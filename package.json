@@ -8,6 +8,7 @@
     "build": "node tools/check-file-budget.mjs && node tools/list-slots.mjs --check && tsc && vite build",
     "preview": "vite preview",
     "serve": "vite preview --port 1420 --strictPort --host",
+    "test": "node --experimental-strip-types --test tests/*.test.ts",
     "test:rental": "node --experimental-strip-types --test tests/rental-clock.test.ts",
     "test:shelf": "node --experimental-strip-types --test tests/shelf-order.test.ts",
     "test:nav": "node --experimental-strip-types --test tests/clerk-nav.test.ts",
