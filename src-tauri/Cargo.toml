@@ -1,0 +1,33 @@
+[package]
+name = "tauri-app"
+version = "0.1.0"
+description = "Halcyon Video — a 3D video store for your media server"
+authors = ["Halcyon Video"]
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+# The `_lib` suffix may seem redundant but it is necessary
+# to make the lib name unique and wouldn't conflict with the bin name.
+# This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
+name = "tauri_app_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-opener = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "rustls-tls"] }
+url = "2"
+
+# Not used by our code: it's here to force a vendored (statically linked) dbus
+# into the Linux bundle. The crate's build script hard-errors with "Unsupported
+# platform." anywhere else, so it must stay target-gated.
+[target.'cfg(target_os = "linux")'.dependencies]
+libdbus-sys = { version = "0.2.7", features = ["vendored"] }
+

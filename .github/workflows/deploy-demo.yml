@@ -1,0 +1,69 @@
+# Deploys the real app shell (index.html) in demo mode to GitHub Pages so the
+# store can be demoed from a URL anywhere (Project Pages URL —
+# https://<owner>.github.io/<repo>/ — which is why the build below passes
+# --base=/<repo>/).
+# VITE_DEMO=1 (see src/demo-mode.ts) stocks the store with the synthetic
+# placeholder library: full UI (power menu, settings, search, walk mode,
+# rentals) with no Jellyfin server/login, credential settings hidden, and
+# playback blocked behind a PLAYBACK DISABLED screen.
+#
+# NOTE: GitHub Pages requires the repo to be PUBLIC (or a paid GitHub plan for
+# private repos). The published site is always public either way.
+name: Deploy demo to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deploy at a time; let an in-flight deploy finish rather than cancelling.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # Puppeteer (a devDependency, not needed for this build) would download
+      # a whole Chromium here otherwise.
+      - run: npm ci
+        env:
+          PUPPETEER_SKIP_DOWNLOAD: "1"
+
+      # Project Pages are served under /<repo>/, so the build needs that base.
+      # VITE_DEMO=1 bakes demo mode into the app shell served at the site root
+      # (harness.html still ships alongside it for visual verification).
+      - run: npm run build -- --base=/${{ github.event.repository.name }}/
+        env:
+          VITE_DEMO: "1"
+
+      - uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,491 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Halcyon Video</title>
+    <script>
+      window.addEventListener('error', (event) => {
+        const isScriptError = event.target && event.target.tagName === 'SCRIPT';
+        const src = isScriptError ? (event.target.src || '') : '';
+        
+        // Auto-reload on main script load failure (handles Vite startup race conditions)
+        if (isScriptError && src.includes('/src/main.ts')) {
+          console.warn("Main script failed to load. Reloading page in 500ms...");
+          setTimeout(() => {
+            window.location.reload();
+          }, 500);
+        }
+      }, true);
+    </script>
+    <link rel="icon" type="image/svg+xml" href="/src/assets/halcyon-logo.svg" />
+    <link rel="stylesheet" href="/src/styles.css" />
+    <script type="module" src="/src/main.ts"></script>
+  </head>
+
+  <body>
+    <!-- The house emblem, defined once and stamped everywhere else via
+         <use href="#bb-ticket-logo"/> (boot overlay, genre menu, login
+         overlay, screensaver disc face). The id is historical and load-
+         bearing for those four use-sites; the art is the Halcyon board. -->
+    <svg style="display:none" aria-hidden="true">
+      <defs>
+        <g id="bb-ticket-logo">
+          <rect class="bb-logo-ticket" x="20" y="60" width="600" height="280" rx="34" fill="#0f4d3a"/>
+          <rect class="bb-logo-border" x="48" y="88" width="544" height="224" rx="22"
+                fill="none" stroke="#c9a227" stroke-width="7"/>
+          <text class="bb-logo-text" x="320" y="212" text-anchor="middle"
+                font-family="'Archivo Black',sans-serif" font-size="92" fill="#f2e8c9"
+                transform="rotate(-4 320 200)">HALCYON</text>
+          <text class="bb-logo-text" x="566" y="286" text-anchor="end"
+                font-family="'Archivo Black',sans-serif" font-size="40" fill="#c9a227">VIDEO</text>
+        </g>
+      </defs>
+    </svg>
+    <div id="app-container">
+      <!-- Three.js 3D Viewport -->
+      <div id="canvas-container"></div>
+
+      <!-- Main UI Container for 1080p scale limiting -->
+      <div id="main-ui-container">
+        <!-- Boot Screen Overlay -->
+        <div id="boot-overlay" class="visible">
+          <div class="boot-card">
+          <!-- House emblem -->
+          <div class="boot-logo-container">
+            <svg class="bb-logo-svg" viewBox="0 0 640 400"><use href="#bb-ticket-logo"/></svg>
+          </div>
+          <!-- Boot Terminal/Console -->
+          <div class="boot-console">
+            <div class="boot-console-header">
+              <span>HTPC Operations Log</span>
+              <span class="pulse-indicator"></span>
+            </div>
+            <div class="boot-console-logs" id="boot-console-logs-container">
+              <div class="log-entry system">[System] Booting Halcyon...</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      </div>
+
+      <!-- (single #canvas-container only — the 3D viewport div at the top of
+           #app-container. A stray empty duplicate here used to sit ON TOP of
+           the canvas and silently eat every pointer event outside pointer
+           lock: no hover, no click, anywhere, in the real app shell.
+           getElementById always mounted the scene into the first one, so
+           rendering looked fine and only interaction died.) -->
+
+      <!-- Bright whiteout used for the exit-door playback transition -->
+      <div id="whiteout-overlay"></div>
+
+      <!-- HUD UI Overlay -->
+      <div id="hud-overlay">
+        <!-- Floating browse locator: current section/aisle name + left/right nav arrows.
+             No background bar — plain text + glyphs floating over the 3D view. -->
+        <div id="browse-locator">
+          <span class="browse-locator-arrow arrow-up hidden" id="browse-locator-arrow-up" aria-hidden="true">&#8593;</span>
+          <span class="browse-locator-arrow arrow-left hidden" id="browse-locator-arrow-left" aria-hidden="true">&#8249;</span>
+          <span class="browse-locator-name" id="browse-locator-name">NEW RELEASES</span>
+          <span class="browse-locator-arrow arrow-right hidden" id="browse-locator-arrow-right" aria-hidden="true">&#8250;</span>
+          <span class="browse-locator-arrow arrow-down hidden" id="browse-locator-arrow-down" aria-hidden="true">&#8595;</span>
+        </div>
+
+        <!-- Floating low-opacity mode hint, single line, no bar -->
+        <div id="browse-hint"></div>
+      </div>
+
+      <!-- Debug Console Overlay -->
+      <div id="dev-console">
+        <div class="console-title">
+          <span>HTPC Operations Log</span>
+          <button id="dev-console-toggle" type="button" title="Minimize log" aria-label="Minimize log">_</button>
+        </div>
+        <div class="console-logs" id="console-logs-container">
+          <div class="log-entry system">[System] Booting Halcyon...</div>
+        </div>
+      </div>
+
+      <!-- Power Menu — fullscreen CRT page in the 1993 POS look
+           (a 1993 rental POS terminal): gold title/footer bars,
+           black body, reverse-video selection. Same action ids as the counter
+           CRT (see counter-terminal.ts) so labels match across both views. -->
+      <div id="power-menu-overlay">
+        <div class="power-card crt-page">
+          <header class="crt-titlebar">
+            <h2 class="power-title">MANAGER TERMINAL — SYSTEM CONTROL</h2>
+            <span class="crt-titlebar-right">HALCYON VIDEO</span>
+          </header>
+          <div class="crt-body">
+            <div class="power-options">
+              <button class="power-btn" id="btn-settings">Store Settings</button>
+              <button class="power-btn" id="btn-flat-mode">Switch to 2D Mode</button>
+              <button class="power-btn" id="btn-suspend">Suspend System (Sleep)</button>
+              <button class="power-btn" id="btn-cec-toggle">Display On/Off (CEC)</button>
+              <button class="power-btn" id="btn-logout">Change Server / Log Out</button>
+              <button class="power-btn" id="btn-exit">Close Halcyon App</button>
+              <button class="power-btn" id="btn-cancel">Return to Store</button>
+            </div>
+            <p class="power-desc crt-status">READY.</p>
+          </div>
+          <footer class="crt-footer">
+            <span class="crt-footer-hint">REMEMBER TO REWIND</span>
+            <span class="crt-footer-page">STORE #55746</span>
+          </footer>
+        </div>
+      </div>
+
+      <!-- Store Settings Drawer (schema-driven; generated from the registry in
+           src/settings.ts by generateSettingsDrawer() in main.ts). Rendered as
+           a fullscreen CRT page: gold title bar, black body of dot-leader
+           rows, gold footer bar carrying the selected row's one-line hint and
+           the page indicator (paging replaces scrolling — see
+           updateSettingsCrtChrome in main.ts). -->
+      <div id="settings-drawer-overlay">
+        <div class="settings-card crt-page">
+          <header class="crt-titlebar">
+            <h2 class="settings-title">STORE SETTINGS</h2>
+            <span class="crt-titlebar-right">HALCYON VIDEO</span>
+          </header>
+          <div class="crt-body">
+            <div id="settings-groups"></div>
+            <p class="settings-desc crt-status" id="settings-status">Changes apply as you make them.</p>
+            <button class="power-btn settings-close-btn" id="btn-settings-close">Apply &amp; Close</button>
+          </div>
+          <footer class="crt-footer">
+            <span class="crt-footer-hint" id="settings-footer-hint"></span>
+            <span class="crt-footer-page" id="settings-footer-page"></span>
+          </footer>
+        </div>
+      </div>
+
+      <!-- Exit Confirmation — small CRT panel (same POS tokens as the drawer) -->
+      <div id="exit-confirm-overlay">
+        <div class="exit-card crt-panel">
+          <h2 class="exit-title crt-panel-title">EXIT APPLICATION?</h2>
+          <p class="exit-desc">CLOSE HALCYON VIDEO AND RETURN TO THE SYSTEM?</p>
+          <div class="exit-options">
+            <button class="exit-btn" id="btn-confirm-exit">YES, EXIT</button>
+            <button class="exit-btn" id="btn-confirm-cancel">NO, RETURN</button>
+          </div>
+          <p class="exit-subdesc crt-panel-footer">OK CONFIRMS &nbsp;&#8226;&nbsp; BACK RETURNS</p>
+        </div>
+      </div>
+
+
+      <!-- Genre Selection Overlay -->
+      <div id="genre-menu-overlay">
+        <div class="genre-card">
+          <div class="genre-ticket-header">
+            <div class="genre-ticket-logo">
+              <svg class="bb-logo-svg" viewBox="0 0 640 400"><use href="#bb-ticket-logo"/></svg>
+            </div>
+            <div class="genre-ticket-sub">GENRE SELECT</div>
+          </div>
+          <div class="genre-library-name" id="genre-library-indicator">MOVIES</div>
+          <div class="genre-list" id="genre-list-container">
+            <!-- Populated dynamically via JS -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Jellyfin Connection / Login Overlay -->
+      <div id="login-overlay">
+        <div class="login-logo-container">
+          <svg class="bb-logo-svg" viewBox="0 0 640 400"><use href="#bb-ticket-logo"/></svg>
+        </div>
+        <div class="login-card">
+          <h2 class="login-title">HTPC Connection Center</h2>
+          <p class="login-subtitle">Configure your media sources and integrations</p>
+          
+          <form id="login-form">
+            <div class="login-columns">
+              <!-- Column 1: Jellyfin -->
+              <div class="login-column">
+                <div class="column-header">
+                  <h3 class="column-title">Jellyfin Server</h3>
+                </div>
+                <p class="column-desc">Primary library provider for cataloging movies and retrieving poster artwork.</p>
+                
+                <div class="input-group">
+                  <label for="login-url">Server Address</label>
+                  <input type="text" id="login-url" placeholder="http://192.168.1.50:8096" value="http://localhost:8096" required />
+                </div>
+                
+                <div class="input-group">
+                  <label for="login-user">Username</label>
+                  <input type="text" id="login-user" placeholder="Enter username" required />
+                </div>
+                
+                <div class="input-group">
+                  <label for="login-pass">Password</label>
+                  <input type="password" id="login-pass" placeholder="Enter password (optional)" />
+                </div>
+              </div>
+
+              <!-- Column 2: Jellyseerr -->
+              <div class="login-column">
+                <div class="column-header">
+                  <h3 class="column-title">Jellyseerr</h3>
+                </div>
+                <p class="column-desc">Connect Jellyseerr to enable a "Coming Soon" requests wall inside the store.</p>
+
+                <div class="input-group">
+                  <label for="login-jellyseerr-url">Jellyseerr Server (optional)</label>
+                  <input type="text" id="login-jellyseerr-url" placeholder="http://192.168.1.50:5055" />
+                </div>
+
+                <div class="input-group">
+                  <label for="login-jellyseerr-key">Jellyseerr API Key (optional)</label>
+                  <input type="password" id="login-jellyseerr-key" placeholder="Enter API key for a Coming Soon wall" />
+                </div>
+              </div>
+
+              <!-- Column 3: Romm (hidden unless Settings > Video Games > Enable
+                   video game section is on -- see showLoginOverlay() in main.ts) -->
+              <div class="login-column" id="login-romm-column">
+                <div class="column-header">
+                  <h3 class="column-title">Romm Games</h3>
+                </div>
+                <p class="column-desc">Connect Romm to display retro video games and ROMs shelves in the store.</p>
+
+                <div class="input-group">
+                  <label for="login-romm-url">Romm Server (optional)</label>
+                  <input type="text" id="login-romm-url" placeholder="http://192.168.1.50:8080" />
+                </div>
+
+                <div class="input-group">
+                  <label for="login-romm-key">Romm Credentials (optional)</label>
+                  <input type="password" id="login-romm-key" placeholder="username:password for a Video Games section" />
+                </div>
+              </div>
+            </div>
+
+            <div class="login-error" id="login-error-msg"></div>
+
+            <div class="login-actions">
+              <button type="submit" class="login-btn primary-btn" id="btn-login-submit">Connect & Sync</button>
+              <button type="button" class="login-btn secondary-btn" id="btn-demo-submit">Try Demo Store (No Server Required)</button>
+            </div>
+          </form>
+          
+          <p class="login-desc">Enter details to catalog movies and retrieve posters.</p>
+        </div>
+      </div>
+
+      <!-- Screensaver Overlay: bouncing 3D rotator — a rental VHS
+           clamshell or, some of the time, a DVD disc. src/screensaver.ts
+           picks the object, steps the rotation (~12fps, deliberately chunky)
+           and drives the bounce. The ticket logo lives once in <defs> at the
+           top of <body> and is stamped onto the disc face via <use>. -->
+      <div id="screensaver-overlay">
+        <div class="screensaver-content">
+          <div class="screensaver-logo mode-vhs" id="screensaver-logo">
+            <div class="ss-rotor" id="ss-rotor">
+              <!-- Faces are bare: screensaver.ts crops the real rental-wrap
+                   scan (video-case.ts) onto front/back/left-spine; the other
+                   faces read as black molded clamshell. -->
+              <div class="ss-vhs">
+                <div class="ss-vhs-face ss-vhs-front"></div>
+                <div class="ss-vhs-face ss-vhs-back"></div>
+                <div class="ss-vhs-face ss-vhs-right"></div>
+                <div class="ss-vhs-face ss-vhs-left"></div>
+                <div class="ss-vhs-face ss-vhs-top"></div>
+                <div class="ss-vhs-face ss-vhs-bottom"></div>
+              </div>
+              <div class="ss-disc">
+                <div class="ss-disc-face ss-disc-label">
+                  <svg class="ss-disc-logo" viewBox="0 0 640 400"><use href="#bb-ticket-logo"/></svg>
+                  <span class="ss-disc-text">DVD VIDEO</span>
+                </div>
+                <div class="ss-disc-face ss-disc-data"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- List Picker Overlay: any short arrow-driven choice — play-time
+           quality versions (4K + 1080p — Movie.versions) and the
+           not-in-stock ORDER / NOT INTERESTED choice (main.ts openListPicker
+           sets the label per use). -->
+      <div id="version-picker-overlay">
+        <div class="episode-card version-card crt-panel">
+          <div class="episode-card-header crt-panel-title">
+            <span class="episode-card-label" id="version-picker-label">CHOOSE A VERSION</span>
+            <h2 class="episode-card-title" id="version-picker-title">MOVIE TITLE</h2>
+          </div>
+          <div class="episode-list" id="version-list-container">
+            <!-- Populated dynamically via JS -->
+          </div>
+          <p class="episode-card-hint crt-panel-footer">ARROWS PICK &nbsp;&#8226;&nbsp; OK CONFIRMS &nbsp;&#8226;&nbsp; BACK CANCELS</p>
+        </div>
+      </div>
+
+      <!-- Search is diegetic now: it lives on the clerk's monitor screen
+           (src/entrance.ts EntranceCheckout, driven via StoreScene.setTerminalText
+           + enterSearchMode()/exitSearchMode()) instead of a DOM overlay. -->
+
+      <!-- Candy Checkout Overlay (T19): "Snacks for tonight?" step shown at
+           rental time when Settings > Delivery > Candy Delivery is on and the
+           candy rack has rows. Never appears when the setting is off. -->
+      <div id="candy-checkout-overlay">
+        <div class="candy-card crt-panel">
+          <div class="crt-panel-title">
+            <span class="episode-card-label">CHECKOUT</span>
+            <h2 class="candy-title">SNACKS FOR TONIGHT?</h2>
+          </div>
+          <p class="candy-desc">Pick some candy from the rack by the register — confirming hands the order to DoorDash so it's here before the movie is.</p>
+          <div class="candy-list" id="candy-list-container">
+            <!-- Populated dynamically via JS -->
+          </div>
+          <div class="candy-zip-row">
+            <label for="candy-zip-input">Delivery ZIP (optional)</label>
+            <input type="text" id="candy-zip-input" placeholder="e.g. 90210" maxlength="10" autocomplete="off" />
+          </div>
+          <p class="candy-status" id="candy-status-msg"></p>
+          <div class="candy-options">
+            <button class="candy-btn" id="btn-candy-order">ORDER VIA DOORDASH</button>
+            <button class="candy-btn" id="btn-candy-skip">NO THANKS, JUST THE MOVIE</button>
+          </div>
+          <p class="episode-card-hint crt-panel-footer">ARROWS PICK &nbsp;&#8226;&nbsp; OK SELECTS &nbsp;&#8226;&nbsp; BACK SKIPS</p>
+        </div>
+      </div>
+
+
+      <!-- In-App Movie Player (streaming-service style) -->
+      <div id="video-player-overlay">
+        <video id="vp-video" playsinline></video>
+
+        <!-- Buffering spinner -->
+        <div id="vp-spinner" class="vp-spinner"></div>
+
+        <!-- Top bar: back + title, own subtle scrim, hides with controls -->
+        <div class="vp-top-bar">
+          <button id="vp-back" class="vp-icon-btn" aria-label="Back to store">
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+          </button>
+          <div class="vp-title-block">
+            <div id="vp-title" class="vp-title">Movie Title</div>
+            <div id="vp-media-status" class="vp-media-status"></div>
+          </div>
+        </div>
+
+        <!-- Bottom control bar -->
+        <div class="vp-control-bar">
+          <div id="vp-progress" class="vp-progress">
+            <div id="vp-progress-buffered" class="vp-progress-buffered"></div>
+            <div id="vp-progress-filled" class="vp-progress-filled">
+              <span class="vp-progress-handle"></span>
+            </div>
+          </div>
+
+          <div class="vp-buttons-row">
+            <div class="vp-buttons-left">
+              <!-- Netflix order (back10 / play / fwd10): must match the
+                   focusableControls() array in video-player.ts or keyboard
+                   focus visibly skips the scrub-back button. -->
+              <button id="vp-back10" class="vp-icon-btn" aria-label="Back 10 seconds">
+                <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M4 12a8 8 0 1 1 2.34 5.66"/>
+                  <path d="M4 6v5h5"/>
+                  <text x="12" y="15" class="vp-seek-label" text-anchor="middle" stroke="none">10</text>
+                </svg>
+              </button>
+              <button id="vp-playpause" class="vp-icon-btn vp-play-btn is-paused" aria-label="Play">
+                <svg class="vp-icon-play" viewBox="0 0 24 24" width="26" height="26" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                <svg class="vp-icon-pause" viewBox="0 0 24 24" width="26" height="26" fill="currentColor"><path d="M7 5h4v14H7zM13 5h4v14h-4z"/></svg>
+              </button>
+              <button id="vp-fwd10" class="vp-icon-btn" aria-label="Forward 10 seconds">
+                <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M20 12a8 8 0 1 0-2.34 5.66"/>
+                  <path d="M20 6v5h-5"/>
+                  <text x="12" y="15" class="vp-seek-label" text-anchor="middle" stroke="none">10</text>
+                </svg>
+              </button>
+
+              <div class="vp-volume">
+                <button id="vp-mute" class="vp-icon-btn" aria-label="Mute">
+                  <svg class="vp-icon-vol-on" viewBox="0 0 24 24" width="21" height="21" fill="currentColor" stroke="none"><path d="M4 9v6h4l5 5V4L8 9H4z"/><path d="M16.3 8.3a5 5 0 0 1 0 7.4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M19 5.8a9 9 0 0 1 0 12.4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                  <svg class="vp-icon-vol-off" viewBox="0 0 24 24" width="21" height="21" fill="currentColor" stroke="none"><path d="M4 9v6h4l5 5V4L8 9H4z"/><path d="M16 9l5.5 5.5M21.5 9L16 14.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                </button>
+                <input id="vp-volume-slider" class="vp-volume-slider" type="range" min="0" max="1" step="0.01" value="1" aria-label="Volume" />
+              </div>
+
+              <div class="vp-time-display">
+                <span id="vp-current">0:00</span><span class="vp-time-sep">/</span><span id="vp-duration">0:00</span>
+              </div>
+            </div>
+
+            <div class="vp-buttons-right">
+              <button id="vp-tracks" class="vp-icon-btn" aria-label="Quality, audio and subtitles" hidden>
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3"/><path d="M1.5 14h5M9.5 8h5M17.5 16h5"/></svg>
+              </button>
+              <button id="vp-subtitles" class="vp-icon-btn" aria-label="Subtitles" hidden>
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M7 14h3M12 14h5M7 10h10"/></svg>
+              </button>
+              <button id="vp-fullscreen" class="vp-icon-btn" aria-label="Fullscreen">
+                <svg class="vp-icon-fs-enter" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3"/></svg>
+                <svg class="vp-icon-fs-exit" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3v3a2 2 0 0 1-2 2H4M15 3v3a2 2 0 0 0 2 2h3M21 15h-3a2 2 0 0 0-2 2v3M3 15h3a2 2 0 0 1 2 2v3"/></svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- Quality / audio / subtitle picker (rows filled by video-player.ts) -->
+          <div id="vp-tracks-menu" class="vp-tracks-menu" hidden></div>
+        </div>
+
+        <!-- Stop-watching confirmation: backing out of non-rental playback
+             returns through the store entrance, so make sure that's what the
+             user meant (a stray Back while hiding the controls shouldn't cost
+             them their place in the store). -->
+        <div id="vp-exit-confirm" hidden>
+          <div class="vp-exit-card">
+            <h2 class="vp-exit-title">STOP WATCHING?</h2>
+            <p class="vp-exit-desc">You&rsquo;ll be dropped off at the front of the store.</p>
+            <div class="vp-exit-options">
+              <button class="exit-btn" id="vp-exit-yes">YES, STOP</button>
+              <button class="exit-btn" id="vp-exit-no">KEEP WATCHING</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- First-Person Walk Mode HUD Overlay -->
+      <div id="walk-hud" class="walk-hud-overlay">
+        <div class="walk-hud-title">Walk Mode Active</div>
+        <div class="walk-hud-body">
+          <div class="walk-hud-row">
+            <span class="walk-hud-key">W</span>
+            <span class="walk-hud-key">A</span>
+            <span class="walk-hud-key">S</span>
+            <span class="walk-hud-key">D</span>
+            <span class="walk-hud-desc">Walk around</span>
+          </div>
+          <div class="walk-hud-row">
+            <span class="walk-hud-key">←</span>
+            <span class="walk-hud-key">↑</span>
+            <span class="walk-hud-key">↓</span>
+            <span class="walk-hud-key">→</span>
+            <span class="walk-hud-desc">Look around</span>
+          </div>
+          <div class="walk-hud-row" style="margin-top: 4px;">
+            <span class="walk-hud-desc" style="margin-left: 0; color: #aaa;">Or click canvas to Lock Mouse</span>
+          </div>
+          <div class="walk-hud-row" style="margin-top: 4px;">
+            <span class="walk-hud-desc" style="margin-left: 0; color: #aaa;">Click a case to pick it up</span>
+          </div>
+          <div class="walk-hud-row" style="margin-top: 8px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 8px;">
+            <span class="walk-hud-key">F</span>
+            <span class="walk-hud-desc">Exit Walk Mode</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Walk-mode aim dot: under pointer lock the OS cursor is captured, so
+           this marks the pick ray's origin (view center). Toggled with the
+           walk HUD (three-scene.ts updateWalkHUD). -->
+      <div id="walk-crosshair"></div>
+    </div>
+  </body>
+</html>

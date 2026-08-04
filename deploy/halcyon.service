@@ -1,0 +1,58 @@
+# Halcyon Video store — systemd *user* service (issue #16).
+#
+# Runs the 3D Jellyfin storefront 24/7 on the HTPC and auto-restarts it on
+# crash, OOM, or `kill -9`. This is a **user** unit (systemctl --user), so it
+# starts inside the graphical login session where WAYLAND_DISPLAY / DISPLAY are
+# available. See deploy/README.md for install + linger setup.
+#
+# By default it launches ./launch.sh (Vite dev server + Brave in --app kiosk),
+# which is the project's documented runtime. To run the compiled Tauri binary
+# instead, see the commented ExecStart below and `npm run tauri build`.
+
+[Unit]
+Description=Halcyon Video store (Jellyfin 3D frontend)
+Documentation=https://github.com/halcyon-video/halcyon-video
+# Only meaningful once a graphical session exists (needs the Wayland/X11 socket).
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+
+# --- Runtime ------------------------------------------------------------------
+# %h expands to the user's home. Adjust WorkingDirectory to wherever the repo is
+# checked out on the target box (install.sh substitutes this automatically).
+WorkingDirectory=%h/media-server-video-store
+ExecStart=/usr/bin/env bash %h/media-server-video-store/launch.sh
+
+# Alternative: the compiled Tauri binary (after `npm run tauri build`). Comment
+# out the two lines above and uncomment this one, pointing at the built binary:
+# ExecStart=%h/media-server-video-store/src-tauri/target/release/halcyon-video
+
+# --- Auto-restart watchdog ----------------------------------------------------
+Restart=always
+RestartSec=5
+# Give a wedged/looping restart cycle a breather instead of hammering forever.
+StartLimitIntervalSec=120
+StartLimitBurst=10
+
+# --- Memory self-heal ---------------------------------------------------------
+# A slow leak over many days self-heals: the cgroup is killed at 4G and the
+# Restart=always policy brings the store straight back with cached credentials.
+# 4G is generous for a Chromium/WebGL frontend; lower it if the box is tight.
+MemoryMax=4G
+MemoryHigh=3G
+# Reap the whole process tree (launch.sh spawns Vite + Brave children).
+KillMode=control-group
+TimeoutStopSec=15
+
+# --- Session environment ------------------------------------------------------
+# The user session usually imports these into the --user manager already (see
+# `systemctl --user import-environment` in install.sh). Uncomment + set if your
+# compositor does not, or if the wrong socket gets picked up.
+# Environment=WAYLAND_DISPLAY=wayland-0
+# Environment=DISPLAY=:0
+# Environment=XDG_RUNTIME_DIR=%t
+
+[Install]
+WantedBy=graphical-session.target

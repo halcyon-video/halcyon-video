@@ -1,0 +1,35 @@
+{
+  "name": "halcyon-video",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "node tools/check-file-budget.mjs && node tools/list-slots.mjs --check && tsc && vite build",
+    "preview": "vite preview",
+    "serve": "vite preview --port 1420 --strictPort --host",
+    "test:rental": "node --experimental-strip-types --test tests/rental-clock.test.ts",
+    "test:shelf": "node --experimental-strip-types --test tests/shelf-order.test.ts",
+    "test:nav": "node --experimental-strip-types --test tests/clerk-nav.test.ts",
+    "test:versions": "node --experimental-strip-types --test tests/version-collapse.test.ts",
+    "test:why": "node --experimental-strip-types --test tests/recommend-why.test.ts",
+    "test:picks": "node --experimental-strip-types --test tests/staff-picks.test.ts",
+    "test:promo": "node --experimental-strip-types --test tests/promo-campaigns.test.ts",
+    "test:comingsoon": "node --experimental-strip-types --test tests/coming-soon-feed.test.ts",
+    "tauri": "tauri"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2",
+    "@tauri-apps/plugin-opener": "^2",
+    "hls.js": "^1.6.16",
+    "n8ao": "^2.0.0",
+    "three": "^0.184.0"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2",
+    "@types/three": "^0.184.1",
+    "puppeteer": "^25.2.0",
+    "typescript": "~5.6.2",
+    "vite": "^6.0.3"
+  }
+}

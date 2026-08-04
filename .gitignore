@@ -1,0 +1,45 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Generated harness screenshots / scratch artifacts
+scratch/
+
+# Feedback pins (F8 in-app hotkey) -- user-filed visual bug reports with
+# screenshots; see feedback/ in the dev server and CLAUDE.md.
+feedback/
+
+# Root-level screenshots (verification-run leftovers). Root only: pngs under
+# public/, docs/screenshots/, src/assets/ etc. stay trackable.
+/*.png
+
+# User-customization assets: scans/recreations of REAL branded products
+# (trademarked art) matched from online references. Never committed — the
+# repo ships generic procedural fallbacks; see public/user-assets/README.md.
+public/user-assets/*
+!public/user-assets/README.md
+
+# Remote Play: kiosk-donated Jellyfin credentials for private instances
+.remote-play-seed.json
+.mcp.json

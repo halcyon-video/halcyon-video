@@ -1,0 +1,2807 @@
+@import url('https://fonts.googleapis.com/css2?family=Archivo+Black&family=Bebas+Neue&family=Outfit:wght@300;400;500;700&family=Share+Tech+Mono&display=swap');
+
+:root {
+  --font-title: 'Bebas Neue', sans-serif;
+  --font-logo: 'Archivo Black', sans-serif;
+  --font-body: 'Outfit', sans-serif;
+  --font-mono: 'Share Tech Mono', monospace;
+  --font-display: 'Archivo Black', sans-serif;
+
+  /* Chrome palette (DOM overlays; the 3D store reads themes.ts) */
+  --bb-navy: #000a1c;
+  --bb-blue: #001f4d;
+  --bb-electric: #004cff;
+  --bb-yellow: #ffcc00;
+
+  /* 1993 POS CRT tokens (a period rental terminal): GOLD on
+     black, solid gold reverse-video title/footer bars with dark ink inside.
+     Canvas-drawn CRT twins live in src/crt-theme.ts — keep the two in sync. */
+  --crt-gold: #ffcc00;
+  --crt-text: #ffd24a;
+  --crt-dim: #a58414;
+  --crt-black: #0a0700;
+  --crt-ink: #000a1c;
+
+  --bg-dark: #000714;
+  --panel-bg: rgba(0, 10, 26, 0.88);
+  --panel-border: rgba(255, 204, 0, 0.35);
+  --panel-border-cyan: rgba(0, 76, 255, 0.35);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  /* Hide mouse cursor for dedicated console experience */
+  cursor: none !important;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+html, body {
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background-color: var(--bg-dark);
+  font-family: var(--font-body);
+  color: #e2e8f0;
+}
+
+#app-container {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+}
+
+#canvas-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+}
+
+/* CRT Scanlines Overlay commented out
+.crt-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 10;
+  pointer-events: none;
+  background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+  background-size: 100% 4px, 3px 100%;
+  opacity: 0.85;
+}
+*/
+
+.crt-vignette {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 11;
+  pointer-events: none;
+  box-shadow: inset 0 0 100px rgba(0, 0, 0, 0.8);
+}
+
+/* HUD Overlay Styling */
+#hud-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 5;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 40px;
+}
+
+/* ─── Floating Browse Locator ───────────────────────────────────────────────
+   Current section/aisle name + left/right nav arrows, floating over the 3D
+   view with no background bar. Used across library-select / browse / inspect
+   / person-endcap / walk-around; fades (never display:none-pops) whenever a
+   menu, overlay, or video playback takes over. */
+#browse-locator {
+  position: absolute;
+  top: 34px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-8px);
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  z-index: 6;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.45s ease, transform 0.45s ease;
+}
+
+#browse-locator.visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* The container hides via opacity: 0 (never display: none), which does NOT
+   stop child animations on its own — kill the arrows' infinite pulses while
+   not visible so they don't keep ticking the compositor between browse
+   sessions (mirrors the per-arrow .hidden rule below). */
+#browse-locator:not(.visible) .browse-locator-arrow {
+  animation: none;
+}
+
+.browse-locator-name {
+  font-family: var(--font-title);
+  font-weight: 700;
+  font-size: 1.35rem;
+  letter-spacing: 3px;
+  color: #fff;
+  text-transform: uppercase;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.9), 0 0 18px rgba(0, 0, 0, 0.6);
+  white-space: nowrap;
+}
+
+.browse-locator-arrow {
+  font-size: 1.9rem;
+  line-height: 1;
+  color: #fff;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.9);
+  opacity: 0.6;
+  pointer-events: auto;
+  cursor: pointer;
+  transition: opacity 0.3s ease;
+}
+
+.browse-locator-arrow.arrow-left {
+  animation: locatorPulseLeft 1.8s ease-in-out infinite;
+}
+
+.browse-locator-arrow.arrow-right {
+  animation: locatorPulseRight 1.8s ease-in-out infinite;
+}
+
+/* Up/down arrows sit vertically above/below the section name, centred on the
+   locator. Absolutely positioned so they don't widen the horizontal flex row. */
+.browse-locator-arrow.arrow-up,
+.browse-locator-arrow.arrow-down {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.browse-locator-arrow.arrow-up {
+  top: -30px;
+  animation: locatorPulseUp 1.8s ease-in-out infinite;
+}
+
+.browse-locator-arrow.arrow-down {
+  bottom: -30px;
+  animation: locatorPulseDown 1.8s ease-in-out infinite;
+}
+
+@keyframes locatorPulseUp {
+  0%, 100% { opacity: 0.5; transform: translateX(-50%) translateY(0); }
+  50% { opacity: 1; transform: translateX(-50%) translateY(-4px); }
+}
+
+@keyframes locatorPulseDown {
+  0%, 100% { opacity: 0.5; transform: translateX(-50%) translateY(0); }
+  50% { opacity: 1; transform: translateX(-50%) translateY(4px); }
+}
+
+.browse-locator-arrow.hidden {
+  opacity: 0;
+  pointer-events: none;
+  animation: none;
+}
+
+.browse-locator-arrow.flash {
+  animation: locatorArrowFlash 0.35s ease;
+}
+
+@keyframes locatorPulseLeft {
+  0%, 100% { opacity: 0.5; transform: translateX(0); }
+  50% { opacity: 1; transform: translateX(-4px); }
+}
+
+@keyframes locatorPulseRight {
+  0%, 100% { opacity: 0.5; transform: translateX(0); }
+  50% { opacity: 1; transform: translateX(4px); }
+}
+
+@keyframes locatorArrowFlash {
+  0% { transform: scale(1); color: #fff; }
+  40% { transform: scale(1.55); color: var(--bb-yellow); }
+  100% { transform: scale(1); color: #fff; }
+}
+
+/* Floating low-opacity mode hint — single line, no bar, bottom-center */
+#browse-hint {
+  position: absolute;
+  bottom: 28px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 90%;
+  font-family: var(--font-title);
+  /* 10-ft type floor (review §4.4): nothing user-facing under 22px @1080p. */
+  font-size: 22px;
+  font-weight: 500;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.6);
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.85);
+  white-space: nowrap;
+  z-index: 6;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.45s ease;
+}
+
+#browse-hint.visible {
+  opacity: 1;
+}
+
+/* Dev Console Log Overlay */
+#dev-console {
+  position: absolute;
+  top: 110px;
+  right: 40px;
+  width: 320px;
+  max-height: 240px;
+  background: rgba(2, 2, 4, 0.85);
+  border: 1px solid var(--panel-border-cyan);
+  border-radius: 8px;
+  padding: 12px;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: #a7f3d0;
+  display: none;
+  flex-direction: column;
+  gap: 8px;
+  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.6);
+  z-index: 12;
+  pointer-events: auto;
+}
+
+.console-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid rgba(0, 240, 255, 0.2);
+  padding-bottom: 5px;
+  font-weight: bold;
+  color: var(--bb-electric);
+  text-transform: uppercase;
+}
+
+#dev-console-toggle {
+  background: transparent;
+  border: 1px solid rgba(0, 240, 255, 0.3);
+  border-radius: 4px;
+  color: var(--bb-electric);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: bold;
+  line-height: 1;
+  width: 20px;
+  height: 18px;
+  cursor: pointer;
+  padding: 0;
+  pointer-events: auto;
+}
+
+#dev-console-toggle:hover {
+  background: rgba(0, 240, 255, 0.15);
+}
+
+/* Collapsed state: hide the log body and the title's bottom rule, shrink to a
+   compact header chip the user can click to restore. */
+#dev-console.minimized {
+  max-height: none;
+}
+
+#dev-console.minimized .console-logs {
+  display: none;
+}
+
+#dev-console.minimized .console-title {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.console-logs {
+  flex-grow: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.console-logs::-webkit-scrollbar {
+  width: 4px;
+}
+.console-logs::-webkit-scrollbar-thumb {
+  background: rgba(0, 240, 255, 0.3);
+}
+
+.log-entry {
+  line-height: 1.3;
+  word-break: break-all;
+}
+
+.log-entry.system { color: #38bdf8; }
+.log-entry.cec { color: #facc15; }
+.log-entry.video { color: #c084fc; }
+
+/* Exit Confirmation — small CRT panel (tokens shared via .crt-panel) */
+#exit-confirm-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 25;
+  background: rgba(0, 0, 0, 0.62);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  opacity: 0;
+  pointer-events: none;
+  /* visibility gates the curved-glass layers to literally zero cost when
+     the menu is shut (reference doc: effects must cost nothing closed). */
+  visibility: hidden;
+  transition: opacity 0.3s ease, visibility 0s linear 0.3s;
+}
+
+#exit-confirm-overlay.visible {
+  opacity: 1;
+  pointer-events: auto;
+  visibility: visible;
+  transition: opacity 0.3s ease;
+}
+
+.exit-card {
+  width: 620px;
+  max-width: 92vw;
+  text-align: center;
+}
+
+.exit-title {
+  font-family: var(--font-mono);
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.exit-desc {
+  font-size: 22px;
+  color: var(--crt-text);
+  letter-spacing: 0.02em;
+}
+
+.exit-options {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  gap: 20px;
+}
+
+.exit-btn {
+  flex: 1;
+  background: transparent;
+  border: 1px solid rgba(255, 204, 0, 0.5);
+  border-radius: 0;
+  padding: 12px 22px;
+  color: var(--crt-text);
+  font-family: var(--font-mono);
+  font-size: 24px;
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  pointer-events: auto;
+}
+
+.exit-btn.selected {
+  background: var(--crt-gold);
+  border-color: var(--crt-gold);
+  color: var(--crt-ink);
+  text-shadow: none;
+}
+
+/* Walk-mode aim dot (click-to-pick-up): marks the pick ray's origin while
+   the pointer is captured. Deliberately faint — it's an aid, not a game HUD. */
+#walk-crosshair {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  width: 6px;
+  height: 6px;
+  margin: -3px 0 0 -3px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.55);
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+  z-index: 15;
+  display: none;
+}
+
+#walk-crosshair.visible {
+  display: block;
+}
+
+/* In-player stop-watching confirmation (video-player.ts requestClose).
+   Lives INSIDE #video-player-overlay so it inherits the player's stacking
+   context; reuses the exit overlay's .exit-btn look. */
+#vp-exit-confirm {
+  position: absolute;
+  inset: 0;
+  z-index: 40; /* above the vp control bars and tracks menu */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: rgba(2, 2, 4, 0.55);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+#vp-exit-confirm[hidden] {
+  display: none;
+}
+
+.vp-exit-card {
+  width: 460px;
+  max-width: calc(100vw - 60px);
+  background: var(--panel-bg);
+  border: 2px solid var(--bb-yellow);
+  border-radius: 16px;
+  padding: 32px 36px;
+  text-align: center;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.vp-exit-title {
+  font-family: var(--font-title);
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: 3px;
+}
+
+.vp-exit-desc {
+  font-size: 1rem;
+  color: #e2e8f0;
+}
+
+.vp-exit-options {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  gap: 16px;
+}
+
+/* ─── 1993 POS CRT components ────────────────────────────────────────────────
+   Reference: a 1993 rental POS terminal. The DOS-era POS
+   sandwich: solid gold reverse-video TITLE BAR, black body of sparse gold
+   rows, solid gold reverse-video FOOTER BAR. No chrome, no blur, no
+   translucency, no scrollbars (pages instead), no idle animation — the
+   scanline/vignette overlay is a single static gradient. One focus rule
+   everywhere: reverse video (gold fill, dark ink) + a '>' cursor. */
+
+/* Fullscreen CRT page (settings drawer, power menu): an image glowing behind
+   curved tube glass, sitting in a sliver of dark bezel. */
+.crt-page {
+  position: relative;
+  width: calc(100vw - 40px);
+  height: calc(100vh - 40px);
+  display: flex;
+  flex-direction: column;
+  background: var(--crt-black);
+  font-family: var(--font-mono);
+  overflow: hidden;
+  border-radius: 34px;
+  /* Faint putty bezel ring + throw-shadow into the surrounding black. */
+  box-shadow:
+    0 0 0 2px rgba(126, 115, 100, 0.22),
+    0 0 70px rgba(0, 0, 0, 0.85);
+}
+
+/* ── Curved-glass illusion — ONE shared layer for every DOM CRT surface ──
+   (a 1993 rental POS terminal, curved glass). The tube reads
+   through static cues only: rounded corners, corner vignette, a curved
+   specular sheen arcing across the upper glass (the room reflecting off the
+   tube), faint scanlines, phosphor bloom on the text. Two pseudo-elements,
+   zero animation, zero cost while the surface is closed (its overlay is
+   display:none / visibility:hidden). Real barrel distortion is deliberately
+   skipped on DOM: readability wins (reference doc). */
+.crt-page::after,
+.crt-panel::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 3;
+  border-radius: inherit;
+  background:
+    repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.15) 0px, rgba(0, 0, 0, 0.15) 2px, transparent 2px, transparent 4px);
+}
+
+.crt-page::before,
+.crt-panel::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 4;
+  border-radius: inherit;
+  background:
+    /* the store reflecting off the tube: two soft window panes, upper left
+       (the defined shape is what makes the glass READ — see the reference
+       photo's tube) */
+    radial-gradient(ellipse 30% 52% at 19% 4%, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.05) 52%, rgba(255, 255, 255, 0) 74%),
+    radial-gradient(ellipse 17% 34% at 40% 0%, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0) 70%),
+    /* broad soft wash over the upper glass... */
+    radial-gradient(ellipse 150% 118% at 34% -78%, rgba(255, 255, 255, 0.12) 52%, rgba(255, 255, 255, 0.06) 61%, rgba(255, 255, 255, 0) 69%),
+    /* ...with a thin brighter rim along its curved lower edge — the arc that
+       sells the tube bulge without smearing the black field */
+    radial-gradient(ellipse 150% 118% at 34% -78%, rgba(255, 255, 255, 0) 62%, rgba(255, 255, 255, 0.07) 65%, rgba(255, 255, 255, 0) 68.5%),
+    /* faint counter-sheen rising from the lower-right of the tube */
+    radial-gradient(ellipse 130% 95% at 88% 130%, rgba(255, 255, 255, 0.055) 50%, rgba(255, 255, 255, 0) 68%),
+    /* tube corners fall off dark */
+    radial-gradient(ellipse 142% 118% at 50% 50%, rgba(0, 0, 0, 0) 55%, rgba(0, 0, 0, 0.62) 100%);
+  box-shadow: inset 0 0 110px rgba(0, 0, 0, 0.45);
+}
+
+.crt-titlebar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 28px;
+  background: var(--crt-gold);
+  color: var(--crt-ink);
+  padding: 15px 56px;
+}
+
+.crt-titlebar h2 {
+  font-family: inherit;
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.crt-titlebar-right {
+  flex: 0 0 auto;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  opacity: 0.8;
+}
+
+.crt-body {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  width: min(1060px, 94vw);
+  margin: 0 auto;
+  padding: 30px 0 16px;
+  color: var(--crt-text);
+  /* Phosphor bloom — static text-shadow, costs nothing after paint. */
+  text-shadow: 0 0 8px rgba(255, 204, 0, 0.3);
+}
+
+.crt-footer {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 32px;
+  background: var(--crt-gold);
+  color: var(--crt-ink);
+  font-size: 23px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 13px 56px;
+}
+
+.crt-footer-hint {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.crt-footer-page {
+  flex: 0 0 auto;
+}
+
+/* Dim status line ("READY." / pending-change notice) above the footer bar. */
+.crt-status {
+  font-family: var(--font-mono);
+  font-size: 22px;
+  color: var(--crt-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  text-align: left;
+  text-shadow: none;
+  margin-top: auto;
+  padding: 14px 14px 4px;
+}
+
+/* Paged-out drawer rows (see updateSettingsCrtChrome in main.ts). */
+.crt-page-hidden {
+  display: none !important;
+}
+
+/* Small CRT panel (exit confirm, pickers, candy checkout): same tokens,
+   same bars, framed as a little tube floating over the dimmed store —
+   the shared curved-glass pseudo-layers above apply here too. */
+.crt-panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  background: var(--crt-black);
+  border: 2px solid rgba(126, 115, 100, 0.4);
+  border-radius: 18px;
+  padding: 0 0 20px;
+  overflow: hidden;
+  box-shadow: 0 16px 60px rgba(0, 0, 0, 0.8);
+  font-family: var(--font-mono);
+  color: var(--crt-text);
+  text-shadow: 0 0 8px rgba(255, 204, 0, 0.3);
+}
+
+/* Side gutters for panel content; the gold bars themselves run full-bleed. */
+.crt-panel > :not(.crt-panel-title):not(.crt-panel-footer) {
+  margin-left: 28px;
+  margin-right: 28px;
+}
+
+.crt-panel-title {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: var(--crt-gold);
+  color: var(--crt-ink);
+  text-shadow: none;
+  padding: 12px 28px 14px;
+  text-align: left;
+}
+
+.crt-panel-footer {
+  background: var(--crt-gold);
+  color: var(--crt-ink);
+  text-shadow: none;
+  font-family: var(--font-mono);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 10px 28px;
+  margin-top: auto;
+  margin-bottom: -20px; /* cancel the panel's bottom padding: bar sits flush */
+}
+
+/* ─── Power Menu (fullscreen CRT page) ─────────────────────────────────── */
+#power-menu-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 20;
+  background: #000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  opacity: 0;
+  pointer-events: none;
+  /* visibility gates the curved-glass layers to literally zero cost when
+     the menu is shut (reference doc: effects must cost nothing closed). */
+  visibility: hidden;
+  transition: opacity 0.3s ease, visibility 0s linear 0.3s;
+}
+
+#power-menu-overlay.visible {
+  opacity: 1;
+  pointer-events: auto;
+  visibility: visible;
+  transition: opacity 0.3s ease;
+}
+
+.power-options {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.power-btn {
+  display: flex;
+  align-items: center;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 9px 14px;
+  color: var(--crt-text);
+  font-family: var(--font-mono);
+  font-size: 26px;
+  text-align: left;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  pointer-events: auto;
+}
+
+/* The '>' cursor column: reserved on every row so labels never shift. */
+.power-btn::before {
+  content: '\00a0';
+  flex: 0 0 auto;
+  width: 1.4ch;
+}
+
+.power-btn.selected {
+  background: var(--crt-gold);
+  color: var(--crt-ink);
+  text-shadow: none;
+}
+
+.power-btn.selected::before {
+  content: '>';
+}
+
+.power-desc {
+  text-align: left;
+}
+
+/* ─── Store Settings Drawer (fullscreen CRT page) ────────────────────────
+   Schema-driven, generated from src/settings.ts. Rows are single-line
+   dot-leader pairs (LABEL·····VALUE) like a rental receipt; the row hints
+   moved into the gold footer bar (one line, selected row only). */
+#settings-drawer-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1200;
+  opacity: 0;
+  pointer-events: none;
+  /* visibility gates the curved-glass layers to literally zero cost when
+     the menu is shut (reference doc: effects must cost nothing closed). */
+  visibility: hidden;
+  transition: opacity 0.3s ease, visibility 0s linear 0.3s;
+}
+
+#settings-drawer-overlay.visible {
+  opacity: 1;
+  pointer-events: auto;
+  visibility: visible;
+  transition: opacity 0.3s ease;
+}
+
+#settings-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow: hidden;
+}
+
+.settings-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.settings-group-title {
+  font-family: var(--font-mono);
+  font-size: 22px;
+  color: var(--crt-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  text-align: left;
+  margin: 14px 0 2px;
+  padding: 0 14px 0 calc(14px + 1.4ch);
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 7px 14px;
+  color: var(--crt-text);
+  font-family: var(--font-mono);
+  font-size: 26px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  pointer-events: auto;
+  text-align: left;
+  width: 100%;
+}
+
+/* Reserved '>' cursor column — same rule as .power-btn. */
+.settings-row::before {
+  content: '\00a0';
+  flex: 0 0 auto;
+  width: 1.4ch;
+  align-self: center;
+}
+
+.settings-row.selected {
+  background: var(--crt-gold);
+  color: var(--crt-ink);
+  text-shadow: none;
+}
+
+.settings-row.selected::before {
+  content: '>';
+}
+
+.settings-row-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 0 1 auto;
+}
+
+.settings-row-label {
+  font-size: inherit;
+  font-weight: 400;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Row hints live in the footer bar now (one line, selected row only) —
+   never inside the rows themselves. */
+.settings-row-hint {
+  display: none;
+}
+
+/* Dot leader between label and value — the rental-receipt line. */
+.settings-row-leader {
+  flex: 1 1 0;
+  min-width: 18px;
+  margin: 0 12px;
+  overflow: hidden;
+  white-space: nowrap;
+  font-size: 22px;
+  opacity: 0.4;
+  align-self: center;
+}
+
+.settings-row-leader::before {
+  content: '··················································································································';
+  letter-spacing: 3px;
+}
+
+.settings-row-value {
+  flex: 0 0 auto;
+  font-size: inherit;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  color: var(--crt-gold);
+  white-space: nowrap;
+}
+
+.settings-row.selected .settings-row-value {
+  color: var(--crt-ink);
+  text-shadow: none;
+}
+
+/* Text/secret rows (Connection group): an inline input, committed on
+   change/blur — see makeTextRow in main.ts. CRT form field: gold on black,
+   square corners, gold caret (block-cursor feel). */
+.settings-text-row {
+  cursor: text;
+}
+
+.settings-row-input {
+  flex: 0 1 46%;
+  min-width: 130px;
+  background: #000;
+  border: 1px solid rgba(255, 204, 0, 0.45);
+  border-radius: 0;
+  padding: 5px 10px;
+  color: var(--crt-text);
+  font-family: var(--font-mono);
+  font-size: 22px;
+  text-align: right;
+  text-transform: none;
+  caret-color: var(--crt-gold);
+  cursor: text !important;
+}
+
+.settings-row-input:focus {
+  outline: none;
+  border-color: var(--crt-gold);
+  background: #000;
+}
+
+/* On a selected (gold) row the field stays a black cut-out — reverse-reverse
+   video, exactly how a highlighted form line looked on the real POS. */
+.settings-row.selected .settings-row-input {
+  color: var(--crt-text);
+  border-color: rgba(0, 10, 28, 0.65);
+  background: var(--crt-black);
+  text-shadow: none;
+}
+
+/* Store Brand page (custom LogoSpec editor rows — see buildStoreBrandPanel in
+   src/settings.ts). Rows reuse .settings-row / -label / -hint / -input so the
+   page reads as one menu; only the embedded controls get styling here. */
+.settings-brand-preview {
+  padding: 10px 14px;
+  cursor: default;
+}
+
+.brand-preview-canvas {
+  display: block;
+  width: min(100%, 780px);
+  margin: 0 auto;
+  height: auto;
+  border-radius: 0;
+  border: 1px solid rgba(255, 204, 0, 0.3);
+}
+
+.brand-preset-row {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  padding-left: calc(14px + 1.4ch);
+}
+
+/* Column-layout rows (preview, preset strip) skip the '>' cursor column —
+   reverse video alone marks their selection. */
+.brand-preset-row::before,
+.settings-brand-preview::before {
+  display: none;
+}
+
+.brand-preset-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.brand-preset-btn {
+  flex: 1 1 auto;
+  background: transparent;
+  border: 1px solid rgba(255, 204, 0, 0.5);
+  border-radius: 0;
+  padding: 4px 10px;
+  color: var(--crt-text);
+  font-family: var(--font-mono);
+  font-size: 22px;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.brand-preset-btn:hover {
+  border-color: var(--crt-gold);
+}
+
+.brand-preset-btn.active {
+  background: var(--crt-gold);
+  border-color: var(--crt-gold);
+  color: var(--crt-ink);
+  text-shadow: none;
+  box-shadow: none;
+}
+
+.settings-row.selected .brand-preset-btn {
+  color: var(--crt-ink);
+  border-color: rgba(0, 10, 28, 0.55);
+  text-shadow: none;
+}
+
+.settings-row.selected .brand-preset-btn.active {
+  background: var(--crt-ink);
+  color: var(--crt-gold);
+}
+
+.settings-row-select {
+  flex: 0 1 46%;
+  min-width: 130px;
+  background: #000;
+  border: 1px solid rgba(255, 204, 0, 0.45);
+  border-radius: 0;
+  padding: 5px 10px;
+  color: var(--crt-text);
+  font-family: var(--font-mono);
+  font-size: 22px;
+  cursor: pointer;
+}
+
+.settings-row-select:focus {
+  outline: none;
+  border-color: var(--crt-gold);
+}
+
+.settings-row-select option {
+  background: #000;
+  color: var(--crt-text);
+}
+
+.settings-row.selected .settings-row-select {
+  color: var(--crt-text);
+  border-color: rgba(0, 10, 28, 0.65);
+  background: var(--crt-black);
+  text-shadow: none;
+}
+
+.brand-color-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 0 auto;
+}
+
+.brand-color-hex {
+  font-family: var(--font-mono);
+  font-size: 22px;
+  color: var(--crt-text);
+}
+
+.settings-row.selected .brand-color-hex {
+  color: var(--crt-ink);
+  text-shadow: none;
+}
+
+.brand-color-wrap input[type='color'] {
+  width: 44px;
+  height: 30px;
+  padding: 2px;
+  background: #000;
+  border: 1px solid rgba(255, 204, 0, 0.45);
+  border-radius: 0;
+  cursor: pointer;
+}
+
+.brand-range-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 1 52%;
+  min-width: 150px;
+}
+
+.brand-range-wrap input[type='range'] {
+  flex: 1;
+  min-width: 70px;
+  accent-color: var(--crt-gold);
+  cursor: pointer;
+}
+
+.settings-row.selected .brand-range-wrap input[type='range'] {
+  accent-color: var(--crt-ink);
+}
+
+.brand-range-value {
+  flex: 0 0 auto;
+  min-width: 56px;
+  text-align: right;
+  font-size: 22px;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  color: var(--crt-text);
+  white-space: nowrap;
+}
+
+.settings-row.selected .brand-range-value {
+  color: var(--crt-ink);
+  text-shadow: none;
+}
+
+/* W3 option thumbnails: a pre-grabbed snapshot of the row's CURRENT value
+   (public/setting-thumbs/<key>--<value>.png, built by
+   tools/gen_setting_thumbs.mjs). Sits between the label block and the value;
+   swapped in place as the value cycles. A missing PNG hides itself (the img's
+   error handler adds .thumb-missing), leaving the row exactly as before. */
+.settings-row-thumb {
+  flex: 0 0 auto;
+  width: 96px;
+  height: 54px;
+  object-fit: cover;
+  border-radius: 0;
+  border: 1px solid rgba(255, 204, 0, 0.35);
+  background: #000;
+  pointer-events: none;
+  margin-right: 12px;
+}
+
+.settings-row.selected .settings-row-thumb {
+  border-color: rgba(0, 10, 28, 0.65);
+}
+
+.settings-row-thumb.thumb-missing {
+  display: none;
+}
+
+/* W3 Custom Wrap block (Store Brand page): per-medium drop-in wrap uploads. */
+.brand-wrap-title {
+  margin-top: 8px;
+}
+
+.brand-wrap-spec {
+  font-size: 22px;
+  letter-spacing: 0.02em;
+  color: var(--crt-dim);
+  text-align: left;
+  text-transform: none;
+  margin: -2px 0 2px;
+  padding-left: calc(14px + 1.4ch);
+}
+
+.brand-wrap-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.brand-wrap-status {
+  font-size: 22px;
+}
+
+.brand-wrap-file {
+  display: none;
+}
+
+/* The drawer's fixed APPLY & CLOSE row (a .power-btn, so it shares the CRT
+   row + reverse-video selection rule). */
+.settings-close-btn {
+  width: 100%;
+  margin-top: 8px;
+}
+
+/* Screensaver Overlay */
+#screensaver-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 30;
+  background: #000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 1.5s ease-in-out;
+}
+
+#screensaver-overlay.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.screensaver-content {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.screensaver-logo {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  pointer-events: none;
+  perspective: 900px;
+  filter: drop-shadow(0 0 15px rgba(0, 240, 255, 0.6));
+  transition: filter 0.2s ease;
+}
+
+/* Container sized per object so the bounce walls hug it; must cover the
+   largest rotated extent (box diagonal / tilted disc), since the 3D children
+   overflow the layout box as they spin. */
+.screensaver-logo.mode-vhs { width: 150px; height: 230px; }
+.screensaver-logo.mode-disc { width: 195px; height: 200px; }
+.screensaver-logo.mode-vhs .ss-disc { display: none; }
+.screensaver-logo.mode-disc .ss-vhs { display: none; }
+
+.ss-defs {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+
+.ss-rotor {
+  transform-style: preserve-3d;
+}
+
+/* ── VHS rental box: the store's own printed wrap, cropped per face
+   by screensaver.ts (front / back / left spine). --vhsW/--vhsD are set from
+   the printed panel proportions at runtime; the fallbacks below match the
+   1988 Standard Version scan. Unprinted faces are black molded clamshell. ── */
+.ss-vhs {
+  --vhsW: 114px;
+  --vhsD: 30px;
+  position: relative;
+  width: var(--vhsW);
+  height: 200px;
+  transform-style: preserve-3d;
+}
+
+.ss-vhs-face {
+  position: absolute;
+  top: 0;
+  left: 0;
+  background-color: #17191d;
+  background-size: 100% 100%;
+}
+
+.ss-vhs-front,
+.ss-vhs-back {
+  width: var(--vhsW);
+  height: 200px;
+  border-radius: 2px;
+  background-color: #ece5d8;
+  /* Molded clamshell lip peeking around the glued-on wrap */
+  box-shadow: inset 0 0 0 1px rgba(10, 10, 12, 0.45);
+}
+
+.ss-vhs-front { transform: translateZ(calc(var(--vhsD) / 2)); }
+.ss-vhs-back { transform: rotateY(180deg) translateZ(calc(var(--vhsD) / 2)); }
+
+.ss-vhs-left,
+.ss-vhs-right {
+  width: var(--vhsD);
+  height: 200px;
+  left: calc((var(--vhsW) - var(--vhsD)) / 2);
+  background-image: linear-gradient(180deg, #1b1d22 0%, #121417 100%);
+}
+
+.ss-vhs-left { transform: rotateY(-90deg) translateZ(calc(var(--vhsW) / 2)); }
+.ss-vhs-right { transform: rotateY(90deg) translateZ(calc(var(--vhsW) / 2)); }
+
+.ss-vhs-top,
+.ss-vhs-bottom {
+  width: var(--vhsW);
+  height: var(--vhsD);
+  top: calc(100px - var(--vhsD) / 2);
+  background-image: linear-gradient(90deg, #1b1d22 0%, #121417 100%);
+}
+
+.ss-vhs-top { transform: rotateX(90deg) translateZ(100px); }
+.ss-vhs-bottom { transform: rotateX(-90deg) translateZ(100px); }
+
+/* ── DVD disc (label side + rainbow data side, punched hub) ── */
+.ss-disc {
+  position: relative;
+  width: 176px;
+  height: 176px;
+  transform-style: preserve-3d;
+}
+
+.ss-disc-face {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 176px;
+  height: 176px;
+  border-radius: 50%;
+  backface-visibility: hidden;
+  -webkit-mask: radial-gradient(circle, transparent 0 10px, #000 11px);
+  mask: radial-gradient(circle, transparent 0 10px, #000 11px);
+}
+
+.ss-disc-label {
+  transform: translateZ(1px);
+  background:
+    radial-gradient(circle, rgba(226, 232, 240, 0.95) 0 24px, rgba(226, 232, 240, 0) 25px),
+    radial-gradient(circle, #10327e 0 84px, #d8dee6 85px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 26px;
+}
+
+.ss-disc-logo {
+  width: 74px;
+  height: auto;
+}
+
+.ss-disc-text {
+  margin-top: auto;
+  padding-bottom: 24px;
+  font-family: var(--font-title);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 4px;
+  color: #ffa903;
+}
+
+.ss-disc-data {
+  transform: rotateY(180deg) translateZ(1px);
+  background:
+    radial-gradient(circle, #d8dee6 0 24px, rgba(216, 222, 230, 0) 25px),
+    conic-gradient(#c8ccd4, #e2b3f0 40deg, #9fd4ff 95deg, #c4f0c0 140deg,
+      #ffe9a8 185deg, #c8ccd4 220deg, #b9a8ff 265deg, #a8e6f0 305deg,
+      #ffc9d8 340deg, #c8ccd4);
+  box-shadow: inset 0 0 3px 1px rgba(255, 255, 255, 0.6);
+}
+
+/* Animations */
+@keyframes flicker {
+  0%, 18%, 22%, 25%, 53%, 57%, 100% {
+    text-shadow: 
+      0 0 4px #fff,
+      0 0 10px var(--bb-yellow),
+      0 0 20px var(--bb-yellow),
+      0 0 40px var(--bb-yellow);
+  }
+  20%, 24%, 55% {
+    text-shadow: none;
+    color: #444;
+  }
+}
+
+#login-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 25;
+  background: rgba(2, 2, 6, 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 24px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.5s ease-in-out;
+  overflow-y: auto;
+  padding: 40px 20px;
+}
+
+#login-overlay,
+#login-overlay * {
+  cursor: default !important;
+}
+
+#login-overlay input {
+  cursor: text !important;
+}
+
+#login-overlay button,
+#login-overlay .login-btn {
+  cursor: pointer !important;
+}
+
+#login-overlay.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.login-logo-container {
+  width: 320px;
+  margin: 0 auto;
+  filter: drop-shadow(0 0 15px rgba(255, 204, 0, 0.5));
+}
+
+.login-logo-container svg {
+  width: 100%;
+  height: auto;
+}
+
+.login-card {
+  width: 1120px;
+  max-width: 95vw;
+  background: var(--panel-bg);
+  border: 2px solid var(--bb-yellow);
+  border-radius: 16px;
+  padding: 40px;
+  box-shadow: 
+    0 10px 45px rgba(0, 0, 0, 0.9),
+    0 0 35px rgba(0, 76, 255, 0.2);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.login-title {
+  font-family: var(--font-title);
+  font-size: 2.2rem;
+  font-weight: 900;
+  color: #fff;
+  text-align: center;
+  text-shadow: 0 0 12px var(--bb-yellow);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+.login-subtitle {
+  font-family: var(--font-body);
+  font-size: 1rem;
+  color: #94a3b8;
+  text-align: center;
+  margin-top: -10px;
+}
+
+#login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.login-columns {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+  margin-top: 10px;
+  margin-bottom: 10px;
+}
+
+.login-column {
+  background: rgba(0, 31, 77, 0.25);
+  border: 1px solid rgba(255, 204, 0, 0.15);
+  border-radius: 12px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  transition: all 0.3s ease;
+}
+
+.login-column:hover {
+  border-color: var(--bb-yellow);
+  box-shadow: 0 0 15px rgba(255, 204, 0, 0.1);
+  background: rgba(0, 31, 77, 0.4);
+}
+
+.column-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid rgba(255, 204, 0, 0.2);
+  padding-bottom: 12px;
+}
+
+.column-title {
+  font-family: var(--font-title);
+  font-size: 1.4rem;
+  font-weight: bold;
+  color: #fff;
+  text-shadow: 0 0 8px rgba(255, 204, 0, 0.3);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.column-desc {
+  font-size: 0.85rem;
+  color: #94a3b8;
+  line-height: 1.4;
+  margin-bottom: 8px;
+  min-height: 48px;
+}
+
+.input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: left;
+}
+
+.input-group label {
+  font-family: var(--font-title);
+  font-size: 0.8rem;
+  font-weight: bold;
+  color: var(--bb-yellow);
+  text-shadow: 0 0 4px rgba(255, 204, 0, 0.3);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.input-group input {
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(0, 240, 255, 0.2);
+  border-radius: 6px;
+  padding: 12px 16px;
+  color: #fff;
+  font-family: var(--font-body);
+  font-size: 1rem;
+  outline: none;
+  transition: all 0.3s ease;
+  cursor: text !important;
+  user-select: text !important;
+}
+
+.input-group input:focus {
+  border-color: var(--bb-electric);
+  background: rgba(15, 23, 42, 0.95);
+  box-shadow: 0 0 10px rgba(0, 240, 255, 0.3);
+}
+
+.login-error {
+  color: #ef4444;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  text-align: center;
+  min-height: 20px;
+  text-shadow: 0 0 4px rgba(239, 68, 68, 0.3);
+}
+
+.login-actions {
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+  margin-top: 10px;
+}
+
+.login-btn {
+  flex: 0 1 360px;
+  width: 100%;
+  padding: 14px;
+  border-radius: 8px;
+  font-family: var(--font-title);
+  font-size: 1rem;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  transition: all 0.3s ease;
+  cursor: pointer !important;
+  pointer-events: auto;
+}
+
+.login-btn.primary-btn {
+  background: rgba(0, 240, 255, 0.1);
+  border: 1px solid var(--bb-electric);
+  color: #fff;
+  text-shadow: 0 0 4px var(--bb-electric);
+}
+
+.login-btn.primary-btn:hover, .login-btn.primary-btn:focus {
+  background: var(--bb-electric);
+  color: #000;
+  box-shadow: 0 0 15px var(--bb-electric);
+  text-shadow: none;
+  transform: translateY(-2px);
+}
+
+.login-btn.secondary-btn {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #94a3b8;
+}
+
+.login-btn.secondary-btn:hover, .login-btn.secondary-btn:focus {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  border-color: #fff;
+  transform: translateY(-2px);
+}
+
+.login-desc {
+  font-family: var(--font-body);
+  font-size: 0.8rem;
+  color: #475569;
+  text-align: center;
+}
+
+/* Genre Menu Overlay */
+#genre-menu-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 15;
+  background: rgba(2, 2, 4, 0.7);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+#genre-menu-overlay.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.genre-card {
+  width: 500px;
+  background: #000a1c;
+  border: 4px solid var(--bb-yellow);
+  border-radius: 12px;
+  padding: 30px;
+  text-align: center;
+  box-shadow: 
+    0 15px 50px rgba(0, 0, 0, 0.9),
+    0 0 30px rgba(255, 204, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.genre-ticket-header {
+  background: transparent;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.genre-ticket-logo {
+  width: 240px;
+  height: auto;
+  margin: 0 auto;
+}
+
+.genre-ticket-logo svg {
+  width: 100%;
+  height: auto;
+}
+
+.genre-ticket-sub {
+  font-family: var(--font-title);
+  font-weight: 900;
+  font-size: 1.1rem;
+  letter-spacing: 4px;
+  color: var(--bb-yellow);
+  text-shadow: 0 0 10px rgba(255, 204, 0, 0.4);
+}
+
+.genre-library-name {
+  display: none !important;
+  font-family: var(--font-title);
+  font-size: 1.8rem;
+  color: #fff;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+  padding-bottom: 10px;
+  letter-spacing: 1px;
+}
+
+.genre-list {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  max-height: 350px;
+  overflow-y: auto;
+  padding-right: 5px;
+}
+
+/* Custom scrollbar for genre list */
+.genre-list::-webkit-scrollbar {
+  width: 8px;
+}
+.genre-list::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+}
+.genre-list::-webkit-scrollbar-thumb {
+  background: var(--bb-yellow);
+  border-radius: 4px;
+}
+
+.genre-item {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 14px;
+  border-radius: 8px;
+  color: #fff;
+  font-family: var(--font-title);
+  font-size: 1.3rem;
+  font-weight: 600;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  letter-spacing: 1px;
+}
+
+.genre-item.selected {
+  background: var(--bb-yellow);
+  color: #000a1c;
+  border-color: var(--bb-yellow);
+  box-shadow: 0 0 15px rgba(255, 204, 0, 0.4);
+  transform: scale(1.02);
+}
+
+/* Boot Screen Overlay */
+#boot-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 99;
+  background: radial-gradient(circle, #051532 0%, #00040e 100%);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.6s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+#boot-overlay.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.boot-card {
+  position: relative;
+  width: 560px;
+  max-width: 90%;
+  background: linear-gradient(135deg, #0e3fa9 0%, #062269 100%);
+  border: 4px solid var(--bb-yellow);
+  border-radius: 16px;
+  padding: 45px 35px 35px 35px;
+  box-shadow: 
+    0 25px 60px rgba(0, 0, 0, 0.95),
+    0 0 40px rgba(14, 63, 169, 0.5),
+    inset 0 0 20px rgba(255, 255, 255, 0.1);
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.boot-logo-container {
+  width: 290px;
+  margin: 10px auto 0 auto;
+  filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.6));
+}
+
+.boot-logo-container svg {
+  width: 100%;
+  height: auto;
+}
+
+.boot-console {
+  background: #00040a;
+  border: 1px solid rgba(0, 76, 255, 0.3);
+  border-radius: 8px;
+  padding: 16px;
+  height: 190px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.8);
+}
+
+.boot-console-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid rgba(0, 76, 255, 0.2);
+  padding-bottom: 6px;
+  font-family: var(--font-title);
+  font-size: 0.9rem;
+  color: #64748b;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.pulse-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 8px #10b981;
+  animation: indicator-pulse 1.2s infinite alternate;
+}
+
+/* #boot-overlay hides via opacity: 0 (not display: none) once boot finishes,
+   so this indicator would otherwise pulse forever in the background. */
+#boot-overlay:not(.visible) .pulse-indicator {
+  animation: none;
+}
+
+.boot-console-logs {
+  flex-grow: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: #34d399;
+  line-height: 1.4;
+  padding-right: 5px;
+}
+
+.boot-console-logs::-webkit-scrollbar {
+  width: 4px;
+}
+.boot-console-logs::-webkit-scrollbar-thumb {
+  background: rgba(52, 211, 153, 0.3);
+  border-radius: 2px;
+}
+
+/* Animations */
+@keyframes indicator-pulse {
+  0% {
+    opacity: 0.4;
+    transform: scale(0.9);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1.1);
+  }
+}
+
+/* ─── Small-CRT-panel row/label styles ───────────────────────────────────── */
+/* Originally the (retired) episode picker's; the row/label classes live on,
+   reused wholesale by the version picker below (openListPicker in main.ts). */
+
+.episode-card {
+  width: 760px;
+  max-width: 94vw;
+  max-height: 84vh;
+}
+
+.episode-card-label {
+  font-family: var(--font-mono);
+  font-size: 22px;
+  letter-spacing: 0.2em;
+  color: rgba(0, 10, 28, 0.72);
+  text-transform: uppercase;
+}
+
+.episode-card-title {
+  font-family: var(--font-mono);
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Scrolls when a season overflows, but never SHOWS a scrollbar (POS rule) —
+   the selection is keyboard-driven and keeps itself in view. */
+.episode-list {
+  overflow-y: auto;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 55vh;
+  scrollbar-width: none;
+}
+
+.episode-list::-webkit-scrollbar {
+  display: none;
+}
+
+.episode-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 7px 14px;
+  border-radius: 0;
+  font-family: var(--font-mono);
+  font-size: 24px;
+  color: var(--crt-text);
+  cursor: none;
+}
+
+.episode-item::before {
+  content: '\00a0';
+  flex: 0 0 auto;
+  width: 1.2ch;
+}
+
+.episode-item.selected {
+  background: var(--crt-gold);
+  color: var(--crt-ink);
+  text-shadow: none;
+}
+
+.episode-item.selected::before {
+  content: '>';
+}
+
+.episode-code {
+  font-family: var(--font-mono);
+  font-size: 22px;
+  color: var(--crt-gold);
+  min-width: 60px;
+}
+
+.episode-item.selected .episode-code {
+  color: var(--crt-ink);
+}
+
+.episode-name {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.episode-duration {
+  font-family: var(--font-mono);
+  font-size: 22px;
+  color: var(--crt-dim);
+}
+
+.episode-item.selected .episode-duration {
+  color: rgba(0, 10, 28, 0.72);
+}
+
+/* ─── Version Picker Overlay (4K / 1080p) ────────────────────────────────── */
+/* Reuses the episode-card row/label styles wholesale. Sits ABOVE the flat
+   detail overlay (flat mode plays open it too) but below the video player. */
+
+#version-picker-overlay {
+  display: none;
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  z-index: 1500;
+  background: rgba(0, 0, 0, 0.62);
+  align-items: center;
+  justify-content: center;
+}
+
+#version-picker-overlay.visible {
+  display: flex;
+}
+
+.version-card {
+  width: 880px;
+}
+
+/* Candy Checkout Overlay (T19) — same small-CRT-panel family. */
+#candy-checkout-overlay {
+  display: none;
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  z-index: 60;
+  background: rgba(0, 0, 0, 0.62);
+  align-items: center;
+  justify-content: center;
+}
+
+#candy-checkout-overlay.visible {
+  display: flex;
+}
+
+.candy-card {
+  width: 680px;
+  max-width: 94vw;
+  max-height: 88vh;
+}
+
+.candy-title {
+  font-family: var(--font-mono);
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.candy-desc {
+  font-size: 22px;
+  color: var(--crt-text);
+  line-height: 1.35;
+}
+
+/* Scrolls past ~5 rows but never shows a scrollbar (POS rule). */
+.candy-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 32vh;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.candy-list::-webkit-scrollbar {
+  display: none;
+}
+
+.candy-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 14px;
+  border-radius: 0;
+  font-family: var(--font-mono);
+  font-size: 24px;
+  text-transform: uppercase;
+  color: var(--crt-text);
+  cursor: none;
+}
+
+.candy-item::before {
+  content: '\00a0';
+  flex: 0 0 auto;
+  width: 1.2ch;
+}
+
+.candy-item.focused {
+  background: var(--crt-gold);
+  color: var(--crt-ink);
+  text-shadow: none;
+}
+
+.candy-item.focused::before {
+  content: '>';
+}
+
+.candy-item-check {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  border-radius: 0;
+  border: 1px solid var(--crt-dim);
+  background: transparent;
+}
+
+.candy-item.focused .candy-item-check {
+  border-color: var(--crt-ink);
+}
+
+.candy-item.checked .candy-item-check {
+  background: var(--crt-gold);
+  border-color: var(--crt-gold);
+}
+
+.candy-item.focused.checked .candy-item-check {
+  background: var(--crt-ink);
+  border-color: var(--crt-ink);
+}
+
+.candy-item-name {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.candy-item-size {
+  font-family: var(--font-mono);
+  font-size: 22px;
+  color: var(--crt-dim);
+}
+
+.candy-item.focused .candy-item-size {
+  color: rgba(0, 10, 28, 0.72);
+}
+
+.candy-zip-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 22px;
+  text-transform: uppercase;
+  color: var(--crt-text);
+}
+
+.candy-zip-row input {
+  flex: 1;
+  background: #000;
+  border: 1px solid rgba(255, 204, 0, 0.45);
+  border-radius: 0;
+  padding: 5px 10px;
+  color: var(--crt-text);
+  font-family: var(--font-mono);
+  font-size: 22px;
+  caret-color: var(--crt-gold);
+  cursor: text !important;
+}
+
+.candy-status {
+  font-family: var(--font-mono);
+  font-size: 22px;
+  color: var(--crt-dim);
+  text-transform: uppercase;
+  min-height: 26px;
+}
+
+.candy-options {
+  display: flex;
+  flex-direction: row;
+  gap: 14px;
+}
+
+.candy-btn {
+  flex: 1;
+  background: transparent;
+  border: 1px solid rgba(255, 204, 0, 0.5);
+  border-radius: 0;
+  padding: 10px 18px;
+  color: var(--crt-text);
+  font-family: var(--font-mono);
+  font-size: 22px;
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  pointer-events: auto;
+}
+
+.candy-btn.focused {
+  background: var(--crt-gold);
+  border-color: var(--crt-gold);
+  color: var(--crt-ink);
+  text-shadow: none;
+}
+
+/* Search is diegetic now (see src/entrance.ts EntranceCheckout's terminal
+   canvas + StoreScene.enterSearchMode()/setTerminalText()) -- no DOM overlay
+   or CSS needed here anymore. */
+
+/* Feedback Pin Overlay (F8, see main.ts openFeedbackPin) -- styled to match
+   the episode-card / candy-card family. The overlay element itself is built
+   in TS (buildFeedbackOverlay), not baked into index.html. */
+#feedback-pin-overlay {
+  display: none;
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  /* Above the video player overlay (2000): pins must be filable mid-playback
+     to capture the player log. */
+  z-index: 3000;
+  background: rgba(0, 7, 20, 0.9);
+  backdrop-filter: blur(8px);
+  align-items: center;
+  justify-content: center;
+}
+
+#feedback-pin-overlay.visible {
+  display: flex;
+}
+
+#feedback-pin-overlay:not(.visible) * {
+  pointer-events: none !important;
+}
+
+.feedback-pin-card {
+  width: 480px;
+  background: var(--panel-bg);
+  border: 2px solid var(--panel-border);
+  border-radius: 14px;
+  padding: 26px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.8);
+}
+
+.feedback-pin-title {
+  font-family: var(--font-title);
+  font-size: 1.6rem;
+  color: #fff;
+  letter-spacing: 1px;
+}
+
+.feedback-pin-textarea {
+  resize: none;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  padding: 10px 12px;
+  color: #fff;
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  line-height: 1.4;
+  cursor: text !important;
+}
+
+.feedback-pin-status {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--bb-yellow);
+  min-height: 14px;
+}
+
+.feedback-pin-options {
+  display: flex;
+  flex-direction: row;
+  gap: 14px;
+}
+
+.feedback-pin-btn {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 13px 18px;
+  border-radius: 8px;
+  color: #fff;
+  font-family: var(--font-title);
+  font-size: 0.95rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  transition: all 0.2s ease;
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.feedback-pin-btn:hover {
+  background: var(--bb-yellow);
+  border-color: #fff;
+  color: #001035;
+}
+
+/* ─── In-App Movie Player ─────────────────────────────────────────────────── */
+
+#video-player-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  background: #000;
+  display: none;
+  opacity: 0;
+  transition: opacity 0.35s ease;
+}
+
+#video-player-overlay.visible {
+  display: block;
+  opacity: 1;
+}
+
+#vp-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #000;
+}
+
+/* T23 diegetic mode: the movie shows on the back room's CRT (a VideoTexture
+   sampling #vp-video), so the fullscreen surface hides and the overlay goes
+   transparent — only the control bars float over the 3D room. `visibility`
+   (not display) keeps the element decoding frames for the texture. */
+#video-player-overlay.vp-diegetic {
+  background: transparent;
+}
+#video-player-overlay.vp-diegetic #vp-video {
+  visibility: hidden;
+}
+
+/* Controls (+ their scrims) fade out smoothly during playback, reappear on input. */
+#video-player-overlay .vp-top-bar,
+#video-player-overlay .vp-control-bar {
+  transition: opacity 0.45s ease, transform 0.45s ease;
+}
+
+#video-player-overlay.controls-hidden .vp-top-bar {
+  opacity: 0;
+  transform: translateY(-14px);
+  pointer-events: none;
+}
+
+#video-player-overlay.controls-hidden .vp-control-bar {
+  opacity: 0;
+  transform: translateY(14px);
+  pointer-events: none;
+}
+
+/* Shared look for every icon control (back, seek, mute, subtitles, fullscreen). */
+.vp-icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: #fff;
+  cursor: none;
+  transition: background 0.15s ease, color 0.15s ease, transform 0.15s ease;
+}
+
+.vp-icon-btn:hover,
+.vp-icon-btn:focus {
+  background: rgba(255, 255, 255, 0.14);
+  color: var(--bb-yellow);
+  transform: scale(1.08);
+  outline: none;
+}
+
+/* Top bar: back button + title, its own subtle scrim, hides with controls */
+.vp-top-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 34px 48px;
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.75), transparent);
+  z-index: 2;
+}
+
+.vp-title-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.vp-title {
+  font-family: var(--font-title);
+  font-size: 28px;
+  letter-spacing: 1.5px;
+  color: #fff;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.9);
+}
+
+.vp-media-status {
+  font-family: var(--font-mono, monospace);
+  font-size: 13px;
+  letter-spacing: 0.3px;
+  color: rgba(255, 255, 255, 0.72);
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.9);
+}
+
+.vp-media-status.is-transcode {
+  color: #ffcc66;
+}
+
+.vp-media-status.is-direct {
+  color: #8fdf8f;
+}
+
+/* Bottom control bar — gradient scrim, not a solid bar */
+.vp-control-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 70px 48px 30px;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.85) 0%, rgba(0, 0, 0, 0.55) 45%, transparent 100%);
+  z-index: 2;
+}
+
+/* Thin scrub bar that thickens on hover; buffered range in a lighter tint. */
+.vp-progress {
+  position: relative;
+  height: 4px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.22);
+  cursor: none;
+  transition: height 0.15s ease;
+  margin-bottom: 16px;
+}
+
+.vp-progress:hover {
+  height: 7px;
+}
+
+.vp-progress-buffered {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 0%;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.38);
+  transition: width 0.2s ease;
+}
+
+.vp-progress-filled {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 0%;
+  border-radius: 3px;
+  background: var(--bb-yellow);
+  box-shadow: 0 0 10px rgba(255, 204, 0, 0.6);
+}
+
+/* Round scrub handle — hidden until the bar is hovered/scrubbed. */
+.vp-progress-handle {
+  position: absolute;
+  right: -7px;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--bb-yellow);
+  box-shadow: 0 0 10px rgba(255, 204, 0, 0.9);
+  opacity: 0;
+  transform: translateY(-50%) scale(0.6);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.vp-progress:hover .vp-progress-handle {
+  opacity: 1;
+  transform: translateY(-50%) scale(1);
+}
+
+/* Buttons row: transport + volume + time on the left, subtitles/fullscreen on the right */
+.vp-buttons-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.vp-buttons-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.vp-buttons-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.vp-seek-label {
+  font-family: var(--font-mono);
+  font-size: 7px;
+  fill: currentColor;
+}
+
+/* Play/pause is slightly larger and bordered to stay the visual anchor. */
+.vp-play-btn {
+  width: 48px;
+  height: 48px;
+  border: 2px solid var(--bb-yellow);
+  background: rgba(0, 10, 26, 0.5);
+}
+
+.vp-play-btn:hover,
+.vp-play-btn:focus {
+  background: var(--bb-yellow);
+  color: var(--bb-navy);
+}
+
+.vp-play-btn .vp-icon-pause { display: block; }
+.vp-play-btn .vp-icon-play { display: none; margin-left: 3px; /* optical centering of the triangle */ }
+.vp-play-btn.is-paused .vp-icon-pause { display: none; }
+.vp-play-btn.is-paused .vp-icon-play { display: block; }
+
+/* Volume: icon + slider that reveals on hover/focus, Netflix-style. */
+.vp-volume {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.vp-volume-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 0;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.3);
+  cursor: none;
+  opacity: 0;
+  transition: width 0.2s ease, opacity 0.2s ease;
+}
+
+.vp-volume:hover .vp-volume-slider,
+.vp-volume:focus-within .vp-volume-slider {
+  width: 90px;
+  opacity: 1;
+}
+
+.vp-volume-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--bb-yellow);
+  box-shadow: 0 0 6px rgba(255, 204, 0, 0.8);
+  cursor: none;
+}
+
+.vp-volume-slider::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border: none;
+  border-radius: 50%;
+  background: var(--bb-yellow);
+  cursor: none;
+}
+
+#vp-mute .vp-icon-vol-off { display: none; }
+#vp-mute.is-muted .vp-icon-vol-on { display: none; }
+#vp-mute.is-muted .vp-icon-vol-off { display: block; }
+
+/* Current / total time — tabular, monospace, Netflix-style */
+.vp-time-display {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 15px;
+  letter-spacing: 0.5px;
+  color: #d7deed;
+  white-space: nowrap;
+}
+
+.vp-time-sep {
+  margin: 0 6px;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+#vp-fullscreen .vp-icon-fs-exit { display: none; }
+#vp-fullscreen.is-fullscreen .vp-icon-fs-enter { display: none; }
+#vp-fullscreen.is-fullscreen .vp-icon-fs-exit { display: block; }
+
+#vp-subtitles.is-active {
+  color: var(--bb-yellow);
+  background: rgba(255, 204, 0, 0.16);
+}
+
+/* Remote/keyboard focus ring for control-bar navigation (arrow keys). */
+.vp-focused {
+  outline: 3px solid var(--bb-yellow);
+  outline-offset: 2px;
+  border-radius: 8px;
+  background: rgba(255, 204, 0, 0.16);
+}
+
+/* Focused timeline (the default remote focus): thicker bar with a soft
+   yellow halo instead of the boxy button outline, and the scrub handle
+   enlarged + glowing so it's obvious left/right will seek. */
+.vp-progress.vp-focused {
+  height: 8px;
+  outline: none;
+  background: rgba(255, 255, 255, 0.3);
+  box-shadow: 0 0 0 2px rgba(255, 204, 0, 0.35), 0 0 14px rgba(255, 204, 0, 0.35);
+}
+
+.vp-progress.vp-focused .vp-progress-handle {
+  opacity: 1;
+  transform: translateY(-50%) scale(1.35);
+  box-shadow: 0 0 14px rgba(255, 204, 0, 1);
+}
+
+#vp-tracks.is-active {
+  color: var(--bb-yellow);
+  background: rgba(255, 204, 0, 0.16);
+}
+
+/* Quality / audio / subtitle picker: anchored above the control bar's right
+   side; rows are keyboard-driven (up/down + enter) and clickable. */
+.vp-tracks-menu {
+  position: absolute;
+  right: 48px;
+  bottom: 110px;
+  min-width: 260px;
+  max-height: 55vh;
+  overflow-y: auto;
+  padding: 10px 0;
+  background: rgba(12, 14, 22, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 10px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+  z-index: 3;
+}
+
+.vp-tracks-menu[hidden] {
+  display: none;
+}
+
+.vp-menu-header {
+  padding: 10px 18px 4px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1.6px;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.vp-menu-row {
+  padding: 8px 18px 8px 40px;
+  position: relative;
+  font-size: 15px;
+  color: #fff;
+  cursor: pointer;
+}
+
+.vp-menu-row:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* Checkmark for the currently-applied choice in each group. */
+.vp-menu-row.is-selected::before {
+  content: '✓';
+  position: absolute;
+  left: 16px;
+  color: var(--bb-yellow);
+  font-weight: 700;
+}
+
+.vp-menu-row.vp-focused {
+  outline: none;
+  border-radius: 0;
+  background: rgba(255, 204, 0, 0.22);
+}
+
+/* Buffering spinner */
+.vp-spinner {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 76px;
+  height: 76px;
+  margin: -38px 0 0 -38px;
+  border: 6px solid rgba(255, 255, 255, 0.2);
+  border-top-color: var(--bb-yellow);
+  border-radius: 50%;
+  z-index: 3;
+  display: none;
+  animation: vp-spin 0.9s linear infinite;
+}
+
+.vp-spinner.visible { display: block; }
+
+@keyframes vp-spin {
+  to { transform: rotate(360deg); }
+}
+
+
+
+/* First-Person Walk Mode HUD styling */
+.walk-hud-overlay {
+  position: absolute;
+  top: 100px;
+  right: 25px;
+  z-index: 1000;
+  width: 250px;
+  background: rgba(10, 20, 50, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  padding: 16px;
+  color: #ffffff;
+  font-family: 'Inter', system-ui, sans-serif;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-10px);
+  transition: opacity 0.35s ease, transform 0.35s ease, visibility 0s linear 0.35s;
+  pointer-events: none;
+}
+
+.walk-hud-overlay.visible {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+  transition: opacity 0.35s ease, transform 0.35s ease, visibility 0s linear 0s;
+  pointer-events: auto;
+}
+
+.walk-hud-title {
+  font-size: 0.85rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: #ffa903;
+  margin-bottom: 12px;
+  letter-spacing: 1.5px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+  padding-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.walk-hud-title::before {
+  content: '';
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  background-color: #00ff66;
+  border-radius: 50%;
+  box-shadow: 0 0 8px #00ff66;
+  animation: walkHudPulse 1.5s infinite alternate;
+}
+
+/* .walk-hud-overlay hides via opacity: 0 (visibility: hidden alone doesn't
+   stop a running CSS animation), so kill it while not visible. */
+.walk-hud-overlay:not(.visible) .walk-hud-title::before {
+  animation: none;
+}
+
+.walk-hud-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.walk-hud-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.walk-hud-key {
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 10px;
+  font-weight: bold;
+  min-width: 16px;
+  text-align: center;
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.35);
+  color: #ffffff;
+}
+
+.walk-hud-desc {
+  font-size: 11px;
+  color: #cccccc;
+  margin-left: auto;
+}
+
+@keyframes walkHudPulse {
+  from { opacity: 0.4; }
+  to { opacity: 1; }
+}
+
+
+/* ─── Exit-door whiteout (playback transition) ─────────────────────────────── */
+#whiteout-overlay {
+  position: fixed;
+  inset: 0;
+  background: #ffffff;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 900; /* above the scene + HUD, below the video player overlays */
+  transition: opacity 1.2s ease-in;
+}
+
+#whiteout-overlay.active {
+  opacity: 1;
+}
+
+#whiteout-overlay.instant {
+  transition: none;
+}
+
+/* Prevent child elements of hidden overlays and locator from intercepting pointer events */
+#boot-overlay:not(.visible) *,
+#power-menu-overlay:not(.visible) *,
+#settings-drawer-overlay:not(.visible) *,
+#exit-confirm-overlay:not(.visible) *,
+#genre-menu-overlay:not(.visible) *,
+#login-overlay:not(.visible) *,
+#screensaver-overlay:not(.visible) *,
+#version-picker-overlay:not(.visible) *,
+#candy-checkout-overlay:not(.visible) *,
+#video-player-overlay:not(.visible) *,
+#browse-locator:not(.visible) * {
+  pointer-events: none !important;
+}
+
