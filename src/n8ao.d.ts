@@ -19,11 +19,19 @@ declare module 'n8ao' {
     screenSpaceRadius: boolean;
     transparencyAware: boolean;
     renderMode: 0 | 1 | 2 | 3 | 4;
+    /**
+     * When false the pass does NOT draw the scene, and composites AO over
+     * whatever `beautyRenderTarget` already holds. That's the hook the partial
+     * composite (src/partial-composite.ts) uses to skip a redundant scene draw.
+     */
+    autoRenderBeauty: boolean;
   }
 
   export class N8AOPass extends Pass {
     constructor(scene: Scene, camera: Camera, width?: number, height?: number);
     configuration: N8AOConfiguration;
+    /** Beauty (pre-AO scene draw) target, with its own depth texture. */
+    beautyRenderTarget: WebGLRenderTarget;
     setQualityMode(
       mode: 'Performance' | 'Low' | 'Medium' | 'High' | 'Ultra' |
         'Neural-Low' | 'Neural-Medium' | 'Neural-High'

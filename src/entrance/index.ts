@@ -1016,6 +1016,45 @@ export class EntranceCheckout implements StoreFixture {
     this.bag?.debugHoldLift();
   }
 
+  /**
+   * Does update() still have visible work to do this frame? Everything it
+   * animates rides along on frames the scene was compositing anyway (it never
+   * calls requestRender), so the partial-composite path — which re-draws ONLY
+   * the ambient TV screens and leaves the rest of the frame cached (see
+   * src/partial-composite.ts) — has to fall back to a full composite whenever
+   * the answer is yes, or a due cursor blink / mid-swing door would freeze.
+   * Conservative by construction: each clause is the same condition update()
+   * itself uses to decide it has work.
+   */
+  wantsFrame(timeMs: number): boolean {
+    if (this.terminalTex && timeMs - this.terminalLastBlink > 530) {
+      const camPos = this.ctx.camera.position;
+      for (const st of this.terminalStations) {
+        if (camPos.distanceToSquared(st) < 144) return true; // a repaint is due
+      }
+    }
+    if (this.bag?.isShown) return true; // soft-body solver may still be stepping
+    // Doors: their lerp is geometric and never exactly lands, so the threshold
+    // is perceptual, not numerical. DOOR_SETTLED rad of swing left to go moves
+    // a 3 ft leaf by ~0.003 ft over the whole remaining travel — orders of
+    // magnitude under a pixel. (At 1e-4 a leaf that shut minutes ago still
+    // reported "moving" and blocked the partial composite forever.)
+    const DOOR_SETTLED = 1e-3;
+    for (const d of this.doors) {
+      // Same proximity test updateVestibuleDoors() steers the lerp with.
+      const open = this.ctx.camera.position.distanceTo(d.center) < 7.0;
+      if (d.kind === 'slide') {
+        const tx = open ? d.openOffset.x : 0;
+        const tz = open ? d.openOffset.z : 0;
+        if (Math.abs(d.currentOffset.x - tx) > DOOR_SETTLED ||
+            Math.abs(d.currentOffset.z - tz) > DOOR_SETTLED) return true;
+      } else if (Math.abs(d.currentAngle - (open ? d.openAngle : 0)) > DOOR_SETTLED) {
+        return true; // mid-swing
+      }
+    }
+    return false;
+  }
+
   // Per-frame: blink the desk terminal cursor (~530 ms), a cheap 1024x768
   // canvas redraw, drive the bag's pick-up lift/settle and reactive wobble
   // if either is running, and swing/slide the vestibule doors for the player.

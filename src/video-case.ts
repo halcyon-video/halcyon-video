@@ -23,6 +23,7 @@ import {
   setCaseMaterialUniformProvider,
   getUploadRenderer,
   uploadTextureNow,
+  wakeTextureStream,
 } from './poster-textures';
 // The GPU upload pipeline lives in poster-textures.ts (see its header). It's
 // re-exported here so the modules that have always reached for these through
@@ -32,6 +33,7 @@ export {
   uploadTextureNow,
   setUploadRenderer,
   setTextureStreamWake,
+  wakeTextureStream,
   setPosterLoadedNotify,
   notifyUserActivity,
   setUploadTurbo,
@@ -777,57 +779,54 @@ let sharedJellyfinSpinePlaceholderMaterial: THREE.MeshStandardMaterial | null = 
 //    scene's lifetime; bounded by the fixture count).
 //
 // The pixel cache reaches ~1.7GB JS heap on the ~1950-title demo catalog
-// (614,400 bytes/title × the whole catalog) — the dominant share of the
-// "~8GB RSS" reports from launch week. It is an LruByteCache (LRU: Map
-// insertion order, oldest-first, re-inserted on every hit — see
-// lru-byte-cache.ts) so a byte budget CAN bound it, but see the budget
-// block below before ever bounding it by default: eviction is NOT yet safe
-// — several consumers still assume presence instead of re-decoding on a
-// miss.
-//
-// Only get()/has()/set()/clear() are used anywhere on these two caches (in
-// this file and in store-stock.ts / store-clerk-flow.ts / store-inspect.ts /
-// asset-viewer.ts / three-scene.ts), so LruByteCache's Map-compatible surface
-// is a drop-in replacement — none of those other files needed to change.
-// (Entry sizes: full-res 320x480 RGBA = 614,400 B per title — COVER_WIDTH ×
+// (614,400 B/title × the whole catalog) — the dominant share of the "~8GB
+// RSS" reports from launch week. It's an LruByteCache (LRU: Map insertion
+// order, oldest-first, re-inserted on every hit — lru-byte-cache.ts); only
+// get()/has()/set()/clear() are used anywhere on it, a Map-compatible
+// surface. (Entry sizes: full-res 320x480 RGBA = 614,400 B — COVER_WIDTH ×
 // COVER_HEIGHT × 4; low-res 64x96 RGBA = 24,576 B.)
 //
-// DEFAULT IS UNBOUNDED — eviction is opt-in via localStorage
-// `bb_poster_cache_mb` (full-res budget in MB; low-res scales at 1/8th,
-// floored at 16MB). Several consumers still treat presence in this cache as
-// an INVARIANT rather than an optimization (GH #97's original "permanent
-// while the medium is unchanged" contract): store-stock/inspect/hero paths
-// gate on has() and can hide a case's instanced copy before the dedicated
-// hero case exists, so an eviction at real catalog scale — where boot decodes
-// EVERY title through here and immediately evicts all but the newest — makes
-// a picked-up/hovered box vanish outright, and every aisle change re-decodes
-// its shelves in a churn storm (both observed on the owner's store,
-// 2026-08-05, with a 256MB default). Do NOT restore a bounded default until
-// every consumer is miss-tolerant (queued as the cache-rework task): on a
-// miss they must keep the instanced copy visible, request an async re-decode,
-// and swap in the pixels on arrival.
+// THE CONTRACT (2026-08-05 miss-tolerance rework): presence here is an OPTIMIZATION, never an
+// invariant — GH #97's old "permanent" contract is retired: it let a bound blank a picked-up/
+// hovered box outright and let every aisle change re-decode already-on-GPU shelves in a churn
+// storm (both observed on the owner's store at 256MB). Every consumer is now miss-tolerant
+// (per-call-site notes at each get()/has() site below, plus store-stock/inspect/clerk-flow's
+// callers): a MISS — never-decoded or evicted, handled identically — must never blank what's on
+// screen (keep the instanced copy / pinned texture / placeholder material), fires an async
+// re-decode via posterQueue.load (worker decode + IndexedDB raw-bytes cache, never a network
+// refetch; deduped per title via its queuedItems map), and on arrival swaps the pixels in +
+// wakes the render loop (scene.requestRender(), or wakeTextureStream() with no scene ref handy —
+// the same nudge a texture-array loaded-flag flip uses, poster-textures.ts). store-stock.ts's
+// loadShelfDetails also checks textureArrayManager's loaded flags first (the GPU array is never
+// evicted), so a title already on the GPU never redecodes just to refill an evicted CPU entry.
 //
-// When a bound IS set, it must exceed the browse working set with real
-// margin or browsing thrashes even without visible breakage: each keypress
-// evicts pixels the next keypress re-decodes, and the cost lands as GC
-// pauses, not in any one perf span (measured: a 100MB budget vs the perf
-// harness's own 123MB catalog → +5.1GB allocation churn, dtMs p90 17→36ms
-// over a 60-move flip session).
-function readPosterCacheBudgetBytes(): number {
-  if (typeof localStorage === 'undefined') return Infinity;
+// DEFAULT IS BOUNDED: full-res 256MB, low-res 64MB. Override via `bb_poster_cache_mb`
+// localStorage (full-res MB; low-res scales at 1/8th of THAT override, floored at 16MB —
+// proportional to entry size would starve mid-size catalogs); a very large override (e.g.
+// 999999) is the effectively-unbounded escape hatch memory-scale diagnostics use
+// (scratch/lru-mem-probe.mjs clears localStorage, so it measures the default).
+//
+// A bound must exceed the browse working set with real margin: GC-pause cost from
+// keypress-driven eviction/redecode churn, not any one perf span (measured: 100MB vs. the perf
+// harness's 123MB catalog → +5.1GB churn, dtMs p90 17→36ms/60-move flip session). Re-measure
+// with `tools/shot.mjs --perf 60` before changing the constants.
+function readPosterCacheOverrideMB(): number | null {
+  if (typeof localStorage === 'undefined') return null;
   const raw = localStorage.getItem('bb_poster_cache_mb');
   const n = raw ? parseFloat(raw) : NaN;
-  return Number.isFinite(n) && n > 0 ? n * 1024 * 1024 : Infinity;
+  return Number.isFinite(n) && n > 0 ? n : null;
 }
-const POSTER_PIXEL_CACHE_BUDGET_BYTES = readPosterCacheBudgetBytes();
+const POSTER_CACHE_OVERRIDE_MB = readPosterCacheOverrideMB();
+const DEFAULT_POSTER_CACHE_MB = 256;
+const DEFAULT_LOW_RES_CACHE_MB = 64; // NOT the 1/8th-override formula's 32MB — tuned independently
+const POSTER_PIXEL_CACHE_BUDGET_BYTES = (POSTER_CACHE_OVERRIDE_MB ?? DEFAULT_POSTER_CACHE_MB) * 1024 * 1024;
 export const posterPixelCache = new LruByteCache(POSTER_PIXEL_CACHE_BUDGET_BYTES);
-// The low-res tier backs the DISTANT-shelf texture-array layer (whole-store
-// working set, tiny entries), so a configured bound scales it gently rather
-// than proportionally to entry size — 1/25th would starve mid-size catalogs.
+// Low-res backs the whole-store distant-shelf texture-array layer (tiny entries);
+// a manual override scales it gently at 1/8th rather than proportional to entry size.
 export const lowResCache = new LruByteCache(
-  Number.isFinite(POSTER_PIXEL_CACHE_BUDGET_BYTES)
-    ? Math.max(16 * 1024 * 1024, POSTER_PIXEL_CACHE_BUDGET_BYTES / 8)
-    : Infinity
+  POSTER_CACHE_OVERRIDE_MB != null
+    ? Math.max(16 * 1024 * 1024, (POSTER_CACHE_OVERRIDE_MB * 1024 * 1024) / 8)
+    : DEFAULT_LOW_RES_CACHE_MB * 1024 * 1024
 );
 // LRU (Map insertion order, oldest first) of transient hero poster textures.
 const HERO_POSTER_LRU_CAP = 16;
@@ -1571,8 +1570,11 @@ function stampCollectionGapSticker(
  * them back through every surface that shows them — the shelf texture
  * arrays, the CPU pixel cache future hero/endcap textures build from, and
  * any already-built hero texture on screen right now (the usual case: you
- * order FROM the inspect view). No-op if the poster hasn't decoded yet —
- * the decode path re-checks requested state and stamps gold itself.
+ * order FROM the inspect view). No-op if the poster hasn't decoded yet OR its
+ * pixel-cache entry was evicted since — either way the decode path re-checks
+ * requested state and stamps gold itself once it (re)runs, so skipping here
+ * is a safe defer (the sanctioned degradation for this path), not a dropped
+ * update.
  */
 export function restampCollectionGapCase(movie: Movie): void {
   const high = posterPixelCache.get(movie.id);
@@ -4615,6 +4617,7 @@ export function createMovieInstancedMeshes(movie: Movie, count: number): Instanc
         const hexColor = leftmostColorCache.get(movie.id) || null;
         frontMats[1] = getJellyfinSpineMaterial(hexColor, probeIdx);
         front.material = [...frontMats];
+        wakeTextureStream(); // no `scene` ref here — reuse the texture-stream wake
       });
       return;
     }
@@ -4625,11 +4628,12 @@ export function createMovieInstancedMeshes(movie: Movie, count: number): Instanc
     lastLoadedPriority = priority;
 
     if (movie.posterUrl) {
-      posterQueue.load(movie, priority, () => {
+      posterQueue.load(movie, priority, () => { // dedupes in-flight requests itself
         frontMats[4] = getPosterMaterial(movie.id, probeIdx, false, !!movie.game, 'fixture');
         const hexColor = leftmostColorCache.get(movie.id) || null;
         frontMats[1] = getJellyfinSpineMaterial(hexColor, probeIdx);
         front.material = [...frontMats];
+        wakeTextureStream();
       });
     }
   };

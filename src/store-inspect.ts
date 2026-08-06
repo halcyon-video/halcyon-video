@@ -644,11 +644,18 @@ export function ensureHeroCases(scene: StoreScene, movie: Movie, nrCase = false)
       : createHeroRentalMaterials(movie, wantDetail !== null);
     perfTrace.end(SP_HERO);
     if (movie.isSeries) scene.ensureSeriesEpisodes(movie);
-    // Poster may still be streaming in — refresh the front once it lands.
+    // Poster may still be streaming in — either never decoded yet, or its
+    // posterPixelCache entry was evicted since (miss-tolerant: the hero mesh
+    // above already built with a placeholder front via createHeroJellyfinMaterials
+    // in that case, never left blank) — refresh the front once real pixels land.
+    // posterQueue.load() dedupes in-flight requests for the same title itself.
     if (!posterPixelCache.has(movie.id) && movie.posterUrl) {
       posterQueue.load(movie, 3, () => {
         if (scene.heroMovieId === movie.id && scene.heroFrontMesh) {
           scene.heroFrontMesh.material = scene.heroFrontMaterials(movie);
+          // This callback can land after the scene idled (render-on-demand) —
+          // wake it, same as any other post-decode material swap.
+          scene.requestRender();
         }
       });
     }

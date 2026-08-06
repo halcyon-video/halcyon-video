@@ -27,6 +27,7 @@ import { GTAOPass } from 'three/examples/jsm/postprocessing/GTAOPass.js';
 import { N8AOPass } from 'n8ao';
 import { BokehPass } from 'three/examples/jsm/postprocessing/BokehPass.js';
 import { Reflector } from 'three/examples/jsm/objects/Reflector.js';
+import { BeautyPass, PartialComposite } from './partial-composite';
 import { FixtureContext, SlottedFixture } from './fixtures';
 import { OverviewCursors, OverviewCursorTarget } from './overview-cursors';
 import { AmbientTvs } from './ambient-tvs';
@@ -141,6 +142,7 @@ const CT_SHADOW = perfSlot('shadowBake');  // full shadow-map rebake requested
 const CT_AO = perfSlot('aoCompute');
 const CT_MIRROR = perfSlot('mirrorDraw');
 const CT_RES = perfSlot('resScaleApply');  // drawing-buffer resize (render targets realloc)
+const CT_PARTIAL = perfSlot('partialComposite'); // VIDEO frame served by the TV-screen patch path
 
 // Module augmentation (MovieSlot itself lives in store-layout.ts): caches the
 // per-slot back-box horizontal jitter. It's a pure function of slot.movie.id
@@ -215,6 +217,13 @@ export class StoreScene {
   private readonly aoCachedCamWorld = new THREE.Matrix4().makeScale(0, 0, 0); // never matches a real camera pose
   private readonly aoCachedCamProj = new THREE.Matrix4();
   private bloomPass: UnrealBloomPass | null = null; // null on 'low' quality, where it's skipped entirely
+  // Partial composite (src/partial-composite.ts): the parked-with-a-TV-playing
+  // fast path. Null when the pass chain can't support it (SMAA / the legacy
+  // GTAO engine) or nothing built a composer. Its gate lives in animate().
+  public partial: PartialComposite | null = null;
+  // Composites served this session, split by path — read by getPerfInfo() (and
+  // the perf probes) to price the VIDEO tier before/after.
+  private fullComposites = 0;
   // Depth-of-field for the inspect/flip close-up ("product shot" look): the held
   // case stays sharp while the shelves behind it fall gently out of focus. null
   // except on 'high' quality. Its `enabled` flag is driven per-frame by the mode
@@ -2008,6 +2017,9 @@ export class StoreScene {
     // of the GTAO view-cache below).
     const aoEngine = localStorage.getItem('bb_ao') === 'gtao' ? 'gtao' : 'n8ao';
     const useN8ao = ssaoEnabled && aoEngine === 'n8ao';
+    // Kept for the partial composite: N8AO owns the beauty target it patches,
+    // and on every other tier the plain RenderPass is the pass it disables.
+    const beautySource: { n8ao: N8AOPass | null; beautyPass: BeautyPass | null } = { n8ao: null, beautyPass: null };
     console.log(`[AO] ssaoEnabled: ${ssaoEnabled} engine: ${ssaoEnabled ? aoEngine : '-'} (bb_ssao=${localStorage.getItem('bb_ssao')})`);
 
     if (useN8ao) {
@@ -2057,13 +2069,18 @@ export class StoreScene {
         },
       };
       this.aoPass = aoCtl;
+      beautySource.n8ao = n8aoPass;
       (window as any).debugSSAO = n8aoPass;
       console.log('[AO] N8AOPass active (half-res, Medium, accumulate):', { width, height });
     }
 
     if (!useN8ao) {
-      const renderPass = new RenderPass(this.scene, this.camera);
-      this.composer.addPass(renderPass);
+      // BeautyPass, not RenderPass: same draw, but into a target of its own so
+      // the partial composite has a beauty (and a depth buffer) that survives
+      // the frame. See src/partial-composite.ts.
+      const beautyPass = new BeautyPass(this.scene, this.camera, this.composer.renderTarget1);
+      this.composer.addPass(beautyPass);
+      beautySource.beautyPass = beautyPass;
     }
 
     // Legacy engine (bb_ao=gtao): GTAOPass (three r184+), full resolution —
@@ -2363,6 +2380,24 @@ export class StoreScene {
     this.filmPass = grade.createGradePass(this, filmicTonemap);
     this.composer.addPass(this.filmPass);
 
+    // Partial composite: while parked with a ceiling TV playing, re-draw only
+    // the screens into the cached beauty and re-run the post chain (see the
+    // module header and animate()'s `patchable` gate). SMAA is excluded on the
+    // plain tier: its internal quads write into the same ping-pong buffers and
+    // would stomp the depth this path leans on. GTAO likewise — it caches its
+    // own G-buffer against a scene draw we would be skipping.
+    const patchableChain = aaMode !== 'smaa' && !(ssaoEnabled && !useN8ao);
+    this.partial = patchableChain && (beautySource.n8ao || beautySource.beautyPass)
+      ? new PartialComposite({
+          renderer: this.renderer,
+          scene: this.scene,
+          camera: this.camera,
+          composer: this.composer as any,
+          n8aoPass: beautySource.n8ao as any,
+          beautyPass: beautySource.beautyPass,
+        })
+      : null;
+
     // EXPOSE FOR DEBUGGING
     (window as any).debugScene = this.scene;
     (window as any).debugRenderer = this.renderer;
@@ -2373,6 +2408,10 @@ export class StoreScene {
     (window as any).getArrangement = () => this.getArrangement();
     (window as any).ARRANGEMENTS = StoreScene.ARRANGEMENTS;
     (window as any).debugResScale = () => this.resScale;
+    // Partial-composite A/B (see PartialComposite.debugAB): renders the same
+    // changed TV picture through the patch path and the full chain in one tick.
+    (window as any).debugPartialAB = () => this.partial?.debugAB(
+      () => { this.ambientTvs?.debugPokeTestCard(performance.now() * 0.0004); }) ?? null;
     // Motion-gated sharpness introspection: effective buffer multiplier is
     // resScale × qualityScale; sharpScale is the native-res target (1 on any
     // already-native window). Used by the shot harness to verify the plumbing.
@@ -2484,6 +2523,9 @@ export class StoreScene {
     // the page layout breaks.
     perfTrace.count(CT_RES);
     this.renderer.setSize(width, height, false);
+    // Every cached buffer the partial composite patches has just been resized
+    // (and thereby cleared) — nothing to patch until a full frame refills them.
+    this.partial?.disarm();
     if (this.composer) {
       this.composer.setSize(width, height);
     }
@@ -4275,6 +4317,11 @@ export class StoreScene {
       tier: this.currentTier,
       isRendering: this.isRendering,
       frames: this.frameCount,
+      // Composites served, split by path: `partials` are the cheap TV-screen
+      // patches (see src/partial-composite.ts), `composites` the full chain.
+      composites: this.fullComposites,
+      partials: this.partial?.frames ?? 0,
+      partialArmed: !!this.partial?.armed,
       resScale: this.resScale,
       calls: info.render.calls,
       triangles: info.render.triangles,
@@ -4751,9 +4798,24 @@ export class StoreScene {
     // mustRenderThisFrame. The quiet window is what keeps it from firing between
     // every browse-cursor keypress; VIDEO tier is excluded outright since those
     // frames recomposite forever at ~24fps.
-    const settleRefine = !this.tierIsIdle && !videoPlaying &&
+    //
+    // No `settleSsFactor > 0` gate here (removed 2026-08-06): settleScale
+    // already falls back to sharpScale — the native-DISPLAY-resolution lift,
+    // NOT a supersample — whenever settleSsFactor is 0 (see its declaration
+    // comment above: "'0' disables and restores the old native-only settle").
+    // Gating settleRefine on settleSsFactor silently broke that promise, and
+    // it also zeroes for 'low' quality (never above-native, by design) — so a
+    // 'low'-tier HiDPI panel (buffer capped at CSS-pixel resolution, i.e.
+    // sub-native) never got the free native lift at rest and stayed
+    // permanently soft, even though nothing stops it from reaching sharpScale.
+    // `qualityScale < settleScale` alone is the correct "is there anything to
+    // gain" test for every tier — it's already false when there's nothing to
+    // lift to. softwareGL is excluded explicitly instead of riding along on
+    // the settleSsFactor gate: one SwiftShader composite is already seconds
+    // long, so it must never pay for a resize + extra draw just to sit at rest.
+    const settleRefine = !this.tierIsIdle && !videoPlaying && !this.softwareGL &&
       !sceneChanging && !cameraMoving && !this.motionSharpDisabled &&
-      this.settleSsFactor > 0 && this.qualityScale < this.settleScale - 1e-3 &&
+      this.qualityScale < this.settleScale - 1e-3 &&
       (time - this.lastCameraMotionTime) >= StoreScene.QUALITY_SETTLE_MS &&
       (time - this.lastSceneChangeTime) >= StoreScene.QUALITY_SETTLE_MS;
     if (settleRefine) {
@@ -4885,6 +4947,58 @@ export class StoreScene {
     // animation on a multi-day session. The grain is stochastic noise, so a
     // periodic wrap is visually invisible while keeping the value precise forever.
     if (this.filmPass) this.filmPass.uniforms['time'].value = (time % 1_000_000) * 0.001;
+
+    // ── PARTIAL COMPOSITE GATE (src/partial-composite.ts) ─────────────────────
+    // The VIDEO tier's whole job is to keep a few hundred pixels of tube face
+    // moving; re-drawing the entire store to do it is ~89% of the frame. When
+    // the ONLY thing that changed since the last full composite is the TV
+    // picture, patch just the screens into the cached beauty and re-run the
+    // post chain (which is what keeps it pixel-exact: AO, bloom, FXAA and the
+    // grain are all still computed for real).
+    //
+    // Every clause below is an invalidation source that must take the full
+    // path. `active` already covers camera motion, input wakes (forceWake),
+    // AO fades, slot pops, launch/carry/back-room/return-drop tweens, an
+    // on-screen clerk and end-cap motion; the rest are the things that change
+    // the picture WITHOUT holding the ACTIVE tier:
+    //   videoPlaying + isPlaying()  the ceiling sets are the reason we're awake
+    //   backRoom.isPlaying()        the back-room CRT is a different screen
+    //   arrow bob                   a moving selection arrow is scene motion
+    //   mustRenderThisFrame         the drawing buffer was just resized/cleared
+    //   settleRefine                the supersampled parked frame must be real
+    //   shadowRefreshFrames         a shadow-map rebake changes the whole frame
+    //   clerkMirrorRefresh / dirty  a mirror would re-render its reflection
+    //   pendingStockedRebake        the one-shot environment bake relights all
+    //   marquee 'chase'             the bulb pattern advances on drawn frames
+    //   entrance.wantsFrame()       cursor blink / vestibule doors / bag solver
+    //   checkoutRunning             the checkout flourish drives its own props
+    //   insideStorePatchZone        outside, glazing (transparent, depth-write
+    //                               off) is blended OVER the sets, and an
+    //                               opaque screen re-draw would erase it
+    const patchable = !!this.partial && !active && videoPlaying && !forceWake &&
+      !mustRenderThisFrame && !settleRefine &&
+      !!this.ambientTvs?.isPlaying() &&
+      !this.backRoom?.isPlaying() && !(arrowVisible && arrowBobAwake) &&
+      this.mode !== 'backroom' && !this.checkoutRunning &&
+      this.shadowRefreshFrames === 0 && !this.clerkMirrorRefresh &&
+      !this.stockedRebakeDue(time) && this.marqueeAnimMode !== 'chase' &&
+      !this.entrance?.wantsFrame(time) &&
+      !this.dirtyMirrorInView() && this.insideStorePatchZone();
+    if (patchable && this.partial!.canPatch()) {
+      // Same per-frame fixture upkeep a VIDEO frame does — the gate above has
+      // already established none of it changes anything visible except the TV
+      // texture upload, which is the entire point of the frame.
+      this.entrance?.update(time);
+      this.ambientTvs?.update(time);
+      for (const f of this.slottedFixtures) f.update(time);
+      perfTrace.end(SP_SIM);
+      perfTrace.begin(SP_RENDER);
+      this.partial!.render();
+      perfTrace.end(SP_RENDER);
+      perfTrace.count(CT_PARTIAL);
+      return;
+    }
+    this.partial?.beforeFullFrame(patchable);
 
     // T21: overview shelf-cursor bob/pulse + billboarding. ACTIVE-tier frames
     // only — on VIDEO/IDLE frames the cursors hold their last pose rather than
@@ -5168,9 +5282,17 @@ export class StoreScene {
         const hb = this.heroBackMesh!;
         // An unpainted cover box is worse than no cover box: it reads as a
         // black slab (or a stretched rental print) sitting where the art
-        // should be. Until the poster exists, show only the rental clamshell —
-        // that IS what a store shelf looks like with the sleeve still out.
-        hf.visible = posterPixelCache.has(slot.movie.id);
+        // should be. Until the poster FIRST exists, show only the rental
+        // clamshell — that IS what a store shelf looks like with the sleeve
+        // still out. But an EVICTED title (pixels dropped by the bounded LRU;
+        // GPU array still has its art, so hasArt() is true) must not fall
+        // into the same branch: with bScale ~0 that hid BOTH meshes and the
+        // whole box vanished on hover. createHeroJellyfinMaterials always
+        // yields a usable front (real art or placeholder) and the miss path
+        // now fires an async redecode + requestRender, so eviction shows
+        // placeholder-then-swap instead of nothing.
+        hf.visible = posterPixelCache.has(slot.movie.id)
+          || textureArrayManager.hasArt(slot.movie.id);
         hb.visible = bScale > 0.0001;
         hf.position.set(fWorldX, fWorldY, fWorldZ);
         hf.rotation.set(slot.currentRotX, slot.frontRotY + theta, 0, CASE_EULER_ORDER);
@@ -5268,8 +5390,7 @@ export class StoreScene {
     // mid-flip-through: 5 probes × 6 faces + a 3-bounce PMREM = ~98ms in one
     // frame). It's a one-shot visual refinement — deferring it until the
     // shopper pauses costs nothing and can never hitch an interaction.
-    if (this.pendingStockedRebake && this.frameCount > 300 && this.dirtySlots.size === 0 && !this.launchAnim &&
-        time - this.lastRenderRequestTime > 2500) {
+    if (this.stockedRebakeDue(time)) {
       this.pendingStockedRebake = false;
       this.outdoor.rebakeEnvironment();
     }
@@ -5344,8 +5465,63 @@ export class StoreScene {
     } else {
       this.renderer.render(this.scene, this.camera);
     }
+    this.fullComposites++;
+    // Arms (or disarms) the partial path for the frames that follow: this frame
+    // has left a beauty buffer behind that the next one may patch.
+    this.partial?.afterFullFrame();
     perfTrace.end(SP_RENDER);
   };
+
+  // The one-shot stocked-shelves environment re-bake fires on the first frame
+  // that satisfies all of this (see its call site). Asked by the partial-
+  // composite gate too: a re-bake relights the whole room, so the frame it
+  // lands on must be a full one. Read as a predicate rather than latching on
+  // `pendingStockedRebake` alone, which can stay true indefinitely (dirty
+  // slots, a busy input clock) and would park the partial path forever.
+  private stockedRebakeDue(time: number): boolean {
+    return this.pendingStockedRebake && this.frameCount > 300 && this.dirtySlots.size === 0 &&
+      !this.launchAnim && time - this.lastRenderRequestTime > 2500;
+  }
+
+  // Partial-composite gate helper: is a mirror that owes a fresh reflection
+  // actually on screen? A dirty mirror off-camera costs nothing (its dirt is
+  // only consumed when the main camera draws it — see installMirrorThrottle),
+  // but one in view would re-render on a full frame and change the picture, so
+  // the partial path must stand down. Spheres are cached: mirrors never move.
+  private dirtyMirrorInView(): boolean {
+    if (this.mirrors.length === 0) return false;
+    this._patchProj.multiplyMatrices(this.camera.projectionMatrix, this.camera.matrixWorldInverse);
+    this._patchFrustum.setFromProjectionMatrix(this._patchProj);
+    for (const m of this.mirrors) {
+      if (!m.dirty) continue;
+      const obj = m.r as THREE.Mesh;
+      let sphere = obj.userData.patchSphere as THREE.Sphere | undefined;
+      if (!sphere) {
+        if (!obj.geometry.boundingSphere) obj.geometry.computeBoundingSphere();
+        if (!obj.geometry.boundingSphere) return true; // can't prove it's off-screen
+        sphere = obj.geometry.boundingSphere.clone().applyMatrix4(obj.matrixWorld);
+        obj.userData.patchSphere = sphere;
+      }
+      if (this._patchFrustum.intersectsSphere(sphere)) return true;
+    }
+    return false;
+  }
+
+  // Partial-composite gate helper: is the eye inside the store proper? Out in
+  // the vestibule or the lot (z >= 8.6 is the vestibule back wall, see
+  // constrainWalkPosition) the storefront glazing sits between the camera and
+  // the sets — and a glass pane is TRANSPARENT with depth-write off, so it
+  // never occludes the patch, yet the full frame blends it over the tube. The
+  // partial path would erase that, so it only runs indoors.
+  private insideStorePatchZone(): boolean {
+    const p = this.camera.position;
+    if (p.z > 7.5 || p.z < this.backWallZ) return false;
+    if (p.y > this.ceilingY || p.y < 0) return false;
+    return Math.abs(p.x - 11.0) < this.getStoreWidth() / 2;
+  }
+
+  private readonly _patchFrustum = new THREE.Frustum();
+  private readonly _patchProj = new THREE.Matrix4();
 
   public pauseAmbientTvs(): void {
     this.ambientTvs?.pause();
@@ -5761,6 +5937,8 @@ export class StoreScene {
       }
     });
 
+    this.partial?.dispose();
+    this.partial = null;
     if (this.composer) {
       this.composer.passes.forEach(pass => {
         if (typeof pass.dispose === 'function') {

@@ -519,6 +519,29 @@ export function buildAllMovieBoxes(scene: StoreScene) {
         return;
       }
 
+      // A posterPixelCache MISS here can mean two different things at real
+      // catalog scale: this title was never decoded (needs a real decode), or
+      // it WAS decoded and its art already reached the GPU array — only its
+      // CPU pixel-cache entry got evicted to stay under budget. Once a GPU
+      // array layer is uploaded it is never evicted (unlike posterPixelCache/
+      // lowResCache), so in the second case the shelf already looks correct
+      // and redecoding would only refill a CPU cache this call doesn't need.
+      // Skipping that redundant redecode matters because updateLOD() re-runs
+      // loadShelfDetails on every browse keypress for every slot it touches
+      // — without this check, a bounded cache turned that into "every aisle
+      // change re-decodes its shelves in a churn storm" (observed 2026-08-05).
+      // Check whichever resolution THIS call actually needs: background
+      // priority only needs low-res on screen, full priority needs high-res
+      // specifically (matches the priority gate above).
+      const needsHighRes = priority >= 1 || textureArrayManager.usesHighResOnly(slot.movie.id);
+      const alreadyOnGPU = needsHighRes
+        ? textureArrayManager.hasHighRes(slot.movie.id)
+        : textureArrayManager.hasArt(slot.movie.id);
+      if (alreadyOnGPU) {
+        onSettled?.();
+        return;
+      }
+
       if (!slot.movie.posterUrl) {
         // Nothing to fetch for this slot — settle immediately so callers awaiting
         // full-catalog readiness don't hang on titles with no artwork.

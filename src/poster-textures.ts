@@ -138,6 +138,21 @@ export function setTextureStreamWake(cb: (() => void) | null) {
   textureStreamWake = cb;
 }
 
+/**
+ * Fire the render-on-demand wake registered above, if any. TextureArrayManager's
+ * setFlag() already calls this on every loaded-flag flip; this export lets other
+ * CPU-cache-driven material swaps that DON'T go through the texture-array loaded
+ * flags — hero/dedicated/fixture cases rebuilt straight from posterPixelCache
+ * (video-case.ts's browse-bin loadShelfDetails, person-endcap cases, etc.) — reuse
+ * the exact same nudge instead of each threading its own scene/requestRender
+ * reference through a module that otherwise has none. Callers that DO have a
+ * `scene` handy (store-inspect.ts, store-clerk-flow.ts) just call
+ * scene.requestRender() directly, same as every other request in those files.
+ */
+export function wakeTextureStream() {
+  textureStreamWake?.();
+}
+
 // Force a texture's GPU upload (and mipmap build) to happen now, so its cost is
 // paid inside the budgeted loop rather than during the next scene render.
 export function uploadTextureNow(texture: THREE.Texture) {
@@ -805,6 +820,21 @@ class TextureArrayManager {
     const idx = this.movieToIndex.get(movieId);
     if (idx === undefined || !this.loadedFlags) return false;
     return this.loadedFlags[idx] > 0;
+  }
+
+  /**
+   * Has the FULL-res layer landed (as opposed to just the low-res preview)?
+   * The GPU array layer, once uploaded, is never evicted — unlike
+   * posterPixelCache/lowResCache, whose CPU-side entries can vanish under a
+   * byte budget. Callers that only re-request a decode to refill an evicted
+   * CPU cache entry (store-stock's loadShelfDetails) check this first: if the
+   * resolution they actually need for this priority is already on the GPU,
+   * the shelf already looks right and a redecode would be pure churn.
+   */
+  public hasHighRes(movieId: string): boolean {
+    const idx = this.movieToIndex.get(movieId);
+    if (idx === undefined || !this.loadedFlags) return false;
+    return this.loadedFlags[idx] >= 255;
   }
 
   public setLowResLoaded(movieId: string, loaded: boolean) {

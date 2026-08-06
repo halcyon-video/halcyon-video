@@ -701,10 +701,15 @@ export function showPersonEndcap(scene: StoreScene, person: string, kind: 'actor
     group.add(mesh);
     caseMeshes.push(mesh);
 
+    // Miss-tolerant: the mesh above already built with createHeroJellyfinMaterials,
+    // which falls back to a placeholder front when posterPixelCache misses (never
+    // decoded yet, or evicted since) — the case is never blank while this resolves.
+    // posterQueue.load() dedupes in-flight requests for the same title itself.
     if (!posterPixelCache.has(movie.id) && movie.posterUrl) {
       posterQueue.load(movie, 2, () => {
         if (scene.personEndcap && scene.personEndcap.caseMeshes[idx] === mesh) {
           mesh.material = createHeroJellyfinMaterials(movie, undefined, true);
+          scene.requestRender(); // may land after the scene idled
         }
       });
     }
