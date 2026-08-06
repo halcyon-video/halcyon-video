@@ -776,9 +776,9 @@ export function registerCoreSettings(): void {
     // manager-terminal / flat-menu switches use (switchRenderMode in main.ts).
     applyMode: 'rebuild-scene',
     hint: 'Full 3D store, or a flat shelf UI for low-power clients.',
-    // Service knob (review §4.3 dedupe): the couch-facing mode switches are
-    // the diegetic ones — power menu, counter CRT, and the flat menu.
-    hidden: true,
+    // Also switchable diegetically (power menu, counter CRT, flat menu); this
+    // row exists so the mode is FINDABLE where users look for it (UX pass
+    // 2026-08: performance controls must live on the couch tree).
   });
 
   registerSetting({
@@ -793,8 +793,7 @@ export function registerCoreSettings(): void {
     ],
     default: 'high',
     applyMode: 'rebuild-scene',
-    hint: 'Reflections and post-processing detail.',
-    hidden: true, // service knob: the kiosk auto-picks per GPU; staff-only override
+    hint: 'Reflections and post-processing detail. Auto-picked per GPU.',
   });
 
   registerSetting({
@@ -809,7 +808,6 @@ export function registerCoreSettings(): void {
     default: 'n8ao',
     applyMode: 'rebuild-scene',
     hint: 'N8AO: cheaper half-res AO. GTAO is the older fallback.',
-    hidden: true, // service knob: AO engine choice
   });
 
   registerSetting({
@@ -828,7 +826,6 @@ export function registerCoreSettings(): void {
     // every other Performance row here takes.
     applyMode: 'rebuild-scene',
     hint: 'ACTIVE render rate. Auto: uncapped on GPUs that earned the supersample grant (and any explicit quality override), else paced to ~60fps at an even display-refresh divisor.',
-    hidden: true, // service knob: the kiosk auto-picks 60; staff-only override
   });
 
   // On-screen frame-rate readout. Live toggle: the meter is a pure DOM overlay
@@ -844,7 +841,6 @@ export function registerCoreSettings(): void {
     applyMode: 'live',
     apply: (value) => enableFpsMeter(!!value),
     hint: 'Corner readout: FPS, frame time, 1% low. IDLE when parked.',
-    hidden: true, // service knob: perf diagnostics readout
   });
 
   // (Removed) 'bb_security_cam' — the security-camera angle is now the ONLY

@@ -901,7 +901,7 @@ const GROUP_HINTS: Record<SettingGroup, string> = {
   'Store Brand': 'Design your own video-store logo and signage.',
   'Playback': 'Audio language, captions, and candy delivery.',
   'Video Games': 'Enable the game section and pick platforms.',
-  'Performance': 'Render mode and graphics quality.',
+  'Performance': 'Graphics quality, render mode, FPS cap and counter.',
   'Connection': 'Jellyfin, Jellyseerr and Romm servers.',
 };
 
@@ -1038,6 +1038,21 @@ function generateSettingsDrawer() {
       );
       groupsEl.appendChild(accountGroupEl);
     }
+
+    // Advanced (UX pass 2026-08): SERVICE MODE used to be reachable only via
+    // the counter CRT's MANAGER OVERRIDE row — a door nothing on screen ever
+    // advertised. The CRT entry stays the diegetic path; this row is its
+    // findable twin on the couch tree.
+    const serviceGroupEl = document.createElement('div');
+    serviceGroupEl.className = 'settings-group';
+    const serviceTitleEl = document.createElement('div');
+    serviceTitleEl.className = 'settings-group-title';
+    serviceTitleEl.textContent = 'Advanced';
+    serviceGroupEl.appendChild(serviceTitleEl);
+    serviceGroupEl.appendChild(makeRow(
+      SETTINGS_GROUP_PREFIX + 'Service', 'Service Mode (Manager Override)',
+      'Staff overrides and diagnostics — also on the counter CRT.', '›'));
+    groupsEl.appendChild(serviceGroupEl);
   } else {
     // One group's settings (or a sub-page / the service page), headed by a
     // Back row.
