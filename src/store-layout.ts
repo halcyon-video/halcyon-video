@@ -737,6 +737,18 @@ export interface ShelvingUnit {
   posInLine: number;
   isLineFront: boolean; // true only for the unit at the line's front end (blue cap)
   isLineBack: boolean;  // true only for the unit at the line's back end (white cap)
+  // A single straight physical row can be POURED as several lineId chunks —
+  // fillField() breaks a run into maxRunUnits-sized pieces (each its own
+  // lineId, with a real RUN_BREAK_GAP cross-aisle and its own endcaps) purely
+  // for shelving-capacity bookkeeping, even though consecutive chunks sit
+  // short-end-to-short-end with only that small gap between them: to a
+  // customer walking the row they read as ONE continuous run. rowGroupId is
+  // shared by every chunk poured from the same fillField() run (i.e. the same
+  // physical row), so StorePlan's walk-order pass and entryBlockOrder() can
+  // treat them as one line for content-flow purposes without disturbing
+  // lineId/isLineFront/isLineBack, which every OTHER consumer (endcap
+  // placement, browse-cursor line-hopping) still keys off unchanged.
+  rowGroupId: number;
   anchorX: number;
   // Placement is now an explicit property of the unit rather than something
   // re-derived from xCenter at every call site. yaw is the island's tilt about its
