@@ -818,7 +818,7 @@ export function registerCoreSettings(): void {
     kind: 'cycle',
     group: 'Performance',
     values: [
-      { id: 'auto', label: 'Auto (60)' },
+      { id: 'auto', label: 'Auto' },
       { id: '0', label: 'Uncapped' },
       { id: '30', label: '30' },
     ],
@@ -827,7 +827,7 @@ export function registerCoreSettings(): void {
     // other bb_* boot flags this group cycles — needs the same scene rebuild
     // every other Performance row here takes.
     applyMode: 'rebuild-scene',
-    hint: 'ACTIVE render rate. Auto paces to ~60fps at an even display-refresh divisor; Uncapped chases the raw refresh rate.',
+    hint: 'ACTIVE render rate. Auto: uncapped on GPUs that earned the supersample grant (and any explicit quality override), else paced to ~60fps at an even display-refresh divisor.',
     hidden: true, // service knob: the kiosk auto-picks 60; staff-only override
   });
 

@@ -1797,7 +1797,17 @@ export class StoreScene {
       && !/Chrome|Chromium/i.test(navigator.userAgent)
       && /Linux/.test(navigator.userAgent);
     if (this.webkitGL) console.log('[GPU] WebKitGTK engine — clamping pixel budget to medium and using static mirrors');
-    this.fpsCapOverride = localStorage.getItem('bb_fps_cap');
+    // Frame-rate cap default follows the supersample grant (owner ruling
+    // 2026-08-05, after wave 1 shipped with a blanket 60-target: "buttery
+    // smooth" is the product on capable hardware): a GPU that measured enough
+    // headroom for above-native supersampling — or any explicit bb_quality
+    // override, the owner's kiosk/harness case — runs UNCAPPED by default and
+    // chases the display's real refresh rate; only auto-tiered machines
+    // without that headroom get the 60-target divisor cap that protects weak
+    // hardware. An explicit bb_fps_cap (the SERVICE MODE row) still forces
+    // either behavior on any machine.
+    this.fpsCapOverride = localStorage.getItem('bb_fps_cap')
+      ?? (supersampleGranted ? '0' : null);
     if (softwareGL) {
       // Software frames cost seconds, so the dynamic scaler's one-step-per-
       // second walk from 1.0 to the floor would itself take minutes (measured:

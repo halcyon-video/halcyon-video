@@ -776,52 +776,59 @@ let sharedJellyfinSpinePlaceholderMaterial: THREE.MeshStandardMaterial | null = 
 //  - decor fixtures — browse-bin cases and framed wall posters (pinned for the
 //    scene's lifetime; bounded by the fixture count).
 //
-// The pixel cache itself used to be a plain unbounded Map: every title ever
-// decoded (browse, inspect, shelf LOD) stayed cached forever, which reached
-// ~1.7GB JS heap on the ~1950-title demo catalog (614,400 bytes/title × the
-// whole catalog). This app runs unattended on kiosks for days at a time, so
-// heap must stay FLAT at catalog scale, not grow with how much of the
-// catalog got glanced at over a multi-day idle session — bounded below by
-// bytes via LruByteCache (LRU: Map insertion order, oldest-first, re-inserted
-// on every hit — see lru-byte-cache.ts). Every consumer already re-decodes on
-// a cache miss (the worker's IndexedDB raw-bytes cache serves it without a
-// network refetch), so eviction is safe by construction — it only costs a
-// re-decode, never a broken poster.
+// The pixel cache reaches ~1.7GB JS heap on the ~1950-title demo catalog
+// (614,400 bytes/title × the whole catalog) — the dominant share of the
+// "~8GB RSS" reports from launch week. It is an LruByteCache (LRU: Map
+// insertion order, oldest-first, re-inserted on every hit — see
+// lru-byte-cache.ts) so a byte budget CAN bound it, but see the budget
+// block below before ever bounding it by default: eviction is NOT yet safe
+// — several consumers still assume presence instead of re-decoding on a
+// miss.
 //
 // Only get()/has()/set()/clear() are used anywhere on these two caches (in
 // this file and in store-stock.ts / store-clerk-flow.ts / store-inspect.ts /
 // asset-viewer.ts / three-scene.ts), so LruByteCache's Map-compatible surface
 // is a drop-in replacement — none of those other files needed to change.
-// (Entry sizes for the budget math below: full-res 320x480 RGBA = 614,400 B
-// per title — COVER_WIDTH × COVER_HEIGHT × 4; low-res 64x96 RGBA = 24,576 B.)
-// Default full-res budget: 256MB ≈ 435 titles resident at once. THE BUDGET
-// MUST EXCEED THE BROWSE WORKING SET (every shelf slot in LOD range around
-// the camera, plus the hero/endcap/fixture set — bounded separately, see
-// HERO_POSTER_LRU_CAP below) with real margin, or browsing THRASHES: each
-// keypress evicts pixels the next keypress re-decodes, and the churn lands as
-// GC pauses, not in any one span. Measured on the perf harness's 200-title
-// catalog with a 100MB budget (smaller than that catalog's own 123MB): +5.1GB
-// of allocation churn and dtMs p90 17→36ms over a 60-move flip session;
-// at 256MB the session is churn-free and matches the unbounded baseline.
-// Overridable per-kiosk via localStorage `bb_poster_cache_mb` (a lower-RAM
-// box can shrink it, at the cost of a smaller no-thrash browse radius).
-const POSTER_PIXEL_CACHE_BUDGET_MB_DEFAULT = 256;
-function readPosterCacheBudgetMB(): number {
-  if (typeof localStorage === 'undefined') return POSTER_PIXEL_CACHE_BUDGET_MB_DEFAULT;
+// (Entry sizes: full-res 320x480 RGBA = 614,400 B per title — COVER_WIDTH ×
+// COVER_HEIGHT × 4; low-res 64x96 RGBA = 24,576 B.)
+//
+// DEFAULT IS UNBOUNDED — eviction is opt-in via localStorage
+// `bb_poster_cache_mb` (full-res budget in MB; low-res scales at 1/8th,
+// floored at 16MB). Several consumers still treat presence in this cache as
+// an INVARIANT rather than an optimization (GH #97's original "permanent
+// while the medium is unchanged" contract): store-stock/inspect/hero paths
+// gate on has() and can hide a case's instanced copy before the dedicated
+// hero case exists, so an eviction at real catalog scale — where boot decodes
+// EVERY title through here and immediately evicts all but the newest — makes
+// a picked-up/hovered box vanish outright, and every aisle change re-decodes
+// its shelves in a churn storm (both observed on the owner's store,
+// 2026-08-05, with a 256MB default). Do NOT restore a bounded default until
+// every consumer is miss-tolerant (queued as the cache-rework task): on a
+// miss they must keep the instanced copy visible, request an async re-decode,
+// and swap in the pixels on arrival.
+//
+// When a bound IS set, it must exceed the browse working set with real
+// margin or browsing thrashes even without visible breakage: each keypress
+// evicts pixels the next keypress re-decodes, and the cost lands as GC
+// pauses, not in any one perf span (measured: a 100MB budget vs the perf
+// harness's own 123MB catalog → +5.1GB allocation churn, dtMs p90 17→36ms
+// over a 60-move flip session).
+function readPosterCacheBudgetBytes(): number {
+  if (typeof localStorage === 'undefined') return Infinity;
   const raw = localStorage.getItem('bb_poster_cache_mb');
   const n = raw ? parseFloat(raw) : NaN;
-  return Number.isFinite(n) && n > 0 ? n : POSTER_PIXEL_CACHE_BUDGET_MB_DEFAULT;
+  return Number.isFinite(n) && n > 0 ? n * 1024 * 1024 : Infinity;
 }
-const POSTER_PIXEL_CACHE_BUDGET_MB = readPosterCacheBudgetMB();
-export const posterPixelCache = new LruByteCache(POSTER_PIXEL_CACHE_BUDGET_MB * 1024 * 1024);
-// lowResCache backs the DISTANT-shelf texture-array layer, so its working set
-// is closer to "the whole visible store" than "the shelves near the camera" —
-// it gets its own independent budget, NOT a proportional slice of the
-// full-res knob (1/25th of 256MB ≈ 10MB ≈ 435 titles would starve any
-// mid-size catalog into the same eviction churn described above). 64MB covers
-// ~2,700 titles — the entire demo catalog and most real libraries — while
-// still capping a games-only 7k store's worst case.
-export const lowResCache = new LruByteCache(64 * 1024 * 1024);
+const POSTER_PIXEL_CACHE_BUDGET_BYTES = readPosterCacheBudgetBytes();
+export const posterPixelCache = new LruByteCache(POSTER_PIXEL_CACHE_BUDGET_BYTES);
+// The low-res tier backs the DISTANT-shelf texture-array layer (whole-store
+// working set, tiny entries), so a configured bound scales it gently rather
+// than proportionally to entry size — 1/25th would starve mid-size catalogs.
+export const lowResCache = new LruByteCache(
+  Number.isFinite(POSTER_PIXEL_CACHE_BUDGET_BYTES)
+    ? Math.max(16 * 1024 * 1024, POSTER_PIXEL_CACHE_BUDGET_BYTES / 8)
+    : Infinity
+);
 // LRU (Map insertion order, oldest first) of transient hero poster textures.
 const HERO_POSTER_LRU_CAP = 16;
 const heroPosterTextureLRU = new Map<string, THREE.Texture>();
