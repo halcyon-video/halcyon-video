@@ -691,6 +691,15 @@ export class EntranceCheckout implements StoreFixture {
         // screen plane we add on the station's +Z side.
         monitor.rotation.y = Math.PI;
         const bb = fitModel(monitor, MON_H);
+        // Push the tube toward the CUSTOMER side of the island: centered on
+        // the spine, the bezel of this very deep model lands basically ON the
+        // island's clerk-side face (innerD/2 = 0.8), leaving no deck at all
+        // for the keyboard (feedback/046). The butt overhangs the island's
+        // back face into the counter well instead, where the outer band hides
+        // it — exactly what a real CRT does on a shallow desk.
+        monitor.position.z -= 0.3;
+        monitor.updateMatrixWorld(true);
+        bb.setFromObject(monitor);
         // Bezel-opening bounds must be measured while the monitor is still
         // detached (setFromObject uses world space; g already carries the
         // station transform).
@@ -747,16 +756,42 @@ export class EntranceCheckout implements StoreFixture {
     });
 
     loader.load(assetUrl('models/keyboard.glb'), (gltf) => {
+      // Key-panel material: a darker putty than the shell so the recessed
+      // key field / numpad still read as such at desk distance — the flat
+      // tintBeige pass turned the whole model into a featureless wedge
+      // (feedback/046).
+      const kbKeys = new THREE.MeshStandardMaterial({ color: 0x9a917c, roughness: 0.72, metalness: 0.03 });
       stationGroups.forEach((g) => {
         const kb = gltf.scene.clone(true);
-        tintBeige(kb, true);
+        // Two-tone by the source model's material names: 'metalDark' is the
+        // shell, 'metalMedium' the recessed key panels.
+        kb.traverse((child) => {
+          if (child instanceof THREE.Mesh) {
+            const pick = (m: THREE.Material) => (m.name === 'metalMedium' ? kbKeys : beigeDark);
+            child.material = Array.isArray(child.material) ? child.material.map(pick) : pick(child.material);
+            child.castShadow = true;
+            child.receiveShadow = true;
+          }
+        });
+        // The model's key field faces its -Z; spin it to face the clerk like
+        // the monitor screen does (feedback/046 "looks backwards").
+        kb.rotation.y = Math.PI;
+        kb.position.set(0, 0, 0);
+        kb.updateMatrixWorld(true);
         const bb = new THREE.Box3().setFromObject(kb);
         const size = bb.getSize(new THREE.Vector3());
-        const s = 0.95 / Math.max(size.x, 1e-4); // ~0.95 ft wide
+        const s = 0.85 / Math.max(size.x, 1e-4); // ~0.85 ft wide
         kb.scale.setScalar(s);
+        kb.updateMatrixWorld(true);
         bb.setFromObject(kb);
         const ctr = bb.getCenter(new THREE.Vector3());
-        kb.position.set(-ctr.x, -bb.min.y, -ctr.z + 0.95);
+        // Seat ON the deck (bottom at y=0), front edge just inside the
+        // island's clerk-side face (innerD/2 = 0.8 from the spine the
+        // station sits on) with its back half tucked under the CRT's bezel
+        // lip — the only strip of deck the monitor leaves free. The old
+        // `-ctr.z + 0.95` push left the near half cantilevered past the
+        // island edge, reading as a floating slab (feedback/046).
+        kb.position.set(-ctr.x, -bb.min.y, 0.78 - bb.max.z);
         g.add(kb);
       });
       this.ctx.requestShadowRefresh();
