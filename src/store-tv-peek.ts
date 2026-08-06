@@ -4,8 +4,11 @@
 // The user stays logically in browse: nothing about the cursor changes, only
 // the camera targets, and the full return state (cursor indices + camera pose)
 // is snapshotted on the way in and restored exactly on the way out. While the
-// peek is up: ←/→ cycle the TVs, ▼ or Back drop back onto the shelf, ▲ and
-// Select do nothing (a peek has nothing to confirm).
+// peek is up: ←/→ cycle the TVs, ▼ or Back drop back onto the shelf, ▲ does
+// nothing, and Select jumps straight to the box of whatever's playing (the
+// one movie streaming to every set — see AmbientTvs.getPlayingMovie) via the
+// same jumpToTitle path a search hit uses, landing in inspect. With no
+// stream (dead glass / test card) Select is a no-op, same as before.
 //
 // Framing follows the harness's `tvclose` state — sit on the screen's own
 // normal so the tube reads square-on — and then backs off along that normal as
@@ -106,6 +109,22 @@ export function enterTvPeek(scene: StoreScene): boolean {
   scene.onConsoleLog(
     `[System] Looking up at the store TV${poses.length > 1 ? ' — ←/→ for the other set' : ''}. ▼ or Back returns to the shelf.`,
     'system');
+  return true;
+}
+
+/**
+ * Select while peeking: jump straight to the box of whatever's playing.
+ * Returns true whenever a peek was active (the press is consumed either
+ * way — a peek has nothing else to confirm); the jump itself only fires
+ * when there's an actual stream to chase.
+ */
+export function tvPeekSelect(scene: StoreScene): boolean {
+  const peek = scene.tvPeek;
+  if (!peek) return false;
+  const movie = scene.ambientTvs?.getPlayingMovie();
+  if (!movie) return true; // dead glass / test card — nothing to jump to
+  scene.tvPeek = null; // leaving the peek for real inspect, not a browse return
+  scene.jumpToTitle(movie.id);
   return true;
 }
 

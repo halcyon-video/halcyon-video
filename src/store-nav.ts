@@ -19,7 +19,7 @@ import { perfTrace } from './perf-trace';
 import { SP_INPUT, TOP_WRAP_GLIDE_LERP } from './scene-shared';
 import { isEndcapKind } from './fixtures/genre-endcap';
 import { enterEndcapCursor } from './browse-cursor';
-import { enterTvPeek, exitTvPeek, tvPeekActive, tvPeekCycle, debugTvPeek, forgetTvPeek } from './store-tv-peek';
+import { enterTvPeek, exitTvPeek, tvPeekActive, tvPeekCycle, tvPeekSelect, debugTvPeek, forgetTvPeek } from './store-tv-peek';
 import {
   openSubNav, subNavActive, subNavArrow, subNavUp, subNavDown, subNavSelect, subNavBack,
   debugSubNav, forgetSubNav,
@@ -654,9 +654,9 @@ export function navOverlayArrow(scene: StoreScene, dir: number): boolean {
   return tvPeekCycle(scene, dir) || subNavArrow(scene, dir);
 }
 
-/** Select while an overlay owns it (a TV peek has nothing to confirm). */
+/** Select while an overlay owns it: a TV peek jumps to what's playing. */
 export function navOverlaySelect(scene: StoreScene): boolean {
-  if (tvPeekActive(scene)) return true;
+  if (tvPeekActive(scene)) return tvPeekSelect(scene);
   return subNavSelect(scene);
 }
 

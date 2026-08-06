@@ -101,6 +101,11 @@ export class AmbientTvs implements StoreFixture {
   // video so the tube treatment is verifiable without a Jellyfin stream.
   private testCardTex: THREE.CanvasTexture | null = null;
   private disposed = false;
+  // The one movie streaming to every set (all screens share a single video
+  // element — see makeVideoTexture) — null when there's no stream (dead
+  // glass / test card). Read by the TV peek's Select action (store-tv-peek.ts)
+  // to jump straight to this title's box.
+  private playingMovie: Movie | null = null;
 
   constructor(private ctx: FixtureContext) {}
 
@@ -120,8 +125,15 @@ export class AmbientTvs implements StoreFixture {
       const seekSec = durationMin * 60 * (0.05 + Math.random() * 0.60);
       videoTex = this.makeVideoTexture(movie, durationMin, seekSec);
       if (videoTex) {
+        this.playingMovie = movie;
         this.ctx.log(`[System] CRT TVs: "${movie.title}" from ~${Math.round(seekSec / 60)}min`, 'system');
       }
+    } else if (pool.length > 0 && localStorage.getItem('bb_tv_testcard') === '1') {
+      // Same harness/dev stand-in as the test-card picture below: with no
+      // Jellyfin stream there's nothing to actually decode, but resolving a
+      // "playing" identity too keeps the TV-peek Select action (jump to the
+      // box of what's playing) testable offline.
+      this.playingMovie = pool[Math.floor(Math.random() * pool.length)];
     }
     this.buildHardware(videoTex);
   }
@@ -713,6 +725,13 @@ export class AmbientTvs implements StoreFixture {
   // dock square in front of one without hand-hunting coordinates.
   getScreenPoses(): { center: THREE.Vector3; normal: THREE.Vector3; width: number; height: number }[] {
     return this.screenPoses;
+  }
+
+  // The title currently streaming to every set, or null with no stream
+  // (dead glass) or the harness test card. Used by the TV peek's Select
+  // action to jump to that title's box.
+  getPlayingMovie(): Movie | null {
+    return this.playingMovie;
   }
 
   // Per-frame: sync the Web Audio listener with the camera, and force the
