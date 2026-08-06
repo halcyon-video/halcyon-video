@@ -262,8 +262,8 @@ export function buildCounterProps93(scene: StoreScene): void {
           const mesh = o as THREE.Mesh;
           if (!mesh.isMesh) return;
           const tint = (m: THREE.Material): THREE.Material => {
-            const t = m.clone() as THREE.MeshStandardMaterial;
-            t.color?.set(s.color);
+            const t = new THREE.MeshPhysicalMaterial({ color: s.color, roughness: 0.15, metalness: 0, clearcoat: 0.6, clearcoatRoughness: 0.2 });
+            const src = m as THREE.MeshStandardMaterial; if (src.map) t.map = src.map;
             return t;
           };
           mesh.material = Array.isArray(mesh.material) ? mesh.material.map(tint) : tint(mesh.material);
@@ -327,28 +327,76 @@ export function buildCounterProps93(scene: StoreScene): void {
     group.add(stack);
 
     // Beige corded desk phone beside the station — every register in the
-    // footage keeps one.
-    const phoneBase = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.1, 0.4), matte(0xd9cdb2, 0.55));
+    // footage keeps one. It sits on the CLERK side of the counter spine:
+    // the 'register-right' snap frame stands ON the spine at cx + 5.4 (see
+    // entrance/index.ts signAnchors), and the phone used to share that exact
+    // spot, so the sign's pole grew straight out of the phone body and its
+    // cord loops read as loose rings scattered on the counter (feedback/047).
     const pPos = entrance.getCounterTopAnchor(cx + 5.3)!;
-    phoneBase.position.set(pPos.x, pPos.y + 0.05, pPos.z);
-    phoneBase.rotation.y = pPos.rotY + 0.2;
+    const pYaw = pPos.rotY + 0.2;
+    const pt = tangent(pYaw);
+    const pn = normal(pYaw);
+    const pOrigin = new THREE.Vector3(pPos.x, pPos.y, pPos.z).add(normal(pPos.rotY).multiplyScalar(0.5));
+    const phoneAt = (dt: number, dn: number, dy: number) =>
+      pOrigin.clone().addScaledVector(pt, dt).addScaledVector(pn, dn).setY(pOrigin.y + dy);
+    const phoneBase = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.1, 0.4), matte(0xd9cdb2, 0.55));
+    phoneBase.position.copy(phoneAt(0, 0, 0.05));
+    phoneBase.rotation.y = pYaw;
     phoneBase.castShadow = true;
     phoneBase.receiveShadow = true;
     group.add(phoneBase);
-    const handset = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.07, 0.13), matte(0xcfc3a8, 0.5));
-    handset.position.set(pPos.x, pPos.y + 0.14, pPos.z);
-    handset.rotation.y = pPos.rotY + 0.2;
+    // Darker keypad plate inset on the deck's far half.
+    const keypad = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.014, 0.22), matte(0xbfb49a, 0.5));
+    keypad.position.copy(phoneAt(0.1, 0.07, 0.105));
+    keypad.rotation.y = pYaw;
+    group.add(keypad);
+    // Handset lying along the near long edge on two cradle ridges, with
+    // ear/mouth lumps hanging over its ends — the flat slab didn't read.
+    for (const dt of [-0.13, 0.13]) {
+      const ridge = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, 0.1), matte(0xcfc3a8, 0.55));
+      ridge.position.copy(phoneAt(dt, -0.09, 0.12));
+      ridge.rotation.y = pYaw;
+      group.add(ridge);
+    }
+    const handset = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.05, 0.12), matte(0xcfc3a8, 0.5));
+    handset.position.copy(phoneAt(0, -0.09, 0.175));
+    handset.rotation.y = pYaw;
     handset.castShadow = true;
     group.add(handset);
-    // Coiled cord, suggested with a few small tori.
+    for (const dt of [-0.2, 0.2]) {
+      const lump = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.06, 0.135), matte(0xcfc3a8, 0.5));
+      lump.position.copy(phoneAt(dt, -0.09, 0.155));
+      lump.rotation.y = pYaw;
+      lump.castShadow = true;
+      group.add(lump);
+    }
+    // Coiled cord: an actual helix wound along a short sagging run from the
+    // mouth end of the handset to the base's corner, instead of the old
+    // "few small tori" suggestion (the rings of feedback/047).
     const cordMat = matte(0xbfb49a, 0.6);
-    for (let i = 0; i < 4; i++) {
-      const loop = new THREE.Mesh(new THREE.TorusGeometry(0.03, 0.008, 6, 10), cordMat);
-      loop.position.set(pPos.x, pPos.y + 0.03, pPos.z)
-        .add(tangent(pPos.rotY).multiplyScalar(0.3 + i * 0.05))
-        .add(normal(pPos.rotY).multiplyScalar(0.14));
-      loop.rotation.x = Math.PI / 2.4;
-      group.add(loop);
+    {
+      const a = phoneAt(-0.24, -0.09, 0.16);
+      const b = phoneAt(-0.44, -0.13, 0.05);
+      const c = phoneAt(-0.31, 0.02, 0.035);
+      const spine = new THREE.QuadraticBezierCurve3(a, b, c);
+      const SAMPLES = 160, turns = 13, coilR = 0.016;
+      const pts: THREE.Vector3[] = [];
+      const tan = new THREE.Vector3(), side = new THREE.Vector3(), bin = new THREE.Vector3();
+      const worldUp = new THREE.Vector3(0, 1, 0);
+      for (let i = 0; i <= SAMPLES; i++) {
+        const u = i / SAMPLES;
+        const p = spine.getPoint(u);
+        spine.getTangent(u, tan);
+        side.crossVectors(worldUp, tan).normalize();
+        bin.crossVectors(tan, side).normalize();
+        const ang = u * turns * Math.PI * 2;
+        pts.push(p.addScaledVector(side, Math.cos(ang) * coilR).addScaledVector(bin, Math.sin(ang) * coilR));
+      }
+      const cord = new THREE.Mesh(
+        new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), SAMPLES * 2, 0.0055, 5, false),
+        cordMat
+      );
+      group.add(cord);
     }
   }
 
