@@ -38,13 +38,13 @@
 //    counter (white body, blue top, yellow pinstripe) that faces the store.
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { createGlassSurfaceNormalMap, createWalkOffMatTexture, useCheapMaterials } from '../canvas-textures';
+import { createGlassSurfaceNormalMap, createWalkOffMatTexture, createHvacVentTexture, useCheapMaterials } from '../canvas-textures';
 import { getTubeMaskCanvas } from '../crt-tube';
 import { makeCrtGlassMaterial, addGlassReflectionPane } from '../glass-reflection';
 import { assetUrl } from '../asset-url';
 import { FixtureContext, StoreFixture } from '../fixtures';
-import { getActiveTheme } from '../themes';
-import { ENTRANCE_SIDELIGHT_WIDTH } from '../store-layout';
+import { getActiveTheme, themeKneeGoldHex } from '../themes';
+import { ENTRANCE_SIDELIGHT_WIDTH, CEILING_Y, mapWallSegmentUV } from '../store-layout';
 import { vestibuleCeilingY } from '../ceiling-soffit';
 import { WINDOW_HEAD_Y } from '../storefront-facade';
 import { buildVestibuleDoor, updateVestibuleDoors, VestibuleDoor } from './doors';
@@ -211,7 +211,24 @@ export class EntranceCheckout implements StoreFixture {
     // dropped ceiling instead of two lids with a slot between them. Nothing is
     // left exposed outside: the facade's entry header already bricks in
     // everything above WINDOW_HEAD_Y + 0.15 (storefront-facade.ts).
-    const wallH = vestibuleCeilingY(this.ctx.ceilingY);
+    //
+    // soffitCapY is that soffit height at the LIVE ceiling — on 'high' it
+    // scales up right along with ceilingY, which used to carry the glass
+    // transom up with it too. Real storefront glass doesn't grow with an
+    // interior's ceiling height, and every extra foot of transom just
+    // handed more of the entrance tower's exterior brick (which backs the
+    // glass the whole way up — storefront-facade.ts's "solid face above
+    // the entry") straight through to the sales floor (feedback/057:
+    // "the yellow wall gives way to brick here... the vestibule should
+    // never be this tall"). wallH now clamps to what the DEFAULT ceiling
+    // height would produce, so the glass itself keeps a normal storefront
+    // proportion no matter the preset; on a normal ceiling this clamp is a
+    // no-op (soffitCapY already equals it) so today's look is unchanged.
+    // The gap this opens up between the (now shorter) glass and the soffit
+    // is closed by a solid, wall-colored capping soffit instead — see
+    // "Solid soffit cap" below.
+    const soffitCapY = vestibuleCeilingY(this.ctx.ceilingY);
+    const wallH = Math.min(soffitCapY, vestibuleCeilingY(CEILING_Y));
     const wallT = 0.12;          // glazing thickness
 
     // ----- Materials -----
@@ -352,6 +369,59 @@ export class EntranceCheckout implements StoreFixture {
 
     // ----- Central glass divider splitting entrance (+X) from exit (-X) -----
     buildGlazedWall('Z', cx, backZ, frontZ, []);
+
+    // ----- Solid soffit cap (opens up only when soffitCapY > wallH, i.e. the
+    // 'high' ceiling preset) -----
+    // Every wall above closed its glass at the clamped wallH, leaving a gap
+    // up to the soffit's real height (soffitCapY) that used to be more
+    // glass. Instead of glazing it, box it in solid and finish it in the
+    // store's own wall material — "the vestibule top half should be a
+    // solid soffit that extends from the upper soffit, [with] walls that
+    // match the color of the store walls" (feedback/057). Reuses the same
+    // wallSurface material + mapWallSegmentUV helper every other recycled
+    // wall surface in the store goes through (store-shell.ts's knee walls,
+    // the front window's kneeSurface, ...) so it carries the same mottle/
+    // orange-peel/contact-AO as the rest of the room instead of a flat
+    // patch of color, and falls back to the theme's knee-gold approximation
+    // in a context with no live wall build (matching store-shell.ts's own
+    // kneeMat fallback) rather than a hardcoded hex.
+    const capH = soffitCapY - wallH;
+    if (capH > 0.05) {
+      const wallSurf = this.ctx.wallSurface;
+      const capMat = wallSurf?.material
+        ?? new THREE.MeshStandardMaterial({ color: new THREE.Color(themeKneeGoldHex()), roughness: 0.92, metalness: 0.0 });
+      const capGeo = new THREE.BoxGeometry(boxW, capH, boxDepth);
+      if (wallSurf) mapWallSegmentUV(capGeo, boxW, capH, wallH, wallSurf.storeWidth, wallSurf.roomHeight);
+      const cap = new THREE.Mesh(capGeo, capMat);
+      cap.position.set(cx, wallH + capH / 2, (frontZ + backZ) / 2);
+      cap.castShadow = true;
+      cap.receiveShadow = true;
+      group.add(cap);
+      this.ctx.addCollider(cap);
+
+      // HVAC diffusers on the entrance (+X chamber) and exit (-X chamber)
+      // sides — "maybe an AC vent on the entrance and exit sides" — set
+      // into the cap's underside over each chamber, same spot the walk-off
+      // mats below centre on (cx ± boxW/4), and the same slotted-diffuser
+      // texture/material recipe the main ceiling's own vents use
+      // (createHvacVentTexture, store-shell.ts).
+      const ventTex = createHvacVentTexture();
+      const ventMat = new THREE.MeshStandardMaterial({
+        map: ventTex, roughness: 0.5, metalness: 0.06,
+        emissive: 0xffffff, emissiveMap: ventTex, emissiveIntensity: 0.15,
+      });
+      const ventW = Math.min(boxDepth * 0.6, 2.0);
+      const ventH = ventW / 2; // matches the texture's 256x128 (2:1) aspect
+      [cx + boxW / 4, cx - boxW / 4].forEach((vx) => {
+        const vent = new THREE.Mesh(new THREE.PlaneGeometry(ventW, ventH), ventMat);
+        // Just BELOW the cap's own bottom face (which sits exactly at wallH) —
+        // proud of it toward the chamber, or the solid box's opaque underside
+        // wins the depth test and hides the vent plane entirely.
+        vent.position.set(vx, wallH - 0.01, (frontZ + backZ) / 2);
+        vent.rotation.x = Math.PI / 2; // normal points down, into the chamber below
+        group.add(vent);
+      });
+    }
 
     // ----- Vestibule ceiling -----
     // There isn't one, and there are no fittings in it either. The cash-wrap

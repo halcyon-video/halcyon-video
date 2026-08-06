@@ -1549,6 +1549,7 @@ export class StoreScene {
       requestRender: () => this.requestRender(),
       activeTheme: this.activeTheme,
       gondolaMaterials: this.gondolaMaterials,
+      wallSurface: this.wallSurface,
     };
   }
 

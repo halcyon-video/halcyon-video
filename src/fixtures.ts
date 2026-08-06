@@ -45,6 +45,13 @@ export interface FixtureContext {
   activeTheme: StoreTheme;
   // Gondola materials for theme-aware shelving.
   gondolaMaterials: GondolaMaterials;
+  // The room's shared amber-gold drywall material + the plane size its
+  // texture repeat is baked for (see mapWallSegmentUV in store-layout.ts).
+  // Null in contexts with no live wall build (e.g. the standalone asset
+  // viewer's stub) — fixtures that reuse the wall finish fall back to a
+  // theme-derived approximation the same way store-shell.ts's own knee
+  // walls do.
+  wallSurface: { material: THREE.Material; storeWidth: number; roomHeight: number } | null;
 }
 
 import { Movie } from './jellyfin';
