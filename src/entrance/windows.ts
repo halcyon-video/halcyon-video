@@ -172,17 +172,25 @@ export function buildWindowBays(
     bottomFrame.position.set(wingC, KNEE_H + frameThickness / 2, 0);
     const topFrame = new THREE.Mesh(horizGeo, frameMat);
     topFrame.position.set(wingC, height - frameThickness / 2, 0);
+    // Vestibule-side verticals run the full height (they terminate against
+    // the vestibule's floor-to-ceiling glazing); wall-side ends stop at the
+    // sill like the dividers — they used to run to the floor, burying a
+    // charcoal bar down the knee wall's face (feedback/041).
     const vertGeo = new THREE.BoxGeometry(frameThickness, height, frameDepth);
+    const vertSillGeo = new THREE.BoxGeometry(frameThickness, height - KNEE_H, frameDepth);
+    const sillVertY = KNEE_H + (height - KNEE_H) / 2;
     const isLeftWing = kneeGap ? wi === 0 : false;
     const innerAtHi = isLeftWing; // left wing's vestibule-side edge is its hi end
-    const leftVert = new THREE.Mesh(vertGeo, frameMat);
+    const leftIsVestibule = !!kneeGap && !innerAtHi;
+    const leftVert = new THREE.Mesh(leftIsVestibule ? vertGeo : vertSillGeo, frameMat);
     leftVert.position.set(
-      kneeGap && !innerAtHi ? wing.lo - frameThickness / 2 : wing.lo + frameThickness / 2,
-      height / 2, 0);
-    const rightVert = new THREE.Mesh(vertGeo, frameMat);
+      leftIsVestibule ? wing.lo - frameThickness / 2 : wing.lo + frameThickness / 2,
+      leftIsVestibule ? height / 2 : sillVertY, 0);
+    const rightIsVestibule = !!kneeGap && innerAtHi;
+    const rightVert = new THREE.Mesh(rightIsVestibule ? vertGeo : vertSillGeo, frameMat);
     rightVert.position.set(
-      kneeGap && innerAtHi ? wing.hi + frameThickness / 2 : wing.hi - frameThickness / 2,
-      height / 2, 0);
+      rightIsVestibule ? wing.hi + frameThickness / 2 : wing.hi - frameThickness / 2,
+      rightIsVestibule ? height / 2 : sillVertY, 0);
     [bottomFrame, topFrame, leftVert, rightVert].forEach((f) => {
       f.castShadow = true;
       f.receiveShadow = true;
