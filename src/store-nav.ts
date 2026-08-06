@@ -7,11 +7,17 @@
 // methods did.
 //
 // The two ends of the vertical chain hand off to their own modules, both of
-// which stay in browse mode and borrow the arrow keys the way the clasp cursor
-// does: ▲ past the top row opens the ceiling-TV peek (store-tv-peek.ts, with
-// the over-the-top shelf wrap as the no-TV fallback), ▼ at the bottom row
-// opens the sub-nav jump index (store-subnav.ts). navOverlay* below is the
-// ←/→/OK/Back half of that dispatch, called from three-scene.ts's stubs.
+// which stay in browse mode and borrow the arrow keys the way the clasp
+// cursor does: ▼ at the bottom row opens the sub-nav jump index
+// (store-subnav.ts), and ▲ past the top row wraps to the far face
+// (wrapOverShelfTop, below) same as it always did pre-2026-08-02. The
+// ceiling-TV peek (store-tv-peek.ts) now lives one level deeper — ▲ at the
+// sub-nav's own Row 1 (2026-08-06, pin 051: it used to open from the top
+// shelf row instead; the owner called that the wrong mode for it) — so this
+// file is also the mediator between the two overlays: neither store-subnav.ts
+// nor store-tv-peek.ts imports the other, moveUp/moveDown/navOverlay* here
+// are what hand control between them. navOverlay* is the ←/→/OK/Back half of
+// that dispatch, called from three-scene.ts's stubs.
 import { backCoverRegions } from './video-case';
 import { BROWSE_WINDOW_SIZE, AISLE_SHELF_HEIGHTS, WALL_SHELF_HEIGHTS, UNIT_SIDE_CAPACITY, BACK_WALL_UNIT_IDX, ShelvingUnit } from './store-layout';
 import { retailAudio } from './audio';
@@ -22,9 +28,18 @@ import { enterEndcapCursor } from './browse-cursor';
 import { enterTvPeek, exitTvPeek, tvPeekActive, tvPeekCycle, tvPeekSelect, debugTvPeek, forgetTvPeek } from './store-tv-peek';
 import {
   openSubNav, subNavActive, subNavArrow, subNavUp, subNavDown, subNavSelect, subNavBack,
-  debugSubNav, forgetSubNav,
+  subNavRefresh, closeSubNav, debugSubNav, forgetSubNav,
 } from './store-subnav';
 import type { StoreScene } from './three-scene';
+
+/**
+ * ▼ or Back while the ceiling-TV peek is up: drop it and resume the sub-nav
+ * index's Row-1 view underneath (the peek's only entry point now — the index
+ * itself was never closed while peeking). False when the peek isn't active.
+ */
+function exitPeekToSubNav(scene: StoreScene): boolean {
+  return exitTvPeek(scene, () => { subNavRefresh(scene); });
+}
 
 export function moveSkippingDuplicates(scene: StoreScene, dir: 'left' | 'right') {
   perfTrace.begin(SP_INPUT);
@@ -545,7 +560,16 @@ export function moveRightInternal(scene: StoreScene) {
 export function moveUp(scene: StoreScene) {
   scene.requestRender();
   if (tvPeekActive(scene)) return;   // peeking at a TV — ▲ has nowhere left to go
-  if (subNavUp(scene)) return;       // jump index: row 2 -> row 1 -> close
+  if (subNavActive(scene)) {
+    if (subNavUp(scene)) return;          // jump index: row 2 -> row 1
+    // Already on row 1: ▲ opens the ceiling-TV peek (store-tv-peek.ts, pin
+    // 051) rather than closing the index — the index stays open underneath.
+    // Where the build has no ambient TVs at all, fall back to the old
+    // close-on-▲.
+    if (enterTvPeek(scene)) return;
+    closeSubNav(scene, true);
+    return;
+  }
   if (scene.mode === 'backroom') return; // couch view — no vertical nav
   if (scene.mode === 'overview') {
     scene.overviewLook(0, 1);
@@ -566,12 +590,12 @@ export function moveUp(scene: StoreScene) {
       // app's users have.
     } else {
       // Already past the top row (after the clasp stop, or straight off the
-      // top row where this run has no clasp): look UP at the nearest ceiling
-      // TV to see what's playing — see store-tv-peek.ts. Where the build has
-      // no ambient TVs at all, this press keeps its old job and continues
-      // "over the top" of the aisle to the opposite face.
+      // top row where this run has no clasp): wrap to the opposite face.
+      // The ceiling-TV peek moved to the sub-nav's own Row 1 (pin 051, see
+      // above and store-tv-peek.ts) — this press keeps its pre-peek job
+      // unconditionally now, not just when the build has no ambient TVs.
       scene.exitClaspCursor();
-      if (!enterTvPeek(scene)) scene.wrapOverShelfTop();
+      scene.wrapOverShelfTop();
     }
   } else if (scene.mode === 'inspect') {
     if (scene.moveSeriesSeasonSelection(-1)) return;
@@ -646,7 +670,11 @@ export function wrapOverShelfTop(scene: StoreScene) {
 // The two browse overlays keep scene.mode at 'browse' and instead intercept
 // the arrow/select/back path, exactly the way the clasp cursor does. These
 // three are what three-scene.ts's moveLeft/moveRight/selectAction/backAction
-// call first; ▲/▼ are intercepted inside moveUp/moveDown above.
+// call first; ▲/▼ are intercepted inside moveUp/moveDown above. The peek now
+// nests INSIDE the index (only ever opened from its Row 1) rather than
+// standing beside it, so tvPeekActive is checked first everywhere below —
+// while peeking, both overlays are technically "open" but only the peek is
+// live to input.
 
 /** ←/→ while an overlay owns them. Returns true when the press was consumed. */
 export function navOverlayArrow(scene: StoreScene, dir: number): boolean {
@@ -656,17 +684,26 @@ export function navOverlayArrow(scene: StoreScene, dir: number): boolean {
 
 /** Select while an overlay owns it: a TV peek jumps to what's playing. */
 export function navOverlaySelect(scene: StoreScene): boolean {
-  if (tvPeekActive(scene)) return tvPeekSelect(scene);
+  if (tvPeekActive(scene)) {
+    const handled = tvPeekSelect(scene);
+    // A hit jumps straight to inspect, leaving both overlays behind — close
+    // the now-stale sub-nav underneath rather than leaving it parked for the
+    // next ▲/▼ press to trip over. A miss (dead glass) leaves the peek (and
+    // the index under it) open exactly as before.
+    if (handled && !tvPeekActive(scene)) closeSubNav(scene, false);
+    return handled;
+  }
   return subNavSelect(scene);
 }
 
 /**
- * Back while an overlay owns it. Both overlays close back into browse, so the
- * escape clamp is untouched: browse remains backAction's floor and this only
- * ever swallows the press that closes the overlay.
+ * Back while an overlay owns it. The peek hands back to the sub-nav index
+ * underneath it (not all the way to browse — see exitPeekToSubNav); the
+ * index itself still closes back into browse, so the escape clamp is
+ * untouched: browse remains backAction's floor.
  */
 export function navOverlayBack(scene: StoreScene): boolean {
-  return exitTvPeek(scene) || subNavBack(scene);
+  return exitPeekToSubNav(scene) || subNavBack(scene);
 }
 
 /** Scene teardown/rebuild: forget both overlays (no camera writes). */
@@ -722,8 +759,8 @@ export function moveSeriesSeasonSelection(scene: StoreScene, dir: number): boole
 
 export function moveDown(scene: StoreScene) {
   scene.requestRender();
-  if (tvPeekActive(scene)) { exitTvPeek(scene); return; } // ▼ drops back onto the shelf
-  if (subNavDown(scene)) return;                          // jump index: row 1 -> row 2
+  if (exitPeekToSubNav(scene)) return; // ▼ drops the peek, resumes the index's Row 1
+  if (subNavDown(scene)) return;       // jump index: row 1 -> row 2
   if (scene.mode === 'backroom') return; // couch view — no vertical nav
   if (scene.mode === 'overview') {
     scene.overviewLook(0, -1);

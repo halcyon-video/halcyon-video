@@ -25,9 +25,17 @@
 //          fixture, so stepping the row is literally walking the displays.
 //
 // The user never leaves browse mode: the cursor is untouched while the index
-// is open, the full return state is snapshotted on open, and Back/▲-from-row-1
-// restores it exactly (browse stays the escape floor — backAction's clamp is
-// unaffected because closing the index swallows that one press).
+// is open, the full return state is snapshotted on open, and Back restores it
+// exactly (browse stays the escape floor — backAction's clamp is unaffected
+// because closing the index swallows that one press).
+//
+// ▲ from Row 1 no longer closes the index (2026-08-06, pin 051): it opens the
+// ceiling-TV peek instead (store-tv-peek.ts) — subNavUp here just declines
+// (returns false) at row 0, and store-nav.ts's moveUp, the mediator between
+// the two overlay modules, is what actually calls enterTvPeek and falls back
+// to the old close-on-▲ only when the build has no ambient TVs to peek at.
+// The index itself stays open (untouched) the whole time the peek is up;
+// subNavRefresh below is what the peek's exit hands control back to.
 //
 // Everything here is keypress-driven; nothing runs per frame (the arrow's
 // bob is the selection arrow's own animate handling, shared with every other
@@ -283,15 +291,31 @@ export function subNavArrow(scene: StoreScene, dir: number): boolean {
   return true;
 }
 
-/** ▲: Row 2 → Row 1, or close from Row 1 (restoring the browse state). */
+/**
+ * ▲: Row 2 → Row 1. Declines (returns false) from Row 1 — store-nav.ts's
+ * moveUp then opens the ceiling-TV peek, falling back to the old close-on-▲
+ * only where the build has no ambient TVs to peek at.
+ */
 export function subNavUp(scene: StoreScene): boolean {
   const state = scene.subNav;
-  if (!state) return false;
-  if (state.row === 0) return closeSubNav(scene, true);
+  if (!state || state.row === 0) return false;
   state.row = 0;
   applyRow(scene, state); // back to the overview vantage, arrow on the row-1 focus
   retailAudio.playKeyClick();
   scene.requestRender();
+  return true;
+}
+
+/**
+ * Re-park the arrow + camera on the current row/selection without changing
+ * it — what the ceiling-TV peek (opened from Row 1's own ▲) hands control
+ * back to on ▼/Back, since the index stays open (untouched) the whole time
+ * the peek is up.
+ */
+export function subNavRefresh(scene: StoreScene): boolean {
+  const state = scene.subNav;
+  if (!state) return false;
+  applyRow(scene, state);
   return true;
 }
 
