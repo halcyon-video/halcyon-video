@@ -69,6 +69,14 @@ export interface SlottedFixture extends StoreFixture {
   capacity: number;
   shelfHeights: number[];
   genre: string;
+  // Recompute which titles this fixture stocks from CURRENT library/watch-
+  // history data, without touching the THREE geometry (build()/dispose() do
+  // that) or the already-baked instanced slots (store-stock.ts's
+  // restockSlottedFixtures() patches those in place afterwards). Optional —
+  // only fixtures whose stock can go stale mid-session need it (currently
+  // pv-drape-table.ts, whose PREVIOUSLY VIEWED selection depends on watch
+  // history that changes the moment a movie finishes playing — feedback/055).
+  refreshStock?(): void;
 }
 
 // Lifecycle every fixture implements. build() constructs the meshes; update()
