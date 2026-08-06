@@ -398,6 +398,22 @@ npm run dev          # dev server on :1420 — first boot shows the login /
                      # membership cards; enter your Jellyfin URL + credentials
 ```
 
+**Docker:**
+
+```sh
+git clone https://github.com/halcyon-video/halcyon-video
+cd halcyon-video
+docker compose up -d           # build the image + serve on :1420
+```
+
+Same first boot as above — open `http://<host>:1420` and enter your Jellyfin
+URL + login (or append `?demo=1` for the no-server demo library). The
+container runs the standard `npm run serve` runtime, so the Jellyseerr/Romm
+integration proxy and F8 feedback pins work out of the box; features that
+need host-side binaries (local mpv playback, Remote Play private instances,
+the TURN relay) stay off. Serving it through a reverse proxy or DNS name?
+Set `HALCYON_ALLOWED_HOSTS` — see the notes in `docker-compose.yml`.
+
 **HTPC / kiosk:**
 
 ```sh

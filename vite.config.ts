@@ -14,6 +14,19 @@ import { remotePlayPlugin } from "./tools/remote-play-server.mjs";
 
 // @ts-expect-error process is a nodejs global
 const host = process.env.TAURI_DEV_HOST;
+
+// Containers / reverse proxies reach `vite preview` under a hostname vite
+// refuses by default (it answers only localhost + raw-IP Host headers, as a
+// DNS-rebinding guard). HALCYON_ALLOWED_HOSTS is a comma-separated list of
+// extra hostnames to answer; the value "all" disables the check entirely —
+// with DNS rebinding, any website a viewer visits could then reach this
+// server same-origin (including /dev-proxy), so prefer the explicit list.
+// Unset, behavior is exactly vite's default.
+// @ts-expect-error process is a nodejs global
+const previewAllowedHosts: string[] = (process.env.HALCYON_ALLOWED_HOSTS ?? "")
+  .split(",")
+  .map((h: string) => h.trim())
+  .filter(Boolean);
 // @ts-expect-error import.meta.dirname is a nodejs (>=21.2) global
 const feedbackDir = path.join(import.meta.dirname, "feedback");
 const MAX_FEEDBACK_BODY_BYTES = 20 * 1024 * 1024; // ~20MB: a full-res PNG dataURL + note text
@@ -348,6 +361,10 @@ export default defineConfig(async () => ({
         remote: path.join(import.meta.dirname, "remote.html"),
       }).filter(([, f]) => fs.existsSync(f))),
     },
+  },
+
+  preview: {
+    allowedHosts: previewAllowedHosts.includes("all") ? true : previewAllowedHosts,
   },
 
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`

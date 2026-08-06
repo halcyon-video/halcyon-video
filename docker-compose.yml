@@ -1,0 +1,16 @@
+services:
+  halcyon:
+    build: .
+    ports:
+      - "1420:1420"
+    restart: unless-stopped
+    init: true
+    # Reaching the store through a DNS name (reverse proxy, NAS hostname)?
+    # vite preview answers only localhost + raw-IP Host headers by default;
+    # list yours here (comma-separated), or "all" to disable the check.
+    # environment:
+    #   HALCYON_ALLOWED_HOSTS: halcyon.example.com
+    #
+    # Keep F8 feedback pins (in-app visual bug reports) on the host:
+    # volumes:
+    #   - ./feedback:/app/feedback
