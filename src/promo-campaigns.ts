@@ -332,11 +332,43 @@ function carveFaces(
  * Used by the single-subject campaigns (a studio, a season).
  */
 function spreadFaces(label: string, pool: Movie[], count: number, rows: number, cols: number): PromoFace[] | null {
-  if (pool.length < count * MIN_DISTINCT_PER_FACE) return null;
-  const buckets: Movie[][] = Array.from({ length: count }, () => []);
-  pool.forEach((m, i) => buckets[i % count].push(m));
-  if (buckets.some((b) => b.length < MIN_DISTINCT_PER_FACE)) return null;
-  return buckets.map((b) => ({ label, source: label, movies: layoutFace(b, rows, cols) }));
+  const movies = pool.filter((m) => !m.isSeries);
+  const shows = pool.filter((m) => m.isSeries);
+
+  const M = movies.length;
+  const S = shows.length;
+
+  let bestPair: { m: number; s: number; error: number } | null = null;
+
+  for (let m = 0; m <= count; m++) {
+    const s = count - m;
+    const mValid = m === 0 || M >= m * MIN_DISTINCT_PER_FACE;
+    const sValid = s === 0 || S >= s * MIN_DISTINCT_PER_FACE;
+    if (mValid && sValid) {
+      const idealM = (M + S) > 0 ? count * (M / (M + S)) : count / 2;
+      const error = Math.abs(m - idealM);
+      if (!bestPair || error < bestPair.error) {
+        bestPair = { m, s, error };
+      }
+    }
+  }
+
+  if (!bestPair) return null;
+
+  const movieBuckets: Movie[][] = Array.from({ length: bestPair.m }, () => []);
+  if (bestPair.m > 0) {
+    movies.forEach((item, i) => movieBuckets[i % bestPair.m].push(item));
+  }
+
+  const showBuckets: Movie[][] = Array.from({ length: bestPair.s }, () => []);
+  if (bestPair.s > 0) {
+    shows.forEach((item, i) => showBuckets[i % bestPair.s].push(item));
+  }
+
+  const allBuckets = [...movieBuckets, ...showBuckets];
+  if (allBuckets.length !== count) return null;
+
+  return allBuckets.map((b) => ({ label, source: label, movies: layoutFace(b, rows, cols) }));
 }
 
 // ─── Campaigns ──────────────────────────────────────────────────────────────
@@ -355,16 +387,25 @@ function recentlyPlayed(libs: JellyfinLibrary[], rows: number, cols: number): Pr
   const sources: FaceSource[] = [];
   const seen = new Set<string>();
   libs.forEach((lib) => {
-    const played = lib.movies
+    const playedMovies: Movie[] = [];
+    const playedShows: Movie[] = [];
+    lib.movies
       .filter((m) => {
         if (!isStockTitle(m) || seen.has(m.id)) return false;
         if (!(m.played || (m.playCount ?? 0) > 0)) return false;
         seen.add(m.id);
         return true;
       })
-      .sort(byRecency);
-    if (played.length >= MIN_DISTINCT_PER_FACE) {
-      sources.push({ label: (lib.name || 'PREVIOUSLY VIEWED').toUpperCase(), pool: played });
+      .sort(byRecency)
+      .forEach((m) => {
+        if (m.isSeries) playedShows.push(m);
+        else playedMovies.push(m);
+      });
+    if (playedMovies.length >= MIN_DISTINCT_PER_FACE) {
+      sources.push({ label: (lib.name || 'PREVIOUSLY VIEWED').toUpperCase(), pool: playedMovies });
+    }
+    if (playedShows.length >= MIN_DISTINCT_PER_FACE) {
+      sources.push({ label: (lib.name || 'PREVIOUSLY VIEWED').toUpperCase(), pool: playedShows });
     }
   });
   if (!sources.length) return null;
