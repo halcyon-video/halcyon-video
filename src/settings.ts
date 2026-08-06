@@ -534,7 +534,7 @@ export function registerCoreSettings(): void {
     group: 'Store Look',
     default: false,
     applyMode: 'rebuild-scene',
-    hint: 'Framed poster groups + film-reel mural, right wall.',
+    hint: 'Featured-actor portraits + film-strip ribbon, right wall. High ceiling only.',
     subpage: 'Building & Storefront',
   });
 

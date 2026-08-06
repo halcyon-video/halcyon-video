@@ -114,6 +114,14 @@ export interface Movie {
   // watch-history recommendations surfaced: its case wears the STAFF PICK
   // sticker (video-case.ts) and it's eligible for the genre endcaps.
   staffPick?: boolean;
+  // Top-billed cast as Jellyfin Person references (id + portrait URL), captured
+  // alongside `actors` (name-only) so wall décor (wall-decor.ts) can tally the
+  // library's most-featured actors and pull real portraits without a second
+  // round-trip. Same top-5 cap as `actors`; `imageUrl` is only set when the
+  // person has a PrimaryImageTag in Jellyfin (many crew/cast entries don't).
+  // Undefined on synthesized titles (discovery/collectionGap/game) and the
+  // synthetic demo/harness catalog, which has no Person image data at all.
+  castPeople?: { id: string; name: string; imageUrl?: string }[];
 }
 
 export interface MediaStreamInfo {
@@ -719,6 +727,14 @@ export async function fetchMediaCatalog(
         overview: item.Overview || "No description available.",
         director: item.People?.find((p: any) => p.Type === "Director")?.Name || "Unknown Director",
         actors: (item.People || []).filter((p: any) => p.Type === "Actor" && p.Name).slice(0, 5).map((p: any) => p.Name),
+        castPeople: (item.People || [])
+          .filter((p: any) => p.Type === "Actor" && p.Name && p.Id)
+          .slice(0, 5)
+          .map((p: any) => ({
+            id: p.Id,
+            name: p.Name,
+            imageUrl: p.PrimaryImageTag ? `${url}/emby/Items/${p.Id}/Images/Primary?api_key=${token}` : undefined,
+          })),
         genres: item.Genres || [],
         localPath: item.Path || '',
         posterUrl: `${url}/emby/Items/${item.Id}/Images/Primary?api_key=${token}`,
@@ -996,6 +1012,14 @@ export async function fetchJellyfinLibrariesAndMovies(
             overview: item.Overview || "No description available.",
             director: item.People?.find((p: any) => p.Type === "Director")?.Name || "Unknown Director",
             actors: (item.People || []).filter((p: any) => p.Type === "Actor" && p.Name).slice(0, 5).map((p: any) => p.Name),
+            castPeople: (item.People || [])
+              .filter((p: any) => p.Type === "Actor" && p.Name && p.Id)
+              .slice(0, 5)
+              .map((p: any) => ({
+                id: p.Id,
+                name: p.Name,
+                imageUrl: p.PrimaryImageTag ? `${url}/emby/Items/${p.Id}/Images/Primary?api_key=${token}` : undefined,
+              })),
             genres: item.Genres || [],
             localPath: item.Path || '',
             posterUrl: `${url}/emby/Items/${item.Id}/Images/Primary?api_key=${token}`,

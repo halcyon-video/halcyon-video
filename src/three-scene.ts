@@ -98,6 +98,7 @@ import * as walk from './store-walk';
 import * as overview from './store-overview';
 import * as cam from './store-camera';
 import * as grade from './store-grade';
+import * as wallDecor from './wall-decor';
 import { gradeNum } from './store-grade';
 import { StorePlan } from './store-plan';
 import { getLastUserActivity } from './user-activity';
@@ -2719,12 +2720,11 @@ export class StoreScene {
   // while idle, near-zero cost even while active.
   public updateMarqueeBulbs(timeMs: number): void { return shell.updateMarqueeBulbs(this, timeMs); }
 
-  // Data-driven wall displays (T07). Each entry in the shell spec's wallDecor
-  // list paints one zone onto a wall segment: a 'poster-group' hangs a row of
-  // framed movie posters (reusing Jellyfin backdrops via posterQueue), a 'mural'
-  // applies a painted film-reel band. Currently wired for the solid right wall;
-  // decor sits high, above the New-Releases shelving and below the cornice.
-  public buildWallDecor(storeWidth: number, backWallZ: number) { return shell.buildWallDecor(this, storeWidth, backWallZ); }
+  // Actor-portrait wall + floating film-strip ribbon (pin 052 rebuild, see
+  // wall-decor.ts): the library's most-featured actors, evenly spread along
+  // the solid right wall, never overlapping the EXIT door/frame or the side
+  // window ribbon. High-ceiling variant only — wall-decor.ts owns that gate.
+  public buildWallDecor(storeWidth: number, backWallZ: number) { return wallDecor.buildWallDecor(this, storeWidth, backWallZ); }
 
   public clearMovieBoxes() { return stock.clearMovieBoxes(this); }
 

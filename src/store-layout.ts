@@ -46,17 +46,13 @@ export interface StoreShellSpec {
   // carries the New Releases wall). null would be a flat back wall, but the
   // stock New-Releases runs assume the step, so the reader always supplies one.
   steppedCorner: null | { corner: 'back-left' | 'back-right'; w: number; d: number };
-  // Data-driven decorated wall zones: framed movie-poster groups and painted-on
-  // mural strips applied to a wall segment.
-  wallDecor: {
-    wall: 'left' | 'right' | 'back';
-    type: 'poster-group' | 'mural';
-    centerX?: number;
-    centerZ?: number;
-    y: number;
-    width: number;
-    art?: string;
-  }[];
+  // Actor-portrait wall + floating film-strip ribbon (pin 052 rebuild, see
+  // wall-decor.ts). Just an on/off flag: the module computes every position
+  // itself from real wall geometry (door/window/cornice exclusion zones) and
+  // the library's actual most-featured actors, so there's nothing to author
+  // here. Only meaningful on the high-ceiling variant — wall-decor.ts is the
+  // single source of truth for that gate too.
+  wallDecorEnabled: boolean;
 }
 
 // Read the active shell spec from localStorage. Absent keys fall back to values
@@ -78,15 +74,9 @@ export function getStoreShellSpec(): StoreShellSpec {
   }
 
   // Wall displays default OFF so the default store is identical to today.
-  const wallDecor: StoreShellSpec['wallDecor'] =
-    ls?.getItem('bb_walldecor') === '1'
-      ? [
-          { wall: 'right', type: 'poster-group', y: 9.7, width: 9.0 },
-          { wall: 'right', type: 'mural', y: 8.4, width: 15.0 },
-        ]
-      : [];
+  const wallDecorEnabled = ls?.getItem('bb_walldecor') === '1';
 
-  return { ceilingY, steppedCorner, wallDecor };
+  return { ceilingY, steppedCorner, wallDecorEnabled };
 }
 
 // ─── Storefront options (T05) ───────────────────────────────────────────────
@@ -747,6 +737,18 @@ export interface ShelvingUnit {
   posInLine: number;
   isLineFront: boolean; // true only for the unit at the line's front end (blue cap)
   isLineBack: boolean;  // true only for the unit at the line's back end (white cap)
+  // A single straight physical row can be POURED as several lineId chunks —
+  // fillField() breaks a run into maxRunUnits-sized pieces (each its own
+  // lineId, with a real RUN_BREAK_GAP cross-aisle and its own endcaps) purely
+  // for shelving-capacity bookkeeping, even though consecutive chunks sit
+  // short-end-to-short-end with only that small gap between them: to a
+  // customer walking the row they read as ONE continuous run. rowGroupId is
+  // shared by every chunk poured from the same fillField() run (i.e. the same
+  // physical row), so StorePlan's walk-order pass and entryBlockOrder() can
+  // treat them as one line for content-flow purposes without disturbing
+  // lineId/isLineFront/isLineBack, which every OTHER consumer (endcap
+  // placement, browse-cursor line-hopping) still keys off unchanged.
+  rowGroupId: number;
   anchorX: number;
   // Placement is now an explicit property of the unit rather than something
   // re-derived from xCenter at every call site. yaw is the island's tilt about its
