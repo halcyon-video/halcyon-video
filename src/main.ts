@@ -2373,8 +2373,18 @@ async function initializeStoreScene(preservePosterCache = false) {
       }
     }
 
+    // Measured GPU quality calibration (src/quality-calibrate.ts), behind the
+    // boot overlay and BEFORE the real (expensive) renderer exists. Dynamic
+    // import keeps it out of 2.5D flat-mode's chunk (this line is already
+    // past the flat-mode early return above) and out of the harness, which
+    // never calls initializeStoreScene() at all. No-ops instantly when an
+    // explicit bb_quality is set or a cached calibration still matches.
+    const { calibrateQualityIfNeeded, armQualityBackstop } = await import('./quality-calibrate');
+    await calibrateQualityIfNeeded();
+
     const { StoreScene } = await import('./three-scene');
     const scene = new StoreScene(canvasContainer, storeLibraries, logToConsole, jfUrl, jfToken, comingSoonMovies, discoveryMovies, storeGameMovies, staffPicks);
+    armQualityBackstop();
 
     let lastLoggedPct = -1;
     scene.onTextureLoadProgress = (loaded, total) => {

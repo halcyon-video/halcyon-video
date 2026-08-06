@@ -13,6 +13,7 @@ import {
   posterPixelCache,
   textureArrayManager,
 } from './video-case';
+import { setSurfaceKtx2Renderer } from './surface-textures';
 // @ts-ignore
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
@@ -105,6 +106,7 @@ import { GondolaMaterials } from './shelving';
 import { StoreClerk } from './clerk';
 import { ClerkNavGrid, NavRect } from './clerk-nav';
 import { setMaxAnisotropy, setCheapMaterials } from './canvas-textures';
+import { readCalibratedQuality } from './quality-calibrate';
 import {
   SIDE_RIBBON_FRONT_Z,
   SIDE_RIBBON_CLEARANCE,
@@ -120,7 +122,7 @@ import { RentalRecord, loadRentalRecord, clearRentalRecord, isLockedOut, formatU
 import { perfTrace, perfSlot } from './perf-trace';
 import { ShelfClasps, type ClaspTarget } from './fixtures/shelf-clasp';
 import { requestMovie } from './jellyseerr';
-import { displayHz } from './display-hz';
+import { displayHz, computeFpsCap } from './display-hz';
 import { type LibraryIndex } from './recommend-why';
 import type { ClerkSuggestion } from './clerk-interaction';
 
@@ -291,13 +293,31 @@ export class StoreScene {
   // initThree(): medium pixel budget without the native-res floor, and the
   // softwareGL static-chrome mirrors instead of live Reflectors.
   public webkitGL = false;
-  // Frame rate the dynamic scaler steers toward: the display's real refresh
-  // rate (see src/display-hz.ts) — except under WebKitGTK, whose threaded
-  // compositor presents WebGL at most every other tick, a hard 60fps ceiling
-  // (measured: even a bare gl.clear() at 640×360 caps there). Chasing past
-  // the engine ceiling would just burn resolution for nothing.
+  // bb_fps_cap override (see computeFpsCap in display-hz.ts), read once in
+  // initThree() alongside the other bb_* boot flags.
+  private fpsCapOverride: string | null = null;
+  // Frame rate the dynamic scaler steers toward AND the ACTIVE tier composites
+  // at (see activeFrameInterval below): the display's real refresh rate run
+  // through computeFpsCap's even-divisor cap (default 60-target; bb_fps_cap
+  // overrides) — except under WebKitGTK, whose threaded compositor presents
+  // WebGL at most every other tick, a hard 60fps ceiling (measured: even a
+  // bare gl.clear() at 640×360 caps there), so it skips the cap math entirely.
+  // A live getter, not cached: displayHz() keeps returning the 60Hz default
+  // until measureDisplayHz()'s async boot sample resolves, and this must pick
+  // up the real rate the moment it does.
   private get targetFps(): number {
-    return this.webkitGL ? 60 : displayHz();
+    return this.webkitGL ? 60 : computeFpsCap(displayHz(), this.fpsCapOverride);
+  }
+  // ACTIVE-tier composite spacing (see the frameInterval gate in animate()).
+  // Subtracts half a vsync period of slack from the nominal 1000/targetFps:
+  // without it, a rAF that lands a hair before the ideal instant fails the
+  // strict `<` check and the frame is skipped, pushing the render out to the
+  // NEXT vsync — the remainder discarded each cycle drifts real cadence below
+  // the target instead of landing on it. When targetFps === displayHz() (the
+  // uncapped case, or any display at/under the 60fps default divisor) this
+  // resolves to less than one vsync and the gate never actually skips.
+  private get activeFrameInterval(): number {
+    return Math.max(0, 1000 / this.targetFps - 0.5 * (1000 / displayHz()));
   }
   private get resScaleMin(): number {
     if (this.softwareGL) return 0.4;
@@ -1754,9 +1774,21 @@ export class StoreScene {
     const integratedGL = /intel.*(uhd|hd graphics|iris)|iris ?xe|radeon\(tm\) graphics|vega \d|\bmali\b|adreno/i.test(gpuName)
       && !/arc|rtx|gtx|geforce|radeon rx/i.test(gpuName);
     console.log(`[GPU] WebGL renderer: ${gpuName}${softwareGL ? ' — SOFTWARE RENDERING, no GPU acceleration; clamping quality to low' : integratedGL ? ' — integrated GPU, defaulting quality to medium' : ''}`);
-    const effectiveQuality = localStorage.getItem('bb_quality') || (softwareGL ? 'low' : integratedGL ? 'medium' : 'high');
+    // Three-way waterfall (src/quality-calibrate.ts): explicit bb_quality
+    // always wins; else a measured calibration for THIS gpuName/screen/DPR
+    // (never consulted under softwareGL — that's always forced 'low' below);
+    // else this regex guess, which stays forever as the first-boot-before-
+    // calibration and calibration-failure fallback.
+    const explicitQuality = localStorage.getItem('bb_quality');
+    const calibrated = !explicitQuality && !softwareGL ? readCalibratedQuality(gpuName) : null;
+    const effectiveQuality = explicitQuality || calibrated?.tier || (softwareGL ? 'low' : integratedGL ? 'medium' : 'high');
     this.effectiveQuality = effectiveQuality as 'high' | 'medium' | 'low';
     this.softwareGL = softwareGL;
+    // Supersample grant: an AUTO-tiered 'high' only earns the above-native
+    // supersample when calibration measured real headroom for it. Explicit
+    // bb_quality=high (owner/harness override) keeps today's behavior
+    // exactly, grant implied — see the pixelRatio block below.
+    const supersampleGranted = !!explicitQuality || !!calibrated?.supersample;
     // Safari-flavoured WebKit on Linux is WebKitGTK — in practice the Tauri
     // shell (wry). Real GPU, but synchronous in-process GL (see the field's
     // comment). Linux-guarded so macOS WKWebView (Metal-backed, fast) and
@@ -1765,6 +1797,7 @@ export class StoreScene {
       && !/Chrome|Chromium/i.test(navigator.userAgent)
       && /Linux/.test(navigator.userAgent);
     if (this.webkitGL) console.log('[GPU] WebKitGTK engine — clamping pixel budget to medium and using static mirrors');
+    this.fpsCapOverride = localStorage.getItem('bb_fps_cap');
     if (softwareGL) {
       // Software frames cost seconds, so the dynamic scaler's one-step-per-
       // second walk from 1.0 to the floor would itself take minutes (measured:
@@ -1819,7 +1852,15 @@ export class StoreScene {
     // that's exactly the behavior the 1440p cap is meant to override, and on
     // a dpr>1 4K TV the floor would silently force the full 8.3MP buffer the
     // user asked not to pay for.
-    this.renderer.setPixelRatio(Math.min(_ssaa, _prCap));
+    // Ungranted AUTO 'high' (see supersampleGranted above) is capped at
+    // native devicePixelRatio here — it still gets the full budget-derived
+    // resolution (never sub-native; a small/4K-panel budget cap applies
+    // exactly as it does today), it just isn't allowed to exceed native.
+    // Medium/low and every granted/explicit case are untouched.
+    const _prCapEff = effectiveQuality === 'high' && !supersampleGranted
+      ? Math.min(_prCap, window.devicePixelRatio || 1)
+      : _prCap;
+    this.renderer.setPixelRatio(Math.min(_ssaa, _prCapEff));
     // Motion-gated native res (see animate()): the ~1440p cap above still holds
     // for STATIC/dwelling frames, but a sub-native panel lifts to native display
     // resolution WHILE THE CAMERA MOVES + on the settle frame, so moving around
@@ -1916,6 +1957,9 @@ export class StoreScene {
     // Let the texture upload queue drive GPU uploads through this renderer so
     // their cost is throttled per-frame rather than spiking during scene renders.
     setUploadRenderer(this.renderer);
+    // Shipped surface .ktx2 fallback (src/surface-textures.ts) needs the
+    // live renderer to detect which GPU compressed format to transcode into.
+    setSurfaceKtx2Renderer(this.renderer);
     // Deferred cover-loaded flags can apply after the scene idles — repaint so
     // the new covers actually show (render-on-demand, issue #24).
     setTextureStreamWake(() => this.requestRender());
@@ -4590,8 +4634,14 @@ export class StoreScene {
     // WALKING must not pin ACTIVE (same hazard as the backroom gate above).
     const clerkActive = !!this.clerk && !this.clerkAsleep && this.mode !== 'backroom' && this.clerk.isMoving() && this.clerk.isOnScreen();
     const arrowVisible = !!this.selectionArrow && this.selectionArrow.visible;
+    // Snapshot before the decrement below: an interaction-wake frame (the
+    // requestRender() burst any input handler fires) must always composite
+    // on the very next rAF, uncapped — see the frameInterval gate further
+    // down — or every click/keypress would pick up latency from whatever
+    // point in the cap's vsync window it happened to land on.
+    const forceWake = this.forceRenderFrames > 0;
     let active =
-      this.forceRenderFrames > 0 ||
+      forceWake ||
       walkKeyHeld ||
       cameraLerping ||
       aoFading ||
@@ -4788,12 +4838,17 @@ export class StoreScene {
       }
     }
 
-    // VIDEO throttle: cap the composite to the video's frame rate. ACTIVE renders
-    // every rAF (frameInterval 0). We only reach here when we intend to render.
+    // ACTIVE throttle: pace composites to targetFps (see activeFrameInterval)
+    // instead of chasing every rAF — that's what let a 144/165/240Hz monitor
+    // run the full N8AO/bloom/bokeh/FXAA chain at full refresh for no visual
+    // gain. VIDEO throttle: cap the composite to the video's frame rate.
     // Software GL caps VIDEO at ~1fps: a playing ceiling TV shouldn't hold the
-    // whole store at one multi-second composite after another.
-    const frameInterval = active ? 0 : (this.softwareGL ? 1000 : this.VIDEO_FRAME_MS);
-    if (!mustRenderThisFrame && time - this.lastRenderTime < frameInterval) {
+    // whole store at one multi-second composite after another. forceWake
+    // bypasses both: a fresh requestRender() burst must land on the next rAF
+    // uncapped (see the forceWake comment above), so it's excluded from the
+    // gate the same way mustRenderThisFrame is.
+    const frameInterval = active ? this.activeFrameInterval : (this.softwareGL ? 1000 : this.VIDEO_FRAME_MS);
+    if (!mustRenderThisFrame && !forceWake && time - this.lastRenderTime < frameInterval) {
       return;
     }
     this.lastRenderTime = time;

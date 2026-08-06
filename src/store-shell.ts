@@ -1227,6 +1227,10 @@ export function buildStore(scene: StoreScene) {
       // dye — the same "scan is the texture, theme is the paint" split the
       // wall surface uses.
       const neutral = neutralizeScanTexture(tex);
+      // (allowKtx2: false below — neutralizeScanTexture reads pixels back via
+      // canvas drawImage/getImageData, which only works on a CPU-decodable
+      // image. A KTX2Loader texture is a GPU-native CompressedTexture with no
+      // such image; see the allowKtx2 note in tryLoadUserAssetTexture.)
       if (neutral) {
         configureCarpetMap(neutral);
         floorMat.color.set(theme.palette.carpet);
@@ -1237,7 +1241,7 @@ export function buildStore(scene: StoreScene) {
       }
       floorMat.needsUpdate = true;
       scene.requestRender?.();
-    });
+    }, { allowKtx2: false });
     tryLoadUserAssetTexture('surfaces/store-carpet/normal.png', (tex) => {
       configureCarpetMap(tex);
       floorMat.normalMap = tex;

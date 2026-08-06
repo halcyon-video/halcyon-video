@@ -812,6 +812,25 @@ export function registerCoreSettings(): void {
     hidden: true, // service knob: AO engine choice
   });
 
+  registerSetting({
+    key: 'bb_fps_cap',
+    label: 'FPS Cap',
+    kind: 'cycle',
+    group: 'Performance',
+    values: [
+      { id: 'auto', label: 'Auto (60)' },
+      { id: '0', label: 'Uncapped' },
+      { id: '30', label: '30' },
+    ],
+    default: 'auto',
+    // fpsCapOverride is read once in initThree() (three-scene.ts), like the
+    // other bb_* boot flags this group cycles — needs the same scene rebuild
+    // every other Performance row here takes.
+    applyMode: 'rebuild-scene',
+    hint: 'ACTIVE render rate. Auto paces to ~60fps at an even display-refresh divisor; Uncapped chases the raw refresh rate.',
+    hidden: true, // service knob: the kiosk auto-picks 60; staff-only override
+  });
+
   // On-screen frame-rate readout. Live toggle: the meter is a pure DOM overlay
   // that passively observes composited frames through the always-on hitch
   // tracer (see src/fps-meter.ts), so switching it on/off neither rebuilds the
