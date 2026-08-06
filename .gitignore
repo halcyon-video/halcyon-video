@@ -27,7 +27,7 @@ dist-ssr
 scratch/
 
 # Feedback pins (F8 in-app hotkey) -- user-filed visual bug reports with
-# screenshots; see feedback/ in the dev server and CLAUDE.md.
+# screenshots; see feedback/ in the dev server.
 feedback/
 
 # Root-level screenshots (verification-run leftovers). Root only: pngs under
