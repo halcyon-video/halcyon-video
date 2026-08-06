@@ -1,9 +1,14 @@
-// 1993 storefront dressing, from the store footage: the gold "FAST DROP"
-// window lettering (with its taped-up instruction sheet) on the vestibule
-// glazing nearest the return chute, the STORE HOURS panel on the entrance sidelight glass
-// (moved off a chain-hung window-bay board 2026-08-02 — feedback/018; see the
-// block itself), the red evening-rental term cards inside the entry glass, and the cream
-// EAS anti-theft pedestals gating each vestibule chamber's store-side door.
+// 1993 storefront dressing, from the store footage: the STORE HOURS panel on
+// the entrance sidelight glass (moved off a chain-hung window-bay board
+// 2026-08-02 — feedback/018; see the block itself), the red evening-rental
+// term cards inside the entry glass, and the cream EAS anti-theft pedestals
+// gating each vestibule chamber's store-side door.
+//
+// REMOVED 2026-08-06 (owner, feedback/040 "makes no sense for fast drop to be
+// here. remove it for now"): the gold FAST DROP vinyl + taped instruction
+// sheet that sat on the vestibule's right-wall glazing. A future drop point
+// should come back as its own fixture with a real slot, not as lettering on
+// a pane with nothing behind it.
 //
 // REMOVED 2026-08-02 (owner, feedback/014 "this looks like shit. remove it"):
 // the pair of red "CHECK OUT TODAY / ANYTIME / RETURN BY MIDNIGHT" clock
@@ -21,7 +26,6 @@ import * as THREE from 'three';
 import type { StoreScene } from '../three-scene';
 import { getStorefrontSpec, ENTRANCE_SIDELIGHT_WIDTH } from '../store-layout';
 import { markSignMesh } from '../sign-builders';
-import { BB_ARCHIVO_BLACK } from '../bundled-fonts';
 
 const texCache = new Map<string, THREE.CanvasTexture>();
 
@@ -37,55 +41,6 @@ function cachedTex(key: string, w: number, h: number, paint: (ctx: CanvasRenderi
   tex.anisotropy = 4;
   texCache.set(key, tex);
   return tex;
-}
-
-function fastDropTex(): THREE.CanvasTexture {
-  return cachedTex('fastdrop', 1024, 256, (ctx, w, h) => {
-    ctx.clearRect(0, 0, w, h);
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.font = `900 150px ${BB_ARCHIVO_BLACK}, sans-serif`;
-    ctx.lineWidth = 10;
-    ctx.lineJoin = 'round';
-    ctx.strokeStyle = '#4a3200';
-    ctx.strokeText('FAST DROP', w / 2, h / 2);
-    const grad = ctx.createLinearGradient(0, h / 2 - 70, 0, h / 2 + 70);
-    grad.addColorStop(0, '#ffe27a');
-    grad.addColorStop(0.5, '#f4b400');
-    grad.addColorStop(1, '#c98d00');
-    ctx.fillStyle = grad;
-    ctx.fillText('FAST DROP', w / 2, h / 2);
-  });
-}
-
-function dropNoticeTex(): THREE.CanvasTexture {
-  return cachedTex('dropnotice', 512, 640, (ctx, w, h) => {
-    ctx.fillStyle = '#f6f4ec';
-    ctx.fillRect(0, 0, w, h);
-    ctx.fillStyle = '#222222';
-    ctx.textAlign = 'center';
-    ctx.font = '900 54px Arial, sans-serif';
-    ctx.fillText('FAST DROP', w / 2, 80);
-    ctx.font = '700 40px Arial, sans-serif';
-    ctx.fillText('OPEN 24 HOURS', w / 2, 150);
-    ctx.font = '400 28px Arial, sans-serif';
-    const lines = [
-      'Drop tapes through the slot',
-      'any time, day or night.',
-      '',
-      'Tapes not rewound',
-      'will be charged.',
-      '',
-      'THANK YOU!',
-    ];
-    lines.forEach((line, i) => ctx.fillText(line, w / 2, 220 + i * 48));
-    // Tape strips at the corners, like a sheet stuck up from inside.
-    ctx.fillStyle = 'rgba(200,195,170,0.8)';
-    ctx.fillRect(10, 10, 90, 34);
-    ctx.fillRect(w - 100, 10, 90, 34);
-    ctx.fillRect(10, h - 44, 90, 34);
-    ctx.fillRect(w - 100, h - 44, 90, 34);
-  });
 }
 
 function letterboardTex(): THREE.CanvasTexture {
@@ -137,75 +92,6 @@ export function buildStorefrontDressing93(scene: StoreScene): void {
       ...(transparent ? { alphaTest: 0.05 } : {}),
     });
 
-  // 1. FAST DROP gold vinyl (feedback/033 — was "QUIK DROP", owner: "we cant
-  // say quick drop"), on the entrance VESTIBULE's own glazing rather than a
-  // random front window-bay pane. It used to hunt the store shell's
-  // `window-bay-<i>` panes for the first one clear of the entrance tower
-  // masonry, which routinely landed it thirty-plus feet down the facade from
-  // the counter — gold lettering floating mid-store with nothing connecting
-  // it to a return chute (owner: "this isnot placed in a way that makes
-  // sense... it needs to connect with the back of the front counter").
-  //
-  // The return chute (src/entrance/return-slot.ts) grows off the counter's
-  // entrance-side shoulder, anchored just past the vestibule's store-side
-  // door (see entrance/index.ts's `returnSlot` placement, x ~ cx+7..10,
-  // z hugging backZ). The vestibule's own RIGHT wall — glazed, running along
-  // Z at x = vest.xR, with the walk-in door punched into it at sideDoorZ
-  // (entrance/index.ts: `buildGlazedWall('Z', xR, backZ, frontZ,
-  // [sideDoorZ])`, "right wall -> into store") — is the one pane of glass
-  // that is BOTH real vestibule glazing AND physically beside that counter
-  // shoulder. Mounting there (on the panel between the door frame and the
-  // front glass, since the sliver behind the door is too narrow for text)
-  // puts the sign right where a customer either steps past it heading for
-  // the door, or sees it through the glass as they cross the chamber —
-  // "connects with the back of the front counter" as closely as the real
-  // geometry allows. Facing -X (into the vestibule) so a customer WALKING IN
-  // reads it correctly (feedback/033); from the sales-floor side, through the
-  // glass, it reads mirrored — the same convention the rest of this file's
-  // window graphics use, just aimed at the opposite door.
-  {
-    const vest = scene.entrance?.getVestibuleInfo();
-    if (vest) {
-      const doorGapZ0 = vest.sideDoorZ - vest.doorW / 2;
-      const doorGapZ1 = vest.sideDoorZ + vest.doorW / 2;
-      // The two glazed panels either side of the walk-in door gap; take
-      // whichever is wide enough to carry the lettering (the door-to-backZ
-      // sliver is usually under a foot — the door-to-frontZ run is the real
-      // pane). Hug the door-frame edge of that panel: the end nearest the
-      // gap the customer (and the counter beyond it) actually stands at.
-      const panels: { z0: number; z1: number; hugMax: boolean }[] = [
-        { z0: vest.backZ, z1: doorGapZ0, hugMax: true },   // hug its far (door) edge
-        { z0: doorGapZ1, z1: vest.frontZ, hugMax: false }, // hug its near (door) edge
-      ];
-      const panel = panels.filter((p) => p.z1 - p.z0 > 1.2).sort((a, b) => (a.z1 - a.z0) - (b.z1 - b.z0))[0];
-      if (panel) {
-        const margin = 0.3;
-        const avail = panel.z1 - panel.z0 - margin;
-        const lettersW = Math.min(2.6, avail - 0.3);
-        const centerZ = panel.hugMax
-          ? panel.z1 - margin - lettersW / 2
-          : panel.z0 + margin + lettersW / 2;
-        const x = vest.xR - 0.06; // just inside the vestibule chamber, off the glass
-        const faceYaw = -Math.PI / 2; // normal -X: reads correctly walking IN through the vestibule
-
-        const letters = new THREE.Mesh(
-          new THREE.PlaneGeometry(lettersW, lettersW / 4),
-          printedOut(fastDropTex(), true),
-        );
-        letters.position.set(x, 5.6, centerZ);
-        letters.rotation.y = faceYaw;
-        markSignMesh(letters);
-        group.add(letters);
-
-        const notice = new THREE.Mesh(new THREE.PlaneGeometry(0.85, 1.06), printedOut(dropNoticeTex()));
-        notice.position.set(x - 0.01, 4.4, centerZ);
-        notice.rotation.y = faceYaw;
-        markSignMesh(notice);
-        group.add(notice);
-      }
-    }
-  }
-
   // 3. STORE HOURS panel, on the entrance glass (feedback pin 018: "seems
   // like it should be on a door, not here"). A store-hours notice is read
   // with a hand already on the door, so it lives on the entry composition —
@@ -214,8 +100,8 @@ export function buildStorefrontDressing93(scene: StoreScene): void {
   // static pane immediately outboard of the door pair: the two leaves
   // swing/slide (buildVestibuleDoor / updateVestibuleDoors) and a decal
   // parented to this static group would float clear of an opening leaf.
-  // Applied to the inside face reading OUT to the lot, like the QUIK DROP
-  // vinyl above, at the ~4.8 ft eye line a posted notice sits at.
+  // Applied to the inside face reading OUT to the lot, at the ~4.8 ft eye
+  // line a posted notice sits at.
   //
   // OPEN — the ARTWORK is not fixed here and is not attested. It is a black
   // changeable-letter board, and nothing in the reference corpus shows one
