@@ -330,6 +330,16 @@ WebRTC, with your touches flowing back as real input. Two flavors:
 Idle costs nothing by construction: `captureStream()` only produces frames when
 the render loop actually paints.
 
+It runs fully headless, too: a Docker or server deployment with no TV
+attached serves private instances only — that's the set-top-box setup. Point
+any device's browser at `/remote.html` and the server does the rendering;
+the box just decodes a video stream, so even the weakest smart-TV browser
+walks the aisles at full fidelity. Until someone donates a login
+(**Settings → Connection → Remote Play**, from any logged-in browser), the
+instances boot the demo library. Give the server hardware GL (`/dev/dri`)
+for the smoothest streams; instances are capped (`REMOTE_PLAY_MAX_INSTANCES`,
+default 2) and viewers past the cap are turned away until one frees up.
+
 ---
 
 ## Little things you'll notice anyway
@@ -398,21 +408,30 @@ npm run dev          # dev server on :1420 — first boot shows the login /
                      # membership cards; enter your Jellyfin URL + credentials
 ```
 
-**Docker:**
+**Docker — the no-fuss way:**
 
 ```sh
-git clone https://github.com/halcyon-video/halcyon-video
-cd halcyon-video
-docker compose up -d           # build the image + serve on :1420
+docker run -d --name halcyon --network host --restart unless-stopped \
+  ghcr.io/halcyon-video/halcyon-video
 ```
 
-Same first boot as above — open `http://<host>:1420` and enter your Jellyfin
-URL + login (or append `?demo=1` for the no-server demo library). The
-container runs the standard `npm run serve` runtime, so the Jellyseerr/Romm
-integration proxy and F8 feedback pins work out of the box; features that
-need host-side binaries (local mpv playback, Remote Play private instances,
-the TURN relay) stay off. Serving it through a reverse proxy or DNS name?
-Set `HALCYON_ALLOWED_HOSTS` — see the notes in `docker-compose.yml`.
+…or, from a clone, `docker compose up -d` (builds the image locally; the
+prebuilt image is published from releases). Then:
+
+1. Open `http://<host>:1420` in a browser and log into your Jellyfin — or
+   append `?demo=1` to try it with no server at all.
+2. Open `http://<host>:1420/remote.html` on a phone, tablet, or set-top box:
+   the **container** renders the store and streams it over WebRTC, with your
+   taps flowing back as input — see [Remote Play](#remote-play--the-store-in-your-pocket).
+   To stream *your* library (not the demo), log in once from any browser and
+   flip **Settings → Connection → Remote Play** on; that donates your login
+   to the server.
+
+`--network host` is what lets WebRTC offer an address other devices can
+actually reach; if you only want in-browser use, `-p 1420:1420` on a normal
+bridge network works too. Serving through a reverse proxy or DNS name? Set
+`HALCYON_ALLOWED_HOSTS`. All the knobs are annotated in
+[`docker-compose.yml`](docker-compose.yml).
 
 **HTPC / kiosk:**
 

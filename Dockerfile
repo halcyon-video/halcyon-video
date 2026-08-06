@@ -7,16 +7,28 @@
 # ?demo=1 for the synthetic demo library, no server needed). This runs the
 # project's documented server runtime (`npm run serve`: vite preview plus the
 # middleware in vite.config.ts), so the Jellyseerr/Romm integration proxy,
-# F8 feedback pins and Remote Play signaling all work. Host-side extras
-# (local mpv playback, Remote Play private instances, the TURN relay) stay
-# off: they need mpv / a browser / coturn on the machine itself.
+# F8 feedback pins and the whole Remote Play stack work — including private
+# instances: open /remote.html on a phone or set-top box and the CONTAINER
+# renders the store and streams it over WebRTC (use host networking for
+# that; see docker-compose.yml). The one host-side feature that stays off
+# is local mpv playback, which only ever applies on the HTPC itself.
 
 FROM node:22-alpine
 WORKDIR /app
 
-# Puppeteer is a devDependency for local visual tooling; its Chromium download
-# is dead weight here (same trick as the Pages deploy workflow).
-ENV PUPPETEER_SKIP_DOWNLOAD=1
+# Chromium renders Remote Play private instances server-side; coturn relays
+# WebRTC for viewers the store can't reach directly (VPN / hostile NAT).
+# This layer is ~800MB — most of the image — and it's what makes
+# remote.html work out of the box on a headless server.
+RUN apk add --no-cache chromium coturn nss freetype harfbuzz ca-certificates ttf-freefont
+
+# Puppeteer is a devDependency for local visual tooling; skip its own
+# Chromium download (same trick as the Pages deploy workflow) and point it
+# at the system one. HALCYON_CONTAINER tells the Remote Play server to pass
+# the container-survival flags to Chromium.
+ENV PUPPETEER_SKIP_DOWNLOAD=1 \
+    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser \
+    HALCYON_CONTAINER=1
 
 COPY package.json package-lock.json ./
 RUN npm ci && npm cache clean --force
