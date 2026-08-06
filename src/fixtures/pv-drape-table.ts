@@ -544,6 +544,16 @@ export class PvDrapeTable implements SlottedFixture {
     };
   }
 
+  // Re-run the ex-rental selection against whatever ctx.libraries reports
+  // NOW (feedback/055: the table never restocked after a watch). The caller
+  // (store-stock.ts's restockSlottedFixtures, wired from the video player's
+  // onClose) diffs the fresh getSlots() against the already-baked instanced
+  // slots and patches only what changed — this just recomputes slotMovies.
+  refreshStock(): void {
+    if (!this.inPeriod()) return;
+    this.initMovies();
+  }
+
   update(_timeMs: number): void {
     // Static prop — the drape is baked, not simulated.
   }

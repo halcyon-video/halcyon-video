@@ -3549,6 +3549,22 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
         setTimeout(() => location.reload(), 250);
         return;
       }
+      // Optimistic local watch-state update (feedback/055): reportPlaybackStopped
+      // below is fire-and-forget and nothing re-fetches the library afterwards,
+      // so without this the Movie object StoreScene already holds a reference
+      // to never learns it was watched this session — the PREVIOUSLY VIEWED
+      // drape table (pv-drape-table.ts) would stay frozen at whatever watch
+      // history existed at boot. Only a natural end counts as "watched":
+      // backing out early shouldn't bump play count or reorder the table.
+      // restockSlottedFixtures() patches the already-built table in place
+      // (see its header in store-stock.ts) — cheap enough to call here, before
+      // the store is shown again below, so any texture swap is invisible.
+      if (endedNaturally) {
+        movie.played = true;
+        movie.playCount = (movie.playCount ?? 0) + 1;
+        movie.lastPlayedDate = new Date().toISOString();
+        storeScene?.restockSlottedFixtures();
+      }
       // A series behaves like a series: an episode that plays to the end rolls
       // straight into the next one (including into the next season — the queue
       // is season-then-episode ordered). Backing out early means "I'm done",

@@ -2968,6 +2968,14 @@ export class StoreScene {
   // Slot map keys are updated so navigation/selection uses the compacted positions.
   public rebuildMovieBoxes() { return stock.rebuildMovieBoxes(this); }
 
+  // Feedback/055: patches any already-built fixture whose stock selection
+  // depends on data that can change mid-session (currently just the
+  // PREVIOUSLY VIEWED drape table's watch history) — see
+  // stock.restockSlottedFixtures's header for why this isn't a full
+  // rebuildMovieBoxes() pass. Wired from the video player's onClose in
+  // main.ts.
+  public restockSlottedFixtures() { return stock.restockSlottedFixtures(this); }
+
 
   // Camera settings transitions based on interaction states (standardized to feet, shelf-relative)
   public updateLOD() { return stock.updateLOD(this); }
