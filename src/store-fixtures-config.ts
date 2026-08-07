@@ -188,9 +188,11 @@ export const DEFAULT_FIXTURE_PLACEMENTS: FixturePlacement[] = [
 //
 // Campaign assignment follows the floor, not just the data:
 //
-//  • back (zOff 5) — PREVIOUSLY VIEWED, a face per library, most recently
-//    watched first. The deep floor is where the previously-viewed sale racks
-//    sat, and it's a browse-me fixture rather than a shout-at-the-door one.
+//  • counter-right — PREVIOUSLY VIEWED, a face per library, most recently
+//    watched first. It's a browse-me fixture, not a shout-at-the-door one, so
+//    it wants the customer already lingering near checkout rather than a
+//    heads-down aisle. (id kept as 'promo-stand-back' — see its own comment
+//    below for why; it is no longer at the back of the store.)
 //  • front (zOff 18) — the current FAMILY campaign: seasonal in season, a
 //    studio spotlight otherwise. Family-forward at the front is the chain's
 //    own merchandising rule.
@@ -222,14 +224,60 @@ const THIRD_STAND_MIN_DEPTH_Z = -34.5;
 
 export function promoStandPlacements(backWallZ: number): FixturePlacement[] {
   const stands: FixturePlacement[] = [
+    // MOVED 2026-08-07 (owner: "the previously viewed display near the back
+    // of the store needs to be next to the front counter on the right
+    // side"). Used to sit deep in the store (relativeToBackWall, zOffset 5 —
+    // see git history), parked against a shelf run far from the register.
+    // id kept as 'promo-stand-back' (tests/shot.mjs's `--state promo --yaw 0`
+    // and window.__promoStands both address it by array position, not by id
+    // string or location) — only the position/options below changed.
+    //
+    // "Right" = the customer's right walking in the front door: store
+    // centreline is x=11, front glass z=15, walking in you face -z, so +x is
+    // the customer's right (matches the RETURN chute / RIGHT-side placements
+    // elsewhere in this file). This is a FOUR-sided display — unlike
+    // pv-drape-table-front (front/back only), the browse camera can dock
+    // against any of its 4 faces at `distance = 1.25 + 2.2 = 3.45` ft from
+    // its CENTRE (store-camera.ts, isDisplay branch) along all four cardinal
+    // directions at yaw 0, which is the binding clearance (bigger than
+    // FLOOR_DISPLAY_CLEARANCE's 3.0 ft the validator itself checks).
+    //
+    // (24.0, -3.0): the shield counter's right band reaches its true widest
+    // point at the raw outline vertex (20.8, 2.26) — see
+    // counterAnchoredPlacements's derivation comment above and
+    // 'counter-band-front-right'/'counter-band-shoulder-right' below. An
+    // initial (22.0, -2.0) estimate hand-interpolated off those rects' own
+    // corners and looked safe on paper, but the validator's actual SAT gap
+    // (oriented-rect vs oriented-rect, not a simple axis distance) came back
+    // tighter than the estimate — 1.98 ft where 3.0 is required — so this was
+    // tuned against the REAL validator output, not the hand math: pushed to
+    // x=24 clears the counter band with no warning at all; the same run also
+    // surfaced a second, non-obvious conflict only present when
+    // pv-drape-table-front is in its 2007-2008 POP-kit period (bb_pop_period
+    // set to that range) — its footprint at (27, 3) came back only 2.15 ft
+    // from (22.0, -2.0), also under the 3.0 ft this fixture's
+    // FLOOR_DISPLAY_CLEARANCE demands of EVERYTHING (not just other
+    // FLOOR_DISPLAY_CLEARANCE fixtures) — which is what pushed z to -3.0 (the
+    // z axis is what SAT reported as the separating axis both times).
+    // Re-verified at the final (24, -3) across shield/usquare counter shapes,
+    // straight/diagonal/herringbone arrangements, corner=wide, --full scale,
+    // and with pv-drape-table-front present: zero layout-validator
+    // warnings/errors in every combination. Also clear of every
+    // counter-anchored prop on this band (candy/rewinder/tip-jar all sit at
+    // x<=13.9), of FIELD_Z_FRONT (~-7, the shelf field's own front edge —
+    // this fixture's south standoff at z=-6.45 stays short of it), and of the
+    // store's right wall (never closer than x=34, same guarantee
+    // pv-drape-table-front's own placement comment established). Verified:
+    // the layout validator (see above), `--state clerkpath` across the same
+    // config sweep (0 footprint intrusions every run), `--state bagexit`/a
+    // first-person walk past the counter (clear of both), and `--state promo
+    // --yaw 0` (stand still builds all 4 faces, 9/9 each).
     {
       id: 'promo-stand-back',
       kind: 'four-sided-display',
-      position: { x: 8.0, z: 5.0 },
+      position: { x: 24.0, z: -3.0 },
       yaw: 0,
       options: {
-        relativeToBackWall: true,
-        zOffset: 5.0,
         // studio-spotlight:2 (not :1) so that if a store has no watch history
         // at all this stand can't land on the same studio as front-right's
         // own fallback.
