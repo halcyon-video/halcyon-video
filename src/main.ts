@@ -2890,6 +2890,14 @@ function startDemoAndLoad() {
   // First visit defaults to daytime out the windows (the scene otherwise
   // rolls day/night 50/50 per boot); user-changeable in Store Look after.
   if (!localStorage.getItem('bb_outside')) localStorage.setItem('bb_outside', 'day');
+  // The games department is off by default (bb_games_enabled, main.ts fetchGames)
+  // because it costs a RomM round-trip nobody asked for. The demo has no RomM and
+  // no round trip — buildDemoGames() is synchronous and local — so that default
+  // was buying nothing here and cost us the whole department: every visitor to
+  // the Pages demo saw a store with no VIDEO GAMES section, which is why the
+  // feature reads as missing to people who have only ever seen the demo. Opt in
+  // on first boot only, so a visitor who switches it off keeps it off.
+  if (!localStorage.getItem('bb_games_enabled')) localStorage.setItem('bb_games_enabled', '1');
   logToConsole('[System] Demo mode: stocking the store with a placeholder library (no media server).', 'system');
   librariesList = buildDemoLibraries(900);
   gameMovies = buildDemoGames(60);
