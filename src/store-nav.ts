@@ -30,6 +30,7 @@ import {
   openSubNav, subNavActive, subNavArrow, subNavUp, subNavDown, subNavSelect, subNavBack,
   subNavRefresh, closeSubNav, debugSubNav, forgetSubNav,
 } from './store-subnav';
+import { talkToClerkAtCounter } from './store-checkout';
 import type { StoreScene } from './three-scene';
 
 /**
@@ -571,6 +572,13 @@ export function moveUp(scene: StoreScene) {
     return;
   }
   if (scene.mode === 'backroom') return; // couch view — no vertical nav
+  // ▲ at the register: speak to the clerk (store-checkout.ts). The counter's
+  // other presses were already spoken for — ◄ terminal, ► tip jar, OK
+  // confirm, Back leave — and ▲ did nothing there.
+  if (scene.mode === 'checkout') {
+    talkToClerkAtCounter(scene);
+    return;
+  }
   if (scene.mode === 'overview') {
     scene.overviewLook(0, 1);
     return;
@@ -762,14 +770,18 @@ export function moveDown(scene: StoreScene) {
   if (exitPeekToSubNav(scene)) return; // ▼ drops the peek, resumes the index's Row 1
   if (subNavDown(scene)) return;       // jump index: row 1 -> row 2
   if (scene.mode === 'backroom') return; // couch view — no vertical nav
-  if (scene.mode === 'overview') {
-    scene.overviewLook(0, -1);
+  // ▼ IN THE SHELF-SELECT VIEWS opens the jump index (owner ruling
+  // 2026-08-06). It used to live on the bottom shelf row, one press off the
+  // floor deep inside browsing — nowhere anyone reaches for a menu. Both
+  // pulled-back "choose where to go" framings get it, since which one is home
+  // depends on the overview-start setting. Unconditional by owner's choice:
+  // ◄ ► ▲ still walk the floating cursor, and the index itself lists every
+  // library, genre and display, so nothing becomes unreachable.
+  if (scene.mode === 'overview' || scene.mode === 'library-select') {
+    openSubNav(scene);
     return;
   }
-  if (scene.mode === 'library-select') {
-    // Down = toward the camera along the forward axis.
-    scene.moveLibrarySelectDirectional('z', -1);
-  } else if (scene.mode === 'person-endcap') {
+  if (scene.mode === 'person-endcap') {
     scene.moveEndcapSelection(0, 1);
   } else if (scene.mode === 'browse') {
     if (scene.claspCursorActive) {
@@ -777,11 +789,10 @@ export function moveDown(scene: StoreScene) {
     } else if (scene.selectedShelf > 0) {
       scene.selectedShelf--;
       scene.updateCameraTarget();
-    } else {
-      // Bottom row: ▼ opens the sub-nav jump index (store-subnav.ts) rather
-      // than dying against the floor.
-      openSubNav(scene);
     }
+    // Bottom row: ▼ stops against the floor. The jump index it used to open
+    // from here moved to the shelf-select views above (owner ruling
+    // 2026-08-06).
   } else if (scene.mode === 'inspect') {
     if (scene.moveSeriesSeasonSelection(1)) return;
     if (scene.moveSeriesEpisodeSelection(1)) return;
