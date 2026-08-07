@@ -451,6 +451,7 @@ export class StoreScene {
     getScene: () => this.scene,
     getRenderer: () => this.renderer,
     getBackWallZ: () => this.backWallZ,
+    getCeilingY: () => this.ceilingY,
     getHeadlight: () => this.headlight ?? null,
     getBakeHidden: () => (this.selectionArrow ? [this.selectionArrow] : []),
     onEnvironmentRebaked: () => {

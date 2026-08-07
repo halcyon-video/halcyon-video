@@ -9,6 +9,7 @@
 import * as THREE from 'three';
 import { Reflector } from 'three/examples/jsm/objects/Reflector.js';
 import { assetUrl } from './asset-url';
+import { CEILING_Y } from './store-layout';
 
 export type OutsideMode = 'day' | 'night' | 'sunset';
 
@@ -51,6 +52,7 @@ export interface OutdoorLightingDeps {
   getScene: () => THREE.Scene;
   getRenderer: () => THREE.WebGLRenderer;
   getBackWallZ: () => number;
+  getCeilingY: () => number;
   // The camera headlight — the one DirectionalLight the per-mode traverse must
   // NOT recolor as "the sun".
   getHeadlight: () => THREE.DirectionalLight | null;
@@ -509,9 +511,22 @@ export class OutdoorLightingRig {
       }
     });
 
-    // Mid-store at eye height, in the clear central walkway.
+    // Mid-store at eye height, in the clear central walkway. cy used to be a
+    // flat 6.5 — fine on the default 13.5 ft deck (48% up, roughly centred
+    // between floor and cornice), but on the 'high' ceiling variant (18 ft)
+    // that same 6.5 sits only 36% up, and the chrome ceiling cornice/soffit
+    // fascia is 100% metalness (zero diffuse term — its whole appearance IS
+    // its env-map reflection). From a capture point that much lower relative
+    // to the room, those bands sampled a dim, mostly-empty part of the bake
+    // and rendered near-black: the wedge read as "hollow, no body" and its
+    // mirror runs looked disconnected from the wall cornice they hand off to
+    // (feedback: "ceiling wedges do not connect on high ceiling... hollow").
+    // Scaling cy with the live ceiling height keeps the capture point at the
+    // same FRACTIONAL height in the room on every preset, so it sees the same
+    // relative view of the cornice/fascia regardless of how tall the deck is.
+    // No-op on the default ceiling (ceilingY === CEILING_Y → cy === 6.5).
     const cx = 11.0;
-    const cy = 6.5;
+    const cy = 6.5 * (this.deps.getCeilingY() / CEILING_Y);
     const cz = (15.0 + this.deps.getBackWallZ()) / 2;
 
     for (let b = 0; b < bounces; b++) {
