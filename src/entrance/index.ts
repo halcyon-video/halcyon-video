@@ -650,6 +650,11 @@ export class EntranceCheckout implements StoreFixture {
     stations: { x: number; y: number; z: number; rotY: number }[]
   ) {
     this.terminalStations = stations.map((st) => new THREE.Vector3(st.x, st.y, st.z));
+    // Real depth (ft) of the inner counter island the terminals sit on —
+    // set synchronously above in build(), well before any of this method's
+    // async GLTF callbacks run. Used below to size the monitor's overhang
+    // off the ACTUAL counter geometry instead of a hardcoded half-depth.
+    const islandDepth = this.counterTopInfo!.depth;
     // Shared terminal screen texture (one canvas drives every desk CRT).
     // Sized generously (2x the old 512x384) so the diegetic search terminal
     // reads crisply once the camera docks close in front of it.
@@ -761,13 +766,33 @@ export class EntranceCheckout implements StoreFixture {
         // screen plane we add on the station's +Z side.
         monitor.rotation.y = Math.PI;
         const bb = fitModel(monitor, MON_H);
-        // Push the tube toward the CUSTOMER side of the island: centered on
-        // the spine, the bezel of this very deep model lands basically ON the
-        // island's clerk-side face (innerD/2 = 0.8), leaving no deck at all
-        // for the keyboard (feedback/046). The butt overhangs the island's
-        // back face into the counter well instead, where the outer band hides
-        // it — exactly what a real CRT does on a shallow desk.
-        monitor.position.z -= 0.3;
+        // This station group's local +Z is the island's front->back offset
+        // axis (matches getInnerCounterSpine's rotY: local Z = -islandDepth/2
+        // is the island's FRONT face, i.e. the customer side — and it sits
+        // FLUSH, zero clearance, against the solid outer counter band, for
+        // both counter shapes (counter.ts builds pFront directly on the
+        // band's own inner face line). Local Z = +islandDepth/2 is the BACK
+        // face, the clerk side, opening onto the open counter well she works
+        // in. This model is nearly as deep as the whole island even centered
+        // (measured: ~1.55 ft of body on a 1.6 ft island, ~0.3 in of slack
+        // total), so it has to overhang SOMEWHERE. The old
+        // `monitor.position.z -= 0.3` overhung it toward the flush FRONT,
+        // driving the tube ~0.27 ft into the solid band — the owner's "the
+        // computer monitors are clipping with the front counter". Overhang
+        // into the open well instead (the safe side), and size the shift off
+        // the model's own measured bounding box rather than a fixed number:
+        // keep a real clearance off the flush front plane, capped so the
+        // back overhang stays well short of the clerk's stand point (~1.15 ft
+        // beyond this edge — see counter.ts getTerminalStanding's standOff).
+        const halfIslandD = islandDepth / 2;
+        const FRONT_CLEARANCE = 0.12;
+        const BACK_OVERHANG_CAP = 0.35;
+        const shiftZ = THREE.MathUtils.clamp(
+          (-halfIslandD + FRONT_CLEARANCE) - bb.min.z,
+          0,
+          (halfIslandD + BACK_OVERHANG_CAP) - bb.max.z,
+        );
+        monitor.position.z += shiftZ;
         monitor.updateMatrixWorld(true);
         bb.setFromObject(monitor);
         // Bezel-opening bounds must be measured while the monitor is still
@@ -855,13 +880,16 @@ export class EntranceCheckout implements StoreFixture {
         kb.updateMatrixWorld(true);
         bb.setFromObject(kb);
         const ctr = bb.getCenter(new THREE.Vector3());
-        // Seat ON the deck (bottom at y=0), front edge just inside the
-        // island's clerk-side face (innerD/2 = 0.8 from the spine the
-        // station sits on) with its back half tucked under the CRT's bezel
-        // lip — the only strip of deck the monitor leaves free. The old
+        // Seat ON the deck (bottom at y=0), back edge just inside the
+        // island's clerk-side face (islandDepth/2, measured off the same
+        // real counter geometry the monitor shift above uses — was a
+        // hardcoded 0.8/0.78) with its back half tucked under the CRT's
+        // bezel lip — the only strip of deck the monitor leaves free. The old
         // `-ctr.z + 0.95` push left the near half cantilevered past the
-        // island edge, reading as a floating slab (feedback/046).
-        kb.position.set(-ctr.x, -bb.min.y, 0.78 - bb.max.z);
+        // island edge, reading as a floating slab (feedback/046). This stays
+        // safely inside [-islandDepth/2, islandDepth/2] (measured: z spans
+        // ~0.42..0.78 on a +-0.8 island) — no counter-clipping here.
+        kb.position.set(-ctr.x, -bb.min.y, (islandDepth / 2 - 0.02) - bb.max.z);
         g.add(kb);
       });
       this.ctx.requestShadowRefresh();
