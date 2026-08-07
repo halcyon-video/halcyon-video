@@ -24,6 +24,20 @@ on a synthetic demo library. Or take the
 > over a laptop on battery. (It's built to live on a dedicated HTPC, where it
 > idles near zero; a leaner demo is on the list.)
 
+### Does it…?
+
+The short answers, so you don't have to go looking for them.
+
+| | |
+|---|---|
+| **Run in Docker?** | Yes — one `docker run`, or `docker compose up -d` from a clone. [Quick start ↓](#quick-start) |
+| **Do video games?** | Yes — point it at [RomM](https://github.com/rommapp/romm) and a whole department appears: per-platform bays, period-correct boxes and jewel cases, and "renting" one launches it. [More ↓](#the-games-department) |
+| **Work with Plex or Emby?** | Not yet — Jellyfin today. The media layer is one module and adapters are the top roadmap item ([#32](https://github.com/halcyon-video/halcyon-video/issues/32)). |
+| **Run on a Raspberry Pi?** | Yes — **2.5D mode** runs the same store as plain HTML/CSS. [More ↓](#25d-mode--the-same-store-for-a-raspberry-pi) |
+| **Work away from home?** | Yes — **Remote Play** streams the live store to any browser, with its own TURN relay for off-LAN viewers. [More ↓](#remote-play--the-store-in-your-pocket) |
+| **Look like *my* video store?** | Yes — brand, logo, colors, themes, fixtures and sign art are all data you drop in a folder, not code. [More ↓](#make-it-yours) |
+| **Work with no media server at all?** | Yes — that's the demo link above. |
+
 ---
 
 ## What it is
@@ -491,7 +505,13 @@ whole store as HTML/CSS on a Raspberry Pi.
 
 **Does it work with Plex or Emby?**
 Today it speaks Jellyfin (and a no-server demo mode). The media layer is one
-module, and Plex/Emby adapters are the most-asked-about item on the roadmap.
+module, and Plex/Emby adapters are the most-asked-about item on the roadmap —
+[issue #32](https://github.com/halcyon-video/halcyon-video/issues/32) is the
+one to watch or chime in on.
+
+**Can I run it in Docker?**
+Yes — see [Quick start](#quick-start). One `docker run` with `--network host`,
+or `docker compose up -d` from a clone to build the image locally.
 
 **Can I make it look like the video store I grew up with?**
 See [Make it yours](#make-it-yours). The app ships a fictional brand and takes
