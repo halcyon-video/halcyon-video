@@ -632,7 +632,7 @@ function updateMovieHUD(movie: Movie | null) {
           : 'FLIP CASE  •  OK TO PLAY  •  PICK A NAME ON THE BACK';
       }
     } else {
-      hint.textContent = 'OK TO EXAMINE  •  BACK OUT  •  OPTIONS AT THE COUNTER';
+      hint.textContent = 'OK TO EXAMINE  •  BACK OUT  •  SETTINGS & HELP AT THE COUNTER';
     }
   }
 }
@@ -669,7 +669,7 @@ function updateHUDForMode(mode: string) {
       // T22: with a tape in hand, surface the route to the counter.
       text = storeScene?.canHoldToCheckout()
         ? 'OK TO EXAMINE  •  CHECK OUT: BACK, THEN THE COUNTER'
-        : 'OK TO EXAMINE  •  BACK OUT  •  OPTIONS AT THE COUNTER';
+        : 'OK TO EXAMINE  •  BACK OUT  •  SETTINGS & HELP AT THE COUNTER';
       break;
     case 'inspect':
       // T22: with carry mode on, the confirm takes the tape instead of playing.
@@ -680,7 +680,9 @@ function updateHUDForMode(mode: string) {
         : 'OK TO PLAY  •  BACK TO THE SHELF  •  PICK A NAME ON THE BACK';
       break;
     case 'checkout':
-      text = 'OK TO CHECK OUT  •  BACK TO KEEP BROWSING';
+      // The Left press is the manager terminal's front door — say so here,
+      // standing at the very counter it lives on (UX pass 2026-08).
+      text = 'OK TO CHECK OUT  •  ◀ MANAGER TERMINAL  •  BACK TO BROWSE';
       break;
     case 'backroom':
       // T23: home with the rentals. Arrows pick a tape, OK reads/plays it,

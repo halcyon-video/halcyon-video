@@ -904,12 +904,16 @@ export class EntranceCheckout implements StoreFixture {
     ctx.fillStyle = CRT_INK;
     ctx.fillText(brandString('pos-system-title', 'HALCYON RENTAL SYSTEM'), PAD_X, PAD_Y + (BAR_H - FONT_PX) / 2);
 
+    // The idle screen is also the manager terminal's only in-world signpost
+    // (UX pass 2026-08): the Left press at the counter was taught nowhere,
+    // and "/" is keyboard-only advice — a remote user needs the other line.
     const lines = this.terminalLines ?? [
       'STORE #55746   GREEN BAY, WI',
       '',
       'READY.',
       '',
       'PRESS / TO SEARCH CATALOG',
+      'AT COUNTER: LEFT = MANAGER MENU',
       '',
       '>',
     ];
