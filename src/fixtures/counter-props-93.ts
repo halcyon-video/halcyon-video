@@ -1,8 +1,13 @@
 // 1993 checkout-counter dressing, straight from the store footage: the
 // customer-facing VFD pole display, a cluster of latex balloons tied to the
-// band, the "HOT PIX" preview-guide boxes, a dot-matrix receipt printer with
-// fanfold paper, and the "RENT A GAME / GET A CARD" trading-card counter
-// display (only when the store actually has a game department).
+// band, a dot-matrix receipt printer with fanfold paper, and the "RENT A GAME
+// / GET A CARD" trading-card counter display (only when the store actually
+// has a game department).
+//
+// The stack of preview-guide cartons that used to sit on the inner counter's
+// far end was pulled at the owner's request (2026-08-06) — the numbered
+// sections below keep their original ids so the remaining ones stay easy to
+// match against the reference footage.
 //
 // Everything is static geometry parented under ONE group that registers in
 // scene.activeSignageObjects, so the signage rebuild path tears it down with
@@ -48,54 +53,6 @@ function vfdTex(): THREE.CanvasTexture {
     ctx.textBaseline = 'middle';
     ctx.fillText('HOLIDAY PRESALE PLUS', w / 2, 64);
     ctx.fillText('8 RENTALS ONLY $24.95', w / 2, 158);
-  });
-}
-
-function hotPixTopTex(): THREE.CanvasTexture {
-  return cachedTex('hotpix-top', 512, 352, (ctx, w, h) => {
-    ctx.fillStyle = '#f4f1ea';
-    ctx.fillRect(0, 0, w, h);
-    // Checkerboard band along the bottom edge, like the real carton print.
-    const sq = 16;
-    for (let x = 0; x < w; x += sq) {
-      for (let y = h - sq * 2; y < h; y += sq) {
-        if (((x + y) / sq) % 2 < 1) {
-          ctx.fillStyle = '#c22417';
-          ctx.fillRect(x, y, sq, sq);
-        }
-      }
-    }
-    ctx.fillStyle = '#c22417';
-    ctx.font = `900 96px ${BB_ARCHIVO_BLACK}, sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.save();
-    ctx.translate(w / 2, h / 2 - 30);
-    ctx.rotate(-0.06);
-    ctx.fillText('HOT PIX', 0, 0);
-    ctx.restore();
-    ctx.font = '700 28px Arial, sans-serif';
-    ctx.fillText('FREE PREVIEW GUIDE — TAKE ONE', w / 2, h / 2 + 52);
-  });
-}
-
-function hotPixSideTex(): THREE.CanvasTexture {
-  return cachedTex('hotpix-side', 512, 64, (ctx, w, h) => {
-    ctx.fillStyle = '#f4f1ea';
-    ctx.fillRect(0, 0, w, h);
-    ctx.fillStyle = '#c22417';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    // FIT the ticker to the carton side instead of trusting a point size: at
-    // 40px this run measured 597px into a 512px face even in the substituted
-    // face, and Archivo Black (~17% wider here) pushed it to 697 — i.e. the
-    // outer "HOT"s were being cut in half by the canvas edge.
-    const ticker = 'HOT PIX  •  HOT PIX  •  HOT PIX';
-    const usable = w - 16;
-    ctx.font = `900 40px ${BB_ARCHIVO_BLACK}, sans-serif`;
-    const natural = Math.max(1, ctx.measureText(ticker).width);
-    ctx.font = `900 ${Math.min(40, Math.floor(40 * (usable / natural)))}px ${BB_ARCHIVO_BLACK}, sans-serif`;
-    ctx.fillText(ticker, w / 2, h / 2 + 2);
   });
 }
 
@@ -276,25 +233,6 @@ export function buildCounterProps93(scene: StoreScene): void {
       });
       scene.requestRender();
     });
-  }
-
-  // 3. HOT PIX preview-guide boxes stacked on the inner counter's far end.
-  {
-    const a = entrance.getCounterTopAnchor(cx - 3.6)!;
-    const boxGeo = new THREE.BoxGeometry(1.0, 0.13, 0.68);
-    const side = printed(hotPixSideTex());
-    const plainTop = matte(0xf4f1ea, 0.7);
-    for (let i = 0; i < 4; i++) {
-      const topMat = i === 3 ? printed(hotPixTopTex()) : plainTop;
-      const box = new THREE.Mesh(boxGeo, [side, side, topMat, plainTop, side, side]);
-      const jx = (seededRandom01(`hp-x-${i}`) - 0.5) * 0.06;
-      const jz = (seededRandom01(`hp-z-${i}`) - 0.5) * 0.06;
-      box.position.set(a.x + jx, a.y + 0.065 + i * 0.13, a.z + jz);
-      box.rotation.y = a.rotY + (seededRandom01(`hp-r-${i}`) - 0.5) * 0.12;
-      box.castShadow = true;
-      box.receiveShadow = true;
-      group.add(box);
-    }
   }
 
   // 4. Dot-matrix printer with fanfold paper, back of the inner counter.
