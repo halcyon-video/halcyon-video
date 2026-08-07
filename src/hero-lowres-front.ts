@@ -10,13 +10,27 @@
 // before the real cover pops in (owner report, 2026-08-06; reproduced at 10/10
 // hovers on a 1400-title catalog, 0/10 on a 400-title one that fits the budget).
 //
-// The art to show instead is already in memory. lowResCache is a SEPARATE 64MB
-// budget of 64x96 thumbnails (24,576 B/title ≈ 2,700 titles), so at the scale
-// where the full-res cache thrashes the low-res tier still holds the entire
-// catalog — and it is decoded from the same source, through the same medium
-// mode, and carries the same gap/staff-pick stamps as the full-res pixels. So
-// the transitional frame can be the title's OWN cover, just soft, which at 47ms
-// reads as the box simply sharpening rather than as a black flash.
+// The art to show instead is already in memory, in TWO places of very different
+// size:
+//  - lowResCache (video-case.ts) is a 64MB budget of 64x96 thumbnails
+//    (24,576 B/title ~ 2,700 titles) — cheap, and checked first below.
+//  - textureArrayManager (poster-textures.ts) never evicts: once a layer is
+//    uploaded it lives on the GPU (and in its CPU mirror) for the life of the
+//    scene. On a catalog that outgrows lowResCache too (or just outpaces it —
+//    a background sweep, loadAllArtworkForActiveLibrary, decodes the whole
+//    library regardless of where the browse cursor is, so titles the cursor
+//    reaches late routinely age out of BOTH small CPU caches before they're
+//    ever hovered) this is the ONLY tier still holding the title's pixels.
+//    Confirmed still-reproducible after the lowResCache-only version of this
+//    fix landed: scratch/hoverflicker2.mjs on a 1400-title catalog shows
+//    hasArt()/hasHighRes() true with BOTH CPU caches missed, past ~move 18 of
+//    a browse sweep — exactly the flat-placeholder case again.
+//
+// Both tiers are decoded from the same source, through the same medium mode,
+// and carry the same gap/staff-pick stamps as the full-res pixels — so the
+// transitional frame is always the title's OWN cover (sometimes low-res,
+// sometimes even the sharper 160x240 GPU layer), which reads as the box
+// sharpening rather than as a black flash.
 //
 // Kept OUT of video-case.ts deliberately: that file sits at its 6000-line budget
 // (tools/check-file-budget.mjs), and per CLAUDE.md hitting the ceiling means
@@ -41,12 +55,25 @@ import {
   POSTER_CROP_X,
   type CaseFinish,
 } from './video-case';
-import { uploadTextureNow } from './poster-textures';
+import { uploadTextureNow, textureArrayManager } from './poster-textures';
 
 // The low-res thumbnails the decode worker produces (see video-case's decode
 // path, which stamps both tiers at these exact dimensions).
 const LOW_W = 64;
 const LOW_H = 96;
+
+/**
+ * lowResCache first (cheapest — no copy, this title's OWN small buffer), then
+ * the array textures' never-evicted GPU mirror (a `.slice()` copy — see
+ * TextureArrayManager.getFallbackPixels). Null only when the title has
+ * genuinely never been decoded at all, in which case the caller's existing
+ * flat-placeholder fallback is correct (there is really nothing to show yet).
+ */
+function resolveFallbackPixels(movieId: string): { data: Uint8Array; w: number; h: number } | null {
+  const cached = lowResCache.get(movieId);
+  if (cached) return { data: cached, w: LOW_W, h: LOW_H };
+  return textureArrayManager.getFallbackPixels(movieId);
+}
 
 // These materials are transient by nature — one per title the cursor passes
 // over, each superseded a few frames later by the full-res build. Bounded like
@@ -91,8 +118,8 @@ export function getLowResFrontMaterial(
   skipCrop: boolean = false,
   finish?: CaseFinish,
 ): THREE.MeshPhysicalMaterial | null {
-  const pixels = lowResCache.get(movieId);
-  if (!pixels) return null;
+  const src = resolveFallbackPixels(movieId);
+  if (!src) return null;
 
   const key = `${movieId}_anim_${isAnimated}_probe_${probeIdx !== undefined ? probeIdx : 'none'}_fin_${finish ?? 'default'}`;
   const cached = lowResFrontLRU.get(key);
@@ -102,7 +129,7 @@ export function getLowResFrontMaterial(
     return cached.mat;
   }
 
-  const tex = new THREE.DataTexture(pixels, LOW_W, LOW_H, THREE.RGBAFormat, THREE.UnsignedByteType);
+  const tex = new THREE.DataTexture(src.data, src.w, src.h, THREE.RGBAFormat, THREE.UnsignedByteType);
   tex.flipY = false;
   tex.colorSpace = THREE.SRGBColorSpace;
   // LinearFilter both ways: this is a 64x96 thumbnail blown up onto a case

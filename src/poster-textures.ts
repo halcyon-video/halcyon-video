@@ -844,6 +844,76 @@ class TextureArrayManager {
   public setHighResLoaded(movieId: string, loaded: boolean) {
     this.setFlag(movieId, loaded ? 255 : 0, false);
   }
+
+  /**
+   * A COPY of this title's best available art straight from the array
+   * textures' CPU mirrors (updateTextureArrayLayerImpl always writes pixels
+   * there before/alongside the GPU upload — see that function's opening
+   * comment), or null if the title has no layer at all.
+   *
+   * Why this exists: hero-lowres-front.ts's soft-cover fallback used to stop
+   * at lowResCache/posterPixelCache — both small, evictable CPU caches
+   * (256MB / 64MB, video-case.ts) bounded well under a real library's size.
+   * A title decoded early in a background sweep (loadAllArtworkForActiveLibrary)
+   * routinely ages out of BOTH before the browse cursor ever reaches it, even
+   * though hasArt()/hasHighRes() are true — its layer has been sitting on the
+   * GPU, uploaded, the whole time. Before this existed, that combination (art
+   * on the GPU, nothing in either CPU cache) fell all the way through to the
+   * flat placeholder — the exact black-flash bug the low-res tier was built to
+   * remove, just reopened by a cache the size of the low-res tier itself.
+   * Measured on a 1400-title synthetic catalog: titles more than ~200 browse
+   * steps from boot order reliably hit this path (scratch/hoverflicker2.mjs).
+   *
+   * Prefers the low-res (64x96) layer even when high-res (160x240) has also
+   * landed: this is a TRANSITIONAL cover, on screen for a frame or two before
+   * the real decode swaps in (same contract as the CPU lowResCache tier this
+   * sits behind), so the high-res layer's extra sharpness buys nothing but a
+   * ~6x heavier synchronous GPU upload (uploadTextureNow, called right on the
+   * cursor-move keypress that triggered the miss). Measured on a 5000-title
+   * catalog (tools/shot.mjs --perf 60 --lib 5000, worst case: every title on
+   * this path — far past this app's ~3000-title production target):
+   * always-preferring high-res cost ~550ms of extra heroMs/caseCanvasMs over
+   * the 60-move sweep (vs. a placeholder-fallback baseline that pays neither);
+   * preferring low-res here recovers about 3.5-4x of that (down to ~65-80ms
+   * extra caseCanvasMs/heroMs — the remaining cost is the texture upload
+   * itself, unavoidable once a real per-title texture has to exist at all).
+   * At the scale that actually reproduced the original report (~1400 titles),
+   * neither version is distinguishable from baseline in p50/p90/hitch count —
+   * this only matters once a catalog is large enough that browsing routinely
+   * outruns both CPU caches on nearly every step.
+   * Falls back to high-res only when there's no low-res layer for this title
+   * at all — a high-bank title once the catalog overflows into two banks
+   * (POSTER_BANKS/isHighBank), where the low-res array becomes a SECOND BANK
+   * holding different titles entirely, not a preview tier for this one.
+   *
+   * A `.slice()` copy, not a `.subarray()` view: a view would keep the ENTIRE
+   * multi-hundred-MB array-texture backing buffer alive for as long as one
+   * caller holds a texture built from a tiny slice of it.
+   */
+  public getFallbackPixels(movieId: string): { data: Uint8Array; w: number; h: number } | null {
+    const idx = this.movieToIndex.get(movieId);
+    if (idx === undefined || !this.loadedFlags || this.loadedFlags[idx] === 0) return null;
+    if (this.lowResArray) {
+      const lowIdx = idx - this.lowResBase;
+      if (lowIdx >= 0) {
+        const { width: w, height: h, data } = this.lowResArray.image;
+        const layerSize = w * h * 4;
+        const start = lowIdx * layerSize;
+        if (start + layerSize <= (data as Uint8Array).length) {
+          return { data: (data as Uint8Array).slice(start, start + layerSize), w, h };
+        }
+      }
+    }
+    if (this.highResArray) {
+      const { width: w, height: h, data } = this.highResArray.image;
+      const layerSize = w * h * 4;
+      const start = idx * layerSize;
+      if (start + layerSize <= (data as Uint8Array).length) {
+        return { data: (data as Uint8Array).slice(start, start + layerSize), w, h };
+      }
+    }
+    return null;
+  }
 }
 
 export const textureArrayManager = new TextureArrayManager();
