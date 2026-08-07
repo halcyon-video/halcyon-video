@@ -8,6 +8,23 @@ cd "$(dirname "$0")"
 export WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-wayland-0}"
 export DISPLAY="${DISPLAY:-:0}"
 export XAUTHORITY="${XAUTHORITY:-$(ls /run/user/$(id -u)/xauth_* 2>/dev/null | head -1)}"
+
+# Only one launcher at a time. On this machine two things start the kiosk at
+# boot (the desktop autostart entry and the session watcher), and with no lock
+# they collided: both built, both raced for :1420 — where the reclaim below
+# kills the *sibling's* live server instead of a stale one — and both launched
+# Brave on the same profile dir, whose singleton lock SIGKILLs the loser. The
+# loser then fell through to the `kill $DEV_PID` at the bottom and took the
+# survivor's server down with it, leaving a fullscreen browser pointed at a
+# dead port and nothing left to notice. Whoever gets here first owns the kiosk;
+# anyone arriving while it is up is redundant and leaves quietly. The lock is
+# an open fd, so it clears on exit however this process dies.
+exec 9>"${TMPDIR:-/tmp}/halcyon-kiosk-launch.lock"
+if ! flock -n 9; then
+  echo "kiosk launch already in progress or running; nothing to do"
+  exit 0
+fi
+
 git fetch
 git pull
 npm run build
