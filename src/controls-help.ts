@@ -61,7 +61,7 @@ const HELP_SECTIONS: HelpSection[] = [
         hint: '◀ ▶ change what’s playing · OK jumps to its case · ▼ returns.',
       },
       {
-        id: 'subnav', control: '▼ past the bottom row', action: 'Jump index',
+        id: 'subnav', control: '▼ in the store view', action: 'Jump index',
         hint: 'Sections & displays: ▼ again for displays · OK flies you there.',
       },
     ],
@@ -76,6 +76,10 @@ const HELP_SECTIONS: HelpSection[] = [
       {
         id: 'terminal', control: '◀ at the register', action: 'Manager terminal',
         hint: 'The clerk’s CRT menu: settings, 2D mode, service, power.',
+      },
+      {
+        id: 'clerkcounter', control: '▲ at the register', action: 'Talk to the clerk',
+        hint: 'Ask what she recommends, search, or just chat. Esc ends it.',
       },
       {
         id: 'tipjar', control: '▶ at the register', action: 'Tip jar',

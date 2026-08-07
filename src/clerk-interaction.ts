@@ -132,6 +132,22 @@ export class ClerkInteraction {
     this.dialog.classList.add('visible');
   }
 
+  /**
+   * Open the full menu across the checkout counter (▲ at the register). Like
+   * openForClasp this bypasses the proximity gate on purpose — that gate only
+   * arms while free-roaming, and at the counter she is already parked at the
+   * register facing you. Unlike a clasp there is no scoped pool: this is the
+   * same walk-up menu the E key gives, so "What do you recommend?" scopes
+   * itself from where you're standing.
+   */
+  openAtCounter() {
+    if (this.open) return;
+    this.claspPool = null;
+    this.claspLabel = null;
+    this.claspSugs = null;
+    this.openMenu();
+  }
+
   /** The clerk faces the camera + plays the talk pose while this is true. */
   isChatting(): boolean {
     return this.open;
