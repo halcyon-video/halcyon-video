@@ -894,7 +894,7 @@ export function registerCoreSettings(): void {
     default: false,
     applyMode: 'live',
     apply: (value) => setRemotePlayEnabled(!!value),
-    hint: 'Streams the store to any browser at /remote.html.',
+    hint: 'Streams the store to any browser at /remote.html. Connecting queries a public STUN server.',
     hidden: true, // service knob: dev/preview-server streaming feature
   });
 
@@ -1040,10 +1040,18 @@ const BRAND_SHAPES: { id: LogoShape; label: string }[] = [
 
 // Display names for the picker. Archivo Black, Outfit and Anton are BUNDLED
 // and mapped onto their shipped files when the emblem is painted to canvas
-// (logo-renderer's BUNDLED_BRAND_FAMILY) — the styles.css Google-Fonts @import
-// that used to be their only source is a network fetch, i.e. absent on an
-// offline kiosk boot. Bebas Neue is still @import-only: DOM chrome sees it,
-// canvas may not.
+// (logo-renderer's BUNDLED_BRAND_FAMILY). The Google-Fonts @import in
+// styles.css that used to be their only source was a network fetch, i.e.
+// absent on an offline kiosk boot; it is gone as of 2026-08-06 and every face
+// now ships in src/assets.
+//
+// Bebas Neue is the one still not canvas-safe. It is bundled now, so the DOM
+// chrome gets it from disk, but it has no BB-prefixed FontFace registration in
+// bundled-fonts.ts and no BUNDLED_BRAND_FAMILY entry — so an emblem that names
+// it still paints in whatever the system sans is, silently. Registering it is
+// a few lines and the file is already here; it needs a look at the rendered
+// emblem before it lands, so it is deliberately NOT bundled into the
+// remove-the-@import change.
 const BRAND_FONTS = ['Archivo Black', 'Bebas Neue', 'Outfit', 'Anton'];
 
 /**

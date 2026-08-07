@@ -396,6 +396,30 @@ This app's steady state is *days on a shelf*, and it's engineered like it:
 Every integration degrades by *absence*, not error: unconfigured features are
 never built, and callers never branch.
 
+### What talks to the internet
+
+The store is built to run on your own network. Fonts, textures and every other
+asset ship inside the bundle, and Jellyfin, Jellyseerr and RomM are your own
+servers at your own addresses — nothing is fetched from a CDN to draw the store.
+
+Two optional features are the exceptions, and only while you use them:
+
+| Feature | Reaches | What for |
+|---|---|---|
+| **Jellyseerr discovery** | `image.tmdb.org` | Cover art for titles you *don't* own |
+| **Remote Play** | `stun.l.google.com` | Finding your public address so a viewer outside your network can connect |
+
+Jellyseerr returns a TMDB *path* rather than the image itself — its own web UI
+fetches from that same CDN — so there is no copy on your server to serve
+instead. Art for titles you already own always comes from Jellyfin, which is why
+the store proper works with the internet unplugged.
+
+Remote Play sends no video through the STUN server: it is one question ("what
+address did this reach you from?") and one answer, during connection setup. Your
+own TURN relay carries the actual traffic when a direct link can't be made. Note
+that the query happens whenever a session negotiates, including on your own LAN
+— an offline-only mode that drops it is on the roadmap rather than done.
+
 ---
 
 ## Quick start
