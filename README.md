@@ -223,6 +223,15 @@ configured native emulator under Tauri (argv-safe, allowlisted), RomM's
 in-browser EmulatorJS player otherwise. Off by default; zero requests when
 disabled.
 
+![The video games department](docs/screenshots/games-department.jpg)
+
+Every platform gets its own carton, at its own real-world proportions — a
+Super Nintendo box is not a PlayStation jewel case wearing different art, and
+neither is a movie case. Your RomM cover scans go on the shapes they were
+printed for.
+
+![Game shelves up close](docs/screenshots/games-shelf.jpg)
+
 ---
 
 ## Watching something
