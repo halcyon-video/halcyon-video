@@ -16,6 +16,7 @@ import { getRommConfig, authHeader } from './romm';
 import { drawTechSpecsTable, TECH_SPECS_TABLE_H } from './tech-specs';
 import { perfTrace, perfSlot } from './perf-trace';
 import { LruByteCache } from './lru-byte-cache';
+import { getLowResFrontMaterial, disposeLowResFrontMaterials } from './hero-lowres-front';
 import {
   queueTextureUpload,
   textureArrayManager,
@@ -1108,7 +1109,7 @@ interface PlasticOpts {
   isRentalCase?: boolean;
   finish?: CaseFinish; // non-rental only; defaults per medium (defaultCaseFinish)
 }
-function makePlasticMaterial(opts: PlasticOpts): THREE.MeshPhysicalMaterial {
+export function makePlasticMaterial(opts: PlasticOpts): THREE.MeshPhysicalMaterial {
   const mat = new THREE.MeshPhysicalMaterial({
     map: opts.map ?? null,
     color: opts.color !== undefined ? new THREE.Color(opts.color) : 0xffffff,
@@ -1325,6 +1326,7 @@ function disposeMediumScopedCaches() {
   pinnedPosterTextures.clear();
   posterPixelCache.clear();
   lowResCache.clear();
+  disposeLowResFrontMaterials();
   // The array layers on the GPU hold art decoded for the OUTGOING medium, so
   // the rebuild fast path must not keep them — force a real reallocation.
   invalidatePosterLayers();
@@ -1952,7 +1954,7 @@ function getJellyfinSpineMaterial(hexColor: string | null, probeIdx?: number, is
 // band horizontally, so 2:3 art fills the narrower VHS face without distortion.
 // The clone shares the image but has its own offset/repeat so the original
 // (also uploaded into the texture array) is untouched.
-function cropFrontTextureForMedium(texture: THREE.Texture): THREE.Texture {
+export function cropFrontTextureForMedium(texture: THREE.Texture): THREE.Texture {
   if (POSTER_CROP_X <= 0) return texture;
   const cropped = texture.clone();
   cropped.wrapS = THREE.ClampToEdgeWrapping;
@@ -2131,7 +2133,8 @@ function getPosterMaterial(movieId: string, probeIdx?: number, isAnimated: boole
   }
   const texture = getOrCreatePosterTexture(movieId, pin);
   if (!texture) {
-    return isAnimated ? getAnimatedJellyfinFrontPlaceholderMaterial() : sharedJellyfinFrontPlaceholderMaterial!;
+    return getLowResFrontMaterial(movieId, probeIdx, isAnimated, skipCrop, finish)
+      ?? (isAnimated ? getAnimatedJellyfinFrontPlaceholderMaterial() : sharedJellyfinFrontPlaceholderMaterial!);
   }
   const env = (probeIdx !== undefined && reflectionProbes[probeIdx]) ? reflectionProbes[probeIdx] : null;
   // Animated fronts crop inside applyWhiteBorderShader (it samples raw UVs, so a
@@ -4666,7 +4669,7 @@ export function createMovieInstancedMeshes(movie: Movie, count: number): Instanc
 // (Jellyfin) box wants the rim on the front's RIGHT + top + bottom, but on the
 // FLIPPED back the same physical edge reads on the LEFT — pass 'left' there so
 // the border tracks the box's real trimmed edge instead of the spine/hinge.
-function applyWhiteBorderShader(
+export function applyWhiteBorderShader(
   mat: THREE.MeshStandardMaterial | THREE.MeshPhysicalMaterial,
   cropX: number = 0,
   borderSide: 'right' | 'left' = 'right',
@@ -5306,9 +5309,7 @@ export function createHeroJellyfinMaterials(movie: Movie, highlightedName?: stri
   // Series season boxsets keep the loose shrink-wrap film (ROADMAP B3);
   // movie cases get the medium's finish (paperboard / amaray polywrap).
   const finish = movie.isSeries ? 'shrinkwrap' as const : undefined;
-  const front = posterPixelCache.has(movie.id)
-    ? getPosterMaterial(movie.id, probeIdx, isAnimated, !!movie.game, pinEndcap ? 'endcap' : 'none', finish)
-    : (isAnimated ? getAnimatedJellyfinFrontPlaceholderMaterial() : sharedJellyfinFrontPlaceholderMaterial!);
+  const front = getPosterMaterial(movie.id, probeIdx, isAnimated, !!movie.game, pinEndcap ? 'endcap' : 'none', finish);
 
   return [
     edgeMat,

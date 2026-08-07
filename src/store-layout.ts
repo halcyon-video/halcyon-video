@@ -205,7 +205,14 @@ export function getStorefrontSpec(storeWidth: number): StorefrontSpec {
     return {
       doorStyle: 'sliding',
       doorWidth: DEFAULT_DOOR_WIDTH,
-      windowBays: defaultWindowBays(storeWidth, DEFAULT_DOOR_WIDTH, true), // light-silver frame + center dividers
+      // Light-silver frame, but FULL-WIDTH panes (#4). This preset used to
+      // pass hasCenterMullion, which halves every 4 ft bay into a pair of 2 ft
+      // panes — from the lot the wing read as a picket fence of posts rather
+      // than a storefront. The era it dresses is the one that could finally
+      // hang big glass, so the mullion is the wrong detail here even though
+      // the silver frame is the right one; the split survives in the spec for
+      // any preset that genuinely wants a divided light.
+      windowBays: defaultWindowBays(storeWidth, DEFAULT_DOOR_WIDTH),
       frameColor: '#c9ced4',
       counterStyle: 'laminate-90s',
       counterTop: 'white',
