@@ -534,7 +534,7 @@ export function registerCoreSettings(): void {
     group: 'Store Look',
     default: false,
     applyMode: 'rebuild-scene',
-    hint: 'Framed poster groups + film-reel mural, right wall.',
+    hint: 'Featured-actor portraits + film-strip ribbon, right wall. High ceiling only.',
     subpage: 'Building & Storefront',
   });
 
@@ -776,9 +776,9 @@ export function registerCoreSettings(): void {
     // manager-terminal / flat-menu switches use (switchRenderMode in main.ts).
     applyMode: 'rebuild-scene',
     hint: 'Full 3D store, or a flat shelf UI for low-power clients.',
-    // Service knob (review §4.3 dedupe): the couch-facing mode switches are
-    // the diegetic ones — power menu, counter CRT, and the flat menu.
-    hidden: true,
+    // Also switchable diegetically (power menu, counter CRT, flat menu); this
+    // row exists so the mode is FINDABLE where users look for it (UX pass
+    // 2026-08: performance controls must live on the couch tree).
   });
 
   registerSetting({
@@ -793,8 +793,7 @@ export function registerCoreSettings(): void {
     ],
     default: 'high',
     applyMode: 'rebuild-scene',
-    hint: 'Reflections and post-processing detail.',
-    hidden: true, // service knob: the kiosk auto-picks per GPU; staff-only override
+    hint: 'Reflections and post-processing detail. Auto-picked per GPU.',
   });
 
   registerSetting({
@@ -809,7 +808,24 @@ export function registerCoreSettings(): void {
     default: 'n8ao',
     applyMode: 'rebuild-scene',
     hint: 'N8AO: cheaper half-res AO. GTAO is the older fallback.',
-    hidden: true, // service knob: AO engine choice
+  });
+
+  registerSetting({
+    key: 'bb_fps_cap',
+    label: 'FPS Cap',
+    kind: 'cycle',
+    group: 'Performance',
+    values: [
+      { id: 'auto', label: 'Auto' },
+      { id: '0', label: 'Uncapped' },
+      { id: '30', label: '30' },
+    ],
+    default: 'auto',
+    // fpsCapOverride is read once in initThree() (three-scene.ts), like the
+    // other bb_* boot flags this group cycles — needs the same scene rebuild
+    // every other Performance row here takes.
+    applyMode: 'rebuild-scene',
+    hint: 'ACTIVE render rate. Auto: uncapped on GPUs that earned the supersample grant (and any explicit quality override), else paced to ~60fps at an even display-refresh divisor.',
   });
 
   // On-screen frame-rate readout. Live toggle: the meter is a pure DOM overlay
@@ -825,7 +841,6 @@ export function registerCoreSettings(): void {
     applyMode: 'live',
     apply: (value) => enableFpsMeter(!!value),
     hint: 'Corner readout: FPS, frame time, 1% low. IDLE when parked.',
-    hidden: true, // service knob: perf diagnostics readout
   });
 
   // (Removed) 'bb_security_cam' — the security-camera angle is now the ONLY
@@ -879,7 +894,7 @@ export function registerCoreSettings(): void {
     default: false,
     applyMode: 'live',
     apply: (value) => setRemotePlayEnabled(!!value),
-    hint: 'Streams the store to any browser at /remote.html.',
+    hint: 'Streams the store to any browser at /remote.html. Connecting queries a public STUN server.',
     hidden: true, // service knob: dev/preview-server streaming feature
   });
 
@@ -1025,10 +1040,18 @@ const BRAND_SHAPES: { id: LogoShape; label: string }[] = [
 
 // Display names for the picker. Archivo Black, Outfit and Anton are BUNDLED
 // and mapped onto their shipped files when the emblem is painted to canvas
-// (logo-renderer's BUNDLED_BRAND_FAMILY) — the styles.css Google-Fonts @import
-// that used to be their only source is a network fetch, i.e. absent on an
-// offline kiosk boot. Bebas Neue is still @import-only: DOM chrome sees it,
-// canvas may not.
+// (logo-renderer's BUNDLED_BRAND_FAMILY). The Google-Fonts @import in
+// styles.css that used to be their only source was a network fetch, i.e.
+// absent on an offline kiosk boot; it is gone as of 2026-08-06 and every face
+// now ships in src/assets.
+//
+// Bebas Neue is the one still not canvas-safe. It is bundled now, so the DOM
+// chrome gets it from disk, but it has no BB-prefixed FontFace registration in
+// bundled-fonts.ts and no BUNDLED_BRAND_FAMILY entry — so an emblem that names
+// it still paints in whatever the system sans is, silently. Registering it is
+// a few lines and the file is already here; it needs a look at the rendered
+// emblem before it lands, so it is deliberately NOT bundled into the
+// remove-the-@import change.
 const BRAND_FONTS = ['Archivo Black', 'Bebas Neue', 'Outfit', 'Anton'];
 
 /**

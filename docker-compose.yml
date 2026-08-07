@@ -1,0 +1,46 @@
+services:
+  halcyon:
+    build: .
+    # Prebuilt image instead of building from the clone (published on
+    # releases — see .github/workflows/publish-image.yml):
+    # image: ghcr.io/halcyon-video/halcyon-video
+    restart: unless-stopped
+    init: true
+
+    # Host networking is what makes Remote Play work: WebRTC has to offer
+    # the machine's real LAN address, and behind the default docker bridge
+    # the container can only offer 172.x candidates no phone or set-top box
+    # can reach. The server takes :1420 (plus :3478/udp and 49200-49260/udp
+    # when the TURN relay is in use).
+    network_mode: host
+
+    # Browse-only alternative (no Remote Play streaming): delete
+    # network_mode above and publish the web port instead:
+    # ports:
+    #   - "1420:1420"
+
+    environment:
+      REMOTE_PLAY_SEED: /data/remote-play-seed.json
+      # Reaching the store through a DNS name (reverse proxy, NAS
+      # hostname)? vite preview answers only localhost + raw-IP Host
+      # headers by default; list yours here (comma-separated), or "all"
+      # to disable the check.
+      # HALCYON_ALLOWED_HOSTS: halcyon.example.com
+
+    volumes:
+      # The Remote Play "seed": log into the store from any browser once
+      # and flip Settings → Connection → Remote Play ON — that donates
+      # your Jellyfin login (minus the password) to the server, so every
+      # /remote.html visitor gets their own private instance of your real
+      # library. This volume keeps it across container rebuilds.
+      - halcyon-data:/data
+      # Keep F8 feedback pins (in-app visual bug reports) on the host:
+      # - ./feedback:/app/feedback
+
+    # Hardware GL + video encode for smoother Remote Play streams on an
+    # Intel/AMD box (otherwise Chromium renders on CPU):
+    # devices:
+    #   - /dev/dri:/dev/dri
+
+volumes:
+  halcyon-data:

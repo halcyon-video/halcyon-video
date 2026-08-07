@@ -1,11 +1,23 @@
-// "Look up at what's on the store TVs" — the browse cursor's Up-past-the-top
-// stop (see store-nav.ts moveUp: shelf row++ → clasp cursor → THIS).
+// "Look up at what's on the store TVs" — opened from the sub-nav jump index's
+// Row 1 (store-subnav.ts), not from the shelf itself (2026-08-06, pin 051:
+// ▲ past the top shelf row used to fall in here when the build had ambient
+// TVs; the owner called that out as the wrong mode to trigger it from, so
+// that press now always keeps its pre-peek job — see store-nav.ts moveUp's
+// wrapOverShelfTop() call — and the peek only opens via ▲ at the sub-nav's
+// Row 1, with the index staying open underneath it the whole time).
 //
 // The user stays logically in browse: nothing about the cursor changes, only
-// the camera targets, and the full return state (cursor indices + camera pose)
-// is snapshotted on the way in and restored exactly on the way out. While the
-// peek is up: ←/→ cycle the TVs, ▼ or Back drop back onto the shelf, ▲ and
-// Select do nothing (a peek has nothing to confirm).
+// the camera targets. Entry doesn't touch scene.subNav at all — it's still
+// there, parked on Row 1 — so exiting just hands control back to it (the
+// `onExit` callback store-nav.ts's moveDown/navOverlayBack pass to
+// exitTvPeek) instead of the generic captured-browse-return restore. While
+// the peek is up: ←/→ cycle the TVs, ▼ or Back drop back onto the index, ▲
+// does nothing, and Select jumps straight to the box of whatever's playing
+// (the one movie streaming to every set — see AmbientTvs.getPlayingMovie)
+// via the same jumpToTitle path a search hit uses, landing in inspect (the
+// mediator then closes the now-stale sub-nav underneath — see
+// navOverlaySelect). With no stream (dead glass / test card) Select is a
+// no-op, same as before.
 //
 // Framing follows the harness's `tvclose` state — sit on the screen's own
 // normal so the tube reads square-on — and then backs off along that normal as
@@ -92,28 +104,55 @@ function frameTv(scene: StoreScene, pose: ScreenPose): void {
 }
 
 /**
- * Enter the peek from the top of the browse cursor. Returns false when this
- * build/theme has no ambient TVs at all — the caller then keeps the old
- * over-the-top shelf wrap for that press.
+ * Enter the peek (from the sub-nav's Row 1 — see store-nav.ts moveUp).
+ * Returns false when this build/theme has no ambient TVs at all — the caller
+ * then falls back to its own old behavior for that press.
  */
 export function enterTvPeek(scene: StoreScene): boolean {
   if (scene.tvPeek) return true;
   const poses = screenPoses(scene);
   if (poses.length === 0) return false;
   const tvIdx = nearestTv(scene, poses);
+  // `ret` is a fallback restore target only — the sub-nav is the sole entry
+  // point now, so exitTvPeek's caller-supplied `onExit` normally wins.
   scene.tvPeek = { tvIdx, ret: captureBrowseReturn(scene) };
   frameTv(scene, poses[tvIdx]);
   scene.onConsoleLog(
-    `[System] Looking up at the store TV${poses.length > 1 ? ' — ←/→ for the other set' : ''}. ▼ or Back returns to the shelf.`,
+    `[System] Looking up at the store TV${poses.length > 1 ? ' — ←/→ for the other set' : ''}. ▼ or Back returns.`,
     'system');
   return true;
 }
 
-export function exitTvPeek(scene: StoreScene): boolean {
+/**
+ * Select while peeking: jump straight to the box of whatever's playing.
+ * Returns true whenever a peek was active (the press is consumed either
+ * way — a peek has nothing else to confirm); the jump itself only fires
+ * when there's an actual stream to chase.
+ */
+export function tvPeekSelect(scene: StoreScene): boolean {
+  const peek = scene.tvPeek;
+  if (!peek) return false;
+  const movie = scene.ambientTvs?.getPlayingMovie();
+  if (!movie) return true; // dead glass / test card — nothing to jump to
+  scene.tvPeek = null; // leaving the peek for real inspect, not a browse return
+  scene.jumpToTitle(movie.id);
+  return true;
+}
+
+/**
+ * ▼ or Back while peeking. `onExit` (supplied by store-nav.ts, the mediator
+ * between this module and store-subnav.ts) says what to hand control back to
+ * — normally "resume the sub-nav's Row 1" now that entry is exclusively from
+ * there. Falls back to the captured raw browse-cursor restore when no
+ * `onExit` is given, so a future caller that opens the peek some other way
+ * still gets a sane default.
+ */
+export function exitTvPeek(scene: StoreScene, onExit?: () => void): boolean {
   const peek = scene.tvPeek;
   if (!peek) return false;
   scene.tvPeek = null;
-  restoreBrowseReturn(scene, peek.ret, PEEK_GLIDE_LERP);
+  if (onExit) onExit();
+  else restoreBrowseReturn(scene, peek.ret, PEEK_GLIDE_LERP);
   scene.onConsoleLog('[System] Back to the shelf.', 'system');
   return true;
 }

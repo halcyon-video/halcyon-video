@@ -18,6 +18,7 @@ import { loadProp } from './props';
 import { getActiveTheme } from './themes';
 import { makeCurvedScreenGeometry, makeTubeOverlayMaterial, makeCrtTestCardTexture } from './crt-tube';
 import { makeCrtGlassMaterial } from './glass-reflection';
+import { TV_PATCH_LAYER } from './scene-shared';
 
 // Front bezel: a flat rounded-rect frame with a rectangular aperture, extruded
 // a little proud of the shell's front face. Shared by the ceiling sets and the
@@ -55,6 +56,24 @@ const SCREEN_BULGE = 0.035;
 // See the gloss-pane comments below: extra reflection gain for the ambient
 // sets, which are flatter and further away than the desk terminals.
 const CEILING_GLASS_GAIN = 1.7;
+
+// Tag one whole SET for the partial-composite patch (see
+// src/partial-composite.ts): while the camera is parked and the picture is the
+// only thing moving, these meshes are re-drawn on their own over the cached
+// beauty buffer instead of the whole store. layers.enable is additive — bit 0
+// stays set, so the normal render, the mirrors and the AO pass never notice.
+//
+// The WHOLE set, not just the screen stack. The scanline overlay and the glass
+// pane are transparent and cover the tube's full silhouette, so wherever the
+// bezel rim (or the shell) beats the picture on depth they would blend a SECOND
+// time over a cached pixel that already contains them. Re-drawing the set's
+// opaque parts too refreshes that base, so every transparent overlay lands on a
+// fresh pixel exactly once — measured: rim error 45/255 over ~50 px with the
+// screen stack alone, 0 with the set. (The opaque re-draws are pinned to their
+// own pixels by EqualDepth — see PartialComposite.patchDraw.)
+function markPatchLayer(root: THREE.Object3D): void {
+  root.traverse((o) => o.layers.enable(TV_PATCH_LAYER));
+}
 
 // The pieces of one ceiling TV that the async GLB upgrade needs to touch:
 // hide/remove the procedural shell, re-fit the screen stack to the real tube.
@@ -101,6 +120,11 @@ export class AmbientTvs implements StoreFixture {
   // video so the tube treatment is verifiable without a Jellyfin stream.
   private testCardTex: THREE.CanvasTexture | null = null;
   private disposed = false;
+  // The one movie streaming to every set (all screens share a single video
+  // element — see makeVideoTexture) — null when there's no stream (dead
+  // glass / test card). Read by the TV peek's Select action (store-tv-peek.ts)
+  // to jump straight to this title's box.
+  private playingMovie: Movie | null = null;
 
   constructor(private ctx: FixtureContext) {}
 
@@ -120,8 +144,15 @@ export class AmbientTvs implements StoreFixture {
       const seekSec = durationMin * 60 * (0.05 + Math.random() * 0.60);
       videoTex = this.makeVideoTexture(movie, durationMin, seekSec);
       if (videoTex) {
+        this.playingMovie = movie;
         this.ctx.log(`[System] CRT TVs: "${movie.title}" from ~${Math.round(seekSec / 60)}min`, 'system');
       }
+    } else if (pool.length > 0 && localStorage.getItem('bb_tv_testcard') === '1') {
+      // Same harness/dev stand-in as the test-card picture below: with no
+      // Jellyfin stream there's nothing to actually decode, but resolving a
+      // "playing" identity too keeps the TV-peek Select action (jump to the
+      // box of what's playing) testable offline.
+      this.playingMovie = pool[Math.floor(Math.random() * pool.length)];
     }
     this.buildHardware(videoTex);
   }
@@ -365,6 +396,7 @@ export class AmbientTvs implements StoreFixture {
       this.tvParts.push({ tvG, body, bezel, screen, scan, gloss });
 
       g.add(tvG);
+      markPatchLayer(g);
       this.ctx.scene.add(g);
 
       // Force update of matrixWorld so we can extract the correct world transform of the screen
@@ -536,6 +568,7 @@ export class AmbientTvs implements StoreFixture {
       gloss.renderOrder = 1;
       g.add(gloss);
 
+      markPatchLayer(g);
       this.ctx.scene.add(g);
       g.updateMatrixWorld(true);
       screen.geometry.computeBoundingSphere();
@@ -660,6 +693,7 @@ export class AmbientTvs implements StoreFixture {
         wrapper.position.set(0, -handle.size.y / 2 * extra, (planeZ - 0.02) - handle.size.z / 2 * extra);
       }
       part.tvG.add(wrapper);
+      markPatchLayer(wrapper); // the real tube joins the partial-composite patch
 
       // Retire the procedural shell. (addCollider only registers the mesh —
       // nothing raycasts the list — so removing it here is safe.)
@@ -713,6 +747,13 @@ export class AmbientTvs implements StoreFixture {
   // dock square in front of one without hand-hunting coordinates.
   getScreenPoses(): { center: THREE.Vector3; normal: THREE.Vector3; width: number; height: number }[] {
     return this.screenPoses;
+  }
+
+  // The title currently streaming to every set, or null with no stream
+  // (dead glass) or the harness test card. Used by the TV peek's Select
+  // action to jump to that title's box.
+  getPlayingMovie(): Movie | null {
+    return this.playingMovie;
   }
 
   // Per-frame: sync the Web Audio listener with the camera, and force the
@@ -787,9 +828,40 @@ export class AmbientTvs implements StoreFixture {
   // even when nothing else moves. A paused/ended/unbuffered video reports false so
   // the scene can drop to the idle heartbeat.
   isPlaying(): boolean {
-    const videoPlaying = !!(this.video && !this.video.paused && !this.video.ended && this.video.readyState >= 2);
+    const videoPlaying = this.forcePlaying ||
+      !!(this.video && !this.video.paused && !this.video.ended && this.video.readyState >= 2);
     if (!videoPlaying) return false;
     return this.checkFrustumTransitions();
+  }
+
+  // ── Harness/dev hooks (no Jellyfin stream offline) ────────────────────────
+  // The test card lights the tubes but never moves, so isPlaying() is false and
+  // the VIDEO tier — and with it the partial-composite path — can't be reached
+  // in a screenshot/probe run. These two let a probe stand in for a stream:
+  // claim to be playing, and repaint the card so the picture actually changes.
+  private forcePlaying = false;
+
+  debugForcePlaying(on: boolean): void {
+    this.forcePlaying = on;
+    this.wasInFrustum = false; // re-announce the transition on the next tick
+  }
+
+  /** Repaint the test card (a sweeping bar) so the "picture changed" case is testable. */
+  debugPokeTestCard(phase: number): boolean {
+    if (!this.testCardTex) return false;
+    const canvas = this.testCardTex.image as HTMLCanvasElement;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return false;
+    const w = canvas.width, h = canvas.height;
+    const x = (phase % 1) * w;
+    ctx.fillStyle = '#0a0a0a';
+    ctx.fillRect(0, h * 0.18, w, h * 0.30);
+    ctx.fillStyle = '#f0f0f0';
+    ctx.fillRect(x, h * 0.18, w * 0.22, h * 0.30);
+    ctx.fillStyle = '#ff2020';
+    ctx.fillRect((x + w * 0.4) % w, h * 0.24, w * 0.10, h * 0.18);
+    this.testCardTex.needsUpdate = true;
+    return true;
   }
 
   pause(): void {

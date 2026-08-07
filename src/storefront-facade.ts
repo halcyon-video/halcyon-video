@@ -104,6 +104,31 @@ export const SIDE_RIBBON_CLEARANCE = 1.2;  // solid wall between the NR unit's f
 export const SIDE_RIBBON_PANE_W = WINDOW_BAY_TARGET_WIDTH; // every side pane exactly 4 ft
 export const SIDE_RIBBON_MIN_LEN = SIDE_RIBBON_PANE_W;     // below one whole pane, keep the wall solid
 
+// ── Right-wall service door + EXIT sign footprint ───────────────────────────
+// Shared with wall-decor.ts (pin 052): wall décor must never overlap this
+// door, its frame, or the EXIT sign above it, so the exclusion geometry is
+// exported here instead of re-derived/duplicated elsewhere.
+export const RIGHT_SIDE_DOOR_W = 3.0;
+export const RIGHT_SIDE_DOOR_H = 7.0;
+export interface RightSideDoorZone {
+  z0: number;   // back edge (more -z) of the door+frame footprint
+  z1: number;   // front edge — sits right at sideRibbon.backZ, the glass start
+  yTop: number; // top of the door/frame/EXIT-sign assembly
+}
+/**
+ * World-space exclusion rectangle for the right-wall service door + EXIT
+ * sign, or null when the shell has no side ribbon — the door only builds
+ * "tucked immediately BEHIND the last window pane" (see the door block
+ * below), so with no ribbon there is no door either.
+ */
+export function rightSideDoorZone(sideRibbon: { frontZ: number; backZ: number } | null): RightSideDoorZone | null {
+  if (!sideRibbon) return null;
+  const doorZ = sideRibbon.backZ - 0.5 - RIGHT_SIDE_DOOR_W / 2;
+  const halfZ = (RIGHT_SIDE_DOOR_W + 0.4) / 2; // matches the interior frame's DOOR_W+0.4 span below
+  const signTopY = RIGHT_SIDE_DOOR_H + 0.75 + (0.73 + 0.06) / 2; // housing center + half its height
+  return { z0: doorZ - halfZ, z1: doorZ + halfZ, yTop: Math.max(RIGHT_SIDE_DOOR_H + 0.16, signTopY) };
+}
+
 export function buildStorefrontFacade(params: FacadeBuildParams): StorefrontFacade {
   const { storeWidth, backWallZ, ceilingY, entryHalfWidth, entryOpeningHalfWidth, brickMaterial, stripeColor, trimColor, sideRibbon, frontCornerMargin } = params;
   const group = new THREE.Group();
@@ -271,8 +296,8 @@ export function buildStorefrontFacade(params: FacadeBuildParams): StorefrontFaca
   // frame, leaf and hardware on the brick veneer outside, plus a matching
   // leaf with a crash bar and an EXIT sign on the interior face.
   if (sideRibbon) {
-    const DOOR_W = 3.0;
-    const DOOR_H = 7.0;
+    const DOOR_W = RIGHT_SIDE_DOOR_W;
+    const DOOR_H = RIGHT_SIDE_DOOR_H;
     const doorZ = sideRibbon.backZ - 0.5 - DOOR_W / 2; // right against the last pane's brick margin
     const frameMat = new THREE.MeshStandardMaterial({ color: 0x22252a, roughness: 0.5, metalness: 0.6 });
     const leafMat = new THREE.MeshStandardMaterial({ color: 0x39404a, roughness: 0.6, metalness: 0.35 });

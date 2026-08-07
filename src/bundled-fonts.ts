@@ -16,8 +16,10 @@
 //   Segoe Script /
 //   Brush Script -> Yellowtail    (retro connected brush script)
 // plus Outfit and Orbitron, which the tech-spec panels already named but which
-// only ever arrived over the styles.css Google-Fonts @import — i.e. never at
+// used to arrive only over a Google-Fonts @import in styles.css — i.e. never at
 // all on a boot with no network, which is the normal state of an HTPC kiosk.
+// That @import is gone (2026-08-06): styles.css now declares @font-face against
+// these same bundled files, so the DOM and the canvas load from one source.
 //
 // Loading follows the shape ensureBrandFont (canvas-textures.ts) and
 // ensureVarsityFont (fixtures/genre-fascia.ts) already use: register the

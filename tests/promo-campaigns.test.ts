@@ -319,3 +319,37 @@ test('every viable campaign fills every slot of every face', () => {
     }
   });
 });
+
+// ─── medium purity (owner feedback pin 054) ─────────────────────────────────
+
+test('each promo face is single-medium (all movies or all TV shows)', () => {
+  withMonth('2026-07-15', () => {
+    const libs = [lib('Mixed', [
+      ...Array.from({ length: 15 }, (_, i) => mk(`Summer Movie ${i}`, { genres: ['Action'], isSeries: false })),
+      ...Array.from({ length: 3 }, (_, i) => mk(`Summer Show ${i}`, { genres: ['Action'], isSeries: true })),
+    ])];
+    const c = buildPromoCampaign(['seasonal:family'], libs, ROWS, COLS)!;
+    assert.ok(c, 'campaign should be viable');
+    assert.equal(c.faces.length, PROMO_FACE_COUNT);
+    c.faces.forEach((f, idx) => {
+      assert.equal(f.movies.length, PER_FACE, `face ${idx} must have ${PER_FACE} items`);
+      const hasMovie = f.movies.some((m) => !m.isSeries);
+      const hasShow = f.movies.some((m) => m.isSeries);
+      assert.ok(!(hasMovie && hasShow), `face ${idx} must not mix movies and shows`);
+    });
+  });
+});
+
+test('if a medium cannot reach minimum distinct titles, campaign falls back rather than mixing', () => {
+  withMonth('2026-07-15', () => {
+    // 8 movies and 2 shows total: movies can fill at most 2 faces (8 < 3*3=9), shows can fill 0 faces (2 < 3).
+    // Total pure faces possible is 2 < 4, so campaign must decline (return null) rather than mixing.
+    const libs = [lib('Mixed', [
+      ...Array.from({ length: 8 }, (_, i) => mk(`Summer Movie ${i}`, { genres: ['Action'], isSeries: false })),
+      ...Array.from({ length: 2 }, (_, i) => mk(`Summer Show ${i}`, { genres: ['Action'], isSeries: true })),
+    ])];
+    const c = buildPromoCampaign(['seasonal:family'], libs, ROWS, COLS);
+    assert.equal(c, null, 'campaign should return null rather than mixing mediums to fill a face');
+  });
+});
+

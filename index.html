@@ -31,14 +31,17 @@
     <svg style="display:none" aria-hidden="true">
       <defs>
         <g id="bb-ticket-logo">
-          <rect class="bb-logo-ticket" x="20" y="60" width="600" height="280" rx="34" fill="#0f4d3a"/>
+          <!-- True Blue board (owner spec 2026-08-05): white letters + white
+               pinstripe on HALCYON_BLUE (src/logo-spec.ts #1a49c2), text set
+               straight — the emerald/brass fills and the -4° rotate were
+               pre-rebrand leftovers this static markup never picked up. -->
+          <rect class="bb-logo-ticket" x="20" y="60" width="600" height="280" rx="34" fill="#1a49c2"/>
           <rect class="bb-logo-border" x="48" y="88" width="544" height="224" rx="22"
-                fill="none" stroke="#c9a227" stroke-width="7"/>
+                fill="none" stroke="#ffffff" stroke-width="7"/>
           <text class="bb-logo-text" x="320" y="212" text-anchor="middle"
-                font-family="'Archivo Black',sans-serif" font-size="92" fill="#f2e8c9"
-                transform="rotate(-4 320 200)">HALCYON</text>
+                font-family="'Archivo Black',sans-serif" font-size="92" fill="#ffffff">HALCYON</text>
           <text class="bb-logo-text" x="566" y="286" text-anchor="end"
-                font-family="'Archivo Black',sans-serif" font-size="40" fill="#c9a227">VIDEO</text>
+                font-family="'Archivo Black',sans-serif" font-size="40" fill="#ffffff">VIDEO</text>
         </g>
       </defs>
     </svg>
@@ -119,6 +122,7 @@
           <div class="crt-body">
             <div class="power-options">
               <button class="power-btn" id="btn-settings">Store Settings</button>
+              <button class="power-btn" id="btn-controls">Controls &amp; Help</button>
               <button class="power-btn" id="btn-flat-mode">Switch to 2D Mode</button>
               <button class="power-btn" id="btn-suspend">Suspend System (Sleep)</button>
               <button class="power-btn" id="btn-cec-toggle">Display On/Off (CEC)</button>
@@ -149,6 +153,7 @@
           </header>
           <div class="crt-body">
             <div id="settings-groups"></div>
+            <div class="settings-more-line" id="settings-more-line"></div>
             <p class="settings-desc crt-status" id="settings-status">Changes apply as you make them.</p>
             <button class="power-btn settings-close-btn" id="btn-settings-close">Apply &amp; Close</button>
           </div>
@@ -228,7 +233,7 @@
                 <div class="column-header">
                   <h3 class="column-title">Jellyseerr</h3>
                 </div>
-                <p class="column-desc">Connect Jellyseerr to enable a "Coming Soon" requests wall inside the store.</p>
+                <p class="column-desc">Connect Jellyseerr to enable a "Coming Soon" requests wall inside the store. Cover art for titles you don't own is fetched from TMDB's image CDN — Jellyseerr returns the artwork's address, not the artwork. Everything you already own is served by Jellyfin.</p>
 
                 <div class="input-group">
                   <label for="login-jellyseerr-url">Jellyseerr Server (optional)</label>

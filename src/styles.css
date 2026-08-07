@@ -1,4 +1,51 @@
-@import url('https://fonts.googleapis.com/css2?family=Archivo+Black&family=Bebas+Neue&family=Outfit:wght@300;400;500;700&family=Share+Tech+Mono&display=swap');
+/* Typefaces are BUNDLED, never fetched (owner mandate 2026-08-06).
+ *
+ * This file used to open with an @import from fonts.googleapis.com. Vite passes
+ * remote @imports through untouched, so it survived into the built CSS: every
+ * boot of the kiosk, and every visitor to the public demo, handed Google an IP,
+ * a User-Agent and a Referer before the first frame drew. The store is meant to
+ * run entirely on your own network, and a webfont request was the one thing
+ * quietly breaking that.
+ *
+ * The 3D canvas already loaded its faces from disk (bundled-fonts.ts); this
+ * brings the DOM chrome in line. All four are OFL, vendored under src/assets
+ * with their licenses in src/assets/licenses.
+ *
+ * Outfit is the VARIABLE cut, so one file serves 100-900 — Google was only
+ * sending 300/400/500/700, so the range here is wider, not narrower. Bebas Neue
+ * and Share Tech Mono are single-weight families upstream too, so the bold text
+ * that leans on them synthesizes exactly as it did before; nothing regresses.
+ *
+ * Adding a face means dropping the file in src/assets and adding a block here.
+ * It must never mean adding a URL. */
+@font-face {
+  font-family: 'Bebas Neue';
+  src: url('./assets/bebas-neue.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Archivo Black';
+  src: url('./assets/archivo-black.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Outfit';
+  src: url('./assets/outfit.ttf') format('truetype-variations');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Share Tech Mono';
+  src: url('./assets/share-tech-mono.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
 
 :root {
   --font-title: 'Bebas Neue', sans-serif;
@@ -645,6 +692,21 @@ html, body {
 /* Paged-out drawer rows (see updateSettingsCrtChrome in main.ts). */
 .crt-page-hidden {
   display: none !important;
+}
+
+/* "More below the fold" line (UX pass 2026-08): overflow used to be signalled
+   only by the footer's small PAGE chip; this receipt-style line sits right
+   under the last visible row whenever the list continues. Fixed min-height so
+   the pagination math reserves it whether or not it carries text. */
+.settings-more-line {
+  font-family: var(--font-mono);
+  font-size: 22px;
+  color: var(--crt-dim);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  text-align: center;
+  min-height: 32px;
+  padding: 8px 14px 0;
 }
 
 /* Small CRT panel (exit confirm, pickers, candy checkout): same tokens,

@@ -58,36 +58,56 @@ export const DEFAULT_FIXTURE_PLACEMENTS: FixturePlacement[] = [
   // period hosts the kit — so on the 2008-fabric bb-2010 theme it stands, and
   // a 2012 period (or a theme with no period at all) simply doesn't get one.
   //
-  // Spot: the front-left of the open central corridor, lying ALONG it
-  // (yaw = 90 deg, long axis in Z) so both stocked faces and the rail sign
-  // present broadside to the walkway — which is also how the 2008 photo has
-  // them, a row of tables running parallel to the aisle rather than across it.
+  // MOVED 2026-08-06 (feedback/055): used to stand at (7.9, -10.4), mid-store
+  // beside the SUMMER SMASH HITS promo stand and the bargain bin — the owner
+  // called it out as buried and crowded, and asked for it "closer to the
+  // front of the store, say, near the register."
   //
-  // That orientation is forced, not chosen. The corridor is 16 ft wide
-  // (CENTER_WALKWAY, x 3..19) and the promo/bin chain zigzagging down it is
-  // spaced 6.5 ft in z, so a 6-ft table laid ACROSS the corridor cannot clear
-  // both the left shelf field and the frontmost chain link: in straight/
-  // diagonal the left field packs out to x ~1.8-3.8, which leaves ~8 ft of
-  // slot for a fixture that would need 12.2. Turned lengthwise the table is
-  // only 2.6 ft wide in x and fits with room to spare. Its z is a fixed world
-  // position, not backWallZ-relative: what it has to clear is the checkout
-  // zone and the field's front edge, and both are anchored to the store front.
+  // FIRST ATTEMPT (superseded, keeping the note as a trap for the next
+  // agent): the pocket flanking the entrance vestibule (x~19-30, z 8.6..15)
+  // looked free on a pure footprint check, but a SlottedFixture's browse
+  // camera backs off `distance = 1.25 + 2.2 = 3.45` ft from whichever face is
+  // selected (store-camera.ts updateCameraTarget's isDisplay branch) — and
+  // that check never ran against anything but the static footprint rect. At
+  // yaw=0 that means the camera needs 3.45 ft clear in front of BOTH the +Z
+  // face and the -Z face, i.e. 6.9 ft of straight-line depth centred on the
+  // table, and the vestibule pocket only has 6.4 ft of depth end to end
+  // (backZ 8.6 to frontZ 15) — there is no z that clears both. Confirmed by
+  // shooting `--state subnav --flip 1`: it glides to this fixture (the DISPLAYS
+  // row's other "PREVIOUSLY VIEWED" entry) and the front-face camera lands at
+  // z ≈ fz+3.45, past the glass — the shot showed the camera standing on the
+  // exterior sidewalk looking back in through the storefront window.
   //
-  // Clearances at (7.9, -10.4), measured by exhaustively re-running the layout
-  // validator's SAT against every footprint in all three arrangements at
-  // production scale AND in the small fast-mode store (worst case of the four
-  // shown): 3.05 ft to promo-stand-front-right — the neighbour that DEMANDS
-  // 3 ft, and the binding one, since its z slides with backWallZ and clamps at
-  // FLOOR_FIXTURE_MAX_Z so the separation has to come from X — 4.50 ft to
-  // promo-stand-front, 2.67 ft to the checkout counter's left front band,
-  // 2.64 ft to a diagonal-arrangement staff endcap, 3.28 ft to the left shelf
-  // field, 3.97 ft to the candy rack, 22.3 ft to the nearest wall. No layout
-  // violations in any of the four.
+  // New spot: (27.0, 3.0), yaw=0, to the RIGHT of the checkout counter
+  // entirely — not squeezed into a pocket at all. The shield counter's
+  // widest point is x=20.8 (at z=2.26; store-fixtures-config.ts's own
+  // counter-band-front-right/-side-right structure-footprints top out
+  // there), so x=27 clears the counter in X at EVERY z, which means both
+  // camera standoff points (fz±3.45 = -0.45 and 6.45) are automatically
+  // clear of the counter too, not just the table's own footprint — no
+  // z-budget fight like the vestibule pocket had. It also clears the
+  // vestibule (xL/xR 3.3/18.7) by a wide margin in X, so z=3 (deep inside the
+  // counter's own -5.5..8.5 span — i.e. genuinely BESIDE the register, not
+  // fronting the glass) is safe without going anywhere near the vestibule
+  // chamber. Table footprint (w=6.0+2*0.08+0.04=6.2, d=2.5+2*0.08+0.04=2.7)
+  // spans x 23.9..30.1 (3.9 ft clear of the store's floor-width minimum of 46
+  // ft, i.e. the right wall never sits closer than x=34) and z 1.65..4.35 —
+  // both comfortably clear of the counter's max 20.8 reach and short of
+  // FIELD_Z_FRONT (world front edge of the shelf field is ~z=-7, so nothing
+  // this far forward at any x is ever inside a shelf run, at any catalog
+  // scale). corner=wide only reshapes the BACK-right corner (steppedCorner in
+  // store-layout.ts), nowhere near z~3, so it doesn't touch this spot either.
+  // Verified: the layout validator (no overlap — 'structure' vs 'fixture'
+  // pairs aren't walkway-checked, and nothing else is placed out here
+  // anyway), the clerk-nav grid (`--state clerkpath`, default + --full sizes,
+  // plus --arrangement diagonal --corner wide: 0 footprint intrusions in
+  // every run), and the subnav camera glide (`--state subnav --flip 1`
+  // lands inside the store, framing the table, not through the glass).
   {
     id: 'pv-drape-table-front',
     kind: 'pv-drape-table',
-    position: { x: 7.9, z: -10.4 },
-    yaw: Math.PI / 2,
+    position: { x: 27.0, z: 3.0 },
+    yaw: 0,
     options: {
       popKit: PV_DRAPE_TABLE_POP_KIT,
       // 2008 recolor of the 2007 purple family; 'purple' and 'red' are the

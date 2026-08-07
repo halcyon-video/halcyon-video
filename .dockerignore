@@ -1,0 +1,30 @@
+# Whitelist: the image build needs exactly what a clean clone provides —
+# ignore everything, then re-include the build + serve inputs. This keeps an
+# image built from a working dev checkout (scratch shots, feedback pins,
+# local rigs, user-customization art) identical to one built from a fresh
+# `git clone`, and keeps the build context small.
+*
+!package.json
+!package-lock.json
+!tsconfig.json
+!vite.config.ts
+!index.html
+!remote.html
+!src
+!public
+!tools/check-file-budget.mjs
+!tools/list-slots.mjs
+!tools/remote-play-server.mjs
+
+# Local-only dev rigs that may sit inside the re-included dirs on a dev
+# checkout (absent from a clean clone; vite.config treats their entry pages
+# as optional).
+src/harness.ts
+src/harness-boot.ts
+src/asset-viewer.ts
+public/colorcheck.html
+public/sign-kit
+
+# User-customization art never ships in an image — the repo's generic
+# fallbacks do (see public/user-assets/README.md).
+public/user-assets

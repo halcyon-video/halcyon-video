@@ -105,12 +105,15 @@ export function clearMovieBoxes(scene: StoreScene) {
 
 export function updateColsCount(scene: StoreScene) {
   if (scene.selectedUnitSource === 'fixture') {
-    if (scene.selectedFixtureId?.startsWith('game-section')) {
-      const fixture = scene.slottedFixtures.find(f => f.placement.id === scene.selectedFixtureId);
-      scene.colsCount = fixture && 'cols' in fixture ? (fixture as any).cols : 12;
-    } else {
-      scene.colsCount = 3;
-    }
+    // Most floor fixtures (endcaps, promo stands, the bargain bin) really are
+    // a fixed 3-per-face layout, but a few (game gondolas, the PV drape
+    // table's 11-wide tiers) publish their own `cols` because they aren't —
+    // read it off the fixture itself rather than assuming every fixture
+    // matches the common case (feedback/050b: this used to hardcode 3 for
+    // every non-game-section fixture, capping the drape table's browse
+    // cursor at 3 of its actual 11 columns per face).
+    const fixture = scene.slottedFixtures.find(f => f.placement.id === scene.selectedFixtureId);
+    scene.colsCount = fixture && 'cols' in fixture ? (fixture as any).cols : 3;
   } else if (scene.selectedUnitIdx === BACK_WALL_UNIT_IDX) {
     scene.colsCount = scene.nrTotalCols; // left wall unit + continuous back wall
   } else {
@@ -515,6 +518,29 @@ export function buildAllMovieBoxes(scene: StoreScene) {
             bSp.needsUpdate = true;
           }
         }
+        onSettled?.();
+        return;
+      }
+
+      // A posterPixelCache MISS here can mean two different things at real
+      // catalog scale: this title was never decoded (needs a real decode), or
+      // it WAS decoded and its art already reached the GPU array — only its
+      // CPU pixel-cache entry got evicted to stay under budget. Once a GPU
+      // array layer is uploaded it is never evicted (unlike posterPixelCache/
+      // lowResCache), so in the second case the shelf already looks correct
+      // and redecoding would only refill a CPU cache this call doesn't need.
+      // Skipping that redundant redecode matters because updateLOD() re-runs
+      // loadShelfDetails on every browse keypress for every slot it touches
+      // — without this check, a bounded cache turned that into "every aisle
+      // change re-decodes its shelves in a churn storm" (observed 2026-08-05).
+      // Check whichever resolution THIS call actually needs: background
+      // priority only needs low-res on screen, full priority needs high-res
+      // specifically (matches the priority gate above).
+      const needsHighRes = priority >= 1 || textureArrayManager.usesHighResOnly(slot.movie.id);
+      const alreadyOnGPU = needsHighRes
+        ? textureArrayManager.hasHighRes(slot.movie.id)
+        : textureArrayManager.hasArt(slot.movie.id);
+      if (alreadyOnGPU) {
         onSettled?.();
         return;
       }
@@ -1269,6 +1295,89 @@ export function rebuildMovieBoxes(scene: StoreScene) {
   scene.selectedCol = 0;
   scene.cameraWindowMinCol = 0;
   scene.updateColsCount();
+}
+
+// Patch already-baked fixture slots after their fixture's underlying stock
+// selection changes (feedback/055: the PREVIOUSLY VIEWED drape table never
+// updated after a watch). Only fixtures that opt in via SlottedFixture's
+// optional refreshStock() are touched — today that's just pv-drape-table.ts.
+// Wired from main.ts's video-player onClose (see launchVideoPlayback) the
+// moment a title finishes playing, before the store is shown again, so any
+// texture pop is invisible.
+//
+// Deliberately NOT a buildAllMovieBoxes() pass: that re-inits the whole
+// texture-array manager and rebuilds every shelf/back-wall/fixture slot in
+// the store for the sake of one fixture's ~66 slots — expensive, and risks
+// disturbing browse/selection state elsewhere. A fixture's slot KEYS
+// (side/shelf/col) are a fixed grid independent of which movie occupies
+// them, so a fresh getSlots() call always names the exact same key set the
+// original buildAllMovieBoxes() populated; this only ever needs to overwrite
+// which movie (and its texture index / spine colour) sits at an existing
+// key's existing (frontMesh, backMesh, instanceIdx) — never touching mesh
+// allocation, so nothing here can outgrow the capacity buildAllMovieBoxes()
+// sized fixtureMeshKey's submeshes to.
+//
+// One accepted trade-off from skipping mesh reallocation: a slot keeps
+// whichever regular/animated submesh (see fixtureMeshKey above) it was
+// ORIGINALLY assigned at boot, even if the newly-swapped-in movie's
+// animated-ness differs. That only exists in VHS medium (CASE_MEDIUM ===
+// 'vhs' && library === 'Animated Movies') and is purely cosmetic (case
+// artwork treatment) — a fine trade for a restock that's safe to run
+// mid-session instead of a full mesh reallocation.
+export function restockSlottedFixtures(scene: StoreScene): void {
+  let touched = false;
+  scene.slottedFixtures.forEach((fixture) => {
+    if (typeof fixture.refreshStock !== 'function') return;
+    fixture.refreshStock();
+    fixture.getSlots().forEach((fixtureSlot) => {
+      const existing = scene.slotsByPosition.get(fixtureSlot.key);
+      if (!existing || existing.movie.id === fixtureSlot.movie.id) return;
+      touched = true;
+
+      // Move the slotsByMovieId bookkeeping (posterQueue completion re-dirties
+      // slots through this index) from the outgoing title to the incoming one.
+      const oldList = scene.slotsByMovieId.get(existing.movie.id);
+      if (oldList) {
+        const at = oldList.indexOf(existing);
+        if (at >= 0) oldList.splice(at, 1);
+      }
+      existing.movie = fixtureSlot.movie;
+      existing.noRentalCase =
+        fixture.placement.options?.noRentalCase === true || isUnstockedTitle(fixtureSlot.movie);
+      let sameMovie = scene.slotsByMovieId.get(fixtureSlot.movie.id);
+      if (!sameMovie) scene.slotsByMovieId.set(fixtureSlot.movie.id, (sameMovie = []));
+      sameMovie.push(existing);
+
+      // Same attribute writes setupSlot() does at initial build (video-case's
+      // shader reads texture index / spine colour per-instance, not per-movie).
+      const texIdx = textureArrayManager.getIndex(fixtureSlot.movie.id);
+      const fIdxAttr = existing.frontMesh.geometry.getAttribute('aTextureIndex') as THREE.InstancedBufferAttribute;
+      if (fIdxAttr) { fIdxAttr.setX(existing.instanceIdx, texIdx); fIdxAttr.needsUpdate = true; }
+      const bIdxAttr = existing.backMesh.geometry.getAttribute('aTextureIndex') as THREE.InstancedBufferAttribute;
+      if (bIdxAttr) { bIdxAttr.setX(existing.instanceIdx, texIdx); bIdxAttr.needsUpdate = true; }
+
+      const spineHex = leftmostColorCache.get(fixtureSlot.movie.id) || '#0f172a';
+      scratchSpineColor.set(spineHex);
+      const fSp = existing.frontMesh.geometry.getAttribute('aSpineColor') as THREE.InstancedBufferAttribute;
+      if (fSp) {
+        fSp.setXYZ(existing.instanceIdx, scratchSpineColor.r, scratchSpineColor.g, scratchSpineColor.b);
+        fSp.needsUpdate = true;
+      }
+      const bSp = existing.backMesh.geometry.getAttribute('aSpineColor') as THREE.InstancedBufferAttribute;
+      if (bSp) {
+        bSp.setXYZ(existing.instanceIdx, scratchSpineColor.r, scratchSpineColor.g, scratchSpineColor.b);
+        bSp.needsUpdate = true;
+      }
+      lastWrittenSpineHex.set(existing, spineHex);
+
+      existing.needsInitialMatrixUpdate = true;
+      scene.dirtySlots.add(existing);
+      // Kick a decode/upload for the incoming title's cover in case this is
+      // its first appearance anywhere on screen this session.
+      existing.loadShelfDetails(1);
+    });
+  });
+  if (touched) scene.requestRender();
 }
 
 export function updateLOD(scene: StoreScene) {

@@ -46,6 +46,12 @@ export const tempMatrix = new THREE.Matrix4();
 // rebuildSSAOExclusionList / the AO compute in three-scene.ts).
 export const AO_MASK_LAYER = 27;
 
+// The TV-patch layer: the ambient sets' screen stack (picture / scanlines /
+// glass), re-drawn ON ITS OWN over the cached beauty buffer on partial
+// composites — see src/partial-composite.ts. Additive (layers.enable), so bit 0
+// stays set and the normal render, mirrors and AO are untouched.
+export const TV_PATCH_LAYER = 26;
+
 // Scratch fallbacks for the launch flourish / checkout-exit camera paths —
 // all run per frame, so no allocations. Underscore names kept from their
 // former life as StoreScene statics to keep the extraction diff mechanical.

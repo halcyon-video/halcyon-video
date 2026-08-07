@@ -45,6 +45,13 @@ export interface FixtureContext {
   activeTheme: StoreTheme;
   // Gondola materials for theme-aware shelving.
   gondolaMaterials: GondolaMaterials;
+  // The room's shared amber-gold drywall material + the plane size its
+  // texture repeat is baked for (see mapWallSegmentUV in store-layout.ts).
+  // Null in contexts with no live wall build (e.g. the standalone asset
+  // viewer's stub) — fixtures that reuse the wall finish fall back to a
+  // theme-derived approximation the same way store-shell.ts's own knee
+  // walls do.
+  wallSurface: { material: THREE.Material; storeWidth: number; roomHeight: number } | null;
 }
 
 import { Movie } from './jellyfin';
@@ -69,6 +76,14 @@ export interface SlottedFixture extends StoreFixture {
   capacity: number;
   shelfHeights: number[];
   genre: string;
+  // Recompute which titles this fixture stocks from CURRENT library/watch-
+  // history data, without touching the THREE geometry (build()/dispose() do
+  // that) or the already-baked instanced slots (store-stock.ts's
+  // restockSlottedFixtures() patches those in place afterwards). Optional —
+  // only fixtures whose stock can go stale mid-session need it (currently
+  // pv-drape-table.ts, whose PREVIOUSLY VIEWED selection depends on watch
+  // history that changes the moment a movie finishes playing — feedback/055).
+  refreshStock?(): void;
 }
 
 // Lifecycle every fixture implements. build() constructs the meshes; update()

@@ -174,6 +174,13 @@ export function ceilingHangingSign(
   const group = new THREE.Group();
 
   if (opts.dieCut) {
+    // Ceiling-attached WEDGE (feedback/049): the pair of flat cards dangling
+    // on long wires read as "floating and disconnected". The owner's spec:
+    // a wedge-shaped body with real depth, attached to the ceiling, carrying
+    // the artwork on each side. End-on it is a shallow ∇ — a flat mounting
+    // cap on the ceiling, the two die-cut faces sloping down to a shared
+    // bottom keel, each tilted a few degrees outward so it reads squarely
+    // from a shopper's eye-line down the aisle.
     const mkMat = (tex: THREE.Texture) => new THREE.MeshStandardMaterial({
       map: tex,
       roughness: 0.6,
@@ -181,28 +188,36 @@ export function ceilingHangingSign(
       transparent: true,
       alphaTest: 0.1,
     });
+    const tilt = 13 * Math.PI / 180;
+    const capT = 0.05;
+    const capY = ceilingY - capT / 2; // mounting cap hugs the ceiling plane
+    const keelY = ceilingY - capT - height * Math.cos(tilt);
     const planeGeo = new THREE.PlaneGeometry(width, height);
     const front = new THREE.Mesh(planeGeo, mkMat(texture));
-    front.position.set(0, signY, 0.012);
+    front.position.set(0, keelY + (height / 2) * Math.cos(tilt), (height / 2) * Math.sin(tilt));
+    front.rotation.x = tilt;
     // No castShadow: an alpha-cut card would still throw its full-rectangle
     // silhouette without a custom depth material.
     front.receiveShadow = true;
     group.add(front);
     const back = new THREE.Mesh(planeGeo, mkMat(getBackTexture(texture)));
-    back.position.set(0, signY, -0.012);
+    back.position.set(0, keelY + (height / 2) * Math.cos(tilt), -(height / 2) * Math.sin(tilt));
+    back.rotation.order = 'YXZ';
     back.rotation.y = Math.PI;
+    back.rotation.x = tilt; // in the flipped frame this leans ITS top outward too
     back.receiveShadow = true;
     group.add(back);
-
-    const wireMat = new THREE.MeshStandardMaterial({ color: 0x666666, roughness: 0.3, metalness: 0.8 });
-    const signTopY = signY + height / 2;
-    const wireHeight = Math.max(0.1, ceilingY - signTopY);
-    const wireGeo = new THREE.CylinderGeometry(0.008, 0.008, wireHeight, 6);
-    for (const dx of [-width / 2 + 0.4, width / 2 - 0.4]) {
-      const wire = new THREE.Mesh(wireGeo, wireMat);
-      wire.position.set(dx, signTopY + wireHeight / 2, 0);
-      group.add(wire);
-    }
+    // Mounting cap: the "body attached to the ceiling". Kept inside the
+    // die-cut banner's straight section so it never pokes past the rounded
+    // ends; neutral fixture hardware, not brand color.
+    const capMat = new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.5, metalness: 0.3 });
+    const cap = new THREE.Mesh(
+      new THREE.BoxGeometry(width * 0.86, capT, height * Math.sin(tilt) * 2 + 0.06),
+      capMat
+    );
+    cap.position.set(0, capY, 0);
+    cap.receiveShadow = true;
+    group.add(cap);
     return group;
   }
 

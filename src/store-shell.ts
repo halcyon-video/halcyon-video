@@ -59,7 +59,10 @@ import type { StoreScene } from './three-scene';
 // from every wall, and the horizontal depth of the band. The ceiling tile
 // grid and marquee both keep clear of this envelope.
 export const CORNICE_WALL_GAP = 2.0;
-export const CORNICE_BAND = 2.9;
+// 2.9 → 1.8 (feedback/044): the underside ledge read far too deep — a ~35 in
+// soffit bottom — and pushed the mirror band ~5 ft off the wall. 1.8 ft is a
+// believable retail cornice depth and moves the mirror in toward the wall.
+export const CORNICE_BAND = 1.8;
 // How far the chrome+mirror cornice body hangs below the true ceiling. The
 // mirror cornice occupies the whole ring between wallTop and ceilY - CORNICE_DROP
 // is the actual VISIBLE "ceiling line" as experienced from inside the store —
@@ -200,17 +203,19 @@ scene: StoreScene,
   topFrame.receiveShadow = true;
   group.add(topFrame);
 
-  // Left vertical frame
-  const verticalFrameGeo = new THREE.BoxGeometry(frameThickness, height, frameDepth);
+  // Left/right vertical end frames — like the dividers, they stop at the
+  // sill. They used to run the full height to the floor, which buried a
+  // charcoal strip down the face of the knee wall at every section end
+  // (feedback/041's "strange black bars extending to the floor").
+  const verticalFrameGeo = new THREE.BoxGeometry(frameThickness, height - KNEE_H, frameDepth);
   const leftFrame = new THREE.Mesh(verticalFrameGeo, frameMat);
-  leftFrame.position.set(-width / 2 + frameThickness / 2, height / 2, 0);
+  leftFrame.position.set(-width / 2 + frameThickness / 2, KNEE_H + (height - KNEE_H) / 2, 0);
   leftFrame.castShadow = true;
   leftFrame.receiveShadow = true;
   group.add(leftFrame);
 
-  // Right vertical frame
   const rightFrame = new THREE.Mesh(verticalFrameGeo, frameMat);
-  rightFrame.position.set(width / 2 - frameThickness / 2, height / 2, 0);
+  rightFrame.position.set(width / 2 - frameThickness / 2, KNEE_H + (height - KNEE_H) / 2, 0);
   rightFrame.castShadow = true;
   rightFrame.receiveShadow = true;
   group.add(rightFrame);
@@ -872,7 +877,7 @@ export function buildStore(scene: StoreScene) {
         panel.position.set(tx, ceilingY - 0.06, tz);
         scene.scene.add(panel);
         scene.troffers.push({ x: tx, z: tz });
-      } else if ((k % 4 === 2) && (m % 4 === 0) && (((k - 2) / 4 + m / 4) % 2 === 0)) {
+      } else if (!overSoffit && (k % 4 === 2) && (m % 4 === 0) && (((k - 2) / 4 + m / 4) % 2 === 0)) {
         // A sparse diagonal of HVAC supply diffusers between the light
         // grids — a real drop ceiling is never 100% acoustic tile, and the
         // uniform grid was part of the CG read. Same module footprint.
@@ -889,7 +894,10 @@ export function buildStore(scene: StoreScene) {
         // and left the rest of the store bare (feedback pin 013). Constant
         // in-tile offset keeps them off dead-center without breaking the
         // row alignment.
-        if (k % 4 === 0 && m % 4 === 2) {
+        // (Same soffit guard as lights/vents: a head on a tile the front
+        // soffit slices through would hang from the cut — feedback/045's
+        // vent did exactly that.)
+        if (!overSoffit && k % 4 === 0 && m % 4 === 2) {
           sprinklerSpots.push({ x: tx + TILE_X * 0.22, z: tz - TILE_Z * 0.18 });
         }
       }
@@ -935,6 +943,12 @@ export function buildStore(scene: StoreScene) {
     const ventTex = createHvacVentTexture();
     const ventMat = new THREE.MeshStandardMaterial({
       map: ventTex, roughness: 0.5, metalness: 0.06,
+      // A small self-lit floor under the bounce: away from a troffer the
+      // bounce field falls to tile-darkness, which erased the plate around
+      // the slots — the louver rows then floated on bare tile and shimmered
+      // like z-fighting (feedback/045). Modulated by the vent map so the
+      // slots stay dark; far too dim to register as a lamp in the bake.
+      emissive: 0xffffff, emissiveMap: ventTex, emissiveIntensity: 0.22,
     });
     ceilingBounce(ventMat, 0.42, ventTex);
     const ventFrameMesh = new THREE.InstancedMesh(trofferFrameGeo, trofferFrameMat, ventSpots.length);
@@ -1227,6 +1241,10 @@ export function buildStore(scene: StoreScene) {
       // dye — the same "scan is the texture, theme is the paint" split the
       // wall surface uses.
       const neutral = neutralizeScanTexture(tex);
+      // (allowKtx2: false below — neutralizeScanTexture reads pixels back via
+      // canvas drawImage/getImageData, which only works on a CPU-decodable
+      // image. A KTX2Loader texture is a GPU-native CompressedTexture with no
+      // such image; see the allowKtx2 note in tryLoadUserAssetTexture.)
       if (neutral) {
         configureCarpetMap(neutral);
         floorMat.color.set(theme.palette.carpet);
@@ -1237,7 +1255,7 @@ export function buildStore(scene: StoreScene) {
       }
       floorMat.needsUpdate = true;
       scene.requestRender?.();
-    });
+    }, { allowKtx2: false });
     tryLoadUserAssetTexture('surfaces/store-carpet/normal.png', (tex) => {
       configureCarpetMap(tex);
       floorMat.normalMap = tex;
@@ -1398,7 +1416,7 @@ export function buildStore(scene: StoreScene) {
     scene.scene.add(win);
     return { win, len, cols };
   };
-  buildSideWall('right');
+  const rightRibbon = buildSideWall('right');
   const leftRibbon = buildSideWall('left');
 
   // 2.7 Add storefront windows over a low knee wall (front wall + side ribbons)
@@ -1520,15 +1538,13 @@ export function buildStore(scene: StoreScene) {
 
     // Poster plane matches the frame constants above (2:3 aspect ratio).
     const posterMesh = new THREE.Mesh(new THREE.PlaneGeometry(posterW, posterH), posterMat);
-    
-    // Center vertically in the visible window pane above the waist rail (Y = 3.3)
-    // and below the cornice drop (ceiling CEILING_Y - 2.7 = 10.8).
-    // Center Y is 3.3 + (10.8 - 3.3) / 2 = 7.05.
-    const waistY = 3.3;
-    const visibleTop = WINDOW_HEAD_Y; // glazing head — the pane the poster hangs in
-    const posterCenterY = waistY + (visibleTop - waistY) / 2;
-    const posterHeight = posterH;
-    const posterTopY = posterCenterY + posterHeight / 2;
+
+    // Center vertically in the GLAZED pane itself — knee wall top (2.0, the
+    // window builders' KNEE_H) up to the glazing head. It used to center
+    // between the waist rail and the head, which hung every poster high in
+    // the pane (feedback/042: "more centered in the window pane").
+    const paneBottom = 2.0;
+    const posterCenterY = paneBottom + (WINDOW_HEAD_Y - paneBottom) / 2;
 
     posterMesh.position.set(0, posterCenterY, 0);
     posterGroup.add(posterMesh);
@@ -1564,32 +1580,9 @@ export function buildStore(scene: StoreScene) {
       posterMat.map = fallbackTex;
     }
 
-    // 2. Suspension Wires
-    const wireMat = new THREE.MeshStandardMaterial({ color: 0x333333, metalness: 0.9, roughness: 0.2 });
-    const wireW = 0.015; // very thin wire
-    const wireH = WINDOW_HEAD_Y - posterTopY; // top of poster up to the window-frame head
-    
-    const wire1 = new THREE.Mesh(new THREE.BoxGeometry(wireW, wireH, wireW), wireMat);
-    wire1.position.set(-1.4, posterTopY + wireH / 2, 0);
-    posterGroup.add(wire1);
-
-    const wire2 = new THREE.Mesh(new THREE.BoxGeometry(wireW, wireH, wireW), wireMat);
-    wire2.position.set(1.4, posterTopY + wireH / 2, 0);
-    posterGroup.add(wire2);
-
-    // 3. Tiny clips holding the poster
-    const clipW = 0.06;
-    const clipH = 0.1;
-    const clipD = 0.04;
-    const clipMat = new THREE.MeshStandardMaterial({ color: 0x888888, metalness: 0.9, roughness: 0.3 });
-    
-    const clip1 = new THREE.Mesh(new THREE.BoxGeometry(clipW, clipH, clipD), clipMat);
-    clip1.position.set(-1.4, posterTopY, 0);
-    posterGroup.add(clip1);
-
-    const clip2 = new THREE.Mesh(new THREE.BoxGeometry(clipW, clipH, clipD), clipMat);
-    clip2.position.set(1.4, posterTopY, 0);
-    posterGroup.add(clip2);
+    // (No suspension wires/clips — feedback/042: "don't need strings above
+    // them". The framed lightbox reads as mounted, and the marquee-bulb ring
+    // it anchors already carries the fixture look.)
 
     // Position the entire group in the pane
     // Z-offset is 0.16 to sit slightly inside the store (away from the glass at Z=0 and frames extending to Z=±0.15)
@@ -1603,7 +1596,7 @@ export function buildStore(scene: StoreScene) {
     // every window (and its posters) has been added to the scene.
     // Ring dimensions land on the centreline of the frame bars, so the bulbs
     // sit ON the frame rather than floating outside it.
-    scene.posterMarqueeFrames.push({ anchor: posterMesh, width: posterW + frameT, height: posterHeight + frameT });
+    scene.posterMarqueeFrames.push({ anchor: posterMesh, width: posterW + frameT, height: posterH + frameT });
 
     return posterGroup;
   };
@@ -1643,14 +1636,16 @@ export function buildStore(scene: StoreScene) {
     frontWindow.add(posterGroup);
   });
 
-  // Posters on every second pane of the left side-window ribbon (skipped
-  // entirely when the store is too shallow to carry a ribbon).
-  if (leftRibbon) {
-    const leftPaneW = leftRibbon.len / leftRibbon.cols;
-    for (let panelIdx = 1; panelIdx < leftRibbon.cols; panelIdx += 2) {
+  // Posters on every second pane of BOTH side-window ribbons (skipped
+  // entirely when the store is too shallow to carry a ribbon). The right
+  // ribbon used to go bare — feedback/042: "this window needs posters too".
+  for (const ribbon of [leftRibbon, rightRibbon]) {
+    if (!ribbon) continue;
+    const paneW = ribbon.len / ribbon.cols;
+    for (let panelIdx = 1; panelIdx < ribbon.cols; panelIdx += 2) {
       const movie = getNextNewReleaseMovie();
-      const paneCenterX = -leftRibbon.len / 2 + (panelIdx + 0.5) * leftPaneW;
-      leftRibbon.win.add(createSuspendedPosterGroup(movie, paneCenterX));
+      const paneCenterX = -ribbon.len / 2 + (panelIdx + 0.5) * paneW;
+      ribbon.win.add(createSuspendedPosterGroup(movie, paneCenterX));
     }
   }
   // ------------------------------
@@ -2606,7 +2601,11 @@ export function buildCeilingFrame(scene: StoreScene, storeWidth: number, backWal
   const zBack = backWallZ + WALL_GAP;
   const drop = CORNICE_DROP; // how far the cornice body hangs below the ceiling
   const band = CORNICE_BAND; // horizontal depth of the cornice
-  const mirrorH = 1.9;  // height of the mirror band on the inner face
+  // Height of the mirror band on the inner face. 1.9 → 2.3 with the
+  // shallower tilt below: on the narrower ring (feedback/044) the old short,
+  // steeply-tilted strip went edge-on at wall-grazing views and the band
+  // read as a dead dark chrome face down the whole run.
+  const mirrorH = 2.3;
   const mirrorY = ceilY - drop * 0.5;
   const innerDepth = (zFront - zBack) - 2 * band; // left/right runs tuck between front/back
 
@@ -2614,20 +2613,71 @@ export function buildCeilingFrame(scene: StoreScene, storeWidth: number, backWal
     color: 0xd6dbe2, metalness: 1.0, roughness: 0.12, envMapIntensity: 1.0
   });
 
-  // edge: chrome body box + inset mirror plane using Reflector.
-  const addEdge = (
-    bodyGeo: THREE.BoxGeometry, bodyPos: THREE.Vector3,
-    mirrorW: number, mirrorPos: THREE.Vector3, mirrorRotY: number,
-    bodyRotY = 0
-  ) => {
-    const group = new THREE.Group();
-
-    const body = new THREE.Mesh(bodyGeo, chromeMat);
-    body.position.copy(bodyPos);
-    body.rotation.y = bodyRotY;
+  // Chrome BODY: one mitred ring strip extruded from the cornice's plan
+  // polyline, instead of the old per-run boxes + oversize square "weld"
+  // patches at the stepped-corner seams. The boxes met the rotated diagonal
+  // in axis-aligned overlaps, and the welds (band*2 squares) poked their
+  // corners out past both faces — the "jutting out silver parts" of
+  // feedback/043. An extruded strip mitres every corner by construction:
+  // the runs meet in clean plane joins at whatever obtuse angle the plan
+  // turns, and there is nothing extra to jut.
+  const buildBodyRing = (outer: { x: number; z: number }[]) => {
+    const interior = { x: STORE_CENTER_X, z: (zFront + zBack) / 2 };
+    // Per-segment inward normal (toward the store interior).
+    const segN: { x: number; z: number }[] = [];
+    for (let i = 0; i < outer.length - 1; i++) {
+      const ux = outer[i + 1].x - outer[i].x, uz = outer[i + 1].z - outer[i].z;
+      const len = Math.hypot(ux, uz) || 1;
+      let nx = uz / len, nz = -ux / len;
+      const midx = (outer[i].x + outer[i + 1].x) / 2, midz = (outer[i].z + outer[i + 1].z) / 2;
+      if (nx * (interior.x - midx) + nz * (interior.z - midz) < 0) { nx = -nx; nz = -nz; }
+      segN.push({ x: nx, z: nz });
+    }
+    // Inner polyline: segment lines offset by `band`, adjacent lines
+    // intersected for the mitre; square caps at the two open ends.
+    const inner: { x: number; z: number }[] = [];
+    for (let i = 0; i < outer.length; i++) {
+      const prev = i > 0 ? i - 1 : null, next = i < segN.length ? i : null;
+      if (prev === null || next === null) {
+        const n = segN[prev ?? next!];
+        inner.push({ x: outer[i].x + n.x * band, z: outer[i].z + n.z * band });
+        continue;
+      }
+      const nA = segN[prev], nB = segN[next];
+      const a0 = { x: outer[i - 1].x + nA.x * band, z: outer[i - 1].z + nA.z * band };
+      const b0 = { x: outer[i].x + nB.x * band, z: outer[i].z + nB.z * band };
+      const dA = { x: outer[i].x - outer[i - 1].x, z: outer[i].z - outer[i - 1].z };
+      const dB = { x: outer[i + 1].x - outer[i].x, z: outer[i + 1].z - outer[i].z };
+      const det = dA.x * -dB.z - dA.z * -dB.x;
+      if (Math.abs(det) < 1e-6) {
+        inner.push(b0); // collinear runs — no corner
+        continue;
+      }
+      const t = ((b0.x - a0.x) * -dB.z - (b0.z - a0.z) * -dB.x) / det;
+      inner.push({ x: a0.x + dA.x * t, z: a0.z + dA.z * t });
+    }
+    const shape = new THREE.Shape();
+    shape.moveTo(outer[0].x, outer[0].z);
+    for (let i = 1; i < outer.length; i++) shape.lineTo(outer[i].x, outer[i].z);
+    for (let i = inner.length - 1; i >= 0; i--) shape.lineTo(inner[i].x, inner[i].z);
+    shape.closePath();
+    const geo = new THREE.ExtrudeGeometry(shape, { depth: drop, bevelEnabled: false });
+    // Shape (x, y=plan z) extruded along +z → rotateX(+90°) maps the
+    // extrusion to hang straight down from the ceiling plane.
+    geo.rotateX(Math.PI / 2);
+    geo.translate(0, ceilY, 0);
+    const body = new THREE.Mesh(geo, chromeMat);
     body.castShadow = true;
     body.receiveShadow = true;
-    group.add(body);
+    scene.scene.add(body);
+    scene.shelves.push(body);
+  };
+
+  // edge: inset mirror plane using Reflector (the chrome body is the ring above).
+  const addEdge = (
+    mirrorW: number, mirrorPos: THREE.Vector3, mirrorRotY: number
+  ) => {
+    const group = new THREE.Group();
 
     // Short runs (stepped-corner notch, slivers beside the vestibule) can
     // leave no room for a mirror once the corner tucks are subtracted.
@@ -2637,7 +2687,7 @@ export function buildCeilingFrame(scene: StoreScene, storeWidth: number, backWal
       return;
     }
 
-    const tiltAngle = 20 * Math.PI / 180; // 20 degrees downward tilt
+    const tiltAngle = 14 * Math.PI / 180; // downward tilt (20° went edge-on at grazing views)
     const localZOffset = (mirrorH / 2) * Math.sin(tiltAngle);
 
     // Software GL: a live Reflector re-renders the entire scene per mirror —
@@ -2722,19 +2772,16 @@ export function buildCeilingFrame(scene: StoreScene, storeWidth: number, backWal
   let seamRightZ = zBack + band;
   if (scene.hasStep) {
     // Diagonal run across the stepped corner (issue #53): a single straight
-    // chrome+mirror band from the end of the back edge (stepX, zBack) to the
-    // start of the right edge (rightEdge, stepZ) — one hypotenuse instead of
-    // the old step-front + connector pair (one fewer Reflector, no zig-zag).
-    // The body is slightly overlength so its ends tuck into the back wall /
-    // right wall behind the neighbouring runs, leaving no corner gaps.
+    // mirror band from the end of the back edge (stepX, zBack) to the start
+    // of the right edge (rightEdge, stepZ) — one hypotenuse instead of the
+    // old step-front + connector pair (one fewer Reflector, no zig-zag).
+    // Its chrome body is part of the mitred ring below.
     const diagDX = rightEdge - stepX;
     const diagDZ = stepZ - zBack;
     const diagLen = Math.hypot(diagDX, diagDZ);
     const diagYaw = -Math.atan2(diagDZ, diagDX);
     const diagNX = -diagDZ / diagLen; // inward normal (into the store)
     const diagNZ = diagDX / diagLen;
-    const diagMidX = (stepX + rightEdge) / 2;
-    const diagMidZ = (zBack + stepZ) / 2;
     // Where the diagonal's inner (mirror) face meets the back run's face
     // (z = zBack + bo) and the right run's face (x = rightEdge - bo). The
     // mirror strips of all three runs extend to exactly these two points so
@@ -2747,24 +2794,35 @@ export function buildCeilingFrame(scene: StoreScene, storeWidth: number, backWal
     seamRightZ = zBack + diagNZ * bo + diagS2 * diagUZ;
     const diagSMid = (diagS1 + diagS2) / 2;
     addEdge(
-      new THREE.BoxGeometry(diagLen + band, drop, band),
-      new THREE.Vector3(diagMidX + diagNX * (band / 2), ceilY - drop / 2, diagMidZ + diagNZ * (band / 2)),
       diagS2 - diagS1,
       new THREE.Vector3(
         stepX + diagNX * bo + diagSMid * diagUX, mirrorY,
         zBack + diagNZ * bo + diagSMid * diagUZ
       ),
-      diagYaw,
       diagYaw
     );
   }
-  // Back edge (runs along X, faces +Z) — stops at the stepped corner when
-  // there is one, otherwise runs the full width of the flat back wall.
-  const backW = stepX - leftEdge;
+  // Chrome body: the whole cornice as ONE mitred ring strip, front-left
+  // connect point around left/back/(diagonal)/right to the front-right
+  // connect point (the cash-wrap soffit fascia closes the loop across the
+  // entrance — see ceiling-soffit.ts).
+  {
+    const connectHalfB = soffitConnectHalf(scene.storefrontSpec, storeWidth, WALL_GAP);
+    const plan: { x: number; z: number }[] = [
+      { x: STORE_CENTER_X - connectHalfB, z: zFront },
+      { x: leftEdge, z: zFront },
+      { x: leftEdge, z: zBack },
+      { x: stepX, z: zBack },
+    ];
+    if (scene.hasStep) plan.push({ x: rightEdge, z: stepZ });
+    plan.push({ x: rightEdge, z: zFront });
+    plan.push({ x: STORE_CENTER_X + connectHalfB, z: zFront });
+    buildBodyRing(plan);
+  }
+  // Back edge mirror (runs along X, faces +Z) — stops at the stepped corner
+  // when there is one, otherwise runs the full width of the flat back wall.
   const backMirrorW = seamBackX - (leftEdge + band);
   addEdge(
-    new THREE.BoxGeometry(backW, drop, band),
-    new THREE.Vector3((leftEdge + stepX) / 2, ceilY - drop / 2, zBack + band / 2),
     backMirrorW,
     new THREE.Vector3((leftEdge + band + seamBackX) / 2, mirrorY, zBack + bo), 0
   );
@@ -2792,54 +2850,21 @@ export function buildCeilingFrame(scene: StoreScene, storeWidth: number, backWal
     const mx0 = wallEnd === 'x0' ? x0 + band : x0;
     const mx1 = wallEnd === 'x1' ? x1 - band : x1;
     addEdge(
-      new THREE.BoxGeometry(w, drop, band),
-      new THREE.Vector3((x0 + x1) / 2, ceilY - drop / 2, zFront - band / 2),
       mx1 - mx0,
       new THREE.Vector3((mx0 + mx1) / 2, mirrorY, zFront - band - 0.02), Math.PI
     );
   }
   // Left edge (runs along Z, faces +X)
   addEdge(
-    new THREE.BoxGeometry(band, drop, innerDepth),
-    new THREE.Vector3(leftEdge + band / 2, ceilY - drop / 2, (zFront + zBack) / 2),
     innerDepth,
     new THREE.Vector3(leftEdge + band + 0.02, mirrorY, (zFront + zBack) / 2), Math.PI / 2
   );
   // Right edge (runs along Z, faces -X) — starts at the stepped corner. The
   // mirror strip runs all the way down to the diagonal seam point.
-  const rightLen = (zFront - band) - (stepZ + band);
   addEdge(
-    new THREE.BoxGeometry(band, drop, rightLen),
-    new THREE.Vector3(rightEdge - band / 2, ceilY - drop / 2, (stepZ + zFront) / 2),
     (zFront - band) - seamRightZ,
     new THREE.Vector3(rightEdge - bo, mirrorY, (seamRightZ + zFront - band) / 2), -Math.PI / 2
   );
-
-  // Corner welds at the two diagonal seams (issue #127): the diagonal run's
-  // body only overlaps its neighbours by band/2 along its OWN (rotated)
-  // length axis, which doesn't reliably cover the wedge where it meets the
-  // axis-aligned back/right runs — the underside visibly gapped there,
-  // showing daylight/void through the ceiling. Two generously-sized square
-  // chrome patches (2x the cornice depth, so they overlap deep into both
-  // the straight run's own footprint and the diagonal's) centred on each
-  // seam point weld the underside solid without depending on exact miter
-  // trig at the join.
-  if (scene.hasStep) {
-    const weldGeo = new THREE.BoxGeometry(band * 2, drop, band * 2);
-    const backDiagWeld = new THREE.Mesh(weldGeo, chromeMat);
-    backDiagWeld.position.set(stepX, ceilY - drop / 2, zBack + band / 2);
-    backDiagWeld.castShadow = true;
-    backDiagWeld.receiveShadow = true;
-    scene.scene.add(backDiagWeld);
-    scene.shelves.push(backDiagWeld);
-
-    const diagRightWeld = new THREE.Mesh(weldGeo, chromeMat);
-    diagRightWeld.position.set(rightEdge - band / 2, ceilY - drop / 2, stepZ);
-    diagRightWeld.castShadow = true;
-    diagRightWeld.receiveShadow = true;
-    scene.scene.add(diagRightWeld);
-    scene.shelves.push(diagRightWeld);
-  }
 
   // --- Prebaked warm up-glow where the cornice meets the gold walls ---
   // The cornice's wall-facing back side throws a static warm wash down the
@@ -3121,113 +3146,8 @@ export function updateMarqueeBulbs(scene: StoreScene, timeMs: number): void {
   mesh.instanceColor.needsUpdate = true;
 }
 
-export function buildWallDecor(scene: StoreScene, storeWidth: number, backWallZ: number) {
-  const decor = scene.shellSpec.wallDecor;
-  if (!decor || decor.length === 0) return;
-
-  const rightX = STORE_CENTER_X + storeWidth / 2 - 0.06;
-  // Usable Z band on the right wall: behind the front vestibule, in front of
-  // the back wall. After the -90° yaw a group's local +X maps to world +Z.
-  const zBand = { back: backWallZ + 3.0, front: 9.0 };
-  const midZ = (zBand.back + zBand.front) / 2;
-
-  // Procedural film-reel band texture: a dark strip with sprocket holes and a
-  // row of framed "cells", tinted to the store's warm signage red.
-  const makeMuralTexture = (cells: number): THREE.CanvasTexture => {
-    const cv = document.createElement('canvas');
-    cv.width = 128 * cells;
-    cv.height = 128;
-    const c = cv.getContext('2d')!;
-    c.fillStyle = '#141414';
-    c.fillRect(0, 0, cv.width, cv.height);
-    // Sprocket-hole rails top and bottom.
-    c.fillStyle = '#e8e2d0';
-    const holeW = 14, holeH = 18, pitch = 32;
-    for (let x = 8; x < cv.width; x += pitch) {
-      c.fillRect(x, 10, holeW, holeH);
-      c.fillRect(x, cv.height - 10 - holeH, holeW, holeH);
-    }
-    // Frame cells with warm-red mattes.
-    for (let i = 0; i < cells; i++) {
-      const fx = i * 128 + 16;
-      c.fillStyle = i % 2 === 0 ? '#7a1414' : '#b8202a';
-      c.fillRect(fx, 40, 96, 48);
-      c.strokeStyle = '#2a2a2a';
-      c.lineWidth = 3;
-      c.strokeRect(fx, 40, 96, 48);
-    }
-    const tex = new THREE.CanvasTexture(cv);
-    tex.colorSpace = THREE.SRGBColorSpace;
-    tex.anisotropy = 4;
-    return tex;
-  };
-
-  const posterFallback = new THREE.TextureLoader().load(assetUrl('latest_movie_poster.png'));
-  posterFallback.colorSpace = THREE.SRGBColorSpace;
-  let decorMovieIdx = 0;
-  const nextDecorMovie = (): Movie | null => {
-    while (decorMovieIdx < scene.recentlyAddedMovies.length) {
-      const m = scene.recentlyAddedMovies[decorMovieIdx++];
-      if (m.posterUrl) return m;
-    }
-    return null;
-  };
-
-  decor.forEach((entry) => {
-    if (entry.wall !== 'right') return; // only the solid right wall is wired today
-    const centerZ = entry.centerZ ?? midZ;
-    const group = new THREE.Group();
-    group.position.set(rightX, entry.y, centerZ);
-    group.rotation.y = -Math.PI / 2; // face into the store; local +X -> world +Z
-
-    if (entry.type === 'mural') {
-      const bandH = 1.0;
-      const cells = Math.max(3, Math.round(entry.width / 2.2));
-      const mat = new THREE.MeshStandardMaterial({
-        map: makeMuralTexture(cells),
-        roughness: 0.85,
-        metalness: 0.0,
-        emissive: 0x2a0808,
-        emissiveIntensity: 0.15,
-      });
-      const band = new THREE.Mesh(new THREE.PlaneGeometry(entry.width, bandH), mat);
-      group.add(band);
-    } else {
-      // poster-group: a row of framed posters across entry.width.
-      const count = 3;
-      const posterH = 2.2;
-      const posterW = posterH * (2 / 3);
-      const gap = (entry.width - count * posterW) / (count + 1);
-      const frameMat = new THREE.MeshStandardMaterial({ color: 0x1a120a, roughness: 0.6, metalness: 0.2 });
-      for (let i = 0; i < count; i++) {
-        const localX = -entry.width / 2 + gap + posterW / 2 + i * (posterW + gap);
-        const frame = new THREE.Mesh(
-          new THREE.PlaneGeometry(posterW + 0.18, posterH + 0.18),
-          frameMat
-        );
-        frame.position.set(localX, 0, 0.01);
-        group.add(frame);
-
-        const posterMat = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide });
-        const movie = nextDecorMovie();
-        if (movie && movie.posterUrl) {
-          posterQueue.load(movie, 8, () => {
-            // Fixture-pinned (#97) — lives as long as the scene. Framed wall
-            // art is promo, not rental stock: no 4K sticker.
-            loadDecorPosterTexture(movie, (tex) => {
-              posterMat.map = tex;
-              posterMat.needsUpdate = true;
-            });
-          });
-        } else {
-          posterMat.map = posterFallback;
-        }
-        const poster = new THREE.Mesh(new THREE.PlaneGeometry(posterW, posterH), posterMat);
-        poster.position.set(localX, 0, 0.02);
-        group.add(poster);
-      }
-    }
-
-    scene.scene.add(group);
-  });
-}
+// Actor-portrait wall + film-strip ribbon décor moved to wall-decor.ts (pin
+// 052 rebuild, 2026-08-06): the old version here hardcoded a fixed poster/
+// mural rectangle that clipped straight through the EXIT door and the side
+// window ribbon. See wall-decor.ts for the replacement (real Jellyfin actor
+// data, computed wall exclusion zones, high-ceiling-only gating).

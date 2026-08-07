@@ -370,11 +370,12 @@ export function buildLogoShapePath(spec: LogoSpec, w: number, h: number): Path2D
 }
 
 // The brand editor's family picker (settings.ts BRAND_FONTS) stores display
-// names, and two of them only ever arrived over the styles.css Google-Fonts
-// @import — i.e. never on an offline kiosk boot, where the emblem then painted
-// in whatever the system sans is and nothing said so. Both are now bundled, so
-// the picker's name maps onto the shipped file. The stored spec keeps the
-// human name; only the canvas font string changes.
+// names, and two of them used to arrive only over a Google-Fonts @import in
+// styles.css — i.e. never on an offline kiosk boot, where the emblem then
+// painted in whatever the system sans is and nothing said so. Both are now
+// bundled (and that @import is gone as of 2026-08-06), so the picker's name
+// maps onto the shipped file. The stored spec keeps the human name; only the
+// canvas font string changes.
 const BUNDLED_BRAND_FAMILY: Record<string, string> = {
   'Archivo Black': BB_ARCHIVO_BLACK,
   Outfit: BB_OUTFIT,

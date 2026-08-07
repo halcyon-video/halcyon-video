@@ -81,7 +81,10 @@ export function remotePlayPlugin() {
   };
 
   // ── seed store ────────────────────────────────────────────────────────────
-  const SEED_FILE = path.join(process.cwd(), ".remote-play-seed.json");
+  // REMOTE_PLAY_SEED points the seed somewhere persistent (a container's
+  // volume mount); unset, it lives beside the checkout as always.
+  const SEED_FILE =
+    process.env.REMOTE_PLAY_SEED || path.join(process.cwd(), ".remote-play-seed.json");
   const validSeed = (s) =>
     s && typeof s === "object" && s.jellyfin_url && s.jellyfin_token ? s : null;
   let seed = null;
@@ -278,6 +281,10 @@ export function remotePlayPlugin() {
           // Raw LAN IPs in ICE candidates: phones/TVs can't always resolve
           // the mDNS names Chrome would otherwise hide them behind.
           "--disable-features=WebRtcHideLocalIpsWithMdns",
+          // Containers cap /dev/shm at 64MB, which kills the renderer once
+          // texture traffic starts; route shm through /tmp instead.
+          // HALCYON_CONTAINER is set by the Dockerfile.
+          ...(process.env.HALCYON_CONTAINER ? ["--disable-dev-shm-usage"] : []),
           marker(),
         ],
         defaultViewport: { width: 1600, height: 900 },
@@ -296,9 +303,17 @@ export function remotePlayPlugin() {
         }, seed);
       }
       const base = `http://localhost:${port()}`;
+      // Unseeded fallback: a dev checkout boots the synthetic harness; a
+      // clean clone / container has no harness rig, so it boots the real
+      // shell in runtime demo mode instead.
+      const hasHarness = ["harness.html", "dist/harness.html"].some((f) =>
+        fs.existsSync(path.join(process.cwd(), f))
+      );
       const url = seed
         ? `${base}/?remoteId=${id}`
-        : `${base}/harness.html?remoteId=${id}${fast ? "&fast=1&lib=200" : ""}`;
+        : hasHarness
+          ? `${base}/harness.html?remoteId=${id}${fast ? "&fast=1&lib=200" : ""}`
+          : `${base}/?remoteId=${id}&demo=1`;
       await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60_000 });
       rec.starting = false;
       ensureReaper();

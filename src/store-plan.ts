@@ -5,21 +5,27 @@
 // that the structure geometry, movie-box baking, and camera framing all read.
 // Swap or subclass this to lay the store out completely differently — nothing
 // in here touches THREE scene objects except the Vector3 rotation helper.
-import * as THREE from 'three';
-import { Movie, JellyfinLibrary } from './jellyfin';
+import type * as THREE from 'three';
+import type { Movie, JellyfinLibrary } from './jellyfin.ts';
 import {
   LIBRARY_X_SPACING, FIELD_Z_FRONT, CENTER_WALKWAY, AISLE_ANGLE, HERRINGBONE_AISLE_ANGLE, BOX_SPACING,
   MAX_SHELF_COLS, UNIT_CAPACITY, MAX_RUN_UNITS, RUN_BREAK_GAP,
   SECTION_CAPACITY, TINY_LIBRARY_MOVIES, MIN_CATEGORY_TITLES,
   STORE_CATEGORY_ORDER, shelfTitleCompare, sectionFillCopies, columnFillCount,
   collectionCategoryCandidates, shelfCategoryCandidatesOf,
-  LibraryLayout, ArrangementId, ShelvingUnit,
-  OverflowPolicy, DEFAULT_OVERFLOW_POLICY, isOverflowTitle,
+  type LibraryLayout, type ArrangementId, type ShelvingUnit,
+  type OverflowPolicy, DEFAULT_OVERFLOW_POLICY, isOverflowTitle,
   UNIT_DEPTH,
   baselineStorefrontWidth, baselineStoreDepth,
   STORE_CENTER_X, FRONT_GLASS_Z,
-} from './store-layout';
-import { Footprint } from './layout-validator';
+  // .ts extension (plus the `type` imports above/below): keeps this module
+  // resolvable under plain `node --test` with type stripping, same as
+  // store-layout.ts's own imports (see tests/store-plan.test.ts) — Node's
+  // ESM loader needs an explicit extension for relative specifiers and can't
+  // parse a real (non-type-only) import it would have to resolve at runtime
+  // through a bare specifier like the un-stripped original.
+} from './store-layout.ts';
+import type { Footprint } from './layout-validator.ts';
 
 /**
  * One line-front run end that opens onto walkway — an endcap host site.
@@ -52,6 +58,7 @@ export class StorePlan {
   // Pivot Z for the diagonal aisle rotation (centre of the aisle cluster).
   public aislePivotZ = 0;
 
+  private libraries: JellyfinLibrary[];
   private libraryLayouts: LibraryLayout[] = [];
   private libraryLayoutsBuilt = false;
 
@@ -62,7 +69,16 @@ export class StorePlan {
   private maxRunUnits = MAX_RUN_UNITS;
   private cachedStoreWidth: number | null = null;
 
-  constructor(private libraries: JellyfinLibrary[]) {}
+  // A plain field + assignment rather than a TypeScript constructor
+  // parameter property: Node's `--experimental-strip-types` (the
+  // node --test runner tests/*.test.ts use, no build step) can't parse that
+  // shorthand (ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX), so it was the one thing
+  // blocking this otherwise-pure module from plain-Node unit testing (see
+  // tests/store-plan.test.ts, tests/clerk-nav.test.ts for the same pattern).
+  // Behavior is identical.
+  constructor(libraries: JellyfinLibrary[]) {
+    this.libraries = libraries;
+  }
 
   // Lay every freestanding unit out as part of a shared, floor-wide run: long
   // lines of units whose short ends touch, tilted to the active arrangement and
@@ -493,17 +509,34 @@ export class StorePlan {
       const libUnits = this.shelvingUnits.filter(u => u.libraryIdx === libIdx);
       if (libUnits.length === 0) continue;
 
-      // Group into lines; order each line's units screen-left first. On
+      // Group into lines by rowGroupId (not lineId): fillField() may have
+      // poured one physical straight row as several lineId CHUNKS purely to
+      // cap run length at maxRunUnits, and consecutive chunks sit only a
+      // RUN_BREAK_GAP apart — a customer walking the row reads them as one
+      // continuous run. Grouping by the shared rowGroupId keeps every chunk
+      // of that row together through the reordering pass below, so the walk
+      // order below can never insert an unrelated line between two chunks
+      // that are physically flush (the "genre stops mid-row, resumes on a
+      // different row" bug: a chunk's own continuation used to be treated as
+      // an independent line the 2-opt could freely place anywhere else).
+      // Order each line's units screen-left first, chunk order (lineId) then
+      // posInLine within a chunk — lineId increases monotonically along a
+      // row's own chunks, so this is the row's true physical order. On
       // mirrored runs (browseSign < 0) the browse side is viewed from the
-      // other aisle, so the line's BACK unit is the screen-left one.
+      // other aisle, so the line's BACK/far end is the screen-left one.
       const lineMap = new Map<number, ShelvingUnit[]>();
       libUnits.forEach(u => {
-        let arr = lineMap.get(u.lineId);
-        if (!arr) lineMap.set(u.lineId, (arr = []));
+        let arr = lineMap.get(u.rowGroupId);
+        if (!arr) lineMap.set(u.rowGroupId, (arr = []));
         arr.push(u);
       });
       lineMap.forEach(arr =>
-        arr.sort((a, b) => (a.browseSign < 0 ? b.posInLine - a.posInLine : a.posInLine - b.posInLine)));
+        arr.sort((a, b) => {
+          if (a.browseSign < 0) {
+            return a.lineId !== b.lineId ? b.lineId - a.lineId : b.posInLine - a.posInLine;
+          }
+          return a.lineId !== b.lineId ? a.lineId - b.lineId : a.posInLine - b.posInLine;
+        }));
 
       // Base reading order: rows nearest the door first; same-depth ties go
       // to the row nearest the central walkway (browseSign-relative so it
@@ -678,6 +711,12 @@ export class StorePlan {
     let qi = 0;
     for (const run of runs) {
       if (qi >= slice.length) break;
+      // Every chunk poured from THIS run is one physical straight row split
+      // only by the maxRunUnits/RUN_BREAK_GAP bookkeeping below — tag them
+      // all with the run's starting lineId so the walk-order pass can later
+      // recognise the split and treat them as one line (see rowGroupId on
+      // ShelvingUnit).
+      const rowGroupId = lineId;
       let take = 0;
       let lastLib = -1;
       let uniqueLibs = 0;
@@ -712,6 +751,7 @@ export class StorePlan {
           posInLine: idxInChunk,
           isLineFront: idxInChunk === 0,
           isLineBack: idxInChunk === chunkSize - 1,
+          rowGroupId,
           anchorX: run.fx,
           xCenter: cxUnit,
           // zPos is stored so aisleZCenter() recovers the run-centre Z exactly.
@@ -761,7 +801,12 @@ export class StorePlan {
   // viewed from the opposite aisle), then the next line. The alphabet is
   // continuous around every gondola. Units are numbered in front reading
   // order by the post-sort in layoutStore, so line spans are contiguous
-  // index runs.
+  // index runs. Grouped by rowGroupId (not lineId): fillField() can pour one
+  // physical row as several lineId chunks (see rowGroupId), and planRuns()'s
+  // walk-order pass keeps a row's chunks contiguous in this array, so
+  // treating the whole rowGroupId run as one line here is what makes a
+  // section's stock flow across the small RUN_BREAK_GAP instead of jumping to
+  // whatever line the reorder happened to place next.
   entryBlockOrder(libIdx: number): { unit: number; side: 'front' | 'back' }[] {
     let order = this.blockOrderCache.get(libIdx);
     if (order) return order;
@@ -770,7 +815,7 @@ export class StorePlan {
     let s = 0;
     while (s < libUnits.length) {
       let e = s;
-      while (e + 1 < libUnits.length && libUnits[e + 1].lineId === libUnits[s].lineId) e++;
+      while (e + 1 < libUnits.length && libUnits[e + 1].rowGroupId === libUnits[s].rowGroupId) e++;
       for (let u = s; u <= e; u++) order.push({ unit: u, side: 'front' });
       for (let u = e; u >= s; u--) order.push({ unit: u, side: 'back' });
       s = e + 1;

@@ -8,6 +8,7 @@
 import * as THREE from 'three';
 import { assetUrl } from './asset-url';
 import { brandPackDir } from './brand-pack';
+import { tryLoadShippedSurfaceKtx2 } from './surface-textures';
 
 // One load attempt at an exact public/-relative path.
 function loadOne(
@@ -30,7 +31,7 @@ function loadOne(
 export function tryLoadUserAssetTexture(
   relPath: string,
   onLoad: (tex: THREE.Texture) => void,
-  opts: { srgb?: boolean; onMiss?: () => void } = {}
+  opts: { srgb?: boolean; onMiss?: () => void; allowKtx2?: boolean } = {}
 ): void {
   // Colour/albedo maps are sRGB (the default); data maps (normal, roughness,
   // metalness, AO, displacement) MUST stay linear or PBR lighting goes wrong —
@@ -38,14 +39,27 @@ export function tryLoadUserAssetTexture(
   const srgb = opts.srgb ?? true;
   // 404 = asset not installed. Surface PBR sets (surfaces/<name>/) have CC0
   // default scans SHIPPED IN THE REPO at public/textures/surfaces/ — a user
-  // drop-in wins, the shipped default fills in behind it, and only when both
-  // are absent does the caller's procedural canvas fallback stay up. Other
-  // asset kinds keep the old contract: miss = not installed.
-  // onMiss lets a caller fall through to the next candidate path
+  // drop-in wins, the shipped GPU-compressed .ktx2 fills in behind it, the
+  // shipped .png behind THAT, and only when all three are absent does the
+  // caller's procedural canvas fallback stay up (see src/surface-textures.ts
+  // for the .ktx2 step — same pixels, 4-6x less VRAM, soft-falls to .png on
+  // any failure). Other asset kinds keep the old contract: miss = not
+  // installed. onMiss lets a caller fall through to the next candidate path
   // (e.g. the sign-art slot/sign/theme resolution chain below).
-  const miss = relPath.startsWith('surfaces/')
-    ? () => loadOne(`textures/${relPath}`, onLoad, srgb, () => opts.onMiss?.())
-    : () => opts.onMiss?.();
+  //
+  // { allowKtx2: false } opts a call OUT of the .ktx2 step entirely (straight
+  // to shipped .png on miss): a KTX2Loader texture is a GPU-native
+  // CompressedTexture with no CPU-readable `.image` — any caller that reads
+  // pixels back out (canvas drawImage/getImageData, e.g. store-shell.ts's
+  // neutralizeScanTexture on the carpet color map) cannot work on it. Those
+  // callers keep paying the PNG's extra VRAM for that one map; every other
+  // surface map still gets the compressed path.
+  const miss = relPath.startsWith('surfaces/') && opts.allowKtx2 !== false
+    ? () => tryLoadShippedSurfaceKtx2(relPath, onLoad, srgb,
+        () => loadOne(`textures/${relPath}`, onLoad, srgb, () => opts.onMiss?.()))
+    : relPath.startsWith('surfaces/')
+      ? () => loadOne(`textures/${relPath}`, onLoad, srgb, () => opts.onMiss?.())
+      : () => opts.onMiss?.();
   // An installed brand pack owns the same tree one level down: its copy of an
   // asset wins, and anything it doesn't ship falls through to the flat path,
   // so a pack is a partial overlay rather than an all-or-nothing swap.
