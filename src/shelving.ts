@@ -114,6 +114,11 @@ function getSpineSlatwallMaterial(panelHeightFt: number): THREE.MeshStandardMate
     tex.generateMipmaps = true;
     tex.minFilter = THREE.LinearMipmapLinearFilter;
     tex.magFilter = THREE.LinearFilter;
+    // Same reasoning as getThickWireGridTexture() above: this backing wall is
+    // read from down the length of the aisle, a grazing angle the isotropic
+    // default blurs (the end caps' matching slatwall, sign-builders.ts, gets
+    // the same fix for the same reason).
+    tex.anisotropy = 8;
     cachedSpineSlatwallMat = new THREE.MeshStandardMaterial({
       map: tex,
       roughness: 0.8,
