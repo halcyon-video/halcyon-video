@@ -88,6 +88,7 @@ import {
 } from './settings';
 import type { SettingDef, SettingGroup } from './settings';
 import { counterTerminalLines } from './counter-terminal';
+import { buildControlsHelpPanel, HELP_ROW_PREFIX } from './controls-help';
 import type { CandyRow } from './fixtures/period-fixtures';
 import { getCandyDeliveryAdapter } from './candy-delivery';
 import { isDemoMode } from './demo-mode';
@@ -484,7 +485,7 @@ const ui = {
 let powerMenuIndex = 0;
 // The demo has no Jellyfin session to log out of and no app window to close —
 // those rows leave the keyboard-nav ring too (their DOM is hidden in main()).
-const powerButtons = ['btn-settings', 'btn-flat-mode', 'btn-suspend', 'btn-cec-toggle', 'btn-logout', 'btn-exit', 'btn-cancel']
+const powerButtons = ['btn-settings', 'btn-controls', 'btn-flat-mode', 'btn-suspend', 'btn-cec-toggle', 'btn-logout', 'btn-exit', 'btn-cancel']
   .filter((id) => !(isDemoMode && (id === 'btn-logout' || id === 'btn-exit')));
 
 // The single CEC row toggles the display: we track the last state WE commanded
@@ -892,7 +893,9 @@ const SETTINGS_SUBPAGE_PREFIX = '__subpage__:';
 // it has no row on the index and is reached only through the counter CRT's
 // MANAGER OVERRIDE row (review §4.3). Groups can also nest one level of
 // sub-pages (settingsSubpage, e.g. Video Games → Platforms).
-let settingsPage: SettingGroup | 'Service' | null = null;
+// 'Controls' is the Controls & Help reference page (src/controls-help.ts) —
+// inert rows, no registry entries, same nav machinery.
+let settingsPage: SettingGroup | 'Service' | 'Controls' | null = null;
 let settingsSubpage: string | null = null;
 
 /** One-line blurbs under each category row on the index page. */
@@ -922,9 +925,10 @@ function generateSettingsDrawer() {
   if (titleEl) {
     titleEl.textContent =
       settingsPage === 'Service' ? 'SERVICE MODE — STAFF ONLY'
-        : settingsSubpage ? settingsSubpage.toUpperCase()
-          : settingsPage ? settingsPage.toUpperCase()
-            : 'STORE SETTINGS';
+        : settingsPage === 'Controls' ? 'CONTROLS & HELP'
+          : settingsSubpage ? settingsSubpage.toUpperCase()
+            : settingsPage ? settingsPage.toUpperCase()
+              : 'STORE SETTINGS';
   }
 
   const makeRow = (key: string, label: string, hint: string | undefined, value: string, valueId?: string) => {
@@ -1020,6 +1024,11 @@ function generateSettingsDrawer() {
     for (const group of visibleGroups()) {
       groupEl.appendChild(makeRow(SETTINGS_GROUP_PREFIX + group, group, GROUP_HINTS[group], '›'));
     }
+    // Controls & Help (UX pass 2026-08): the controls reference, top-level so
+    // a new user finds it before they need it.
+    groupEl.appendChild(makeRow(
+      SETTINGS_GROUP_PREFIX + 'Controls', 'Controls & Help',
+      'What every button does — remote, keyboard, gamepad.', '›'));
     groupsEl.appendChild(groupEl);
 
     // Account (T17): not a settings-registry entry -- switching who's logged
@@ -1090,9 +1099,18 @@ function generateSettingsDrawer() {
       });
     } else if (settingsPage === 'Service') {
       // SERVICE MODE — STAFF ONLY: every `hidden:true` registration, exactly
-      // the knobs kept off the couch tree. Only reachable via the counter
-      // CRT's MANAGER OVERRIDE row, never from the index page.
+      // the knobs kept off the couch tree. Reachable via the counter CRT's
+      // MANAGER OVERRIDE row and the index's Advanced row.
       for (const def of serviceSettings()) appendDefRow(def);
+    } else if (settingsPage === 'Controls') {
+      // Controls & Help: inert reference rows (src/controls-help.ts).
+      buildControlsHelpPanel(groupEl, {
+        registerRow: (key) => {
+          settingsRowKeys.push(key);
+          return settingsRowKeys.length - 1;
+        },
+        selectRow: (idx) => setSettingsSelection(idx),
+      });
     } else if (settingsSubpage !== null) {
       for (const def of settingsInSubpage(settingsPage, settingsSubpage)) appendDefRow(def);
     } else {
@@ -1127,17 +1145,31 @@ function generateSettingsDrawer() {
     closeBtn.onclick = () => closeSettingsDrawer();
     closeBtn.onpointerenter = () => setSettingsSelection(closeIndex);
   }
+
+  // Fresh DOM, nothing paged out yet — measure and pack the pages now.
+  computeSettingsPagination();
 }
 
 // ─── Drawer CRT chrome: paging + footer bar (review §4.4) ────────────────────
 //
-// The CRT page never scrolls: rows show in fixed pages of 8 and the gold
-// footer bar carries "PAGE n/m" plus the SELECTED row's hint as one line.
-// Purely presentational — selection still wraps through every row in order
-// (Up/Down), and the visible page simply follows the selection.
+// The CRT page never scrolls: rows pack into pages and the gold footer bar
+// carries "PAGE n/m" plus the SELECTED row's hint as one line. Purely
+// presentational — selection still wraps through every row in order (Up/Down),
+// and the visible page simply follows the selection.
+//
+// Pages are packed by MEASURED height (UX pass 2026-08), not a fixed row
+// count: the old 8-row pages clipped their last row behind the body's
+// overflow:hidden whenever section titles added height — options that were
+// simply invisible, with nothing saying so. Measurement happens once per
+// drawer build (computeSettingsPagination below), and the body carries an
+// explicit "▼ CONT'D — N MORE" line whenever options continue past the fold.
 
-const SETTINGS_PAGE_SIZE = 8;
 let settingsCrtPage = 0;
+// Cached per drawer build: every .settings-group child → its page, the page
+// of each focusable row (by settingsRowKeys index), and the page count.
+let settingsItemPages = new Map<HTMLElement, number>();
+let settingsRowPages: number[] = [];
+let settingsPageCount = 1;
 
 function settingsRowEl(index: number): HTMLElement | null {
   const key = settingsRowKeys[index];
@@ -1145,39 +1177,89 @@ function settingsRowEl(index: number): HTMLElement | null {
   return document.getElementById(key === SETTINGS_CLOSE_KEY ? 'btn-settings-close' : `setting-row-${key}`);
 }
 
-function updateSettingsCrtChrome() {
-  // The close button is pinned below the row area and never pages out. The
-  // Store Brand page runs shorter pages: its live preview canvas (always
-  // visible, not a focus row) takes the top half of the body.
-  const pageSize = settingsPage === 'Store Brand' ? 5 : SETTINGS_PAGE_SIZE;
-  const pageable = settingsRowKeys.length - 1;
-  const pages = Math.max(1, Math.ceil(pageable / pageSize));
-  if (settingsIndex < pageable) settingsCrtPage = Math.floor(settingsIndex / pageSize);
-  settingsCrtPage = Math.min(settingsCrtPage, pages - 1);
-  const rowPage = new Map<HTMLElement, number>();
-  for (let i = 0; i < pageable; i++) {
-    const el = settingsRowEl(i);
-    if (!el) continue;
-    const page = Math.floor(i / pageSize);
-    rowPage.set(el, page);
-    el.classList.toggle('crt-page-hidden', page !== settingsCrtPage);
-  }
+/**
+ * Pack the freshly-generated drawer DOM into pages by measured height. Runs
+ * once per generateSettingsDrawer — the DOM is fresh (nothing crt-page-hidden
+ * yet) so offsetHeight is real, and the overlay's closed state is only
+ * visibility:hidden, which still lays out. Furniture (group titles, spec
+ * paragraphs) attaches to the row BELOW it so headings never orphan onto the
+ * end of a page; the Store Brand preview canvas is pinned on every page and
+ * its height is simply subtracted from each page's budget.
+ */
+function computeSettingsPagination() {
+  settingsItemPages = new Map();
+  settingsRowPages = [];
+  settingsPageCount = 1;
+  settingsCrtPage = 0;
+  const groupsEl = document.getElementById('settings-groups');
+  const bodyEl = document.querySelector<HTMLElement>('#settings-drawer-overlay .crt-body');
+  if (!groupsEl || !bodyEl) return;
 
-  // Non-row furniture (group titles, the custom-wrap spec paragraph) follows
-  // the page of the first focusable row BELOW it, so headings never orphan
-  // onto the wrong page. The brand preview row stays pinned on every page.
+  const GAP = 2; // #settings-groups / .settings-group flex gap
+  // offsetHeight misses margins — and group titles carry a 14px top margin,
+  // which is exactly the kind of unmeasured height that used to clip rows.
+  const outerH = (el: HTMLElement | null): number => {
+    if (!el) return 0;
+    const s = getComputedStyle(el);
+    const m = (v: string) => (Number.isFinite(parseFloat(v)) ? parseFloat(v) : 0);
+    return el.offsetHeight + m(s.marginTop) + m(s.marginBottom);
+  };
+
+  const statusH = outerH(document.getElementById('settings-status'));
+  const closeH = outerH(document.getElementById('btn-settings-close'));
+  const moreH = outerH(document.getElementById('settings-more-line')) || 40;
+  const bodyStyle = getComputedStyle(bodyEl);
+  let avail = bodyEl.clientHeight
+    - parseFloat(bodyStyle.paddingTop) - parseFloat(bodyStyle.paddingBottom)
+    - statusH - closeH - moreH - 12; // small slack for the status line's gap
+
+  const items = Array.from(groupsEl.querySelectorAll<HTMLElement>('.settings-group > *'));
+  let page = 0;
+  let used = 0;
+  let pending: HTMLElement[] = []; // furniture waiting to join its row's page
+  let pendingH = 0;
+  for (const el of items) {
+    if (el.classList.contains('settings-brand-preview')) {
+      avail -= outerH(el) + GAP; // pinned: costs every page its height
+      continue;
+    }
+    const h = outerH(el) + GAP;
+    if (!el.classList.contains('settings-row')) {
+      pending.push(el);
+      pendingH += h;
+      continue;
+    }
+    if (used > 0 && used + pendingH + h > avail) {
+      page++;
+      used = 0;
+    }
+    for (const p of pending) settingsItemPages.set(p, page);
+    settingsItemPages.set(el, page);
+    used += pendingH + h;
+    pending = [];
+    pendingH = 0;
+  }
+  for (const p of pending) settingsItemPages.set(p, page); // trailing furniture
+  settingsPageCount = page + 1;
+
+  // Focusable-row index → page (the close button is pinned, not pageable).
+  for (let i = 0; i < settingsRowKeys.length - 1; i++) {
+    const el = settingsRowEl(i);
+    settingsRowPages.push((el && settingsItemPages.get(el)) ?? 0);
+  }
+}
+
+function updateSettingsCrtChrome() {
+  const pages = settingsPageCount;
+  const pageable = settingsRowKeys.length - 1;
+  if (settingsIndex < pageable) settingsCrtPage = settingsRowPages[settingsIndex] ?? 0;
+  settingsCrtPage = Math.min(settingsCrtPage, pages - 1);
   const groupsEl = document.getElementById('settings-groups');
   if (groupsEl) {
-    const items = Array.from(groupsEl.querySelectorAll<HTMLElement>('.settings-group > *'));
-    let nextPage = pages - 1;
-    for (let i = items.length - 1; i >= 0; i--) {
-      const el = items[i];
-      if (rowPage.has(el)) {
-        nextPage = rowPage.get(el)!;
-        continue;
-      }
-      if (el.classList.contains('settings-brand-preview')) continue;
-      el.classList.toggle('crt-page-hidden', nextPage !== settingsCrtPage);
+    for (const el of Array.from(groupsEl.querySelectorAll<HTMLElement>('.settings-group > *'))) {
+      if (el.classList.contains('settings-brand-preview')) continue; // pinned
+      const p = settingsItemPages.get(el);
+      el.classList.toggle('crt-page-hidden', p !== undefined && p !== settingsCrtPage);
     }
   }
 
@@ -1186,6 +1268,18 @@ function updateSettingsCrtChrome() {
     pageEl.textContent = pages > 1
       ? `PAGE ${settingsCrtPage + 1}/${pages} ${settingsCrtPage > 0 ? '▲' : ''}${settingsCrtPage < pages - 1 ? '▼' : ''}`.trimEnd()
       : '';
+  }
+
+  // The fold line: how many actual options (focusable rows) sit past the
+  // bottom of this page — the affordance the footer chip alone never was.
+  const moreEl = document.getElementById('settings-more-line');
+  if (moreEl) {
+    const below = settingsRowPages.filter((p) => p > settingsCrtPage).length;
+    const above = settingsRowPages.filter((p) => p < settingsCrtPage).length;
+    moreEl.textContent =
+      below > 0 ? `▼ CONT'D — ${below} MORE OPTION${below === 1 ? '' : 'S'} BELOW`
+        : above > 0 ? `▲ ${above} MORE OPTION${above === 1 ? '' : 'S'} ABOVE`
+          : '';
   }
 
   const hintEl = document.getElementById('settings-footer-hint');
@@ -1260,6 +1354,9 @@ function activateSetting(key: string, dir: number) {
     const idx = settingsRowKeys.indexOf(SETTINGS_GROUP_PREFIX + fromPage);
     setSettingsSelection(Math.max(0, idx));
     return;
+  }
+  if (key.startsWith(HELP_ROW_PREFIX)) {
+    return; // Controls & Help rows are a reference card, not knobs
   }
   if (key.startsWith(SETTINGS_GROUP_PREFIX)) {
     if (dir < 0) return; // Left on a category row shouldn't open its page
@@ -1411,7 +1508,7 @@ let elementBeforeSettingsOpened: HTMLElement | null = null;
  * straight onto a specific page instead — the counter CRT's MANAGER OVERRIDE
  * row passes 'Service' (the staff page has no index row to navigate from).
  */
-function openSettingsDrawer(page: SettingGroup | 'Service' | null = null) {
+function openSettingsDrawer(page: SettingGroup | 'Service' | 'Controls' | null = null) {
   if (ui.isPowerMenuOpen) closePowerMenu();
 
   if (getSetting<string>('bb_render_mode') === 'flat') {
@@ -3070,9 +3167,15 @@ async function executePowerMenuAction(btnId: string) {
       return;
 
     case 'btn-service':
-      // MANAGER OVERRIDE (counter CRT only): straight onto the staff-only
-      // SERVICE MODE page — the hidden developer/service knobs.
+      // MANAGER OVERRIDE: straight onto the staff-only SERVICE MODE page —
+      // the hidden developer/service knobs.
       openSettingsDrawer('Service');
+      return;
+
+    case 'btn-controls':
+      // Controls & Help reference (UX pass 2026-08): every input the app
+      // understands, on one page — reachable from all three menus.
+      openSettingsDrawer('Controls');
       return;
 
     case 'btn-flat-mode':

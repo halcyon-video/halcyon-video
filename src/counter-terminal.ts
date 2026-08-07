@@ -13,6 +13,7 @@ import { brandString } from './brand-pack';
 // every label here must stay within 38.
 export const COUNTER_TERMINAL_LABELS: Record<string, string> = {
   'btn-settings': 'STORE SETTINGS',
+  'btn-controls': 'CONTROLS & HELP',
   'btn-flat-mode': 'SWITCH TO 2D MODE',
   'btn-suspend': 'SUSPEND SYSTEM (SLEEP)',
   'btn-cec-toggle': 'DISPLAY ON/OFF (CEC)',

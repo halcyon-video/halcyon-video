@@ -647,6 +647,21 @@ html, body {
   display: none !important;
 }
 
+/* "More below the fold" line (UX pass 2026-08): overflow used to be signalled
+   only by the footer's small PAGE chip; this receipt-style line sits right
+   under the last visible row whenever the list continues. Fixed min-height so
+   the pagination math reserves it whether or not it carries text. */
+.settings-more-line {
+  font-family: var(--font-mono);
+  font-size: 22px;
+  color: var(--crt-dim);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  text-align: center;
+  min-height: 32px;
+  padding: 8px 14px 0;
+}
+
 /* Small CRT panel (exit confirm, pickers, candy checkout): same tokens,
    same bars, framed as a little tube floating over the dimmed store —
    the shared curved-glass pseudo-layers above apply here too. */
