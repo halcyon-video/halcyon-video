@@ -37,7 +37,7 @@ import { makeCurvedScreenGeometry, makeTubeOverlayMaterial } from './crt-tube';
 import { makeCrtGlassMaterial } from './glass-reflection';
 import { tryLoadUserAssetTexture } from './user-assets';
 import type { RentalRecord } from './rental-clock';
-import { formatUnlockLabel } from './rental-clock';
+import { formatUnlockLabel, formatCheckoutStamp } from './rental-clock';
 import { brandString } from './brand-pack';
 import { BB_MONO, ensureBundledFont, bundledFontReady } from './bundled-fonts';
 
@@ -537,12 +537,19 @@ export class BackRoom {
    * slogan is a real mark and does not ship; the tagline is a neutral house
    * line a pack can override.
    *
-   * DUE BACK stays: this prop's diegetic job is telling you when the tape is
-   * owed, and rental-clock is what drives the lockout.
+   * DUE BACK stays, and prints LAST and largest: this prop's diegetic job is
+   * telling you when the tape is owed, and rental-clock is what drives the
+   * lockout. Everything above it is period dressing.
    */
   private buildDueNote(tableTopY: number): void {
     if (!this.record) return;
-    const W = 512, H = 1180;
+    // A longer blank tail than the print needs, and deliberately so: the plane
+    // is CENTRED on the table, so lengthening the paper walks the printed block
+    // back up the slip, away from the couch. That buys the last line room to
+    // stay inside the frame with a weekend's four items on the bill, and lands
+    // it nearer the pile's focal plane into the bargain. Texel size is
+    // 0.36/512 whatever H is, so nothing about the type changes.
+    const W = 512, H = 1450;
     const canvas = document.createElement('canvas');
     canvas.width = W;
     canvas.height = H;
@@ -567,10 +574,17 @@ export class BackRoom {
       ctx.textBaseline = 'alphabetic';
 
       const px = 21;
-      const line = (y: number) => { ctx.font = `${px}px "${mono}", monospace`; return y; };
+      const line = (y: number, size = px) => { ctx.font = `${size}px "${mono}", monospace`; return y; };
       const left = (t: string, y: number, x = L) => { ctx.textAlign = 'left'; ctx.fillText(t, x, line(y)); };
       const right = (t: string, y: number) => { ctx.textAlign = 'right'; ctx.fillText(t, R, line(y)); };
       const mid = (t: string, y: number) => { ctx.textAlign = 'center'; ctx.fillText(t, CX, line(y)); };
+      // Emphasis on a printer with no bold face: strike the row twice, a hair
+      // apart, the way an impact head was made to shout.
+      const heavy = (t: string, y: number, size: number) => {
+        ctx.textAlign = 'center';
+        ctx.fillText(t, CX, line(y, size));
+        ctx.fillText(t, CX + 0.9, y);
+      };
       // A rule is a printed row of characters, not a drawn line — the printer
       // had no graphics, which is why the reference's rules are asterisks.
       const rule = (ch: string, y: number) => {
@@ -586,8 +600,12 @@ export class BackRoom {
       };
 
       const RENT = 3.25;
-      const items = this.record!.items;
-      const sub = items.length * RENT;
+      // The slip lists what is ON THE TABLE, not what the record says:
+      // record.items are catalog ids (unprintable), and resolveRentalMovies
+      // silently drops any that no longer resolve — so the record's length
+      // isn't even guaranteed to match the pile the receipt lies next to.
+      const titles = this.tapes.map((t) => t.movie.title);
+      const sub = titles.length * RENT;
       const tax = Math.round(sub * 0.0475 * 100) / 100;
       const f = (n: number) => n.toFixed(2);
 
@@ -602,7 +620,7 @@ export class BackRoom {
       rule('*', y + 14); y += 44;
 
       money('Balance', '0.00', y); y += 30;
-      for (const title of items) {
+      for (const title of titles) {
         left(title.toUpperCase().slice(0, 30), y); y += 26;
         money('Rental', f(RENT), y, 22); y += 30;
       }
@@ -615,17 +633,25 @@ export class BackRoom {
       money('Tendered VISA', f(sub + tax), y); y += 26;
       money('Change Due', '0.00', y); y += 46;
 
-      // The one line this prop exists for.
-      left('DUE BACK :', y);
-      right(this.devTimer ? 'IN 5 MINUTES' : formatUnlockLabel(this.record!), y); y += 44;
-
       left('Cust #: 0000123456', y); y += 26;
       left(`Name  : ${brandString('receipt-member', 'MEMBER')}`, y); y += 48;
       mid('Thank You for your Visit.', y); y += 26;
       mid('We appreciate your business.', y); y += 34;
       mid(brandString('rental-rules-note', 'PLEASE REWIND'), y); y += 34;
       rule('*', y); y += 30;
-      left(brandString('receipt-stamp', '0117-06-22-NOV-1995 20:57:32.31'), y);
+      // Store/terminal number is the store's (a pack may reissue it); the
+      // date, clock and centiseconds are this transaction's own.
+      left(`${brandString('receipt-register', '0117-06')}-${formatCheckoutStamp(this.record!)}`, y); y += 40;
+
+      // The line this prop exists for, printed LAST, double-struck and far
+      // bigger than the body: it has to read from the couch, across a focal
+      // plane pinned to the tape pile rather than to the paper. Label over
+      // time rather than the label/amount row the money lines use — side by
+      // side, the two halves collide on 3-inch stock past ~34px, and the time
+      // is the half worth the size.
+      rule('*', y); y += 50;
+      heavy('DUE BACK', y, 38); y += 58;
+      heavy(this.devTimer ? 'IN 5 MINUTES' : formatUnlockLabel(this.record!), y, 48);
 
       tex.needsUpdate = true;
     };

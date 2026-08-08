@@ -18,6 +18,7 @@ import {
   isLockedOut,
   msUntilUnlock,
   formatUnlockLabel,
+  formatCheckoutStamp,
   DEV_LOCKOUT_MS,
 } from '../src/rental-clock.ts';
 
@@ -122,4 +123,36 @@ test('formatUnlockLabel: readable diegetic label', () => {
   assert.equal(formatUnlockLabel(rec), 'MON 8:00 AM');
   const rec2 = makeRentalRecord(['a'], d(7, 20), false); // Tue → Wed 12:00
   assert.equal(formatUnlockLabel(rec2), 'WED 12:00 PM');
+});
+
+test('formatCheckoutStamp: register stamp for an evening checkout', () => {
+  const rec = makeRentalRecord(['a'], d(7, 20), false); // Tue 2026-07-07 20:00
+  assert.equal(formatCheckoutStamp(rec), '07-JUL-2026 20:00:00.00');
+});
+
+test('formatCheckoutStamp: single-digit day/hour/minute/second all pad to two', () => {
+  const rec = makeRentalRecord(['a'], new Date(2026, 6, 8, 9, 5, 3, 0), false);
+  assert.equal(formatCheckoutStamp(rec), '08-JUL-2026 09:05:03.00');
+});
+
+test('formatCheckoutStamp: midnight prints 00, not 12 (24h register clock)', () => {
+  const rec = makeRentalRecord(['a'], d(6, 0), false); // Mon 2026-07-06 00:00
+  assert.equal(formatCheckoutStamp(rec), '06-JUL-2026 00:00:00.00');
+});
+
+test('formatCheckoutStamp: centiseconds are the record\'s own ms, floored', () => {
+  const at = (ms: number) => makeRentalRecord(['a'], new Date(2026, 6, 11, 14, 30, 9, ms), false);
+  assert.equal(formatCheckoutStamp(at(310)), '11-JUL-2026 14:30:09.31');
+  assert.equal(formatCheckoutStamp(at(319)), '11-JUL-2026 14:30:09.31'); // 31.9 cs floors
+  assert.equal(formatCheckoutStamp(at(9)), '11-JUL-2026 14:30:09.00');
+  assert.equal(formatCheckoutStamp(at(999)), '11-JUL-2026 14:30:09.99');
+});
+
+test('formatCheckoutStamp: matches the 1995 reference slip\'s shape', () => {
+  const rec = makeRentalRecord(['a'], new Date(1995, 10, 22, 20, 57, 32, 310), false);
+  assert.equal(formatCheckoutStamp(rec), '22-NOV-1995 20:57:32.31');
+});
+
+test('formatCheckoutStamp: an unparseable checkoutAt prints nothing', () => {
+  assert.equal(formatCheckoutStamp({ items: ['a'], checkoutAt: 'garbage', unlockAt: 'garbage' }), '');
 });
