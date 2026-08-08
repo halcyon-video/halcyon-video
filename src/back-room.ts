@@ -35,6 +35,7 @@ import {
 import { getPropOrFallback, screenRectWorld, PropScreenRect, PropInstance } from './props';
 import { makeCurvedScreenGeometry, makeTubeOverlayMaterial } from './crt-tube';
 import { makeCrtGlassMaterial } from './glass-reflection';
+import { tryLoadUserAssetTexture } from './user-assets';
 import type { RentalRecord } from './rental-clock';
 import { formatUnlockLabel } from './rental-clock';
 import { brandString } from './brand-pack';
@@ -172,6 +173,9 @@ export class BackRoom {
     this.buildVcrClock();
     this.redrawClocks(true);
   }
+
+  /** The coffee table's re-material (see placeCoffeeTable); ours to free. */
+  private tableWood: THREE.MeshStandardMaterial | null = null;
 
   private roomMat(color: number, roughness = 0.9): THREE.MeshStandardMaterial {
     const m = new THREE.MeshStandardMaterial({ color, roughness, metalness: 0.02 });
@@ -347,7 +351,57 @@ export class BackRoom {
     this.doorUnlocked = unlocked;
   }
 
+  /**
+   * The GLB is Kenney's "Table Coffee Glass" — a dark frame with a GLASS top,
+   * which in this room's single-lamp light read as pale celadon laminate
+   * rather than glass (owner call, 2026-08-07: dark blonde wood instead).
+   *
+   * Re-materialled here rather than by swapping the model: the mesh is the
+   * right shape and size, and this keeps the CC0 asset as-shipped instead of
+   * forking it. Every surface takes the same board, pane included — a glass
+   * top over wood legs is the thing being replaced, not a look worth half of.
+   *
+   * The grain is a real photo scan from the git-ignored user-assets tree
+   * (surfaces/table-wood — see its NOTES.md), and the COMMITTED fallback is a
+   * plain lit board colour, not a procedural stand-in. Owner call after three
+   * procedural attempts: drawn strokes read as corduroy, radial growth rings
+   * as sand ripples, warped straight grain as burl. The GLB's UVs tile hard
+   * across the top, which sets a scale none of them survived. Flat and
+   * correctly lit beats invented grain.
+   */
   private placeCoffeeTable(table: PropInstance): number {
+    const wood = new THREE.MeshStandardMaterial({
+      color: 0xb08a55, roughness: 0.62, metalness: 0.0,
+    });
+    this.tableWood = wood;
+
+    // Below 1: the model's UVs already tile heavily across the top, so a
+    // repeat of 1 lays ~20 boards across it. This puts roughly one plank run
+    // over the surface, which is what a coffee table actually is.
+    const fit = (tex: THREE.Texture) => {
+      tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+      tex.repeat.set(0.16, 0.16);
+      tex.anisotropy = 8;
+    };
+    tryLoadUserAssetTexture('surfaces/table-wood/color.png', (tex) => {
+      fit(tex); wood.map = tex; wood.color.setHex(0xffffff); wood.needsUpdate = true;
+    });
+    tryLoadUserAssetTexture('surfaces/table-wood/normal.png', (tex) => {
+      fit(tex); wood.normalMap = tex; wood.normalScale.set(0.5, 0.5); wood.needsUpdate = true;
+    }, { srgb: false });
+    tryLoadUserAssetTexture('surfaces/table-wood/roughness.png', (tex) => {
+      fit(tex); wood.roughnessMap = tex; wood.needsUpdate = true;
+    }, { srgb: false });
+
+    table.object.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (!m.isMesh) return;
+      // The GLB's own materials belong to the prop cache; dropping our
+      // reference to them here is all this does.
+      m.material = wood;
+      m.castShadow = true;
+      m.receiveShadow = true;
+    });
     table.object.position.set(0, 0, 0.9);
     this.group.add(table.object);
     return table.size.y;
@@ -1066,6 +1120,15 @@ export class BackRoom {
       if (tex) tex.dispose();
       m.dispose();
     });
+    if (this.tableWood) {
+      // Both maps by hand: the sweep above only frees `.map`, and this material
+      // also carries a roughnessMap.
+      this.tableWood.map?.dispose();
+      this.tableWood.normalMap?.dispose();
+      this.tableWood.roughnessMap?.dispose();
+      this.tableWood.dispose();
+      this.tableWood = null;
+    }
     this.vcrClock?.tex.dispose();
     this.vcrClock = null;
     this.tvGlow = null;
