@@ -650,7 +650,7 @@ export function registerCoreSettings(): void {
     default: false,
     applyMode: 'live',
     apply: (value, scene) => scene.setRentalMode(!!value),
-    hint: 'Halcyon house rules: real due-backs, back room, lockout.',
+    hint: 'Halcyon house rules: real due-backs, living room, lockout.',
   });
 
   // Dev timer: ships available but OFF (ticket). Read at checkout time, so a

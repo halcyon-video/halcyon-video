@@ -4,7 +4,7 @@
 movie you own is a case on a shelf. Browse the aisles under warm fluorescents,
 pull *Back to the Future* off the wall, flip it over and read the back of the
 box, carry it to the counter, and watch the clerk drop it in a bag that
-crinkles around it. Then take it home to the back room and put it in the VCR.
+crinkles around it. Then take it home to the living room and put it in the VCR.
 
 It is not a menu with a skin on it. It's a store.
 
@@ -158,7 +158,7 @@ and Enter flies you to the title's spot on the shelf.
 
 ![The return chute](docs/screenshots/return-chute.jpg)
 
-### The back room
+### The living room
 
 After checkout you're **home** — rented clamshells and the receipt on the
 coffee table, a CRT and VCR with a blinking clock. Inspect your tapes from the
@@ -428,7 +428,7 @@ This app's steady state is *days on a shelf*, and it's engineered like it:
 
 | You have | You get |
 |---|---|
-| **Jellyfin** (required — or demo mode) | The store, browsing, walk mode, playback, rentals, back room, clerk, themes, brand editor |
+| **Jellyfin** (required — or demo mode) | The store, browsing, walk mode, playback, rentals, living room, clerk, themes, brand editor |
 | **Jellyseerr** (optional) | Recommendation clasps, REQUEST / COMING SOON cases, collection gaps, discovery shelving, staff picks, FOR YOU endcaps, "order it for me" |
 | **RomM** (optional) | The video-game department, native or in-browser game launching |
 | **Tauri build** (optional) | mpv playback command, HDMI-CEC control, system suspend, native game launch, CORS-free proxying |
