@@ -611,6 +611,29 @@ export function rentalBottomLift(
   return (base.h + VHS_RIM_VERTICAL_FT - retailH) / 2;
 }
 
+/**
+ * Real DEPTH of the rental shell, for the same reason rentalBottomLift()
+ * exists: the slot has one depth (the retail box's) and offsets both boxes by
+ * half of it, so the shell — which is always THICKER than what it holds —
+ * straddles the parting plane and its front face pushes into the back of the
+ * box standing in front. About 0.07 in on every game and every VHS movie:
+ * small, but two cases interpenetrating reads as a rendering fault at any
+ * range you can actually see it.
+ *
+ * Mirrors getRentalGeometry's depth choice exactly — a DVD-shaped rental box
+ * IS the retail geometry (keeps its own depth), anything else is the thicker
+ * moulded clamshell.
+ */
+export function rentalBoxDepth(
+  retailDims?: { w: number; h: number; d: number },
+  rentalDims?: { w: number; h: number; d: number }
+): number {
+  const base = rentalDims ?? (retailDims ? undefined : { w: CASE_WIDTH, h: CASE_HEIGHT, d: CASE_DEPTH });
+  if (!base) return retailDims?.d ?? CASE_DEPTH;
+  const isDvdShaped = base.w === CASE_DIMS.dvd.w && base.h === CASE_DIMS.dvd.h;
+  return isDvdShaped ? base.d : VHS_RENTAL_DEPTH_FT;
+}
+
 // Instanced-mesh batching key: one batch per distinct BOX SIZE, not per platform
 // — platforms sharing a carton (Game Boy / Game Boy Color, SNES / N64, the DVD
 // keep-case consoles) share a batch. Only the RETAIL box varies: the rental

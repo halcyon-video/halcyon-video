@@ -8,7 +8,7 @@
 import * as THREE from 'three';
 import { Movie } from './jellyfin';
 import { buildGoldClamshellFillers, getGoldCaseMaterials, repaintGoldCase } from './fixtures/gold-clamshell';
-import { posterQueue, CASE_MEDIUM, CASE_HEIGHT, CASE_DEPTH, textureArrayManager, createClonedCaseGeometry, getGlobalFrontMaterials, getGlobalBackMaterials, updateGlobalMaterialsEnvMap, leftmostColorCache, posterPixelCache, reflectionProbes, isGlobalMaterial, lowResCache, createProgramWarmupMaterials, gameShapeKey, gameDimsForShape, gameCaseDims, gameRentalDims, rentalBottomLift, beginRebuildDrain, SERIES_DEPTH_MULT } from './video-case';
+import { posterQueue, CASE_MEDIUM, CASE_HEIGHT, CASE_DEPTH, textureArrayManager, createClonedCaseGeometry, getGlobalFrontMaterials, getGlobalBackMaterials, updateGlobalMaterialsEnvMap, leftmostColorCache, posterPixelCache, reflectionProbes, isGlobalMaterial, lowResCache, createProgramWarmupMaterials, gameShapeKey, gameDimsForShape, gameCaseDims, gameRentalDims, rentalBottomLift, rentalBoxDepth, beginRebuildDrain, SERIES_DEPTH_MULT } from './video-case';
 import { AISLE_SHELF_HEIGHTS, WALL_SHELF_HEIGHTS, LEAN_ANGLE, STAGGER_OFFSET, UNIT_SIDE_CAPACITY, BACK_WALL_UNIT_IDX, sideEntrySlot, COPY_X_JITTER_RANGE, EXTRA_COPY_DEPTH_STEP, extraCopiesCount, isUnstockedTitle, seededRandom01, MovieSlot } from './store-layout';
 import { retailAudio } from './audio';
 import {
@@ -83,6 +83,18 @@ function aisleCaseDims(movie: Movie): { height: number; depth: number; liftDepth
 function slotRentalLift(movie: Movie): number {
   if (!movie.game) return rentalBottomLift();
   return rentalBottomLift(gameCaseDims(movie.platform, movie.discCount), gameRentalDims(movie.platform));
+}
+
+/**
+ * Half-depth to seat the rental shell BEHIND the parting plane rather than
+ * across it. The slot's own `depth` is the retail box's, and offsetting both
+ * boxes by half of it buries the thicker shell's front face inside the box in
+ * front (see rentalBoxDepth). Front stays at +retail/2; the shell goes to
+ * -shell/2, so the two faces meet instead of overlapping.
+ */
+function slotRentalHalfDepth(movie: Movie): number {
+  if (!movie.game) return rentalBoxDepth() / 2;
+  return rentalBoxDepth(gameCaseDims(movie.platform, movie.discCount), gameRentalDims(movie.platform)) / 2;
 }
 
 export function clearMovieBoxes(scene: StoreScene) {
@@ -696,7 +708,7 @@ export function buildAllMovieBoxes(scene: StoreScene) {
         frontRotY: 0,
         backJitter,
         backX: -STAGGER_OFFSET + backJitter,
-        backZ: -boxDepth / 2,
+        backZ: -slotRentalHalfDepth(movie),
         backYLift: slotRentalLift(movie),
         backRotY: 0,
         currentScale: 1.0,
@@ -770,7 +782,7 @@ export function buildAllMovieBoxes(scene: StoreScene) {
       frontRotY: 0,
       backJitter,
       backX: -STAGGER_OFFSET + backJitter,
-      backZ: -boxDepth / 2,
+      backZ: -slotRentalHalfDepth(movie),
       backYLift: slotRentalLift(movie),
       backRotY: 0,
       currentScale: 1.0,
@@ -841,7 +853,7 @@ export function buildAllMovieBoxes(scene: StoreScene) {
         frontRotY: 0,
         backJitter,
         backX: backJitter,
-        backZ: -fixtureSlot.depth / 2,
+        backZ: -slotRentalHalfDepth(movie),
         backYLift: slotRentalLift(movie),
         backRotY: 0,
         currentScale: 1.0,
