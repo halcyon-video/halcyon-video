@@ -57,7 +57,15 @@ import {
   isMembershipPickerOpen,
   type MembershipLoginSession,
 } from './membership-cards';
-import { getActiveTheme, applyThemeCssVars } from './themes';
+import { getActiveTheme, applyThemeCssVars, THEMES, resolveThemeId } from './themes';
+import {
+  activeMediaCutoff,
+  filterLibrariesByCutoff,
+  filterMoviesByCutoff,
+  loadMediaReleasePin,
+  eraThemeIdForDate,
+  toDateOnly,
+} from './media-release-date';
 import { retailAudio } from './audio';
 import { BB_ARCHIVO_BLACK, bundledFontsReady } from './bundled-fonts';
 import { brandString, loadBrandPack } from './brand-pack';
@@ -80,6 +88,7 @@ import {
   getSettingDef,
   nextCycleValue,
   currentValueLabel,
+  resolveHint,
   buildStoreBrandPanel,
   activateBrandRow,
   BRAND_ROW_PREFIX,
@@ -87,7 +96,13 @@ import {
   refreshSettingThumb,
 } from './settings';
 import type { SettingDef, SettingGroup } from './settings';
-import { counterTerminalLines } from './counter-terminal';
+import {
+  MEDIA_DATE_BUTTON_ID,
+  counterTerminalClose,
+  counterTerminalInput,
+  counterTerminalOpen,
+  initCounterTerminalFlow,
+} from './counter-terminal-flow';
 import { buildControlsHelpPanel, HELP_ROW_PREFIX } from './controls-help';
 import type { CandyRow } from './fixtures/period-fixtures';
 import { getCandyDeliveryAdapter } from './candy-delivery';
@@ -96,6 +111,13 @@ import { startScreensaverAnimation, stopScreensaverAnimation } from './screensav
 import { buildDemoLibraries, buildDemoDiscovery, buildDemoGames, makeSyntheticEpisodes, demoPoster } from './demo-library';
 import { EMPTY_STAFF_PICKS, loadStaffPicks, StaffPicks } from './staff-picks-loader';
 import { titleMatchKeys } from './staff-picks';
+import {
+  episodeLabel,
+  markWatchedAndFindNext,
+  resolveActiveItemTiming,
+  resolveMpvPrefArgs,
+  playLocalWithMpv,
+} from './playback-flow';
 
 // ─── Application State ────────────────────────────────────────────────────────
 
@@ -122,10 +144,34 @@ let gameMovies: Movie[] = [];
 // a rebuild rather than a full re-sync.
 let storeLibraries: JellyfinLibrary[] = [];
 let storeGameMovies: Movie[] = [];
+// Store-facing views of the Jellyseerr lists, gated like the libraries above.
+let storeComingSoon: Movie[] = [];
+let storeDiscovery: Movie[] = [];
 function refreshStoreCatalog() {
   const catalog = storeCatalog(librariesList, gameMovies);
-  storeLibraries = catalog.libraries;
-  storeGameMovies = catalog.games;
+  // Media Release Date pin (#42): everything premiering after the rolling
+  // cutoff is absent from the store entirely. Filtered COPIES of the fetched
+  // lists — clearing the pin is a rebuild, never a re-sync.
+  const cutoff = activeMediaCutoff();
+  storeLibraries = cutoff ? filterLibrariesByCutoff(catalog.libraries, cutoff) : catalog.libraries;
+  storeGameMovies = cutoff ? filterMoviesByCutoff(catalog.games, cutoff) : catalog.games;
+  storeComingSoon = cutoff ? filterMoviesByCutoff(comingSoonMovies, cutoff) : comingSoonMovies;
+  storeDiscovery = cutoff ? filterMoviesByCutoff(discoveryMovies, cutoff) : discoveryMovies;
+  if (!cutoff) return;
+  // MATCH STORE ERA: the decor tracks the pin's effective date (and crosses
+  // era boundaries as the rolling date does). Persist-only — we're already
+  // inside the build funnel, so the scene about to build reads the new era.
+  // This is the one override that SHOULD win without asking (that's what the
+  // follow is for), so when it actually changes the era, say so — the store
+  // looking different today needs a line explaining why.
+  if (loadMediaReleasePin()?.matchEra) {
+    const era = eraThemeIdForDate(cutoff, Object.keys(THEMES));
+    if (era && resolveThemeId(getSetting<string>('bb_theme')) !== era) {
+      setSetting('bb_theme', era);
+      logToConsole(`[System] Media Release Date: the store has crossed into its ${THEMES[era].name} era.`, 'system');
+    }
+  }
+  logToConsole(`[System] Media Release Date: store pinned to ${toDateOnly(cutoff)} — later releases are absent.`, 'system');
 }
 // Watch-history staff picks (stickers + genre endcaps) -- see staff-picks.ts.
 // Computed right before the 3D scene is built; stays empty without watch
@@ -469,7 +515,7 @@ const ui = {
   isCandyCheckoutOpen: false,
   isFeedbackOpen: false,
   // The clerk's terminal at the checkout counter, showing the same options as
-  // the power menu but drawn on the desk CRT (see openCounterTerminal). Not an
+  // the power menu but drawn on the desk CRT (counter-terminal-flow.ts). Not an
   // overlay — it's in-scene — but it owns the arrow keys while docked, so it
   // joins isAnyOverlayOpen to keep shelf navigation from running underneath.
   isCounterTerminalOpen: false,
@@ -494,13 +540,14 @@ const powerButtons = ['btn-settings', 'btn-controls', 'btn-flat-mode', 'btn-susp
 // commands are idempotent no-ops when the display is already in that state.
 let cecDisplayAssumedOn = true;
 
-// The counter CRT carries one extra row the glass power menu doesn't:
+// The counter CRT carries extra rows the glass power menu doesn't:
 // MANAGER OVERRIDE, the diegetic (and only couch-reachable) entry into the
-// SERVICE MODE settings page (review §4.3). Inserted just above RETURN TO
-// STORE so the safe exit stays last.
+// SERVICE MODE settings page (review §4.3), and MEDIA RELEASE DATE (#42),
+// the catalog-pin sub-screen. Inserted just above RETURN TO STORE so the
+// safe exit stays last.
 const counterTerminalButtons = (() => {
   const ids = [...powerButtons];
-  ids.splice(ids.indexOf('btn-cancel'), 0, 'btn-service');
+  ids.splice(ids.indexOf('btn-cancel'), 0, MEDIA_DATE_BUTTON_ID, 'btn-service');
   return ids;
 })();
 
@@ -827,50 +874,19 @@ function closePowerMenu() {
 // StoreScene.enterSearchMode) with the options rendered in amber phosphor.
 //
 // Rows are the SAME `powerButtons` ids the overlay uses (plus the CRT-only
-// MANAGER OVERRIDE row — see counterTerminalButtons) and dispatch through
-// the same executePowerMenuAction(), so the two views can never drift out of
-// sync — including the demo-mode filter that drops logout/exit. Only the labels
-// differ: the CRT is 40 columns wide, so they're shortened here.
-// Row text lives in src/counter-terminal.ts so the 3D harness (which boots
-// StoreScene without this DOM shell) renders the identical menu.
-let counterTerminalIndex = 0;
-
-function renderCounterTerminal() {
-  const { lines, cursorLine } = counterTerminalLines(counterTerminalButtons, counterTerminalIndex);
-  storeScene?.setTerminalText(lines, cursorLine);
-}
-
-function openCounterTerminal() {
-  if (!storeScene || ui.isAnyOverlayOpen) return;
-  ui.isCounterTerminalOpen = true;
-  counterTerminalIndex = 0;
-  storeScene.enterSearchMode(); // camera dock only — the text is ours
-  renderCounterTerminal();
-  logToConsole('[Terminal] Manager terminal open at the counter.', 'system');
-}
-
-function closeCounterTerminal() {
-  if (!ui.isCounterTerminalOpen) return;
-  ui.isCounterTerminalOpen = false;
-  // Hands the camera back and resets the CRT to its idle rental screen.
-  storeScene?.exitSearchMode();
-  logToConsole('[Terminal] Manager terminal closed.', 'system');
-}
-
-function stepCounterTerminal(delta: number) {
-  const n = counterTerminalButtons.length;
-  counterTerminalIndex = (counterTerminalIndex + delta + n) % n;
-  retailAudio.playKeyClick();
-  renderCounterTerminal();
-}
-
-async function activateCounterTerminal() {
-  const btnId = counterTerminalButtons[counterTerminalIndex];
-  // Close first: several actions (settings drawer, logout) take over the
-  // screen, and the docked camera must be handed back before they do.
-  closeCounterTerminal();
-  await executePowerMenuAction(btnId);
-}
+// MANAGER OVERRIDE and MEDIA RELEASE DATE rows — see counterTerminalButtons)
+// and dispatch through the same executePowerMenuAction(), so the two views can
+// never drift out of sync. The controller itself (menu state + the #42 date
+// sub-screen) lives in counter-terminal-flow.ts; this is its one wiring point.
+initCounterTerminalFlow({
+  scene: () => storeScene,
+  ui,
+  buttons: counterTerminalButtons,
+  execute: (btnId) => executePowerMenuAction(btnId),
+  keyClick: () => retailAudio.playKeyClick(),
+  log: (msg) => logToConsole(msg, 'system'),
+  rebuild: () => rebuildStoreScene(),
+});
 
 // ─── Settings Drawer ───────────────────────────────────────────────────────
 //
@@ -972,7 +988,8 @@ function generateSettingsDrawer() {
     row.className = 'settings-row settings-text-row';
     row.id = `setting-row-${def.key}`;
     row.tabIndex = -1; // focusable by setSettingsSelection, not in tab order
-    if (def.hint) row.dataset.hint = def.hint; // footer-bar hint, see makeRow
+    const textHint = resolveHint(def);
+    if (textHint) row.dataset.hint = textHint; // footer-bar hint, see makeRow
     const main = document.createElement('span');
     main.className = 'settings-row-main';
     main.innerHTML = `
@@ -1074,7 +1091,7 @@ function generateSettingsDrawer() {
       if (def.kind === 'text' || def.kind === 'secret') {
         groupEl.appendChild(makeTextRow(def));
       } else {
-        groupEl.appendChild(makeRow(def.key, def.label, def.hint, '', `setting-value-${def.key}`));
+        groupEl.appendChild(makeRow(def.key, def.label, resolveHint(def), '', `setting-value-${def.key}`));
       }
     };
     if (settingsPage === 'Store Brand') {
@@ -1448,6 +1465,18 @@ function activateSetting(key: string, dir: number) {
     generateSettingsDrawer();
     refreshSettingsValues();
     setSettingsSelection(Math.max(0, settingsRowKeys.indexOf(key)));
+  }
+
+  // Post-commit hook (e.g. changing Store Theme detaches era-follow so the
+  // pick can stick). Runs BEFORE the value/hint refresh below so both render
+  // the post-hook truth — the theme row must lose its "(AUTO)" the moment the
+  // follow detaches, not on the next drawer open.
+  const note = def.onChange?.(getSetting(key));
+  if (typeof note === 'string') logToConsole(`[System] ${note}`, 'system');
+  if (typeof def.hint === 'function') {
+    const row = document.getElementById(`setting-row-${key}`);
+    if (row) row.dataset.hint = def.hint();
+    updateSettingsCrtChrome(); // the footer bar shows the selected row's hint
   }
 
   const el = document.getElementById(`setting-value-${key}`);
@@ -2425,7 +2454,7 @@ async function initializeStoreScene(preservePosterCache = false) {
         if (lib.movies[i].discovery) lib.movies.splice(i, 1);
       }
     }
-    bootFlatStore(storeLibraries, canvasContainer, storeGameMovies, discoveryMovies);
+    bootFlatStore(storeLibraries, canvasContainer, storeGameMovies, storeDiscovery);
     hideBootOverlay();
     return;
   }
@@ -2497,7 +2526,7 @@ async function initializeStoreScene(preservePosterCache = false) {
     await calibrateQualityIfNeeded();
 
     const { StoreScene } = await import('./three-scene');
-    const scene = new StoreScene(canvasContainer, storeLibraries, logToConsole, jfUrl, jfToken, comingSoonMovies, discoveryMovies, storeGameMovies, staffPicks);
+    const scene = new StoreScene(canvasContainer, storeLibraries, logToConsole, jfUrl, jfToken, storeComingSoon, storeDiscovery, storeGameMovies, staffPicks);
     armQualityBackstop();
 
     let lastLoggedPct = -1;
@@ -2614,7 +2643,7 @@ async function initializeStoreScene(preservePosterCache = false) {
     };
 
     // Left at the checkout counter reaches for the clerk's terminal.
-    scene.onCounterTerminal = () => openCounterTerminal();
+    scene.onCounterTerminal = () => counterTerminalOpen();
     scene.onEnterFlatMode = () => executePowerMenuAction('btn-flat-mode');
 
     // Library-select (end-cap) left/right nav arrows on the floating locator.
@@ -3400,20 +3429,9 @@ async function wakeRefresh() {
 // season-then-episode order (see fetchSeriesEpisodes), so an episode running to
 // its end rolls into the next one — across season boundaries too. Rebuilt on
 // every launch; a movie clears it.
+// nextEpisodeInQueue/episodeLabel/markWatchedAndFindNext live in
+// playback-flow.ts — shared with the mpv exit handler below.
 let seriesQueue: { seriesId: string; episodes: Episode[] } | null = null;
-
-/** The episode after `currentItemId` in the active series queue, if any. */
-function nextEpisodeInQueue(movie: Movie, currentItemId: string): Episode | null {
-  if (!movie.isSeries || seriesQueue?.seriesId !== movie.id) return null;
-  const i = seriesQueue.episodes.findIndex((e) => e.id === currentItemId);
-  return i >= 0 ? (seriesQueue.episodes[i + 1] ?? null) : null;
-}
-
-/** "S02E05 · Title" for console/log lines. */
-function episodeLabel(ep: Episode): string {
-  const num = `S${String(ep.seasonNumber).padStart(2, '0')}E${String(ep.episodeNumber).padStart(2, '0')}`;
-  return ep.name ? `${num} · ${ep.name}` : num;
-}
 
 export async function launchVideoPlayback(movie: Movie, overrideItemId?: string, overridePath?: string, startHidden = false, diegetic = false, version?: MovieVersion) {
   revealPendingHidden = false; // fresh launch — clear any stale reveal handshake
@@ -3495,6 +3513,10 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
     seriesQueue = null;
   }
 
+  // Resume position (0 = start over) and, for the mpv path's natural-end vs.
+  // quit check below, the item's known runtime — see resolveActiveItemTiming.
+  const { resumeTicks, durationTicks } = resolveActiveItemTiming(movie, overrideItemId, seriesQueue);
+
   // Local playback first. When the file is on this machine, mpv plays it
   // directly — the only path that gives real HDR and the original soundtrack,
   // and the only one that doesn't have Jellyfin spooling the film to disk as
@@ -3513,16 +3535,30 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
   if (localPath && !diegetic && clientIsServerMachine && !isRemotelyDriven()
       && getSetting<boolean>('bb_local_mpv') !== false) {
     const spawnMpv = async (): Promise<boolean> => {
-      const started = await playLocalWithMpv(localPath, playbackId, 0, () => {
-        ui.isPlaybackActive = false;
-        storeScene?.resumeRendering();
-        storeScene?.resumeAmbientTvs();
-        storeScene?.returnToEntrance();
-        updateMovieHUD(storeScene?.getSelectedMovie() || null);
-        logToConsole(`[Video] Stopped "${movie.title}". Returned through the entrance.`, 'video');
-      });
+      const started = await playLocalWithMpv(
+        localPath, playbackId, resumeTicks, durationTicks, await resolveMpvPrefArgs(),
+        (_positionTicks, endedNaturally) => {
+          ui.isPlaybackActive = false;
+          // Series binge-watching, same as the HTML5 path below: a natural
+          // end rolls straight into the next queued episode; mpv is spawned
+          // again via the ordinary recursive launch, same as a fresh play.
+          const nextEp = markWatchedAndFindNext(movie, endedNaturally, seriesQueue, playbackId, () => storeScene?.restockSlottedFixtures());
+          if (nextEp) {
+            logToConsole(`[Video] "${movie.title}" — up next: ${episodeLabel(nextEp)}.`, 'video');
+            void launchVideoPlayback(movie, nextEp.id, nextEp.path || undefined, false, false);
+            return;
+          }
+          storeScene?.resumeRendering();
+          storeScene?.resumeAmbientTvs();
+          storeScene?.returnToEntrance();
+          updateMovieHUD(storeScene?.getSelectedMovie() || null);
+          logToConsole(`[Video] Stopped "${movie.title}". Returned through the entrance.`, 'video');
+        },
+        (msg) => logToConsole(msg, 'video'),
+      );
       if (started) {
         // The store is behind a fullscreen window now — stop drawing it.
+        ui.isPlaybackActive = true;
         storeScene?.pauseAmbientTvs();
         storeScene?.pauseRendering();
       }
@@ -3604,10 +3640,11 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
   const initialSubtitleIndex = wantSubtitles
     ? (subtitleStreams.find(matchesPrefLang) ?? subtitleStreams.find((s) => s.isDefault) ?? subtitleStreams[0])?.index
     : undefined;
-  if (initialAudioIndex !== undefined || initialSubtitleIndex !== undefined) {
+  if (initialAudioIndex !== undefined || initialSubtitleIndex !== undefined || resumeTicks > 0) {
     logToConsole(
       `[Video] Playback prefs: audio=${initialAudioIndex !== undefined ? trackLabel(preferredAudio!) : 'default'}, ` +
-        `subtitles=${initialSubtitleIndex !== undefined ? 'on' : 'off'}.`,
+        `subtitles=${initialSubtitleIndex !== undefined ? 'on' : 'off'}, ` +
+        `resume=${resumeTicks > 0 ? `${Math.round(resumeTicks / 10_000_000)}s` : 'no'}.`,
       'video',
     );
   }
@@ -3621,6 +3658,7 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
     mediaSourceId,
     audioStreamIndex: initialAudioIndex,
     subtitleStreamIndex: initialSubtitleIndex,
+    startPositionTicks: resumeTicks || undefined,
   });
   const hevcCopy = isHevcPassThroughEnabled() && (sourceVideoCodec === 'hevc' || sourceVideoCodec === 'h265');
   const mediaInfoSummary =
@@ -3655,6 +3693,7 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
     defaultAudioIndex: initialAudioIndex,
     defaultSubtitleIndex: initialSubtitleIndex,
     subtitlesDefaultOn: wantSubtitles,
+    startPositionTicks: resumeTicks || undefined,
     hideVideoSurface: diegetic,
     // Non-diegetic playback exits through returnToEntrance() (onClose below)
     // — gate user-initiated exits behind an "are you sure?" so a Back meant
@@ -3677,30 +3716,14 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
         setTimeout(() => location.reload(), 250);
         return;
       }
-      // Optimistic local watch-state update (feedback/055): reportPlaybackStopped
-      // below is fire-and-forget and nothing re-fetches the library afterwards,
-      // so without this the Movie object StoreScene already holds a reference
-      // to never learns it was watched this session — the PREVIOUSLY VIEWED
-      // drape table (pv-drape-table.ts) would stay frozen at whatever watch
-      // history existed at boot. Only a natural end counts as "watched":
-      // backing out early shouldn't bump play count or reorder the table.
-      // restockSlottedFixtures() patches the already-built table in place
-      // (see its header in store-stock.ts) — cheap enough to call here, before
-      // the store is shown again below, so any texture swap is invisible.
-      if (endedNaturally) {
-        movie.played = true;
-        movie.playCount = (movie.playCount ?? 0) + 1;
-        movie.lastPlayedDate = new Date().toISOString();
-        storeScene?.restockSlottedFixtures();
-      }
-      // A series behaves like a series: an episode that plays to the end rolls
-      // straight into the next one (including into the next season — the queue
-      // is season-then-episode ordered). Backing out early means "I'm done",
-      // so only a natural end advances. The player reuses one <video> element,
-      // so a diegetic (back-room CRT) advance keeps its existing VideoTexture
-      // mapping — no re-attach needed. startHidden stays false: the tape
-      // animation is the gesture for STARTING a title, not for continuing one.
-      const nextEp = endedNaturally ? nextEpisodeInQueue(movie, playbackId) : null;
+      // Optimistic local watch-state update + up-next lookup (see
+      // markWatchedAndFindNext in playback-flow.ts, shared with the mpv exit
+      // handler above) — only a natural end counts as "watched"/advances.
+      // The player reuses one <video> element, so a diegetic (back-room CRT)
+      // advance keeps its existing VideoTexture mapping — no re-attach
+      // needed. startHidden stays false: the tape animation is the gesture
+      // for STARTING a title, not for continuing one.
+      const nextEp = markWatchedAndFindNext(movie, endedNaturally, seriesQueue, playbackId, () => storeScene?.restockSlottedFixtures());
       if (nextEp) {
         reportPlaybackStopped(jellyfinUrl, token, playbackId, positionTicks);
         logToConsole(`[Video] "${movie.title}" — up next: ${episodeLabel(nextEp)}.`, 'video');
@@ -3848,79 +3871,6 @@ function revealVideoPlayback() {
 }
 
 /** Launch the original file in the system media player (mpv/VLC) as a fallback. */
-/**
- * Play a title by handing mpv the file on disk, bypassing Jellyfin's streaming
- * path entirely. Only correct when the media, the server and this app are on
- * one machine — but that's this deployment, and it buys three things the
- * webview cannot do at all: genuine HDR output (Chromium has no HDR video
- * path, so it flattens an HDR10 master to SDR no matter how cleanly the file
- * reaches it), the original lossless multichannel audio instead of a stereo
- * AAC downmix, and seeking that doesn't wait on a server.
- *
- * It also stops Jellyfin writing the film to disk as HLS segments while you
- * watch — ~70 GB for a 4K remux — which it only ever did because the webview
- * can't demux Matroska.
- *
- * Returns false when the local endpoint isn't reachable (production bundle,
- * no dev/preview server) so the caller can fall back to in-app streaming.
- */
-async function playLocalWithMpv(
-  filePath: string,
-  itemId: string,
-  startPositionTicks: number,
-  onExit: (positionTicks: number) => void,
-): Promise<boolean> {
-  const jellyfinUrl = localStorage.getItem('jellyfin_url');
-  const token = localStorage.getItem('jellyfin_token');
-  const startSeconds = Math.max(0, Math.floor(startPositionTicks / 10_000_000));
-
-  let id: string;
-  try {
-    const res = await fetch('/__play', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ path: filePath, startSeconds }),
-    });
-    if (!res.ok) {
-      logToConsole(`[Video] Local player refused the file (${res.status}); streaming instead.`, 'video');
-      return false;
-    }
-    id = (await res.json()).id;
-  } catch {
-    // No endpoint (production bundle) — caller falls back to the in-app player.
-    return false;
-  }
-
-  logToConsole(`[Video] Playing off disk in mpv (from ${startSeconds}s).`, 'video');
-  ui.isPlaybackActive = true;
-  if (jellyfinUrl && token) reportPlaybackStart(jellyfinUrl, token, itemId);
-
-  // Poll for position so Continue Watching still tracks, and so closing mpv
-  // returns to the store the same way the in-app player's Back does.
-  let lastTicks = startPositionTicks;
-  const poll = window.setInterval(async () => {
-    try {
-      const res = await fetch(`/__play?id=${encodeURIComponent(id)}`);
-      if (!res.ok) throw new Error(String(res.status));
-      const s = await res.json();
-      lastTicks = Math.round((s.position ?? 0) * 10_000_000);
-      if (!s.exited) {
-        if (jellyfinUrl && token) reportPlaybackProgress(jellyfinUrl, token, itemId, lastTicks, false);
-        return;
-      }
-      window.clearInterval(poll);
-      if (s.error) logToConsole(`[Video] mpv error: ${s.error}`, 'video');
-      if (jellyfinUrl && token) reportPlaybackStopped(jellyfinUrl, token, itemId, lastTicks);
-      onExit(lastTicks);
-    } catch {
-      // Endpoint vanished (server restarted) — stop polling rather than spin.
-      window.clearInterval(poll);
-      onExit(lastTicks);
-    }
-  }, 5000);
-  return true;
-}
-
 async function playExternally(path: string) {
   if (!isTauri) {
     logToConsole('[Video] External player not available outside Tauri.', 'video');
@@ -4025,7 +3975,7 @@ async function main() {
       if (ui.isLoginOpen) return;
       if (ui.isSearchOpen) return;
       if (ui.isPowerMenuOpen) return;
-      if (ui.isCounterTerminalOpen) return; // already docked; Left is what opened it
+      if (ui.isCounterTerminalOpen) { counterTerminalInput('left'); return; }
       if (ui.isSettingsDrawerOpen) {
         if (settingsRowKeys[settingsIndex] !== SETTINGS_CLOSE_KEY) activateSelectedSetting(-1);
         return;
@@ -4049,8 +3999,9 @@ async function main() {
       if (ui.isSearchOpen) return;
       if (ui.isPowerMenuOpen) return;
       // Right steps back out of the terminal to the counter — the mirror of
-      // the Left press that reached for it.
-      if (ui.isCounterTerminalOpen) { closeCounterTerminal(); return; }
+      // the Left press that reached for it (or moves field focus while the
+      // date sub-screen is up; the flow decides).
+      if (ui.isCounterTerminalOpen) { counterTerminalInput('right'); return; }
       if (ui.isSettingsDrawerOpen) {
         if (settingsRowKeys[settingsIndex] !== SETTINGS_CLOSE_KEY) activateSelectedSetting(1);
         return;
@@ -4082,7 +4033,7 @@ async function main() {
         setPowerMenuSelection(nextIdx);
         logToConsole(`[Input] Power menu selection: ${powerButtons[nextIdx]}`, 'system');
       } else if (ui.isCounterTerminalOpen) {
-        stepCounterTerminal(-1);
+        counterTerminalInput('up');
       } else if (ui.isVersionPickerOpen) {
         moveVersionPickerSelection(-1);
       } else if (ui.isCandyCheckoutOpen) {
@@ -4108,7 +4059,7 @@ async function main() {
         setPowerMenuSelection(nextIdx);
         logToConsole(`[Input] Power menu selection: ${powerButtons[nextIdx]}`, 'system');
       } else if (ui.isCounterTerminalOpen) {
-        stepCounterTerminal(1);
+        counterTerminalInput('down');
       } else if (ui.isVersionPickerOpen) {
         moveVersionPickerSelection(1);
       } else if (ui.isCandyCheckoutOpen) {
@@ -4140,7 +4091,7 @@ async function main() {
       // than falling through to selectAction(), which in checkout mode would
       // confirm the rental.
       if (ui.isCounterTerminalOpen) {
-        await activateCounterTerminal();
+        await counterTerminalInput('ok');
         return;
       }
 
@@ -4229,7 +4180,7 @@ async function main() {
       }
 
       if (ui.isCounterTerminalOpen) {
-        closeCounterTerminal();
+        counterTerminalInput('back'); // steps the date sub-screen out first
         return;
       }
 
@@ -4269,7 +4220,7 @@ async function main() {
       if (ui.isSearchOpen) { closeSearch(); return; }
       // P while the diegetic version is already up closes it rather than
       // stacking the glass overlay on top of the same options.
-      if (ui.isCounterTerminalOpen) { closeCounterTerminal(); return; }
+      if (ui.isCounterTerminalOpen) { counterTerminalClose(); return; }
 
       if (ui.isExitConfirmOpen) {
         closeExitConfirm();

@@ -10,9 +10,11 @@
 // which is the point: no vendored encoder, no dependency, no network.
 //
 // The store shows this to a living room, so the card is deliberately quiet: a
-// 5-inch counter card next to the register, no glow, no animation, nothing on
-// the marquee. It is also switchable off entirely (`bb_tip_jar`), because the
-// same build runs on a family TV where a donation ask is not wanted.
+// counter card next to the register (9 in wide as of GH #10, up from the
+// original 6 — it read too small to bother scanning), no glow, no animation,
+// nothing on the marquee. It is also switchable off entirely (`bb_tip_jar`),
+// because the same build runs on a family TV where a donation ask is not
+// wanted.
 import { getActiveLogoSpec, HALCYON_GOLD, HALCYON_CREAM, HALCYON_BLUE } from './logo-spec';
 import { getActiveTheme } from './themes';
 import { BB_ARCHIVO_BLACK, bundledFontReady, ensureBundledFont } from './bundled-fonts';

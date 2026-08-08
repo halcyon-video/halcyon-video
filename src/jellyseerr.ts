@@ -10,6 +10,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { Movie } from './jellyfin';
 import { isDemoMode } from './demo-mode';
+import { activeSuggestionWindow, titleInWindow, windowGteParam, windowLteParam } from './media-release-date';
 
 export interface JellyseerrConfig {
   url: string;
@@ -282,6 +283,11 @@ export async function fetchDiscoverMovies(): Promise<Movie[]> {
   const seenTmdbIds = new Set<number>();
   const movies: Movie[] = [];
   const dismissed = getDismissedTitleIds();
+  // Release window (#42): the permanent suggestion bounds with the rolling
+  // Media Release Date pin folded into the ceiling (tighter wins). Applied
+  // client-side on every ingested item — the server-side params below are an
+  // efficiency, not the gate, and /discover/trending takes no date params.
+  const win = activeSuggestionWindow();
 
   const ingest = (items: any[]) => {
     for (const item of items) {
@@ -294,6 +300,7 @@ export async function fetchDiscoverMovies(): Promise<Movie[]> {
       // Jellyseerr attaches `mediaInfo` once it knows the title exists in (or
       // has been requested into) the library -- never duplicate those here.
       if (item.mediaInfo) continue;
+      if (!titleInWindow({ premiereDate: item.releaseDate || undefined }, win)) continue;
       const title: string | undefined = item.title || item.name;
       if (!title) continue;
 
@@ -326,12 +333,21 @@ export async function fetchDiscoverMovies(): Promise<Movie[]> {
   };
 
   try {
+    // /discover/movies forwards TMDB's primary-release-date bounds, so ask the
+    // server to pre-trim its page — otherwise a tight window could see a whole
+    // page of out-of-window titles and shelve nothing despite eligible films
+    // one page deeper. Trending has no such params; ingest() gates it.
+    const lte = windowLteParam(win);
+    const gte = windowGteParam(win);
+    const datedMovies = '/api/v1/discover/movies?page=1'
+      + (gte ? `&primaryReleaseDateGte=${gte}` : '')
+      + (lte ? `&primaryReleaseDateLte=${lte}` : '');
     const [trending, popular] = await Promise.all([
       jellyseerrRequest(config, '/api/v1/discover/trending?page=1').catch((e) => {
         console.warn('[Jellyseerr] Trending discovery fetch failed:', e);
         return null;
       }),
-      jellyseerrRequest(config, '/api/v1/discover/movies?page=1').catch((e) => {
+      jellyseerrRequest(config, datedMovies).catch((e) => {
         console.warn('[Jellyseerr] Popular discovery fetch failed:', e);
         return null;
       }),
@@ -446,6 +462,11 @@ export async function fetchCollectionGaps(targets: CollectionGapTarget[]): Promi
   const movies: Movie[] = [];
   const seenTmdbIds = new Set<number>();
   const dismissed = getDismissedTitleIds();
+  // Release window (#42): a gap case is a suggestion ("order it?"), so the
+  // suggestion bounds gate it — EXCEPT one the player already ordered, whose
+  // case must keep standing (the rolling pin still absents post-cutoff ones
+  // at the scene-build funnel regardless).
+  const win = activeSuggestionWindow();
   let dismissedCount = 0;
 
   const fetchOne = async (target: CollectionGapTarget): Promise<void> => {
@@ -475,6 +496,7 @@ export async function fetchCollectionGaps(targets: CollectionGapTarget[]): Promi
       if (dismissed.has(tmdbId)) { dismissedCount++; continue; }
       const title: string | undefined = part.title || part.name;
       if (!title) continue;
+      if (!alreadyRequested && !titleInWindow({ premiereDate: part.releaseDate || undefined }, win)) continue;
 
       seenTmdbIds.add(tmdbId);
 
@@ -557,8 +579,13 @@ const seedCache = new Map<number, RecommendationSeed[]>();
 export async function fetchRecommendationSeeds(anchorTmdbId: number): Promise<RecommendationSeed[]> {
   const config = getJellyseerrConfig();
   if (!config) return [];
+  // Release window (#42): staff-pick seeds obey the same suggestion bounds as
+  // the discovery shelves. The cache keeps the RAW list and the filter runs on
+  // the way out, so a pin set after the cache warmed still bites.
+  const win = activeSuggestionWindow();
+  const inWindow = (list: RecommendationSeed[]) => list.filter((s) => titleInWindow(s, win));
   const cached = seedCache.get(anchorTmdbId);
-  if (cached) return cached;
+  if (cached) return inWindow(cached);
   const seeds: RecommendationSeed[] = [];
   try {
     const res = await jellyseerrRequest(config, `/api/v1/movie/${anchorTmdbId}/recommendations?page=1`);
@@ -585,7 +612,7 @@ export async function fetchRecommendationSeeds(anchorTmdbId: number): Promise<Re
     return [];
   }
   seedCache.set(anchorTmdbId, seeds);
-  return seeds;
+  return inWindow(seeds);
 }
 
 export interface MovieDetailResult {

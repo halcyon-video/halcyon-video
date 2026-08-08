@@ -601,11 +601,15 @@ export function ensureHeroCases(scene: StoreScene, movie: Movie, nrCase = false)
   // aspect, so the rental copy appeared to change size per title.
   const gameDims = movie.game ? gameCaseDims(movie.platform, movie.discCount) : undefined;
   const shellDims = movie.game ? gameRentalDims(movie.platform) : undefined;
+  // Same probe the shelf path resolves off the browsed library (store-stock's
+  // updateLOD) — the hero/inspect case sits closer to the camera than any
+  // shelf copy, so it should carry the same environment reflections, not none.
+  const probeIdx = Math.min(scene.selectedLibraryIdx, 4);
   if (!scene.heroFrontMesh || !scene.heroBackMesh) {
     const geoFront = getCaseGeometry(isAnimated, gameDims);
     const geoBack = getRentalCaseGeometry(false, shellDims);
-    const front = new THREE.Mesh(geoFront, createHeroJellyfinMaterials(movie));
-    const back = new THREE.Mesh(geoBack, createHeroRentalMaterials(movie));
+    const front = new THREE.Mesh(geoFront, createHeroJellyfinMaterials(movie, undefined, false, false, probeIdx));
+    const back = new THREE.Mesh(geoBack, createHeroRentalMaterials(movie, false, probeIdx));
     [front, back].forEach((m) => {
       m.castShadow = true;
       m.receiveShadow = true;
@@ -641,7 +645,7 @@ export function ensureHeroCases(scene: StoreScene, movie: Movie, nrCase = false)
     // RELEASE RENTAL case, matching the wall's instanced back boxes.
     scene.heroBackMesh.material = nrCase
       ? getGoldCaseMaterials()
-      : createHeroRentalMaterials(movie, wantDetail !== null);
+      : createHeroRentalMaterials(movie, wantDetail !== null, probeIdx);
     perfTrace.end(SP_HERO);
     if (movie.isSeries) scene.ensureSeriesEpisodes(movie);
     // Poster may still be streaming in — either never decoded yet, or its
@@ -663,18 +667,21 @@ export function ensureHeroCases(scene: StoreScene, movie: Movie, nrCase = false)
 }
 
 export function heroFrontMaterials(scene: StoreScene, movie: Movie): THREE.Material[] {
+  // Same probe index the shelf path resolves off the browsed library
+  // (store-stock's updateLOD) — see ensureHeroCases above.
+  const probeIdx = Math.min(scene.selectedLibraryIdx, 4);
   // The retail box's back carries the synopsis + cast list — the text the
   // shopper is actually reading — so an inspected case gets the high-resolution
   // face here too, not just via ensureHeroCases (this is the path flip and
   // cast-row navigation come back through).
-  if (movie.isSeries) return createHeroSeriesBoxsetMaterials(movie, scene.highlightedBackRegionName);
-  const mats = createHeroJellyfinMaterials(movie, scene.highlightedBackRegionName, false, scene.mode === 'inspect');
+  if (movie.isSeries) return createHeroSeriesBoxsetMaterials(movie, scene.highlightedBackRegionName, probeIdx);
+  const mats = createHeroJellyfinMaterials(movie, scene.highlightedBackRegionName, false, scene.mode === 'inspect', probeIdx);
   // A game's real back/spine scans arrive over the network. Fire and forget,
   // UNLIKE the asset viewer, which awaits: this runs on every browse keypress
   // and blocking the hero rebuild on a fetch would stall the cursor. The swap
   // mutates `mats` in place, so the mesh already holding the array picks it up
   // — it just needs a frame, and the loop is render-on-demand.
-  applyGameCaseArt(movie, mats).then((changed) => { if (changed) scene.requestRender(); });
+  applyGameCaseArt(movie, mats, probeIdx).then((changed) => { if (changed) scene.requestRender(); });
   return mats;
 }
 

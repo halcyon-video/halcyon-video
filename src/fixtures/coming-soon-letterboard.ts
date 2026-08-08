@@ -48,6 +48,7 @@ import { getActiveTheme, themeTrimDarkHex, themeKneeGoldHex, scaleHex } from '..
 import { markSignMesh } from '../sign-builders';
 import { tryLoadUserAssetTexture } from '../user-assets';
 import { getRequestedDiscoveryIds, onJellyseerrRequestChange } from '../jellyseerr';
+import { activeMediaCutoff } from '../media-release-date';
 import {
   ComingSoonRow,
   collectComingSoon,
@@ -489,6 +490,10 @@ export class ComingSoonLetterboard implements StoreFixture {
       const feed = collectComingSoon(this.ctx.libraries, {
         extra: this.ctx.staffPickMovies,
         requestedIds: getRequestedDiscoveryIds(),
+        // Media Release Date pin (#42): "not out yet" means after the store's
+        // rolling today, not the wall clock's — a store pinned ahead of real
+        // time must not board already-premiered-there titles as coming soon.
+        now: activeMediaCutoff() ?? undefined,
       });
       return comingSoonRows(feed, COMING_SOON_LETTERBOARD_SLOTS);
     } catch (e) {

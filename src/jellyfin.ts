@@ -1,4 +1,8 @@
 import { invoke } from '@tauri-apps/api/core';
+// Explicit .ts specifier: tests/version-collapse.test.ts loads this module
+// under `node --test`'s type-stripping loader, which can't resolve the bare
+// sibling specifier (same note as media-date-screen.ts).
+import { activeMediaCutoff, titleReleasedBy } from './media-release-date.ts';
 
 export interface Movie {
   id: string;
@@ -110,6 +114,16 @@ export interface Movie {
   played?: boolean;
   playCount?: number;
   lastPlayedDate?: string; // ISO — orders anchors by recency
+  // Ticks into the item Jellyfin says THIS user left off at. The server only
+  // ever returns a non-zero PlaybackPositionTicks while the item is still
+  // inside its own resume window (fully watched or never started both come
+  // back unset) — so "present -> resume there" is the same rule every other
+  // Jellyfin client follows, with no separate "start over" affordance needed.
+  resumePositionTicks?: number;
+  // Exact runtime in ticks (Jellyfin's RunTimeTicks), alongside the rounded
+  // `duration` display string above. Lets a natural end-of-file be told apart
+  // from a user quit without a per-path duration probe (see playback-flow.ts).
+  runTimeTicks?: number;
   // Set by the staff-picks engine on an OWNED title that the aggregated
   // watch-history recommendations surfaced: its case wears the STAFF PICK
   // sticker (video-case.ts) and it's eligible for the genre endcaps.
@@ -231,6 +245,9 @@ export interface Episode {
   overview: string;
   path: string;
   runTimeTicks?: number;
+  /** This user's UserData.PlaybackPositionTicks — see Movie.resumePositionTicks
+   *  for the same "present -> resume there" rule. */
+  resumePositionTicks?: number;
   thumbUrl?: string;
   seasonId?: string;
   /** Primary (poster, 2:3) image of the Season item this episode belongs to. */
@@ -749,6 +766,7 @@ export async function fetchMediaCatalog(
         primaryImageAspectRatio: (typeof item.PrimaryImageAspectRatio === 'number' && item.PrimaryImageAspectRatio > 0) ? item.PrimaryImageAspectRatio : undefined,
         versions: buildItemVersions(item),
         tmdbId: extractTmdbId(item),
+        runTimeTicks: item.RunTimeTicks || undefined,
         ...extractWatchState(item),
       };
     });
@@ -887,13 +905,19 @@ function extractTmdbId(item: any): number | undefined {
 }
 
 /** This user's watch state off UserData (requested via Fields=UserData). */
-function extractWatchState(item: any): Pick<Movie, 'played' | 'playCount' | 'lastPlayedDate'> {
+function extractWatchState(
+  item: any
+): Pick<Movie, 'played' | 'playCount' | 'lastPlayedDate' | 'resumePositionTicks'> {
   const ud = item?.UserData;
   if (!ud) return {};
   return {
     played: ud.Played === true || undefined,
     playCount: typeof ud.PlayCount === 'number' && ud.PlayCount > 0 ? ud.PlayCount : undefined,
     lastPlayedDate: typeof ud.LastPlayedDate === 'string' && ud.LastPlayedDate ? ud.LastPlayedDate : undefined,
+    resumePositionTicks:
+      typeof ud.PlaybackPositionTicks === 'number' && ud.PlaybackPositionTicks > 0
+        ? ud.PlaybackPositionTicks
+        : undefined,
   };
 }
 
@@ -1036,6 +1060,7 @@ export async function fetchJellyfinLibrariesAndMovies(
             primaryImageAspectRatio: (typeof item.PrimaryImageAspectRatio === 'number' && item.PrimaryImageAspectRatio > 0) ? item.PrimaryImageAspectRatio : undefined,
             versions: item.Type === "Series" ? undefined : buildItemVersions(item),
             tmdbId: extractTmdbId(item),
+            runTimeTicks: item.Type === "Series" ? undefined : (item.RunTimeTicks || undefined),
             ...extractWatchState(item),
           };
         });
@@ -1150,12 +1175,21 @@ export async function fetchSeriesEpisodes(
       // the season panel's "first episode of season N" lookup, the episode
       // selector's index, and playback's up-next step all walk this array, so
       // they were all reading a mis-ordered series.
-      `${url}/emby/Users/${userId}/Items?ParentId=${seriesId}&IncludeItemTypes=Episode&Recursive=true&Fields=Path,Overview,RunTimeTicks&SortBy=ParentIndexNumber,IndexNumber&SortOrder=Ascending&Limit=500`,
+      `${url}/emby/Users/${userId}/Items?ParentId=${seriesId}&IncludeItemTypes=Episode&Recursive=true&Fields=Path,Overview,RunTimeTicks,PremiereDate,UserData&SortBy=ParentIndexNumber,IndexNumber&SortOrder=Ascending&Limit=500`,
       undefined,
       token
     );
     const data = JSON.parse(responseStr);
-    const items: any[] = data.Items || [];
+    let items: any[] = data.Items || [];
+    // Media Release Date pin (#42): a series that premiered before the rolling
+    // cutoff still shelves, but episodes that aired after it haven't happened
+    // yet in the store's timeline — a 1996-pinned store must not list (or
+    // play) a 1998 season. Undated episodes stay, same rule as the catalog.
+    const mediaCutoff = activeMediaCutoff();
+    if (mediaCutoff) {
+      items = items.filter((item) =>
+        titleReleasedBy({ premiereDate: item.PremiereDate || undefined }, mediaCutoff));
+    }
     return items.map((item) => ({
       id: item.Id,
       seriesId,
@@ -1166,6 +1200,10 @@ export async function fetchSeriesEpisodes(
       overview: item.Overview || "",
       path: item.Path || "",
       runTimeTicks: item.RunTimeTicks || 0,
+      resumePositionTicks:
+        typeof item.UserData?.PlaybackPositionTicks === 'number' && item.UserData.PlaybackPositionTicks > 0
+          ? item.UserData.PlaybackPositionTicks
+          : undefined,
       // Episode "still" — the Primary image on an Episode item. Sized down for
       // the on-box thumbnail; falls back to a placeholder if the load 404s.
       thumbUrl: `${url}/emby/Items/${item.Id}/Images/Primary?api_key=${token}&maxWidth=400`,

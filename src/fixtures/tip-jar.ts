@@ -1,4 +1,4 @@
-// The tip jar — a cup and a 5-inch card on the checkout counter's band top.
+// The tip jar — a cup and a 9-inch card on the checkout counter's band top.
 //
 // This is a NEW sign for a fictional chain, so there is no reference photo to
 // rectify against: nothing about it is a recreation of a real object, and the
@@ -32,15 +32,21 @@ type Disposable = { geo?: THREE.BufferGeometry; mat?: THREE.Material; tex?: THRE
 const CUP_R_TOP = 0.165;
 const CUP_R_BOT = 0.135;
 const CUP_H = 0.36;
-const CARD_W = 0.5;           // 6 in
+// GH #10: the QR card read too small to bother scanning from where a
+// customer actually stands — scaled ~1.5x (9 in wide, was 6 in).
+const CARD_W = 0.75;
 const CARD_H = CARD_W / TIP_CARD_ASPECT;
 const CARD_T = 0.012;
 const CARD_LEAN = 0.20;       // rad — an easel card leans back about 11 deg
 // They stand SIDE BY SIDE, not card-behind-cup: a 4 in card behind a 4.3 in
 // cup is a card nobody can read (first build, caught in the counter shot).
-const CUP_X = -0.34;
-const CARD_X = 0.26;
-const CARD_TEX_W = 1024;
+// Pushed further apart than a naive centre-scale to keep clearance as the
+// card grew (GH #10): the cup nudges left, the card nudges right, so the
+// gap between the cup's band and the card's near edge is actually WIDER
+// than it was at the old size instead of shrinking into the mug.
+const CUP_X = -0.40;
+const CARD_X = 0.36;
+const CARD_TEX_W = 1536;
 
 export class TipJar implements StoreFixture {
   public placement: FixturePlacement;

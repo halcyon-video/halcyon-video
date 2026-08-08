@@ -21,12 +21,13 @@ export const DEFAULT_SIGNAGE_CONFIG: Record<string, string | null> = {
   // Set any `ceiling-nav-line-<lineId>` to `null` here to remove it, or to
   // a specific sign ID to override the dynamic genre name.
 
-  // 1993 footage pack: red "$3 RENTAL" card in front of the New Releases
-  // wall and the yellow "NEXT REGISTER PLEASE" tent on the closed stretch of
-  // the counter band. The bargain-bin INCREDIBLE VALUES card was removed at
-  // the owner's request (pin 031) — slot deliberately empty.
+  // 1993 footage pack: the yellow "NEXT REGISTER PLEASE" tent on the closed
+  // stretch of the counter band. The bargain-bin INCREDIBLE VALUES card was
+  // removed at the owner's request (pin 031) — slot deliberately empty. The
+  // red "$3 RENTAL" card that used to hang in front of the New Releases wall
+  // was removed entirely (GH #2) — its slot no longer exists at all, so
+  // there's no key for it here (see STATIC_SIGNAGE_SLOT_IDS below).
   'promo-previously-viewed': null,
-  'promo-new-release': 'three-dollar-rental',
   'register-next': 'next-register-please',
 };
 
@@ -52,7 +53,6 @@ export const STATIC_SIGNAGE_SLOT_IDS: readonly string[] = [
   'wall-newrelease-left-wall',
   // 1993 hanging promo cards (store-shell.ts)
   'promo-previously-viewed',
-  'promo-new-release',
 ];
 
 // Ceiling genre/library nav slots are DYNAMIC — one per shelving line, id

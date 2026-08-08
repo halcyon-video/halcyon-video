@@ -24,6 +24,9 @@ export const COUNTER_TERMINAL_LABELS: Record<string, string> = {
   // CRT-only row (not in the glass power menu): the diegetic door into the
   // SERVICE MODE settings page — the staff knobs hidden from the couch tree.
   'btn-service': 'MANAGER OVERRIDE (STAFF ONLY)',
+  // CRT-only row (#42): opens the BIOS-style date sub-screen that pins the
+  // catalog to a rolling point in time (counter-terminal-flow.ts).
+  'btn-media-date': 'MEDIA RELEASE DATE (PIN CATALOG)',
   'btn-cancel': 'RETURN TO STORE',
 };
 

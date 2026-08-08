@@ -1551,6 +1551,21 @@ export function buildStore(scene: StoreScene) {
     // Poster plane matches the frame constants above (2:3 aspect ratio).
     const posterMesh = new THREE.Mesh(new THREE.PlaneGeometry(posterW, posterH), posterMat);
 
+    // GH #5: the material is DoubleSide (issue #61 wanted it opaque from
+    // both sides, since the poster hangs mid-pane with nothing to hide),
+    // but DoubleSide draws the SAME uv on both faces — it doesn't mirror
+    // one of them. A plane's default front face (the one that reads
+    // correctly) pointed local +Z, which every caller's parent transform
+    // (frontWindow's rotation.y=PI, each side ribbon's inward yaw) turns
+    // into a normal aimed INTO the store. So the correct print always
+    // faced the sales floor and the parking lot got the mirrored back.
+    // A real poster faces the street: flip the plane 180 here so the
+    // front face's normal points the other way (outside, for every
+    // caller of this shared factory) and let the inside keep the
+    // DoubleSide fallback — a mirrored read, same as the reference
+    // footage shoots any poster through glass from the wrong side.
+    posterMesh.rotation.y = Math.PI;
+
     // Center vertically in the GLAZED pane itself — knee wall top (2.0, the
     // window builders' KNEE_H) up to the glazing head. It used to center
     // between the waist rail and the head, which hung every poster high in
@@ -2456,18 +2471,12 @@ export function buildStore(scene: StoreScene) {
       length: leftWallShelfWidth,
       localZ: 0.1
     }] : []),
-    // 1993 footage pack: red "$3 RENTAL / 2 EVENING NEW RELEASE" card hanging
-    // in front of the New Releases back wall, the way the real store hung its
-    // price promo right over the new-release bays.
-    {
-      id: 'promo-new-release',
-      category: 'ceiling-promo',
-      // Hang it lower in the 2000 store so it clears the TV-bank housing that
-      // now sits over the New Releases wall centre.
-      pos: new THREE.Vector3(STORE_CENTER_X, getActiveTheme().id === 'bb-2000' ? 7.4 : 8.9, backWallZ + 3.5),
-      yaw: 0
-    },
-    // ...and the yellow "INCREDIBLE VALUES / PREVIOUSLY VIEWED MOVIES" card
+    // (The red "$3 RENTAL / 2 EVENING NEW RELEASE" card that used to hang
+    // here, in front of the New Releases back wall over the floor displays,
+    // was removed entirely by owner request — GH #2. The slot construction
+    // and its catalog entry are gone too, not just nulled in signage-config.)
+    //
+    // The yellow "INCREDIBLE VALUES / PREVIOUSLY VIEWED MOVIES" card
     // over the bargain bin (our previously-viewed tub). The bin RESOLVES its
     // own position at build time (relativeToBackWall + clamp — see
     // bargain-bin.ts), so read the built fixture's footprint, not the raw

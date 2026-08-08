@@ -122,32 +122,9 @@ export function buildStorefrontDressing93(scene: StoreScene): void {
     group.add(panel);
   }
 
-  // 3b. Red rental-term cards hung inside the entry glass FACING IN (T25
-  // item 30, measured ~32x9in): '3 EVENING RENTAL' and '2 EVENING RENTAL',
-  // white straight caps on flat red, one each side of the door head.
-  {
-    const cardTex = (line: string) => cachedTex(`term-${line}`, 768, 216, (ctx, w, h) => {
-      ctx.fillStyle = '#c8102e';
-      ctx.fillRect(0, 0, w, h);
-      ctx.fillStyle = '#ffffff';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.font = '700 108px Arial, sans-serif';
-      ctx.fillText(line, w / 2, h / 2 + 4);
-    });
-    for (const [i, line] of ['3 EVENING RENTAL', '2 EVENING RENTAL'].entries()) {
-      const card = new THREE.Mesh(
-        new THREE.PlaneGeometry(2.7, 0.76),
-        new THREE.MeshStandardMaterial({ map: cardTex(line), roughness: 0.7, metalness: 0 })
-      );
-      // Inside face of the vestibule glass, flanking the door head, print
-      // toward the store (rotation.y = PI turns +Z away from the lot).
-      card.position.set(11.0 + (i === 0 ? -1.75 : 1.75), 8.6, glassZ - 0.12);
-      card.rotation.y = Math.PI;
-      markSignMesh(card);
-      group.add(card);
-    }
-  }
+  // (3b. The red '3 EVENING RENTAL' / '2 EVENING RENTAL' cards that used to
+  // hang inside the entry glass, flanking the door head, were removed
+  // entirely by owner request — GH #3.)
 
   // 4. EAS anti-theft pedestals — the cream rounded-top gates, EXIT DOOR ONLY
   // (feedback/035, owner: "we don't need these theft venters in the
