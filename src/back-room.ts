@@ -93,6 +93,30 @@ const SPINE_STOP_YAW = -Math.PI * 1.5 - 0.28;
 // bottom edge also reads from the viewer's seat. Per-level jitter adds on top.
 const STACK_REST_YAW = Math.PI / 2 - 0.35;
 
+/**
+ * Soft radial contact-shadow texture — this room's stand-in for a shadow map.
+ * The set is lit by one small rig that casts nothing (addOwned forces
+ * castShadow/receiveShadow off), and it sits past the sun's shadow frustum
+ * anyway, so every "shadow" here is a drawn gradient laid on the surface
+ * beneath the object. `peak` is the alpha directly under it, `mid` the alpha
+ * at 60% of the radius; both reach zero at the edge.
+ */
+function softShadowTexture(peak: number, mid: number): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = 128;
+  canvas.height = 128;
+  const ctx = canvas.getContext('2d')!;
+  const g = ctx.createRadialGradient(64, 64, 8, 64, 64, 64);
+  g.addColorStop(0, `rgba(10, 18, 40, ${peak})`);
+  g.addColorStop(0.6, `rgba(10, 18, 40, ${mid})`);
+  g.addColorStop(1, 'rgba(10, 18, 40, 0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 128, 128);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
 export class BackRoom {
   public state: BackRoomState = 'view';
   public focusedIdx = 0;
@@ -174,6 +198,7 @@ export class BackRoom {
     this.placeTvAndDeck(tv, deck);
     this.buildTapes(movies, tableTopY);
     this.buildDueNote(tableTopY);
+    this.buildTableContactShadows(tableTopY);
     this.buildVcrClock();
     this.redrawClocks(true);
   }
@@ -272,26 +297,68 @@ export class BackRoom {
 
     // Soft contact shadow under the furniture cluster (table + TV stand) so
     // the props sit ON the floor instead of hovering over flat colour.
-    const shadowCanvas = document.createElement('canvas');
-    shadowCanvas.width = 128;
-    shadowCanvas.height = 128;
-    const sctx = shadowCanvas.getContext('2d')!;
-    const sg = sctx.createRadialGradient(64, 64, 8, 64, 64, 64);
-    sg.addColorStop(0, 'rgba(10, 18, 40, 0.42)');
-    sg.addColorStop(0.6, 'rgba(10, 18, 40, 0.22)');
-    sg.addColorStop(1, 'rgba(10, 18, 40, 0)');
-    sctx.fillStyle = sg;
-    sctx.fillRect(0, 0, 128, 128);
-    const shadowTex = new THREE.CanvasTexture(shadowCanvas);
-    shadowTex.colorSpace = THREE.SRGBColorSpace;
     const shadow = new THREE.Mesh(
       new THREE.CircleGeometry(1, 32),
-      new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, depthWrite: false }),
+      new THREE.MeshBasicMaterial({ map: softShadowTexture(0.42, 0.22), transparent: true, depthWrite: false }),
     );
     shadow.rotation.x = -Math.PI / 2;
     shadow.position.set(0, 0.01, -2.0); // spans the table (z≈0.9) and TV stand (z≈-5.3)
     shadow.scale.set(6.5, 5.6, 1);
     this.addOwned(shadow);
+  }
+
+  /**
+   * Contact shadows on the TABLE TOP.
+   *
+   * The cluster shadow above grounds the furniture to the floor, and for a
+   * view taken from eye height across the room that was the whole job. It
+   * isn't any more: the camera now sits inches off the surface (VIEW_POS), so
+   * the pile and the slip ARE the frame, and both were lying on wood with
+   * nothing under them — reading as decals on the table rather than objects on
+   * it. Same technique as the floor for the same reason: this room's one small
+   * light rig casts no real shadows (see addOwned), so the grounding cue has
+   * to be drawn.
+   *
+   * Both sit above the table and below what they ground — the lowest case's
+   * underside is at +0.008 and the slip's at +0.006 (see buildTapes /
+   * buildDueNote), so there is room for each without z-fighting the wood.
+   */
+  private buildTableContactShadows(tableTopY: number): void {
+    // Under the pile. Darker and tighter than the floor's: this is a stack of
+    // clamshells sitting flat on a hard surface a few inches from the lamp,
+    // not a whole furniture cluster on a dim floor.
+    const pile = new THREE.Mesh(
+      new THREE.CircleGeometry(1, 24),
+      new THREE.MeshBasicMaterial({ map: softShadowTexture(0.5, 0.26), transparent: true, depthWrite: false }),
+    );
+    pile.rotation.x = -Math.PI / 2;
+    // OFFSET, not centred. A blob centred under the stack is almost entirely
+    // occluded by the stack itself — which is how the first pass read as no
+    // shadow at all. The key is the warm point at (-5.5, 6.0, 2.4) (buildLights),
+    // so from the pile at (0.15, ~1.42) the throw runs +x and slightly -z:
+    // normalize(5.65, -0.98) ≈ (0.985, -0.171). Push the blob that way by a
+    // stack's-worth and it spills out on the far side, against bare wood, where
+    // it can actually be seen. Elongated along the same axis for the same reason.
+    pile.position.set(0.15 + 0.197, tableTopY + 0.004, 1.42 - 0.034);
+    pile.scale.set(0.72, 0.44, 1); // clamshell footprint plus the gradient's falloff
+    this.addOwned(pile);
+
+    // Under the slip. Paper lying flat has almost no gap to shadow, so this is
+    // much fainter, and it carries the slip's own -0.34 skew rather than
+    // sitting square to the table — a shadow square to a skewed object is more
+    // obviously wrong than no shadow at all.
+    const slip = new THREE.Mesh(
+      new THREE.PlaneGeometry(1, 1),
+      new THREE.MeshBasicMaterial({ map: softShadowTexture(0.3, 0.13), transparent: true, depthWrite: false }),
+    );
+    slip.rotation.order = 'YXZ';
+    slip.rotation.x = -Math.PI / 2;
+    slip.rotation.y = -0.34;
+    // Barely offset along the same throw: a sheet lying flat has no gap under
+    // it to shadow, so this is an edge-darkening cue, not a cast shadow.
+    slip.position.set(0.66 + 0.030, tableTopY + 0.003, 1.58 - 0.005);
+    slip.scale.set(0.52, 1.18, 1);
+    this.addOwned(slip);
   }
 
   private buildLights(): void {
