@@ -5279,7 +5279,10 @@ export class StoreScene {
 
       const bScale = (showBackBox && seriesZMult === 1) ? s : 0.0;
       const bWorldX = slot.currentX + slot.backX * Math.cos(theta) + slot.backZ * Math.sin(theta);
-      const bWorldY = slot.currentY;
+      // Rental shells are taller than the box they stand behind and both
+      // geometries are origin-centred, so the shell needs lifting onto the
+      // shelf rather than sharing the front box's centre (MovieSlot.backYLift).
+      const bWorldY = slot.currentY + slot.backYLift;
       const bWorldZ = slot.currentZ - slot.backX * Math.sin(theta) + slot.backZ * Math.cos(theta);
 
       if (heroActive) {

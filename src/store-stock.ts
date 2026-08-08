@@ -8,7 +8,7 @@
 import * as THREE from 'three';
 import { Movie } from './jellyfin';
 import { buildGoldClamshellFillers, getGoldCaseMaterials, repaintGoldCase } from './fixtures/gold-clamshell';
-import { posterQueue, CASE_MEDIUM, CASE_HEIGHT, CASE_DEPTH, textureArrayManager, createClonedCaseGeometry, getGlobalFrontMaterials, getGlobalBackMaterials, updateGlobalMaterialsEnvMap, leftmostColorCache, posterPixelCache, reflectionProbes, isGlobalMaterial, lowResCache, createProgramWarmupMaterials, gameShapeKey, gameDimsForShape, gameCaseDims, beginRebuildDrain, SERIES_DEPTH_MULT } from './video-case';
+import { posterQueue, CASE_MEDIUM, CASE_HEIGHT, CASE_DEPTH, textureArrayManager, createClonedCaseGeometry, getGlobalFrontMaterials, getGlobalBackMaterials, updateGlobalMaterialsEnvMap, leftmostColorCache, posterPixelCache, reflectionProbes, isGlobalMaterial, lowResCache, createProgramWarmupMaterials, gameShapeKey, gameDimsForShape, gameCaseDims, gameRentalDims, rentalBottomLift, beginRebuildDrain, SERIES_DEPTH_MULT } from './video-case';
 import { AISLE_SHELF_HEIGHTS, WALL_SHELF_HEIGHTS, LEAN_ANGLE, STAGGER_OFFSET, UNIT_SIDE_CAPACITY, BACK_WALL_UNIT_IDX, sideEntrySlot, COPY_X_JITTER_RANGE, EXTRA_COPY_DEPTH_STEP, extraCopiesCount, isUnstockedTitle, seededRandom01, MovieSlot } from './store-layout';
 import { retailAudio } from './audio';
 import {
@@ -72,6 +72,17 @@ function aisleCaseDims(movie: Movie): { height: number; depth: number; liftDepth
     depth: CASE_DEPTH,
     liftDepth: CASE_DEPTH * (movie.isSeries ? SERIES_DEPTH_MULT : 1),
   };
+}
+
+/**
+ * Per-slot lift for the rental shell (see MovieSlot.backYLift). A movie's
+ * shell is the store-medium clamshell; a game's is its media-CLASS case with
+ * the platform's real carton in front, which is where the two heights diverge
+ * far enough to push the shell down through the shelf.
+ */
+function slotRentalLift(movie: Movie): number {
+  if (!movie.game) return rentalBottomLift();
+  return rentalBottomLift(gameCaseDims(movie.platform, movie.discCount), gameRentalDims(movie.platform));
 }
 
 export function clearMovieBoxes(scene: StoreScene) {
@@ -686,6 +697,7 @@ export function buildAllMovieBoxes(scene: StoreScene) {
         backJitter,
         backX: -STAGGER_OFFSET + backJitter,
         backZ: -boxDepth / 2,
+        backYLift: slotRentalLift(movie),
         backRotY: 0,
         currentScale: 1.0,
         loadShelfDetails: () => {},
@@ -759,6 +771,7 @@ export function buildAllMovieBoxes(scene: StoreScene) {
       backJitter,
       backX: -STAGGER_OFFSET + backJitter,
       backZ: -boxDepth / 2,
+      backYLift: slotRentalLift(movie),
       backRotY: 0,
       currentScale: 1.0,
       loadShelfDetails: () => {},
@@ -829,6 +842,7 @@ export function buildAllMovieBoxes(scene: StoreScene) {
         backJitter,
         backX: backJitter,
         backZ: -fixtureSlot.depth / 2,
+        backYLift: slotRentalLift(movie),
         backRotY: 0,
         currentScale: 1.0,
         loadShelfDetails: () => {},

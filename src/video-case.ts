@@ -575,6 +575,42 @@ export function gameRentalDims(platform?: string): { w: number; h: number; d: nu
   return GAME_CLASS_DIMS[isDiscPlatform(platform) ? 'disc' : 'cart'];
 }
 
+/**
+ * How far to LIFT the rental shell so it stands on the same surface as the
+ * retail box in front of it.
+ *
+ * Both boxes are RoundedBoxGeometry centred on their own origin and both are
+ * placed at the slot's single Y (three-scene's fWorldY/bWorldY), so a shell
+ * that is taller than the box in front of it hangs BELOW that box by half the
+ * difference — straight through the shelf it is supposed to be sitting on.
+ * Nothing clamps it, because a shelf is a surface the boxes are posed onto,
+ * not a collider they rest against.
+ *
+ * That difference is never zero on a clamshell: the rental case is moulded
+ * larger than the sleeve it holds (VHS_RIM_VERTICAL_FT), so even a movie sank
+ * by half the rim. Games are far worse — the shell is the media CLASS case
+ * (a full-height VHS clamshell for any cartridge) while the retail box is the
+ * platform's real carton, so a landscape SNES box (5.25 in) stands in front of
+ * an 8.73 in shell and drops it ~1.7 in under the shelf.
+ *
+ * Returns 0 for the DVD-medium movie case, where the rental box IS the retail
+ * geometry (getRentalGeometry defers to getGeometry) and there is nothing to
+ * correct.
+ */
+export function rentalBottomLift(
+  retailDims?: { w: number; h: number; d: number },
+  rentalDims?: { w: number; h: number; d: number }
+): number {
+  const retailH = retailDims?.h ?? CASE_HEIGHT;
+  // Mirrors getRentalGeometry: a DVD-shaped rental box is the retail geometry
+  // (no rim), anything else is the clamshell with the vertical rim added.
+  const base = rentalDims ?? (retailDims ? undefined : { w: CASE_WIDTH, h: CASE_HEIGHT, d: CASE_DEPTH });
+  if (!base) return 0;
+  const isDvdShaped = base.w === CASE_DIMS.dvd.w && base.h === CASE_DIMS.dvd.h;
+  if (isDvdShaped) return (base.h - retailH) / 2;
+  return (base.h + VHS_RIM_VERTICAL_FT - retailH) / 2;
+}
+
 // Instanced-mesh batching key: one batch per distinct BOX SIZE, not per platform
 // — platforms sharing a carton (Game Boy / Game Boy Color, SNES / N64, the DVD
 // keep-case consoles) share a batch. Only the RETAIL box varies: the rental

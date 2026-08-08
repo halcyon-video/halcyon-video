@@ -127,7 +127,7 @@ export function slotBackBoxPose(_scene: StoreScene, slot: MovieSlot): CarryPose 
   const theta = slot.currentRotY;
   return {
     x: slot.currentX + slot.backX * Math.cos(theta) + slot.backZ * Math.sin(theta),
-    y: slot.currentY,
+    y: slot.currentY + slot.backYLift,
     z: slot.currentZ - slot.backX * Math.sin(theta) + slot.backZ * Math.cos(theta),
     rotY: slot.backRotY + theta,
   };
