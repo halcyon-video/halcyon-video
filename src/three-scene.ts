@@ -4685,8 +4685,12 @@ export class StoreScene {
         u['focus'].value = THREE.MathUtils.clamp(this.backRoom!.focusDistance(), 0.35, 6.0);
         // Wider than the inspect default: the subject is a foot away and the TV
         // ~7 ft past it, so the inspect aperture would barely register.
-        u['aperture'].value = 0.0125;
-        u['maxblur'].value = 0.014;
+        // Tighter than the first pass: the receipt runs from the focal plane
+        // out toward the lens, so a wide aperture softened the print that this
+        // framing exists to show. The TV is ~7 ft past a ~1.3 ft focus, which
+        // still defocuses hard at this setting.
+        u['aperture'].value = 0.0062;
+        u['maxblur'].value = 0.011;
       } else if (dofOn) {
         // Focal plane on the FACE of the held case, not on the look target (the
         // case centre) and — the bug this replaced — not on a 1.5 floor that sat

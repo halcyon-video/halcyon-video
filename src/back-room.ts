@@ -479,8 +479,14 @@ export class BackRoom {
   private buildTapes(movies: Movie[], tableTopY: number): void {
     const n = Math.min(4, movies.length);
     const yaw = [-0.16, 0.12, -0.06, 0.2];
-    const jx = [0.02, -0.03, 0.035, -0.02];
-    const jz = [0.9, 0.93, 0.86, 0.91];
+    // Nudged toward the camera's own x (0.34): centred on the room, the pile
+    // sat left of frame and the bottom case ran off the edge.
+    const jx = [0.17, 0.12, 0.185, 0.13];
+    // Pulled toward the couch (was ~0.90, the table's centre): the view now
+    // sits inches off the surface, and at the middle of the table the pile read
+    // small and far. Still well inside the top — the stack's own footprint is
+    // only a few inches deep.
+    const jz = [1.42, 1.45, 1.38, 1.43];
     const caseThick = getRentalCaseDepth();
     this.stackStep = caseThick + 0.004;
     this.stackBaseY = tableTopY + caseThick / 2 + 0.008;
@@ -630,11 +636,20 @@ export class BackRoom {
     );
     note.rotation.order = 'YXZ';
     note.rotation.x = -Math.PI / 2;
-    note.rotation.y = 0.34;
-    // Set at the pile's own depth, not nearer the couch: the view's focal
-    // plane is on the pile (focusDistance), and a receipt 0.25 ft in front of
-    // it fell far enough forward to go soft at this aperture.
-    note.position.set(0.86, tableTopY + 0.006, 0.94);
+    // NEGATIVE, and skewed rather than square to the lens. Rotating about +Y
+    // swings the slip's NEAR end toward +X, so a positive angle threw the tail
+    // out to the right; negative turns it clockwise seen from above, putting
+    // the bottom of the slip further left than its top — the way it lies when
+    // dropped from the near side of the table. The skew also carries the
+    // focus: square to the lens, most of the slip's length sits at near depths
+    // and falls outside the depth of field, while angled it keeps the printed
+    // block broadside and in focus and lets only the tail go soft.
+    note.rotation.y = -0.34;
+    // Runs OUT OF FRAME toward the couch: its far end sits at the pile's depth
+    // (the focal plane) and it trails down past the bottom edge of the view, so
+    // the printed block lands in focus while the near end falls away — which is
+    // what a receipt dropped on a table in front of you actually looks like.
+    note.position.set(0.66, tableTopY + 0.006, 1.58);
     this.addOwned(note);
   }
 
@@ -985,7 +1000,7 @@ export class BackRoom {
    */
   focusDistance(): number {
     const eye = this._pose.pos.set(VIEW_POS.x, VIEW_POS.y, VIEW_POS.z).add(BACK_ROOM_ORIGIN);
-    const pile = this._v.set(0, this.stackBaseY, 0.9).add(BACK_ROOM_ORIGIN);
+    const pile = this._v.set(0, this.stackBaseY, 1.42).add(BACK_ROOM_ORIGIN);
     return eye.distanceTo(pile);
   }
 
