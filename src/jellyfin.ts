@@ -1,4 +1,8 @@
 import { invoke } from '@tauri-apps/api/core';
+// Explicit .ts specifier: tests/version-collapse.test.ts loads this module
+// under `node --test`'s type-stripping loader, which can't resolve the bare
+// sibling specifier (same note as media-date-screen.ts).
+import { activeMediaCutoff, titleReleasedBy } from './media-release-date.ts';
 
 export interface Movie {
   id: string;
@@ -1150,12 +1154,21 @@ export async function fetchSeriesEpisodes(
       // the season panel's "first episode of season N" lookup, the episode
       // selector's index, and playback's up-next step all walk this array, so
       // they were all reading a mis-ordered series.
-      `${url}/emby/Users/${userId}/Items?ParentId=${seriesId}&IncludeItemTypes=Episode&Recursive=true&Fields=Path,Overview,RunTimeTicks&SortBy=ParentIndexNumber,IndexNumber&SortOrder=Ascending&Limit=500`,
+      `${url}/emby/Users/${userId}/Items?ParentId=${seriesId}&IncludeItemTypes=Episode&Recursive=true&Fields=Path,Overview,RunTimeTicks,PremiereDate&SortBy=ParentIndexNumber,IndexNumber&SortOrder=Ascending&Limit=500`,
       undefined,
       token
     );
     const data = JSON.parse(responseStr);
-    const items: any[] = data.Items || [];
+    let items: any[] = data.Items || [];
+    // Media Release Date pin (#42): a series that premiered before the rolling
+    // cutoff still shelves, but episodes that aired after it haven't happened
+    // yet in the store's timeline — a 1996-pinned store must not list (or
+    // play) a 1998 season. Undated episodes stay, same rule as the catalog.
+    const mediaCutoff = activeMediaCutoff();
+    if (mediaCutoff) {
+      items = items.filter((item) =>
+        titleReleasedBy({ premiereDate: item.PremiereDate || undefined }, mediaCutoff));
+    }
     return items.map((item) => ({
       id: item.Id,
       seriesId,

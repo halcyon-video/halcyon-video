@@ -883,6 +883,20 @@ export function registerCoreSettings(): void {
   cred('jellyseerr_url', 'Jellyseerr URL', 'text');
   cred('jellyseerr_apikey', 'Jellyseerr API Key', 'secret');
 
+  // Permanent release-date bounds on everything Jellyseerr SUGGESTS (discovery
+  // shelves, staff-pick seeds, un-ordered collection gaps) — a static window
+  // that does NOT move with the clock, unlike the terminal's rolling Media
+  // Release Date pin. The two compose: tighter bound wins (#42).
+  const seerrOn = (): boolean => !!getSetting<string>('jellyseerr_url');
+  cred('jellyseerr_suggest_from', 'Suggestions From', 'text', {
+    visibleWhen: seerrOn,
+    hint: 'YYYY or YYYY-MM-DD. Never suggest titles released earlier.',
+  });
+  cred('jellyseerr_suggest_until', 'Suggestions Until', 'text', {
+    visibleWhen: seerrOn,
+    hint: 'YYYY or YYYY-MM-DD. Never suggest titles released later. The Media Release Date pin still applies if tighter.',
+  });
+
   // Remote Play: stream this running store, peer-to-peer, to any browser on
   // the network (see src/remote-play.ts). Live toggle — starts/stops hosting
   // without a rebuild.

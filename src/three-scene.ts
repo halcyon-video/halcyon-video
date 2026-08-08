@@ -55,6 +55,7 @@ import {
   StorefrontSpec,
   FixturePlacement,
 } from './store-layout';
+import { activeMediaCutoff } from './media-release-date';
 import { titleMatchKeys } from './staff-picks';
 import { OutdoorLightingRig, type OutsideMode } from './outdoor-lighting';
 import { CandyDisplay, CandyRow } from './fixtures/period-fixtures';
@@ -1233,9 +1234,21 @@ export class StoreScene {
       });
     });
     const allMovies = Array.from(allMoviesMap.values());
+    // Media Release Date pin (#42): under a pin, "new" means newest in the
+    // STORE'S timeline — the nearest premiere at or before the rolling cutoff
+    // (the catalog is already filtered to it) — not most recently added to
+    // the server, which would fill the wall with whatever synced last.
+    const nrCutoff = activeMediaCutoff();
+    const nrReleaseKey = (m: Movie): number => {
+      if (m.premiereDate) {
+        const t = Date.parse(m.premiereDate);
+        if (Number.isFinite(t)) return t;
+      }
+      return m.year > 0 ? new Date(m.year, 0, 1).getTime() : 0;
+    };
     const sortedByDate = [...allMovies].sort((a, b) => {
-      const dateA = a.dateCreated ? new Date(a.dateCreated).getTime() : 0;
-      const dateB = b.dateCreated ? new Date(b.dateCreated).getTime() : 0;
+      const dateA = nrCutoff ? nrReleaseKey(a) : (a.dateCreated ? new Date(a.dateCreated).getTime() : 0);
+      const dateB = nrCutoff ? nrReleaseKey(b) : (b.dateCreated ? new Date(b.dateCreated).getTime() : 0);
       if (dateA !== dateB) return dateB - dateA;
       return b.title.localeCompare(a.title);
     });

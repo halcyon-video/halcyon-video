@@ -17,6 +17,7 @@
     "test:picks": "node --experimental-strip-types --test tests/staff-picks.test.ts",
     "test:promo": "node --experimental-strip-types --test tests/promo-campaigns.test.ts",
     "test:comingsoon": "node --experimental-strip-types --test tests/coming-soon-feed.test.ts",
+    "test:releasedate": "node --experimental-strip-types --test tests/media-release-date.test.ts tests/media-date-screen.test.ts",
     "tauri": "tauri"
   },
   "dependencies": {

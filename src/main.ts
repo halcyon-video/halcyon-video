@@ -57,7 +57,15 @@ import {
   isMembershipPickerOpen,
   type MembershipLoginSession,
 } from './membership-cards';
-import { getActiveTheme, applyThemeCssVars } from './themes';
+import { getActiveTheme, applyThemeCssVars, THEMES, resolveThemeId } from './themes';
+import {
+  activeMediaCutoff,
+  filterLibrariesByCutoff,
+  filterMoviesByCutoff,
+  loadMediaReleasePin,
+  eraThemeIdForDate,
+  toDateOnly,
+} from './media-release-date';
 import { retailAudio } from './audio';
 import { BB_ARCHIVO_BLACK, bundledFontsReady } from './bundled-fonts';
 import { brandString, loadBrandPack } from './brand-pack';
@@ -87,7 +95,13 @@ import {
   refreshSettingThumb,
 } from './settings';
 import type { SettingDef, SettingGroup } from './settings';
-import { counterTerminalLines } from './counter-terminal';
+import {
+  MEDIA_DATE_BUTTON_ID,
+  counterTerminalClose,
+  counterTerminalInput,
+  counterTerminalOpen,
+  initCounterTerminalFlow,
+} from './counter-terminal-flow';
 import { buildControlsHelpPanel, HELP_ROW_PREFIX } from './controls-help';
 import type { CandyRow } from './fixtures/period-fixtures';
 import { getCandyDeliveryAdapter } from './candy-delivery';
@@ -122,10 +136,28 @@ let gameMovies: Movie[] = [];
 // a rebuild rather than a full re-sync.
 let storeLibraries: JellyfinLibrary[] = [];
 let storeGameMovies: Movie[] = [];
+// Store-facing views of the Jellyseerr lists, gated like the libraries above.
+let storeComingSoon: Movie[] = [];
+let storeDiscovery: Movie[] = [];
 function refreshStoreCatalog() {
   const catalog = storeCatalog(librariesList, gameMovies);
-  storeLibraries = catalog.libraries;
-  storeGameMovies = catalog.games;
+  // Media Release Date pin (#42): everything premiering after the rolling
+  // cutoff is absent from the store entirely. Filtered COPIES of the fetched
+  // lists — clearing the pin is a rebuild, never a re-sync.
+  const cutoff = activeMediaCutoff();
+  storeLibraries = cutoff ? filterLibrariesByCutoff(catalog.libraries, cutoff) : catalog.libraries;
+  storeGameMovies = cutoff ? filterMoviesByCutoff(catalog.games, cutoff) : catalog.games;
+  storeComingSoon = cutoff ? filterMoviesByCutoff(comingSoonMovies, cutoff) : comingSoonMovies;
+  storeDiscovery = cutoff ? filterMoviesByCutoff(discoveryMovies, cutoff) : discoveryMovies;
+  if (!cutoff) return;
+  // MATCH STORE ERA: the decor tracks the pin's effective date (and crosses
+  // era boundaries as the rolling date does). Persist-only — we're already
+  // inside the build funnel, so the scene about to build reads the new era.
+  if (loadMediaReleasePin()?.matchEra) {
+    const era = eraThemeIdForDate(cutoff, Object.keys(THEMES));
+    if (era && resolveThemeId(getSetting<string>('bb_theme')) !== era) setSetting('bb_theme', era);
+  }
+  logToConsole(`[System] Media Release Date: store pinned to ${toDateOnly(cutoff)} — later releases are absent.`, 'system');
 }
 // Watch-history staff picks (stickers + genre endcaps) -- see staff-picks.ts.
 // Computed right before the 3D scene is built; stays empty without watch
@@ -469,7 +501,7 @@ const ui = {
   isCandyCheckoutOpen: false,
   isFeedbackOpen: false,
   // The clerk's terminal at the checkout counter, showing the same options as
-  // the power menu but drawn on the desk CRT (see openCounterTerminal). Not an
+  // the power menu but drawn on the desk CRT (counter-terminal-flow.ts). Not an
   // overlay — it's in-scene — but it owns the arrow keys while docked, so it
   // joins isAnyOverlayOpen to keep shelf navigation from running underneath.
   isCounterTerminalOpen: false,
@@ -494,13 +526,14 @@ const powerButtons = ['btn-settings', 'btn-controls', 'btn-flat-mode', 'btn-susp
 // commands are idempotent no-ops when the display is already in that state.
 let cecDisplayAssumedOn = true;
 
-// The counter CRT carries one extra row the glass power menu doesn't:
+// The counter CRT carries extra rows the glass power menu doesn't:
 // MANAGER OVERRIDE, the diegetic (and only couch-reachable) entry into the
-// SERVICE MODE settings page (review §4.3). Inserted just above RETURN TO
-// STORE so the safe exit stays last.
+// SERVICE MODE settings page (review §4.3), and MEDIA RELEASE DATE (#42),
+// the catalog-pin sub-screen. Inserted just above RETURN TO STORE so the
+// safe exit stays last.
 const counterTerminalButtons = (() => {
   const ids = [...powerButtons];
-  ids.splice(ids.indexOf('btn-cancel'), 0, 'btn-service');
+  ids.splice(ids.indexOf('btn-cancel'), 0, MEDIA_DATE_BUTTON_ID, 'btn-service');
   return ids;
 })();
 
@@ -827,50 +860,19 @@ function closePowerMenu() {
 // StoreScene.enterSearchMode) with the options rendered in amber phosphor.
 //
 // Rows are the SAME `powerButtons` ids the overlay uses (plus the CRT-only
-// MANAGER OVERRIDE row — see counterTerminalButtons) and dispatch through
-// the same executePowerMenuAction(), so the two views can never drift out of
-// sync — including the demo-mode filter that drops logout/exit. Only the labels
-// differ: the CRT is 40 columns wide, so they're shortened here.
-// Row text lives in src/counter-terminal.ts so the 3D harness (which boots
-// StoreScene without this DOM shell) renders the identical menu.
-let counterTerminalIndex = 0;
-
-function renderCounterTerminal() {
-  const { lines, cursorLine } = counterTerminalLines(counterTerminalButtons, counterTerminalIndex);
-  storeScene?.setTerminalText(lines, cursorLine);
-}
-
-function openCounterTerminal() {
-  if (!storeScene || ui.isAnyOverlayOpen) return;
-  ui.isCounterTerminalOpen = true;
-  counterTerminalIndex = 0;
-  storeScene.enterSearchMode(); // camera dock only — the text is ours
-  renderCounterTerminal();
-  logToConsole('[Terminal] Manager terminal open at the counter.', 'system');
-}
-
-function closeCounterTerminal() {
-  if (!ui.isCounterTerminalOpen) return;
-  ui.isCounterTerminalOpen = false;
-  // Hands the camera back and resets the CRT to its idle rental screen.
-  storeScene?.exitSearchMode();
-  logToConsole('[Terminal] Manager terminal closed.', 'system');
-}
-
-function stepCounterTerminal(delta: number) {
-  const n = counterTerminalButtons.length;
-  counterTerminalIndex = (counterTerminalIndex + delta + n) % n;
-  retailAudio.playKeyClick();
-  renderCounterTerminal();
-}
-
-async function activateCounterTerminal() {
-  const btnId = counterTerminalButtons[counterTerminalIndex];
-  // Close first: several actions (settings drawer, logout) take over the
-  // screen, and the docked camera must be handed back before they do.
-  closeCounterTerminal();
-  await executePowerMenuAction(btnId);
-}
+// MANAGER OVERRIDE and MEDIA RELEASE DATE rows — see counterTerminalButtons)
+// and dispatch through the same executePowerMenuAction(), so the two views can
+// never drift out of sync. The controller itself (menu state + the #42 date
+// sub-screen) lives in counter-terminal-flow.ts; this is its one wiring point.
+initCounterTerminalFlow({
+  scene: () => storeScene,
+  ui,
+  buttons: counterTerminalButtons,
+  execute: (btnId) => executePowerMenuAction(btnId),
+  keyClick: () => retailAudio.playKeyClick(),
+  log: (msg) => logToConsole(msg, 'system'),
+  rebuild: () => rebuildStoreScene(),
+});
 
 // ─── Settings Drawer ───────────────────────────────────────────────────────
 //
@@ -2425,7 +2427,7 @@ async function initializeStoreScene(preservePosterCache = false) {
         if (lib.movies[i].discovery) lib.movies.splice(i, 1);
       }
     }
-    bootFlatStore(storeLibraries, canvasContainer, storeGameMovies, discoveryMovies);
+    bootFlatStore(storeLibraries, canvasContainer, storeGameMovies, storeDiscovery);
     hideBootOverlay();
     return;
   }
@@ -2497,7 +2499,7 @@ async function initializeStoreScene(preservePosterCache = false) {
     await calibrateQualityIfNeeded();
 
     const { StoreScene } = await import('./three-scene');
-    const scene = new StoreScene(canvasContainer, storeLibraries, logToConsole, jfUrl, jfToken, comingSoonMovies, discoveryMovies, storeGameMovies, staffPicks);
+    const scene = new StoreScene(canvasContainer, storeLibraries, logToConsole, jfUrl, jfToken, storeComingSoon, storeDiscovery, storeGameMovies, staffPicks);
     armQualityBackstop();
 
     let lastLoggedPct = -1;
@@ -2614,7 +2616,7 @@ async function initializeStoreScene(preservePosterCache = false) {
     };
 
     // Left at the checkout counter reaches for the clerk's terminal.
-    scene.onCounterTerminal = () => openCounterTerminal();
+    scene.onCounterTerminal = () => counterTerminalOpen();
     scene.onEnterFlatMode = () => executePowerMenuAction('btn-flat-mode');
 
     // Library-select (end-cap) left/right nav arrows on the floating locator.
@@ -4025,7 +4027,7 @@ async function main() {
       if (ui.isLoginOpen) return;
       if (ui.isSearchOpen) return;
       if (ui.isPowerMenuOpen) return;
-      if (ui.isCounterTerminalOpen) return; // already docked; Left is what opened it
+      if (ui.isCounterTerminalOpen) { counterTerminalInput('left'); return; }
       if (ui.isSettingsDrawerOpen) {
         if (settingsRowKeys[settingsIndex] !== SETTINGS_CLOSE_KEY) activateSelectedSetting(-1);
         return;
@@ -4049,8 +4051,9 @@ async function main() {
       if (ui.isSearchOpen) return;
       if (ui.isPowerMenuOpen) return;
       // Right steps back out of the terminal to the counter — the mirror of
-      // the Left press that reached for it.
-      if (ui.isCounterTerminalOpen) { closeCounterTerminal(); return; }
+      // the Left press that reached for it (or moves field focus while the
+      // date sub-screen is up; the flow decides).
+      if (ui.isCounterTerminalOpen) { counterTerminalInput('right'); return; }
       if (ui.isSettingsDrawerOpen) {
         if (settingsRowKeys[settingsIndex] !== SETTINGS_CLOSE_KEY) activateSelectedSetting(1);
         return;
@@ -4082,7 +4085,7 @@ async function main() {
         setPowerMenuSelection(nextIdx);
         logToConsole(`[Input] Power menu selection: ${powerButtons[nextIdx]}`, 'system');
       } else if (ui.isCounterTerminalOpen) {
-        stepCounterTerminal(-1);
+        counterTerminalInput('up');
       } else if (ui.isVersionPickerOpen) {
         moveVersionPickerSelection(-1);
       } else if (ui.isCandyCheckoutOpen) {
@@ -4108,7 +4111,7 @@ async function main() {
         setPowerMenuSelection(nextIdx);
         logToConsole(`[Input] Power menu selection: ${powerButtons[nextIdx]}`, 'system');
       } else if (ui.isCounterTerminalOpen) {
-        stepCounterTerminal(1);
+        counterTerminalInput('down');
       } else if (ui.isVersionPickerOpen) {
         moveVersionPickerSelection(1);
       } else if (ui.isCandyCheckoutOpen) {
@@ -4140,7 +4143,7 @@ async function main() {
       // than falling through to selectAction(), which in checkout mode would
       // confirm the rental.
       if (ui.isCounterTerminalOpen) {
-        await activateCounterTerminal();
+        await counterTerminalInput('ok');
         return;
       }
 
@@ -4229,7 +4232,7 @@ async function main() {
       }
 
       if (ui.isCounterTerminalOpen) {
-        closeCounterTerminal();
+        counterTerminalInput('back'); // steps the date sub-screen out first
         return;
       }
 
@@ -4269,7 +4272,7 @@ async function main() {
       if (ui.isSearchOpen) { closeSearch(); return; }
       // P while the diegetic version is already up closes it rather than
       // stacking the glass overlay on top of the same options.
-      if (ui.isCounterTerminalOpen) { closeCounterTerminal(); return; }
+      if (ui.isCounterTerminalOpen) { counterTerminalClose(); return; }
 
       if (ui.isExitConfirmOpen) {
         closeExitConfirm();
