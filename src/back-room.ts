@@ -335,9 +335,11 @@ export class BackRoom {
    * forking it. Every surface takes the same board, pane included — a glass
    * top over wood legs is the thing being replaced, not a look worth half of.
    *
-   * The grain is a real photo scan from the git-ignored user-assets tree
-   * (surfaces/table-wood — see its NOTES.md), and the COMMITTED fallback is a
-   * plain lit board colour, not a procedural stand-in. Owner call after three
+   * The grain is a real photo scan SHIPPED IN THE REPO at
+   * public/textures/surfaces/table-wood (ambientCG WoodFloor043, CC0 — see its
+   * NOTES.md), so every install gets it; a user-assets drop-in of the same name
+   * still wins. Only when both are absent does the flat lit board colour stand
+   * in, and it is a colour, not a procedural grain. Owner call after three
    * procedural attempts: drawn strokes read as corduroy, radial growth rings
    * as sand ripples, warped straight grain as burl. The GLB's UVs tile hard
    * across the top, which sets a scale none of them survived. Flat and
