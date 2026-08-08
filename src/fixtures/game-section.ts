@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { Movie } from '../jellyfin';
 import { FixturePlacement, shelfTitleCompare, BOX_SPACING, UNIT_DEPTH, UNIT_TOP_DEPTH, LEAN_ANGLE } from '../store-layout';
 import { FixtureContext, SlottedFixture, FixtureSlot } from '../fixtures';
-import { Footprint } from '../layout-validator';
+import { Footprint, localZOffset } from '../layout-validator';
 import { createCategorySignTexture, createFlushTopperLabelTexture } from '../canvas-textures';
 import { gameCaseDims } from '../video-case';
 import { createTrapezoidGeometry, splitTrapezoidGroups, createLibraryEndCapMaterial, getSlatwallPanelMaterial, markSignMesh } from '../sign-builders';
@@ -560,14 +560,25 @@ export class GameSection implements SlottedFixture {
     const shelfLength = (this.cols - 1) * BOX_SPACING + 1.0;
     const capFront = this.hasFrontCap ? 0.1 : 0;
     const capBack = this.hasBackCap ? 0.1 : 0;
+    // The caps are ASYMMETRIC: a unit in the middle of a run carries one, at
+    // its OUTER end only, so the run reads as a single continuous fixture. A
+    // footprint centred on the placement spreads that one cap's 0.1 ft over
+    // BOTH ends, overstating the unit by 0.05 ft into the neighbour it meets
+    // flush — which is exactly why two end-to-end units reported overlapping
+    // by 0.10 ft (one whole cap) with nothing wrong in the geometry.
+    // Local +Z is the front cap's end, -Z the back cap's (see the yaw notes in
+    // gameSectionPlacements), and local Z maps to world by the convention in
+    // layout-validator's header.
+    const yaw = this.placement.yaw;
+    const { dx, dz } = localZOffset(yaw, (capFront - capBack) / 2);
     return {
       label: `fixture:${this.placement.id}`,
       kind: 'fixture',
-      cx: this.placement.position.x,
-      cz: this.placement.position.z,
+      cx: this.placement.position.x + dx,
+      cz: this.placement.position.z + dz,
       w: UNIT_DEPTH,
       d: shelfLength + capFront + capBack,
-      yaw: this.placement.yaw,
+      yaw,
     };
   }
 

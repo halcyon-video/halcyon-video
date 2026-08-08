@@ -30,6 +30,19 @@ export interface Footprint {
  *  1.5 ft aisle walkway minimum (see validateLayout's default). */
 export const FLOOR_DISPLAY_CLEARANCE = 3.0;
 
+/**
+ * World-space offset of a point sitting `delta` along a footprint's LOCAL Z
+ * axis, using the same rotation convention as everything else here (see the
+ * header). Exists because a fixture whose extent is ASYMMETRIC about its
+ * placement — an aisle-run unit carrying an end cap on its outer end only —
+ * cannot describe itself with a box centred on that placement. Spreading the
+ * extra depth over both ends instead overstates it into whatever it meets
+ * flush, which reads as a phantom overlap of exactly the asymmetry.
+ */
+export function localZOffset(yaw: number, delta: number): { dx: number; dz: number } {
+  return { dx: delta * Math.sin(yaw), dz: delta * Math.cos(yaw) };
+}
+
 export interface LayoutViolation {
   severity: 'error' | 'warn';
   a: string; b?: string;
