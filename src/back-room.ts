@@ -46,8 +46,12 @@ import { BB_MONO, ensureBundledFont, bundledFontReady } from './bundled-fonts';
 export const BACK_ROOM_ORIGIN = new THREE.Vector3(211, 0, 0);
 
 // Couch eye point + where the couch view looks (local to the room origin).
-const VIEW_POS = new THREE.Vector3(0, 4.05, 4.55);
-const VIEW_LOOK = new THREE.Vector3(0, 2.55, -5.3);
+// Low and close, just above the table top and a short reach back from its
+// near edge, looking ACROSS the surface rather than down onto the room. The
+// tapes and the receipt are the subject at this range; the TV falls well
+// behind the focal plane and is carried by the bokeh pass.
+const VIEW_POS = new THREE.Vector3(0.34, 2.50, 2.42);
+const VIEW_LOOK = new THREE.Vector3(0.30, 2.08, 0.42);
 // Inspected tape hovers this far in front of the couch eye point.
 const INSPECT_DIST = 1.18;
 
@@ -261,40 +265,10 @@ export class BackRoom {
     floor.position.y = 0;
     this.addOwned(floor);
 
-    // Woven area rug under the furniture cluster: a lit, textured island in
-    // the unlit void floor. It takes the warm key/fill lights (unlike the
-    // MeshBasic floor), which visually ties the props to the ground plane.
-    {
-      const R = 256;
-      const rugCanvas = document.createElement('canvas');
-      rugCanvas.width = R; rugCanvas.height = R;
-      const rctx = rugCanvas.getContext('2d')!;
-      rctx.fillStyle = '#5a2f28'; // worn rust red
-      rctx.fillRect(0, 0, R, R);
-      // Border band.
-      rctx.strokeStyle = '#3b2019';
-      rctx.lineWidth = 18;
-      rctx.strokeRect(14, 14, R - 28, R - 28);
-      rctx.strokeStyle = '#8a5c33';
-      rctx.lineWidth = 3;
-      rctx.strokeRect(26, 26, R - 52, R - 52);
-      // Weave noise.
-      for (let i = 0; i < 2600; i++) {
-        const v = Math.random();
-        rctx.fillStyle = v > 0.5 ? 'rgba(0,0,0,0.10)' : 'rgba(255,235,210,0.05)';
-        rctx.fillRect(Math.random() * R, Math.random() * R, 1.6, 1.2);
-      }
-      const rugTex = new THREE.CanvasTexture(rugCanvas);
-      rugTex.colorSpace = THREE.SRGBColorSpace;
-      const rug = new THREE.Mesh(
-        new THREE.PlaneGeometry(9.5, 12.5),
-        new THREE.MeshStandardMaterial({ map: rugTex, roughness: 0.97, metalness: 0 }),
-      );
-      rug.rotation.x = -Math.PI / 2;
-      rug.position.set(0, 0.005, -1.6); // under couch sightline: table (z≈0.9) to TV stand (z≈-5.3)
-      (rug.material as THREE.MeshStandardMaterial).envMapIntensity = 0.18; // pocket sits outside the store — see roomMat
-      this.addOwned(rug);
-    }
+    // No area rug: at the close across-the-table framing this view now uses
+    // (see VIEW_POS), the rug filled the lower third with woven red and pulled
+    // the eye off the tapes and the receipt, which are what the shot is of.
+    // The contact shadow below still ties the furniture to the ground plane.
 
     // Soft contact shadow under the furniture cluster (table + TV stand) so
     // the props sit ON the floor instead of hovering over flat colour.
@@ -657,7 +631,10 @@ export class BackRoom {
     note.rotation.order = 'YXZ';
     note.rotation.x = -Math.PI / 2;
     note.rotation.y = 0.34;
-    note.position.set(0.95, tableTopY + 0.006, 1.15);
+    // Set at the pile's own depth, not nearer the couch: the view's focal
+    // plane is on the pile (focusDistance), and a receipt 0.25 ft in front of
+    // it fell far enough forward to go soft at this aperture.
+    note.position.set(0.86, tableTopY + 0.006, 0.94);
     this.addOwned(note);
   }
 
@@ -999,6 +976,18 @@ export class BackRoom {
   }
 
   // ── Camera poses for StoreScene's lerp ─────────────────────────────────────
+
+  /**
+   * Distance from the couch eye point to the tape pile — the focal plane for
+   * the depth-of-field pass in this view. The pile, not the look target: the
+   * look target sits between the tapes and the receipt so both frame well, and
+   * focusing there would leave the spine (the thing being read) soft.
+   */
+  focusDistance(): number {
+    const eye = this._pose.pos.set(VIEW_POS.x, VIEW_POS.y, VIEW_POS.z).add(BACK_ROOM_ORIGIN);
+    const pile = this._v.set(0, this.stackBaseY, 0.9).add(BACK_ROOM_ORIGIN);
+    return eye.distanceTo(pile);
+  }
 
   cameraPose(): { pos: THREE.Vector3; look: THREE.Vector3 } {
     this._pose.pos.copy(BACK_ROOM_ORIGIN).add(VIEW_POS);
