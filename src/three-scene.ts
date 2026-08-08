@@ -1216,7 +1216,15 @@ export class StoreScene {
       // Left wall has no stepped corner: its unit back-aligns to the back wall.
       const unitBackZ = this.nrLeftWallUnitBackZ();
       const unitSpace = (this.sideRibbon ? this.sideRibbon.backZ - SIDE_RIBBON_CLEARANCE : 15.0) - unitBackZ;
-      this.nrLeftWallCols = Math.max(0, Math.min(36, Math.floor((unitSpace - 1.0) / BOX_SPACING)));
+      // GH #6: this used to hard-cap at 36 columns regardless of how much wall
+      // was actually available, which left the run stopping visibly short of
+      // the window ribbon on any store wide enough to offer more (the
+      // baseline-width store's ~44 available columns only ever built 36,
+      // an 8-column/~4.6ft gap of bare wall between the last case and the
+      // glass). The whole point of this calc is described right above it as
+      // ADAPTIVE — sized to whatever the ribbon leaves behind it — so let it
+      // actually use the space it computed instead of throwing some away.
+      this.nrLeftWallCols = Math.max(0, Math.floor((unitSpace - 1.0) / BOX_SPACING));
       if (this.nrLeftWallCols < SECTION_COLS) this.nrLeftWallCols = 0; // below one section, drop the run
 
       this.nrTotalCols = this.nrLeftWallCols + this.nrBackWallCols;
