@@ -37,6 +37,8 @@ import { makeCurvedScreenGeometry, makeTubeOverlayMaterial } from './crt-tube';
 import { makeCrtGlassMaterial } from './glass-reflection';
 import type { RentalRecord } from './rental-clock';
 import { formatUnlockLabel } from './rental-clock';
+import { brandString } from './brand-pack';
+import { BB_MONO, ensureBundledFont, bundledFontReady } from './bundled-fonts';
 
 // Room origin: +200ft in X from the store centreline (x=11) — far outside the
 // shell, past every wall, mural, exterior pano and light probe.
@@ -480,43 +482,127 @@ export class BackRoom {
     this.applyFocusPoses(performance.now());
   }
 
+  /**
+   * The rental receipt on the coffee table — a measured redraw of a real 1995
+   * video-store register slip (owner reference, 2026-08-07), replacing the
+   * landscape card with a house-colour header band that was here before. That
+   * card was invented; this one follows the artifact.
+   *
+   * What the reference actually is: a narrow impact-printed slip, violet ribbon
+   * ink on off-white stock, monospace throughout, no colour and no logo — the
+   * header is TYPED, like every other line. Its shape is: transaction number
+   * flush right, a centred address block, an asterisk rule, a centred store
+   * tagline, a Store/Employee row, a second rule, then line items as PAIRS (an
+   * all-caps title line, then an indented kind/price line), a dashed rule
+   * before the totals, a `=====` rule before Amount Due, tender and change, the
+   * member block, a centred thank-you couplet, a final rule, and a timestamp.
+   *
+   * Brand rules (CLAUDE.md #2): the wordmark and address come from brand canon,
+   * NOT from the photo — same brandString keys the case wrap prints, so a brand
+   * pack retitles the receipt with everything else. The reference's own chain
+   * slogan is a real mark and does not ship; the tagline is a neutral house
+   * line a pack can override.
+   *
+   * DUE BACK stays: this prop's diegetic job is telling you when the tape is
+   * owed, and rental-clock is what drives the lockout.
+   */
   private buildDueNote(tableTopY: number): void {
     if (!this.record) return;
+    const W = 512, H = 1180;
     const canvas = document.createElement('canvas');
-    canvas.width = 512;
-    canvas.height = 340;
+    canvas.width = W;
+    canvas.height = H;
     const ctx = canvas.getContext('2d')!;
-    // A cream rental receipt slip with the house header band.
-    ctx.fillStyle = '#f4e7c6';
-    ctx.fillRect(0, 0, 512, 340);
-    ctx.fillStyle = '#1a49c2';
-    ctx.fillRect(0, 0, 512, 74);
-    ctx.fillStyle = '#ffd23f';
-    ctx.font = 'bold 44px "Courier New", monospace';
-    ctx.textAlign = 'center';
-    ctx.fillText('RENTAL RECEIPT', 256, 52);
-    ctx.fillStyle = '#28241c';
-    ctx.font = 'bold 34px "Courier New", monospace';
-    ctx.fillText(`${this.record.items.length} TAPE${this.record.items.length === 1 ? '' : 'S'} — THANK YOU!`, 256, 130);
-    ctx.font = 'bold 40px "Courier New", monospace';
-    ctx.fillStyle = '#8d1111';
-    ctx.fillText('DUE BACK:', 256, 210);
-    ctx.font = 'bold 52px "Courier New", monospace';
-    ctx.fillText(this.devTimer ? 'IN 5 MINUTES' : formatUnlockLabel(this.record), 256, 278);
-    ctx.fillStyle = '#28241c';
-    ctx.font = '24px "Courier New", monospace';
-    ctx.fillText('PLEASE REWIND', 256, 322);
-
     const tex = new THREE.CanvasTexture(canvas);
     tex.colorSpace = THREE.SRGBColorSpace;
+
+    const paint = () => {
+      const mono = bundledFontReady(BB_MONO) ? BB_MONO : 'monospace';
+      // Impact ribbon on thermal stock: a violet-leaning ink that is nowhere
+      // near black, on paper that is nowhere near white.
+      const INK = '#3f4486', PAPER = '#f1eee4';
+      const L = 34, R = W - 34, CX = W / 2;
+      ctx.fillStyle = PAPER;
+      ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = INK;
+      ctx.textBaseline = 'alphabetic';
+
+      const px = 21;
+      const line = (y: number) => { ctx.font = `${px}px "${mono}", monospace`; return y; };
+      const left = (t: string, y: number, x = L) => { ctx.textAlign = 'left'; ctx.fillText(t, x, line(y)); };
+      const right = (t: string, y: number) => { ctx.textAlign = 'right'; ctx.fillText(t, R, line(y)); };
+      const mid = (t: string, y: number) => { ctx.textAlign = 'center'; ctx.fillText(t, CX, line(y)); };
+      // A rule is a printed row of characters, not a drawn line — the printer
+      // had no graphics, which is why the reference's rules are asterisks.
+      const rule = (ch: string, y: number) => {
+        ctx.font = `${px}px "${mono}", monospace`;
+        const w = ctx.measureText(ch).width || 1;
+        mid(ch.repeat(Math.max(1, Math.floor((R - L) / w))), y);
+      };
+      // Price rows: label left, an aligned dollar column, amount flush right.
+      const money = (label: string, amount: string, y: number, indent = 0) => {
+        left(label, y, L + indent);
+        ctx.textAlign = 'left'; ctx.fillText('$', R - 118, line(y));
+        right(amount, y);
+      };
+
+      const RENT = 3.25;
+      const items = this.record!.items;
+      const sub = items.length * RENT;
+      const tax = Math.round(sub * 0.0475 * 100) / 100;
+      const f = (n: number) => n.toFixed(2);
+
+      let y = 46;
+      right(brandString('receipt-txn', '90103-00213995'), y); y += 40;
+      mid(brandString('brand-wordmark-video', 'HALCYON VIDEO'), y); y += 26;
+      mid(brandString('wrap-address-street', '2400 KINGFISHER PKWY').replace(/\s+/g, ' '), y); y += 26;
+      mid(brandString('wrap-address-city', 'CEDAR FALLS, IA 50613').replace(/\s+/g, ' '), y); y += 34;
+      rule('*', y); y += 30;
+      mid(brandString('receipt-tagline', 'THANKS FOR RENTING WITH US!'), y); y += 30;
+      left('Store: 0117', y); right('Employee : 00004', y); y += 12;
+      rule('*', y + 14); y += 44;
+
+      money('Balance', '0.00', y); y += 30;
+      for (const title of items) {
+        left(title.toUpperCase().slice(0, 30), y); y += 26;
+        money('Rental', f(RENT), y, 22); y += 30;
+      }
+      y += 6;
+      ctx.textAlign = 'right'; ctx.fillText('----------', R, line(y)); y += 30;
+      money('Subtotal', f(sub), y); y += 26;
+      money('Total Tax', f(tax), y); y += 12;
+      ctx.textAlign = 'right'; ctx.fillText('==========', R, line(y + 14)); y += 44;
+      money('Amount Due', f(sub + tax), y); y += 44;
+      money('Tendered VISA', f(sub + tax), y); y += 26;
+      money('Change Due', '0.00', y); y += 46;
+
+      // The one line this prop exists for.
+      left('DUE BACK :', y);
+      right(this.devTimer ? 'IN 5 MINUTES' : formatUnlockLabel(this.record!), y); y += 44;
+
+      left('Cust #: 0000123456', y); y += 26;
+      left(`Name  : ${brandString('receipt-member', 'MEMBER')}`, y); y += 48;
+      mid('Thank You for your Visit.', y); y += 26;
+      mid('We appreciate your business.', y); y += 34;
+      mid(brandString('rental-rules-note', 'PLEASE REWIND'), y); y += 34;
+      rule('*', y); y += 30;
+      left(brandString('receipt-stamp', '0117-06-22-NOV-1995 20:57:32.31'), y);
+
+      tex.needsUpdate = true;
+    };
+
+    paint();
+    ensureBundledFont(BB_MONO, paint);
+
+    // Real receipt stock is ~3.1 in wide; this is printed a touch over that so
+    // the small type still reads from the couch, which is where it is looked at.
     const note = new THREE.Mesh(
-      new THREE.PlaneGeometry(1.05, 0.7),
-      new THREE.MeshStandardMaterial({ map: tex, roughness: 0.9, metalness: 0 }),
+      new THREE.PlaneGeometry(0.36, 0.36 * (H / W)),
+      new THREE.MeshStandardMaterial({ map: tex, roughness: 0.94, metalness: 0 }),
     );
     note.rotation.order = 'YXZ';
     note.rotation.x = -Math.PI / 2;
     note.rotation.y = 0.34;
-    // Beside the pile (which sits at the table centre), flat on the table top.
     note.position.set(0.95, tableTopY + 0.006, 1.15);
     this.addOwned(note);
   }

@@ -32,6 +32,7 @@ import archivoBlackUrl from './assets/archivo-black.ttf';
 import outfitUrl from './assets/outfit.ttf';
 import orbitronUrl from './assets/orbitron.ttf';
 import yellowtailUrl from './assets/yellowtail.ttf';
+import shareTechMonoUrl from './assets/share-tech-mono.ttf';
 
 /** Anton — the Impact-class ultra-condensed black. Also the varsity/fascia face. */
 export const BB_ANTON = 'BBAnton';
@@ -43,6 +44,15 @@ export const BB_OUTFIT = 'BBOutfit';
 export const BB_ORBITRON = 'BBOrbitron';
 /** Yellowtail — the brush script the 1990 collection header card sets. */
 export const BB_BRUSH = 'BBBrush';
+/**
+ * The bundled MONOSPACE face — receipts, register tape, anything printed by a
+ * counter machine. The ttf was already in src/assets and referenced by nothing;
+ * meanwhile nine painters asked for `"Courier New", monospace`, which is not
+ * installed on this machine (fc-match resolves it to Liberation Mono) and is
+ * not guaranteed anywhere else either. Bundling it is the same fix the display
+ * faces got: paint with a face we actually shipped, not one we hope is there.
+ */
+export const BB_MONO = 'BBMono';
 
 interface FaceSpec {
   url: string;
@@ -64,6 +74,7 @@ const FACES: Record<string, FaceSpec> = {
   [BB_OUTFIT]: { url: outfitUrl, descriptors: { weight: '100 900' } },
   [BB_ORBITRON]: { url: orbitronUrl, descriptors: { weight: '400 900' } },
   [BB_BRUSH]: { url: yellowtailUrl, descriptors: { weight: '100 900' } },
+  [BB_MONO]: { url: shareTechMonoUrl, descriptors: { weight: '100 900' } },
 };
 
 /**
