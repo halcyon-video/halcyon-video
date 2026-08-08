@@ -650,7 +650,7 @@ export function registerCoreSettings(): void {
     default: false,
     applyMode: 'live',
     apply: (value, scene) => scene.setRentalMode(!!value),
-    hint: 'Halcyon house rules: real due-backs, back room, lockout.',
+    hint: 'Halcyon house rules: real due-backs, living room, lockout.',
   });
 
   // Dev timer: ships available but OFF (ticket). Read at checkout time, so a
@@ -917,6 +917,25 @@ export function registerCoreSettings(): void {
     default: false,
     applyMode: 'reload',
     hint: 'Adds a Video Games shelf stocked from Romm (or demo).',
+  });
+
+  // The native launch path (romm.ts launchGame -> Tauri's launch_game) has
+  // always read this key, but nothing ever registered it — so the only way to
+  // set it was to write localStorage by hand, and the feature read as missing
+  // to anyone who looked for it. The Rust side splits on whitespace and spawns
+  // an argv ARRAY (no shell) with the program checked against a fixed emulator
+  // allowlist, so a typo here fails closed rather than running something.
+  // Desktop only: a browser build has no __TAURI_INTERNALS__ and falls through
+  // to Romm's EmulatorJS player regardless of what is typed.
+  registerSetting({
+    key: 'romm_launch_cmd',
+    label: 'Emulator Command',
+    kind: 'text',
+    group: 'Video Games',
+    default: '',
+    applyMode: 'live',
+    hint: 'Desktop app only. e.g. "retroarch -L /path/to/core.so {path}" — {path} becomes the rom file. Blank uses Romm\'s in-browser player.',
+    visibleWhen: () => getSetting<boolean>('bb_games_enabled'),
   });
 
   // GAMES ONLY: the games stop being a department and become the store (see

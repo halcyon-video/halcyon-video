@@ -364,6 +364,18 @@ export class StoreClerk {
   }
 
   /**
+   * Talk to her across the checkout counter (▲ at the register). Same menu
+   * the walk-up E key opens; enterCheckout has already summoned her to the
+   * register, so there is no proximity test left to pass. False when the
+   * dialog layer was never built (headless/tests).
+   */
+  public talkAtCounter(): boolean {
+    if (!this.interaction) return false;
+    this.interaction.openAtCounter();
+    return true;
+  }
+
+  /**
    * Test hook (`clerktalk` checkpoint): open the walk-up "What do you
    * recommend?" answer — the standing-position-scoped path, not a clasp's —
    * without simulating the E-key/menu flow.

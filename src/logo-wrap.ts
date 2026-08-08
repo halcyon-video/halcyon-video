@@ -201,9 +201,11 @@ function brandRentalLine(spec: LogoSpec): string {
 // ─── Public API ──────────────────────────────────────────────────────────────
 
 /** Settings-drawer label for the procedural variants, derived from the brand. */
-export function customWrapLabel(spec: LogoSpec, kind: 'custom' | 'custom-ticket'): string {
+export function customWrapLabel(spec: LogoSpec, kind: 'custom' | 'custom-ticket' | 'custom-blue'): string {
   const brand = spec.mainText.toUpperCase().trim() || 'CUSTOM';
-  return kind === 'custom' ? `${brand} — custom wrap` : `${brand} — custom ticket back`;
+  if (kind === 'custom') return `${brand} — custom wrap`;
+  if (kind === 'custom-ticket') return `${brand} — custom ticket back`;
+  return `${brand} — blue rental wrap`;
 }
 
 // One canvas per (kind, medium) per boot. The spec can't change under us
@@ -253,6 +255,13 @@ export function buildCustomTemplateWrap(spec: LogoSpec, medium: CaseMedium): HTM
 /** The 'custom-ticket' all-emblem wrap (plain — no metadata anywhere). */
 export function buildCustomTicketWrap(spec: LogoSpec, medium: CaseMedium): HTMLCanvasElement {
   return cachedWrap(`custom-ticket-${medium}`, () => drawTicketWrap(spec, medium));
+}
+
+/** The DVD-only 'blue' wrap: the VHS 'Standard Version' design (cream stock,
+ *  full-bleed blue panel, gold-rule frame) redrawn on the DVD wrap's own fold
+ *  geometry. Typed-metadata compatible (video-case.ts's drawDvdBlueOverlays). */
+export function buildDvdBlueTemplateWrap(spec: LogoSpec): HTMLCanvasElement {
+  return cachedWrap('custom-dvd-blue', () => drawDvdBlueTemplateWrap(spec));
 }
 
 // ─── The cream/white TEMPLATE wrap ───────────────────────────────────────────
@@ -647,6 +656,228 @@ function drawDvdTemplateWrap(spec: LogoSpec): HTMLCanvasElement {
   ctx.fillText(brandLine, 783, 640);
 
   drawFrontPlaceholder(ctx, spec, 'dvd');
+  return canvas;
+}
+
+// ── DVD "Blue" template (the VHS "Standard Version" design ported onto the
+// DVD wrap's own fold geometry: 1024×683, folds x 478/558) ──────────────────
+// Same cream stock, full-bleed blue back/front panels, gold-rule frame and
+// typed-metadata contract as drawVhsTemplateWrap above — administrative/
+// structural text prints in Arial exactly like the VHS wrap (only the giant
+// front wordmark uses the brand font), just re-laid-out for the DVD canvas's
+// narrower spine and shorter height instead of reusing the VHS pixel
+// geometry verbatim. The back-window and care-block coordinates below are
+// shared with video-case.ts's drawDvdBlueOverlays — keep the two in step.
+// The spine field positions (SPINE_FIELDS.dvd), the spine's big-line/barcode
+// geometry and the front title-placeholder column (cx 995.5, centre y 374)
+// are reused VERBATIM from drawDvdTemplateWrap/drawDvd2003Overlays below —
+// that geometry doesn't depend on how the back/front panels are styled, so
+// there's no reason to re-derive it.
+function drawDvdBlueTemplateWrap(spec: LogoSpec): HTMLCanvasElement {
+  const W = IMG_W, H = IMG_H.dvd; // 1024×683
+  const stock = STOCK.vhs, ink = INK.vhs; // same cream-stock print family as the VHS wrap
+  const canvas = document.createElement('canvas');
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext('2d')!;
+  const rand = mulberry32(spec.tornSeed ^ 0x44564442); // 'DVDB' — distinct stream from the other two wraps
+  const brandLine = brandRentalLine(spec);
+  const brandName = `${spec.mainText} ${spec.subText}`.replace(/\s+/g, ' ').trim().toUpperCase();
+  const pc = wrapPrintColors(spec); // scan-sampled inks for untouched defaults
+  const bcDigits = `390 39${String(10000000 + ((spec.tornSeed * 7919) % 90000000)).slice(0, 8)}`;
+
+  // Paper stock + faint fold creases at the DVD crop boundaries (478/558).
+  ctx.fillStyle = stock;
+  ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = 'rgba(0,0,0,0.06)';
+  ctx.fillRect(478, 0, 1, H);
+  ctx.fillRect(558, 0, 1, H);
+
+  // ── BACK top strip: barcode + number left, address block centred ──
+  ctx.fillStyle = ink;
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'alphabetic';
+  ctx.font = 'bold 14px Arial, sans-serif';
+  ctx.fillText(bcDigits, 20, 30);
+  drawFlatBarcode(ctx, rand, 22, 38, 100, 24, ink);
+  drawAddressBlock(ctx, spec, 320, ink);
+
+  // ── BACK panel: printed brand panel bleeding off the bottom ──
+  const backPanel = printedPanelPath(rand, 18, 410, 80, 30, H);
+  ctx.fillStyle = pc.body;
+  ctx.fill(backPanel);
+  // Rights micro-print down the panel's left edge, like the VHS wrap's.
+  vTextDown(ctx, brandString('wrap-rights-line', `${brandName} — ALL RIGHTS RESERVED`),
+    27, 108, '8px Arial, sans-serif', 'rgba(255,255,255,0.92)');
+
+  // Label window: stock card set into the panel. Shared bounds with
+  // video-case.ts's drawDvdBlueOverlays (wx/wMax/windowBottom there derive
+  // from these).
+  const winX0 = 48, winY0 = 104, winX1 = 376, winY1 = 404;
+  ctx.fillStyle = stock;
+  ctx.fillRect(winX0, winY0, winX1 - winX0, winY1 - winY0);
+  ctx.strokeStyle = ink;
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(winX0 + 1.5, winY0 + 1.5, winX1 - winX0 - 3, winY1 - winY0 - 3);
+  ctx.fillStyle = ink;
+  const headPx = fitArialPx(ctx, brandLine, 14, 'bold', winX1 - winX0 - 20, 9);
+  ctx.font = `bold ${headPx}px Arial, sans-serif`;
+  ctx.fillText(brandLine, winX0 + 10, winY0 + 22);
+
+  // Care print on the panel below the window — DISC-appropriate copy (never
+  // the VHS tape wording), same gold-headline / white-body pairs treatment
+  // as the VHS wrap's care block.
+  const careMax = winX1 - winX0 - 18;
+  const careX = winX0 + 9;
+  const head = (t: string, y: number, px: number): number => {
+    ctx.fillStyle = spec.textColor;
+    ctx.font = `bold ${px}px Arial, sans-serif`;
+    let yy = y;
+    for (const ln of wrapLines(ctx, t, careMax)) { ctx.fillText(ln, careX, yy); yy += px + 2; }
+    return yy;
+  };
+  const body = (t: string, y: number): number => {
+    ctx.fillStyle = 'rgba(255,255,255,0.95)';
+    ctx.font = '9.5px Arial, sans-serif';
+    let yy = y;
+    for (const ln of wrapLines(ctx, t, careMax)) { ctx.fillText(ln, careX, yy); yy += 11; }
+    return yy;
+  };
+  let cy = winY1 + 28;
+  cy = head('PLEASE HANDLE WITH CARE', cy, 15);
+  cy = head('DISC CARE:', cy, 15) + 3;
+  cy = head('HOLD THE DISC BY ITS EDGE OR CENTER HOLE ONLY.', cy, 10.5);
+  cy = body('(Fingerprints and dust can cause skipping or freezing during playback.)', cy) + 3;
+  cy = head('DO NOT LEAVE THIS CASE IN A HOT PLACE, LIKE GLOVE BOX OR CAR SEAT.', cy, 10.5);
+  cy = body('Extreme heat can warp the disc beyond repair.', cy) + 3;
+  cy = head('NEVER WRITE ON OR APPLY A LABEL TO THE DISC SURFACE.', cy, 10.5);
+  cy = body('(Doing so can damage the laser-read layer.)', cy) + 3;
+  head('DISCS MUST BE RETURNED TO LOCATION RENTED.', cy, 10);
+
+  // Back gold-rule frame, inset within the blue panel around the window +
+  // care block — mirrors the VHS wrap's ticket-frame treatment.
+  ctx.strokeStyle = pc.stripe;
+  ctx.lineWidth = 2;
+  ctx.save();
+  ctx.clip(backPanel);
+  ctx.beginPath();
+  ctx.moveTo(43.5, 55);
+  ctx.lineTo(43.5, 655);
+  ctx.moveTo(380.5, 55);
+  ctx.lineTo(380.5, 655);
+  ctx.moveTo(42.5, winY1 + 11);
+  ctx.lineTo(381.5, winY1 + 11);
+  ctx.moveTo(42.5, 655);
+  ctx.lineTo(381.5, 655);
+  ctx.stroke();
+  ctx.restore();
+
+  // ── SPINE: the printed rental form — same field positions as the plain
+  // DVD wrap's own form (SPINE_FIELDS.dvd) and the same big-line/barcode
+  // geometry as drawDvdTemplateWrap below, just set in the VHS wrap's ink
+  // instead of the brand-blue body color. ──
+  for (const f of SPINE_FIELDS.dvd) {
+    vTextDownEndingAt(ctx, f.text, f.cx, f.endY, '18px Arial, sans-serif', ink);
+  }
+  const sbp = fitArialPx(ctx, brandLine, 26, 'bold', 420, 12);
+  ctx.font = `bold ${sbp}px Arial, sans-serif`;
+  const sblen = ctx.measureText(brandLine).width;
+  vTextDown(ctx, brandLine, 540, 473 - sblen, `bold ${sbp}px Arial, sans-serif`, ink);
+  drawSpineBarcode(ctx, rand, 486, 493, 66, 70, ink);
+
+  // ── FRONT top: address block + barcode top-right (stops left of the
+  // title column, which must stay clear stock for the typed title). ──
+  drawAddressBlock(ctx, spec, 670, ink);
+  ctx.fillStyle = ink;
+  ctx.textAlign = 'left';
+  ctx.font = 'bold 14px Arial, sans-serif';
+  ctx.fillText(bcDigits, 800, 30);
+  drawFlatBarcode(ctx, rand, 802, 38, 118, 24, ink);
+
+  // ── FRONT panel: the giant brand ticket ──
+  const frontPanel = printedPanelPath(rand, 600, 940, 80, 33, H);
+  ctx.fillStyle = pc.body;
+  ctx.fill(frontPanel);
+
+  const hasBand = spec.bandText !== '';
+  const hasTag = spec.taglineText !== '';
+  const hasSub = spec.subText !== '';
+  const contentTop = 124;
+  const bandTop = 583.5, bandBottom = 633.5;
+  const contentBottom = hasBand ? bandTop - 24.5 : 621;
+  const stripeBottom = hasBand ? bandBottom : H;
+  ctx.strokeStyle = pc.stripe;
+  ctx.lineWidth = 2.25;
+  ctx.save();
+  ctx.clip(frontPanel);
+  ctx.beginPath();
+  ctx.moveTo(624.5, 55);
+  ctx.lineTo(624.5, stripeBottom);
+  ctx.moveTo(922.5, 55);
+  ctx.lineTo(922.5, stripeBottom);
+  if (hasTag) {
+    ctx.moveTo(814.5, 55);
+    ctx.lineTo(814.5, hasBand ? bandTop : H);
+  }
+  if (hasBand) {
+    ctx.moveTo(623.5, bandTop);
+    ctx.lineTo(923.5, bandTop);
+    ctx.moveTo(623.5, bandBottom);
+    ctx.lineTo(923.5, bandBottom);
+  }
+  ctx.stroke();
+  ctx.restore();
+  if (hasBand) {
+    const bt = spec.bandText.toUpperCase();
+    const bpx = fitArialPx(ctx, bt, 34, 'normal', 270, 12);
+    ctx.save();
+    ctx.translate(771, (bandTop + bandBottom) / 2 + 1);
+    ctx.rotate(Math.PI);
+    ctx.scale(0.85, 1);
+    ctx.font = `${bpx}px Arial, sans-serif`;
+    ctx.fillStyle = pc.letter;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(bt, 0, 0);
+    ctx.restore();
+  }
+  if (hasTag) {
+    const tt = spec.taglineText.toUpperCase();
+    const tpx = fitSpecFontPx(ctx, spec, tt, 50, 360, 12);
+    ctx.font = getLogoFontString(spec, tpx);
+    vTextUp(ctx, tt, 867, hasBand ? bandTop - 19.5 : H - 18, getLogoFontString(spec, tpx), pc.letter);
+  }
+  // Main wordmark column (+ optional sub column) reading bottom→top up the
+  // front face, KNOCKED OUT of the panel — same treatment as the VHS wrap.
+  const colsRight = hasTag ? 806 : 915;
+  const colLen = contentBottom - contentTop;
+  const colMidY = (contentTop + contentBottom) / 2;
+  const RW = colsRight - 625;
+  const main = spec.mainText.toUpperCase();
+  const mpx = fitSpecFontPx(ctx, spec, main, RW * (hasSub ? 0.58 : 0.68), colLen, 14);
+  const mainCx = 625 + (hasSub ? RW * 0.36 : RW * 0.5);
+  ctx.font = getLogoFontString(spec, mpx);
+  const mlen = ctx.measureText(main).width;
+  const mainBottom = colMidY + mlen / 2;
+  vTextUp(ctx, main, mainCx, mainBottom, getLogoFontString(spec, mpx), stock);
+  if (hasSub) {
+    const sub = spec.subText.toUpperCase();
+    const spx = fitSpecFontPx(ctx, spec, sub, mpx * 0.42, colLen * 0.6, 9);
+    ctx.font = getLogoFontString(spec, spx);
+    const slen = ctx.measureText(sub).width;
+    vTextUp(ctx, sub, 625 + RW * 0.78, mainBottom - mlen + slen, getLogoFontString(spec, spx), stock);
+  }
+
+  // Front right-edge title placeholder — SAME column the plain DVD wrap
+  // uses (cx 995.5, centre y 374, drawFrontPlaceholder's 'dvd' branch below),
+  // so video-case.ts's drawDvdBlueOverlays erase/retype logic can reuse that
+  // geometry verbatim instead of duplicating it. Printed here in this wrap's
+  // ink rather than drawFrontPlaceholder's DVD ink, to match the VHS ribbon.
+  const phPx = fitArialPx(ctx, brandLine, 18, 'bold', 288, 11);
+  ctx.font = `bold ${phPx}px Arial, sans-serif`;
+  const phLen = ctx.measureText(brandLine).width;
+  vTextUp(ctx, brandLine, 995.5, 374 + phLen / 2, `bold ${phPx}px Arial, sans-serif`, ink);
+
   return canvas;
 }
 

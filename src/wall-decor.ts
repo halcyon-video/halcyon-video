@@ -1,5 +1,7 @@
 // Actor-portrait wall + floating film-strip ribbon — pin 052 rebuild
-// (feedback/052, GitHub issue #25).
+// (feedback/052, GitHub issue #25), widened 2026-08 to span all three back
+// walls (feedback: "the actor posters... are supposed to span the entire
+// back three walls with the film strip. not just a tiny portion of one").
 //
 // The previous version of this feature (deleted from store-shell.ts) hung a
 // fixed-size row of movie posters + a "mural" band at a hardcoded width/Z,
@@ -13,20 +15,34 @@
 //    only shell with a tall wall band above the door/window line to hang
 //    anything in. The gate lives HERE (not just in the shell spec) so it
 //    can't drift out of sync with the setting that actually grew the wall.
-//  - Computes the wall's CLEAR z-span(s) from the real shell geometry before
-//    placing anything: the back-wall/step join, the side window ribbon, and
-//    the service door + EXIT sign footprint (shared from
-//    storefront-facade.ts, the same numbers the door itself is built from).
-//    Obstacles are excluded, never overlapped, and both the strip and the
-//    portrait row break into per-span segments if the wall ever produces
+//  - Computes EACH of the three back walls' (left, back, right) CLEAR
+//    run(s) from the real shell geometry before placing anything: the
+//    side window ribbon (shared/mirrored on both left and right — see
+//    buildSideWall in store-shell.ts, which draws both from the same
+//    scene.sideRibbon span), the service door + EXIT sign (right wall
+//    only, shared from storefront-facade.ts, the same numbers the door
+//    itself is built from), and the stepped back-right corner's short
+//    perpendicular connector face — which is NOT one of the three named
+//    walls, so it stays undecorated and simply splits the back/right runs
+//    apart when the step is present. Obstacles are excluded, never
+//    overlapped, and a wall breaks into per-span segments if it produces
 //    more than one clear run — see computeClearSpans/planPortraitSlots.
+//  - The three walls' bands read as ONE continuous run around the two
+//    corners they actually share (left-back always; back-right too when
+//    the store has no stepped corner): each side butts its span right up
+//    to the OTHER wall's own flush-mounted plane (WALL_INSET, not the
+//    bigger CORNER_MARGIN breathing room reserved for corners with no
+//    décor on the other side, e.g. the step notch or the ribbon/door) so
+//    the two perpendicular planes meet edge-to-edge with no gap and no
+//    poke-through.
 //  - Content is the library's actual most-featured actors: tallies
 //    Movie.castPeople (top-billed cast, Jellyfin Person id + portrait image)
 //    across every library, keeps only people with a real portrait image, and
-//    takes the top MAX_PORTRAITS by appearance count, evenly spread. Zero
-//    qualifying actors (e.g. the synthetic demo/harness catalog, which has
-//    no Person image data) still gets the film strip — just no portraits,
-//    per spec ("zero = just the film strip").
+//    takes the top MAX_PORTRAITS by appearance count, evenly spread across
+//    every wall's spans in proportion to their length. Zero qualifying
+//    actors (e.g. the synthetic demo/harness catalog, which has no Person
+//    image data) still gets the film strip — just no portraits, per spec
+//    ("zero = just the film strip").
 //  - The film strip is CONSTRUCTED as the object it is — sprocket-hole rails
 //    along both edges, frame lines dividing cells — not a blur or a generic
 //    stripe (owner's tone-on-tone-ghost-art rule). Its accent color pulls
@@ -39,8 +55,9 @@ import { CORNICE_DROP } from './store-shell';
 import { getActiveTheme, themeTrimDarkHex, type StoreTheme } from './themes';
 
 // ── Tunables ─────────────────────────────────────────────────────────────
-const WALL_INSET = 0.06;        // flush-mount depth off the wall plane (matches the old rightX inset)
-const CORNER_MARGIN = 0.6;      // breathing room off the back-wall/step corner
+const WALL_INSET = 0.06;        // flush-mount depth off the wall plane (matches the old rightX inset); also
+                                 // used as the "clean butt" gap between two walls' décor planes at a shared corner
+const CORNER_MARGIN = 0.6;      // breathing room off a corner that has NO décor on the other side (the step notch, the vestibule end)
 const DOOR_MARGIN = 0.4;        // extra clearance beyond the door/frame's own footprint
 // Clearance below the VISIBLE ceiling line: the chrome mirror cornice hangs
 // CORNICE_DROP below the true ceiling and occludes anything painted above
@@ -51,7 +68,11 @@ const CEILING_MARGIN = 2.3;
 const MIN_SPAN_LEN = 3.0;       // a clear run shorter than this isn't worth decorating
 const MIN_PORTRAIT_GAP = 1.2;   // minimum breathing room between/around frames — "evenly spread", never crammed
 
-const MAX_PORTRAITS = 6;
+// Was 6 for a single wall's one span; the décor now runs the combined
+// left+back+right wall length (roughly 3x), so the cap scales with it. Still
+// just a ceiling — planPortraitSlots drops slots (fewer, or none per span)
+// rather than ever crowding past MIN_PORTRAIT_GAP.
+const MAX_PORTRAITS = 18;
 const PORTRAIT_H = 2.4;
 const PORTRAIT_ASPECT = 2 / 3;  // width / height, matching the poster-card convention elsewhere
 const PORTRAIT_W = PORTRAIT_H * PORTRAIT_ASPECT;
@@ -62,30 +83,88 @@ const PORTRAIT_FRAMED_H = PORTRAIT_H + FRAME_PAD * 2;
 const STRIP_H = 1.3;
 const STRIP_CELL_FT = 1.3;      // world-space width baked into one texture "cell"
 
-interface ClearSpan { z0: number; z1: number } // z0 < z1, world Z
+type WallId = 'left' | 'back' | 'right';
+
+// A clear run on one of the three walls. `s0`/`s1` are a coordinate ALONG
+// the wall's own run direction — world Z for the left/right walls, world X
+// for the back wall — not necessarily x/z uniformly, which is why every
+// consumer goes through wallFrame/wallPoint below instead of touching x/z
+// directly.
+interface ClearSpan { wall: WallId; s0: number; s1: number } // s0 < s1
 
 /**
- * Right-wall clear z-span(s): the solid run behind the side window ribbon,
- * minus the service door + EXIT sign footprint. The front span past the
- * ribbon (toward the checkout/vestibule) is deliberately out of scope — it
- * isn't audited here for other fixtures, and rule 3 is "skip a spot rather
- * than risk overlapping something." Returns [] when there isn't enough
- * clear wall to bother with.
+ * The wall's fixed (perpendicular-to-its-run) world coordinate — flush-mount
+ * inset off the true wall plane — and the yaw that faces a Y-up group's
+ * local +Z (its "forward"/proud-of-the-strip axis) into the store interior.
  */
-function computeClearSpans(scene: StoreScene, backWallZ: number): ClearSpan[] {
-  // The floor (and this wall) only reaches back to the stepped corner's
-  // forward face when the notch is present — the true back-wall Z is behind
-  // it, walled off by the perpendicular connector face (see the baseboard
-  // logic in store-shell.ts, which uses this same rule).
+function wallFrame(wall: WallId, storeWidth: number, backWallZ: number): { fixed: number; rotY: number } {
+  switch (wall) {
+    case 'left': return { fixed: STORE_CENTER_X - storeWidth / 2 + WALL_INSET, rotY: Math.PI / 2 };
+    case 'right': return { fixed: STORE_CENTER_X + storeWidth / 2 - WALL_INSET, rotY: -Math.PI / 2 };
+    case 'back': return { fixed: backWallZ + WALL_INSET, rotY: 0 };
+  }
+}
+
+/** World (x, z) for the point at run-coordinate `s` on `wall`. */
+function wallPoint(wall: WallId, s: number, fixed: number): { x: number; z: number } {
+  return wall === 'back' ? { x: s, z: fixed } : { x: fixed, z: s };
+}
+
+/**
+ * Clear run(s) across all three back walls, computed from real shell
+ * geometry. Never overlaps an obstacle — obstacles are excluded, not
+ * clipped around, per rule 3 ("skip a spot rather than risk overlapping").
+ *
+ * Obstacles: the side window ribbon (shared scene.sideRibbon span, mirrored
+ * onto both the left and right walls by buildSideWall in store-shell.ts),
+ * the right wall's service door + EXIT sign footprint (rightSideDoorZone),
+ * and the stepped back-right corner's perpendicular connector face — which
+ * is real wall but not one of the three NAMED walls, so it is treated the
+ * same as any other obstacle and simply left undecorated, splitting the
+ * back and right runs apart when a step is present.
+ *
+ * Where two of the three walls share a plain corner (left-back always;
+ * back-right too when the store has no step), their spans butt right up to
+ * WALL_INSET of the corner — the depth the OTHER wall's own plane sits at —
+ * so the two bands meet edge-to-edge with no gap and no poke-through. Where
+ * a wall's run ends at an obstacle instead (the step notch, the ribbon, the
+ * door), it keeps the bigger CORNER_MARGIN breathing room, same as before.
+ */
+function computeClearSpans(scene: StoreScene, storeWidth: number, backWallZ: number): ClearSpan[] {
+  const wallLeft = STORE_CENTER_X - storeWidth / 2;
+  const wallRight = STORE_CENTER_X + storeWidth / 2;
+  // The floor (and the right wall) only reaches back to the stepped
+  // corner's forward face when the notch is present — the true back-wall Z
+  // is behind it, walled off by the perpendicular connector face (see the
+  // baseboard logic in store-shell.ts, which uses this same rule).
   const stepWallZ = scene.hasStep ? backWallZ + scene.stepDepth : backWallZ;
-  const rearZ = stepWallZ + CORNER_MARGIN;
 
   const ribbonBackZ = scene.sideRibbon ? scene.sideRibbon.backZ : SIDE_RIBBON_FRONT_Z;
-  const door = rightSideDoorZone(scene.sideRibbon);
-  const frontZ = door ? Math.min(ribbonBackZ, door.z0 - DOOR_MARGIN) : ribbonBackZ;
+  const spans: ClearSpan[] = [];
 
-  if (frontZ - rearZ < MIN_SPAN_LEN) return [];
-  return [{ z0: rearZ, z1: frontZ }];
+  // Back wall: wallLeft -> stepX (or all the way to wallRight when the
+  // store has no stepped corner). Left end always butts the left wall;
+  // right end either clears the step's connector face (breathing room) or
+  // butts the right wall directly.
+  const backLeft = wallLeft + WALL_INSET;
+  const backRight = scene.hasStep ? scene.stepX - CORNER_MARGIN : wallRight - WALL_INSET;
+  if (backRight - backLeft >= MIN_SPAN_LEN) spans.push({ wall: 'back', s0: backLeft, s1: backRight });
+
+  // Left wall: the step is always back-RIGHT (store-layout.ts only ever
+  // builds 'back-right'), so the left wall's back corner is always a plain
+  // butt against the back wall. Front end clears the ribbon.
+  const leftRear = backWallZ + WALL_INSET;
+  if (ribbonBackZ - leftRear >= MIN_SPAN_LEN) spans.push({ wall: 'left', s0: leftRear, s1: ribbonBackZ });
+
+  // Right wall: butts the back wall directly when the corner is flat,
+  // otherwise clears the step's connector face with breathing room. Front
+  // end clears the ribbon AND the service door + EXIT sign footprint.
+  const rightRear = scene.hasStep ? stepWallZ + CORNER_MARGIN : backWallZ + WALL_INSET;
+  const door = rightSideDoorZone(scene.sideRibbon);
+  const rightFront = door ? Math.min(ribbonBackZ, door.z0 - DOOR_MARGIN) : ribbonBackZ;
+  if (rightFront - rightRear >= MIN_SPAN_LEN) spans.push({ wall: 'right', s0: rightRear, s1: rightFront });
+
+  return spans;
 }
 
 interface FeaturedActor { id: string; name: string; imageUrl: string; count: number }
@@ -113,16 +192,17 @@ function tallyFeaturedActors(scene: StoreScene, max: number): FeaturedActor[] {
     .slice(0, max);
 }
 
-interface PortraitSlot { z: number }
+interface PortraitSlot { wall: WallId; s: number }
 
 /**
  * Evenly spreads `desiredCount` portrait slots across one or more clear
- * spans, proportional to each span's length, with even gaps within each
- * span (and never packed tighter than MIN_PORTRAIT_GAP — a span that can't
- * fit its share just gets fewer, or none).
+ * spans (which may sit on different walls), proportional to each span's
+ * length, with even gaps within each span (and never packed tighter than
+ * MIN_PORTRAIT_GAP — a span that can't fit its share just gets fewer, or
+ * none).
  */
 function planPortraitSlots(spans: ClearSpan[], desiredCount: number): PortraitSlot[] {
-  const lens = spans.map((s) => s.z1 - s.z0);
+  const lens = spans.map((s) => s.s1 - s.s0);
   const totalLen = lens.reduce((a, b) => a + b, 0) || 1;
 
   const raw = lens.map((l) => (desiredCount * l) / totalLen);
@@ -140,12 +220,12 @@ function planPortraitSlots(spans: ClearSpan[], desiredCount: number): PortraitSl
   const slots: PortraitSlot[] = [];
   spans.forEach((span, i) => {
     let n = counts[i];
-    const len = span.z1 - span.z0;
+    const len = span.s1 - span.s0;
     while (n > 0 && (len - n * PORTRAIT_FRAMED_W) / (n + 1) < MIN_PORTRAIT_GAP) n--;
     if (n <= 0) return;
     const gap = (len - n * PORTRAIT_FRAMED_W) / (n + 1);
     for (let k = 0; k < n; k++) {
-      slots.push({ z: span.z0 + gap + PORTRAIT_FRAMED_W / 2 + k * (PORTRAIT_FRAMED_W + gap) });
+      slots.push({ wall: span.wall, s: span.s0 + gap + PORTRAIT_FRAMED_W / 2 + k * (PORTRAIT_FRAMED_W + gap) });
     }
   });
   return slots;
@@ -241,19 +321,23 @@ export function buildWallDecor(scene: StoreScene, storeWidth: number, backWallZ:
   // tall wall band it hangs on doesn't exist otherwise.
   if (scene.ceilingY < HIGH_CEILING_Y - 0.01) return;
 
-  const spans = computeClearSpans(scene, backWallZ);
+  const spans = computeClearSpans(scene, storeWidth, backWallZ);
   if (spans.length === 0) return;
 
   const theme = getActiveTheme();
-  const rightX = STORE_CENTER_X + storeWidth / 2 - WALL_INSET;
   const visibleCeilingY = scene.ceilingY - CORNICE_DROP;
   const centerY = visibleCeilingY - CEILING_MARGIN - PORTRAIT_H / 2;
 
-  // Film strip: one segment per clear span, floating flush on the wall.
-  // Always built when décor is enabled — "zero [actors] = just the film
-  // strip" — the portraits (if any) hang proud of it below.
+  // Film strip: one segment per clear span (on whichever of the three walls
+  // it belongs to), floating flush on the wall. Always built when décor is
+  // enabled — "zero [actors] = just the film strip" — the portraits (if
+  // any) hang proud of it below. Adjoining spans butt at WALL_INSET of a
+  // shared corner (see computeClearSpans), so consecutive segments read as
+  // one continuous ribbon turning the corner rather than separate pieces.
   spans.forEach((span) => {
-    const len = span.z1 - span.z0;
+    const len = span.s1 - span.s0;
+    const { fixed, rotY } = wallFrame(span.wall, storeWidth, backWallZ);
+    const mid = wallPoint(span.wall, (span.s0 + span.s1) / 2, fixed);
     const mat = new THREE.MeshStandardMaterial({
       map: makeFilmStripTexture(theme, len),
       roughness: 0.85,
@@ -263,8 +347,8 @@ export function buildWallDecor(scene: StoreScene, storeWidth: number, backWallZ:
     });
     const band = new THREE.Mesh(new THREE.PlaneGeometry(len, STRIP_H), mat);
     const group = new THREE.Group();
-    group.position.set(rightX, centerY, (span.z0 + span.z1) / 2);
-    group.rotation.y = -Math.PI / 2; // face into the store; local +X -> world +Z
+    group.position.set(mid.x, centerY, mid.z);
+    group.rotation.y = rotY; // face into the store; local +Z -> world "into the room" for every wall
     group.add(band);
     scene.scene.add(group);
   });
@@ -282,9 +366,11 @@ export function buildWallDecor(scene: StoreScene, storeWidth: number, backWallZ:
   slots.forEach((slot, i) => {
     const actor = actors[i];
     if (!actor) return;
+    const { fixed, rotY } = wallFrame(slot.wall, storeWidth, backWallZ);
+    const p = wallPoint(slot.wall, slot.s, fixed);
     const group = new THREE.Group();
-    group.position.set(rightX, centerY, slot.z);
-    group.rotation.y = -Math.PI / 2;
+    group.position.set(p.x, centerY, p.z);
+    group.rotation.y = rotY;
 
     const frame = new THREE.Mesh(new THREE.PlaneGeometry(PORTRAIT_FRAMED_W, PORTRAIT_FRAMED_H), frameMat);
     frame.position.z = 0.02; // proud of the strip (local +Z -> toward the store interior)

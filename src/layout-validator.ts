@@ -30,6 +30,19 @@ export interface Footprint {
  *  1.5 ft aisle walkway minimum (see validateLayout's default). */
 export const FLOOR_DISPLAY_CLEARANCE = 3.0;
 
+/**
+ * World-space offset of a point sitting `delta` along a footprint's LOCAL Z
+ * axis, using the same rotation convention as everything else here (see the
+ * header). Exists because a fixture whose extent is ASYMMETRIC about its
+ * placement — an aisle-run unit carrying an end cap on its outer end only —
+ * cannot describe itself with a box centred on that placement. Spreading the
+ * extra depth over both ends instead overstates it into whatever it meets
+ * flush, which reads as a phantom overlap of exactly the asymmetry.
+ */
+export function localZOffset(yaw: number, delta: number): { dx: number; dz: number } {
+  return { dx: delta * Math.sin(yaw), dz: delta * Math.cos(yaw) };
+}
+
 export interface LayoutViolation {
   severity: 'error' | 'warn';
   a: string; b?: string;
@@ -195,5 +208,71 @@ export function validateLayout(
     return x.message < y.message ? -1 : x.message > y.message ? 1 : 0;
   });
 
+  return violations;
+}
+
+// ─── Case-pair fit ──────────────────────────────────────────────────────────
+//
+// Every shelf slot shows TWO boxes: the title's retail case in front and the
+// store's rental shell behind it. They are separate geometries, separately
+// sized, positioned from ONE slot's numbers — which is exactly how they drift
+// apart. Two real bugs shipped from that: the shell hung below the shelf
+// because both boxes took the slot's single Y while being origin-centred
+// (~1.7 in on a landscape SNES carton), and the shell straddled the parting
+// plane because both took the RETAIL depth while the shell is always thicker
+// (~0.07 in on every game and every VHS movie).
+//
+// Neither is a collision problem — nothing moves, and a resolver would just
+// shove the boxes to some other wrong place and hide the arithmetic. They are
+// assertion problems: the placement is knowable up front, so check it up
+// front. Validated per distinct SHAPE, not per slot — the mismatch is a
+// property of the box pair, so a store gets a handful of checks, not 3000.
+
+export interface CaseFitPair {
+  label: string;                 // e.g. 'game:PLAYSTATION', 'movie:vhs'
+  retailH: number; retailD: number;
+  shellH: number;  shellD: number;
+  /** Shell's Y offset from the slot centre (MovieSlot.backYLift). */
+  lift: number;
+  /** Local-Z centres of the two boxes (MovieSlot.frontZ / backZ). */
+  frontZ: number; backZ: number;
+}
+
+/** Sub-thou-of-a-foot noise from the dims tables; not a real defect. */
+const CASE_FIT_TOL = 0.0005;
+
+export function validateCaseFit(pairs: CaseFitPair[]): LayoutViolation[] {
+  const violations: LayoutViolation[] = [];
+  const inches = (ft: number) => `${(ft * 12).toFixed(2)} in`;
+
+  for (const p of pairs) {
+    // Depth: the boxes must meet, not interpenetrate. Positive overlap means
+    // the shell's front face is inside the case standing in front of it.
+    const frontMin = p.frontZ - p.retailD / 2, frontMax = p.frontZ + p.retailD / 2;
+    const shellMin = p.backZ - p.shellD / 2,  shellMax = p.backZ + p.shellD / 2;
+    const overlap = Math.min(frontMax, shellMax) - Math.max(frontMin, shellMin);
+    if (overlap > CASE_FIT_TOL) {
+      violations.push({
+        severity: 'error', a: p.label, b: 'rental-shell',
+        message: `cases interpenetrate by ${inches(overlap)} in depth`,
+      });
+    }
+
+    // Footing: both boxes stand on the same shelf, so their BOTTOMS agree.
+    // Geometry is origin-centred, so the bottom is -h/2 plus any lift.
+    const frontBottom = -p.retailH / 2;
+    const shellBottom = p.lift - p.shellH / 2;
+    const drop = frontBottom - shellBottom;
+    if (Math.abs(drop) > CASE_FIT_TOL) {
+      violations.push({
+        severity: 'error', a: p.label, b: 'rental-shell',
+        message: drop > 0
+          ? `shell sinks ${inches(drop)} below the shelf the case stands on`
+          : `shell floats ${inches(-drop)} above the shelf the case stands on`,
+      });
+    }
+  }
+
+  violations.sort((x, y) => (x.a !== y.a ? (x.a < y.a ? -1 : 1) : (x.message < y.message ? -1 : 1)));
   return violations;
 }

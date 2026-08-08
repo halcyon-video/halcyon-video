@@ -826,6 +826,13 @@ export interface MovieSlot {
   backX: number;
   backZ: number;
   backRotY: number;
+  /**
+   * Lift (ft) applied to the rental shell ONLY, so its bottom lands on the
+   * same surface as the retail box in front of it. Both boxes share the
+   * slot's single Y and both geometries are origin-centred, so a taller shell
+   * otherwise hangs through the shelf. See rentalBottomLift() in video-case.
+   */
+  backYLift: number;
 
   currentScale: number;
   loadShelfDetails: (priority?: number, onSettled?: () => void) => void;

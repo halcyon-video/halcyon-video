@@ -35,16 +35,23 @@ import {
 import { getPropOrFallback, screenRectWorld, PropScreenRect, PropInstance } from './props';
 import { makeCurvedScreenGeometry, makeTubeOverlayMaterial } from './crt-tube';
 import { makeCrtGlassMaterial } from './glass-reflection';
+import { tryLoadUserAssetTexture } from './user-assets';
 import type { RentalRecord } from './rental-clock';
-import { formatUnlockLabel } from './rental-clock';
+import { formatUnlockLabel, formatCheckoutStamp } from './rental-clock';
+import { brandString } from './brand-pack';
+import { BB_MONO, ensureBundledFont, bundledFontReady } from './bundled-fonts';
 
 // Room origin: +200ft in X from the store centreline (x=11) — far outside the
 // shell, past every wall, mural, exterior pano and light probe.
 export const BACK_ROOM_ORIGIN = new THREE.Vector3(211, 0, 0);
 
 // Couch eye point + where the couch view looks (local to the room origin).
-const VIEW_POS = new THREE.Vector3(0, 4.05, 4.55);
-const VIEW_LOOK = new THREE.Vector3(0, 2.55, -5.3);
+// Low and close, just above the table top and a short reach back from its
+// near edge, looking ACROSS the surface rather than down onto the room. The
+// tapes and the receipt are the subject at this range; the TV falls well
+// behind the focal plane and is carried by the bokeh pass.
+const VIEW_POS = new THREE.Vector3(0.34, 2.50, 2.42);
+const VIEW_LOOK = new THREE.Vector3(0.30, 2.08, 0.42);
 // Inspected tape hovers this far in front of the couch eye point.
 const INSPECT_DIST = 1.18;
 
@@ -85,6 +92,30 @@ const SPINE_STOP_YAW = -Math.PI * 1.5 - 0.28;
 // spine (local −X) dead at the couch; backing off ~20° turns it so the case
 // bottom edge also reads from the viewer's seat. Per-level jitter adds on top.
 const STACK_REST_YAW = Math.PI / 2 - 0.35;
+
+/**
+ * Soft radial contact-shadow texture — this room's stand-in for a shadow map.
+ * The set is lit by one small rig that casts nothing (addOwned forces
+ * castShadow/receiveShadow off), and it sits past the sun's shadow frustum
+ * anyway, so every "shadow" here is a drawn gradient laid on the surface
+ * beneath the object. `peak` is the alpha directly under it, `mid` the alpha
+ * at 60% of the radius; both reach zero at the edge.
+ */
+function softShadowTexture(peak: number, mid: number): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = 128;
+  canvas.height = 128;
+  const ctx = canvas.getContext('2d')!;
+  const g = ctx.createRadialGradient(64, 64, 8, 64, 64, 64);
+  g.addColorStop(0, `rgba(10, 18, 40, ${peak})`);
+  g.addColorStop(0.6, `rgba(10, 18, 40, ${mid})`);
+  g.addColorStop(1, 'rgba(10, 18, 40, 0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 128, 128);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
 
 export class BackRoom {
   public state: BackRoomState = 'view';
@@ -167,9 +198,13 @@ export class BackRoom {
     this.placeTvAndDeck(tv, deck);
     this.buildTapes(movies, tableTopY);
     this.buildDueNote(tableTopY);
+    this.buildTableContactShadows(tableTopY);
     this.buildVcrClock();
     this.redrawClocks(true);
   }
+
+  /** The coffee table's re-material (see placeCoffeeTable); ours to free. */
+  private tableWood: THREE.MeshStandardMaterial | null = null;
 
   private roomMat(color: number, roughness = 0.9): THREE.MeshStandardMaterial {
     const m = new THREE.MeshStandardMaterial({ color, roughness, metalness: 0.02 });
@@ -255,63 +290,75 @@ export class BackRoom {
     floor.position.y = 0;
     this.addOwned(floor);
 
-    // Woven area rug under the furniture cluster: a lit, textured island in
-    // the unlit void floor. It takes the warm key/fill lights (unlike the
-    // MeshBasic floor), which visually ties the props to the ground plane.
-    {
-      const R = 256;
-      const rugCanvas = document.createElement('canvas');
-      rugCanvas.width = R; rugCanvas.height = R;
-      const rctx = rugCanvas.getContext('2d')!;
-      rctx.fillStyle = '#5a2f28'; // worn rust red
-      rctx.fillRect(0, 0, R, R);
-      // Border band.
-      rctx.strokeStyle = '#3b2019';
-      rctx.lineWidth = 18;
-      rctx.strokeRect(14, 14, R - 28, R - 28);
-      rctx.strokeStyle = '#8a5c33';
-      rctx.lineWidth = 3;
-      rctx.strokeRect(26, 26, R - 52, R - 52);
-      // Weave noise.
-      for (let i = 0; i < 2600; i++) {
-        const v = Math.random();
-        rctx.fillStyle = v > 0.5 ? 'rgba(0,0,0,0.10)' : 'rgba(255,235,210,0.05)';
-        rctx.fillRect(Math.random() * R, Math.random() * R, 1.6, 1.2);
-      }
-      const rugTex = new THREE.CanvasTexture(rugCanvas);
-      rugTex.colorSpace = THREE.SRGBColorSpace;
-      const rug = new THREE.Mesh(
-        new THREE.PlaneGeometry(9.5, 12.5),
-        new THREE.MeshStandardMaterial({ map: rugTex, roughness: 0.97, metalness: 0 }),
-      );
-      rug.rotation.x = -Math.PI / 2;
-      rug.position.set(0, 0.005, -1.6); // under couch sightline: table (z≈0.9) to TV stand (z≈-5.3)
-      (rug.material as THREE.MeshStandardMaterial).envMapIntensity = 0.18; // pocket sits outside the store — see roomMat
-      this.addOwned(rug);
-    }
+    // No area rug: at the close across-the-table framing this view now uses
+    // (see VIEW_POS), the rug filled the lower third with woven red and pulled
+    // the eye off the tapes and the receipt, which are what the shot is of.
+    // The contact shadow below still ties the furniture to the ground plane.
 
     // Soft contact shadow under the furniture cluster (table + TV stand) so
     // the props sit ON the floor instead of hovering over flat colour.
-    const shadowCanvas = document.createElement('canvas');
-    shadowCanvas.width = 128;
-    shadowCanvas.height = 128;
-    const sctx = shadowCanvas.getContext('2d')!;
-    const sg = sctx.createRadialGradient(64, 64, 8, 64, 64, 64);
-    sg.addColorStop(0, 'rgba(10, 18, 40, 0.42)');
-    sg.addColorStop(0.6, 'rgba(10, 18, 40, 0.22)');
-    sg.addColorStop(1, 'rgba(10, 18, 40, 0)');
-    sctx.fillStyle = sg;
-    sctx.fillRect(0, 0, 128, 128);
-    const shadowTex = new THREE.CanvasTexture(shadowCanvas);
-    shadowTex.colorSpace = THREE.SRGBColorSpace;
     const shadow = new THREE.Mesh(
       new THREE.CircleGeometry(1, 32),
-      new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, depthWrite: false }),
+      new THREE.MeshBasicMaterial({ map: softShadowTexture(0.42, 0.22), transparent: true, depthWrite: false }),
     );
     shadow.rotation.x = -Math.PI / 2;
     shadow.position.set(0, 0.01, -2.0); // spans the table (z≈0.9) and TV stand (z≈-5.3)
     shadow.scale.set(6.5, 5.6, 1);
     this.addOwned(shadow);
+  }
+
+  /**
+   * Contact shadows on the TABLE TOP.
+   *
+   * The cluster shadow above grounds the furniture to the floor, and for a
+   * view taken from eye height across the room that was the whole job. It
+   * isn't any more: the camera now sits inches off the surface (VIEW_POS), so
+   * the pile and the slip ARE the frame, and both were lying on wood with
+   * nothing under them — reading as decals on the table rather than objects on
+   * it. Same technique as the floor for the same reason: this room's one small
+   * light rig casts no real shadows (see addOwned), so the grounding cue has
+   * to be drawn.
+   *
+   * Both sit above the table and below what they ground — the lowest case's
+   * underside is at +0.008 and the slip's at +0.006 (see buildTapes /
+   * buildDueNote), so there is room for each without z-fighting the wood.
+   */
+  private buildTableContactShadows(tableTopY: number): void {
+    // Under the pile. Darker and tighter than the floor's: this is a stack of
+    // clamshells sitting flat on a hard surface a few inches from the lamp,
+    // not a whole furniture cluster on a dim floor.
+    const pile = new THREE.Mesh(
+      new THREE.CircleGeometry(1, 24),
+      new THREE.MeshBasicMaterial({ map: softShadowTexture(0.5, 0.26), transparent: true, depthWrite: false }),
+    );
+    pile.rotation.x = -Math.PI / 2;
+    // OFFSET, not centred. A blob centred under the stack is almost entirely
+    // occluded by the stack itself — which is how the first pass read as no
+    // shadow at all. The key is the warm point at (-5.5, 6.0, 2.4) (buildLights),
+    // so from the pile at (0.15, ~1.42) the throw runs +x and slightly -z:
+    // normalize(5.65, -0.98) ≈ (0.985, -0.171). Push the blob that way by a
+    // stack's-worth and it spills out on the far side, against bare wood, where
+    // it can actually be seen. Elongated along the same axis for the same reason.
+    pile.position.set(0.15 + 0.197, tableTopY + 0.004, 1.42 - 0.034);
+    pile.scale.set(0.72, 0.44, 1); // clamshell footprint plus the gradient's falloff
+    this.addOwned(pile);
+
+    // Under the slip. Paper lying flat has almost no gap to shadow, so this is
+    // much fainter, and it carries the slip's own -0.34 skew rather than
+    // sitting square to the table — a shadow square to a skewed object is more
+    // obviously wrong than no shadow at all.
+    const slip = new THREE.Mesh(
+      new THREE.PlaneGeometry(1, 1),
+      new THREE.MeshBasicMaterial({ map: softShadowTexture(0.3, 0.13), transparent: true, depthWrite: false }),
+    );
+    slip.rotation.order = 'YXZ';
+    slip.rotation.x = -Math.PI / 2;
+    slip.rotation.y = -0.34;
+    // Barely offset along the same throw: a sheet lying flat has no gap under
+    // it to shadow, so this is an edge-darkening cue, not a cast shadow.
+    slip.position.set(0.66 + 0.030, tableTopY + 0.003, 1.58 - 0.005);
+    slip.scale.set(0.52, 1.18, 1);
+    this.addOwned(slip);
   }
 
   private buildLights(): void {
@@ -345,7 +392,59 @@ export class BackRoom {
     this.doorUnlocked = unlocked;
   }
 
+  /**
+   * The GLB is Kenney's "Table Coffee Glass" — a dark frame with a GLASS top,
+   * which in this room's single-lamp light read as pale celadon laminate
+   * rather than glass (owner call, 2026-08-07: dark blonde wood instead).
+   *
+   * Re-materialled here rather than by swapping the model: the mesh is the
+   * right shape and size, and this keeps the CC0 asset as-shipped instead of
+   * forking it. Every surface takes the same board, pane included — a glass
+   * top over wood legs is the thing being replaced, not a look worth half of.
+   *
+   * The grain is a real photo scan SHIPPED IN THE REPO at
+   * public/textures/surfaces/table-wood (ambientCG WoodFloor043, CC0 — see its
+   * NOTES.md), so every install gets it; a user-assets drop-in of the same name
+   * still wins. Only when both are absent does the flat lit board colour stand
+   * in, and it is a colour, not a procedural grain. Owner call after three
+   * procedural attempts: drawn strokes read as corduroy, radial growth rings
+   * as sand ripples, warped straight grain as burl. The GLB's UVs tile hard
+   * across the top, which sets a scale none of them survived. Flat and
+   * correctly lit beats invented grain.
+   */
   private placeCoffeeTable(table: PropInstance): number {
+    const wood = new THREE.MeshStandardMaterial({
+      color: 0xb08a55, roughness: 0.62, metalness: 0.0,
+    });
+    this.tableWood = wood;
+
+    // Below 1: the model's UVs already tile heavily across the top, so a
+    // repeat of 1 lays ~20 boards across it. This puts roughly one plank run
+    // over the surface, which is what a coffee table actually is.
+    const fit = (tex: THREE.Texture) => {
+      tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+      tex.repeat.set(0.16, 0.16);
+      tex.anisotropy = 8;
+    };
+    tryLoadUserAssetTexture('surfaces/table-wood/color.png', (tex) => {
+      fit(tex); wood.map = tex; wood.color.setHex(0xffffff); wood.needsUpdate = true;
+    });
+    tryLoadUserAssetTexture('surfaces/table-wood/normal.png', (tex) => {
+      fit(tex); wood.normalMap = tex; wood.normalScale.set(0.5, 0.5); wood.needsUpdate = true;
+    }, { srgb: false });
+    tryLoadUserAssetTexture('surfaces/table-wood/roughness.png', (tex) => {
+      fit(tex); wood.roughnessMap = tex; wood.needsUpdate = true;
+    }, { srgb: false });
+
+    table.object.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (!m.isMesh) return;
+      // The GLB's own materials belong to the prop cache; dropping our
+      // reference to them here is all this does.
+      m.material = wood;
+      m.castShadow = true;
+      m.receiveShadow = true;
+    });
     table.object.position.set(0, 0, 0.9);
     this.group.add(table.object);
     return table.size.y;
@@ -449,8 +548,14 @@ export class BackRoom {
   private buildTapes(movies: Movie[], tableTopY: number): void {
     const n = Math.min(4, movies.length);
     const yaw = [-0.16, 0.12, -0.06, 0.2];
-    const jx = [0.02, -0.03, 0.035, -0.02];
-    const jz = [0.9, 0.93, 0.86, 0.91];
+    // Nudged toward the camera's own x (0.34): centred on the room, the pile
+    // sat left of frame and the bottom case ran off the edge.
+    const jx = [0.17, 0.12, 0.185, 0.13];
+    // Pulled toward the couch (was ~0.90, the table's centre): the view now
+    // sits inches off the surface, and at the middle of the table the pile read
+    // small and far. Still well inside the top — the stack's own footprint is
+    // only a few inches deep.
+    const jz = [1.42, 1.45, 1.38, 1.43];
     const caseThick = getRentalCaseDepth();
     this.stackStep = caseThick + 0.004;
     this.stackBaseY = tableTopY + caseThick / 2 + 0.008;
@@ -480,44 +585,171 @@ export class BackRoom {
     this.applyFocusPoses(performance.now());
   }
 
+  /**
+   * The rental receipt on the coffee table — a measured redraw of a real 1995
+   * video-store register slip (owner reference, 2026-08-07), replacing the
+   * landscape card with a house-colour header band that was here before. That
+   * card was invented; this one follows the artifact.
+   *
+   * What the reference actually is: a narrow impact-printed slip, violet ribbon
+   * ink on off-white stock, monospace throughout, no colour and no logo — the
+   * header is TYPED, like every other line. Its shape is: transaction number
+   * flush right, a centred address block, an asterisk rule, a centred store
+   * tagline, a Store/Employee row, a second rule, then line items as PAIRS (an
+   * all-caps title line, then an indented kind/price line), a dashed rule
+   * before the totals, a `=====` rule before Amount Due, tender and change, the
+   * member block, a centred thank-you couplet, a final rule, and a timestamp.
+   *
+   * Brand rules (CLAUDE.md #2): the wordmark and address come from brand canon,
+   * NOT from the photo — same brandString keys the case wrap prints, so a brand
+   * pack retitles the receipt with everything else. The reference's own chain
+   * slogan is a real mark and does not ship; the tagline is a neutral house
+   * line a pack can override.
+   *
+   * DUE BACK stays, and prints LAST and largest: this prop's diegetic job is
+   * telling you when the tape is owed, and rental-clock is what drives the
+   * lockout. Everything above it is period dressing.
+   */
   private buildDueNote(tableTopY: number): void {
     if (!this.record) return;
+    // A longer blank tail than the print needs, and deliberately so: the plane
+    // is CENTRED on the table, so lengthening the paper walks the printed block
+    // back up the slip, away from the couch. That buys the last line room to
+    // stay inside the frame with a weekend's four items on the bill, and lands
+    // it nearer the pile's focal plane into the bargain. Texel size is
+    // 0.36/512 whatever H is, so nothing about the type changes.
+    const W = 512, H = 1450;
     const canvas = document.createElement('canvas');
-    canvas.width = 512;
-    canvas.height = 340;
+    canvas.width = W;
+    canvas.height = H;
     const ctx = canvas.getContext('2d')!;
-    // A cream rental receipt slip with the house header band.
-    ctx.fillStyle = '#f4e7c6';
-    ctx.fillRect(0, 0, 512, 340);
-    ctx.fillStyle = '#1a49c2';
-    ctx.fillRect(0, 0, 512, 74);
-    ctx.fillStyle = '#ffd23f';
-    ctx.font = 'bold 44px "Courier New", monospace';
-    ctx.textAlign = 'center';
-    ctx.fillText('RENTAL RECEIPT', 256, 52);
-    ctx.fillStyle = '#28241c';
-    ctx.font = 'bold 34px "Courier New", monospace';
-    ctx.fillText(`${this.record.items.length} TAPE${this.record.items.length === 1 ? '' : 'S'} — THANK YOU!`, 256, 130);
-    ctx.font = 'bold 40px "Courier New", monospace';
-    ctx.fillStyle = '#8d1111';
-    ctx.fillText('DUE BACK:', 256, 210);
-    ctx.font = 'bold 52px "Courier New", monospace';
-    ctx.fillText(this.devTimer ? 'IN 5 MINUTES' : formatUnlockLabel(this.record), 256, 278);
-    ctx.fillStyle = '#28241c';
-    ctx.font = '24px "Courier New", monospace';
-    ctx.fillText('PLEASE REWIND', 256, 322);
-
     const tex = new THREE.CanvasTexture(canvas);
     tex.colorSpace = THREE.SRGBColorSpace;
+
+    const paint = () => {
+      const mono = bundledFontReady(BB_MONO) ? BB_MONO : 'monospace';
+      // Impact ribbon on thermal stock: a violet-leaning ink that is nowhere
+      // near black, on paper that is nowhere near white.
+      // Far darker than the ribbon actually is. The reference's ink is a mid
+      // violet on white, but this slip is a lit MeshStandard surface under a
+      // warm key: the lamp lifts the paper and crushes the contrast, and a
+      // faithful violet came out invisible on screen. Overdriving to near-black
+      // navy is what reads AS violet ink once the room has had its way with it.
+      const INK = '#141634', PAPER = '#f5f2e9';
+      const L = 34, R = W - 34, CX = W / 2;
+      ctx.fillStyle = PAPER;
+      ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = INK;
+      ctx.textBaseline = 'alphabetic';
+
+      const px = 21;
+      const line = (y: number, size = px) => { ctx.font = `${size}px "${mono}", monospace`; return y; };
+      const left = (t: string, y: number, x = L) => { ctx.textAlign = 'left'; ctx.fillText(t, x, line(y)); };
+      const right = (t: string, y: number) => { ctx.textAlign = 'right'; ctx.fillText(t, R, line(y)); };
+      const mid = (t: string, y: number) => { ctx.textAlign = 'center'; ctx.fillText(t, CX, line(y)); };
+      // Emphasis on a printer with no bold face: strike the row twice, a hair
+      // apart, the way an impact head was made to shout.
+      const heavy = (t: string, y: number, size: number) => {
+        ctx.textAlign = 'center';
+        ctx.fillText(t, CX, line(y, size));
+        ctx.fillText(t, CX + 0.9, y);
+      };
+      // A rule is a printed row of characters, not a drawn line — the printer
+      // had no graphics, which is why the reference's rules are asterisks.
+      const rule = (ch: string, y: number) => {
+        ctx.font = `${px}px "${mono}", monospace`;
+        const w = ctx.measureText(ch).width || 1;
+        mid(ch.repeat(Math.max(1, Math.floor((R - L) / w))), y);
+      };
+      // Price rows: label left, an aligned dollar column, amount flush right.
+      const money = (label: string, amount: string, y: number, indent = 0) => {
+        left(label, y, L + indent);
+        ctx.textAlign = 'left'; ctx.fillText('$', R - 118, line(y));
+        right(amount, y);
+      };
+
+      const RENT = 3.25;
+      // The slip lists what is ON THE TABLE, not what the record says:
+      // record.items are catalog ids (unprintable), and resolveRentalMovies
+      // silently drops any that no longer resolve — so the record's length
+      // isn't even guaranteed to match the pile the receipt lies next to.
+      const titles = this.tapes.map((t) => t.movie.title);
+      const sub = titles.length * RENT;
+      const tax = Math.round(sub * 0.0475 * 100) / 100;
+      const f = (n: number) => n.toFixed(2);
+
+      let y = 46;
+      right(brandString('receipt-txn', '90103-00213995'), y); y += 40;
+      mid(brandString('brand-wordmark-video', 'HALCYON VIDEO'), y); y += 26;
+      mid(brandString('wrap-address-street', '2400 KINGFISHER PKWY').replace(/\s+/g, ' '), y); y += 26;
+      mid(brandString('wrap-address-city', 'CEDAR FALLS, IA 50613').replace(/\s+/g, ' '), y); y += 34;
+      rule('*', y); y += 30;
+      mid(brandString('receipt-tagline', 'THANKS FOR RENTING WITH US!'), y); y += 30;
+      left('Store: 0117', y); right('Employee : 00004', y); y += 12;
+      rule('*', y + 14); y += 44;
+
+      money('Balance', '0.00', y); y += 30;
+      for (const title of titles) {
+        left(title.toUpperCase().slice(0, 30), y); y += 26;
+        money('Rental', f(RENT), y, 22); y += 30;
+      }
+      y += 6;
+      ctx.textAlign = 'right'; ctx.fillText('----------', R, line(y)); y += 30;
+      money('Subtotal', f(sub), y); y += 26;
+      money('Total Tax', f(tax), y); y += 12;
+      ctx.textAlign = 'right'; ctx.fillText('==========', R, line(y + 14)); y += 44;
+      money('Amount Due', f(sub + tax), y); y += 44;
+      money('Tendered VISA', f(sub + tax), y); y += 26;
+      money('Change Due', '0.00', y); y += 46;
+
+      left('Cust #: 0000123456', y); y += 26;
+      left(`Name  : ${brandString('receipt-member', 'MEMBER')}`, y); y += 48;
+      mid('Thank You for your Visit.', y); y += 26;
+      mid('We appreciate your business.', y); y += 34;
+      mid(brandString('rental-rules-note', 'PLEASE REWIND'), y); y += 34;
+      rule('*', y); y += 30;
+      // Store/terminal number is the store's (a pack may reissue it); the
+      // date, clock and centiseconds are this transaction's own.
+      left(`${brandString('receipt-register', '0117-06')}-${formatCheckoutStamp(this.record!)}`, y); y += 40;
+
+      // The line this prop exists for, printed LAST, double-struck and far
+      // bigger than the body: it has to read from the couch, across a focal
+      // plane pinned to the tape pile rather than to the paper. Label over
+      // time rather than the label/amount row the money lines use — side by
+      // side, the two halves collide on 3-inch stock past ~34px, and the time
+      // is the half worth the size.
+      rule('*', y); y += 50;
+      heavy('DUE BACK', y, 38); y += 58;
+      heavy(this.devTimer ? 'IN 5 MINUTES' : formatUnlockLabel(this.record!), y, 48);
+
+      tex.needsUpdate = true;
+    };
+
+    paint();
+    ensureBundledFont(BB_MONO, paint);
+
+    // Real receipt stock is ~3.1 in wide; this is printed a touch over that so
+    // the small type still reads from the couch, which is where it is looked at.
     const note = new THREE.Mesh(
-      new THREE.PlaneGeometry(1.05, 0.7),
-      new THREE.MeshStandardMaterial({ map: tex, roughness: 0.9, metalness: 0 }),
+      new THREE.PlaneGeometry(0.36, 0.36 * (H / W)),
+      new THREE.MeshStandardMaterial({ map: tex, roughness: 0.94, metalness: 0 }),
     );
     note.rotation.order = 'YXZ';
     note.rotation.x = -Math.PI / 2;
-    note.rotation.y = 0.34;
-    // Beside the pile (which sits at the table centre), flat on the table top.
-    note.position.set(0.95, tableTopY + 0.006, 1.15);
+    // NEGATIVE, and skewed rather than square to the lens. Rotating about +Y
+    // swings the slip's NEAR end toward +X, so a positive angle threw the tail
+    // out to the right; negative turns it clockwise seen from above, putting
+    // the bottom of the slip further left than its top — the way it lies when
+    // dropped from the near side of the table. The skew also carries the
+    // focus: square to the lens, most of the slip's length sits at near depths
+    // and falls outside the depth of field, while angled it keeps the printed
+    // block broadside and in focus and lets only the tail go soft.
+    note.rotation.y = -0.34;
+    // Runs OUT OF FRAME toward the couch: its far end sits at the pile's depth
+    // (the focal plane) and it trails down past the bottom edge of the view, so
+    // the printed block lands in focus while the near end falls away — which is
+    // what a receipt dropped on a table in front of you actually looks like.
+    note.position.set(0.66, tableTopY + 0.006, 1.58);
     this.addOwned(note);
   }
 
@@ -860,6 +1092,18 @@ export class BackRoom {
 
   // ── Camera poses for StoreScene's lerp ─────────────────────────────────────
 
+  /**
+   * Distance from the couch eye point to the tape pile — the focal plane for
+   * the depth-of-field pass in this view. The pile, not the look target: the
+   * look target sits between the tapes and the receipt so both frame well, and
+   * focusing there would leave the spine (the thing being read) soft.
+   */
+  focusDistance(): number {
+    const eye = this._pose.pos.set(VIEW_POS.x, VIEW_POS.y, VIEW_POS.z).add(BACK_ROOM_ORIGIN);
+    const pile = this._v.set(0, this.stackBaseY, 1.42).add(BACK_ROOM_ORIGIN);
+    return eye.distanceTo(pile);
+  }
+
   cameraPose(): { pos: THREE.Vector3; look: THREE.Vector3 } {
     this._pose.pos.copy(BACK_ROOM_ORIGIN).add(VIEW_POS);
     if (this.state === 'inspect') {
@@ -980,6 +1224,15 @@ export class BackRoom {
       if (tex) tex.dispose();
       m.dispose();
     });
+    if (this.tableWood) {
+      // Both maps by hand: the sweep above only frees `.map`, and this material
+      // also carries a roughnessMap.
+      this.tableWood.map?.dispose();
+      this.tableWood.normalMap?.dispose();
+      this.tableWood.roughnessMap?.dispose();
+      this.tableWood.dispose();
+      this.tableWood = null;
+    }
     this.vcrClock?.tex.dispose();
     this.vcrClock = null;
     this.tvGlow = null;

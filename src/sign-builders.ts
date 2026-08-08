@@ -345,8 +345,22 @@ function getSlatwallEndCapTexture(): THREE.CanvasTexture {
     const ctx = canvas.getContext('2d')!;
     ctx.fillStyle = '#eadcbc'; // warm tan slatwall base
     ctx.fillRect(0, 0, 32, 32);
-    ctx.fillStyle = '#ab9674'; // darker groove line
-    ctx.fillRect(0, 26, 32, 6);
+    // Groove: shadow ramp into the slot, dark slot, lit lip below it — the same
+    // three-part treatment as the gondola spine's slatwall (shelving.ts's
+    // getSpineSlatwallMaterial, scaled down from its 64px tile to this one's
+    // 32px), so a routed channel is what this reads as up close. This used to
+    // be a single flat fillRect (base tan, then one flat darker band) — a
+    // printed stripe, not a groove — the one visible seam between what the
+    // code already calls "the same warm-tan family" of slat surfaces.
+    const grad = ctx.createLinearGradient(0, 21, 0, 27);
+    grad.addColorStop(0, 'rgba(0,0,0,0)');
+    grad.addColorStop(1, 'rgba(0,0,0,0.30)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 21, 32, 6);
+    ctx.fillStyle = '#7d6a49'; // dark slot
+    ctx.fillRect(0, 27, 32, 3.5);
+    ctx.fillStyle = '#f6ecd3'; // lit lip
+    ctx.fillRect(0, 30.5, 32, 1.5);
     const tex = new THREE.CanvasTexture(canvas);
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.wrapS = THREE.RepeatWrapping;
@@ -358,6 +372,11 @@ function getSlatwallEndCapTexture(): THREE.CanvasTexture {
     tex.generateMipmaps = true;
     tex.minFilter = THREE.LinearMipmapLinearFilter;
     tex.magFilter = THREE.LinearFilter;
+    // Seen edge-on down every aisle (a customer approaches an end cap along the
+    // run, the classic grazing angle) — same reasoning, same value, as
+    // shelving.ts's wire-shelf grid texture (getThickWireGridTexture: "shelves
+    // are seen at grazing angles; keep the grid crisp").
+    tex.anisotropy = 8;
     cachedSlatwallEndCapTexture = tex;
   }
   return cachedSlatwallEndCapTexture;

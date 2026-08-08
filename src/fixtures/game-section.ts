@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { Movie } from '../jellyfin';
 import { FixturePlacement, shelfTitleCompare, BOX_SPACING, UNIT_DEPTH, UNIT_TOP_DEPTH, LEAN_ANGLE } from '../store-layout';
 import { FixtureContext, SlottedFixture, FixtureSlot } from '../fixtures';
-import { Footprint } from '../layout-validator';
+import { Footprint, localZOffset } from '../layout-validator';
 import { createCategorySignTexture, createFlushTopperLabelTexture } from '../canvas-textures';
 import { gameCaseDims } from '../video-case';
 import { createTrapezoidGeometry, splitTrapezoidGroups, createLibraryEndCapMaterial, getSlatwallPanelMaterial, markSignMesh } from '../sign-builders';
@@ -560,14 +560,25 @@ export class GameSection implements SlottedFixture {
     const shelfLength = (this.cols - 1) * BOX_SPACING + 1.0;
     const capFront = this.hasFrontCap ? 0.1 : 0;
     const capBack = this.hasBackCap ? 0.1 : 0;
+    // The caps are ASYMMETRIC: a unit in the middle of a run carries one, at
+    // its OUTER end only, so the run reads as a single continuous fixture. A
+    // footprint centred on the placement spreads that one cap's 0.1 ft over
+    // BOTH ends, overstating the unit by 0.05 ft into the neighbour it meets
+    // flush — which is exactly why two end-to-end units reported overlapping
+    // by 0.10 ft (one whole cap) with nothing wrong in the geometry.
+    // Local +Z is the front cap's end, -Z the back cap's (see the yaw notes in
+    // gameSectionPlacements), and local Z maps to world by the convention in
+    // layout-validator's header.
+    const yaw = this.placement.yaw;
+    const { dx, dz } = localZOffset(yaw, (capFront - capBack) / 2);
     return {
       label: `fixture:${this.placement.id}`,
       kind: 'fixture',
-      cx: this.placement.position.x,
-      cz: this.placement.position.z,
+      cx: this.placement.position.x + dx,
+      cz: this.placement.position.z + dz,
       w: UNIT_DEPTH,
       d: shelfLength + capFront + capBack,
-      yaw: this.placement.yaw,
+      yaw,
     };
   }
 
@@ -593,7 +604,12 @@ export class GameSection implements SlottedFixture {
           const colZ = -shelfLength / 2 + 0.5 + col * BOX_SPACING;
 
           const platform = movie.platform || this.frontPlatforms[s];
-          const dims = gameCaseDims(platform);
+          // discCount matters: a multi-disc title ships in the FAT jewel case
+          // (JEWEL_FAT_DEPTH_IN), and store-stock builds its mesh at that depth via
+          // gameShapeKey(platform, discCount). Sizing the SLOT without it placed the
+          // box as if it were a single jewel case, so the extra depth overhung
+          // backwards into the rental shell by 0.16 in.
+          const dims = gameCaseDims(platform, movie.discCount);
           const currentBoxHeight = dims.h;
           const currentBoxDepth = dims.d;
 
@@ -641,7 +657,12 @@ export class GameSection implements SlottedFixture {
           const colZ = shelfLength / 2 - 0.5 - col * BOX_SPACING;
 
           const platform = movie.platform || this.backPlatforms[s];
-          const dims = gameCaseDims(platform);
+          // discCount matters: a multi-disc title ships in the FAT jewel case
+          // (JEWEL_FAT_DEPTH_IN), and store-stock builds its mesh at that depth via
+          // gameShapeKey(platform, discCount). Sizing the SLOT without it placed the
+          // box as if it were a single jewel case, so the extra depth overhung
+          // backwards into the rental shell by 0.16 in.
+          const dims = gameCaseDims(platform, movie.discCount);
           const currentBoxHeight = dims.h;
           const currentBoxDepth = dims.d;
 

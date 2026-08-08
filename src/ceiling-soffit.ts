@@ -271,7 +271,16 @@ export interface FrontSoffitParams {
   tileX: number;
   tileZ: number;
   softwareGL: boolean;
-  reflectorResolution: number;
+  /**
+   * Reflector target size in PIXELS, already derived from the real drawing
+   * buffer by the caller. Deliberately a w/h PAIR, not one number: a Reflector
+   * renders the reflected VIEW into its target and samples it with SCREEN-space
+   * projective coords, so the target has to track the drawing buffer's shape.
+   * A square target squashed to 1:1 and stretched back out over this band's
+   * ~20:1 run is the smeared, stair-stepped strip F8 pin 028 was filed on —
+   * fixed for the ceiling-frame mirror at the time, missed here.
+   */
+  reflectorSize: { w: number; h: number };
   /**
    * bb-2000 look (user): a plain all-WHITE soffit with no chrome/mirror band and
    * INSET CIRCULAR (recessed can) lights instead of the rectangular troffers.
@@ -293,7 +302,7 @@ export function buildFrontSoffit(params: FrontSoffitParams): FrontSoffitResult {
   const {
     scene, ceilingY, storefrontSpec, storeWidth, corniceWallGap, corniceBand, corniceDrop,
     tileMaterial, trofferPanelMaterial, trofferFrameMaterial, tileX, tileZ,
-    softwareGL, reflectorResolution, plainWhite,
+    softwareGL, reflectorSize, plainWhite,
   } = params;
 
   // bb-2000: an all-white soffit body (no reflective ceiling-tile deck). The
@@ -505,8 +514,8 @@ export function buildFrontSoffit(params: FrontSoffitParams): FrontSoffitResult {
     } else {
       placeMirror(new Reflector(new THREE.PlaneGeometry(mirrorW, mirrorH), {
         clipBias: 0.003,
-        textureWidth: reflectorResolution,
-        textureHeight: reflectorResolution,
+        textureWidth: reflectorSize.w,
+        textureHeight: reflectorSize.h,
         color: 0xffffff,
       }));
     }

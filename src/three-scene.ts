@@ -451,6 +451,7 @@ export class StoreScene {
     getScene: () => this.scene,
     getRenderer: () => this.renderer,
     getBackWallZ: () => this.backWallZ,
+    getCeilingY: () => this.ceilingY,
     getHeadlight: () => this.headlight ?? null,
     getBakeHidden: () => (this.selectionArrow ? [this.selectionArrow] : []),
     onEnvironmentRebaked: () => {
@@ -4672,9 +4673,25 @@ export class StoreScene {
     // pass — and its extra depth render — entirely while browsing/walking. No
     // requestRender of its own: it only ever runs on frames already being drawn.
     if (this.bokehPass) {
-      const dofOn = this.mode === 'inspect';
+      // Also the back room's couch view: that shot sits a few inches off the
+      // table reading a tape spine and a receipt, so the TV behind belongs well
+      // out of focus. Not while a tape is held up or a film is playing — those
+      // states drive the camera themselves.
+      const backRoomView = this.mode === 'backroom' && this.backRoom?.state === 'view';
+      const dofOn = this.mode === 'inspect' || backRoomView;
       if (this.bokehPass.enabled !== dofOn) this.bokehPass.enabled = dofOn;
-      if (dofOn) {
+      if (backRoomView) {
+        const u = this.bokehPass.uniforms as { [k: string]: THREE.IUniform };
+        u['focus'].value = THREE.MathUtils.clamp(this.backRoom!.focusDistance(), 0.35, 6.0);
+        // Wider than the inspect default: the subject is a foot away and the TV
+        // ~7 ft past it, so the inspect aperture would barely register.
+        // Tighter than the first pass: the receipt runs from the focal plane
+        // out toward the lens, so a wide aperture softened the print that this
+        // framing exists to show. The TV is ~7 ft past a ~1.3 ft focus, which
+        // still defocuses hard at this setting.
+        u['aperture'].value = 0.0062;
+        u['maxblur'].value = 0.011;
+      } else if (dofOn) {
         // Focal plane on the FACE of the held case, not on the look target (the
         // case centre) and — the bug this replaced — not on a 1.5 floor that sat
         // behind a case measured 0.90-1.35 units out, which left the back-cover
@@ -4683,8 +4700,11 @@ export class StoreScene {
         // Clamp still guards a mid-lerp look target from throwing the focal
         // plane onto the far wall; the floor is now well under the real
         // inspect band instead of above it.
-        (this.bokehPass.uniforms as { [k: string]: THREE.IUniform })['focus'].value =
-          THREE.MathUtils.clamp(focusDist, 0.35, 6.0);
+        const u = this.bokehPass.uniforms as { [k: string]: THREE.IUniform };
+        u['focus'].value = THREE.MathUtils.clamp(focusDist, 0.35, 6.0);
+        // Back the inspect look out again — the back-room branch widens these.
+        u['aperture'].value = 0.0032;
+        u['maxblur'].value = 0.006;
       }
     }
 
@@ -5278,7 +5298,10 @@ export class StoreScene {
 
       const bScale = (showBackBox && seriesZMult === 1) ? s : 0.0;
       const bWorldX = slot.currentX + slot.backX * Math.cos(theta) + slot.backZ * Math.sin(theta);
-      const bWorldY = slot.currentY;
+      // Rental shells are taller than the box they stand behind and both
+      // geometries are origin-centred, so the shell needs lifting onto the
+      // shelf rather than sharing the front box's centre (MovieSlot.backYLift).
+      const bWorldY = slot.currentY + slot.backYLift;
       const bWorldZ = slot.currentZ - slot.backX * Math.sin(theta) + slot.backZ * Math.cos(theta);
 
       if (heroActive) {

@@ -8,8 +8,9 @@
 import * as THREE from 'three';
 import { Movie } from './jellyfin';
 import { buildGoldClamshellFillers, getGoldCaseMaterials, repaintGoldCase } from './fixtures/gold-clamshell';
-import { posterQueue, CASE_MEDIUM, CASE_HEIGHT, CASE_DEPTH, textureArrayManager, createClonedCaseGeometry, getGlobalFrontMaterials, getGlobalBackMaterials, updateGlobalMaterialsEnvMap, leftmostColorCache, posterPixelCache, reflectionProbes, isGlobalMaterial, lowResCache, createProgramWarmupMaterials, gameShapeKey, gameDimsForShape, gameCaseDims, beginRebuildDrain, SERIES_DEPTH_MULT } from './video-case';
+import { posterQueue, CASE_MEDIUM, CASE_HEIGHT, CASE_DEPTH, textureArrayManager, createClonedCaseGeometry, getGlobalFrontMaterials, getGlobalBackMaterials, updateGlobalMaterialsEnvMap, leftmostColorCache, posterPixelCache, reflectionProbes, isGlobalMaterial, lowResCache, createProgramWarmupMaterials, gameShapeKey, gameDimsForShape, gameCaseDims, gameRentalDims, rentalBottomLift, rentalBoxDepth, rentalBoxHeight, beginRebuildDrain, SERIES_DEPTH_MULT } from './video-case';
 import { AISLE_SHELF_HEIGHTS, WALL_SHELF_HEIGHTS, LEAN_ANGLE, STAGGER_OFFSET, UNIT_SIDE_CAPACITY, BACK_WALL_UNIT_IDX, sideEntrySlot, COPY_X_JITTER_RANGE, EXTRA_COPY_DEPTH_STEP, extraCopiesCount, isUnstockedTitle, seededRandom01, MovieSlot } from './store-layout';
+import { validateCaseFit, type CaseFitPair } from './layout-validator';
 import { retailAudio } from './audio';
 import {
   CASE_EULER_ORDER, sectionColSpan, SlotPos,
@@ -72,6 +73,71 @@ function aisleCaseDims(movie: Movie): { height: number; depth: number; liftDepth
     depth: CASE_DEPTH,
     liftDepth: CASE_DEPTH * (movie.isSeries ? SERIES_DEPTH_MULT : 1),
   };
+}
+
+/**
+ * Per-slot lift for the rental shell (see MovieSlot.backYLift). A movie's
+ * shell is the store-medium clamshell; a game's is its media-CLASS case with
+ * the platform's real carton in front, which is where the two heights diverge
+ * far enough to push the shell down through the shelf.
+ */
+function slotRentalLift(movie: Movie): number {
+  if (!movie.game) return rentalBottomLift();
+  return rentalBottomLift(gameCaseDims(movie.platform, movie.discCount), gameRentalDims(movie.platform));
+}
+
+/**
+ * Half-depth to seat the rental shell BEHIND the parting plane rather than
+ * across it. The slot's own `depth` is the retail box's, and offsetting both
+ * boxes by half of it buries the thicker shell's front face inside the box in
+ * front (see rentalBoxDepth). Front stays at +retail/2; the shell goes to
+ * -shell/2, so the two faces meet instead of overlapping.
+ */
+function slotRentalHalfDepth(movie: Movie): number {
+  if (!movie.game) return rentalBoxDepth() / 2;
+  return rentalBoxDepth(gameCaseDims(movie.platform, movie.discCount), gameRentalDims(movie.platform)) / 2;
+}
+
+/**
+ * Assert the retail case and its rental shell actually fit together, once per
+ * distinct SHAPE rather than per slot (the mismatch is a property of the box
+ * pair, so a whole store is a handful of checks). Catches the two ways these
+ * have silently drifted apart before — shell through the shelf, shell through
+ * the case in front — as `[cases] ERROR` lines beside the layout validator's,
+ * and on window.__caseViolations for verification scripts.
+ */
+function validateCaseFitForStock(scene: StoreScene): void {
+  const seen = new Set<string>();
+  const pairs: CaseFitPair[] = [];
+  scene.slotsByPosition.forEach((slot) => {
+    const movie = slot.movie;
+    if (!movie) return;
+    const label = movie.game ? `game:${movie.platform || '?'}${(movie.discCount ?? 1) >= 2 ? '#fat' : ''}` : `movie:${CASE_MEDIUM}`;
+    if (seen.has(label)) return;
+    seen.add(label);
+    // Two INDEPENDENT sources, which is the only thing that makes this an
+    // assertion rather than a restatement. Sizes come from the dims tables
+    // that feed the geometry; the placement is read back off the BUILT SLOT,
+    // so a call site that computes its own offsets is caught as readily as a
+    // wrong shared helper. Reconstructing the placement here instead — the
+    // first cut did — makes the check vacuous: it stayed silent with both
+    // shipped bugs reintroduced.
+    const retail = movie.game ? gameCaseDims(movie.platform, movie.discCount) : { w: 0, h: CASE_HEIGHT, d: CASE_DEPTH };
+    const rental = movie.game ? gameRentalDims(movie.platform) : undefined;
+    const retailArg = movie.game ? retail : undefined;
+    pairs.push({
+      label,
+      retailH: retail.h, retailD: retail.d,
+      shellH: rentalBoxHeight(retailArg, rental),
+      shellD: rentalBoxDepth(retailArg, rental),
+      lift: slot.backYLift,
+      frontZ: slot.frontZ,
+      backZ: slot.backZ,
+    });
+  });
+  const violations = validateCaseFit(pairs);
+  violations.forEach((v) => console.error(`[cases] ${v.severity.toUpperCase()} ${v.a} <-> ${v.b}: ${v.message}`));
+  (window as any).__caseViolations = violations;
 }
 
 export function clearMovieBoxes(scene: StoreScene) {
@@ -685,7 +751,8 @@ export function buildAllMovieBoxes(scene: StoreScene) {
         frontRotY: 0,
         backJitter,
         backX: -STAGGER_OFFSET + backJitter,
-        backZ: -boxDepth / 2,
+        backZ: -slotRentalHalfDepth(movie),
+        backYLift: slotRentalLift(movie),
         backRotY: 0,
         currentScale: 1.0,
         loadShelfDetails: () => {},
@@ -758,7 +825,8 @@ export function buildAllMovieBoxes(scene: StoreScene) {
       frontRotY: 0,
       backJitter,
       backX: -STAGGER_OFFSET + backJitter,
-      backZ: -boxDepth / 2,
+      backZ: -slotRentalHalfDepth(movie),
+      backYLift: slotRentalLift(movie),
       backRotY: 0,
       currentScale: 1.0,
       loadShelfDetails: () => {},
@@ -828,7 +896,8 @@ export function buildAllMovieBoxes(scene: StoreScene) {
         frontRotY: 0,
         backJitter,
         backX: backJitter,
-        backZ: -fixtureSlot.depth / 2,
+        backZ: -slotRentalHalfDepth(movie),
+        backYLift: slotRentalLift(movie),
         backRotY: 0,
         currentScale: 1.0,
         loadShelfDetails: () => {},
@@ -842,6 +911,9 @@ export function buildAllMovieBoxes(scene: StoreScene) {
       scene.dirtySlots.add(slot);
     });
   });
+
+  // Slots are all built now, so the fit check can read real placements.
+  validateCaseFitForStock(scene);
 
   // Mark attributes as needing update so they are uploaded to GPU
   scene.unitSideFrontMeshMap.forEach(mesh => {

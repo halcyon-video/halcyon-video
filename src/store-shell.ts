@@ -1165,9 +1165,21 @@ export function buildStore(scene: StoreScene) {
     });
     ceilingBounce(soffitMat, 0.24, soffitTex);
 
-    const isHeadless = navigator.userAgent.includes('HeadlessChrome') || navigator.webdriver;
+    // Same derivation as the ceiling-frame mirror below (see the long note on
+    // F8 pin 028 there): track the drawing buffer's size AND shape, cap by
+    // quality tier. What was here instead was a square res with a HEADLESS pin
+    // at 64 — so every `shot.mjs` frame showed a smeared 64px band no matter
+    // what --quality asked for, and no screenshot could gate the look. The
+    // harness's own fast default is quality LOW, which still lands on the cheap
+    // tier, so this costs nothing on ordinary shots.
+    const soffitBuf = scene.renderer.getDrawingBufferSize(new THREE.Vector2());
     const q = localStorage.getItem('bb_quality') || 'high';
-    const soffitReflectorRes = isHeadless || q === 'low' ? 64 : q === 'medium' ? 256 : 512;
+    const soffitCap = q === 'low' ? 256 : q === 'medium' ? 512 : 1024;
+    const soffitW = Math.max(64, Math.min(soffitCap, Math.round(soffitBuf.x)));
+    const soffitReflectorSize = {
+      w: soffitW,
+      h: Math.max(64, Math.round(soffitW * (soffitBuf.y / Math.max(1, soffitBuf.x)))),
+    };
 
     const soffit = buildFrontSoffit({
       scene: scene.scene,
@@ -1183,7 +1195,7 @@ export function buildStore(scene: StoreScene) {
       tileX: TILE_X,
       tileZ: TILE_Z,
       softwareGL: scene.softwareGL || scene.webkitGL,
-      reflectorResolution: soffitReflectorRes,
+      reflectorSize: soffitReflectorSize,
       // bb-2000: all-white soffit body + inset circular can lights, no mirror
       // ring (the perimeter cornice is dropped for that store — user).
       plainWhite: getActiveTheme().id === 'bb-2000',

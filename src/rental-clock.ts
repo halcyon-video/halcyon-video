@@ -133,6 +133,26 @@ export function formatUnlockLabel(record: RentalRecord): string {
   return `${dayNames[d.getDay()]} ${h}:${mm} ${ampm}`;
 }
 
+/**
+ * Format the checkout instant as a register stamp, e.g. "22-NOV-1995 20:57:32.31"
+ * (day, 3-letter month, year, 24h clock, centiseconds) — the shape the 1995
+ * reference slip prints on its last line.
+ *
+ * The centiseconds are the record's own milliseconds/10, not decoration: a
+ * receipt stamp is per-transaction data, so every digit on it has to come from
+ * the transaction. `checkoutAt` has nothing finer than ms to give.
+ */
+export function formatCheckoutStamp(record: RentalRecord): string {
+  const t = Date.parse(record.checkoutAt);
+  if (!Number.isFinite(t)) return '';
+  const d = new Date(t);
+  const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+  const p = (n: number) => n.toString().padStart(2, '0');
+  const date = `${p(d.getDate())}-${months[d.getMonth()]}-${d.getFullYear()}`;
+  const time = `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+  return `${date} ${time}.${p(Math.floor(d.getMilliseconds() / 10))}`;
+}
+
 // ── localStorage plumbing (guarded so the pure math above stays node-testable) ──
 
 export function loadRentalRecord(): RentalRecord | null {

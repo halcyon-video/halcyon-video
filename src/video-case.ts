@@ -8,7 +8,7 @@ import { isDiscoveryRequested } from './jellyseerr';
 import { getActiveTheme } from './themes';
 import { getActiveLogoSpec } from './logo-spec';
 import { drawLogo } from './logo-renderer';
-import { buildCustomTemplateWrap, buildCustomTicketWrap, customWrapLabel, ensureWrapFontsLoaded } from './logo-wrap';
+import { buildCustomTemplateWrap, buildCustomTicketWrap, buildDvdBlueTemplateWrap, customWrapLabel, ensureWrapFontsLoaded } from './logo-wrap';
 import type { BrandPackWrapSpec } from './brand-pack';
 import { brandAssetUrl, brandString, getBrandPack } from './brand-pack';
 import type { DecodeMode } from './poster-worker';
@@ -17,6 +17,10 @@ import { drawTechSpecsTable, TECH_SPECS_TABLE_H } from './tech-specs';
 import { perfTrace, perfSlot } from './perf-trace';
 import { LruByteCache } from './lru-byte-cache';
 import { getLowResFrontMaterial, disposeLowResFrontMaterials } from './hero-lowres-front';
+// The two DVD typed-metadata passes live in their own module (this file is at
+// its line budget — see dvd-overlays.ts's header). They import this file's
+// shared text/measure helpers back; the cycle is function-level only.
+import { drawDvd2003Overlays, drawDvdBlueOverlays, DVD_BLUE_WRAP_LAYOUT } from './dvd-overlays';
 import {
   queueTextureUpload,
   textureArrayManager,
@@ -221,7 +225,9 @@ export const COVER_VARIANTS: Record<CaseMedium, CoverVariant[]> = {
   // Procedural LogoSpec wraps: the store's own brand on every case. 'standard'
   // clones the printed-form pixel geometry, so it carries the full
   // typed-metadata pass; 'ticket' draws its spine band on the all-emblem fold
-  // lines and is `plain` (final art, nothing typed over it).
+  // lines and is `plain` (final art, nothing typed over it). DVD-only 'blue'
+  // is the same TEMPLATE family as 'standard' — the VHS wrap's cream-stock/
+  // blue-panel/gold-rule design, redrawn on the DVD wrap's own fold geometry.
   //
   // A brand pack that ships wrap SCANS adds its own variants alongside these
   // (syncBrandPackWrapVariants below) — including replacing 'standard' with a
@@ -243,6 +249,11 @@ export const COVER_VARIANTS: Record<CaseMedium, CoverVariant[]> = {
       id: 'standard', get label() { return customWrapLabel(wrapLogoSpec(), 'custom'); },
       url: 'procedural://logo-wrap/custom',
       procedural: (m) => buildCustomTemplateWrap(wrapLogoSpec(), m),
+    },
+    {
+      id: 'blue', get label() { return customWrapLabel(wrapLogoSpec(), 'custom-blue'); },
+      url: 'procedural://logo-wrap/custom-blue', layout: DVD_BLUE_WRAP_LAYOUT,
+      procedural: (_m) => buildDvdBlueTemplateWrap(wrapLogoSpec()),
     },
     {
       id: 'ticket', get label() { return customWrapLabel(wrapLogoSpec(), 'custom-ticket'); },
@@ -562,6 +573,79 @@ export function gameFaceAspect(platform?: string): number {
  */
 export function gameRentalDims(platform?: string): { w: number; h: number; d: number } {
   return GAME_CLASS_DIMS[isDiscPlatform(platform) ? 'disc' : 'cart'];
+}
+
+/**
+ * How far to LIFT the rental shell so it stands on the same surface as the
+ * retail box in front of it.
+ *
+ * Both boxes are RoundedBoxGeometry centred on their own origin and both are
+ * placed at the slot's single Y (three-scene's fWorldY/bWorldY), so a shell
+ * that is taller than the box in front of it hangs BELOW that box by half the
+ * difference — straight through the shelf it is supposed to be sitting on.
+ * Nothing clamps it, because a shelf is a surface the boxes are posed onto,
+ * not a collider they rest against.
+ *
+ * That difference is never zero on a clamshell: the rental case is moulded
+ * larger than the sleeve it holds (VHS_RIM_VERTICAL_FT), so even a movie sank
+ * by half the rim. Games are far worse — the shell is the media CLASS case
+ * (a full-height VHS clamshell for any cartridge) while the retail box is the
+ * platform's real carton, so a landscape SNES box (5.25 in) stands in front of
+ * an 8.73 in shell and drops it ~1.7 in under the shelf.
+ *
+ * Returns 0 for the DVD-medium movie case, where the rental box IS the retail
+ * geometry (getRentalGeometry defers to getGeometry) and there is nothing to
+ * correct.
+ */
+export function rentalBottomLift(
+  retailDims?: { w: number; h: number; d: number },
+  rentalDims?: { w: number; h: number; d: number }
+): number {
+  const retailH = retailDims?.h ?? CASE_HEIGHT;
+  return (rentalBoxHeight(retailDims, rentalDims) - retailH) / 2;
+}
+
+/**
+ * Real HEIGHT of the rental shell as getRentalGeometry builds it: a
+ * DVD-shaped rental box is the retail geometry (no rim), anything else is the
+ * moulded clamshell with VHS_RIM_VERTICAL_FT added.
+ *
+ * Split out from rentalBottomLift so the fit validator has a source of truth
+ * for the shell's size that is INDEPENDENT of the placement being checked.
+ * Deriving one from the other makes the assertion vacuous — which is exactly
+ * what happened on the first cut of that check.
+ */
+export function rentalBoxHeight(
+  retailDims?: { w: number; h: number; d: number },
+  rentalDims?: { w: number; h: number; d: number }
+): number {
+  const base = rentalDims ?? (retailDims ? undefined : { w: CASE_WIDTH, h: CASE_HEIGHT, d: CASE_DEPTH });
+  if (!base) return retailDims?.h ?? CASE_HEIGHT;
+  const isDvdShaped = base.w === CASE_DIMS.dvd.w && base.h === CASE_DIMS.dvd.h;
+  return isDvdShaped ? base.h : base.h + VHS_RIM_VERTICAL_FT;
+}
+
+/**
+ * Real DEPTH of the rental shell, for the same reason rentalBottomLift()
+ * exists: the slot has one depth (the retail box's) and offsets both boxes by
+ * half of it, so the shell — which is always THICKER than what it holds —
+ * straddles the parting plane and its front face pushes into the back of the
+ * box standing in front. About 0.07 in on every game and every VHS movie:
+ * small, but two cases interpenetrating reads as a rendering fault at any
+ * range you can actually see it.
+ *
+ * Mirrors getRentalGeometry's depth choice exactly — a DVD-shaped rental box
+ * IS the retail geometry (keeps its own depth), anything else is the thicker
+ * moulded clamshell.
+ */
+export function rentalBoxDepth(
+  retailDims?: { w: number; h: number; d: number },
+  rentalDims?: { w: number; h: number; d: number }
+): number {
+  const base = rentalDims ?? (retailDims ? undefined : { w: CASE_WIDTH, h: CASE_HEIGHT, d: CASE_DEPTH });
+  if (!base) return retailDims?.d ?? CASE_DEPTH;
+  const isDvdShaped = base.w === CASE_DIMS.dvd.w && base.h === CASE_DIMS.dvd.h;
+  return isDvdShaped ? base.d : VHS_RENTAL_DEPTH_FT;
 }
 
 // Instanced-mesh batching key: one batch per distinct BOX SIZE, not per platform
@@ -2845,7 +2929,7 @@ function drawGrid(ctx: CanvasRenderingContext2D, width: number, height: number, 
 // lives on the retail (jellyfin) case; the rental copy is the generic
 // rental sleeve, identified only by its spine + back metadata.
 
-interface BoxLayout {
+export interface BoxLayout {
   imgW: number;
   imgH: number;
   // Panel crops, normalized [x0, y0, x1, y1] of the full scan.
@@ -2862,6 +2946,12 @@ interface BoxLayout {
   // geometry — dispatched to drawDvd2003Overlays instead of
   // drawStandardVhsOverlays. Mutually exclusive with standardVhs.
   dvd2003?: boolean;
+  // True for the DVD-only "Blue" wrap: the VHS 'Standard Version' design
+  // (cream stock, full-bleed blue panel, gold-rule frame) redrawn on the
+  // DVD wrap's own fold geometry — same typed-form idea as dvd2003, on its
+  // own coordinate set (drawDvdBlueTemplateWrap in logo-wrap.ts, dispatched
+  // here to drawDvdBlueOverlays). Mutually exclusive with standardVhs/dvd2003.
+  dvdBlue?: boolean;
   // True for the all-ticket wraps: the print has no window, form fields, or
   // title placeholder anywhere, so the scan renders exactly as printed —
   // drawBoxOverlays is a no-op (every field above except the crops is unused).
@@ -2942,7 +3032,7 @@ const stockGains = new Map<string, [number, number, number]>();
 
 /** A colour sampled off the raw scan, put through that scan's stock white
  *  balance — identity for a scan that needed no correction. */
-function scanColor(medium: CaseMedium, hex: string): string {
+export function scanColor(medium: CaseMedium, hex: string): string {
   const g = stockGains.get(activeCoverVariant(medium).url);
   if (!g) return hex;
   const n = parseInt(hex.slice(1), 16);
@@ -3043,7 +3133,7 @@ function loadBoxImage(medium: CaseMedium, cb: (img: HTMLImageElement | HTMLCanva
 }
 
 // Greedy word-wrap. ctx.font must already be set to the measuring font.
-function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
+export function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
   const words = text.split(/\s+/).filter(Boolean);
   const lines: string[] = [];
   let cur = '';
@@ -3068,7 +3158,7 @@ function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number)
 // spine-drawn text gets squashed across the spine at render time (cap height
 // shrinks, width doesn't — letters read fat). Narrowing the glyphs by the same
 // ratio restores true proportions at a slightly smaller effective size.
-function drawVerticalText(
+export function drawVerticalText(
   ctx: CanvasRenderingContext2D,
   text: string,
   cx: number,
@@ -3094,7 +3184,7 @@ function drawVerticalText(
 // Ratio between the case's physical spine aspect (d/h) and the scan crop's
 // aspect — the squash factor render applies to anything drawn in the scan's
 // spine region, and therefore the xScale that pre-compensates it.
-function spineTextXScale(medium: CaseMedium): number {
+export function spineTextXScale(medium: CaseMedium): number {
   const L = BOX_LAYOUTS[medium];
   const crop = L.spine;
   const cropAspect = ((crop[2] - crop[0]) * L.imgW) / L.imgH;
@@ -3120,10 +3210,10 @@ function spineTextXScale(medium: CaseMedium): number {
 //   • front blue panel's orange border: x 663-939, y 128-709 (the giant orange
 //     the wordmark reads bottom→top; the typed sticker sits horizontally over
 //     its bottom, the way stores labelled the real cases).
-const STANDARD_INK = '#211d19'; // sampled print ink (soft black, not #000)
+export const STANDARD_INK = '#211d19'; // sampled print ink (soft black, not #000)
 
 // Largest font size ≤ basePx (min minPx) at which `text` fits maxLen.
-function fitFontPx(
+export function fitFontPx(
   ctx: CanvasRenderingContext2D,
   text: string,
   basePx: number,
@@ -3141,7 +3231,7 @@ function fitFontPx(
 // bottom-to-top (glyph tops facing LEFT), matching the front panel's printed
 // right-edge "<BRAND> VIDEO RENTAL" line and the giant wordmark column.
 // Draws upward from yBottom; returns the column's length (its upward extent).
-function drawVerticalTextUp(
+export function drawVerticalTextUp(
   ctx: CanvasRenderingContext2D,
   text: string,
   cx: number,
@@ -3264,112 +3354,6 @@ function drawStandardVhsOverlays(ctx: CanvasRenderingContext2D, movie: Movie) {
   ctx.restore();
 }
 
-// ── 2003 DVD rental wrap fill-in ─────────────────────────────────────────────
-// Same printed-form idea as drawStandardVhsOverlays (typed values into a
-// printed form), remeasured on this scan's own 1024×683 canvas — its fold
-// lines, column positions and window bounds don't match the VHS scan's.
-// Coordinates are full-scan pixels, measured off the scan:
-//   • spine fields read top→bottom, tops right (drawVerticalText): CATEGORY:
-//     column cx≈518 (label ends y≈187), RATING:/RENT CODE:/DIST: column
-//     cx≈498 (labels end y≈158, y≈335, y≈427). The big printed spine line
-//     (cx≈540, caps x 531-548, y 95-478) is the spine's title placeholder —
-//     erased and retyped as the movie's title, sized to end clear of the
-//     barcode digits (start y≈492).
-//   • back-panel label window: interior x≈48-350, printed "<BRAND> VIDEO
-//     RENTAL" heading ends y≈125, window bottom (checkout-day chart starts)
-//     y≈500.
-//   • front right edge: printed "<BRAND> VIDEO RENTAL" placeholder line
-//     at x≈989-1002, y≈230-518 (art background ends ~x974, safe to erase from
-//     x≈978), reading bottom→top like the VHS scan's equivalent line.
-const DVD_2003_INK = '#0a0a0a'; // sampled print ink (near-black, cooler than VHS's)
-
-function drawDvd2003Overlays(ctx: CanvasRenderingContext2D, movie: Movie) {
-  ctx.save();
-
-  let h = 0;
-  for (let i = 0; i < movie.id.length; i++) h = (h * 31 + movie.id.charCodeAt(i)) >>> 0;
-
-  // --- Spine: type real metadata into the printed form fields ---
-  const dXs = spineTextXScale('dvd');
-  const spineValue = (text: string, cx: number, yTop: number, maxLen: number) => {
-    if (!text) return;
-    const size = fitFontPx(ctx, text, 18, 'normal', maxLen / dXs, 9);
-    drawVerticalText(ctx, text, cx, yTop, `${size}px Arial, sans-serif`, DVD_2003_INK, dXs);
-  };
-  spineValue((movie.genres[0] || 'FEATURE').toUpperCase(), 518, 197, 260); // CATEGORY:
-  spineValue((movie.rating || 'NR').toUpperCase(), 498, 168, 60);          // RATING:
-  spineValue(String(10 + (h % 90)), 498, 345, 40);                        // RENT CODE:
-  const distributor = (movie.studios?.[0] || String(10000 + (h % 90000))).toUpperCase();
-  spineValue(distributor, 498, 437, 54);                                  // DIST:
-
-  // Erase the print's big "<BRAND> VIDEO RENTAL" spine line and set the
-  // movie's title in its exact spot (see the coordinate comment above).
-  ctx.fillStyle = '#fcfdfa'; // spine label white, sampled beside the line
-  ctx.fillRect(526, 80, 30, 408);
-  const SPINE_TITLE_MAX = 385 / dXs; // y 95 → 480 after xScale, clear of the barcode digits
-  let spineTitle = movie.title.toUpperCase();
-  const sSize = fitFontPx(ctx, spineTitle, 36, 'bold', SPINE_TITLE_MAX, 11);
-  ctx.font = `bold ${sSize}px Arial, sans-serif`;
-  if (ctx.measureText(spineTitle).width > SPINE_TITLE_MAX) {
-    while (spineTitle.length > 3 && ctx.measureText(spineTitle + '…').width > SPINE_TITLE_MAX) {
-      spineTitle = spineTitle.slice(0, -1);
-    }
-    spineTitle += '…';
-  }
-  drawVerticalText(ctx, spineTitle, 540, 95, `bold ${sSize}px Arial, sans-serif`, DVD_2003_INK, dXs);
-
-  // --- Back-panel label window: typed title card under the printed heading ---
-  const wx = 48;
-  const wMax = 302; // interior right edge ≈ 350, short of the website strip at x≈363
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'top';
-  ctx.fillStyle = DVD_2003_INK;
-  const titleSize = 26, overSize = 16, metaSize = 15;
-  const windowBottom = 490;
-  let y = 140;
-  ctx.font = `bold ${titleSize}px Arial, sans-serif`;
-  for (const ln of wrapText(ctx, movie.title.toUpperCase(), wMax).slice(0, 3)) {
-    ctx.fillText(ln, wx, y);
-    y += titleSize + 3;
-  }
-  y += 8;
-
-  ctx.font = `bold ${metaSize}px Arial, sans-serif`;
-  const genreList = movie.genres.slice(0, 3).join(', ').toUpperCase() || 'FEATURE';
-  const metaRaw = [
-    movie.director ? `DIRECTED BY ${movie.director.toUpperCase()}` : '',
-    `${genreList}   ·   RATED ${movie.rating || 'NR'}`,
-    `RELEASED ${movie.year}${movie.duration ? `   ·   ${movie.duration}` : ''}`,
-  ].filter(Boolean);
-  const metaLines: string[] = [];
-  for (const m of metaRaw) metaLines.push(...wrapText(ctx, m, wMax));
-  const metaTop = windowBottom - metaLines.length * (metaSize + 3);
-
-  ctx.font = `${overSize}px Arial, sans-serif`;
-  const maxOverLines = Math.max(0, Math.floor((metaTop - 10 - y) / (overSize + 3)));
-  for (const ln of wrapText(ctx, movie.overview || '', wMax).slice(0, maxOverLines)) {
-    ctx.fillText(ln, wx, y);
-    y += overSize + 3;
-  }
-  ctx.font = `bold ${metaSize}px Arial, sans-serif`;
-  let my = metaTop;
-  for (const ln of metaLines) {
-    ctx.fillText(ln, wx, my);
-    my += metaSize + 3;
-  }
-
-  // --- Front right edge: erase the printed placeholder line, set the title ---
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(978, 205, 36, 340);
-  const F_TITLE_MAX = 560;
-  const fTitle = movie.title.toUpperCase();
-  const fSize = fitFontPx(ctx, fTitle, 19, 'bold', F_TITLE_MAX, 11);
-  ctx.font = `bold ${fSize}px Arial, sans-serif`;
-  const fLen = ctx.measureText(fTitle).width;
-  drawVerticalTextUp(ctx, fTitle, 995.5, 374 + fLen / 2, `bold ${fSize}px Arial, sans-serif`, DVD_2003_INK);
-
-  ctx.restore();
-}
 
 // Overlay a movie's real metadata onto a full-resolution copy of the scan. No-op
 // for a null movie (the generic front placeholder / unfocused back), which keeps
@@ -3380,6 +3364,10 @@ function drawBoxOverlays(ctx: CanvasRenderingContext2D, L: BoxLayout, movie: Mov
   if (L.plain) return;
   if (L.standardVhs) {
     drawStandardVhsOverlays(ctx, movie);
+    return;
+  }
+  if (L.dvdBlue) {
+    drawDvdBlueOverlays(ctx, movie);
     return;
   }
   if (L.dvd2003) {

@@ -1,5 +1,8 @@
-// The SUB-NAV JUMP INDEX — ▼ from the bottom shelf row (see store-nav.ts
-// moveDown: exit clasp → shelf row-- → THIS instead of the old dead stop).
+// The SUB-NAV JUMP INDEX — ▼ from the pulled-back shelf-select views, i.e.
+// the framing you boot into (see store-nav.ts moveDown). It opened from the
+// BOTTOM SHELF ROW until 2026-08-06, when the owner moved it: a jump menu
+// belongs on the view where you are already choosing where to go, not one
+// press off the floor in the middle of browsing a run.
 //
 // Two rows, both driven by ←/→ with ▲/▼ switching between them. There is no
 // DOM for this (owner call: the indexes are logical, not chrome) — the
@@ -244,7 +247,7 @@ function applyRow(scene: StoreScene, state: SubNavState): void {
 
 // ─── Open / close ────────────────────────────────────────────────────────────
 
-/** ▼ at the bottom shelf row. Always handled (the index always has Row 1). */
+/** ▼ in the shelf-select views. Always handled (the index always has Row 1). */
 export function openSubNav(scene: StoreScene): boolean {
   if (scene.subNav) return true;
   const rows = [buildLibraryRow(scene), buildDisplayRow(scene)];

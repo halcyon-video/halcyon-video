@@ -127,7 +127,7 @@ export function slotBackBoxPose(_scene: StoreScene, slot: MovieSlot): CarryPose 
   const theta = slot.currentRotY;
   return {
     x: slot.currentX + slot.backX * Math.cos(theta) + slot.backZ * Math.sin(theta),
-    y: slot.currentY,
+    y: slot.currentY + slot.backYLift,
     z: slot.currentZ - slot.backX * Math.sin(theta) + slot.backZ * Math.cos(theta),
     rotY: slot.backRotY + theta,
   };
@@ -211,8 +211,30 @@ export function enterCheckout(scene: StoreScene): void {
   if (n > 0) {
     scene.onConsoleLog(`[System] At the checkout counter with ${n} tape(s). Enter to check out.`, 'system');
   } else {
-    scene.onConsoleLog('[System] At the checkout counter. Left opens the manager terminal.', 'system');
+    scene.onConsoleLog('[System] At the checkout counter. Left opens the manager terminal, Up talks to the clerk.', 'system');
   }
+}
+
+/**
+ * ▲ at the checkout counter: speak to the clerk (owner request 2026-08-06).
+ * The counter already carries Left (manager terminal), Right (tip jar), OK
+ * (confirm) and Back (leave); ▲ was the one free press, and she is standing
+ * right there — enterCheckout summons her to the register — so the store's
+ * one human being was the only thing at the counter you couldn't address.
+ *
+ * Opens the SAME menu the walk-up E key gives (find something / what do you
+ * recommend / just browsing), not a checkout-only script, so there is one
+ * clerk conversation in the app rather than two that drift apart.
+ *
+ * False when there is no clerk or no dialog layer (headless harness, tests),
+ * or mid-flourish, so the caller can fall through to its old no-op.
+ */
+export function talkToClerkAtCounter(scene: StoreScene): boolean {
+  if (scene.mode !== 'checkout' || scene.checkoutRunning) return false;
+  if (!scene.clerk?.talkAtCounter()) return false;
+  scene.onConsoleLog('[System] Talking to the clerk at the counter.', 'system');
+  scene.requestRender();
+  return true;
 }
 
 export function checkoutStand(scene: StoreScene, out: THREE.Vector3): THREE.Vector3 {

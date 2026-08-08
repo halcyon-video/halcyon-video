@@ -4,7 +4,7 @@
 movie you own is a case on a shelf. Browse the aisles under warm fluorescents,
 pull *Back to the Future* off the wall, flip it over and read the back of the
 box, carry it to the counter, and watch the clerk drop it in a bag that
-crinkles around it. Then take it home to the back room and put it in the VCR.
+crinkles around it. Then take it home to the living room and put it in the VCR.
 
 It is not a menu with a skin on it. It's a store.
 
@@ -23,6 +23,33 @@ on a synthetic demo library. Or take the
 > expect a few GB of memory and real GPU use, and prefer a plugged-in machine
 > over a laptop on battery. (It's built to live on a dedicated HTPC, where it
 > idles near zero; a leaner demo is on the list.)
+
+### The same library, four ways
+
+None of this is a preset you pick once. Era, lighting, floor plan and media
+format are independent settings, and every combination is a store you can walk
+around in. [More ↓](#make-it-yours)
+
+| | |
+|:--:|:--:|
+| ![Four decades of fit-out](docs/screenshots/store-era.gif) | ![Day, sunset, night](docs/screenshots/time-of-day.gif) |
+| **Four decades of fit-out** — board signage and VHS in 1990, the fascia-band era in 1993, arched plaques in 2000, wire-black DVD shelving in 2010. | **Day, sunset, night** — the light through the front glass, on eight measured-sun HDR skies. |
+| ![Three floor plans](docs/screenshots/shelf-arrangement.gif) | ![VHS or DVD](docs/screenshots/media-format.gif) |
+| **Three floor plans** — herringbone, straight, or diagonal shelf runs, packed to fit the room. | **VHS or DVD** — the whole store re-cased, on correctly-proportioned rental shells. |
+
+### Does it…?
+
+The short answers, so you don't have to go looking for them.
+
+| | |
+|---|---|
+| **Run in Docker?** | Yes — one `docker run`, or `docker compose up -d` from a clone. [Quick start ↓](#quick-start) |
+| **Do video games?** | Yes — point it at [RomM](https://github.com/rommapp/romm) and a whole department appears: per-platform bays, period-correct boxes and jewel cases, and "renting" one launches it. [More ↓](#the-games-department) |
+| **Work with Plex or Emby?** | Not yet — Jellyfin today. The media layer is one module and adapters are the top roadmap item ([#32](https://github.com/halcyon-video/halcyon-video/issues/32)). |
+| **Run on a Raspberry Pi?** | Yes — **2.5D mode** runs the same store as plain HTML/CSS. [More ↓](#25d-mode--the-same-store-for-a-raspberry-pi) |
+| **Work away from home?** | Yes — **Remote Play** streams the live store to any browser, with its own TURN relay for off-LAN viewers. [More ↓](#remote-play--the-store-in-your-pocket) |
+| **Look like *my* video store?** | Yes — brand, logo, colors, themes, fixtures and sign art are all data you drop in a folder, not code. [More ↓](#make-it-yours) |
+| **Work with no media server at all?** | Yes — that's the demo link above. |
 
 ---
 
@@ -131,7 +158,7 @@ and Enter flies you to the title's spot on the shelf.
 
 ![The return chute](docs/screenshots/return-chute.jpg)
 
-### The back room
+### The living room
 
 After checkout you're **home** — rented clamshells and the receipt on the
 coffee table, a CRT and VCR with a blinking clock. Inspect your tapes from the
@@ -205,9 +232,23 @@ Point it at **[RomM](https://github.com/rommapp/romm)** and a freestanding
 gondola appears: per-platform bays with brand-colored blades — SNES and N64
 cardboard boxes in landscape, PlayStation jewel cases, Genesis clamshells — 13
 platform toggles, top-rated titles first. "Renting" a game launches it: a
-configured native emulator under Tauri (argv-safe, allowlisted), RomM's
-in-browser EmulatorJS player otherwise. Off by default; zero requests when
-disabled.
+native emulator under Tauri, or RomM's in-browser EmulatorJS player otherwise.
+Off by default; zero requests when disabled.
+
+Set **Emulator Command** in the manager terminal's Video Games page —
+`retroarch -L /path/to/core.so {path}`, where `{path}` becomes the rom. The
+desktop app spawns that as an argument array (never a shell) and only if the
+program is on a fixed emulator allowlist, so a typo fails closed instead of
+running something else. Leave it blank for the browser player.
+
+![The video games department](docs/screenshots/games-department.jpg)
+
+Every platform gets its own carton, at its own real-world proportions — a
+Super Nintendo box is not a PlayStation jewel case wearing different art, and
+neither is a movie case. Your RomM cover scans go on the shapes they were
+printed for.
+
+![Game shelves up close](docs/screenshots/games-shelf.jpg)
 
 ---
 
@@ -387,7 +428,7 @@ This app's steady state is *days on a shelf*, and it's engineered like it:
 
 | You have | You get |
 |---|---|
-| **Jellyfin** (required — or demo mode) | The store, browsing, walk mode, playback, rentals, back room, clerk, themes, brand editor |
+| **Jellyfin** (required — or demo mode) | The store, browsing, walk mode, playback, rentals, living room, clerk, themes, brand editor |
 | **Jellyseerr** (optional) | Recommendation clasps, REQUEST / COMING SOON cases, collection gaps, discovery shelving, staff picks, FOR YOU endcaps, "order it for me" |
 | **RomM** (optional) | The video-game department, native or in-browser game launching |
 | **Tauri build** (optional) | mpv playback command, HDMI-CEC control, system suspend, native game launch, CORS-free proxying |
@@ -491,7 +532,13 @@ whole store as HTML/CSS on a Raspberry Pi.
 
 **Does it work with Plex or Emby?**
 Today it speaks Jellyfin (and a no-server demo mode). The media layer is one
-module, and Plex/Emby adapters are the most-asked-about item on the roadmap.
+module, and Plex/Emby adapters are the most-asked-about item on the roadmap —
+[issue #32](https://github.com/halcyon-video/halcyon-video/issues/32) is the
+one to watch or chime in on.
+
+**Can I run it in Docker?**
+Yes — see [Quick start](#quick-start). One `docker run` with `--network host`,
+or `docker compose up -d` from a clone to build the image locally.
 
 **Can I make it look like the video store I grew up with?**
 See [Make it yours](#make-it-yours). The app ships a fictional brand and takes

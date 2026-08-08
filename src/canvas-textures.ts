@@ -2134,4 +2134,3 @@ export function createLightPoolTexture(color = '#ffdca0'): THREE.CanvasTexture {
   tex.colorSpace = THREE.SRGBColorSpace;
   return tex;
 }
-
