@@ -602,13 +602,27 @@ export function rentalBottomLift(
   rentalDims?: { w: number; h: number; d: number }
 ): number {
   const retailH = retailDims?.h ?? CASE_HEIGHT;
-  // Mirrors getRentalGeometry: a DVD-shaped rental box is the retail geometry
-  // (no rim), anything else is the clamshell with the vertical rim added.
+  return (rentalBoxHeight(retailDims, rentalDims) - retailH) / 2;
+}
+
+/**
+ * Real HEIGHT of the rental shell as getRentalGeometry builds it: a
+ * DVD-shaped rental box is the retail geometry (no rim), anything else is the
+ * moulded clamshell with VHS_RIM_VERTICAL_FT added.
+ *
+ * Split out from rentalBottomLift so the fit validator has a source of truth
+ * for the shell's size that is INDEPENDENT of the placement being checked.
+ * Deriving one from the other makes the assertion vacuous — which is exactly
+ * what happened on the first cut of that check.
+ */
+export function rentalBoxHeight(
+  retailDims?: { w: number; h: number; d: number },
+  rentalDims?: { w: number; h: number; d: number }
+): number {
   const base = rentalDims ?? (retailDims ? undefined : { w: CASE_WIDTH, h: CASE_HEIGHT, d: CASE_DEPTH });
-  if (!base) return 0;
+  if (!base) return retailDims?.h ?? CASE_HEIGHT;
   const isDvdShaped = base.w === CASE_DIMS.dvd.w && base.h === CASE_DIMS.dvd.h;
-  if (isDvdShaped) return (base.h - retailH) / 2;
-  return (base.h + VHS_RIM_VERTICAL_FT - retailH) / 2;
+  return isDvdShaped ? base.h : base.h + VHS_RIM_VERTICAL_FT;
 }
 
 /**

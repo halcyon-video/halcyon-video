@@ -593,7 +593,12 @@ export class GameSection implements SlottedFixture {
           const colZ = -shelfLength / 2 + 0.5 + col * BOX_SPACING;
 
           const platform = movie.platform || this.frontPlatforms[s];
-          const dims = gameCaseDims(platform);
+          // discCount matters: a multi-disc title ships in the FAT jewel case
+          // (JEWEL_FAT_DEPTH_IN), and store-stock builds its mesh at that depth via
+          // gameShapeKey(platform, discCount). Sizing the SLOT without it placed the
+          // box as if it were a single jewel case, so the extra depth overhung
+          // backwards into the rental shell by 0.16 in.
+          const dims = gameCaseDims(platform, movie.discCount);
           const currentBoxHeight = dims.h;
           const currentBoxDepth = dims.d;
 
@@ -641,7 +646,12 @@ export class GameSection implements SlottedFixture {
           const colZ = shelfLength / 2 - 0.5 - col * BOX_SPACING;
 
           const platform = movie.platform || this.backPlatforms[s];
-          const dims = gameCaseDims(platform);
+          // discCount matters: a multi-disc title ships in the FAT jewel case
+          // (JEWEL_FAT_DEPTH_IN), and store-stock builds its mesh at that depth via
+          // gameShapeKey(platform, discCount). Sizing the SLOT without it placed the
+          // box as if it were a single jewel case, so the extra depth overhung
+          // backwards into the rental shell by 0.16 in.
+          const dims = gameCaseDims(platform, movie.discCount);
           const currentBoxHeight = dims.h;
           const currentBoxDepth = dims.d;
 
