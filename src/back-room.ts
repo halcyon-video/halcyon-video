@@ -554,7 +554,12 @@ export class BackRoom {
       const mono = bundledFontReady(BB_MONO) ? BB_MONO : 'monospace';
       // Impact ribbon on thermal stock: a violet-leaning ink that is nowhere
       // near black, on paper that is nowhere near white.
-      const INK = '#3f4486', PAPER = '#f1eee4';
+      // Far darker than the ribbon actually is. The reference's ink is a mid
+      // violet on white, but this slip is a lit MeshStandard surface under a
+      // warm key: the lamp lifts the paper and crushes the contrast, and a
+      // faithful violet came out invisible on screen. Overdriving to near-black
+      // navy is what reads AS violet ink once the room has had its way with it.
+      const INK = '#141634', PAPER = '#f5f2e9';
       const L = 34, R = W - 34, CX = W / 2;
       ctx.fillStyle = PAPER;
       ctx.fillRect(0, 0, W, H);
