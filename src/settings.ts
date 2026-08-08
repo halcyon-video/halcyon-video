@@ -31,6 +31,7 @@ import {
 import { brandDropReport } from './brand-drop';
 import type { LogoShape, LogoSpec } from './logo-spec';
 import { drawLogo, getLogoFontString } from './logo-renderer';
+import { loadMediaReleasePin, saveMediaReleasePin } from './media-release-date';
 import type { StoreScene } from './three-scene';
 
 export type SettingKind = 'toggle' | 'cycle' | 'text' | 'secret';
@@ -55,8 +56,26 @@ export interface SettingDef<T = unknown> {
   applyMode: ApplyMode;
   /** For 'live' settings: apply the new value to the running scene in place. */
   apply?: (value: T, scene: StoreScene) => void;
-  /** One-line helper text shown under the row. */
-  hint?: string;
+  /**
+   * One-line helper text shown under the row. A function form is re-resolved
+   * every time the drawer (re)builds a row — for rows whose advice depends on
+   * live state (e.g. Store Theme while era-follow is driving it). Read it
+   * through resolveHint(), never directly.
+   */
+  hint?: string | (() => string);
+  /**
+   * Decorates the row's displayed value at render time (currentValueLabel) —
+   * e.g. Store Theme shows "… (AUTO)" while the Media Release Date pin is
+   * driving the era. Receives the plain label, returns what to show.
+   */
+  valueLabel?: (label: string) => string;
+  /**
+   * Runs after a drawer commit persists a new value (cycle/toggle rows).
+   * A returned string is logged to the boot console — the hook for side
+   * effects a change must announce (e.g. changing the theme detaches
+   * era-follow so the pick can actually stick).
+   */
+  onChange?: (value: unknown) => string | void;
   /**
    * Service/developer knob: registered so the registry documents the key and
    * live-apply still works, but never rendered on the couch-facing drawer
@@ -188,14 +207,20 @@ export function nextCycleValue(key: string): string {
 export function currentValueLabel(key: string): string {
   const def = registry.get(key);
   if (!def) return '';
-  if (def.kind === 'toggle') return getSetting<boolean>(key) ? 'On' : 'Off';
+  const decorate = (label: string) => (def.valueLabel ? def.valueLabel(label) : label);
+  if (def.kind === 'toggle') return decorate(getSetting<boolean>(key) ? 'On' : 'Off');
   if (def.kind === 'cycle') {
     const cur = String(getSetting(key));
-    return def.values?.find((v) => v.id === cur)?.label ?? cur;
+    return decorate(def.values?.find((v) => v.id === cur)?.label ?? cur);
   }
   const val = getSetting<string>(key);
-  if (def.kind === 'secret') return val ? '••••••••' : '(not set)';
-  return val || '(not set)';
+  if (def.kind === 'secret') return decorate(val ? '••••••••' : '(not set)');
+  return decorate(val || '(not set)');
+}
+
+/** A def's hint for THIS render — resolves the dynamic (function) form. */
+export function resolveHint(def: SettingDef): string | undefined {
+  return typeof def.hint === 'function' ? def.hint() : def.hint;
 }
 
 // ─── Option thumbnails (W3) ──────────────────────────────────────────────────
@@ -366,6 +391,13 @@ export function registerCoreSettings(): void {
   coreRegistered = true;
 
   // Store Look ---------------------------------------------------------------
+  // While the Media Release Date pin's MATCH STORE ERA is on (#42), this row
+  // is being DRIVEN: the scene-build funnel re-derives bb_theme from the pin
+  // every rebuild. Auto-brightness rules apply — the row wears "(AUTO)" and
+  // says who's driving BEFORE you touch it, and touching it takes control
+  // back (onChange detaches the follow) instead of losing a silent fight
+  // with the funnel one rebuild later.
+  const eraFollowOn = (): boolean => !!loadMediaReleasePin()?.matchEra;
   registerSetting({
     key: 'bb_theme',
     label: 'Store Theme',
@@ -374,7 +406,18 @@ export function registerCoreSettings(): void {
     values: Object.values(THEMES).map((t) => ({ id: t.id, label: t.name })),
     default: 'bb-1990',
     applyMode: 'rebuild-scene',
-    hint: 'Era + brand styling for the whole store.',
+    // Footer bar clips hints at 62 chars — the follow-mode line is written
+    // to fit whole, so the "detaches" half is never truncated away.
+    hint: () => eraFollowOn()
+      ? 'Following the Media Release Date pin. A change detaches it.'
+      : 'Era + brand styling for the whole store.',
+    valueLabel: (label) => (eraFollowOn() ? `${label} (AUTO)` : label),
+    onChange: () => {
+      const pin = loadMediaReleasePin();
+      if (!pin?.matchEra) return;
+      saveMediaReleasePin({ ...pin, matchEra: false });
+      return 'Store era detached from the Media Release Date pin — era follow is off.';
+    },
   });
 
   // Store Brand -------------------------------------------------------------
@@ -1788,7 +1831,8 @@ export function buildSettingsGroupPreview(container: HTMLElement, group: Setting
     row.type = 'button';
     row.className = 'settings-row';
     row.id = `setting-row-${def.key}`;
-    if (def.hint) row.dataset.hint = def.hint; // one-line footer-bar hint (CRT chrome)
+    const rowHint = resolveHint(def);
+    if (rowHint) row.dataset.hint = rowHint; // one-line footer-bar hint (CRT chrome)
     row.innerHTML = `
       <span class="settings-row-main">
         <span class="settings-row-label">${def.label}</span>

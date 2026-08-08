@@ -88,6 +88,7 @@ import {
   getSettingDef,
   nextCycleValue,
   currentValueLabel,
+  resolveHint,
   buildStoreBrandPanel,
   activateBrandRow,
   BRAND_ROW_PREFIX,
@@ -153,9 +154,15 @@ function refreshStoreCatalog() {
   // MATCH STORE ERA: the decor tracks the pin's effective date (and crosses
   // era boundaries as the rolling date does). Persist-only — we're already
   // inside the build funnel, so the scene about to build reads the new era.
+  // This is the one override that SHOULD win without asking (that's what the
+  // follow is for), so when it actually changes the era, say so — the store
+  // looking different today needs a line explaining why.
   if (loadMediaReleasePin()?.matchEra) {
     const era = eraThemeIdForDate(cutoff, Object.keys(THEMES));
-    if (era && resolveThemeId(getSetting<string>('bb_theme')) !== era) setSetting('bb_theme', era);
+    if (era && resolveThemeId(getSetting<string>('bb_theme')) !== era) {
+      setSetting('bb_theme', era);
+      logToConsole(`[System] Media Release Date: the store has crossed into its ${THEMES[era].name} era.`, 'system');
+    }
   }
   logToConsole(`[System] Media Release Date: store pinned to ${toDateOnly(cutoff)} — later releases are absent.`, 'system');
 }
@@ -974,7 +981,8 @@ function generateSettingsDrawer() {
     row.className = 'settings-row settings-text-row';
     row.id = `setting-row-${def.key}`;
     row.tabIndex = -1; // focusable by setSettingsSelection, not in tab order
-    if (def.hint) row.dataset.hint = def.hint; // footer-bar hint, see makeRow
+    const textHint = resolveHint(def);
+    if (textHint) row.dataset.hint = textHint; // footer-bar hint, see makeRow
     const main = document.createElement('span');
     main.className = 'settings-row-main';
     main.innerHTML = `
@@ -1076,7 +1084,7 @@ function generateSettingsDrawer() {
       if (def.kind === 'text' || def.kind === 'secret') {
         groupEl.appendChild(makeTextRow(def));
       } else {
-        groupEl.appendChild(makeRow(def.key, def.label, def.hint, '', `setting-value-${def.key}`));
+        groupEl.appendChild(makeRow(def.key, def.label, resolveHint(def), '', `setting-value-${def.key}`));
       }
     };
     if (settingsPage === 'Store Brand') {
@@ -1450,6 +1458,18 @@ function activateSetting(key: string, dir: number) {
     generateSettingsDrawer();
     refreshSettingsValues();
     setSettingsSelection(Math.max(0, settingsRowKeys.indexOf(key)));
+  }
+
+  // Post-commit hook (e.g. changing Store Theme detaches era-follow so the
+  // pick can stick). Runs BEFORE the value/hint refresh below so both render
+  // the post-hook truth — the theme row must lose its "(AUTO)" the moment the
+  // follow detaches, not on the next drawer open.
+  const note = def.onChange?.(getSetting(key));
+  if (typeof note === 'string') logToConsole(`[System] ${note}`, 'system');
+  if (typeof def.hint === 'function') {
+    const row = document.getElementById(`setting-row-${key}`);
+    if (row) row.dataset.hint = def.hint();
+    updateSettingsCrtChrome(); // the footer bar shows the selected row's hint
   }
 
   const el = document.getElementById(`setting-value-${key}`);
