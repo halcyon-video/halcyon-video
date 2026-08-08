@@ -111,6 +111,13 @@ import { startScreensaverAnimation, stopScreensaverAnimation } from './screensav
 import { buildDemoLibraries, buildDemoDiscovery, buildDemoGames, makeSyntheticEpisodes, demoPoster } from './demo-library';
 import { EMPTY_STAFF_PICKS, loadStaffPicks, StaffPicks } from './staff-picks-loader';
 import { titleMatchKeys } from './staff-picks';
+import {
+  episodeLabel,
+  markWatchedAndFindNext,
+  resolveActiveItemTiming,
+  resolveMpvPrefArgs,
+  playLocalWithMpv,
+} from './playback-flow';
 
 // ─── Application State ────────────────────────────────────────────────────────
 
@@ -3422,20 +3429,9 @@ async function wakeRefresh() {
 // season-then-episode order (see fetchSeriesEpisodes), so an episode running to
 // its end rolls into the next one — across season boundaries too. Rebuilt on
 // every launch; a movie clears it.
+// nextEpisodeInQueue/episodeLabel/markWatchedAndFindNext live in
+// playback-flow.ts — shared with the mpv exit handler below.
 let seriesQueue: { seriesId: string; episodes: Episode[] } | null = null;
-
-/** The episode after `currentItemId` in the active series queue, if any. */
-function nextEpisodeInQueue(movie: Movie, currentItemId: string): Episode | null {
-  if (!movie.isSeries || seriesQueue?.seriesId !== movie.id) return null;
-  const i = seriesQueue.episodes.findIndex((e) => e.id === currentItemId);
-  return i >= 0 ? (seriesQueue.episodes[i + 1] ?? null) : null;
-}
-
-/** "S02E05 · Title" for console/log lines. */
-function episodeLabel(ep: Episode): string {
-  const num = `S${String(ep.seasonNumber).padStart(2, '0')}E${String(ep.episodeNumber).padStart(2, '0')}`;
-  return ep.name ? `${num} · ${ep.name}` : num;
-}
 
 export async function launchVideoPlayback(movie: Movie, overrideItemId?: string, overridePath?: string, startHidden = false, diegetic = false, version?: MovieVersion) {
   revealPendingHidden = false; // fresh launch — clear any stale reveal handshake
@@ -3517,6 +3513,10 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
     seriesQueue = null;
   }
 
+  // Resume position (0 = start over) and, for the mpv path's natural-end vs.
+  // quit check below, the item's known runtime — see resolveActiveItemTiming.
+  const { resumeTicks, durationTicks } = resolveActiveItemTiming(movie, overrideItemId, seriesQueue);
+
   // Local playback first. When the file is on this machine, mpv plays it
   // directly — the only path that gives real HDR and the original soundtrack,
   // and the only one that doesn't have Jellyfin spooling the film to disk as
@@ -3535,16 +3535,30 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
   if (localPath && !diegetic && clientIsServerMachine && !isRemotelyDriven()
       && getSetting<boolean>('bb_local_mpv') !== false) {
     const spawnMpv = async (): Promise<boolean> => {
-      const started = await playLocalWithMpv(localPath, playbackId, 0, () => {
-        ui.isPlaybackActive = false;
-        storeScene?.resumeRendering();
-        storeScene?.resumeAmbientTvs();
-        storeScene?.returnToEntrance();
-        updateMovieHUD(storeScene?.getSelectedMovie() || null);
-        logToConsole(`[Video] Stopped "${movie.title}". Returned through the entrance.`, 'video');
-      });
+      const started = await playLocalWithMpv(
+        localPath, playbackId, resumeTicks, durationTicks, await resolveMpvPrefArgs(),
+        (_positionTicks, endedNaturally) => {
+          ui.isPlaybackActive = false;
+          // Series binge-watching, same as the HTML5 path below: a natural
+          // end rolls straight into the next queued episode; mpv is spawned
+          // again via the ordinary recursive launch, same as a fresh play.
+          const nextEp = markWatchedAndFindNext(movie, endedNaturally, seriesQueue, playbackId, () => storeScene?.restockSlottedFixtures());
+          if (nextEp) {
+            logToConsole(`[Video] "${movie.title}" — up next: ${episodeLabel(nextEp)}.`, 'video');
+            void launchVideoPlayback(movie, nextEp.id, nextEp.path || undefined, false, false);
+            return;
+          }
+          storeScene?.resumeRendering();
+          storeScene?.resumeAmbientTvs();
+          storeScene?.returnToEntrance();
+          updateMovieHUD(storeScene?.getSelectedMovie() || null);
+          logToConsole(`[Video] Stopped "${movie.title}". Returned through the entrance.`, 'video');
+        },
+        (msg) => logToConsole(msg, 'video'),
+      );
       if (started) {
         // The store is behind a fullscreen window now — stop drawing it.
+        ui.isPlaybackActive = true;
         storeScene?.pauseAmbientTvs();
         storeScene?.pauseRendering();
       }
@@ -3626,10 +3640,11 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
   const initialSubtitleIndex = wantSubtitles
     ? (subtitleStreams.find(matchesPrefLang) ?? subtitleStreams.find((s) => s.isDefault) ?? subtitleStreams[0])?.index
     : undefined;
-  if (initialAudioIndex !== undefined || initialSubtitleIndex !== undefined) {
+  if (initialAudioIndex !== undefined || initialSubtitleIndex !== undefined || resumeTicks > 0) {
     logToConsole(
       `[Video] Playback prefs: audio=${initialAudioIndex !== undefined ? trackLabel(preferredAudio!) : 'default'}, ` +
-        `subtitles=${initialSubtitleIndex !== undefined ? 'on' : 'off'}.`,
+        `subtitles=${initialSubtitleIndex !== undefined ? 'on' : 'off'}, ` +
+        `resume=${resumeTicks > 0 ? `${Math.round(resumeTicks / 10_000_000)}s` : 'no'}.`,
       'video',
     );
   }
@@ -3643,6 +3658,7 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
     mediaSourceId,
     audioStreamIndex: initialAudioIndex,
     subtitleStreamIndex: initialSubtitleIndex,
+    startPositionTicks: resumeTicks || undefined,
   });
   const hevcCopy = isHevcPassThroughEnabled() && (sourceVideoCodec === 'hevc' || sourceVideoCodec === 'h265');
   const mediaInfoSummary =
@@ -3677,6 +3693,7 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
     defaultAudioIndex: initialAudioIndex,
     defaultSubtitleIndex: initialSubtitleIndex,
     subtitlesDefaultOn: wantSubtitles,
+    startPositionTicks: resumeTicks || undefined,
     hideVideoSurface: diegetic,
     // Non-diegetic playback exits through returnToEntrance() (onClose below)
     // — gate user-initiated exits behind an "are you sure?" so a Back meant
@@ -3699,30 +3716,14 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
         setTimeout(() => location.reload(), 250);
         return;
       }
-      // Optimistic local watch-state update (feedback/055): reportPlaybackStopped
-      // below is fire-and-forget and nothing re-fetches the library afterwards,
-      // so without this the Movie object StoreScene already holds a reference
-      // to never learns it was watched this session — the PREVIOUSLY VIEWED
-      // drape table (pv-drape-table.ts) would stay frozen at whatever watch
-      // history existed at boot. Only a natural end counts as "watched":
-      // backing out early shouldn't bump play count or reorder the table.
-      // restockSlottedFixtures() patches the already-built table in place
-      // (see its header in store-stock.ts) — cheap enough to call here, before
-      // the store is shown again below, so any texture swap is invisible.
-      if (endedNaturally) {
-        movie.played = true;
-        movie.playCount = (movie.playCount ?? 0) + 1;
-        movie.lastPlayedDate = new Date().toISOString();
-        storeScene?.restockSlottedFixtures();
-      }
-      // A series behaves like a series: an episode that plays to the end rolls
-      // straight into the next one (including into the next season — the queue
-      // is season-then-episode ordered). Backing out early means "I'm done",
-      // so only a natural end advances. The player reuses one <video> element,
-      // so a diegetic (back-room CRT) advance keeps its existing VideoTexture
-      // mapping — no re-attach needed. startHidden stays false: the tape
-      // animation is the gesture for STARTING a title, not for continuing one.
-      const nextEp = endedNaturally ? nextEpisodeInQueue(movie, playbackId) : null;
+      // Optimistic local watch-state update + up-next lookup (see
+      // markWatchedAndFindNext in playback-flow.ts, shared with the mpv exit
+      // handler above) — only a natural end counts as "watched"/advances.
+      // The player reuses one <video> element, so a diegetic (back-room CRT)
+      // advance keeps its existing VideoTexture mapping — no re-attach
+      // needed. startHidden stays false: the tape animation is the gesture
+      // for STARTING a title, not for continuing one.
+      const nextEp = markWatchedAndFindNext(movie, endedNaturally, seriesQueue, playbackId, () => storeScene?.restockSlottedFixtures());
       if (nextEp) {
         reportPlaybackStopped(jellyfinUrl, token, playbackId, positionTicks);
         logToConsole(`[Video] "${movie.title}" — up next: ${episodeLabel(nextEp)}.`, 'video');
@@ -3870,79 +3871,6 @@ function revealVideoPlayback() {
 }
 
 /** Launch the original file in the system media player (mpv/VLC) as a fallback. */
-/**
- * Play a title by handing mpv the file on disk, bypassing Jellyfin's streaming
- * path entirely. Only correct when the media, the server and this app are on
- * one machine — but that's this deployment, and it buys three things the
- * webview cannot do at all: genuine HDR output (Chromium has no HDR video
- * path, so it flattens an HDR10 master to SDR no matter how cleanly the file
- * reaches it), the original lossless multichannel audio instead of a stereo
- * AAC downmix, and seeking that doesn't wait on a server.
- *
- * It also stops Jellyfin writing the film to disk as HLS segments while you
- * watch — ~70 GB for a 4K remux — which it only ever did because the webview
- * can't demux Matroska.
- *
- * Returns false when the local endpoint isn't reachable (production bundle,
- * no dev/preview server) so the caller can fall back to in-app streaming.
- */
-async function playLocalWithMpv(
-  filePath: string,
-  itemId: string,
-  startPositionTicks: number,
-  onExit: (positionTicks: number) => void,
-): Promise<boolean> {
-  const jellyfinUrl = localStorage.getItem('jellyfin_url');
-  const token = localStorage.getItem('jellyfin_token');
-  const startSeconds = Math.max(0, Math.floor(startPositionTicks / 10_000_000));
-
-  let id: string;
-  try {
-    const res = await fetch('/__play', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ path: filePath, startSeconds }),
-    });
-    if (!res.ok) {
-      logToConsole(`[Video] Local player refused the file (${res.status}); streaming instead.`, 'video');
-      return false;
-    }
-    id = (await res.json()).id;
-  } catch {
-    // No endpoint (production bundle) — caller falls back to the in-app player.
-    return false;
-  }
-
-  logToConsole(`[Video] Playing off disk in mpv (from ${startSeconds}s).`, 'video');
-  ui.isPlaybackActive = true;
-  if (jellyfinUrl && token) reportPlaybackStart(jellyfinUrl, token, itemId);
-
-  // Poll for position so Continue Watching still tracks, and so closing mpv
-  // returns to the store the same way the in-app player's Back does.
-  let lastTicks = startPositionTicks;
-  const poll = window.setInterval(async () => {
-    try {
-      const res = await fetch(`/__play?id=${encodeURIComponent(id)}`);
-      if (!res.ok) throw new Error(String(res.status));
-      const s = await res.json();
-      lastTicks = Math.round((s.position ?? 0) * 10_000_000);
-      if (!s.exited) {
-        if (jellyfinUrl && token) reportPlaybackProgress(jellyfinUrl, token, itemId, lastTicks, false);
-        return;
-      }
-      window.clearInterval(poll);
-      if (s.error) logToConsole(`[Video] mpv error: ${s.error}`, 'video');
-      if (jellyfinUrl && token) reportPlaybackStopped(jellyfinUrl, token, itemId, lastTicks);
-      onExit(lastTicks);
-    } catch {
-      // Endpoint vanished (server restarted) — stop polling rather than spin.
-      window.clearInterval(poll);
-      onExit(lastTicks);
-    }
-  }, 5000);
-  return true;
-}
-
 async function playExternally(path: string) {
   if (!isTauri) {
     logToConsole('[Video] External player not available outside Tauri.', 'video');

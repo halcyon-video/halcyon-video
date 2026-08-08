@@ -179,7 +179,7 @@ function mpvPlayerPlugin() {
     "",
   ].join("\n"));
 
-  function launch(file: string, startSeconds: number): string {
+  function launch(file: string, startSeconds: number, prefs?: { alang?: string; slang?: string; subsOff?: boolean }): string {
     const id = String(nextId++);
     const session = { position: startSeconds, exited: false } as {
       position: number; exited: boolean; error?: string;
@@ -214,9 +214,17 @@ function mpvPlayerPlugin() {
       // leave-the-room behavior as the in-app player's MPRIS pause).
       "--input-ipc-server=/tmp/halcyon-mpv.sock",
       `--start=${Math.max(0, Math.floor(startSeconds))}`,
-      "--",
-      file,
     ];
+    // Settings ▸ Playback preferences (bb_audio_lang / bb_subtitles_default),
+    // translated by playback-flow.ts's resolveMpvPrefArgs — mpv has no
+    // Jellyfin-style track-index picker for a raw local file, so these go
+    // straight through as ffmpeg-style language codes; "captions off" is the
+    // precise --sid=no rather than an empty --slang, which would just leave
+    // mpv's own default subtitle selection in charge.
+    if (prefs?.alang) args.push(`--alang=${prefs.alang}`);
+    if (prefs?.slang) args.push(`--slang=${prefs.slang}`);
+    if (prefs?.subsOff) args.push("--sid=no");
+    args.push("--", file);
 
     const child = spawn("mpv", args, { stdio: ["ignore", "pipe", "pipe"] });
 
@@ -273,7 +281,12 @@ function mpvPlayerPlugin() {
         if (!fs.existsSync(file) || !fs.statSync(file).isFile()) {
           return json(404, { error: "no such file" });
         }
-        return json(200, { id: launch(file, Number(body.startSeconds) || 0) });
+        const prefs = {
+          alang: typeof body.alang === "string" ? body.alang.slice(0, 32) : undefined,
+          slang: typeof body.slang === "string" ? body.slang.slice(0, 32) : undefined,
+          subsOff: body.subsOff === true,
+        };
+        return json(200, { id: launch(file, Number(body.startSeconds) || 0, prefs) });
       } catch (err) {
         return json(400, { error: String(err) });
       }
