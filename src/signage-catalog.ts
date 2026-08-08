@@ -1,7 +1,6 @@
 import * as THREE from 'three';
 import { createSignTextTexture, createCategorySignTexture, createNewReleasesSignTexture } from './canvas-textures';
 import { bb93SignageOn } from './genre-colors';
-import { BB_ANTON } from './bundled-fonts';
 
 export type SignCategory =
   | 'bin-topper'        // above previously-viewed bins
@@ -11,7 +10,7 @@ export type SignCategory =
   | 'shelf'             // on gondola shelves / pricing strips
   | 'divider'           // on shelf dividers
   | 'ceiling-nav'       // hanging navigation (GENRE names, NEW RELEASES →, etc.)
-  | 'ceiling-promo';    // hanging price/promo cards (1993: "$3 RENTAL", "INCREDIBLE VALUES")
+  | 'ceiling-promo';    // hanging price/promo cards (1993: "INCREDIBLE VALUES")
 
 export interface SignDef {
   id: string;
@@ -19,42 +18,6 @@ export interface SignDef {
   fixture: 'acrylic-tent' | 'ceiling-hanging' | 'shelf-topper' | 'wall' | 'wire-frame';
   texture: () => THREE.Texture;   // canvas-texture factory
   size: { w: number; h: number }; // feet
-}
-
-// Footage-style promo card: big condensed ALL-CAPS lines filling the card
-// width (tight leading), optional small header line — the way the real
-// hanging cards read from across the store.
-function stackedCardTexture(bg: string, fg: string, lines: string[], header: string | null): THREE.Texture {
-  const canvas = document.createElement('canvas');
-  canvas.width = 640;
-  canvas.height = Math.round(640 * (header ? 1.35 : 0.68));
-  const ctx = canvas.getContext('2d')!;
-  ctx.fillStyle = bg;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillStyle = fg;
-  let y = 40;
-  if (header) {
-    ctx.font = '700 44px "Arial Narrow", Arial, sans-serif';
-    ctx.fillText(header, canvas.width / 2, y + 20);
-    y += 78;
-  }
-  const lineH = (canvas.height - y - 30) / lines.length;
-  for (const line of lines) {
-    let size = Math.min(120, lineH * 0.82);
-    ctx.font = `800 ${size}px "Arial Narrow", ${BB_ANTON}, sans-serif`;
-    while (size > 30 && ctx.measureText(line).width > canvas.width - 60) {
-      size -= 4;
-      ctx.font = `800 ${size}px "Arial Narrow", ${BB_ANTON}, sans-serif`;
-    }
-    ctx.fillText(line, canvas.width / 2, y + lineH / 2);
-    y += lineH;
-  }
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = 8;
-  return tex;
 }
 
 const STATIC_CATALOG: SignDef[] = [
@@ -100,17 +63,10 @@ const STATIC_CATALOG: SignDef[] = [
     texture: () => createSignTextTexture('Movie Theater Candy', '$1.99 each', 'promo', 0.9 / 0.7),
     size: { w: 0.9, h: 0.7 }
   },
-  // 1993 footage pack: the hanging promo card (stacked condensed lines
-  // filling the card, per the footage close-ups) and the closed-lane tent.
-  // (The yellow INCREDIBLE VALUES card over the bargain bin was retired by
-  // owner pin 031.)
-  {
-    id: 'three-dollar-rental',
-    category: 'ceiling-promo',
-    fixture: 'ceiling-hanging',
-    texture: () => stackedCardTexture('#7e2430', '#e8c46a', ['2-EVENING', 'NEW RELEASE', 'RENTAL  $3'], null),
-    size: { w: 2.0, h: 1.35 }
-  },
+  // 1993 footage pack: the closed-lane tent. (The yellow INCREDIBLE VALUES
+  // card over the bargain bin was retired by owner pin 031; the red
+  // "2-EVENING NEW RELEASE RENTAL $3" ceiling card over the back-wall floor
+  // displays was removed entirely by owner request — GH #2.)
   {
     id: 'next-register-please',
     category: 'register',

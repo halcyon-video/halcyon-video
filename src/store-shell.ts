@@ -2456,18 +2456,12 @@ export function buildStore(scene: StoreScene) {
       length: leftWallShelfWidth,
       localZ: 0.1
     }] : []),
-    // 1993 footage pack: red "$3 RENTAL / 2 EVENING NEW RELEASE" card hanging
-    // in front of the New Releases back wall, the way the real store hung its
-    // price promo right over the new-release bays.
-    {
-      id: 'promo-new-release',
-      category: 'ceiling-promo',
-      // Hang it lower in the 2000 store so it clears the TV-bank housing that
-      // now sits over the New Releases wall centre.
-      pos: new THREE.Vector3(STORE_CENTER_X, getActiveTheme().id === 'bb-2000' ? 7.4 : 8.9, backWallZ + 3.5),
-      yaw: 0
-    },
-    // ...and the yellow "INCREDIBLE VALUES / PREVIOUSLY VIEWED MOVIES" card
+    // (The red "$3 RENTAL / 2 EVENING NEW RELEASE" card that used to hang
+    // here, in front of the New Releases back wall over the floor displays,
+    // was removed entirely by owner request — GH #2. The slot construction
+    // and its catalog entry are gone too, not just nulled in signage-config.)
+    //
+    // The yellow "INCREDIBLE VALUES / PREVIOUSLY VIEWED MOVIES" card
     // over the bargain bin (our previously-viewed tub). The bin RESOLVES its
     // own position at build time (relativeToBackWall + clamp — see
     // bargain-bin.ts), so read the built fixture's footprint, not the raw
