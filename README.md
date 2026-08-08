@@ -219,9 +219,14 @@ Point it at **[RomM](https://github.com/rommapp/romm)** and a freestanding
 gondola appears: per-platform bays with brand-colored blades — SNES and N64
 cardboard boxes in landscape, PlayStation jewel cases, Genesis clamshells — 13
 platform toggles, top-rated titles first. "Renting" a game launches it: a
-configured native emulator under Tauri (argv-safe, allowlisted), RomM's
-in-browser EmulatorJS player otherwise. Off by default; zero requests when
-disabled.
+native emulator under Tauri, or RomM's in-browser EmulatorJS player otherwise.
+Off by default; zero requests when disabled.
+
+Set **Emulator Command** in the manager terminal's Video Games page —
+`retroarch -L /path/to/core.so {path}`, where `{path}` becomes the rom. The
+desktop app spawns that as an argument array (never a shell) and only if the
+program is on a fixed emulator allowlist, so a typo fails closed instead of
+running something else. Leave it blank for the browser player.
 
 ![The video games department](docs/screenshots/games-department.jpg)
 
