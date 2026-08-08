@@ -4543,7 +4543,7 @@ export interface InstancedMovieGroup {
   movie: Movie;
 }
 
-export function createMovieInstancedMeshes(movie: Movie, count: number): InstancedMovieGroup {
+export function createMovieInstancedMeshes(movie: Movie, count: number, probeIdx?: number): InstancedMovieGroup {
   const boxGeo = getGeometry();
   initSharedMaterials();
 
@@ -4589,8 +4589,6 @@ export function createMovieInstancedMeshes(movie: Movie, count: number): Instanc
   let shelfDetailsLoaded = false;
   let fullDetailsLoaded = false;
   let lastLoadedPriority = 0;
-
-  const probeIdx = (movie as any).reflectionProbeIdx;
 
   const loadShelfDetails = (priority = 1) => {
     const isFirstLoad = !shelfDetailsLoaded;
@@ -5229,13 +5227,12 @@ function gameFaceMaterial(key: string, map: THREE.Texture, env: THREE.Texture | 
  * folds into side flaps, so a real one reads its title from either edge.
  * Cardboard cartons keep the single -X spine.
  */
-export async function applyGameCaseArt(movie: Movie, mats: THREE.Material[]): Promise<boolean> {
+export async function applyGameCaseArt(movie: Movie, mats: THREE.Material[], probeIdx?: number): Promise<boolean> {
   if (!movie.game || !movie.gameArt) return false;
   const [back, spine] = await Promise.all([
     loadGameFaceTexture(movie, 'back'),
     loadGameFaceTexture(movie, 'spine'),
   ]);
-  const probeIdx = (movie as any).reflectionProbeIdx;
   const env = (probeIdx !== undefined && reflectionProbes[probeIdx]) ? reflectionProbes[probeIdx] : null;
   let changed = false;
   if (back) {
@@ -5287,11 +5284,10 @@ export async function applyGameCaseArt(movie: Movie, mats: THREE.Material[]): Pr
   return changed;
 }
 
-export function createHeroJellyfinMaterials(movie: Movie, highlightedName?: string, pinEndcap: boolean = false, heroDetail: boolean = false): THREE.Material[] {
+export function createHeroJellyfinMaterials(movie: Movie, highlightedName?: string, pinEndcap: boolean = false, heroDetail: boolean = false, probeIdx?: number): THREE.Material[] {
   initSharedMaterials();
   const isAnimated = CASE_MEDIUM === 'vhs' && movie.libraryName === 'Animated Movies';
   const spineColor = leftmostColorCache.get(movie.id) || null;
-  const probeIdx = (movie as any).reflectionProbeIdx;
 
   const edgeMat = isAnimated ? sharedWhiteMaterial! : sharedBlackMaterial!;
   // Series season boxsets keep the loose shrink-wrap film (ROADMAP B3);
@@ -5316,10 +5312,9 @@ export function createHeroJellyfinMaterials(movie: Movie, highlightedName?: stri
 // front's title sticker).
 // `heroDetail`: see createHeroJellyfinMaterials above — true only for the case
 // being inspected, which is the one whose print anyone can actually read.
-export function createHeroRentalMaterials(movie: Movie, heroDetail: boolean = false): THREE.Material[] {
+export function createHeroRentalMaterials(movie: Movie, heroDetail: boolean = false, probeIdx?: number): THREE.Material[] {
   initSharedMaterials();
   const isAnimated = CASE_MEDIUM === 'vhs' && movie.libraryName === 'Animated Movies';
-  const probeIdx = (movie as any).reflectionProbeIdx;
 
   // GH #42: the hero rental copy is a clamshell — black molded edges on VHS
   // (including Animated Movies, which now match every other tape); white on DVD.
@@ -5861,10 +5856,10 @@ export function drawSeriesSeasonPanel(
  * front / metadata back / tinted spine edges, with the wide +X / -X side
  * panels swapped for the neutral brand canvas and the vertical season selector.
  */
-export function createHeroSeriesBoxsetMaterials(movie: Movie, _highlightedName?: string): THREE.Material[] {
+export function createHeroSeriesBoxsetMaterials(movie: Movie, _highlightedName?: string, probeIdx?: number): THREE.Material[] {
   // highlightedName only ever influenced base[5], which is discarded below —
   // don't pass it through, so no highlight canvas redraw happens per keypress.
-  const base = createHeroJellyfinMaterials(movie);
+  const base = createHeroJellyfinMaterials(movie, undefined, false, false, probeIdx);
   return [
     getSeriesPanel('episodes').mat,
     getSeriesPanel('play').mat,
@@ -5874,7 +5869,7 @@ export function createHeroSeriesBoxsetMaterials(movie: Movie, _highlightedName?:
     // Back face: the episode selector replaces the usual STARRING/CREDITS back.
     // Content is painted by drawSeriesEpisodeBackCover (driven from the scene,
     // which owns the fetched episode list); base[5] is discarded.
-    getSeriesBackPanel().mat,
+    getSeriesBackPanel(probeIdx).mat,
   ];
 }
 
