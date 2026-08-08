@@ -4,8 +4,12 @@
 #   docker run -d --name halcyon --network host --restart unless-stopped \
 #     ghcr.io/halcyon-video/halcyon-video
 #
-# Runs on release tags (vX.Y.Z) and by hand (workflow_dispatch). Multi-arch:
-# amd64 + arm64 (NAS / Pi / Apple-silicon hosts).
+# Runs on release tags (vX.Y.Z) and by hand (workflow_dispatch). amd64 only
+# for now: the arm64 half of the v0.2.0 publish died in `npm ci` with a V8
+# "Illegal instruction" under QEMU user emulation (the classic node-on-alpine
+# qemu failure), and emulating around it is a losing game — arm64 comes back
+# as a separate job on GitHub's native ubuntu-24.04-arm runners with a
+# manifest merge, tracked as a follow-up.
 #
 # NOTE: the very first published package is PRIVATE by default — flip it to
 # public once under the org's Packages → halcyon-video → settings, or pulls
@@ -27,7 +31,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: docker/setup-qemu-action@v3
+      # No setup-qemu: it existed only to emulate the arm64 build (see header).
       - uses: docker/setup-buildx-action@v3
 
       - uses: docker/login-action@v3
@@ -49,7 +53,7 @@ jobs:
       - uses: docker/build-push-action@v6
         with:
           context: .
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
