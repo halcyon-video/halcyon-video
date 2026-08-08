@@ -24,6 +24,19 @@ on a synthetic demo library. Or take the
 > over a laptop on battery. (It's built to live on a dedicated HTPC, where it
 > idles near zero; a leaner demo is on the list.)
 
+### The same library, four ways
+
+None of this is a preset you pick once. Era, lighting, floor plan and media
+format are independent settings, and every combination is a store you can walk
+around in. [More ↓](#make-it-yours)
+
+| | |
+|:--:|:--:|
+| ![Four decades of fit-out](docs/screenshots/store-era.gif) | ![Day, sunset, night](docs/screenshots/time-of-day.gif) |
+| **Four decades of fit-out** — board signage and VHS in 1990, the fascia-band era in 1993, arched plaques in 2000, wire-black DVD shelving in 2010. | **Day, sunset, night** — the light through the front glass, on eight measured-sun HDR skies. |
+| ![Three floor plans](docs/screenshots/shelf-arrangement.gif) | ![VHS or DVD](docs/screenshots/media-format.gif) |
+| **Three floor plans** — herringbone, straight, or diagonal shelf runs, packed to fit the room. | **VHS or DVD** — the whole store re-cased, on correctly-proportioned rental shells. |
+
 ### Does it…?
 
 The short answers, so you don't have to go looking for them.
