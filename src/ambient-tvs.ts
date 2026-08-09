@@ -18,6 +18,7 @@ import { loadProp } from './props';
 import { getActiveTheme } from './themes';
 import { makeCurvedScreenGeometry, makeTubeOverlayMaterial, makeCrtTestCardTexture } from './crt-tube';
 import { makeCrtGlassMaterial } from './glass-reflection';
+import { tvPoolLibraryIds } from './library-settings';
 import { TV_PATCH_LAYER } from './scene-shared';
 
 // Front bezel: a flat rounded-rect frame with a rectangular aperture, extruded
@@ -129,11 +130,35 @@ export class AmbientTvs implements StoreFixture {
   constructor(private ctx: FixtureContext) {}
 
   build(): void {
-    const FAMILY_GENRES = new Set(['Family']);
+    // What the overhead sets may play (#39): libraries the user explicitly
+    // selected (Settings → Playback → Overhead TVs, bb_tvlib_* toggles via
+    // library-settings.ts) — or, with nothing selected, the original
+    // family-genre heuristic over the whole catalog, so existing stores keep
+    // their behavior. A selection that matches no loaded library (say, the
+    // store stopped carrying it) falls back the same way rather than going
+    // dark. Same gate for live streaming and the test-card stand-in below.
+    const chosen = tvPoolLibraryIds();
     const allMovies: Movie[] = [];
-    this.ctx.libraries.forEach(lib => lib.movies.forEach(m => { if (!m.isSeries) allMovies.push(m); }));
-    let pool = allMovies.filter(m => m.genres.some(g => FAMILY_GENRES.has(g)));
-    if (pool.length === 0) pool = allMovies;
+    const chosenMovies: Movie[] = [];
+    this.ctx.libraries.forEach(lib => lib.movies.forEach(m => {
+      if (m.isSeries) return;
+      allMovies.push(m);
+      if (chosen.has(lib.id)) chosenMovies.push(m);
+    }));
+    let pool: Movie[];
+    if (chosenMovies.length > 0) {
+      pool = chosenMovies;
+      this.ctx.log(`[System] CRT TVs: drawing from ${chosen.size} selected library(ies).`, 'system');
+    } else {
+      const FAMILY_GENRES = new Set(['Family']);
+      pool = allMovies.filter(m => m.genres.some(g => FAMILY_GENRES.has(g)));
+      if (pool.length === 0) pool = allMovies;
+    }
+    (window as any).__tvPool = {
+      selected: chosen.size,
+      size: pool.length,
+      libs: [...new Set(pool.map(m => m.libraryName))].sort(),
+    };
 
     // The TVs are store furniture — they hang from the ceiling regardless of
     // whether a stream is available; without a server they just show dead glass.
