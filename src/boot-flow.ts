@@ -25,11 +25,22 @@ import {
 import { buildDemoLibraries, buildDemoGames } from './demo-library';
 import { getSetting } from './settings';
 import { isDemoMode } from './demo-mode';
+import { excludedLibraryIds } from './library-settings';
+import {
+  initSetupFlow,
+  openSetupTerminal,
+  openSetupNotice,
+  closeSetupTerminal,
+  type SetupTerminalScene,
+} from './store-setup-flow';
 
 export interface BootFlowDeps {
   log: (message: string, type?: 'system' | 'cec' | 'video') => void;
-  /** main.ts's ui-state object — this flow owns its isLoginOpen flag. */
-  ui: { isLoginOpen: boolean };
+  /** main.ts's ui-state object — this flow owns isLoginOpen and isSetupOpen. */
+  ui: { isLoginOpen: boolean; isSetupOpen: boolean };
+  /** The live scene (or null before reveal) — the setup terminal's CRT dock. */
+  scene: () => SetupTerminalScene | null;
+  keyClick: () => void;
   /** Publish a fetched/synthesized library list into main.ts's state. */
   setLibraries: (libs: JellyfinLibrary[]) => void;
   /** Publish demo game stock (main.ts's gameMovies). */
@@ -49,8 +60,152 @@ export interface BootFlowDeps {
 
 let deps: BootFlowDeps | null = null;
 
+// Opening-day (#41) plumbing: what the setup terminal should show once the
+// empty scene has revealed, and hooks into the auto-retry loop below so the
+// notice screen's RETRY NOW / CHANGE SERVER rows can drive it.
+let pendingSetup: { notice?: { address: string; detail: string } } | null = null;
+let retryNowHook: (() => void) | null = null;
+let cancelRetryHook: (() => void) | null = null;
+
 export function initBootFlow(d: BootFlowDeps): void {
   deps = d;
+  initSetupFlow({
+    scene: d.scene,
+    ui: d.ui,
+    log: d.log,
+    keyClick: d.keyClick,
+    callbacks: {
+      tryDemo: () => {
+        hideLoginOverlay();
+        closeMembershipCardPicker();
+        showBootOverlay();
+        startDemoAndLoad();
+      },
+      sync: syncForSetup,
+      openStore: () => {
+        showBootOverlay();
+        d.launchStore();
+      },
+      changeServer: () => {
+        cancelRetryHook?.();
+        localStorage.removeItem('jellyfin_url');
+        localStorage.removeItem('jellyfin_username');
+        localStorage.removeItem('jellyfin_token');
+        localStorage.removeItem('jellyfin_userid');
+        d.log('[Setup] Saved server dropped — pick a new distributor.', 'system');
+      },
+      retryNow: () => retryNowHook?.(),
+    },
+  });
+}
+
+/**
+ * Boot (or rebuild) into the EMPTY store — bare shelves, no posters — and
+ * queue the setup terminal to dock once the scene reveals (#41). Serves both
+ * the true first run and the unreachable-server failure state.
+ */
+export function enterOpeningDay(opts?: { notice?: { address: string; detail: string } }): void {
+  if (!deps) return;
+  pendingSetup = { notice: opts?.notice };
+  deps.setLibraries([]);
+  deps.setGames([]);
+  // The empty build takes a second or two; the boot overlay (already up on
+  // first paint, re-raised here for live re-entries like log-out) covers the
+  // teardown/build and drops the moment the bare store is ready.
+  showBootOverlay();
+  deps.launchStore();
+}
+
+/**
+ * Called by main.ts at the scene-reveal moment (textures ready, overlay about
+ * to drop): if an opening-day boot queued the setup terminal, dock it now so
+ * the player wakes at the counter CRT.
+ */
+export function maybeOpenSetupTerminal(): void {
+  if (!pendingSetup) return;
+  const p = pendingSetup;
+  pendingSetup = null;
+  if (p.notice) openSetupNotice(p.notice.address, p.notice.detail);
+  else openSetupTerminal();
+}
+
+/**
+ * CHANGE SERVER / LOG OUT (#41): the empty-store setup terminal is the
+ * re-entry point, not the old DOM form. Flat mode (no 3D counter to dock to)
+ * keeps the form.
+ */
+export function logOutToOpeningDay(): void {
+  if (!deps) return;
+  deps.log('[System] Logging out and resetting Jellyfin session...', 'system');
+  localStorage.removeItem('jellyfin_url');
+  localStorage.removeItem('jellyfin_username');
+  localStorage.removeItem('jellyfin_password');
+  localStorage.removeItem('jellyfin_token');
+  localStorage.removeItem('jellyfin_userid');
+  deps.teardownScene();
+  if (getSetting<string>('bb_render_mode') === 'flat') {
+    showLoginOverlay();
+    return;
+  }
+  enterOpeningDay();
+}
+
+/**
+ * The setup terminal's catalog sync: same stall watchdog + sidecar loaders as
+ * finishLoginAndLaunch, but progress renders as a CRT readout instead of the
+ * boot console, and the carried-library exclusions just chosen on the
+ * checkbox screen are honored (their item sync is skipped entirely).
+ */
+async function syncForSetup(
+  url: string,
+  session: MembershipLoginSession,
+  onStage: (stage: string, pages: number) => void
+): Promise<void> {
+  if (!deps) throw new Error('Boot flow not initialized.');
+  const d = deps;
+  const LOGIN_STALL_MS = 45_000;
+  let stallTimer: ReturnType<typeof setTimeout> | null = null;
+  let onStall: (() => void) | null = null;
+  const armStall = () => {
+    if (stallTimer) clearTimeout(stallTimer);
+    stallTimer = setTimeout(() => onStall?.(), LOGIN_STALL_MS);
+  };
+  const stallPromise = new Promise<never>((_, reject) => {
+    onStall = () => reject(new Error(`No response from Jellyfin for ${LOGIN_STALL_MS / 1000}s`));
+    armStall();
+  });
+  let pages = 0;
+  let lastStage = 'CONTACTING DISTRIBUTOR...';
+  const onProgress = (stage: string) => {
+    armStall();
+    if (stage === 'page') pages++;
+    else lastStage = `SYNCING ${stage.toUpperCase()}`;
+    onStage(lastStage, pages);
+  };
+  let libs: JellyfinLibrary[];
+  try {
+    [libs] = await Promise.all([
+      Promise.race([
+        fetchJellyfinLibrariesAndMovies(url, session.accessToken, session.userId, onProgress, {
+          excludeLibraryIds: excludedLibraryIds(),
+        }),
+        stallPromise,
+      ]),
+      d.loadComingSoon(),
+      d.loadDiscovery(),
+      d.loadGames(),
+    ]);
+  } finally {
+    if (stallTimer) clearTimeout(stallTimer);
+  }
+  d.setLibraries(libs);
+  const gapCount = await d.mergeCollectionGaps(libs);
+  const totalMoviesCount = libs.reduce((acc, lib) => acc + lib.movies.length, 0);
+  d.log(`[System] Loaded ${libs.length} libraries (${totalMoviesCount} titles total). Opening the store...`, 'system');
+  await d.logJellyseerrStatus(gapCount);
+  if (d.gameCount() > 0) {
+    d.log(`[System] Romm: ${d.gameCount()} game(s) loaded for the Video Games section.`, 'system');
+  }
 }
 
 // ─── Login / boot overlays ────────────────────────────────────────────────────
@@ -169,7 +324,9 @@ async function finishLoginAndLaunch(urlInput: string, session: MembershipLoginSe
   try {
     [libs] = await Promise.all([
       Promise.race([
-        fetchJellyfinLibrariesAndMovies(urlInput, session.accessToken, session.userId, armLoginStall),
+        fetchJellyfinLibrariesAndMovies(urlInput, session.accessToken, session.userId, armLoginStall, {
+          excludeLibraryIds: excludedLibraryIds(),
+        }),
         loginTimeout
       ]),
       deps.loadComingSoon(),
@@ -363,6 +520,7 @@ export async function checkCredentialsAndLoad() {
     const STALL_MS = 45_000;
     let currentDelay = 10_000; // starts at 10s
     const MAX_DELAY = 5 * 60 * 1000; // 5min cap
+    let noticeShown = false; // the empty-store failure notice (#41), once
 
     const attemptSync = async () => {
       if (escaped) return;
@@ -385,7 +543,9 @@ export async function checkCredentialsAndLoad() {
         let libs: JellyfinLibrary[];
         [libs] = await Promise.all([
           Promise.race([
-            fetchJellyfinLibrariesAndMovies(jellyfinUrl, activeToken!, activeUserId!, armStall),
+            fetchJellyfinLibrariesAndMovies(jellyfinUrl, activeToken!, activeUserId!, armStall, {
+              excludeLibraryIds: excludedLibraryIds(),
+            }),
             stallPromise
           ]),
           d.loadComingSoon(),
@@ -414,6 +574,11 @@ export async function checkCredentialsAndLoad() {
 
         hideLoginOverlay(); // in case user clicked to dismiss boot screen
         closeMembershipCardPicker();
+        // A recovered notice-mode boot (#41) is docked at the empty store's
+        // setup terminal — leave it cleanly, and re-raise the boot overlay it
+        // hid so the stocked rebuild happens behind the usual reveal.
+        closeSetupTerminal({ keepCamera: true });
+        showBootOverlay();
         // Boot overlay stays up (see waitForFontsAndInit/initializeStoreScene) until
         // every cover texture has loaded, so the store is never revealed mid-load.
         d.launchStore();
@@ -423,6 +588,24 @@ export async function checkCredentialsAndLoad() {
 
         const msg = err?.message ?? (typeof err === 'string' ? err : String(err));
         d.log(`[System] Auto-login failed: ${msg}. Retrying in ${currentDelay / 1000}s...`, 'system');
+
+        // #41: the empty store doubles as the failure state — never a modal
+        // error or an endless dark overlay. The first failure boots the empty
+        // shell with the DISTRIBUTOR NOT ANSWERING notice on the counter CRT
+        // (auto-retry keeps running underneath); later failures just refresh
+        // the notice line. Flat mode has no counter to dock to and keeps the
+        // classic behavior. The boot-escape listener comes off first — its
+        // any-key jump to the card picker would fight the notice menu.
+        if (getSetting<string>('bb_render_mode') !== 'flat') {
+          if (!noticeShown) {
+            noticeShown = true;
+            document.removeEventListener('keydown', bootEscape);
+            document.removeEventListener('click', bootEscape);
+            enterOpeningDay({ notice: { address: jellyfinUrl, detail: msg } });
+          } else {
+            openSetupNotice(jellyfinUrl, msg);
+          }
+        }
 
         retryTimeoutId = setTimeout(async () => {
           if (escaped) return;
@@ -455,12 +638,46 @@ export async function checkCredentialsAndLoad() {
       }
     };
 
+    // The notice screen's rows reach into this loop (#41): RETRY NOW fires an
+    // immediate attempt, CHANGE SERVER stops the loop for good.
+    retryNowHook = () => {
+      if (retryTimeoutId) {
+        clearTimeout(retryTimeoutId);
+        retryTimeoutId = null;
+      }
+      void attemptSync();
+    };
+    cancelRetryHook = () => {
+      escaped = true;
+      if (retryTimeoutId) {
+        clearTimeout(retryTimeoutId);
+        retryTimeoutId = null;
+      }
+      document.removeEventListener('keydown', bootEscape);
+      document.removeEventListener('click', bootEscape);
+    };
+
     attemptSync();
-  } else {
+  } else if (jellyfinUrl) {
+    // A saved server with no session (e.g. after Switch Member): the fanned
+    // membership-card picker, exactly as before.
     d.log('[System] No saved credentials. Showing Login screen.', 'system');
     document.removeEventListener('keydown', bootEscape);
     document.removeEventListener('click', bootEscape);
     setTimeout(() => { hideBootOverlay(); showLoginOrCards(); }, 500);
+  } else {
+    // Nothing saved at all — this is the store's OPENING DAY (#41): boot the
+    // empty shell and wake at the counter CRT's NEW STORE SETUP. No DOM form.
+    // Flat mode (no 3D counter) keeps the classic login overlay.
+    document.removeEventListener('keydown', bootEscape);
+    document.removeEventListener('click', bootEscape);
+    if (getSetting<string>('bb_render_mode') === 'flat') {
+      d.log('[System] No saved credentials. Showing Login screen.', 'system');
+      setTimeout(() => { hideBootOverlay(); showLoginOrCards(); }, 500);
+      return;
+    }
+    d.log('[System] First run — opening day. Setting up at the counter terminal.', 'system');
+    enterOpeningDay();
   }
 }
 

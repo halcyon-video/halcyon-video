@@ -948,6 +948,112 @@ async function applyCollectionMembership(
   }
 }
 
+/**
+ * The user's video-capable views: one Views call + the non-video blocklist,
+ * shared by the full catalog sync below and the names-only listing the
+ * first-run setup terminal shows (#41).
+ *
+ * The filter is a BLOCKLIST on purpose: mixed movies-and-shows libraries have
+ * reported their CollectionType as "mixed", "unknown", "folders", or nothing
+ * at all depending on server version, so allowlisting known values kept
+ * dropping them (the "my mixed library never shows up" bug). Anything not
+ * explicitly non-video is synced — an empty or non-video generic view
+ * returns 0 Movie/Series/Video items in the item fetch and is discarded
+ * harmlessly. Blocked: music, books, photos, playlists, livetv, trailers,
+ * and boxsets (collections only duplicate items already synced from their
+ * home libraries; membership is tagged via applyCollectionMembership).
+ * Grouped-folder views report Type "UserView" rather than
+ * "CollectionFolder", so both container types are accepted.
+ */
+async function fetchVideoViews(url: string, token: string, userId: string): Promise<any[]> {
+  const viewsResponseStr = await jellyfinRequest(
+    "GET",
+    `${url}/emby/Users/${userId}/Views`,
+    undefined,
+    token
+  );
+
+  let viewsData;
+  try {
+    viewsData = JSON.parse(viewsResponseStr);
+  } catch (e) {
+    throw new Error(viewsResponseStr || "Jellyfin views API returned invalid response.");
+  }
+
+  const viewItems = viewsData.Items || [];
+  const NON_VIDEO_COLLECTION_TYPES = new Set([
+    "music", "books", "photos", "playlists", "livetv", "trailers", "boxsets",
+  ]);
+  return viewItems.filter((v: any) => {
+    const keep =
+      (v.Type === "CollectionFolder" || v.Type === "UserView") &&
+      !NON_VIDEO_COLLECTION_TYPES.has(String(v.CollectionType ?? "").toLowerCase());
+    // Always log the verdict per view — "why is my library missing?" should
+    // be answerable from the console without a debugger.
+    console.info(
+      `[Jellyfin] View "${v.Name}" (Type=${v.Type}, CollectionType=${v.CollectionType ?? "none"}): ${keep ? "syncing" : "skipped (non-video)"}`
+    );
+    return keep;
+  });
+}
+
+export interface LibrarySummary {
+  id: string;
+  name: string;
+}
+
+const KNOWN_LIBS_KEY = 'bb_known_libraries';
+
+/**
+ * Remember the server's FULL video-library list (id + name) whenever a fetch
+ * sees it — the fetchers above/below are the only places that ever see the
+ * complete list, exclusions and all. localStorage-persisted so the Store
+ * Libraries settings page can offer EXCLUDED libraries for re-enabling on
+ * every later boot (#41): an excluded library is absent from the synced
+ * catalog by design, so the catalog alone can never list it again.
+ */
+function rememberKnownLibraries(libs: ReadonlyArray<LibrarySummary>): void {
+  if (typeof localStorage === 'undefined') return;
+  try {
+    localStorage.setItem(KNOWN_LIBS_KEY, JSON.stringify(libs.map((l) => ({ id: l.id, name: l.name }))));
+  } catch { /* quota — the drawer just misses excluded rows until next boot */ }
+}
+
+/** The last-remembered full server library list ([] before any real fetch). */
+export function knownServerLibraries(): LibrarySummary[] {
+  if (typeof localStorage === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(KNOWN_LIBS_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed)
+      ? parsed.filter((l) => l && typeof l.id === 'string' && typeof l.name === 'string')
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Names-only library listing for the first-run setup terminal (#41): one
+ * Views call, no item sync, so the checkbox screen can appear the moment a
+ * member signs in — the expensive per-library item fetch then runs only for
+ * the libraries the store actually carries.
+ */
+export async function fetchLibraryList(
+  jellyfinUrl: string,
+  token: string,
+  userId: string
+): Promise<LibrarySummary[]> {
+  if (!token || !jellyfinUrl || !userId) {
+    throw new Error("Missing connection credentials.");
+  }
+  const url = jellyfinUrl.replace(/\/$/, "");
+  const views = await fetchVideoViews(url, token, userId);
+  const list = views.map((v: any) => ({ id: String(v.Id), name: String(v.Name) }));
+  rememberKnownLibraries(list);
+  return list;
+}
+
 export async function fetchJellyfinLibrariesAndMovies(
   jellyfinUrl: string,
   token: string,
@@ -956,7 +1062,15 @@ export async function fetchJellyfinLibrariesAndMovies(
   // a big library legitimately takes minutes, so a caller must be able to tell
   // "still working" from "server is gone" without a wall-clock deadline that
   // a large enough catalog can never beat.
-  onProgress?: (stage: string) => void
+  onProgress?: (stage: string) => void,
+  opts?: {
+    /**
+     * Library ids this store does NOT carry (#41): their item sync is skipped
+     * entirely, not fetched-and-hidden. Sourced from the Store Libraries
+     * toggles (Settings → Connection / the setup terminal's checkbox rows).
+     */
+    excludeLibraryIds?: ReadonlySet<string>;
+  }
 ): Promise<JellyfinLibrary[]> {
   if (!token || !jellyfinUrl || !userId) {
     throw new Error("Missing connection credentials.");
@@ -967,47 +1081,22 @@ export async function fetchJellyfinLibrariesAndMovies(
 
   if (onProgress) pageProgressTick = () => onProgress('page');
   try {
-    const viewsResponseStr = await jellyfinRequest(
-      "GET",
-      `${url}/emby/Users/${userId}/Views`,
-      undefined,
-      token
-    );
-
-    let viewsData;
-    try {
-      viewsData = JSON.parse(viewsResponseStr);
-    } catch (e) {
-      throw new Error(viewsResponseStr || "Jellyfin views API returned invalid response.");
-    }
-
-    const viewItems = viewsData.Items || [];
-    // Pick the views that can hold shelf-able video. This is a BLOCKLIST on
-    // purpose: mixed movies-and-shows libraries have reported their
-    // CollectionType as "mixed", "unknown", "folders", or nothing at all
-    // depending on server version, so allowlisting known values kept dropping
-    // them (the "my mixed library never shows up" bug). Anything not
-    // explicitly non-video is synced — an empty or non-video generic view
-    // returns 0 Movie/Series/Video items below and is discarded harmlessly.
-    // Blocked: music, books, photos, playlists, livetv, trailers, and boxsets
-    // (collections only duplicate items already synced from their home
-    // libraries; membership is tagged via applyCollectionMembership).
-    // Grouped-folder views report Type "UserView" rather than
-    // "CollectionFolder", so both container types are accepted.
-    const NON_VIDEO_COLLECTION_TYPES = new Set([
-      "music", "books", "photos", "playlists", "livetv", "trailers", "boxsets",
-    ]);
-    const movieLibraries = viewItems.filter((v: any) => {
-      const keep =
-        (v.Type === "CollectionFolder" || v.Type === "UserView") &&
-        !NON_VIDEO_COLLECTION_TYPES.has(String(v.CollectionType ?? "").toLowerCase());
-      // Always log the verdict per view — "why is my library missing?" should
-      // be answerable from the console without a debugger.
-      console.info(
-        `[Jellyfin] View "${v.Name}" (Type=${v.Type}, CollectionType=${v.CollectionType ?? "none"}): ${keep ? "syncing" : "skipped (non-video)"}`
-      );
-      return keep;
-    });
+    const allVideoViews = await fetchVideoViews(url, token, userId);
+    // The full pre-exclusion list is remembered so the Store Libraries page
+    // can keep offering excluded libraries for re-enabling (#41).
+    rememberKnownLibraries(allVideoViews.map((v: any) => ({ id: String(v.Id), name: String(v.Name) })));
+    const excluded = opts?.excludeLibraryIds;
+    const movieLibraries = excluded?.size
+      ? allVideoViews.filter((v: any) => {
+          const skip = excluded.has(String(v.Id));
+          if (skip) {
+            console.info(
+              `[Jellyfin] View "${v.Name}": skipped (not carried by this store — Settings → Connection → Store Libraries)`
+            );
+          }
+          return !skip;
+        })
+      : allVideoViews;
 
     const librariesList: JellyfinLibrary[] = [];
 

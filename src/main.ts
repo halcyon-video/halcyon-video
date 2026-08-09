@@ -51,7 +51,6 @@ import { isGamesOnly, storeCatalog } from './games-only';
 import { isMembershipPickerOpen } from './membership-cards';
 import {
   initBootFlow,
-  showLoginOverlay,
   showBootOverlay,
   hideBootOverlay,
   showLoginOrCards,
@@ -59,7 +58,11 @@ import {
   startDemoAndLoad,
   checkCredentialsAndLoad,
   setupLoginHandlers,
+  maybeOpenSetupTerminal,
+  logOutToOpeningDay,
 } from './boot-flow';
+import { setupTerminalInput } from './store-setup-flow';
+import { registerLibraryToggles } from './library-settings';
 import { getActiveTheme, applyThemeCssVars, THEMES, resolveThemeId } from './themes';
 import {
   activeMediaCutoff,
@@ -152,6 +155,11 @@ let storeComingSoon: Movie[] = [];
 let storeDiscovery: Movie[] = [];
 function refreshStoreCatalog() {
   const catalog = storeCatalog(librariesList, gameMovies);
+  // Per-library toggles (#41 Store Libraries / #39 Overhead TVs) register
+  // here — the one funnel that sees every catalog, login, demo and rebuild
+  // alike. The drawer builds its pages at open time, so late registration is
+  // enough. Synthetic games-only "libraries" are platforms, not libraries.
+  registerLibraryToggles(catalog.libraries.filter((l) => !l.games).map((l) => ({ id: l.id, name: l.name })));
   // Media Release Date pin (#42): everything premiering after the rolling
   // cutoff is absent from the store entirely. Filtered COPIES of the fetched
   // lists — clearing the pin is a rebuild, never a re-sync.
@@ -522,12 +530,16 @@ const ui = {
   // overlay — it's in-scene — but it owns the arrow keys while docked, so it
   // joins isAnyOverlayOpen to keep shelf navigation from running underneath.
   isCounterTerminalOpen: false,
+  // NEW STORE SETUP on the same CRT (#41, store-setup-flow.ts): the opening-
+  // day / failure-state terminal the empty store docks to. Same in-scene-but-
+  // owns-the-keys treatment as the manager terminal above.
+  isSetupOpen: false,
 
   /** True if any overlay is blocking main navigation */
   get isAnyOverlayOpen(): boolean {
     return this.isPowerMenuOpen || this.isSettingsDrawerOpen || this.isLoginOpen || this.isExitConfirmOpen
       || this.isVersionPickerOpen || this.isSearchOpen || this.isCandyCheckoutOpen
-      || this.isFeedbackOpen || this.isCounterTerminalOpen || isMembershipPickerOpen();
+      || this.isFeedbackOpen || this.isCounterTerminalOpen || this.isSetupOpen || isMembershipPickerOpen();
   }
 };
 
@@ -933,6 +945,8 @@ const GROUP_HINTS: Record<SettingGroup, string> = {
 const SUBPAGE_HINTS: Record<string, string> = {
   'Building & Storefront': 'Ceiling, corner step, walls, bulbs, storefront style.',
   'Platforms': 'Which consoles get a section on the Video Games shelf.',
+  'Store Libraries': 'Which server libraries this store carries as aisles.',
+  'Overhead TVs': 'Which libraries feed the ceiling TVs. All off = family picks.',
 };
 
 /** Build the drawer DOM for the current page. Rows are updated in place. */
@@ -2642,6 +2656,9 @@ async function initializeStoreScene(preservePosterCache = false) {
       aisleIndicatorInterval = window.setInterval(updateBrowseHUDVisibility, 200);
 
       logToConsole('[System] All textures loaded. Store ready.', 'system');
+      // Opening day (#41): dock the counter CRT's NEW STORE SETUP before the
+      // overlay drops, so the player wakes already at the terminal.
+      maybeOpenSetupTerminal();
       hideBootOverlay();
       // You've just come in through the doors — ring the entry chime. (May stay
       // silent if the browser hasn't seen a user gesture yet; that's fine.)
@@ -2771,23 +2788,9 @@ async function executePowerMenuAction(btnId: string) {
 
     case 'btn-logout':
       if (isDemoMode) break; // no session in the demo (button is hidden too)
-      logToConsole('[System] Logging out and resetting Jellyfin session...', 'system');
-      localStorage.removeItem('jellyfin_url');
-      localStorage.removeItem('jellyfin_username');
-      localStorage.removeItem('jellyfin_password');
-      localStorage.removeItem('jellyfin_token');
-      localStorage.removeItem('jellyfin_userid');
-      
-      if (storeScene) {
-        storeScene.destroy();
-        storeScene = null;
-      }
-      if (aisleIndicatorInterval !== null) {
-        clearInterval(aisleIndicatorInterval);
-        aisleIndicatorInterval = null;
-      }
-      updateMovieHUD(null);
-      showLoginOverlay();
+      // #41: CHANGE SERVER / LOG OUT re-enters the empty store's NEW STORE
+      // SETUP terminal (flat mode keeps the classic login overlay).
+      logOutToOpeningDay();
       break;
 
     case 'btn-exit':
@@ -3413,6 +3416,8 @@ async function main() {
   initBootFlow({
     log: logToConsole,
     ui,
+    scene: () => storeScene,
+    keyClick: () => retailAudio.playKeyClick(),
     setLibraries: (libs) => { librariesList = libs; },
     setGames: (games) => { gameMovies = games; },
     loadComingSoon: loadComingSoonMovies,
@@ -3508,6 +3513,7 @@ async function main() {
       if (isDemoMode && ui.isPlaybackActive) return; // demo PLAYBACK DISABLED card is up
       if (videoPlayer?.isOpen) { videoPlayer.navigateHorizontal(-1); return; }
       if (ui.isLoginOpen) return;
+      if (ui.isSetupOpen) { void setupTerminalInput('left'); return; }
       if (ui.isSearchOpen) return;
       if (ui.isPowerMenuOpen) return;
       if (ui.isCounterTerminalOpen) { counterTerminalInput('left'); return; }
@@ -3531,6 +3537,7 @@ async function main() {
       if (isDemoMode && ui.isPlaybackActive) return; // demo PLAYBACK DISABLED card is up
       if (videoPlayer?.isOpen) { videoPlayer.navigateHorizontal(1); return; }
       if (ui.isLoginOpen) return;
+      if (ui.isSetupOpen) { void setupTerminalInput('right'); return; }
       if (ui.isSearchOpen) return;
       if (ui.isPowerMenuOpen) return;
       // Right steps back out of the terminal to the counter — the mirror of
@@ -3557,6 +3564,7 @@ async function main() {
       if (isDemoMode && ui.isPlaybackActive) return; // demo PLAYBACK DISABLED card is up
       if (videoPlayer?.isOpen) { videoPlayer.navigateVertical(-1); return; }
       if (ui.isLoginOpen) return;
+      if (ui.isSetupOpen) { void setupTerminalInput('up'); return; }
       if (ui.isSearchOpen) return;
       if (ui.isExitConfirmOpen) return;
 
@@ -3583,6 +3591,7 @@ async function main() {
       if (isDemoMode && ui.isPlaybackActive) return; // demo PLAYBACK DISABLED card is up
       if (videoPlayer?.isOpen) { videoPlayer.navigateVertical(1); return; }
       if (ui.isLoginOpen) return;
+      if (ui.isSetupOpen) { void setupTerminalInput('down'); return; }
       if (ui.isSearchOpen) return;
       if (ui.isExitConfirmOpen) return;
 
@@ -3611,6 +3620,7 @@ async function main() {
         return;
       }
       if (ui.isLoginOpen) return;
+      if (ui.isSetupOpen) { await setupTerminalInput('ok'); return; }
 
       if (ui.isSettingsDrawerOpen) {
         activateSelectedSetting(1);
@@ -3690,6 +3700,7 @@ async function main() {
       if (isDemoMode && ui.isPlaybackActive) { closeDemoPlaybackOverlay(); return; }
       if (videoPlayer?.isOpen) { if (!videoPlayer.handleBack()) videoPlayer.requestClose(); return; }
       if (ui.isLoginOpen) return;
+      if (ui.isSetupOpen) { void setupTerminalInput('back'); return; }
 
       if (ui.isSettingsDrawerOpen) {
         // Back from a group page returns to the category index; back from the
@@ -3744,6 +3755,8 @@ async function main() {
       if (isDemoMode && ui.isPlaybackActive) { closeDemoPlaybackOverlay(); return; }
       if (videoPlayer?.isOpen) { videoPlayer.close(); return; }
       if (ui.isLoginOpen) return;
+      // No power menu over NEW STORE SETUP — there's no store behind it yet.
+      if (ui.isSetupOpen) return;
 
       if (ui.isSettingsDrawerOpen) {
         closeSettingsDrawer();
@@ -3769,7 +3782,7 @@ async function main() {
     },
     onSearch: () => {
       if (storeScene?.isWalkAroundMode) return;
-      if (ui.isLoginOpen || ui.isPlaybackActive || ui.isCandyCheckoutOpen || ui.isVersionPickerOpen) return;
+      if (ui.isLoginOpen || ui.isSetupOpen || ui.isPlaybackActive || ui.isCandyCheckoutOpen || ui.isVersionPickerOpen) return;
       if (ui.isSearchOpen) {
         closeSearch();
       } else {
@@ -3805,7 +3818,8 @@ async function main() {
       // dismissable — Back is its cancel — so auto-cancel it and let the
       // saver take over. Login keeps blocking: it's a typing session.
       if (ui.isExitConfirmOpen && !ui.isPlaybackActive && !ui.isLoginOpen) closeExitConfirm();
-      if (!ui.isPlaybackActive && !ui.isScreensaverActive && !ui.isLoginOpen && !ui.isExitConfirmOpen) {
+      // NEW STORE SETUP is a typing session like login — never screensave it.
+      if (!ui.isPlaybackActive && !ui.isScreensaverActive && !ui.isLoginOpen && !ui.isSetupOpen && !ui.isExitConfirmOpen) {
         ui.isScreensaverActive = true;
         document.getElementById('screensaver-overlay')!.classList.add('visible');
         retailAudio.suspendForIdle();
