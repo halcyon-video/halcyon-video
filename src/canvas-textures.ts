@@ -5,13 +5,14 @@
 import * as THREE from 'three';
 import { getActiveTheme, type StoreTheme } from './themes';
 import { getActiveLogoSpec, storefrontBrandGold } from './logo-spec';
-import { bb93GenreColor, bb93SignageOn } from './genre-colors';
+import { bb93SignageOn } from './genre-colors';
 import {
   drawLogo, getLogoFontString, logoFontFamily, buildLogoShapePath, logoShapeInnerBox,
   logoShapeFitRect,
 } from './logo-renderer';
 import agencyFontUrl from './assets/sairasemicondensed-medium.ttf';
 import { BB_ARCHIVO_BLACK, bundledFontsReady } from './bundled-fonts';
+import { createCategoryPlate1993Texture } from './fixtures/category-plate-1993';
 
 // ─── Anisotropic-filtering budget ────────────────────────────────────────────
 // Grazing-angle surfaces (the carpet and walls receding toward the back wall,
@@ -419,87 +420,12 @@ export function createCategorySignTexture(
 
   // OPT-IN (bb_93_signage, ceiling-nav only — `ribbon` is passed solely by
   // the ceiling-nav catalog entry so endcap placards etc. never restyle):
-  // the footage's COMEDY ceiling marker (Part II 00:58, frames2/scene_002)
-  // is a LAYERED COLLAGE, not a flat ribbon: a family-colored backer
-  // parallelogram tilted one way with a big darker-shade disc riding its
-  // right end and a detached slash piece off its left end, and on top —
-  // tilted slightly the other way — a navy rounded plate with a white
-  // inset outline carrying white BOLD-ITALIC letters that fill it. Painted
-  // on a transparent canvas; the hanging-sign builder renders it as an
-  // alpha-cut card (see ceilingHangingSign's dieCut mode). Other themes keep
-  // the muted rectangles + plain white label.
+  // the 1993 ceiling CATEGORY PLATE. The measured reconstruction and its
+  // mirrored-layout back twin live in fixtures/category-plate-1993.ts (one
+  // source of truth shared with the solid-body fixture builder — frame
+  // citations there). Other themes keep the muted rectangles + plain label.
   if (ribbon && bb93SignageOn()) {
-    canvas.width = 1536;
-    canvas.height = 640;
-    const label = categoryName.toUpperCase();
-    const family = bb93GenreColor(label);
-    const shade = (hex: string, f: number) => {
-      const n = parseInt(hex.slice(1), 16);
-      const ch = (v: number) => Math.round(v * f);
-      return `rgb(${ch(n >> 16 & 255)},${ch(n >> 8 & 255)},${ch(n & 255)})`;
-    };
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    const cx = 768, cy = 320;
-
-    // Backer parallelogram, tilted CCW, with the disc on its right end and
-    // the detached slash just off its left end (all one alpha-cut layer).
-    ctx.save();
-    ctx.translate(cx, cy);
-    ctx.rotate(-0.10);
-    ctx.transform(1, 0, -0.18, 1, 0, 0); // italic-lean the backer like the footage
-    ctx.fillStyle = family;
-    ctx.fillRect(-540, -200, 1080, 400);
-    ctx.fillRect(-640, -200, 62, 400);  // detached slash piece, small gap to the body
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.restore();
-    ctx.save();
-    ctx.translate(cx, cy);
-    ctx.rotate(-0.10);
-    ctx.fillStyle = shade(family, 0.78);
-    ctx.beginPath();
-    ctx.arc(452, 40, 168, 0, Math.PI * 2); // big disc riding the right end
-    ctx.fill();
-    ctx.fillStyle = shade(family, 0.92);
-    ctx.beginPath();
-    ctx.arc(452, 40, 108, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-
-    // Navy plate on top, counter-tilted, white outline inset from its edge.
-    ctx.save();
-    ctx.translate(cx - 60, cy);
-    ctx.rotate(0.035);
-    const pw = 880, ph = 320, r = 42;
-    ctx.fillStyle = '#1a2a6e';
-    ctx.beginPath();
-    ctx.roundRect(-pw / 2, -ph / 2, pw, ph, r);
-    ctx.fill();
-    ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 14;
-    ctx.beginPath();
-    ctx.roundRect(-pw / 2 + 26, -ph / 2 + 26, pw - 52, ph - 52, r - 18);
-    ctx.stroke();
-
-    // White bold-italic letters filling the plate: hold cap height at the
-    // footage's ~58% of the plate and condense to fit (same sign-shop fit
-    // as the genre fascia — size the visible caps, never the em).
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    let size = Math.round((ph * 0.58) / 0.72);
-    const setFont = () => { ctx.font = `italic 900 ${size}px ${BB_ARCHIVO_BLACK}, sans-serif`; };
-    setFont();
-    const maxW = pw - 110;
-    let squeeze = Math.min(1, maxW / ctx.measureText(label).width);
-    if (squeeze < 0.6) {
-      size = Math.max(50, Math.floor(size * (squeeze / 0.6)));
-      setFont();
-      squeeze = Math.min(1, maxW / ctx.measureText(label).width);
-    }
-    ctx.scale(squeeze, 1);
-    ctx.fillStyle = '#ffffff';
-    ctx.fillText(label, 0, 6);
-    ctx.restore();
-    return toSignTexture(canvas);
+    return createCategoryPlate1993Texture(categoryName, faceAspect);
   }
 
   // The Halcyon board. Every title sign in the store wears the SAME board —

@@ -17,7 +17,10 @@ export const BB93_FAMILY_COLORS: Record<string, string> = {
   'GENERAL': '#1f6fc4',
   'SCI-FI & FANTASY': '#5b4ba0',
   'HORROR': '#5b4ba0',
-  'ACTION': '#5b4ba0',
+  // ACTION is directly attested MAGENTA on the 1993 ceiling plate
+  // (HFNfVDQdMxs f0016, "a magenta/red rounded plate"), not the sci-fi
+  // purple it was previously grouped with.
+  'ACTION': '#c13066',
   'SPECIAL INTEREST': '#b03a2e',
 };
 

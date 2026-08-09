@@ -6,6 +6,7 @@ import {
   isKnownSignageSlotId,
   validateSignageConfig
 } from '../signage-config';
+import { buildCategoryPlate1993 } from './category-plate-1993';
 import {
   acrylicTentSign,
   ceilingHangingSign,
@@ -387,15 +388,14 @@ export function buildSignage(ctx: FixtureContext, slots: SignSlot[], activeSigna
         fixtureMesh = acrylicTentSign(texture, w, h);
         break;
       case 'ceiling-hanging': {
-        // bb-90s ceiling GENRE panels are die-cut ribbon banners (arrowhead
-        // end, diamond accent, family colors — painted into the texture by
-        // createCategorySignTexture). Promo hangers and other themes stay
-        // rectangular framed boxes.
+        // 1993 ceiling-nav category plates are SOLID rounded die-cut bodies
+        // (fixtures/category-plate-1993.ts — owner rulings feedback/049 +
+        // 2026-08-09). Promo hangers and other themes stay rectangular
+        // framed boxes.
         const nav93 = bb93SignageOn() && slot.category === 'ceiling-nav';
-        fixtureMesh = ceilingHangingSign(
-          texture, w, h, slot.ceilingY ?? 13.5, slot.pos.y,
-          nav93 ? { dieCut: true } : {}
-        );
+        fixtureMesh = nav93
+          ? buildCategoryPlate1993(texture, w, h, slot.ceilingY ?? 13.5)
+          : ceilingHangingSign(texture, w, h, slot.ceilingY ?? 13.5, slot.pos.y);
         break;
       }
       case 'shelf-topper':

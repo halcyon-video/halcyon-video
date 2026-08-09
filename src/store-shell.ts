@@ -2423,6 +2423,21 @@ export function buildStore(scene: StoreScene) {
       genreName
     };
   });
+  // GAMES wedge (owner, 2026-08-09): the games department gets its own
+  // ceiling-nav hanger, centered over the game-section units (slotted
+  // fixtures are installed earlier in this same build pass).
+  const gameUnits = scene.slottedFixtures.filter(f => f.placement?.id?.startsWith('game-section'));
+  if (gameUnits.length) {
+    const gx = gameUnits.reduce((s, f) => s + f.placement.position.x, 0) / gameUnits.length;
+    const gz = gameUnits.reduce((s, f) => s + f.placement.position.z, 0) / gameUnits.length;
+    ceilingSlots.push({
+      id: 'ceiling-nav-games-dept',
+      category: 'ceiling-nav',
+      pos: new THREE.Vector3(gx, 9.75, gz),
+      yaw: Math.atan2(STORE_CENTER_X - gx, counterMidZ - gz),
+      genreName: 'GAMES'
+    });
+  }
 
   const signageSlots: SignSlot[] = [
     ...ceilingSlots,

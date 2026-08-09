@@ -94,11 +94,13 @@ export function getSignDef(id: string): SignDef | undefined {
   // If it's a dynamic ceiling nav sign (e.g. 'ceiling-nav-ACTION' or 'ceiling-nav-COMEDY')
   if (id.startsWith('ceiling-nav-')) {
     const genreOrLibName = id.slice('ceiling-nav-'.length).toUpperCase();
-    // Opt-in bb_93_signage: layered genre marker (backer + disc + navy
-    // plate, ~36in x 15in per the Part II COMEDY sign vs the light fixture
-    // beside it); default keeps the #34 rectangle.
+    // Opt-in bb_93_signage: the solid equilateral category WEDGE (owner
+    // spec 2026-08-09) — 3.1 ft wide, 15 in tall; end-on an equilateral ∇
+    // (top depth 2h/√3 ≈ 17 in). Nameplate proportions from the warped
+    // rUhRHo44CIA f0013 (see fixtures/category-plate-1993.ts). Default
+    // keeps the #34 rectangle.
     const ribbon93 = bb93SignageOn();
-    const size = ribbon93 ? { w: 3.0, h: 1.25 } : { w: 4.2, h: 1.2 };
+    const size = ribbon93 ? { w: 3.1, h: 1.25 } : { w: 4.2, h: 1.2 };
     return {
       id,
       category: 'ceiling-nav',
