@@ -3835,9 +3835,14 @@ async function main() {
       }
     },
     onToggleWalkAround: () => {
-      if (!ui.isPlaybackActive && !ui.isScreensaverActive && !ui.isLoginOpen && !ui.isExitConfirmOpen) {
-        storeScene?.toggleWalkAround();
-      }
+      // Whatever owns the keyboard also owns the camera. This used to check
+      // only playback/screensaver/login/exit-confirm, so F walked away from a
+      // docked CRT — and on opening day that was unrecoverable: NEW STORE
+      // SETUP still swallowed every key (ui.isSetupOpen), while nothing left
+      // could bring the camera back to the terminal. Same trap at the manager
+      // terminal. isAnyOverlayOpen covers all of them, plus the old four.
+      if (ui.isAnyOverlayOpen || ui.isPlaybackActive || ui.isScreensaverActive) return;
+      storeScene?.toggleWalkAround();
     },
     // T22: carry-mode shortcuts. Both are guarded no-ops with the 'Carry &
     // checkout' toggle off (or while any overlay owns the keyboard).

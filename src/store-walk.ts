@@ -257,6 +257,10 @@ export function toggleWalkAround(scene: StoreScene) {
   } else {
     // Enter walk around mode
     scene.savedModeBeforeWalk = scene.mode;
+    // Let go of any counter-CRT camera dock first (search / manager terminal /
+    // NEW STORE SETUP). A stash left behind makes the next enterSearchMode()
+    // think it is still docked and quietly do nothing.
+    scene.releaseSearchDock();
     // T21: the overview's cursors/crosshair are mode dressing — hide them
     // while walking (restored on exit above).
     if (scene.mode === 'overview') scene.hideOverviewVisuals();

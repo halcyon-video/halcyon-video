@@ -1548,6 +1548,17 @@ export class StoreScene {
     this.entrance?.setTerminalText(null); // desk CRTs back to the idle rental screen
   }
 
+  /**
+   * Walking away from the counter (store-walk.ts) drops the dock WITHOUT
+   * restoring its stashed pose — walk mode is about to take the camera anyway.
+   * Leaving the stash set is what made a later enterSearchMode() a silent
+   * no-op ("already docked"), so the CRT could never be reached again.
+   */
+  public releaseSearchDock(): void {
+    this.searchPreCameraPos = null;
+    this.searchPreLookAt = null;
+  }
+
   // Everything a swappable fixture (ambient TVs, entrance, ...) needs from the
   // scene, bundled so fixture classes never hold a reference to StoreScene.
   public fixtureContext(): FixtureContext {
