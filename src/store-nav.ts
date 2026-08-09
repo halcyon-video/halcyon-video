@@ -730,6 +730,18 @@ export function isSubNavOpen(scene: StoreScene): boolean {
   return subNavActive(scene);
 }
 
+/**
+ * True while a scene-driven overlay owns the keyboard — the ▼ jump index or
+ * the ceiling-TV peek nested in it. These are NOT tracked by main.ts's
+ * `ui.isAnyOverlayOpen` (they're in-scene, not DOM), so every shortcut that
+ * guards on that flag has to consult this one too, or c / f / r / x fire
+ * straight through a live index and drop you at the counter (or into
+ * walk-around) with the index still floating over the screen.
+ */
+export function isNavOverlayOpen(scene: StoreScene): boolean {
+  return subNavActive(scene) || tvPeekActive(scene);
+}
+
 export function moveSeriesEpisodeSelection(scene: StoreScene, dir: number): boolean {
   const movie = scene.getSelectedMovie();
   if (scene.mode !== 'inspect' || !movie?.isSeries) return false;

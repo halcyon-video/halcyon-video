@@ -2368,7 +2368,10 @@ export function buildStore(scene: StoreScene) {
         if (ok) scene.onConsoleLog(`[Clerk] Ordered "${movie.title}" through Jellyseerr.`, 'system');
         return ok;
       },
-      onSearch: () => scene.enterSearchMode(),
+      // Route through main.ts's openSearch() so ui.isSearchOpen is set and Back
+      // can close it; the bare enterSearchMode() fallback is for hosts that
+      // wire no handler (the harness), where a stuck dock is harmless.
+      onSearch: () => (scene.onOpenSearch ? scene.onOpenSearch() : scene.enterSearchMode()),
       onLog: (msg) => scene.onConsoleLog(msg, 'system'),
       onBlip: () => retailAudio.playBoxPickup(),
     },

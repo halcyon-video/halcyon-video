@@ -696,6 +696,9 @@ export class StoreScene {
       shelf: number;
       col: number;
       nrDirect: boolean;
+      // Fixture-hosted cases are identified by these, not by unitIdx.
+      unitSource: 'shelving' | 'fixture';
+      fixtureId: string | null;
     };
   } | null = null;
   public slottedFixtures: SlottedFixture[] = [];
@@ -851,6 +854,14 @@ export class StoreScene {
   // only reports the intent — the menu's contents and key handling live in
   // main.ts alongside the power menu they mirror.
   public onCounterTerminal?: () => void;
+  // Same split for the search terminal: anything in-scene that offers "let me
+  // search" (the clerk dialog's option 1) must raise it through main.ts's
+  // openSearch(), which owns ui.isSearchOpen and therefore the Back key that
+  // closes it again. Calling enterSearchMode() directly instead docks the
+  // camera with nobody owning it, and since the dock is never released the
+  // NEXT enterSearchMode() early-returns — killing search and the manager
+  // terminal for the rest of the session.
+  public onOpenSearch?: () => void;
   public onEnterFlatMode?: () => void;
   public onBrowseConfirm?: () => void;
 
@@ -3486,6 +3497,8 @@ export class StoreScene {
   public navOverlaySelect(): boolean { return nav.navOverlaySelect(this); }
   public navOverlayBack(): boolean { return nav.navOverlayBack(this); }
   public isSubNavOpen(): boolean { return nav.isSubNavOpen(this); }
+  /** A scene-driven overlay (jump index / TV peek) owns the keys — see store-nav. */
+  public isNavOverlayOpen(): boolean { return nav.isNavOverlayOpen(this); }
   public debugNavOverlay() { return nav.debugNavOverlay(this); }
 
   // Deprecated: the genre menu is gone (shelves are permanently sorted into the

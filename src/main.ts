@@ -825,10 +825,22 @@ function updateBrowseHUDVisibility() {
 // buttons can't hold); the keyboard/gamepad HOLD ENTER / HOLD ▼ gestures keep
 // working and the fill bars still double as their live hold-progress meters.
 
+/**
+ * True when nothing owns the keyboard, so a bare-letter shortcut (c / r / x /
+ * f) or a hold gesture may fire. `ui.isAnyOverlayOpen` covers the DOM overlays
+ * and the two in-scene CRT terminals; `isNavOverlayOpen()` covers the
+ * scene-driven ones (▼ jump index, ceiling-TV peek) that `ui.*` cannot see.
+ * Every shortcut goes through here — checking `ui.isAnyOverlayOpen` alone is
+ * what let `c` open the checkout counter underneath a live jump index.
+ */
+function shortcutsAllowed(): boolean {
+  return !!storeScene && !ui.isAnyOverlayOpen && !ui.isPlaybackActive
+    && !ui.isScreensaverActive && !storeScene.isNavOverlayOpen();
+}
+
 /** True when nothing modal/immersive should be eating the hold shortcuts. */
 function holdHintsAllowed(): boolean {
-  return !!storeScene && !storeScene.isWalkAroundMode
-    && !ui.isAnyOverlayOpen && !ui.isPlaybackActive && !ui.isScreensaverActive;
+  return shortcutsAllowed() && !storeScene!.isWalkAroundMode;
 }
 
 /** Show/hide the pills; cheap no-op when nothing changed (called from the HUD poll). */
@@ -2578,6 +2590,7 @@ async function initializeStoreScene(preservePosterCache = false) {
 
     // Left at the checkout counter reaches for the clerk's terminal.
     scene.onCounterTerminal = () => counterTerminalOpen();
+    scene.onOpenSearch = () => { void openSearch(); };
     scene.onEnterFlatMode = () => executePowerMenuAction('btn-flat-mode');
 
     // Library-select (end-cap) left/right nav arrows on the floating locator.
@@ -2639,6 +2652,11 @@ async function initializeStoreScene(preservePosterCache = false) {
       storeScene = scene;
       (window as any).storeScene = storeScene;
       (window as any).librariesList = storeLibraries;
+      // Which overlay owns the keyboard, as the app itself sees it. Several
+      // of these (search, the two in-scene CRT terminals) have no DOM tell, so
+      // a black-box reader can only guess at them; exposing the real object
+      // lets the nav-state verifier assert on the actual input owner.
+      (window as any).__uiState = ui;
 
       // Re-apply the user's explicit live preferences (outside mode, library
       // view) to the fresh scene so a rebuild preserves them.
@@ -3782,15 +3800,20 @@ async function main() {
     },
     onSearch: () => {
       if (storeScene?.isWalkAroundMode) return;
-      if (ui.isLoginOpen || ui.isSetupOpen || ui.isPlaybackActive || ui.isCandyCheckoutOpen || ui.isVersionPickerOpen) return;
-      if (ui.isSearchOpen) {
-        closeSearch();
-      } else {
-        // Close other overlays before opening search
-        if (ui.isPowerMenuOpen) closePowerMenu();
-        if (ui.isExitConfirmOpen) closeExitConfirm();
-        openSearch();
-      }
+      // / while search is up closes it, from anywhere.
+      if (ui.isSearchOpen) { closeSearch(); return; }
+      // The power menu and the exit dialog are lightweight menus that / is
+      // allowed to SUPERSEDE — close them, then open search in their place.
+      if (ui.isPowerMenuOpen) closePowerMenu();
+      if (ui.isExitConfirmOpen) closeExitConfirm();
+      // Everything else owns the keyboard and must not have search stacked on
+      // top of it: the settings drawer, the two in-scene CRT terminals (which
+      // share search's camera dock), the candy/version/membership modals, the
+      // login and setup typing sessions, playback, and the scene-driven jump
+      // index. Testing the individual flags here is what let / open a second
+      // live overlay over the settings drawer and the manager terminal.
+      if (!shortcutsAllowed()) return;
+      openSearch();
     },
     onActivity: () => {
       if (ui.isScreensaverActive) {
@@ -3841,29 +3864,29 @@ async function main() {
       // SETUP still swallowed every key (ui.isSetupOpen), while nothing left
       // could bring the camera back to the terminal. Same trap at the manager
       // terminal. isAnyOverlayOpen covers all of them, plus the old four.
-      if (ui.isAnyOverlayOpen || ui.isPlaybackActive || ui.isScreensaverActive) return;
+      if (!shortcutsAllowed()) return;
       storeScene?.toggleWalkAround();
     },
     // T22: carry-mode shortcuts. Both are guarded no-ops with the 'Carry &
     // checkout' toggle off (or while any overlay owns the keyboard).
     onCheckout: () => {
-      if (ui.isAnyOverlayOpen || ui.isPlaybackActive || ui.isScreensaverActive) return;
+      if (!shortcutsAllowed()) return;
       if (storeScene?.isWalkAroundMode) return;
       storeScene?.enterCheckout();
     },
     onReturnTape: () => {
-      if (ui.isAnyOverlayOpen || ui.isPlaybackActive || ui.isScreensaverActive) return;
+      if (!shortcutsAllowed()) return;
       storeScene?.returnCarriedTape();
     },
     onNotInterested: () => {
-      if (ui.isAnyOverlayOpen || ui.isPlaybackActive || ui.isScreensaverActive) return;
+      if (!shortcutsAllowed()) return;
       handleGapDismiss();
     },
     // T22: hold-select-to-checkout. While a tape is in hand (and nothing modal
     // is on top), holding Enter / gamepad A jumps straight to the counter; a
     // quick tap still performs the normal select action on release.
     isHoldSelectArmed: () => {
-      if (ui.isAnyOverlayOpen || ui.isPlaybackActive || ui.isScreensaverActive) return false;
+      if (!shortcutsAllowed()) return false;
       if (videoPlayer?.isOpen) return false;
       if (storeScene?.isWalkAroundMode) return false;
       return !!storeScene?.canHoldToCheckout();
