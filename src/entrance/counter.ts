@@ -362,7 +362,7 @@ export function buildCheckoutCounter(
   const dFace = STRIPE_RECESS;            // stripe's visible face, just behind the band face
   const dBack = STRIPE_RECESS + STRIPE_T; // stripe slab's hidden back face
   const slabH = STRIPE_H + 0.02 + (rounded ? 0.12 : 0); // over-tall: tucks into the blue (and their bevels)
-  bandSegs.forEach(({ edge, trimA, trimB }) => {
+  bandSegs.forEach(({ edge, trimA, trimB, e }) => {
     const N = normals[edge];
     const T = tangents[edge];
     const A = P_out[edge];
@@ -385,6 +385,16 @@ export function buildCheckoutCounter(
       { noBevel: true, noCollide: true }); // recessed trim, not a body piece: sharp cut, no collider
     mesh.castShadow = false;
     mesh.receiveShadow = false;
+
+    // ...and CLOSE the channel behind it. The groove is cut clean through the
+    // band (it is the space between two extrusions), while the stripe slab
+    // only fills the outer 0.09 ft of a 1.5 ft depth — so the counter had an
+    // open slot running its whole length, plainly visible as a dark line under
+    // the top edge from the clerk side and through the walk-through gap's cut
+    // ends. This blue filler spans from the stripe's hidden back face to the
+    // band's inner edge, leaving the recess a recess on the customer side only.
+    extrudeSegment(aBack, bBack, e.B_in, e.A_in, GROOVE_HALF * 2, STRIPE_Y - GROOVE_HALF,
+      counterTopBlue, { noBevel: true, noCollide: true }); // body pieces above/below already collide
   });
 
   // ----- Inner counter: angled V-shaped island inside the shield -----
