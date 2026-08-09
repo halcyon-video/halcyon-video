@@ -9,6 +9,7 @@ import { OverviewCursors, OverviewCursorTarget, NEW_RELEASES_CURSOR_LIB, CHECKOU
 import { BROWSE_WINDOW_SIZE, AISLE_SHELF_HEIGHTS, SECTION_COLS, UNIT_SIDE_CAPACITY, BACK_WALL_UNIT_IDX, SECTION_CAPACITY, sideEntrySlot, ShelvingUnit } from './store-layout';
 import { OVERVIEW_POS, OVERVIEW_LOOK_STEP, OVERVIEW_YAW_CLAMP, OVERVIEW_PITCH_MIN, OVERVIEW_PITCH_MAX } from './scene-shared';
 import { isEndcapKind } from './fixtures/genre-endcap';
+import { slottedFixtureLabel, qualifyDuplicateLabels } from './fixture-labels';
 import type { StoreScene } from './three-scene';
 
 export function buildOverviewCursorTargets(scene: StoreScene): OverviewCursorTarget[] {
@@ -70,14 +71,14 @@ export function buildOverviewCursorTargets(scene: StoreScene): OverviewCursorTar
   // configuration they had no reachable entry point at all. Cursors float
   // lower than the shelf ones: these fixtures are waist-height islands, so a
   // gondola-height ticket would read as belonging to the run behind them.
+  const fixtureTargets: OverviewCursorTarget[] = [];
   scene.slottedFixtures.forEach((f, standIdx) => {
     // Endcaps (genre AND collection) get no standalone cursor (user request):
     // they're browsed by walking off their run's entrance-end column
     // (store-nav flow-through).
     if (isEndcapKind(f.placement.kind)) return;
-    const label = ((f.placement.options?.genre as string) || f.placement.id || 'display').toUpperCase();
-    targets.push({
-      label,
+    fixtureTargets.push({
+      label: slottedFixtureLabel(f),
       x: f.placement.position.x,
       y: 5.1,
       z: f.placement.position.z,
@@ -87,6 +88,11 @@ export function buildOverviewCursorTargets(scene: StoreScene): OverviewCursorTar
       col: 0,
     });
   });
+  // Number the repeats (four game gondolas all call themselves VIDEO GAMES) in
+  // left-to-right order, the order the cursor ring steps them in.
+  fixtureTargets.sort((a, b) => (a.x - b.x) || (a.z - b.z));
+  qualifyDuplicateLabels(fixtureTargets, (t) => scene.slottedFixtures[t.unitIdxInLibrary]);
+  targets.push(...fixtureTargets);
   // T22: the front-counter checkout waypoint. Always present (not just in
   // carry mode): the clerk's desk terminal — Left at the counter — is the
   // diegetic settings/power menu, so the counter must stay reachable by

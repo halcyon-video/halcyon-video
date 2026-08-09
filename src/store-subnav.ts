@@ -49,6 +49,7 @@ import {
 } from './browse-cursor';
 import { OVERVIEW_POS } from './scene-shared';
 import { isEndcapKind } from './fixtures/genre-endcap';
+import { slottedFixtureLabel, qualifyDuplicateLabels } from './fixture-labels';
 import { retailAudio } from './audio';
 import type { StoreScene } from './three-scene';
 
@@ -192,12 +193,8 @@ function buildDisplayRow(scene: StoreScene): SubNavItem[] {
     // campaign chain came up empty. Both report no slots AND no footprint —
     // never index a destination that isn't physically there.
     if (f.getSlots().length === 0 && !f.getFootprint?.()) return;
-    // `genre` is the fixture's own live identity string (a promo stand's
-    // campaign topper, a bin's name, an endcap's title) — the same one the
-    // browse HUD names it by; the placement option and the id are fallbacks.
-    const label = (f.genre || (p.options?.genre as string) || p.id || 'display').toUpperCase();
     out.push({
-      label,
+      label: slottedFixtureLabel(f),
       kind: isEndcapKind(p.kind) ? 'endcap' : 'fixture',
       libraryIdx: -1, unitIdxInLibrary: -1, side: 'front', col: 0,
       fixtureIdx,
@@ -208,25 +205,10 @@ function buildDisplayRow(scene: StoreScene): SubNavItem[] {
       lookY: heights.length > 0 ? (heights[0] + heights[heights.length - 1]) / 2 + 0.4 : 3.0,
     });
   });
-  // Front of the store first, so stepping right walks deeper in.
+  // Front of the store first, so stepping right walks deeper in — then number
+  // any repeated titles in that same stepping order.
   out.sort((a, b) => (b.z - a.z) || (a.x - b.x));
-  // Several endcaps share a title in an uncategorized store (they all fall
-  // back to "Related Movies"), and a row of identical tickets is unusable —
-  // qualify the repeats with the aisle they stand at the end of.
-  const counts = new Map<string, number>();
-  for (const it of out) counts.set(it.label, (counts.get(it.label) ?? 0) + 1);
-  const seen = new Map<string, number>();
-  for (const it of out) {
-    if ((counts.get(it.label) ?? 0) < 2) continue;
-    const base = it.label;
-    const n = (seen.get(base) ?? 0) + 1;
-    seen.set(base, n);
-    const lib = scene.slottedFixtures[it.fixtureIdx]?.placement.options?.libraryName as string | undefined;
-    // A qualifier that repeats the title ("MOVIES · MOVIES") disambiguates
-    // nothing — number those instead.
-    const qual = lib && lib.toUpperCase() !== base ? lib.toUpperCase() : null;
-    it.label = qual ? `${base} · ${qual}` : `${base} ${n}`;
-  }
+  qualifyDuplicateLabels(out, (it) => scene.slottedFixtures[it.fixtureIdx]);
   declutter(out);
   return out;
 }
