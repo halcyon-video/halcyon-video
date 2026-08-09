@@ -52,7 +52,7 @@ import { isEndcapKind } from './fixtures/genre-endcap';
 import { retailAudio } from './audio';
 import type { StoreScene } from './three-scene';
 
-export type SubNavKind = 'library' | 'new-releases' | 'genre' | 'fixture' | 'endcap';
+export type SubNavKind = 'library' | 'new-releases' | 'genre' | 'fixture' | 'endcap' | 'checkout';
 
 export interface SubNavItem {
   label: string;
@@ -128,10 +128,30 @@ function declutter(items: SubNavItem[]): void {
   }
 }
 
-/** Row 1: libraries in store order, the New Releases wall, then genre sections. */
+/**
+ * Row 1: the checkout counter, libraries in store order, the New Releases
+ * wall, then genre sections.
+ *
+ * The counter leads because it is the one destination that is not stock: it is
+ * where you pay, where the clerk stands, and — through Left at the counter —
+ * the ONLY way into the manager terminal, i.e. every setting the app has. The
+ * index listed every library, genre and display but not the counter, so a
+ * player navigating by the index (the whole point of the index) could reach
+ * every shelf in the building and never the register or the settings behind
+ * it. The entrance overview's own CHECKOUT cursor was the sole route, several
+ * arrow presses deep in a ring of aisle tickets.
+ */
 function buildLibraryRow(scene: StoreScene): SubNavItem[] {
   const out: SubNavItem[] = [];
   const genres: SubNavItem[] = [];
+  out.push({
+    label: 'CHECKOUT COUNTER',
+    kind: 'checkout',
+    libraryIdx: -1, unitIdxInLibrary: -1, side: 'front', col: 0, fixtureIdx: -1,
+    // Same anchor the overview's CHECKOUT cursor floats on: just above the
+    // counter band's store-facing apex.
+    x: 11.0, y: 5.4, z: scene.deskApexZ() + 0.6, yaw: 0, lookY: 3.0,
+  });
   for (let libIdx = 0; libIdx < scene.libraries.length; libIdx++) {
     const units = scene.shelvingUnits.filter((u) => u.libraryIdx === libIdx);
     if (units.length === 0) continue;
@@ -251,11 +271,18 @@ function applyRow(scene: StoreScene, state: SubNavState): void {
 export function openSubNav(scene: StoreScene): boolean {
   if (scene.subNav) return true;
   const rows = [buildLibraryRow(scene), buildDisplayRow(scene)];
-  scene.subNav = { rows, row: 0, sel: [0, 0], ret: captureBrowseReturn(scene) };
+  // Open on the first STOCK destination, not on the counter that now leads
+  // Row 1: ▼ is pressed to go shopping, and swinging the camera to the
+  // register every time would be a jarring default. The counter sits one ◀
+  // from here (the row wraps), which is the whole point of putting it first —
+  // it is the immediate neighbour of the landing selection, and you see it
+  // labelled the moment you step that way.
+  const firstStock = rows[0].findIndex((i) => i.kind !== 'checkout');
+  scene.subNav = { rows, row: 0, sel: [Math.max(0, firstStock), 0], ret: captureBrowseReturn(scene) };
   applyRow(scene, scene.subNav);
   retailAudio.playKeyClick();
   scene.onConsoleLog(
-    `[System] Jump index — ${rows[0].length} libraries/genres, ${rows[1].length} displays.`, 'system');
+    `[System] Jump index — ${rows[0].length} counter/libraries/genres, ${rows[1].length} displays.`, 'system');
   scene.requestRender();
   return true;
 }
@@ -355,6 +382,15 @@ export function subNavSelect(scene: StoreScene): boolean {
   if (!item) return closeSubNav(scene, true);
   closeSubNav(scene, false);
   retailAudio.playKeyClick();
+
+  if (item.kind === 'checkout') {
+    // Straight to the register — the same waypoint the overview's CHECKOUT
+    // cursor confirms into, and from there Left opens the manager terminal.
+    scene.enterCheckout();
+    scene.onConsoleLog(`[System] Jumping to "${item.label}".`, 'system');
+    scene.requestRender();
+    return true;
+  }
 
   if (item.kind === 'new-releases') {
     // Reuse the New Releases entry logic wholesale (the same hop the overview
