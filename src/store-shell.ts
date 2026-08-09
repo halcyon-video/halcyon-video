@@ -2196,8 +2196,17 @@ export function buildStore(scene: StoreScene) {
     fixture.build();
     const footprint = fixture.getFootprint?.();
     if (footprint) fixtureFootprints.push(footprint);
-    if ('getSlots' in fixture && typeof (fixture as any).getSlots === 'function') {
-      scene.slottedFixtures.push(fixture as SlottedFixture);
+    const slotted = 'getSlots' in fixture && typeof (fixture as any).getSlots === 'function'
+      ? (fixture as SlottedFixture) : null;
+    // A fixture that DECLINED to build is not on the floor: an era-gated POP
+    // kit outside its period, a promo stand whose campaign chain came up
+    // empty, a bargain bin with nothing to dump on opening day. Each reports
+    // no slots AND no footprint. Keep those out of the browsable set entirely
+    // — the entrance overview builds a floating cursor for every entry here,
+    // so an unbuilt one parked a ticket over bare carpet (the empty
+    // opening-day store showed "PROMO-STAND-BACK" hanging over nothing).
+    if (slotted && (slotted.getSlots().length > 0 || footprint)) {
+      scene.slottedFixtures.push(slotted);
       // No auto stand-points around an endcap: it abuts its aisle run, so
       // the ringed dests would park the clerk against (or inside) the
       // shelving it touches — she approaches it like the aisle itself.
@@ -2334,39 +2343,49 @@ export function buildStore(scene: StoreScene) {
       yaw: Math.PI / 2, kind: 'wall', key: `wall:right:${fz}`,
     });
   }
-  scene.clerk = new StoreClerk(scene.plan, clerkFloorDests, scene.shelvingUnits, {
-    // Only offer to chat while the player is free-roaming the floor.
-    isAvailable: () => scene.mode === 'walk-around',
-    getMovies: () => {
-      const map = new Map<string, Movie>();
-      scene.libraries.forEach((lib) => lib.movies.forEach((m) => map.set(m.id, m)));
-      return Array.from(map.values());
+  // Opening day (#41): no stock, no staff. The empty shell is a store that has
+  // not taken delivery yet — a clerk working the floor of it reads as a bug,
+  // and she has nothing to stock, recommend or check out (owner call
+  // 2026-08-09). She arrives with the first shipment, i.e. with the very next
+  // scene build, since a stocked store rebuilds this whole function.
+  const storeHasStock = scene.libraries.some((lib) => lib.movies.length > 0)
+    || scene.gameMovies.length > 0;
+  if (storeHasStock) {
+    const clerk = new StoreClerk(scene.plan, clerkFloorDests, scene.shelvingUnits, {
+      // Only offer to chat while the player is free-roaming the floor.
+      isAvailable: () => scene.mode === 'walk-around',
+      getMovies: () => {
+        const map = new Map<string, Movie>();
+        scene.libraries.forEach((lib) => lib.movies.forEach((m) => map.set(m.id, m)));
+        return Array.from(map.values());
+      },
+      getLocalContext: () => scene.localRecommendPool(),
+      // "Order it for me": the clerk-dialog twin of the inspect-view request
+      // press — the shared orderTitle flow, with her toast muted because
+      // she's already talking to you in the dialog.
+      onRequest: async (movie) => {
+        const ok = await scene.orderTitle(movie, { clerkLine: false });
+        if (ok) scene.onConsoleLog(`[Clerk] Ordered "${movie.title}" through Jellyseerr.`, 'system');
+        return ok;
+      },
+      onSearch: () => scene.enterSearchMode(),
+      onLog: (msg) => scene.onConsoleLog(msg, 'system'),
+      onBlip: () => retailAudio.playBoxPickup(),
     },
-    getLocalContext: () => scene.localRecommendPool(),
-    // "Order it for me": the clerk-dialog twin of the inspect-view request
-    // press — the shared orderTitle flow, with her toast muted because
-    // she's already talking to you in the dialog.
-    onRequest: async (movie) => {
-      const ok = await scene.orderTitle(movie, { clerkLine: false });
-      if (ok) scene.onConsoleLog(`[Clerk] Ordered "${movie.title}" through Jellyseerr.`, 'system');
-      return ok;
-    },
-    onSearch: () => scene.enterSearchMode(),
-    onLog: (msg) => scene.onConsoleLog(msg, 'system'),
-    onBlip: () => retailAudio.playBoxPickup(),
-  },
-  scene.clerkNavGrid,
-  entranceClerkNav
-    ? { register: entranceClerkNav.register, terminals: entranceClerkNav.terminals }
-    : null);
-  // AO-excluded: she's a billboard sprite + blob-shadow plane — screen-space
-  // AO on a flat sprite is a halo artifact, and excluding her means her
-  // roaming never invalidates the frozen AO term (see the GTAO wrapper).
-  // aoBlendMask: also knock the AO *blend* out of her pixels each frame, or
-  // the shelf shadows behind her get multiplied straight across the sprite.
-  scene.clerk.group.userData.excludeFromSSAO = true;
-  scene.clerk.group.userData.aoBlendMask = true;
-  scene.scene.add(scene.clerk.group);
+    scene.clerkNavGrid,
+    entranceClerkNav
+      ? { register: entranceClerkNav.register, terminals: entranceClerkNav.terminals }
+      : null);
+    // AO-excluded: she's a billboard sprite + blob-shadow plane — screen-space
+    // AO on a flat sprite is a halo artifact, and excluding her means her
+    // roaming never invalidates the frozen AO term (see the GTAO wrapper).
+    // aoBlendMask: also knock the AO *blend* out of her pixels each frame, or
+    // the shelf shadows behind her get multiplied straight across the sprite.
+    clerk.group.userData.excludeFromSSAO = true;
+    clerk.group.userData.aoBlendMask = true;
+    scene.scene.add(clerk.group);
+    scene.clerk = clerk;
+  }
 
   // --- Dynamic Store Signage system ---
   const getLineGenreName = (lineId: number): string => {

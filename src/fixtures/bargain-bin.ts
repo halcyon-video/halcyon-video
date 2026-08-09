@@ -62,6 +62,9 @@ export class BargainBin implements SlottedFixture {
   private disposables: Array<{ dispose(): void }> = [];
   private slotMovies: Movie[] = [];
   private fillerMovies: Movie[] = [];
+  // False until build() actually puts a tub on the floor — see build()'s
+  // no-stock bail and getFootprint().
+  private built = false;
 
   constructor(placement: FixturePlacement, ctx: FixtureContext) {
     this.placement = placement;
@@ -105,6 +108,12 @@ export class BargainBin implements SlottedFixture {
     const height = this.binHeight();
 
     this.initMovies();
+    // Nothing to dump, no bin. A store with no catalog at all — opening day
+    // (#41), where the whole point is BARE SHELVES, NO STOCK — used to get one
+    // lone tub sign-written "BARGAIN BIN / 3 FOR $10" standing on an otherwise
+    // empty floor, which reads as stock the store hasn't taken delivery of yet.
+    // The empty-tub case is equally wrong on a tiny real library.
+    if (this.slotMovies.length === 0) return;
 
     const group = new THREE.Group();
     group.position.set(this.placement.position.x, 0, this.placement.position.z);
@@ -249,6 +258,7 @@ export class BargainBin implements SlottedFixture {
     this.ctx.scene.add(group);
     this.ctx.addCollider(bin);
     this.ctx.requestShadowRefresh();
+    this.built = true;
   }
 
   // The lowest-audience-score titles across all libraries. Slots duplicate
@@ -380,7 +390,11 @@ export class BargainBin implements SlottedFixture {
   // The tub's collision-relevant footprint is its wider top rim: exactly
   // sideFt face-to-face (same derivation as PreviouslyViewedBin). Floor
   // displays demand double-walkway clearance to everything, walls included.
-  getFootprint(): Footprint {
+  // Null when the bin declined to build (no stock): "no floor footprint" is
+  // also what tells store-shell this fixture isn't on the floor, so nothing
+  // hands an absent bin an overview cursor or a jump-index entry.
+  getFootprint(): Footprint | null {
+    if (!this.built) return null;
     const sideFt = this.binSide();
     return {
       label: `fixture:${this.placement.id}`,
