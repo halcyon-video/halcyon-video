@@ -160,14 +160,30 @@ export function closeSetupTerminal(opts?: { keepCamera?: boolean }): void {
 async function dial(address: string): Promise<void> {
   if (!deps) return;
   const url = normalizeUrl(address.trim());
+  // Remember the dialed server IMMEDIATELY, not at afterAuth(): both routes to
+  // the CRT sign-in screen below (an empty card list, a refused one) skip
+  // afterAuth entirely, and manualSignIn() reads pendingUrl. Without this it
+  // fell back to localStorage's jellyfin_url — unset on a true first run — and
+  // authenticated against '', i.e. the app's own origin, so a single-user
+  // Jellyfin (public card list empty) could NEVER be connected to from here.
+  pendingUrl = url;
   screen = { kind: 'dialing', address: url, step: 'LOOKING UP MEMBERSHIP CARDS...' };
   render();
   let users;
   try {
     users = await fetchPublicUsers(url);
   } catch (e: any) {
-    deps.log(`[Setup] No answer from ${url}: ${e?.message ?? e}`);
-    screen = { ...initialHomeScreen(address), row: 1, error: 'NO ANSWER. CHECK THE ADDRESS + CORS.' };
+    const msg = String(e?.message ?? e);
+    deps.log(`[Setup] No membership card list from ${url}: ${msg}`);
+    // A server that ANSWERED and refused the list (public users switched off,
+    // a reverse proxy blocking /Users/Public) is perfectly usable — it just
+    // can't fan the cards out. Sign in by name instead of dead-ending on the
+    // home screen, which is what the DOM login form has always done. Only a
+    // server that said nothing at all is a bad address.
+    screen = /HTTP error \d+/.test(msg)
+      ? { kind: 'manual-auth', row: 0, username: '', password: '',
+          error: 'NO CARD LIST HERE. SIGN IN BY NAME.' }
+      : { ...initialHomeScreen(address), row: 1, error: 'NO ANSWER. CHECK THE ADDRESS + CORS.' };
     render();
     return;
   }
@@ -199,6 +215,14 @@ async function manualSignIn(): Promise<void> {
   if (!deps || screen.kind !== 'manual-auth') return;
   const { username, password } = screen;
   const url = pendingUrl || normalizeUrl(localStorage.getItem('jellyfin_url') || '');
+  if (!url) {
+    // Belt and braces for the bug the pendingUrl assignment in dial() fixes:
+    // never authenticate against an empty URL (which resolves to the app's own
+    // origin and fails forever) — send them back to type an address.
+    screen = { ...initialHomeScreen(), row: 1, error: 'TYPE THE SERVER ADDRESS FIRST.' };
+    render();
+    return;
+  }
   screen = { kind: 'dialing', address: url, step: `SIGNING IN ${username.toUpperCase().slice(0, 26)}...` };
   render();
   try {
