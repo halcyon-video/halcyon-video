@@ -53,7 +53,8 @@ import { slottedFixtureLabel, qualifyDuplicateLabels } from './fixture-labels';
 import { retailAudio } from './audio';
 import type { StoreScene } from './three-scene';
 
-export type SubNavKind = 'library' | 'new-releases' | 'genre' | 'fixture' | 'endcap' | 'checkout';
+export type SubNavKind = 'library' | 'new-releases' | 'genre' | 'fixture' | 'endcap' | 'checkout'
+  | 'flat-mode';
 
 export interface SubNavItem {
   label: string;
@@ -153,6 +154,22 @@ function buildLibraryRow(scene: StoreScene): SubNavItem[] {
     // counter band's store-facing apex.
     x: 11.0, y: 5.4, z: scene.deskApexZ() + 0.6, yaw: 0, lookY: 3.0,
   });
+  // 2D MODE rides beside the counter for exactly the reason the counter itself
+  // is here: it was reachable ONLY from the entrance overview's arrow layer, so
+  // a player navigating by the index could never leave 3D — and on a store
+  // rooted at library-select (bb_overview_start=0) that layer is not built at
+  // all, leaving the power menu as the sole route. Offered only when a host has
+  // wired the handler; the harness and the asset viewer have not, and a dead
+  // row entry is worse than no entry.
+  if (scene.onEnterFlatMode) {
+    out.push({
+      label: '2D MODE',
+      kind: 'flat-mode',
+      libraryIdx: -1, unitIdxInLibrary: -1, side: 'front', col: 0, fixtureIdx: -1,
+      // The overview parks its own 2D MODE cursor here, just right of CHECKOUT.
+      x: 14.5, y: 5.4, z: scene.deskApexZ() + 0.6, yaw: 0, lookY: 3.0,
+    });
+  }
   for (let libIdx = 0; libIdx < scene.libraries.length; libIdx++) {
     const units = scene.shelvingUnits.filter((u) => u.libraryIdx === libIdx);
     if (units.length === 0) continue;
@@ -259,7 +276,10 @@ export function openSubNav(scene: StoreScene): boolean {
   // from here (the row wraps), which is the whole point of putting it first —
   // it is the immediate neighbour of the landing selection, and you see it
   // labelled the moment you step that way.
-  const firstStock = rows[0].findIndex((i) => i.kind !== 'checkout');
+  // Open on the first STOCK destination — ▼ is pressed to go shopping, so the
+  // non-shelf entries at the head of the row (counter, 2D mode) are stepped to
+  // deliberately, never landed on.
+  const firstStock = rows[0].findIndex((i) => i.kind !== 'checkout' && i.kind !== 'flat-mode');
   scene.subNav = { rows, row: 0, sel: [Math.max(0, firstStock), 0], ret: captureBrowseReturn(scene) };
   applyRow(scene, scene.subNav);
   retailAudio.playKeyClick();
@@ -364,6 +384,15 @@ export function subNavSelect(scene: StoreScene): boolean {
   if (!item) return closeSubNav(scene, true);
   closeSubNav(scene, false);
   retailAudio.playKeyClick();
+
+  if (item.kind === 'flat-mode') {
+    // Hands off to the same power-menu action the overview cursor confirms
+    // into; the store is about to be torn down for the flat shell, so there is
+    // no camera move to make here.
+    scene.onConsoleLog('[System] Switching to 2D mode.', 'system');
+    scene.onEnterFlatMode?.();
+    return true;
+  }
 
   if (item.kind === 'checkout') {
     // Straight to the register — the same waypoint the overview's CHECKOUT
