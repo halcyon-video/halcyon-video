@@ -8,7 +8,7 @@ import * as THREE from 'three';
 import { CASE_WIDTH, CASE_HEIGHT } from './video-case';
 import { FIELD_Z_FRONT, BROWSE_WINDOW_SIZE, AISLE_SHELF_HEIGHTS, WALL_SHELF_HEIGHTS, BOX_SPACING, UNIT_FRAME_HEIGHT, unitDepthAtHeight, BACK_WALL_UNIT_IDX, extraCopiesCount, MovieSlot, STORE_CENTER_X } from './store-layout';
 import { getActiveTheme } from './themes';
-import { OVERVIEW_POS } from './scene-shared';
+import { OVERVIEW_POS, OVERVIEW_PITCH_MIN, OVERVIEW_PITCH_MAX } from './scene-shared';
 import { BB_ARCHIVO_BLACK } from './bundled-fonts';
 import type { StoreScene } from './three-scene';
 
@@ -85,8 +85,18 @@ export function updateCameraTarget(scene: StoreScene) {
 
   // T21: entrance overview — feet planted at the vantage, head-look only.
   // The look target comes from overviewYaw/Pitch and rides the same
-  // targetCameraPos/targetLookAt lerp every other mode uses.
+  // targetCameraPos/targetLookAt lerp every other mode uses. Those two angles
+  // are kept pointing at whatever the jump index has focused (aimOverviewAt
+  // below), so re-deriving the pose here always agrees with the index.
   if (scene.mode === 'overview') {
+    // …except while the index previews a floor DISPLAY (Row 2), which walks
+    // the camera off the vantage to face the fixture. The index owns the
+    // targets then; re-deriving them would snap the camera home mid-preview.
+    if (scene.subNav && scene.subNav.row === 1) {
+      scene.updateSelectionArrow();
+      scene.triggerLibrarySelectUpdate(false);
+      return;
+    }
     const p = OVERVIEW_POS;
     scene.targetCameraPos.copy(p);
     const cp = Math.cos(scene.overviewPitch);
@@ -472,6 +482,29 @@ export function updateCameraTarget(scene: StoreScene) {
   // view, #62).
   scene.updateSelectionArrow();
   scene.triggerLibrarySelectUpdate(scene.mode === 'library-select');
+}
+
+/**
+ * Turn the entrance-overview head-look toward a world point — the marker
+ * floating over whatever the jump index has focused (store-subnav.ts), or an
+ * overview cursor target.
+ *
+ * overviewYaw/overviewPitch ARE the pose for `mode === 'overview'`: every
+ * updateCameraTarget() re-derives the camera from them. So anything that moves
+ * the focus has to move these two angles, or the next unrelated retarget
+ * (a resize, a settings apply, a mode bounce) snaps the view back to a stale
+ * heading. Aims a couple of feet BELOW the marker, at the stock, so a distant
+ * run doesn't tilt the horizon up.
+ */
+export function aimOverviewAt(scene: StoreScene, x: number, y: number, z: number): void {
+  const p = OVERVIEW_POS;
+  const dx = x - p.x, dz = z - p.z;
+  // forward = (-sin yaw, sin pitch, -cos yaw) — see updateCameraTarget().
+  scene.overviewYaw = Math.atan2(-dx, -dz);
+  scene.overviewPitch = THREE.MathUtils.clamp(
+    Math.atan2((y - 2.0) - p.y, Math.hypot(dx, dz)),
+    OVERVIEW_PITCH_MIN, OVERVIEW_PITCH_MAX);
+  updateCameraTarget(scene);
 }
 
 export function createSelectionArrow(scene: StoreScene) {

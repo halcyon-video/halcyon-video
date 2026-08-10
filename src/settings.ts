@@ -651,7 +651,7 @@ export function registerCoreSettings(): void {
     default: true,
     applyMode: 'live',
     apply: (value, scene) => scene.setOverviewStart(!!value),
-    hint: 'Start inside the doors with shelf cursors. Off = cam view.',
+    hint: 'Start inside the doors on the jump index. Off = cam view.',
     hidden: true, // service knob: navigation-flow experiment (T21)
   });
 

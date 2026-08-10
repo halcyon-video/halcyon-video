@@ -1,13 +1,25 @@
-// Overview (security-cam library-select) cursor mode — extracted from
-// StoreScene (three-scene.ts keeps one-line delegating stubs): building the
-// floating cursor targets (sections, genre placards, fixtures, checkout),
-// focus stepping, the free-look, and entering browse from a cursor. Every
-// function takes the StoreScene as its first parameter and reads/writes
-// scene state exactly as the original methods did.
-import * as THREE from 'three';
+// The entrance overview — the vantage you stand at when the store is not
+// showing you a shelf. Extracted from StoreScene (three-scene.ts keeps
+// one-line delegating stubs): the target list (sections, genre placards,
+// fixtures, checkout) and entering browse from one of those targets.
+//
+// NAVIGATION LIVES IN THE JUMP INDEX (store-subnav.ts), not here. Until
+// 2026-08-09 this module also ran an arrow-stepped cursor ring with its own
+// free-look, so the store booted into one navigation layer and the index —
+// the layer that owns ▲ "look up at the store TVs", ▼ "the displays", and a
+// named list of every destination — was a press away underneath it. Two
+// answers to the same question, and the boot one landed on whichever cursor
+// happened to sit nearest the middle of the frame. The ring is gone: entering
+// the overview raises the index (showOverviewVisuals), leaving it takes the
+// index down (hideOverviewVisuals), and every arrow in this view belongs to
+// the index. What survives here is the TARGET list, which is still how a
+// query ("browse HORROR", a harness checkpoint, the search box) resolves a
+// name to a shelf.
 import { OverviewCursors, OverviewCursorTarget, NEW_RELEASES_CURSOR_LIB, CHECKOUT_CURSOR_LIB, FIXTURE_CURSOR_LIB, FLAT_MODE_CURSOR_LIB } from './overview-cursors';
 import { BROWSE_WINDOW_SIZE, AISLE_SHELF_HEIGHTS, SECTION_COLS, UNIT_SIDE_CAPACITY, BACK_WALL_UNIT_IDX, SECTION_CAPACITY, sideEntrySlot, ShelvingUnit } from './store-layout';
-import { OVERVIEW_POS, OVERVIEW_LOOK_STEP, OVERVIEW_YAW_CLAMP, OVERVIEW_PITCH_MIN, OVERVIEW_PITCH_MAX } from './scene-shared';
+import { OVERVIEW_POS } from './scene-shared';
+import { openSubNav, closeSubNav, forgetSubNav, subNavSelect } from './store-subnav';
+import { aimOverviewAt } from './store-camera';
 import { isEndcapKind } from './fixtures/genre-endcap';
 import { slottedFixtureLabel, qualifyDuplicateLabels } from './fixture-labels';
 import type { StoreScene } from './three-scene';
@@ -208,14 +220,23 @@ export function setOverviewCrosshairVisible(scene: StoreScene, v: boolean): void
 
 export function showOverviewVisuals(scene: StoreScene): void {
   // feedback/003: the per-run chevron cloud stays hidden — the single big
-  // selection arrow (shared with the seccam view) marks the focused run and
-  // ←/→ steps through runs in screen order. The cursor set is still built:
-  // it remains the target list and the confirm path for overviewEnterBrowse.
+  // selection arrow (shared with the seccam view) marks the focused
+  // destination. The cursor set is still built: it remains the target list and
+  // the confirm path for a QUERY (overviewEnterBrowse('HORROR')).
   scene.ensureOverviewCursors();
+  // The jump index IS this view's navigation (see the module header). Raising
+  // it here rather than in enterOverview() covers every way the overview comes
+  // back up — walking out of walk mode, undocking the search CRT, a settings
+  // apply — with one rule instead of one call site each.
+  if (scene.mode === 'overview') openSubNav(scene, true);
   scene.updateSelectionArrow();
 }
 
 export function hideOverviewVisuals(scene: StoreScene): void {
+  // Called on the way OUT of the overview (or while something else takes the
+  // camera): drop the index with it, or it would keep owning the arrow keys
+  // from under walk mode / the desk CRT / the back room.
+  forgetSubNav(scene);
   scene.overviewCursors?.setVisible(false);
   scene.setOverviewCrosshairVisible(false);
   // Called before scene.mode changes on the way out of the overview, so hide
@@ -223,8 +244,13 @@ export function hideOverviewVisuals(scene: StoreScene): void {
   if (scene.mode === 'overview' && scene.selectionArrow) scene.selectionArrow.visible = false;
 }
 
+/**
+ * Point the cursor set at whatever is nearest the current head-look. Only the
+ * QUERY path cares about this now (the index owns the focus the player sees),
+ * so it declines while the index is up rather than fighting it for the camera.
+ */
 export function updateOverviewFocus(scene: StoreScene): void {
-  if (!scene.overviewCursors) return;
+  if (!scene.overviewCursors || scene.subNav) return;
   const cp = Math.cos(scene.overviewPitch);
   scene._ovForward.set(
     -Math.sin(scene.overviewYaw) * cp,
@@ -240,44 +266,8 @@ export function applyOverviewFocus(scene: StoreScene, idx: number): void {
   const t = cursors.targets[idx];
   if (!t) return;
   cursors.setFocused(idx);
-  const p = OVERVIEW_POS;
-  const dx = t.x - p.x, dz = t.z - p.z;
-  // forward = (-sin yaw, sin pitch, -cos yaw) — see updateCameraTarget().
-  scene.overviewYaw = Math.atan2(-dx, -dz);
-  // Aim a couple of feet below the floating marker (at the shelves), not at
-  // the marker itself, so distant runs don't tilt the horizon up.
-  scene.overviewPitch = THREE.MathUtils.clamp(
-    Math.atan2((t.y - 2.0) - p.y, Math.hypot(dx, dz)),
-    OVERVIEW_PITCH_MIN, OVERVIEW_PITCH_MAX);
+  aimOverviewAt(scene, t.x, t.y, t.z); // also retargets the camera
   scene.updateSelectionArrow();
-  scene.updateCameraTarget();
-  scene.triggerLibrarySelectUpdate(false); // keeps the HUD locator label fresh
-}
-
-export function overviewFocusStep(scene: StoreScene, dir: number): void {
-  const cursors = scene.ensureOverviewCursors();
-  const n = cursors.targets.length;
-  if (n === 0) return;
-  const p = OVERVIEW_POS;
-  const yawOf = (i: number) => {
-    const t = cursors.targets[i];
-    return Math.atan2(-(t.x - p.x), -(t.z - p.z));
-  };
-  // Positive yaw is further LEFT, so left→right order is yaw descending.
-  const order = Array.from({ length: n }, (_, i) => i).sort((a, b) => yawOf(b) - yawOf(a));
-  const pos = order.indexOf(cursors.focusedIdx);
-  const next = pos < 0 ? (dir > 0 ? 0 : n - 1) : (pos + dir + n) % n;
-  scene.applyOverviewFocus(order[next]);
-}
-
-export function overviewLook(scene: StoreScene, dYaw: number, dPitch: number): void {
-  scene.overviewYaw = THREE.MathUtils.clamp(
-    scene.overviewYaw + dYaw * OVERVIEW_LOOK_STEP,
-    -OVERVIEW_YAW_CLAMP, OVERVIEW_YAW_CLAMP);
-  scene.overviewPitch = THREE.MathUtils.clamp(
-    scene.overviewPitch + dPitch * OVERVIEW_LOOK_STEP,
-    OVERVIEW_PITCH_MIN, OVERVIEW_PITCH_MAX);
-  scene.updateCameraTarget();
   scene.triggerLibrarySelectUpdate(false); // keeps the HUD locator label fresh
 }
 
@@ -290,16 +280,21 @@ export function enterOverview(scene: StoreScene): void {
   scene.isBrowsingNewReleasesDirectly = false;
   scene.overviewYaw = 0;
   scene.overviewPitch = 0;
-  scene.showOverviewVisuals();
-  scene.updateOverviewFocus();
+  scene.showOverviewVisuals(); // raises the jump index and aims the view at it
+  scene.updateOverviewFocus(); // no-op while the index is up (see above)
   if (scene.onModeChange) scene.onModeChange(scene.mode);
   if (scene.onGenreMenuUpdate) scene.onGenreMenuUpdate('', [], 0, false);
   scene.updateCameraTarget();
-  scene.onConsoleLog('[System] Entrance overview — ←/→ to pick a section, Enter to browse.', 'system');
+  scene.onConsoleLog(
+    '[System] Inside the store — ◄ ► pick a section, ▼ the displays, ▲ the TVs, OK to go.', 'system');
 }
 
 export function overviewEnterBrowse(scene: StoreScene, query?: string): boolean {
   if (scene.mode !== 'overview') return false;
+  // No name given: "go where the player is pointing" — which is the jump
+  // index's focus, the only focus this view shows.
+  if (!query && scene.subNav) return subNavSelect(scene);
+  if (scene.subNav) closeSubNav(scene, false); // a query overrides it
   const cursors = scene.ensureOverviewCursors();
   let idx = cursors.focusedIdx;
   if (query) {

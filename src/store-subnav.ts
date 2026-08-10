@@ -1,8 +1,18 @@
-// The SUB-NAV JUMP INDEX — ▼ from the pulled-back shelf-select views, i.e.
-// the framing you boot into (see store-nav.ts moveDown). It opened from the
-// BOTTOM SHELF ROW until 2026-08-06, when the owner moved it: a jump menu
-// belongs on the view where you are already choosing where to go, not one
-// press off the floor in the middle of browsing a run.
+// The JUMP INDEX — the store's ONE navigation layer, and what you are in the
+// moment the doors close behind you.
+//
+// It opened from the BOTTOM SHELF ROW until 2026-08-06, when the owner moved it
+// onto the pulled-back "choose where to go" views (a jump menu belongs where
+// you are already choosing a destination, not one press off the floor in the
+// middle of a run). It became the ROOT itself on 2026-08-09: the entrance
+// overview used to boot with its own arrow-stepped cursor ring, so you landed
+// in one navigation mode and had to press ▼ to reach the real one — two layers
+// answering the same question, with ▲ (look up at the store TVs) live in only
+// one of them. The cursor ring is gone; store-overview.ts's showOverviewVisuals
+// opens this index as the overview's nav layer, and it stays open for as long
+// as that view is up. `root: true` marks that instance: Back does not close it
+// (there is nothing underneath), and its focus is remembered across a trip into
+// an aisle so backing out returns the marker to where you left it.
 //
 // Two rows, both driven by ←/→ with ▲/▼ switching between them. There is no
 // DOM for this (owner call: the indexes are logical, not chrome) — the
@@ -12,9 +22,12 @@
 // branch). One marker over the focused destination, exactly as feedback/003
 // settled it — never a cloud of per-target signs.
 //
-//   Row 1  LIBRARIES & GENRES — every library in store order, then the New
-//          Releases wall, then the genre sections that PHYSICALLY exist as
-//          shelf sections. Genre → location is resolved through the same
+//   Row 1  LIBRARIES & GENRES — the checkout counter, every library, the New
+//          Releases wall, and the genre sections that PHYSICALLY exist as
+//          shelf sections, all in ONE left-to-right run across the store as
+//          seen from the vantage (sortByScreenOrder). ◄ and ► move the marker
+//          left and right through the room, never through a list order the
+//          room can't show you. Genre → location is resolved through the same
 //          StorePlan data the overview's genre cursors use
 //          (StoreScene.genreCursorTargets → layout.sectionLabels +
 //          entryBlockOrder), so a section is listed only when the plan can
@@ -27,10 +40,11 @@
 //          gondolas. Moving the highlight GLIDES the camera to face that
 //          fixture, so stepping the row is literally walking the displays.
 //
-// The user never leaves browse mode: the cursor is untouched while the index
-// is open, the full return state is snapshotted on open, and Back restores it
-// exactly (browse stays the escape floor — backAction's clamp is unaffected
-// because closing the index swallows that one press).
+// Opened from browse (not the case today, but the open/close contract is
+// unchanged): the cursor is untouched while the index is up, the full return
+// state is snapshotted on open, and Back restores it exactly. At the ROOT
+// there is no such return — Back declines here and store-nav.ts's
+// navOverlayBack hands the press to backAction's own floor clamp.
 //
 // ▲ from Row 1 no longer closes the index (2026-08-06, pin 051): it opens the
 // ceiling-TV peek instead (store-tv-peek.ts) — subNavUp here just declines
@@ -48,6 +62,7 @@ import {
   enterEndcapCursor, enterFixtureCursor, enterShelfCursor,
 } from './browse-cursor';
 import { OVERVIEW_POS } from './scene-shared';
+import { aimOverviewAt } from './store-camera';
 import { isEndcapKind } from './fixtures/genre-endcap';
 import { slottedFixtureLabel, qualifyDuplicateLabels } from './fixture-labels';
 import { retailAudio } from './audio';
@@ -79,7 +94,12 @@ export interface SubNavState {
   row: number;
   sel: number[];
   ret: BrowseReturn;
+  /** The store's root nav layer (opened with the entrance overview itself). */
+  root: boolean;
 }
+
+/** Where the ROOT index's marker was when you last left it (label, per row). */
+export interface SubNavFocusMemory { row: number; label: string; }
 
 // Shelf-row markers float at the overview cursor's height (just above the
 // signboards); fixture markers hover over their own topper instead — a
@@ -101,7 +121,14 @@ const WALKUP_EYE_Y = 5.2;
 const SUBNAV_GLIDE_LERP = 0.35;
 
 export function subNavActive(scene: StoreScene): boolean {
-  return scene.subNav !== null;
+  const state = scene.subNav;
+  if (!state) return false;
+  // The root index belongs to the entrance view and comes down with it
+  // (store-overview.ts hideOverviewVisuals). If the mode moved on some other
+  // way, it is stale — drop it here rather than let a dead index keep eating
+  // the arrow keys in a mode that has its own use for them.
+  if (state.root && scene.mode !== 'overview') { forgetSubNav(scene); return false; }
+  return true;
 }
 
 // ─── Row contents ────────────────────────────────────────────────────────────
@@ -111,6 +138,25 @@ function shelfItem(
   side: 'front' | 'back', col: number, x: number, y: number, z: number,
 ): SubNavItem {
   return { label: label.toUpperCase(), kind, libraryIdx, unitIdxInLibrary, side, col, fixtureIdx: -1, x, y, z, yaw: 0, lookY: 3 };
+}
+
+/**
+ * Put a row in the order the player SEES it: left to right across the store
+ * from the entrance vantage.
+ *
+ * ◄ / ► are a direction in the room, not a step through a list — an index
+ * whose rows ran in build order (all the libraries, then the New Releases
+ * wall, then every genre section) sent the marker leaping from the far right
+ * of the store back to an aisle you already walked past. Ordering by bearing
+ * from the vantage is what the entrance overview's own cursor ring did before
+ * the index replaced it, and it is the property that makes the marker's travel
+ * match the key you pressed. Positive yaw is further LEFT, so left→right is
+ * yaw DESCENDING.
+ */
+function sortByScreenOrder(items: SubNavItem[]): void {
+  const p = OVERVIEW_POS;
+  const yawOf = (i: SubNavItem) => Math.atan2(-(i.x - p.x), -(i.z - p.z));
+  items.sort((a, b) => yawOf(b) - yawOf(a));
 }
 
 /**
@@ -131,17 +177,18 @@ function declutter(items: SubNavItem[]): void {
 }
 
 /**
- * Row 1: the checkout counter, libraries in store order, the New Releases
- * wall, then genre sections.
+ * Row 1: the checkout counter, every library, the New Releases wall and the
+ * genre sections — sorted into one left-to-right sweep of the room.
  *
- * The counter leads because it is the one destination that is not stock: it is
- * where you pay, where the clerk stands, and — through Left at the counter —
+ * The counter is here because it is the one destination that is not stock: it
+ * is where you pay, where the clerk stands, and — through Left at the counter —
  * the ONLY way into the manager terminal, i.e. every setting the app has. The
  * index listed every library, genre and display but not the counter, so a
  * player navigating by the index (the whole point of the index) could reach
  * every shelf in the building and never the register or the settings behind
- * it. The entrance overview's own CHECKOUT cursor was the sole route, several
- * arrow presses deep in a ring of aisle tickets.
+ * it. It used to LEAD the row for that reason; now it simply sits where it
+ * stands in the store, which is easier to find, not harder — you point at the
+ * counter by looking at the counter.
  */
 function buildLibraryRow(scene: StoreScene): SubNavItem[] {
   const out: SubNavItem[] = [];
@@ -195,11 +242,12 @@ function buildLibraryRow(scene: StoreScene): SubNavItem[] {
       11.0, 8.6, scene.backWallZ + 3.0)); // wall shelving is taller than gondolas
   }
   const row = out.concat(genres);
+  sortByScreenOrder(row);
   declutter(row);
   return row;
 }
 
-/** Row 2: every slotted floor fixture, ordered front of store → back. */
+/** Row 2: every slotted floor fixture, in the same left-to-right sweep. */
 function buildDisplayRow(scene: StoreScene): SubNavItem[] {
   const out: SubNavItem[] = [];
   scene.slottedFixtures.forEach((f, fixtureIdx) => {
@@ -222,9 +270,10 @@ function buildDisplayRow(scene: StoreScene): SubNavItem[] {
       lookY: heights.length > 0 ? (heights[0] + heights[heights.length - 1]) / 2 + 0.4 : 3.0,
     });
   });
-  // Front of the store first, so stepping right walks deeper in — then number
-  // any repeated titles in that same stepping order.
-  out.sort((a, b) => (b.z - a.z) || (a.x - b.x));
+  // Left to right, like Row 1 (it used to run front-of-store → back, so ►
+  // walked you deeper in rather than sideways) — then number any repeated
+  // titles in that same stepping order.
+  sortByScreenOrder(out);
   qualifyDuplicateLabels(out, (it) => scene.slottedFixtures[it.fixtureIdx]);
   declutter(out);
   return out;
@@ -246,11 +295,19 @@ function previewCurrent(scene: StoreScene, state: SubNavState): void {
   if (state.row === 1) {
     faceFixture(scene, item, PREVIEW_DIST, PREVIEW_EYE_Y);
     scene.targetLookAt.y = item.y + PREVIEW_LOOK_LIFT; // frame marker AND stock
+  } else if (scene.mode === 'overview') {
+    // At the overview the head-look angles ARE the camera pose, so pan by
+    // aiming them (store-camera.ts aimOverviewAt) rather than by writing the
+    // targets directly — anything that retargets the camera later then still
+    // finds the view pointing at the focused destination.
+    aimOverviewAt(scene, item.x, item.y, item.z);
+    scene.cameraGlideLerp = SUBNAV_GLIDE_LERP;
+    scene.requestRender();
   } else {
-    // Row 1 reads from the entrance overview's vantage — the viewpoint the
+    // Opened over some other view (the seccam library-select root): read Row 1
+    // from the entrance vantage anyway — that is the viewpoint the
     // arrow-over-the-run framing is designed for (from a browse pose two feet
-    // off the shelf the far destinations are unreadable). Stepping the row
-    // pans the look marker-to-marker while the camera holds that vantage.
+    // off the shelf the far destinations are unreadable).
     scene.targetCameraPos.copy(OVERVIEW_POS);
     scene.targetLookAt.set(item.x, item.y, item.z);
     scene.cameraGlideLerp = SUBNAV_GLIDE_LERP;
@@ -262,26 +319,47 @@ function previewCurrent(scene: StoreScene, state: SubNavState): void {
 function applyRow(scene: StoreScene, state: SubNavState): void {
   scene.updateSelectionArrow(); // reads scene.subNav — the while-open branch
   previewCurrent(scene, state);
+  // The root index outlives any one trip into an aisle: remember where its
+  // marker was so backing out of a shelf puts it back, instead of resetting to
+  // the far end of the store every time.
+  const item = state.rows[state.row][state.sel[state.row]];
+  if (state.root && item) scene.subNavRootFocus = { row: state.row, label: item.label };
 }
 
 // ─── Open / close ────────────────────────────────────────────────────────────
 
-/** ▼ in the shelf-select views. Always handled (the index always has Row 1). */
-export function openSubNav(scene: StoreScene): boolean {
+/**
+ * Open the index. `root` marks the store's own nav layer — the one
+ * store-overview.ts raises with the entrance view and never takes down (see
+ * the module header). Always handled: the index always has Row 1.
+ */
+export function openSubNav(scene: StoreScene, root = false): boolean {
   if (scene.subNav) return true;
   const rows = [buildLibraryRow(scene), buildDisplayRow(scene)];
-  // Open on the first STOCK destination, not on the counter that now leads
-  // Row 1: ▼ is pressed to go shopping, and swinging the camera to the
-  // register every time would be a jarring default. The counter sits one ◀
-  // from here (the row wraps), which is the whole point of putting it first —
-  // it is the immediate neighbour of the landing selection, and you see it
-  // labelled the moment you step that way.
-  // Open on the first STOCK destination — ▼ is pressed to go shopping, so the
-  // non-shelf entries at the head of the row (counter, 2D mode) are stepped to
-  // deliberately, never landed on.
+  // Land on the player's FIRST LIBRARY. This is where they are standing when
+  // the store finishes loading, so it has to be a place they meant to go — a
+  // library of their own, named on the marker, and the same one every time.
+  // Not "the first entry in the row", which after the spatial sort is whatever
+  // happens to stand at the left edge of the room (a genre placard, the
+  // counter), and not the old overview cursor ring's pick, which was whichever
+  // marker landed nearest the middle of the frame — routinely a bargain bin.
+  const libraryItems = rows[0].filter((i) => i.kind === 'library');
+  const firstLibrary = libraryItems.length
+    ? rows[0].indexOf(libraryItems.reduce((a, b) => (b.libraryIdx < a.libraryIdx ? b : a)))
+    : -1;
   const firstStock = rows[0].findIndex((i) => i.kind !== 'checkout' && i.kind !== 'flat-mode');
-  scene.subNav = { rows, row: 0, sel: [Math.max(0, firstStock), 0], ret: captureBrowseReturn(scene) };
-  applyRow(scene, scene.subNav);
+  const landing = firstLibrary >= 0 ? firstLibrary : firstStock;
+  const state: SubNavState = {
+    rows, row: 0, sel: [Math.max(0, landing), 0], ret: captureBrowseReturn(scene), root,
+  };
+  // Coming back out of an aisle: pick up where the marker was left.
+  const mem = root ? scene.subNavRootFocus : null;
+  if (mem) {
+    const i = rows[mem.row]?.findIndex((it) => it.label === mem.label) ?? -1;
+    if (i >= 0) { state.row = mem.row; state.sel[mem.row] = i; }
+  }
+  scene.subNav = state;
+  applyRow(scene, state);
   retailAudio.playKeyClick();
   scene.onConsoleLog(
     `[System] Jump index — ${rows[0].length} counter/libraries/genres, ${rows[1].length} displays.`, 'system');
@@ -310,7 +388,7 @@ export function forgetSubNav(scene: StoreScene): void {
 
 /** ←/→ inside the active row (wraps — a remote has no way to "scroll faster"). */
 export function subNavArrow(scene: StoreScene, dir: number): boolean {
-  const state = scene.subNav;
+  const state = subNavActive(scene) ? scene.subNav! : null;
   if (!state) return false;
   const items = state.rows[state.row];
   if (items.length > 0) {
@@ -329,7 +407,7 @@ export function subNavArrow(scene: StoreScene, dir: number): boolean {
  * only where the build has no ambient TVs to peek at.
  */
 export function subNavUp(scene: StoreScene): boolean {
-  const state = scene.subNav;
+  const state = subNavActive(scene) ? scene.subNav! : null;
   if (!state || state.row === 0) return false;
   state.row = 0;
   applyRow(scene, state); // back to the overview vantage, arrow on the row-1 focus
@@ -345,7 +423,7 @@ export function subNavUp(scene: StoreScene): boolean {
  * the peek is up.
  */
 export function subNavRefresh(scene: StoreScene): boolean {
-  const state = scene.subNav;
+  const state = subNavActive(scene) ? scene.subNav! : null;
   if (!state) return false;
   applyRow(scene, state);
   return true;
@@ -353,7 +431,7 @@ export function subNavRefresh(scene: StoreScene): boolean {
 
 /** ▼: Row 1 → Row 2 (and swallowed on Row 2 — there is no third row). */
 export function subNavDown(scene: StoreScene): boolean {
-  const state = scene.subNav;
+  const state = subNavActive(scene) ? scene.subNav! : null;
   if (!state) return false;
   // An empty display row (bare test store) is unreachable rather than a
   // cursor-less dead zone the arrows silently rattle around in.
@@ -378,10 +456,10 @@ export function subNavDown(scene: StoreScene): boolean {
  *                                    close and leave the cursor where it was
  */
 export function subNavSelect(scene: StoreScene): boolean {
-  const state = scene.subNav;
+  const state = subNavActive(scene) ? scene.subNav! : null;
   if (!state) return false;
   const item = state.rows[state.row][state.sel[state.row]];
-  if (!item) return closeSubNav(scene, true);
+  if (!item) return subNavBack(scene) || true; // empty row: nothing to confirm
   closeSubNav(scene, false);
   retailAudio.playKeyClick();
 
@@ -443,20 +521,37 @@ export function subNavSelect(scene: StoreScene): boolean {
   return true;
 }
 
-/** Back always closes (and restores) — never falls through to backAction. */
+/**
+ * Back closes (and restores) an index opened over something.
+ *
+ * The ROOT index has nothing under it to restore, and closing it would strand
+ * the player in a view with no navigation at all — so there Back means "up one
+ * level": from the DISPLAYS row back to the sections row, and at the sections
+ * row it declines, leaving backAction's own root clamp to answer the press.
+ */
 export function subNavBack(scene: StoreScene): boolean {
+  const state = subNavActive(scene) ? scene.subNav! : null;
+  if (state?.root) {
+    if (state.row === 0) return false;
+    state.row = 0;
+    applyRow(scene, state);
+    retailAudio.playKeyClick();
+    scene.requestRender();
+    return true;
+  }
   return closeSubNav(scene, true);
 }
 
 /** Harness probe (`subnav` checkpoint). */
 export function debugSubNav(scene: StoreScene): {
-  open: boolean; row: number; sel: number[];
+  open: boolean; root: boolean; row: number; sel: number[];
   rows: string[][]; selected: string; kind: string;
 } {
   const state = scene.subNav;
   const item = state ? state.rows[state.row][state.sel[state.row]] : undefined;
   return {
     open: !!state,
+    root: !!state?.root,
     row: state?.row ?? -1,
     sel: state ? state.sel.slice() : [],
     rows: state ? state.rows.map((r) => r.map((i) => i.label)) : [],

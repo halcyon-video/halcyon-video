@@ -721,7 +721,9 @@ function updateHUDForMode(mode: string) {
       text = 'OK TO BROWSE THIS SECTION  •  BACK TO EXIT';
       break;
     case 'overview':
-      text = 'ARROWS TO LOOK  •  OK TO FLY TO A SHELF  •  BACK FOR SECTIONS';
+      // The jump index IS this view (store-subnav.ts) — say what its four
+      // directions do, since there is no free-look here to advertise any more.
+      text = '◀ ▶ PICK A SECTION  •  ▼ THE DISPLAYS  •  ▲ THE TVs  •  OK TO GO';
       break;
     case 'genre-select':
       // Genre picker is its own full overlay with its own chrome.

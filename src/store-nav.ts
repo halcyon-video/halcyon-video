@@ -566,8 +566,10 @@ export function moveUp(scene: StoreScene) {
     // Already on row 1: ▲ opens the ceiling-TV peek (store-tv-peek.ts, pin
     // 051) rather than closing the index — the index stays open underneath.
     // Where the build has no ambient TVs at all, fall back to the old
-    // close-on-▲.
+    // close-on-▲ — except at the ROOT index, which is the floor: closing it
+    // there would leave the store with no navigation layer at all.
     if (enterTvPeek(scene)) return;
+    if (scene.subNav?.root) return;
     closeSubNav(scene, true);
     return;
   }
@@ -580,7 +582,9 @@ export function moveUp(scene: StoreScene) {
     return;
   }
   if (scene.mode === 'overview') {
-    scene.overviewLook(0, 1);
+    // ▲ at the overview belongs to the index (its Row 1 opens the ceiling-TV
+    // peek); reaching here means the view came up without one — raise it.
+    scene.showOverviewVisuals();
     return;
   }
   if (scene.mode === 'library-select') {
@@ -687,6 +691,13 @@ export function wrapOverShelfTop(scene: StoreScene) {
 /** ←/→ while an overlay owns them. Returns true when the press was consumed. */
 export function navOverlayArrow(scene: StoreScene, dir: number): boolean {
   scene.requestRender();
+  // At the entrance overview the index owns ←/→ outright — there is no cursor
+  // ring behind it any more (store-overview.ts). Re-raise it if some path put
+  // us in this view without one rather than letting the press fall through to
+  // a browse cursor nobody can see.
+  if (scene.mode === 'overview' && !subNavActive(scene) && !tvPeekActive(scene)) {
+    scene.showOverviewVisuals();
+  }
   return tvPeekCycle(scene, dir) || subNavArrow(scene, dir);
 }
 
@@ -725,9 +736,16 @@ export function debugNavOverlay(scene: StoreScene) {
   return { peek: debugTvPeek(scene), subnav: debugSubNav(scene) };
 }
 
-/** True while the jump index is up (main.ts fades the browse HUD under it). */
+/**
+ * True while the jump index is up AS AN OVERLAY — i.e. covering some other
+ * view, which is what makes main.ts fade that view's HUD under it and gag the
+ * bare-letter shortcuts. The ROOT index (the entrance overview's own
+ * navigation) is not covering anything: it IS the view, so its HUD hint
+ * belongs on screen and `c` / `f` / `/` work there exactly as in any other
+ * base view.
+ */
 export function isSubNavOpen(scene: StoreScene): boolean {
-  return subNavActive(scene);
+  return subNavActive(scene) && !scene.subNav?.root;
 }
 
 /**
@@ -736,10 +754,12 @@ export function isSubNavOpen(scene: StoreScene): boolean {
  * `ui.isAnyOverlayOpen` (they're in-scene, not DOM), so every shortcut that
  * guards on that flag has to consult this one too, or c / f / r / x fire
  * straight through a live index and drop you at the counter (or into
- * walk-around) with the index still floating over the screen.
+ * walk-around) with the index still floating over the screen. The root index
+ * is excluded for the reason isSubNavOpen gives: it is a base view, not a
+ * layer over one.
  */
 export function isNavOverlayOpen(scene: StoreScene): boolean {
-  return subNavActive(scene) || tvPeekActive(scene);
+  return isSubNavOpen(scene) || tvPeekActive(scene);
 }
 
 export function moveSeriesEpisodeSelection(scene: StoreScene, dir: number): boolean {
@@ -783,14 +803,12 @@ export function moveDown(scene: StoreScene) {
   if (subNavDown(scene)) return;       // jump index: row 1 -> row 2
   if (scene.mode === 'backroom') return; // couch view — no vertical nav
   // ▼ IN THE SHELF-SELECT VIEWS opens the jump index (owner ruling
-  // 2026-08-06). It used to live on the bottom shelf row, one press off the
-  // floor deep inside browsing — nowhere anyone reaches for a menu. Both
-  // pulled-back "choose where to go" framings get it, since which one is home
-  // depends on the overview-start setting. Unconditional by owner's choice:
-  // ◄ ► ▲ still walk the floating cursor, and the index itself lists every
-  // library, genre and display, so nothing becomes unreachable.
+  // 2026-08-06). At the entrance overview it is already up — it IS that view's
+  // navigation now (owner ruling 2026-08-09), so ▼ there was consumed above by
+  // subNavDown on its way to the DISPLAYS row. This is the seccam
+  // library-select root (bb_overview_start=0), which still opens it on demand.
   if (scene.mode === 'overview' || scene.mode === 'library-select') {
-    openSubNav(scene);
+    openSubNav(scene, scene.mode === 'overview');
     return;
   }
   if (scene.mode === 'person-endcap') {

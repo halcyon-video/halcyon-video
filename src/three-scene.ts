@@ -3083,27 +3083,16 @@ export class StoreScene {
 
   public hideOverviewVisuals(): void { return overview.hideOverviewVisuals(this); }
 
-  // Initial focus when (re)entering the overview: pick the cursor nearest the
-  // current aim so the arrow starts on something sensible straight ahead.
-  // After that, focus is purely index-driven (overviewFocusStep) — feedback/003.
+  // Pick the cursor nearest the current aim, for the query/confirm path only —
+  // declines while the jump index is up, which at the overview is always
+  // (store-overview.ts: the index is that view's navigation).
   public updateOverviewFocus(): void { return overview.updateOverviewFocus(this); }
 
   // Focus a cursor by index: highlight it, park the big arrow over it, and
   // turn the head toward it (the camera-target lerp makes the turn a smooth pan).
   public applyOverviewFocus(idx: number): void { return overview.applyOverviewFocus(this, idx); }
 
-  // feedback/003: ←/→ walk the cursor list in screen order (left→right as seen
-  // from the vantage), wrapping at the ends. Sorting a couple dozen indices on
-  // a keypress is nothing; doing it here (not cached) keeps it correct across
-  // cursor-set rebuilds (carry-mode toggles etc.).
-  public overviewFocusStep(dir: number): void { return overview.overviewFocusStep(this, dir); }
-
-  // Arrow-key head-look (up/down only since feedback/003): tilt the view by a
-  // fixed step, clamped so you can't stare at the ceiling/floor. Key repeat
-  // (and the gamepad auto-repeat in input.ts) makes a held arrow a smooth pan.
-  public overviewLook(dYaw: number, dPitch: number): void { return overview.overviewLook(this, dYaw, dPitch); }
-
-  // Stand at the entrance-overview vantage with the shelf cursors up. The
+  // Stand at the entrance-overview vantage with the jump index up. The
   // beginning browsing point when overviewStart is on; also the harness's
   // `--state overview` target.
   public enterOverview(): void { return overview.enterOverview(this); }
@@ -3395,8 +3384,10 @@ export class StoreScene {
   // stuck (the info panel wouldn't change). The public move* wrappers advance past
   // any run of the same movie id so each keypress lands on a genuinely new title.
   // requestRender() here wakes the on-demand renderer (issue #24) for the keystroke.
-  public moveLeft() { if (this.navOverlayArrow(-1)) return; this.requestRender(); if (this.claspCursorActive) this.exitClaspCursor(); if (this.mode === 'backroom') { this.backRoomMove(-1); return; } if (this.mode === 'overview') { this.overviewFocusStep(-1); return; } if (this.mode === 'checkout') { this.onCounterTerminal?.(); return; } this.moveSkippingDuplicates('left'); }
-  public moveRight() { if (this.navOverlayArrow(1)) return; this.requestRender(); if (this.claspCursorActive) this.exitClaspCursor(); if (this.mode === 'backroom') { this.backRoomMove(1); return; } if (this.mode === 'overview') { this.overviewFocusStep(1); return; } if (this.mode === 'checkout' && this.openTipJar()) return; this.moveSkippingDuplicates('right'); }
+  // (At the entrance overview navOverlayArrow above always consumes these —
+  // the jump index owns ←/→ there, and raises itself if it somehow isn't up.)
+  public moveLeft() { if (this.navOverlayArrow(-1)) return; this.requestRender(); if (this.claspCursorActive) this.exitClaspCursor(); if (this.mode === 'backroom') { this.backRoomMove(-1); return; } if (this.mode === 'checkout') { this.onCounterTerminal?.(); return; } this.moveSkippingDuplicates('left'); }
+  public moveRight() { if (this.navOverlayArrow(1)) return; this.requestRender(); if (this.claspCursorActive) this.exitClaspCursor(); if (this.mode === 'backroom') { this.backRoomMove(1); return; } if (this.mode === 'checkout' && this.openTipJar()) return; this.moveSkippingDuplicates('right'); }
 
   /**
    * The counter's other side press: Left docks to the manager terminal, Right
@@ -3487,12 +3478,15 @@ export class StoreScene {
 
   public moveDown() { return nav.moveDown(this); }
 
-  // Browse overlays that keep mode==='browse' and own the arrow keys while up
-  // (like the clasp cursor): the ceiling-TV peek (store-tv-peek.ts, entered by
-  // ▲ past the top shelf row) and the sub-nav jump index (store-subnav.ts,
-  // opened by ▼ at the bottom row). State + delegating stubs only.
+  // Scene-driven overlays that own the arrow keys while up (like the clasp
+  // cursor): the ceiling-TV peek (store-tv-peek.ts, ▲ at the index's Row 1)
+  // and the JUMP INDEX (store-subnav.ts) — which at the entrance overview is
+  // not an overlay at all but that view's own navigation, raised with it and
+  // never taken down. State + delegating stubs only.
   public tvPeek: peek.TvPeekState | null = null;
   public subNav: subnav.SubNavState | null = null;
+  /** Where the root index's marker was left, so backing out returns to it. */
+  public subNavRootFocus: subnav.SubNavFocusMemory | null = null;
   public navOverlayArrow(dir: number): boolean { return nav.navOverlayArrow(this, dir); }
   public navOverlaySelect(): boolean { return nav.navOverlaySelect(this); }
   public navOverlayBack(): boolean { return nav.navOverlayBack(this); }
@@ -3548,9 +3542,11 @@ export class StoreScene {
     if (this.mode === 'person-endcap' && this.personEndcap) {
       return this.personEndcap.person.toUpperCase();
     }
-    // T21: at the entrance overview the locator names the focused shelf cursor.
+    // T21: at the entrance overview the locator names the focused destination
+    // — the jump index's marker, which is what the player is pointing at.
     if (this.mode === 'overview') {
-      return this.overviewCursors?.focusedLabel || 'STORE OVERVIEW';
+      return this.debugNavOverlay().subnav.selected
+        || this.overviewCursors?.focusedLabel || 'STORE OVERVIEW';
     }
     if (this.selectedLibraryIdx === this.libraries.length) {
       return "NEW RELEASES";
