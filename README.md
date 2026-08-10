@@ -494,8 +494,10 @@ prebuilt image is published from releases). Then:
 
 `--network host` is what lets WebRTC offer an address other devices can
 actually reach; if you only want in-browser use, `-p 1420:1420` on a normal
-bridge network works too. Serving through a reverse proxy or DNS name? Set
-`HALCYON_ALLOWED_HOSTS`. All the knobs are annotated in
+bridge network works too. Reaching the container by a DNS name — your NAS
+name, a reverse proxy, a custom domain — needs that name in
+`HALCYON_ALLOWED_HOSTS` (outside a container the machine's own hostname,
+`.local` name and tailnet name already work). All the knobs are annotated in
 [`docker-compose.yml`](docker-compose.yml).
 
 **HTPC / kiosk:**
