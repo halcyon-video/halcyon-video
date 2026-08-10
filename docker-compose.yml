@@ -21,10 +21,13 @@ services:
 
     environment:
       REMOTE_PLAY_SEED: /data/remote-play-seed.json
-      # Reaching the store through a DNS name (reverse proxy, NAS
-      # hostname)? vite preview answers only localhost + raw-IP Host
-      # headers by default; list yours here (comma-separated), or "all"
-      # to disable the check.
+      # The server answers to localhost, raw IPs, and the names of the
+      # machine it runs on — but in a container that means the CONTAINER's
+      # hostname, not your host's. So reaching it by a DNS name (your NAS
+      # name, a reverse proxy, a custom domain) needs that name listed
+      # here: comma-separated, a leading dot (".example.com") matches
+      # subdomains, "all" disables the check. Refused requests explain
+      # this and echo back the name they were refused under.
       # HALCYON_ALLOWED_HOSTS: halcyon.example.com
 
     volumes:

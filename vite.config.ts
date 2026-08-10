@@ -8,25 +8,92 @@ import * as path from "node:path";
 // @ts-expect-error see above
 import * as os from "node:os";
 // @ts-expect-error see above
-import { spawn } from "node:child_process";
+import { spawn, execFileSync } from "node:child_process";
+// @ts-expect-error see above
+import * as net from "node:net";
 // @ts-expect-error plain-js module, no declarations (see header note)
 import { remotePlayPlugin } from "./tools/remote-play-server.mjs";
 
 // @ts-expect-error process is a nodejs global
 const host = process.env.TAURI_DEV_HOST;
 
-// Containers / reverse proxies reach `vite preview` under a hostname vite
-// refuses by default (it answers only localhost + raw-IP Host headers, as a
-// DNS-rebinding guard). HALCYON_ALLOWED_HOSTS is a comma-separated list of
-// extra hostnames to answer; the value "all" disables the check entirely —
-// with DNS rebinding, any website a viewer visits could then reach this
-// server same-origin (including /dev-proxy), so prefer the explicit list.
-// Unset, behavior is exactly vite's default.
+// ─── Which Host headers this server answers to ────────────────────────────────
+//
+// vite answers only `localhost` and raw-IP Host headers by default, as a
+// DNS-rebinding guard. That default is why `http://192.168.1.5:1420` loads the
+// store while `http://my-htpc:1420` — the same machine, under the name people
+// actually type — dies on "Blocked request. This host is not allowed".
+//
+// So this machine's OWN names are allowed automatically: its hostname, its
+// `.local` mDNS name, and its tailnet MagicDNS name. That keeps the guard
+// doing the job it exists for — a rebinding page reaches us under the
+// ATTACKER's domain, which is still refused — while making the obvious way to
+// reach your own server work out of the box. Any OTHER name (a reverse proxy,
+// a NAS alias, a container reached by its host's name — inside a container the
+// detected name is the CONTAINER's) goes in HALCYON_ALLOWED_HOSTS: a
+// comma-separated list, where a leading dot (".example.com") matches
+// subdomains. The value "all" turns the check off entirely — any site a viewer
+// visits could then reach this server same-origin, including /dev-proxy, so
+// prefer naming the hosts.
+
+// 100.64.0.0/10, the CGNAT range tailscale hands out.
+function hasTailnetAddress(): boolean {
+  for (const addrs of Object.values(os.networkInterfaces())) {
+    for (const addr of (addrs as any[]) ?? []) {
+      if (addr.family !== "IPv4") continue;
+      const [a, b] = String(addr.address).split(".").map(Number);
+      if (a === 100 && b >= 64 && b <= 127) return true;
+    }
+  }
+  return false;
+}
+
+// This node's MagicDNS name ("nobara.tail9ff35f.ts.net"), or null. Only shells
+// out when a tailnet address is actually present, so a box without tailscale
+// pays nothing; a wedged daemon is capped at 1.5s and falls back to null
+// rather than hanging server startup.
+function tailnetHostName(): string | null {
+  if (!hasTailnetAddress()) return null;
+  try {
+    const out = execFileSync("tailscale", ["status", "--json"], {
+      timeout: 1500,
+      stdio: ["ignore", "pipe", "ignore"],
+      encoding: "utf8",
+    });
+    const name = JSON.parse(out)?.Self?.DNSName;
+    return typeof name === "string" && name ? name : null;
+  } catch {
+    return null;
+  }
+}
+
+function ownHostNames(): string[] {
+  const names = new Set<string>();
+  const add = (n: unknown) => {
+    // Host headers are case-insensitive and MagicDNS names arrive
+    // fully-qualified with a trailing dot; normalize both away.
+    const clean = String(n ?? "").trim().toLowerCase().replace(/\.$/, "");
+    if (clean && clean !== "localhost") names.add(clean);
+  };
+  const hostname = os.hostname(); // short ("nobara") or an FQDN, per system
+  add(hostname);
+  const short = hostname.split(".")[0];
+  add(short);
+  add(`${short}.local`); // mDNS/avahi — how most LANs reach a NAS or HTPC
+  add(tailnetHostName());
+  add(host); // TAURI_DEV_HOST, when set
+  return [...names];
+}
+
 // @ts-expect-error process is a nodejs global
-const previewAllowedHosts: string[] = (process.env.HALCYON_ALLOWED_HOSTS ?? "")
+const configuredHosts: string[] = (process.env.HALCYON_ALLOWED_HOSTS ?? "")
   .split(",")
   .map((h: string) => h.trim())
   .filter(Boolean);
+
+const allowedHosts: string[] | true = configuredHosts.includes("all")
+  ? true
+  : [...ownHostNames(), ...configuredHosts];
 // @ts-expect-error import.meta.dirname is a nodejs (>=21.2) global
 const feedbackDir = path.join(import.meta.dirname, "feedback");
 const MAX_FEEDBACK_BODY_BYTES = 20 * 1024 * 1024; // ~20MB: a full-res PNG dataURL + note text
@@ -355,9 +422,89 @@ function integrationProxyPlugin() {
   };
 }
 
+// Same rules vite applies to a Host header (see isHostAllowedWithoutCache):
+// raw IPs and localhost always pass, entries match exactly, and a leading dot
+// matches the domain plus its subdomains.
+function isHostAllowed(allowedHosts: string[] | true, hostHeader: unknown): boolean {
+  if (allowedHosts === true) return true;
+  const raw = String(hostHeader ?? "").trim();
+  if (!raw) return false;
+  if (/^(?:file|.+-extension):/i.test(raw)) return true;
+  if (raw[0] === "[") {
+    // Bracketed IPv6 literal, e.g. "[::1]:1420".
+    const end = raw.indexOf("]");
+    return end > 0 && net.isIP(raw.slice(1, end)) === 6;
+  }
+  const colon = raw.indexOf(":");
+  const hostname = (colon === -1 ? raw : raw.slice(0, colon)).toLowerCase();
+  if (net.isIP(hostname) === 4) return true;
+  if (hostname === "localhost" || hostname.endsWith(".localhost")) return true;
+  return allowedHosts.some((allowed: string) =>
+    allowed[0] === "."
+      ? allowed.slice(1) === hostname || hostname.endsWith(allowed)
+      : allowed === hostname
+  );
+}
+
+// vite installs its own host check AFTER every plugin middleware — on both
+// servers, since the configureServer / configurePreviewServer hook loops run
+// first — so the endpoints above have always answered whatever the Host header
+// said: the DNS-rebinding guard covered the static files and nothing else.
+// That is backwards, because the endpoints are the dangerous half. /dev-proxy
+// will fetch any URL and pass the caller's credentials through, /__play spawns
+// a player, /__feedback writes to disk, and /__remote/status hands out live
+// TURN credentials — under rebinding the attacker's page is same-origin, so
+// its custom X-Proxy-Target header never triggers the preflight that is
+// supposed to keep others out. Registering this first in `plugins` puts the
+// allow-list back in front of all of them.
+//
+// It also replaces vite's own rejection message, which tells the reader to
+// edit vite.config.js — the wrong advice here, and impossible inside the
+// container. Ours names the env var and echoes back the host that was refused.
+function hostGuardPlugin() {
+  const attach = (isPreview: boolean) => (server: any) => {
+    server.middlewares.use((req: any, res: any, next: any) => {
+      const opts = isPreview ? server.config.preview : server.config.server;
+      // Mirror vite: no check when it is disabled outright, or under https —
+      // a rebinding attacker cannot present a valid cert for the name it takes.
+      if (opts.allowedHosts === true || opts.https) return next();
+      if (isHostAllowed(opts.allowedHosts ?? [], req.headers.host)) return next();
+
+      // Echoed into a text/plain body, so the only real concern is a header
+      // stuffed with control characters or length.
+      const shown = String(req.headers.host ?? "")
+        .replace(/[^\x20-\x7e]/g, "")
+        .slice(0, 100);
+      res.statusCode = 403;
+      res.setHeader("Content-Type", "text/plain; charset=utf-8");
+      res.end(
+        `Blocked request. This host (${JSON.stringify(shown)}) is not allowed.\n\n` +
+          `Halcyon answers to localhost, raw IP addresses, and this machine's own\n` +
+          `names (hostname, <hostname>.local, tailnet name). To reach it under a\n` +
+          `different name — a reverse proxy, a NAS alias, a custom domain — name it:\n\n` +
+          `    HALCYON_ALLOWED_HOSTS=${shown.split(":")[0] || "my.example.com"} npm run serve\n\n` +
+          `Comma-separate several; a leading dot (".example.com") matches subdomains;\n` +
+          `"all" disables this check, which is only safe on a network you trust.\n`
+      );
+    });
+  };
+  return {
+    name: "halcyon-host-guard",
+    configureServer: attach(false),
+    configurePreviewServer: attach(true),
+  };
+}
+
 // https://vite.dev/config/
 export default defineConfig(async () => ({
-  plugins: [feedbackPinPlugin(), mpvPlayerPlugin(), integrationProxyPlugin(), remotePlayPlugin()],
+  plugins: [
+    // First: everything below it answers only to an allowed Host header.
+    hostGuardPlugin(),
+    feedbackPinPlugin(),
+    mpvPlayerPlugin(),
+    integrationProxyPlugin(),
+    remotePlayPlugin(),
+  ],
 
   // Two entries: index.html (the real Tauri/Jellyfin app) and harness.html
   // (the synthetic-library demo — also what the GitHub Pages deploy serves,
@@ -377,7 +524,7 @@ export default defineConfig(async () => ({
   },
 
   preview: {
-    allowedHosts: previewAllowedHosts.includes("all") ? true : previewAllowedHosts,
+    allowedHosts,
   },
 
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
@@ -389,6 +536,10 @@ export default defineConfig(async () => ({
     port: 1420,
     strictPort: true,
     host: host || "0.0.0.0",
+    // launch.sh and the systemd unit serve the store from the DEV server, so
+    // this needs the same allow-list as preview or reaching the kiosk by name
+    // fails there too.
+    allowedHosts,
     hmr: host
       ? {
           protocol: "ws",
