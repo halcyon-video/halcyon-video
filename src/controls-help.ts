@@ -57,12 +57,16 @@ const HELP_SECTIONS: HelpSection[] = [
         hint: 'Case → shelf → store view → sections. Nothing is locked.',
       },
       {
-        id: 'tvpeek', control: '▲ past the top row', action: 'Ceiling TVs',
-        hint: '◀ ▶ change what’s playing · OK jumps to its case · ▼ returns.',
+        id: 'subnav', control: '◀ ▶ in the store view', action: 'Pick a section',
+        hint: 'The marker walks the store left to right · OK flies you there.',
       },
       {
-        id: 'subnav', control: '▼ in the store view', action: 'Jump index',
-        hint: 'Sections & displays: ▼ again for displays · OK flies you there.',
+        id: 'subnavdisplays', control: '▼ in the store view', action: 'The displays',
+        hint: 'Endcaps, promo stands and bins · ▶ steps them · BACK comes up.',
+      },
+      {
+        id: 'tvpeek', control: '▲ in the store view', action: 'Ceiling TVs',
+        hint: '◀ ▶ change what’s playing · OK jumps to its case · ▼ returns.',
       },
     ],
   },

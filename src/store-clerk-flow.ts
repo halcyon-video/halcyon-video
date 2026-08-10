@@ -461,6 +461,13 @@ export function showPersonEndcap(scene: StoreScene, person: string, kind: 'actor
     shelf: scene.selectedShelf,
     col: scene.selectedCol,
     nrDirect: scene.isBrowsingNewReleasesDirectly,
+    // A case on a SLOTTED FIXTURE (staff-picks endcap, promo stand, collection
+    // cap) is identified by these two, not by the shelving indices — its
+    // unitIdx is meaningless. Restoring without them rebuilt a shelving slot
+    // key that matched nothing, so Back out of the endcap landed in `inspect`
+    // holding no movie at all.
+    unitSource: scene.selectedUnitSource,
+    fixtureId: scene.selectedFixtureId,
   };
 
   // Locate the initiating shelving unit run.
@@ -831,9 +838,20 @@ export function closePersonEndcap(scene: StoreScene, restore: boolean) {
     scene.selectedShelf = rs.shelf;
     scene.selectedCol = rs.col;
     scene.isBrowsingNewReleasesDirectly = rs.nrDirect;
+    scene.selectedUnitSource = rs.unitSource;
+    scene.selectedFixtureId = rs.fixtureId;
     scene.mode = rs.mode;
     scene.isFlipped = false; scene.heroSpine = false;
     scene.updateColsCount();
+    // The stock behind those coordinates can be gone by now — the title was
+    // dismissed or ordered while the endcap was up, or the slot was restocked.
+    // `inspect` with nothing to inspect is a dead end (a hero case with no
+    // movie, and Enter/flip acting on null), so fall back to the shelf view
+    // rather than restoring a mode the selection can no longer support.
+    if (scene.mode === 'inspect' && !scene.getSelectedMovie()) {
+      scene.mode = 'browse';
+      scene.onConsoleLog("[System] That title is no longer on the shelf.", "system");
+    }
     if (scene.onModeChange) scene.onModeChange(scene.mode);
     scene.updateCameraTarget();
     if (scene.onSelectionChange) scene.onSelectionChange(scene.getSelectedMovie());

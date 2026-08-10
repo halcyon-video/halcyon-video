@@ -15,11 +15,8 @@ measureDisplayHz();
 const isTauri = !!(window as any).__TAURI_INTERNALS__;
 function closeApp() { isTauri ? getCurrentWindow().close() : window.close(); }
 import {
-  fetchJellyfinLibrariesAndMovies,
   authenticateUser,
   validateToken,
-  fetchPublicUsers,
-  normalizeUrl,
   Movie,
   JellyfinLibrary,
   fetchFirstEpisodeOfSeries,
@@ -51,12 +48,21 @@ import {
 } from './jellyseerr';
 import { fetchGames, launchGame } from './romm';
 import { isGamesOnly, storeCatalog } from './games-only';
+import { isMembershipPickerOpen } from './membership-cards';
 import {
-  openMembershipCardPicker,
-  closeMembershipCardPicker,
-  isMembershipPickerOpen,
-  type MembershipLoginSession,
-} from './membership-cards';
+  initBootFlow,
+  showBootOverlay,
+  hideBootOverlay,
+  showLoginOrCards,
+  switchMember,
+  startDemoAndLoad,
+  checkCredentialsAndLoad,
+  setupLoginHandlers,
+  maybeOpenSetupTerminal,
+  logOutToOpeningDay,
+} from './boot-flow';
+import { setupTerminalInput } from './store-setup-flow';
+import { registerLibraryToggles } from './library-settings';
 import { getActiveTheme, applyThemeCssVars, THEMES, resolveThemeId } from './themes';
 import {
   activeMediaCutoff,
@@ -108,7 +114,7 @@ import type { CandyRow } from './fixtures/period-fixtures';
 import { getCandyDeliveryAdapter } from './candy-delivery';
 import { isDemoMode } from './demo-mode';
 import { startScreensaverAnimation, stopScreensaverAnimation } from './screensaver';
-import { buildDemoLibraries, buildDemoDiscovery, buildDemoGames, makeSyntheticEpisodes, demoPoster } from './demo-library';
+import { buildDemoDiscovery, makeSyntheticEpisodes, demoPoster } from './demo-library';
 import { EMPTY_STAFF_PICKS, loadStaffPicks, StaffPicks } from './staff-picks-loader';
 import { titleMatchKeys } from './staff-picks';
 import {
@@ -149,6 +155,11 @@ let storeComingSoon: Movie[] = [];
 let storeDiscovery: Movie[] = [];
 function refreshStoreCatalog() {
   const catalog = storeCatalog(librariesList, gameMovies);
+  // Per-library toggles (#41 Store Libraries / #39 Overhead TVs) register
+  // here — the one funnel that sees every catalog, login, demo and rebuild
+  // alike. The drawer builds its pages at open time, so late registration is
+  // enough. Synthetic games-only "libraries" are platforms, not libraries.
+  registerLibraryToggles(catalog.libraries.filter((l) => !l.games).map((l) => ({ id: l.id, name: l.name })));
   // Media Release Date pin (#42): everything premiering after the rolling
   // cutoff is absent from the store entirely. Filtered COPIES of the fetched
   // lists — clearing the pin is a rebuild, never a re-sync.
@@ -519,12 +530,16 @@ const ui = {
   // overlay — it's in-scene — but it owns the arrow keys while docked, so it
   // joins isAnyOverlayOpen to keep shelf navigation from running underneath.
   isCounterTerminalOpen: false,
+  // NEW STORE SETUP on the same CRT (#41, store-setup-flow.ts): the opening-
+  // day / failure-state terminal the empty store docks to. Same in-scene-but-
+  // owns-the-keys treatment as the manager terminal above.
+  isSetupOpen: false,
 
   /** True if any overlay is blocking main navigation */
   get isAnyOverlayOpen(): boolean {
     return this.isPowerMenuOpen || this.isSettingsDrawerOpen || this.isLoginOpen || this.isExitConfirmOpen
       || this.isVersionPickerOpen || this.isSearchOpen || this.isCandyCheckoutOpen
-      || this.isFeedbackOpen || this.isCounterTerminalOpen || isMembershipPickerOpen();
+      || this.isFeedbackOpen || this.isCounterTerminalOpen || this.isSetupOpen || isMembershipPickerOpen();
   }
 };
 
@@ -706,7 +721,9 @@ function updateHUDForMode(mode: string) {
       text = 'OK TO BROWSE THIS SECTION  •  BACK TO EXIT';
       break;
     case 'overview':
-      text = 'ARROWS TO LOOK  •  OK TO FLY TO A SHELF  •  BACK FOR SECTIONS';
+      // The jump index IS this view (store-subnav.ts) — say what its four
+      // directions do, since there is no free-look here to advertise any more.
+      text = '◀ ▶ PICK A SECTION  •  ▼ THE DISPLAYS  •  ▲ THE TVs  •  OK TO GO';
       break;
     case 'genre-select':
       // Genre picker is its own full overlay with its own chrome.
@@ -810,10 +827,22 @@ function updateBrowseHUDVisibility() {
 // buttons can't hold); the keyboard/gamepad HOLD ENTER / HOLD ▼ gestures keep
 // working and the fill bars still double as their live hold-progress meters.
 
+/**
+ * True when nothing owns the keyboard, so a bare-letter shortcut (c / r / x /
+ * f) or a hold gesture may fire. `ui.isAnyOverlayOpen` covers the DOM overlays
+ * and the two in-scene CRT terminals; `isNavOverlayOpen()` covers the
+ * scene-driven ones (▼ jump index, ceiling-TV peek) that `ui.*` cannot see.
+ * Every shortcut goes through here — checking `ui.isAnyOverlayOpen` alone is
+ * what let `c` open the checkout counter underneath a live jump index.
+ */
+function shortcutsAllowed(): boolean {
+  return !!storeScene && !ui.isAnyOverlayOpen && !ui.isPlaybackActive
+    && !ui.isScreensaverActive && !storeScene.isNavOverlayOpen();
+}
+
 /** True when nothing modal/immersive should be eating the hold shortcuts. */
 function holdHintsAllowed(): boolean {
-  return !!storeScene && !storeScene.isWalkAroundMode
-    && !ui.isAnyOverlayOpen && !ui.isPlaybackActive && !ui.isScreensaverActive;
+  return shortcutsAllowed() && !storeScene!.isWalkAroundMode;
 }
 
 /** Show/hide the pills; cheap no-op when nothing changed (called from the HUD poll). */
@@ -930,6 +959,8 @@ const GROUP_HINTS: Record<SettingGroup, string> = {
 const SUBPAGE_HINTS: Record<string, string> = {
   'Building & Storefront': 'Ceiling, corner step, walls, bulbs, storefront style.',
   'Platforms': 'Which consoles get a section on the Video Games shelf.',
+  'Store Libraries': 'Which server libraries this store carries as aisles.',
+  'Overhead TVs': 'Which libraries feed the ceiling TVs. All off = family picks.',
 };
 
 /** Build the drawer DOM for the current page. Rows are updated in place. */
@@ -1627,89 +1658,6 @@ async function finishConnectionEditsAndReload() {
   }
   settingsPendingAuthReset = false;
   setTimeout(() => location.reload(), 400);
-}
-
-// ─── Login Overlay ────────────────────────────────────────────────────────────
-
-function showLoginOverlay() {
-  if (isDemoMode) return; // the demo never logs in
-  closeMembershipCardPicker(); // defensive: idempotent if it wasn't open
-  ui.isLoginOpen = true;
-  const overlay = document.getElementById('login-overlay');
-  if (overlay) {
-    overlay.classList.add('visible');
-    
-    const envUrl = typeof import.meta.env !== 'undefined' ? import.meta.env.VITE_JELLYFIN_URL : undefined;
-    const savedUrl = localStorage.getItem('jellyfin_url') || envUrl;
-    if (savedUrl) {
-      const urlInput = document.getElementById('login-url') as HTMLInputElement;
-      if (urlInput) urlInput.value = savedUrl;
-    }
-
-    const envUser = typeof import.meta.env !== 'undefined' ? import.meta.env.VITE_JELLYFIN_USERNAME : undefined;
-    const savedUsername = localStorage.getItem('jellyfin_username') || envUser;
-    const userInput = document.getElementById('login-user') as HTMLInputElement;
-    if (userInput) {
-      if (savedUsername) userInput.value = savedUsername;
-      userInput.focus();
-    }
-
-    const envPass = typeof import.meta.env !== 'undefined' ? import.meta.env.VITE_JELLYFIN_PASSWORD : undefined;
-    const passInput = document.getElementById('login-pass') as HTMLInputElement;
-    if (passInput && envPass) {
-      passInput.value = envPass;
-    }
-
-    // Jellyseerr (optional) -- same persistence mechanism as the Jellyfin
-    // fields above, just two extra fields that stay blank when unused.
-    const envJellyseerrUrl = typeof import.meta.env !== 'undefined' ? import.meta.env.VITE_JELLYSEERR_URL : undefined;
-    const savedJellyseerrUrl = localStorage.getItem('jellyseerr_url') || envJellyseerrUrl;
-    const jellyseerrUrlInput = document.getElementById('login-jellyseerr-url') as HTMLInputElement;
-    if (jellyseerrUrlInput) jellyseerrUrlInput.value = savedJellyseerrUrl || '';
-
-    const envJellyseerrKey = typeof import.meta.env !== 'undefined' ? import.meta.env.VITE_JELLYSEERR_APIKEY : undefined;
-    const savedJellyseerrKey = localStorage.getItem('jellyseerr_apikey') || envJellyseerrKey;
-    const jellyseerrKeyInput = document.getElementById('login-jellyseerr-key') as HTMLInputElement;
-    if (jellyseerrKeyInput) jellyseerrKeyInput.value = savedJellyseerrKey || '';
-
-    // T18: Romm (optional) -- same prefill treatment as Jellyseerr. Column
-    // stays hidden (values still prefilled, just not shown) unless the Video
-    // Games section is switched on in Settings, so opting in still requires a
-    // deliberate settings-drawer toggle before Romm creds are even offered.
-    const envRommUrl = typeof import.meta.env !== 'undefined' ? import.meta.env.VITE_ROMM_URL : undefined;
-    const envRommKey = typeof import.meta.env !== 'undefined' ? import.meta.env.VITE_ROMM_APIKEY : undefined;
-    const rommUrlInput = document.getElementById('login-romm-url') as HTMLInputElement | null;
-    if (rommUrlInput) rommUrlInput.value = localStorage.getItem('romm_url') || envRommUrl || '';
-    const rommKeyInput = document.getElementById('login-romm-key') as HTMLInputElement | null;
-    if (rommKeyInput) rommKeyInput.value = localStorage.getItem('romm_apikey') || envRommKey || '';
-    const rommColumn = document.getElementById('login-romm-column');
-    if (rommColumn) rommColumn.style.display = getSetting<boolean>('bb_games_enabled') ? '' : 'none';
-  }
-}
-
-function hideLoginOverlay() {
-  ui.isLoginOpen = false;
-  const overlay = document.getElementById('login-overlay');
-  if (overlay) {
-    overlay.classList.remove('visible');
-  }
-}
-
-function hideBootOverlay() {
-  const overlay = document.getElementById('boot-overlay');
-  if (overlay) {
-    overlay.classList.remove('visible');
-  }
-}
-
-// Re-shown after a manual login (the boot overlay is only up by default on the
-// very first paint) so the scene has somewhere opaque to load behind while its
-// textures stream in.
-function showBootOverlay() {
-  const overlay = document.getElementById('boot-overlay');
-  if (overlay) {
-    overlay.classList.add('visible');
-  }
 }
 
 // ─── Feedback Pin (F8) ────────────────────────────────────────────────────────
@@ -2644,6 +2592,7 @@ async function initializeStoreScene(preservePosterCache = false) {
 
     // Left at the checkout counter reaches for the clerk's terminal.
     scene.onCounterTerminal = () => counterTerminalOpen();
+    scene.onOpenSearch = () => { void openSearch(); };
     scene.onEnterFlatMode = () => executePowerMenuAction('btn-flat-mode');
 
     // Library-select (end-cap) left/right nav arrows on the floating locator.
@@ -2705,6 +2654,11 @@ async function initializeStoreScene(preservePosterCache = false) {
       storeScene = scene;
       (window as any).storeScene = storeScene;
       (window as any).librariesList = storeLibraries;
+      // Which overlay owns the keyboard, as the app itself sees it. Several
+      // of these (search, the two in-scene CRT terminals) have no DOM tell, so
+      // a black-box reader can only guess at them; exposing the real object
+      // lets the nav-state verifier assert on the actual input owner.
+      (window as any).__uiState = ui;
 
       // Re-apply the user's explicit live preferences (outside mode, library
       // view) to the fresh scene so a rebuild preserves them.
@@ -2722,6 +2676,9 @@ async function initializeStoreScene(preservePosterCache = false) {
       aisleIndicatorInterval = window.setInterval(updateBrowseHUDVisibility, 200);
 
       logToConsole('[System] All textures loaded. Store ready.', 'system');
+      // Opening day (#41): dock the counter CRT's NEW STORE SETUP before the
+      // overlay drops, so the player wakes already at the terminal.
+      maybeOpenSetupTerminal();
       hideBootOverlay();
       // You've just come in through the doors — ring the entry chime. (May stay
       // silent if the browser hasn't seen a user gesture yet; that's fine.)
@@ -2783,419 +2740,10 @@ async function waitForFontsAndInit() {
 }
 
 // ─── Credentials / Boot ───────────────────────────────────────────────────────
+// The whole boot/credentials flow lives in boot-flow.ts (extracted at the
+// line-budget ceiling, #41 prerequisite); main.ts hands it state setters and
+// loaders through initBootFlow() inside main() below.
 
-/**
- * Shared "we're authenticated, now go load the store" tail used by both the
- * classic login form and the membership card picker (T17). Never stores a
- * password -- only the resulting session token/userid.
- */
-async function finishLoginAndLaunch(urlInput: string, session: MembershipLoginSession) {
-  logToConsole(`[System] Authenticated successfully as ${session.userName}.`, 'system');
-  localStorage.setItem('jellyfin_url', urlInput);
-  localStorage.setItem('jellyfin_token', session.accessToken);
-  localStorage.setItem('jellyfin_userid', session.userId);
-  localStorage.setItem('jellyfin_last_userid', session.userId); // remembered for next boot's card highlight
-
-  logToConsole('[System] Downloading movie libraries and catalog metadata...', 'system');
-  // Stall watchdog, not a deadline — see the auto-login path for why a fixed
-  // cap on total sync duration is unsurvivable for a large enough library.
-  const LOGIN_STALL_MS = 45_000;
-  let loginStallTimer: ReturnType<typeof setTimeout> | null = null;
-  let onLoginStall: (() => void) | null = null;
-  const armLoginStall = () => {
-    if (loginStallTimer) clearTimeout(loginStallTimer);
-    loginStallTimer = setTimeout(() => onLoginStall?.(), LOGIN_STALL_MS);
-  };
-  const loginTimeout = new Promise<never>((_, reject) => {
-    onLoginStall = () => reject(new Error(`No response from Jellyfin for ${LOGIN_STALL_MS / 1000}s`));
-    armLoginStall();
-  });
-  try {
-    [librariesList] = await Promise.all([
-      Promise.race([
-        fetchJellyfinLibrariesAndMovies(urlInput, session.accessToken, session.userId, armLoginStall),
-        loginTimeout
-      ]),
-      loadComingSoonMovies(),
-      loadDiscoveryMovies(),
-      loadGameMovies()
-    ]);
-  } finally {
-    if (loginStallTimer) clearTimeout(loginStallTimer);
-  }
-  const gapCount = await mergeCollectionGaps(librariesList);
-  const totalMoviesCount = librariesList.reduce((acc, lib) => acc + lib.movies.length, 0);
-
-  logToConsole(`[System] Loaded ${librariesList.length} libraries (${totalMoviesCount} titles total). Launching store...`, 'system');
-  await logJellyseerrStatus(gapCount);
-  if (gameMovies.length > 0) {
-    logToConsole(`[System] Romm: ${gameMovies.length} game(s) loaded for the Video Games section.`, 'system');
-  }
-  hideLoginOverlay();
-  // Bring the boot overlay back up as an opaque loading screen -- it stays
-  // visible (see initializeStoreScene) until every cover texture has loaded.
-  showBootOverlay();
-  waitForFontsAndInit();
-}
-
-/**
- * Boot/re-login entry point (T17): if we know a server URL, try its public
- * user list first and show the fanned membership-card picker; only fall back
- * to the classic single-login form if the server has no saved URL yet, the
- * public user list is disabled, or it comes back empty (single-user server).
- */
-async function showLoginOrCards(reason?: string) {
-  if (isDemoMode) return; // the demo never logs in
-  const savedUrl = localStorage.getItem('jellyfin_url');
-  if (savedUrl) {
-    try {
-      const users = await fetchPublicUsers(savedUrl);
-      if (users.length > 0) {
-        if (reason) logToConsole(`[System] ${reason}`, 'system');
-        logToConsole(`[System] Found ${users.length} membership card(s) on ${savedUrl}.`, 'system');
-        openMembershipCardPicker({
-          serverUrl: savedUrl,
-          users,
-          lastUserId: localStorage.getItem('jellyfin_last_userid'),
-          onLogin: (session) => finishLoginAndLaunch(savedUrl, session),
-          onManualLogin: () => abortBootToLogin(reason),
-          onDemoMode: () => {
-            hideLoginOverlay();
-            closeMembershipCardPicker();
-            showBootOverlay();
-            startDemoAndLoad();
-          },
-          log: (msg) => logToConsole(msg, 'system'),
-        });
-        return;
-      }
-    } catch (e: any) {
-      logToConsole(`[System] Public user list unavailable (${e?.message ?? e}); falling back to login form.`, 'system');
-    }
-  }
-  abortBootToLogin(reason);
-}
-
-/**
- * "Switch Member" affordance (T17), reachable from the settings drawer:
- * tears down the current session/scene (like logging out) but keeps the
- * server URL, then re-shows the membership card picker so another
- * household member can pick their own card without re-typing the server.
- */
-function switchMember() {
-  logToConsole('[System] Switching membership card...', 'system');
-  localStorage.removeItem('jellyfin_token');
-  localStorage.removeItem('jellyfin_userid');
-
-  if (storeScene) {
-    storeScene.destroy();
-    storeScene = null;
-  }
-  if (aisleIndicatorInterval !== null) {
-    clearInterval(aisleIndicatorInterval);
-    aisleIndicatorInterval = null;
-  }
-  updateMovieHUD(null);
-  void showLoginOrCards();
-}
-
-function abortBootToLogin(reason?: string) {
-  hideBootOverlay();
-  showLoginOverlay();
-  if (reason) {
-    const errorMsg = document.getElementById('login-error-msg') as HTMLDivElement;
-    const submitBtn = document.getElementById('btn-login-submit') as HTMLButtonElement;
-    if (submitBtn) { submitBtn.disabled = false; submitBtn.innerText = 'Connect & Sync'; }
-    if (errorMsg) { errorMsg.style.color = 'red'; errorMsg.innerText = reason; }
-  }
-}
-
-/**
- * Demo-mode boot (see src/demo-mode.ts): no credential gate, no Jellyfin
- * fetch, no login overlay ever — stock the store from the synthetic demo
- * library and hand off to the normal texture-gated reveal.
- */
-function startDemoAndLoad() {
-  // First visit defaults to daytime out the windows (the scene otherwise
-  // rolls day/night 50/50 per boot); user-changeable in Store Look after.
-  if (!localStorage.getItem('bb_outside')) localStorage.setItem('bb_outside', 'day');
-  // The games department is off by default (bb_games_enabled, main.ts fetchGames)
-  // because it costs a RomM round-trip nobody asked for. The demo has no RomM and
-  // no round trip — buildDemoGames() is synchronous and local — so that default
-  // was buying nothing here and cost us the whole department: every visitor to
-  // the Pages demo saw a store with no VIDEO GAMES section, which is why the
-  // feature reads as missing to people who have only ever seen the demo. Opt in
-  // on first boot only, so a visitor who switches it off keeps it off.
-  if (!localStorage.getItem('bb_games_enabled')) localStorage.setItem('bb_games_enabled', '1');
-  logToConsole('[System] Demo mode: stocking the store with a placeholder library (no media server).', 'system');
-  librariesList = buildDemoLibraries(900);
-  gameMovies = buildDemoGames(60);
-  waitForFontsAndInit();
-}
-
-async function checkCredentialsAndLoad() {
-  // Security hardening: Purge any stored plaintext password
-  localStorage.removeItem('jellyfin_password');
-
-  const envUrl = (typeof import.meta.env !== 'undefined' ? import.meta.env.VITE_JELLYFIN_URL : undefined) || '';
-  const envUser = (typeof import.meta.env !== 'undefined' ? import.meta.env.VITE_JELLYFIN_USERNAME : undefined) || '';
-  const envPass = (typeof import.meta.env !== 'undefined' ? import.meta.env.VITE_JELLYFIN_PASSWORD : undefined) || '';
-
-  let jellyfinUrl = localStorage.getItem('jellyfin_url') || envUrl;
-  let token = localStorage.getItem('jellyfin_token');
-  let userId = localStorage.getItem('jellyfin_userid');
-
-  // If no saved token/userId, attempt auto-authentication using credentials stored in .env.local / env
-  if ((!token || !userId || !jellyfinUrl) && envUrl && envUser && envPass) {
-    logToConsole('[System] File credentials (.env.local) found. Authenticating automatically...', 'system');
-    try {
-      const session = await authenticateUser(envUrl, envUser, envPass);
-      localStorage.setItem('jellyfin_url', envUrl);
-      localStorage.setItem('jellyfin_username', envUser);
-      localStorage.setItem('jellyfin_token', session.accessToken);
-      localStorage.setItem('jellyfin_userid', session.userId);
-      localStorage.setItem('jellyfin_last_userid', session.userId);
-      jellyfinUrl = envUrl;
-      token = session.accessToken;
-      userId = session.userId;
-      logToConsole(`[System] Auto-authenticated successfully as ${session.userName}.`, 'system');
-
-      if (typeof import.meta.env !== 'undefined') {
-        if (import.meta.env.VITE_JELLYSEERR_URL && import.meta.env.VITE_JELLYSEERR_APIKEY) {
-          localStorage.setItem('jellyseerr_url', import.meta.env.VITE_JELLYSEERR_URL);
-          localStorage.setItem('jellyseerr_apikey', import.meta.env.VITE_JELLYSEERR_APIKEY);
-        }
-        if (import.meta.env.VITE_ROMM_URL && import.meta.env.VITE_ROMM_APIKEY) {
-          localStorage.setItem('romm_url', import.meta.env.VITE_ROMM_URL);
-          localStorage.setItem('romm_apikey', import.meta.env.VITE_ROMM_APIKEY);
-          if (!localStorage.getItem('bb_games_enabled')) {
-            localStorage.setItem('bb_games_enabled', '1');
-          }
-        }
-      }
-    } catch (err: any) {
-      logToConsole(`[System] Auto-authentication from file credentials failed: ${err?.message || err}`, 'system');
-    }
-  }
-
-  let escaped = false;
-  let retryTimeoutId: any = null;
-
-  // Any keypress or click on the boot screen skips auto-connect and goes to login.
-  const bootEscape = (e: Event) => {
-    if (e.type === 'keydown' && (e as KeyboardEvent).key === 'Tab') return; // ignore tab
-    escaped = true;
-    if (retryTimeoutId) {
-      clearTimeout(retryTimeoutId);
-      retryTimeoutId = null;
-    }
-    document.removeEventListener('keydown', bootEscape);
-    document.removeEventListener('click', bootEscape);
-    hideBootOverlay();
-    showLoginOrCards();
-  };
-  document.addEventListener('keydown', bootEscape);
-  document.addEventListener('click', bootEscape);
-
-  if (jellyfinUrl && token && userId) {
-    logToConsole('[System] Saved Jellyfin credentials found. Connecting...', 'system');
-
-    // A STALL timeout, not a deadline. This was a flat 20s cap on the whole
-    // multi-library sync, which a large enough catalog can never beat: the
-    // sync would be killed mid-flight, retried, and killed again forever, so
-    // boot never reached the store and every post-login step (collection
-    // gaps, the Jellyseerr status line, the scene itself) simply never ran.
-    // Sync duration scales with library size and is not a fault; silence is.
-    // The watchdog therefore fires only when the server has sent nothing at
-    // all for this long, and every page resets it.
-    const STALL_MS = 45_000;
-    let currentDelay = 10_000; // starts at 10s
-    const MAX_DELAY = 5 * 60 * 1000; // 5min cap
-
-    const attemptSync = async () => {
-      if (escaped) return;
-
-      const activeToken = localStorage.getItem('jellyfin_token') || token;
-      const activeUserId = localStorage.getItem('jellyfin_userid') || userId;
-
-      let stallTimer: ReturnType<typeof setTimeout> | null = null;
-      let onStall: (() => void) | null = null;
-      const armStall = () => {
-        if (stallTimer) clearTimeout(stallTimer);
-        stallTimer = setTimeout(() => onStall?.(), STALL_MS);
-      };
-      const stallPromise = new Promise<never>((_, reject) => {
-        onStall = () => reject(new Error(`No response from Jellyfin for ${STALL_MS / 1000}s`));
-        armStall();
-      });
-
-      try {
-        [librariesList] = await Promise.all([
-          Promise.race([
-            fetchJellyfinLibrariesAndMovies(jellyfinUrl, activeToken, activeUserId, armStall),
-            stallPromise
-          ]),
-          loadComingSoonMovies(),
-          loadDiscoveryMovies(),
-          loadGameMovies()
-        ]);
-        if (stallTimer) { clearTimeout(stallTimer); stallTimer = null; }
-
-        if (escaped) return;
-
-        document.removeEventListener('keydown', bootEscape);
-        document.removeEventListener('click', bootEscape);
-        if (retryTimeoutId) {
-          clearTimeout(retryTimeoutId);
-          retryTimeoutId = null;
-        }
-
-        const gapCount = await mergeCollectionGaps(librariesList);
-        const totalMoviesCount = librariesList.reduce((acc, lib) => acc + lib.movies.length, 0);
-        logToConsole(`[System] Connected to Jellyfin. Sync'd ${librariesList.length} libraries (${totalMoviesCount} movies total).`, 'system');
-        await logJellyseerrStatus(gapCount);
-        if (gameMovies.length > 0) {
-          logToConsole(`[System] Romm: ${gameMovies.length} game(s) loaded for the Video Games section.`, 'system');
-        }
-
-        hideLoginOverlay(); // in case user clicked to dismiss boot screen
-        closeMembershipCardPicker();
-        // Boot overlay stays up (see waitForFontsAndInit/initializeStoreScene) until
-        // every cover texture has loaded, so the store is never revealed mid-load.
-        waitForFontsAndInit();
-      } catch (err: any) {
-        if (stallTimer) { clearTimeout(stallTimer); stallTimer = null; }
-        if (escaped) return;
-
-        const msg = err?.message ?? (typeof err === 'string' ? err : String(err));
-        logToConsole(`[System] Auto-login failed: ${msg}. Retrying in ${currentDelay / 1000}s...`, 'system');
-
-        retryTimeoutId = setTimeout(async () => {
-          if (escaped) return;
-
-          // Before each retry, check if cached token fails validation. If so, attempt to re-auth from cached credentials.
-          const freshToken = localStorage.getItem('jellyfin_token') || token;
-          try {
-            const isValid = await validateToken(jellyfinUrl, freshToken);
-            if (!isValid) {
-              const user = localStorage.getItem('jellyfin_username') || envUser;
-              const pass = localStorage.getItem('jellyfin_password') || envPass;
-              if (user && pass && jellyfinUrl) {
-                logToConsole('[System] Jellyfin token stale — re-authenticating...', 'system');
-                const session = await authenticateUser(jellyfinUrl, user, pass);
-                localStorage.setItem('jellyfin_token', session.accessToken);
-                localStorage.setItem('jellyfin_userid', session.userId);
-                logToConsole('[System] Re-auth OK.', 'system');
-              }
-            }
-          } catch (e: any) {
-            logToConsole(`[System] Silent re-auth check failed: ${e.message || e}`, 'system');
-          }
-
-          // Double the delay for exponential backoff up to the cap
-          const nextDelay = Math.min(currentDelay * 2, MAX_DELAY);
-          currentDelay = nextDelay;
-
-          attemptSync();
-        }, currentDelay);
-      }
-    };
-
-    attemptSync();
-  } else {
-    logToConsole('[System] No saved credentials. Showing Login screen.', 'system');
-    document.removeEventListener('keydown', bootEscape);
-    document.removeEventListener('click', bootEscape);
-    setTimeout(() => { hideBootOverlay(); showLoginOrCards(); }, 500);
-  }
-}
-
-function setupLoginHandlers() {
-  const form = document.getElementById('login-form') as HTMLFormElement;
-  const errorMsg = document.getElementById('login-error-msg') as HTMLDivElement;
-
-  const demoBtn = document.getElementById('btn-demo-submit') as HTMLButtonElement | null;
-  if (demoBtn) {
-    demoBtn.addEventListener('click', () => {
-      hideLoginOverlay();
-      closeMembershipCardPicker();
-      showBootOverlay();
-      startDemoAndLoad();
-    });
-  }
-
-  if (form) {
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      if (errorMsg) errorMsg.innerText = '';
-      
-      const submitBtn = document.getElementById('btn-login-submit') as HTMLButtonElement;
-      if (submitBtn) {
-        submitBtn.disabled = true;
-        submitBtn.innerText = 'Connecting...';
-      }
-
-      const rawUrl = (document.getElementById('login-url') as HTMLInputElement).value.trim();
-      const urlInput = normalizeUrl(rawUrl);
-      const userInput = (document.getElementById('login-user') as HTMLInputElement).value.trim();
-      const passInput = (document.getElementById('login-pass') as HTMLInputElement).value;
-      // Jellyseerr is entirely optional -- both fields are blank by default and
-      // saving an empty value clears any previously-saved config, so leaving
-      // them blank silently disables the coming-soon feature.
-      const jellyseerrUrlEl = document.getElementById('login-jellyseerr-url') as HTMLInputElement | null;
-      const jellyseerrKeyEl = document.getElementById('login-jellyseerr-key') as HTMLInputElement | null;
-      const jellyseerrUrlInput = jellyseerrUrlEl?.value.trim() ?? '';
-      const jellyseerrKeyInput = jellyseerrKeyEl?.value.trim() ?? '';
-
-      try {
-        logToConsole(`[System] Contacting Jellyfin server: ${urlInput}`, 'system');
-        const session = await authenticateUser(urlInput, userInput, passInput);
-
-        // Only the manual single-login form remembers username (to prefill);
-        // the password is never persisted in plaintext localStorage.
-        localStorage.setItem('jellyfin_username', userInput);
-
-        if (jellyseerrUrlInput && jellyseerrKeyInput) {
-          localStorage.setItem('jellyseerr_url', jellyseerrUrlInput);
-          localStorage.setItem('jellyseerr_apikey', jellyseerrKeyInput);
-        } else {
-          localStorage.removeItem('jellyseerr_url');
-          localStorage.removeItem('jellyseerr_apikey');
-        }
-
-        // T18: Romm (optional) -- same persistence pattern as Jellyseerr above.
-        // Both fields blank clears any saved config, disabling the game section.
-        const rommUrlInput = (document.getElementById('login-romm-url') as HTMLInputElement | null)?.value.trim() ?? '';
-        const rommKeyInput = (document.getElementById('login-romm-key') as HTMLInputElement | null)?.value.trim() ?? '';
-        if (rommUrlInput && rommKeyInput) {
-          localStorage.setItem('romm_url', rommUrlInput);
-          localStorage.setItem('romm_apikey', rommKeyInput);
-        } else {
-          localStorage.removeItem('romm_url');
-          localStorage.removeItem('romm_apikey');
-        }
-
-        await finishLoginAndLaunch(urlInput, session);
-      } catch (err: any) {
-        logToConsole(`[System] Connection error: ${err.message}`, 'system');
-        if (errorMsg) {
-          let userMsg = err.message || 'Failed to connect to Jellyfin server';
-          if (userMsg.includes('HTTP error 401')) {
-            userMsg = 'Invalid username or password.';
-          } else if (userMsg.includes('Failed to fetch') || userMsg.includes('NetworkError')) {
-            userMsg = `Unable to connect to "${urlInput}". Check the server address, CORS settings, and verify Jellyfin is online.`;
-          }
-          errorMsg.innerText = userMsg;
-        }
-      } finally {
-        if (submitBtn) {
-          submitBtn.disabled = false;
-          submitBtn.innerText = 'Connect & Sync';
-        }
-      }
-    });
-  }
-}
 
 // ─── Power Action ─────────────────────────────────────────────────────────────
 
@@ -3260,23 +2808,9 @@ async function executePowerMenuAction(btnId: string) {
 
     case 'btn-logout':
       if (isDemoMode) break; // no session in the demo (button is hidden too)
-      logToConsole('[System] Logging out and resetting Jellyfin session...', 'system');
-      localStorage.removeItem('jellyfin_url');
-      localStorage.removeItem('jellyfin_username');
-      localStorage.removeItem('jellyfin_password');
-      localStorage.removeItem('jellyfin_token');
-      localStorage.removeItem('jellyfin_userid');
-      
-      if (storeScene) {
-        storeScene.destroy();
-        storeScene = null;
-      }
-      if (aisleIndicatorInterval !== null) {
-        clearInterval(aisleIndicatorInterval);
-        aisleIndicatorInterval = null;
-      }
-      updateMovieHUD(null);
-      showLoginOverlay();
+      // #41: CHANGE SERVER / LOG OUT re-enters the empty store's NEW STORE
+      // SETUP terminal (flat mode keeps the classic login overlay).
+      logOutToOpeningDay();
       break;
 
     case 'btn-exit':
@@ -3899,6 +3433,32 @@ async function main() {
   // eagerly here just serialized it ahead of checkCredentialsAndLoad() below
   // for no benefit (flat mode never imports three-scene, so it never paid this
   // cost either way).
+  initBootFlow({
+    log: logToConsole,
+    ui,
+    scene: () => storeScene,
+    keyClick: () => retailAudio.playKeyClick(),
+    setLibraries: (libs) => { librariesList = libs; },
+    setGames: (games) => { gameMovies = games; },
+    loadComingSoon: loadComingSoonMovies,
+    loadDiscovery: loadDiscoveryMovies,
+    loadGames: loadGameMovies,
+    mergeCollectionGaps,
+    logJellyseerrStatus,
+    gameCount: () => gameMovies.length,
+    launchStore: () => { void waitForFontsAndInit(); },
+    teardownScene: () => {
+      if (storeScene) {
+        storeScene.destroy();
+        storeScene = null;
+      }
+      if (aisleIndicatorInterval !== null) {
+        clearInterval(aisleIndicatorInterval);
+        aisleIndicatorInterval = null;
+      }
+      updateMovieHUD(null);
+    },
+  });
   setupLoginHandlers();
   setupSearchInputCapture();
   
@@ -3973,6 +3533,7 @@ async function main() {
       if (isDemoMode && ui.isPlaybackActive) return; // demo PLAYBACK DISABLED card is up
       if (videoPlayer?.isOpen) { videoPlayer.navigateHorizontal(-1); return; }
       if (ui.isLoginOpen) return;
+      if (ui.isSetupOpen) { void setupTerminalInput('left'); return; }
       if (ui.isSearchOpen) return;
       if (ui.isPowerMenuOpen) return;
       if (ui.isCounterTerminalOpen) { counterTerminalInput('left'); return; }
@@ -3996,6 +3557,7 @@ async function main() {
       if (isDemoMode && ui.isPlaybackActive) return; // demo PLAYBACK DISABLED card is up
       if (videoPlayer?.isOpen) { videoPlayer.navigateHorizontal(1); return; }
       if (ui.isLoginOpen) return;
+      if (ui.isSetupOpen) { void setupTerminalInput('right'); return; }
       if (ui.isSearchOpen) return;
       if (ui.isPowerMenuOpen) return;
       // Right steps back out of the terminal to the counter — the mirror of
@@ -4022,6 +3584,7 @@ async function main() {
       if (isDemoMode && ui.isPlaybackActive) return; // demo PLAYBACK DISABLED card is up
       if (videoPlayer?.isOpen) { videoPlayer.navigateVertical(-1); return; }
       if (ui.isLoginOpen) return;
+      if (ui.isSetupOpen) { void setupTerminalInput('up'); return; }
       if (ui.isSearchOpen) return;
       if (ui.isExitConfirmOpen) return;
 
@@ -4048,6 +3611,7 @@ async function main() {
       if (isDemoMode && ui.isPlaybackActive) return; // demo PLAYBACK DISABLED card is up
       if (videoPlayer?.isOpen) { videoPlayer.navigateVertical(1); return; }
       if (ui.isLoginOpen) return;
+      if (ui.isSetupOpen) { void setupTerminalInput('down'); return; }
       if (ui.isSearchOpen) return;
       if (ui.isExitConfirmOpen) return;
 
@@ -4076,6 +3640,7 @@ async function main() {
         return;
       }
       if (ui.isLoginOpen) return;
+      if (ui.isSetupOpen) { await setupTerminalInput('ok'); return; }
 
       if (ui.isSettingsDrawerOpen) {
         activateSelectedSetting(1);
@@ -4155,6 +3720,7 @@ async function main() {
       if (isDemoMode && ui.isPlaybackActive) { closeDemoPlaybackOverlay(); return; }
       if (videoPlayer?.isOpen) { if (!videoPlayer.handleBack()) videoPlayer.requestClose(); return; }
       if (ui.isLoginOpen) return;
+      if (ui.isSetupOpen) { void setupTerminalInput('back'); return; }
 
       if (ui.isSettingsDrawerOpen) {
         // Back from a group page returns to the category index; back from the
@@ -4209,6 +3775,8 @@ async function main() {
       if (isDemoMode && ui.isPlaybackActive) { closeDemoPlaybackOverlay(); return; }
       if (videoPlayer?.isOpen) { videoPlayer.close(); return; }
       if (ui.isLoginOpen) return;
+      // No power menu over NEW STORE SETUP — there's no store behind it yet.
+      if (ui.isSetupOpen) return;
 
       if (ui.isSettingsDrawerOpen) {
         closeSettingsDrawer();
@@ -4234,15 +3802,20 @@ async function main() {
     },
     onSearch: () => {
       if (storeScene?.isWalkAroundMode) return;
-      if (ui.isLoginOpen || ui.isPlaybackActive || ui.isCandyCheckoutOpen || ui.isVersionPickerOpen) return;
-      if (ui.isSearchOpen) {
-        closeSearch();
-      } else {
-        // Close other overlays before opening search
-        if (ui.isPowerMenuOpen) closePowerMenu();
-        if (ui.isExitConfirmOpen) closeExitConfirm();
-        openSearch();
-      }
+      // / while search is up closes it, from anywhere.
+      if (ui.isSearchOpen) { closeSearch(); return; }
+      // The power menu and the exit dialog are lightweight menus that / is
+      // allowed to SUPERSEDE — close them, then open search in their place.
+      if (ui.isPowerMenuOpen) closePowerMenu();
+      if (ui.isExitConfirmOpen) closeExitConfirm();
+      // Everything else owns the keyboard and must not have search stacked on
+      // top of it: the settings drawer, the two in-scene CRT terminals (which
+      // share search's camera dock), the candy/version/membership modals, the
+      // login and setup typing sessions, playback, and the scene-driven jump
+      // index. Testing the individual flags here is what let / open a second
+      // live overlay over the settings drawer and the manager terminal.
+      if (!shortcutsAllowed()) return;
+      openSearch();
     },
     onActivity: () => {
       if (ui.isScreensaverActive) {
@@ -4270,7 +3843,8 @@ async function main() {
       // dismissable — Back is its cancel — so auto-cancel it and let the
       // saver take over. Login keeps blocking: it's a typing session.
       if (ui.isExitConfirmOpen && !ui.isPlaybackActive && !ui.isLoginOpen) closeExitConfirm();
-      if (!ui.isPlaybackActive && !ui.isScreensaverActive && !ui.isLoginOpen && !ui.isExitConfirmOpen) {
+      // NEW STORE SETUP is a typing session like login — never screensave it.
+      if (!ui.isPlaybackActive && !ui.isScreensaverActive && !ui.isLoginOpen && !ui.isSetupOpen && !ui.isExitConfirmOpen) {
         ui.isScreensaverActive = true;
         document.getElementById('screensaver-overlay')!.classList.add('visible');
         retailAudio.suspendForIdle();
@@ -4286,30 +3860,35 @@ async function main() {
       }
     },
     onToggleWalkAround: () => {
-      if (!ui.isPlaybackActive && !ui.isScreensaverActive && !ui.isLoginOpen && !ui.isExitConfirmOpen) {
-        storeScene?.toggleWalkAround();
-      }
+      // Whatever owns the keyboard also owns the camera. This used to check
+      // only playback/screensaver/login/exit-confirm, so F walked away from a
+      // docked CRT — and on opening day that was unrecoverable: NEW STORE
+      // SETUP still swallowed every key (ui.isSetupOpen), while nothing left
+      // could bring the camera back to the terminal. Same trap at the manager
+      // terminal. isAnyOverlayOpen covers all of them, plus the old four.
+      if (!shortcutsAllowed()) return;
+      storeScene?.toggleWalkAround();
     },
     // T22: carry-mode shortcuts. Both are guarded no-ops with the 'Carry &
     // checkout' toggle off (or while any overlay owns the keyboard).
     onCheckout: () => {
-      if (ui.isAnyOverlayOpen || ui.isPlaybackActive || ui.isScreensaverActive) return;
+      if (!shortcutsAllowed()) return;
       if (storeScene?.isWalkAroundMode) return;
       storeScene?.enterCheckout();
     },
     onReturnTape: () => {
-      if (ui.isAnyOverlayOpen || ui.isPlaybackActive || ui.isScreensaverActive) return;
+      if (!shortcutsAllowed()) return;
       storeScene?.returnCarriedTape();
     },
     onNotInterested: () => {
-      if (ui.isAnyOverlayOpen || ui.isPlaybackActive || ui.isScreensaverActive) return;
+      if (!shortcutsAllowed()) return;
       handleGapDismiss();
     },
     // T22: hold-select-to-checkout. While a tape is in hand (and nothing modal
     // is on top), holding Enter / gamepad A jumps straight to the counter; a
     // quick tap still performs the normal select action on release.
     isHoldSelectArmed: () => {
-      if (ui.isAnyOverlayOpen || ui.isPlaybackActive || ui.isScreensaverActive) return false;
+      if (!shortcutsAllowed()) return false;
       if (videoPlayer?.isOpen) return false;
       if (storeScene?.isWalkAroundMode) return false;
       return !!storeScene?.canHoldToCheckout();

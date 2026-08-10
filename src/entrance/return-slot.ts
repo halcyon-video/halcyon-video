@@ -42,6 +42,14 @@ import {
 const CHUTE_W = 2.4;
 const CHUTE_H = 3.85;   // just proud of the band top (3.4 + 0.14 cap)
 const CHUTE_D = 0.9;    // protrusion past the band face into the store
+// How far the body runs BACK from the band face. Mirrors counter.ts's bandD
+// (the same layout-agnostic mirroring entrance/index.ts does for BAND_H), so
+// the chute's rear wall lands flush with the inside face of the blue band
+// rather than stopping dead at its outer face — it is a bumped-out SECTION of
+// the counter, not a box parked against it, and at 0.04 ft deep the crown
+// used to leave the counter top running on behind it with a visible step
+// (owner, 2026-08-09).
+const CHUTE_BACK = 1.5;
 const FRONT_T = 0.14;   // face/side wall thickness
 const SLOT_W = 1.0;     // "a little bigger than a VHS length" (case is ~0.73 ft)
 const SLOT_H = 0.3;
@@ -160,7 +168,10 @@ export class ReturnSlot {
     const darkMat = new THREE.MeshStandardMaterial({ color: 0x05070c, roughness: 0.95, metalness: 0.0 });
     this.ownedMats.push(blueMat, whiteMat, darkMat);
 
-    const zRear = -0.04; // tucked a hair into the band face
+    // Rear a hair in FRONT of the band's inner face: flush to the eye, but
+    // never coplanar with the band mesh (which would z-fight over the strip of
+    // chute that stands proud of the counter top).
+    const zRear = -(CHUTE_BACK - 0.01);
     const zFace = CHUTE_D;
 
     const box = (w: number, h: number, d: number, x: number, y: number, z: number, mat: THREE.Material, collide = true) => {

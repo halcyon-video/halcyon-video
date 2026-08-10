@@ -10,6 +10,14 @@ export function peekBackTexture(tex: THREE.Texture): THREE.Texture | undefined {
   return backTextureCache.get(tex);
 }
 
+// Pre-seed a texture's back twin with something other than the plain flip —
+// e.g. the 1993 category plate's mirrored-LAYOUT side 2, which keeps the
+// die-cut silhouette in place while its glyphs still read forward from
+// behind. Must run before anyone calls getBackTexture(tex).
+export function registerBackTexture(tex: THREE.Texture, back: THREE.Texture): void {
+  backTextureCache.set(tex, back);
+}
+
 // Helper to copy the canvas and create a distinct texture flipped horizontally for readable double-sided signs
 export function getBackTexture(tex: THREE.Texture): THREE.Texture {
   if (backTextureCache.has(tex)) {
