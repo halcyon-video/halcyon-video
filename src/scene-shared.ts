@@ -78,6 +78,11 @@ export const CAMERA_GLIDE_LERP = 0.3;
 export const TOP_WRAP_GLIDE_LERP = 0.2;
 
 // Hitch-tracer slots for the hero-case rebind (see perf-trace.ts).
+export const SP_MIRROR = perfSlot('mirrorMs');   // Reflector re-render inside the composite
+export const CT_MIRROR = perfSlot('mirrorDraw');
+// Live planar reflection refresh target, Hz — deliberately well under any
+// display rate; store-mirrors.ts explains what that buys.
+export const MIRROR_REFRESH_HZ = 20;
 export const SP_HERO = perfSlot('heroMs');   // hero-case rebind (real artwork materials)
 export const CT_HERO = perfSlot('heroBind'); // selection moved onto a new title
 

@@ -27,6 +27,7 @@ import { GTAOPass } from 'three/examples/jsm/postprocessing/GTAOPass.js';
 import { N8AOPass } from 'n8ao';
 import { BokehPass } from 'three/examples/jsm/postprocessing/BokehPass.js';
 import { Reflector } from 'three/examples/jsm/objects/Reflector.js';
+import * as mirrors from './store-mirrors';
 import { BeautyPass, PartialComposite } from './partial-composite';
 import { FixtureContext, SlottedFixture } from './fixtures';
 import { OverviewCursors, OverviewCursorTarget } from './overview-cursors';
@@ -139,10 +140,8 @@ const SP_SIM = perfSlot('simMs');          // animate() bookkeeping+simulation u
 const SP_SLOTS = perfSlot('slotsMs');      // dirty-slot lerp/matrix pass (includes hero bind)
 const SP_RENDER = perfSlot('renderMs');    // composer/renderer composite
 const SP_AO = perfSlot('aoComputeMs');     // GTAO recompute inside the composite
-const SP_MIRROR = perfSlot('mirrorMs');    // Reflector re-render inside the composite
 const CT_SHADOW = perfSlot('shadowBake');  // full shadow-map rebake requested
 const CT_AO = perfSlot('aoCompute');
-const CT_MIRROR = perfSlot('mirrorDraw');
 const CT_RES = perfSlot('resScaleApply');  // drawing-buffer resize (render targets realloc)
 const CT_PARTIAL = perfSlot('partialComposite'); // VIDEO frame served by the TV-screen patch path
 
@@ -316,7 +315,7 @@ export class StoreScene {
   // A live getter, not cached: displayHz() keeps returning the 60Hz default
   // until measureDisplayHz()'s async boot sample resolves, and this must pick
   // up the real rate the moment it does.
-  private get targetFps(): number {
+  public get targetFps(): number {
     return this.webkitGL ? 60 : computeFpsCap(displayHz(), this.fpsCapOverride);
   }
   // ACTIVE-tier composite spacing (see the frameInterval gate in animate()).
@@ -919,14 +918,12 @@ export class StoreScene {
   // only thing holding the VIDEO tier on the entrance/jump-index view — the
   // app's root since 2026-08-09 — and the VIDEO tier is excluded from the
   // settle supersample (see settleRefine). At 30s that meant the FIRST view
-  // you see, and the one you return to constantly, spent half a minute
-  // re-compositing a room in which nothing moves but this arrow, then went
-  // straight to IDLE, parking forever on a frame rendered at the base budget:
-  // 2180x1226 stretched over a 3840x2160 panel. Both halves measured on the
-  // 4K harness: 4009 renderer.render() calls per 10 idle seconds before,
-  // 27 after (~148x), and the parked frame goes 2.67MP -> 16.6MP.
-  // The arrow stays visible, frozen mid-pose; any input resumes it, since
-  // every input path stamps user activity.
+  // you see spent half a minute re-compositing a room where nothing moves but
+  // this arrow, then dropped straight to IDLE, parking forever on a base-budget
+  // frame: 2180x1226 stretched over a 3840x2160 panel. Measured on the 4K
+  // harness: 4009 renderer.render() calls per 10 idle seconds before, 27 after,
+  // and the parked frame goes 2.67MP -> 16.6MP. The arrow stays visible, frozen
+  // mid-pose; any input resumes it, since every input path stamps activity.
   private static readonly ARROW_BOB_INPUT_MS = 2_500;
   // How long after the camera stops moving qualityScale stays at native res, so
   // the frame you settle on is sharp before render-on-demand parks it. Sized to
@@ -2804,129 +2801,34 @@ export class StoreScene {
   public updateColsCount() { return stock.updateColsCount(this); }
 
   // Live mirrors, throttled. See installMirrorThrottle().
-  private mirrors: { r: any; dirty: boolean }[] = [];
-  private mirrorRenderBudget = 0;
+  public mirrors: { r: any; dirty: boolean }[] = [];
+  public mirrorRenderBudget = 0;
   private static reflectorRendering = false;
   // Camera state as of the last updateMirrorThrottle() call, used to detect
   // whether the view actually changed (see updateMirrorThrottle).
-  private lastMirrorCamPos = new THREE.Vector3(Infinity, Infinity, Infinity);
-  private lastMirrorCamQuat = new THREE.Quaternion();
+  public lastMirrorCamPos = new THREE.Vector3(Infinity, Infinity, Infinity);
+  public lastMirrorCamQuat = new THREE.Quaternion();
   // Round-robins which mirror gets queued for refresh while the camera is
   // moving, so all 4 stay reasonably fresh without ever exceeding the
   // per-frame render budget.
-  private mirrorRefreshIdx = 0;
-  // Alternate-frame gate for mirror refreshes while chasing a >90fps target.
-  private mirrorMotionParity = 0;
-  // bb_mirrors=0 — measurement/opt-out knob: mirrors keep their last (boot)
-  // reflection forever instead of re-rendering the scene as the camera moves.
-  private mirrorsFrozen = localStorage.getItem('bb_mirrors') === '0';
+  public mirrorRefreshIdx = 0;
+  // Frame counter modulo the mirror refresh stride (see updateMirrorThrottle).
+  public mirrorMotionParity = 0;
+  // Live planar reflection refresh target, Hz — deliberately well under any
+  // display rate; updateMirrorThrottle explains what that buys.
+  // bb_mirrors=0 — opt-out/measurement knob: freeze reflections at their last
+  // render instead of re-rendering the scene as the camera moves.
+  public mirrorsFrozen = localStorage.getItem('bb_mirrors') === '0';
   // Sticky one-shot, consumed by the updateMirrorThrottle() call in animate():
   // set when the clerk comes to rest so mirrors catch her final pose. Her
   // update() runs in the pre-tier bookkeeping section (issue #96), so the rAF
   // she stops on can be one the IDLE/VIDEO throttles never composite.
-  private clerkMirrorRefresh = false;
+  public clerkMirrorRefresh = false;
 
-  /**
-   * A naive setup re-renders every mirror's reflection every frame. Each
-   * Reflector renders the whole scene from its viewpoint, and because the
-   * pillars face each other + the cornice faces the room, those renders
-   * cascade into each other — hundreds of nested renders that crash the GPU,
-   * and even guarded against recursion they cost ~12 full scene renders/frame
-   * (~26 fps).
-   *
-   * But a planar reflection of a static scene only changes when the *viewer*
-   * moves. So we wrap each mirror's onBeforeRender to render only when:
-   *   - no other mirror is mid-render (kills the recursion cascade), AND
-   *   - this mirror is "dirty" (the camera moved since it last rendered), AND
-   *   - we're under the per-frame budget (≤1 mirror render/frame).
-   * When you're parked at a shelf the mirrors are free (they reuse their last
-   * reflection texture, which is still correct), so browsing runs at full
-   * frame-rate. Reflections are frozen while the camera moves and refreshed once
-   * it settles (see updateMirrorThrottle) — the reflection is a real render, so
-   * shelves are the right size and perspective from wherever you come to rest.
-   */
-  private installMirrorThrottle() {
-    this.scene.traverse((obj) => {
-      if (obj instanceof Reflector) {
-        const entry = { r: obj, dirty: true };
-        this.mirrors.push(entry);
-        const original = obj.onBeforeRender.bind(obj);
-        obj.onBeforeRender = (...args: any[]) => {
-          if (StoreScene.reflectorRendering) return;                 // no mirror-in-mirror nesting
-          if (!entry.dirty || this.mirrorRenderBudget <= 0) return;  // static view → reuse last reflection
-          entry.dirty = false;
-          this.mirrorRenderBudget--;
-          StoreScene.reflectorRendering = true;
-
-          // Temporarily hide the selection arrow during mirror renders so it doesn't reflect
-          const arrowWasVisible = this.selectionArrow ? this.selectionArrow.visible : false;
-          if (this.selectionArrow) {
-            this.selectionArrow.visible = false;
-          }
-
-          perfTrace.count(CT_MIRROR);
-          perfTrace.begin(SP_MIRROR);
-          try { (original as any)(...args); }
-          finally {
-            perfTrace.end(SP_MIRROR);
-            if (this.selectionArrow) {
-              this.selectionArrow.visible = arrowWasVisible;
-            }
-            StoreScene.reflectorRendering = false;
-          }
-        };
-      }
-    });
-  }
-
-  /**
-   * Called once per frame before rendering. Decides whether any mirror needs
-   * a fresh reflection this frame and, if so, admits at most one into the
-   * render budget that installMirrorThrottle's onBeforeRender wrapper consumes.
-   *
-   * - Camera fully still and nothing structural changed: budget = 0, every
-   *   mirror reuses its last reflection texture (0 reflector renders/frame).
-   * - Camera moving: one mirror is round-robined into the dirty queue per
-   *   frame (mirrorRefreshIdx), budget = 1, so reflections track the camera
-   *   at ~1 render/frame instead of 4.
-   * - Structural change (forceAll — scene rebuild, shelf pop, end-cap/clerk
-   *   motion): every mirror is marked dirty, but the budget is still capped
-   *   at 1/frame; mirrors that don't get the budget this frame stay dirty
-   *   and drain over the next few frames.
-   */
-  private updateMirrorThrottle(forceAll: boolean) {
-    const moved =
-      this.camera.position.distanceToSquared(this.lastMirrorCamPos) > 1e-6 ||
-      Math.abs(1 - Math.abs(this.camera.quaternion.dot(this.lastMirrorCamQuat))) > 1e-7;
-
-    if (moved || forceAll) {
-      this.lastMirrorCamPos.copy(this.camera.position);
-      this.lastMirrorCamQuat.copy(this.camera.quaternion);
-    }
-
-    if (forceAll) {
-      for (const m of this.mirrors) m.dirty = true;
-    } else if (moved && this.mirrors.length > 0) {
-      this.mirrors[this.mirrorRefreshIdx % this.mirrors.length].dirty = true;
-      this.mirrorRefreshIdx = (this.mirrorRefreshIdx + 1) % this.mirrors.length;
-    }
-
-    // A fresh reflection is a full extra scene render (~7ms / ~700 draw calls
-    // at high budget). At a 60Hz target one per frame fits; chasing 120fps
-    // it's most of the frame budget, so admit renders on alternate frames
-    // only — dirty flags are sticky, so nothing is lost, and a 60Hz mirror
-    // under a 120Hz camera is indistinguishable. Gating the budget (not the
-    // dirty marking) keeps it effective when clerk motion force-dirties all.
-    this.mirrorMotionParity ^= 1;
-    const admit = !this.mirrorsFrozen && (this.targetFps <= 90 || this.mirrorMotionParity === 0);
-
-    this.mirrorRenderBudget = 0;
-    if (admit) {
-      for (const m of this.mirrors) {
-        if (m.dirty) { this.mirrorRenderBudget = 1; break; }
-      }
-    }
-  }
+  // Live mirrors: install the per-Reflector render throttle, and decide each
+  // frame whether any reflection may re-render. See store-mirrors.ts.
+  private installMirrorThrottle() { return mirrors.installMirrorThrottle(this); }
+  private updateMirrorThrottle(forceAll: boolean) { return mirrors.updateMirrorThrottle(this, forceAll); }
 
   // Cube render targets behind the current reflection probes, kept so a re-bake
   // (outside-mode change) can dispose them instead of leaking GPU memory.
