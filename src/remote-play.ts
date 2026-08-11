@@ -120,6 +120,17 @@ export function isRemotelyDriven(): boolean {
 
 /** Live-apply entry for the settings toggle. Safe to call redundantly. */
 export function setRemotePlayEnabled(on: boolean): void {
+  // A spawned private instance exists ONLY to host — its viewer is already
+  // waiting on the stream — so nothing may switch that off. This is a guard,
+  // not a nicety: the instance boots with the owner's donated settings, and
+  // applyLiveSettings() replays every explicitly-set live one onto the newly
+  // built scene. bb_remote_play was among them, so the instance would start
+  // hosting, finish building its store, and then immediately tear the stream
+  // down — leaving every private viewer on "Store is still booting…" forever.
+  if (instanceId && !on) {
+    console.log('[RemotePlay] ignoring disable on a private instance — hosting is its whole job');
+    return;
+  }
   if (on === running) return;
   running = on;
   stats.running = on;

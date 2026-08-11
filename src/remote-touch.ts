@@ -64,10 +64,15 @@ const CSS = `
 #rt-pad .rt-btn { font-size: 21px; margin: 3px; }
 #rt-actions .rt-btn { min-width: 76px; height: 50px; padding: 0 16px; }
 #rt-actions .rt-ok { background: rgba(255, 210, 63, 0.9); color: #0a1944; border-color: #ffd23f; }
+/* The page's own hint line sits bottom-centre, which is exactly where the pad
+   now is: lift it clear and let it wrap, since its phone wording is longer
+   than the nowrap desktop one and a 390px screen cuts it off at both ends. */
+#hint { bottom: 200px; max-width: 84vw; white-space: normal; text-align: center; }
 /* Landscape phones are short: shrink so the pad never eats the picture. */
 @media (max-height: 460px) {
   #rt-pad { grid-template-columns: repeat(3, 46px); grid-template-rows: repeat(3, 46px); }
   #rt-actions .rt-btn { height: 42px; min-width: 66px; }
+  #hint { bottom: 158px; }
 }`;
 
 /** Grid placement for the D-pad's cross, by [column, row]. */
