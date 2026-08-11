@@ -8,6 +8,8 @@
 // of three.js and app imports: this page must load instantly on a phone or an
 // old laptop — the whole point of server-side rendering the store.
 
+import { installTouchControls, isTouchPrimary } from './remote-touch';
+
 const video = document.getElementById('screen') as HTMLVideoElement;
 const stage = document.getElementById('stage') as HTMLDivElement;
 const statusEl = document.getElementById('status') as HTMLDivElement;
@@ -393,7 +395,12 @@ function toggleMouseLook() {
 // Clicks: while mouse-looking the host activates whatever its walk-mode gaze
 // has focused (coordinates are irrelevant); otherwise map the click through
 // the object-fit letterbox onto normalized video coordinates.
+// Set while a touch drag is looking around; the click a touchend synthesizes
+// afterwards would otherwise pick whatever the finger happened to stop on.
+let touchDragging = false;
+
 stage.addEventListener('click', (e) => {
+  if (touchDragging) return;
   unmute();
   if (document.pointerLockElement === stage) {
     sendInput({ t: 'click', x: 0.5, y: 0.5 });
@@ -411,6 +418,22 @@ stage.addEventListener('click', (e) => {
   if (x < 0 || x > 1 || y < 0 || y > 1) return; // letterbox bar
   sendInput({ t: 'click', x, y });
 });
+
+// Touch devices get a thumb D-pad + drag-to-look instead of a keyboard they
+// don't have and a pointer lock iOS Safari won't grant (src/remote-touch.ts).
+// Everything it sends is an ordinary key/look message, so the host is unaware
+// there's a phone on the other end.
+if (isTouchPrimary()) {
+  installTouchControls({
+    stage,
+    sendKey: (key, code, down, repeat) =>
+      sendInput({ t: 'key', et: down ? 'down' : 'up', key, code, repeat }),
+    sendLook: (dx, dy) => sendInput({ t: 'look', dx, dy }),
+    unmute,
+    setDragging: (v) => { touchDragging = v; },
+  });
+  hintEl.textContent = 'D-pad browses · OK selects · drag to look around · tap a case to pick it';
+}
 
 // Verification hook (tools/verify_remote_play.mjs).
 (window as any).__remoteViewer = {
