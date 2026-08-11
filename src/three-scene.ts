@@ -14,6 +14,7 @@ import {
   textureArrayManager,
 } from './video-case';
 import { setSurfaceKtx2Renderer } from './surface-textures';
+import { pendingTextureUploads } from './poster-textures';
 // @ts-ignore
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
@@ -2568,8 +2569,18 @@ export class StoreScene {
     } else {
       this.motionScale = this.sharpScale;
     }
+    // settleScale is an absolute pixel target expressed as a multiplier over
+    // resScale (see its division above), so it is only correct for the resScale
+    // it was computed under. qualityScale, however, is latched by animate() and
+    // outlives that: let resScale rise afterwards — which it does constantly,
+    // since the scaler walks back up after boot — and the latched value
+    // over-delivers by exactly the ratio. Measured: a 29.5MP buffer against a
+    // 17MP SETTLE_PX_CAP, i.e. a ~500MB target allocation for one frame. Clamp
+    // it to the freshly-solved ceiling; motionScale is always <= settleScale, so
+    // this can only ever catch the stale case.
     // The parked frame must never be softer than the motion it followed.
     this.settleScale = Math.max(this.settleScale, this.motionScale);
+    this.qualityScale = Math.min(this.qualityScale, this.settleScale);
 
     const width = Math.max(1, Math.floor(clientWidth * this.resScale * this.qualityScale));
     const height = Math.max(1, Math.floor(clientHeight * this.resScale * this.qualityScale));
@@ -4217,6 +4228,20 @@ export class StoreScene {
       // VIDEO tier: don't let its throttled pacing feed the window; just keep
       // the clock from accumulating stale elapsed time across the gap.
       this.resScaleFrames = 0;
+      this.resScaleWindowStart = time;
+      return;
+    }
+    // Texture uploads are not a GPU verdict. The boot wave (and any streaming
+    // burst) hands this window frames pinned at 0.2-30fps by decode + upload
+    // work whose cost has nothing to do with how many pixels we are shading —
+    // the scaler read that as "slow GPU" and walked resolution down to the 0.70
+    // floor on a machine that then held a locked 60. It only climbs back at
+    // 0.05 per two good seconds, and cannot climb at all in the VIDEO tier
+    // (the early return above), so one boot could soften the store for the rest
+    // of the session. Skip the window entirely while the queue is draining.
+    if (pendingTextureUploads() > 0) {
+      this.resScaleFrames = 0;
+      this.resScaleGoodStreak = 0;
       this.resScaleWindowStart = time;
       return;
     }
