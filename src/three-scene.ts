@@ -914,6 +914,20 @@ export class StoreScene {
   // fades out and her roaming sim pauses entirely — nobody's there, nothing
   // needs to move, so the store can go fully idle.
   private static readonly IDLE_TIER_INPUT_MS = 30_000;
+  // How long the selection arrow keeps BOBBING after the last real input.
+  // Deliberately far shorter than IDLE_TIER_INPUT_MS, because the bob is the
+  // only thing holding the VIDEO tier on the entrance/jump-index view — the
+  // app's root since 2026-08-09 — and the VIDEO tier is excluded from the
+  // settle supersample (see settleRefine). At 30s that meant the FIRST view
+  // you see, and the one you return to constantly, spent half a minute
+  // re-compositing a room in which nothing moves but this arrow, then went
+  // straight to IDLE, parking forever on a frame rendered at the base budget:
+  // 2180x1226 stretched over a 3840x2160 panel. Both halves measured on the
+  // 4K harness: 4009 renderer.render() calls per 10 idle seconds before,
+  // 27 after (~148x), and the parked frame goes 2.67MP -> 16.6MP.
+  // The arrow stays visible, frozen mid-pose; any input resumes it, since
+  // every input path stamps user activity.
+  private static readonly ARROW_BOB_INPUT_MS = 2_500;
   // How long after the camera stops moving qualityScale stays at native res, so
   // the frame you settle on is sharp before render-on-demand parks it. Sized to
   // outlast the ~250ms AO fade-in that keeps rendering after a stop, so the
@@ -2803,6 +2817,9 @@ export class StoreScene {
   private mirrorRefreshIdx = 0;
   // Alternate-frame gate for mirror refreshes while chasing a >90fps target.
   private mirrorMotionParity = 0;
+  // bb_mirrors=0 — measurement/opt-out knob: mirrors keep their last (boot)
+  // reflection forever instead of re-rendering the scene as the camera moves.
+  private mirrorsFrozen = localStorage.getItem('bb_mirrors') === '0';
   // Sticky one-shot, consumed by the updateMirrorThrottle() call in animate():
   // set when the clerk comes to rest so mirrors catch her final pose. Her
   // update() runs in the pre-tier bookkeeping section (issue #96), so the rAF
@@ -2901,7 +2918,7 @@ export class StoreScene {
     // under a 120Hz camera is indistinguishable. Gating the budget (not the
     // dirty marking) keeps it effective when clerk motion force-dirties all.
     this.mirrorMotionParity ^= 1;
-    const admit = this.targetFps <= 90 || this.mirrorMotionParity === 0;
+    const admit = !this.mirrorsFrozen && (this.targetFps <= 90 || this.mirrorMotionParity === 0);
 
     this.mirrorRenderBudget = 0;
     if (admit) {
@@ -4625,7 +4642,7 @@ export class StoreScene {
     // STAYS visible on the parked frame — and stops claiming the VIDEO tier,
     // so the tier drops to IDLE. Every input path funnels through
     // requestRender()/markUserActivity, which resumes the bob next frame.
-    const arrowBobAwake = time - getLastUserActivity() < StoreScene.IDLE_TIER_INPUT_MS;
+    const arrowBobAwake = time - getLastUserActivity() < StoreScene.ARROW_BOB_INPUT_MS;
     if (this.selectionArrow && this.selectionArrow.visible && arrowBobAwake) {
       const t = performance.now() * 0.002;
       this.selectionArrow.position.y = this.selectionArrowBaseY + Math.sin(t) * 0.15;
