@@ -1,12 +1,13 @@
-// Live planar-mirror throttling — extracted from StoreScene (three-scene.ts
-// keeps one-line delegating stubs). The cornice band and the front soffit ring
-// are three.js Reflectors: each one re-renders the whole scene from its own
+// Live planar mirrors — extracted from StoreScene (three-scene.ts keeps
+// one-line delegating stubs). The cornice band and the front soffit ring are
+// three.js Reflectors: each renders the whole scene again from its own
 // viewpoint, which is the single most expensive thing in the frame at catalog
-// scale. Everything here exists to make them cost almost nothing when nothing
-// about the reflection has actually changed.
+// scale. This module decides which machines get them at all, how often a stale
+// reflection is allowed to redraw, and which mirror that redraw is spent on.
 //
-// Both functions take the StoreScene as their first parameter and read/write
+// Every function takes the StoreScene as its first parameter and reads/writes
 // scene state exactly as the original methods did.
+import * as THREE from 'three';
 import { Reflector } from 'three/examples/jsm/objects/Reflector.js';
 import { perfTrace } from './perf-trace';
 import { SP_MIRROR, CT_MIRROR, MIRROR_REFRESH_HZ } from './scene-shared';
@@ -17,73 +18,176 @@ import type { StoreScene } from './three-scene';
 // render, cascading into hundreds of nested scene draws.
 let reflectorRendering = false;
 
+// Reflections redrawn per admitted frame. A second one does not amortise — it
+// costs ~5ms of its own and drops p50 below 60fps.
+const MIRRORS_PER_FRAME = 1;
+
+export type MirrorEntry = {
+  r: any; dirty: boolean; original: (...a: any[]) => void;
+  /** False until this reflector has rendered once — its target is still blank. */
+  rendered: boolean;
+};
+
+// Scratch, module-scoped so the per-frame pass allocates nothing.
+const frustumScratch = new THREE.Frustum();
+const projScreenScratch = new THREE.Matrix4();
+const sphereScratch = new THREE.Sphere();
+
+/** Is this mirror's plane inside the main camera's frustum? */
+function onScreen(m: MirrorEntry): boolean {
+  const geo = m.r.geometry;
+  if (!geo) return false;
+  if (!geo.boundingSphere) geo.computeBoundingSphere();
+  sphereScratch.copy(geo.boundingSphere).applyMatrix4(m.r.matrixWorld);
+  return frustumScratch.intersectsSphere(sphereScratch);
+}
+
 /**
- * A naive setup re-renders every mirror's reflection every frame. Each
- * Reflector renders the whole scene from its viewpoint, and because the
- * pillars face each other + the cornice faces the room, those renders
- * cascade into each other — hundreds of nested renders that crash the GPU,
- * and even guarded against recursion they cost ~12 full scene renders/frame
- * (~26 fps).
+ * Does this machine get live planar reflections at all? (Owner product call,
+ * 2026-08-11: "underpowered machines can't have the mirror.")
  *
- * But a planar reflection of a static scene only changes when the *viewer*
- * moves. So we wrap each mirror's onBeforeRender to render only when:
- *   - no other mirror is mid-render (kills the recursion cascade), AND
- *   - this mirror is "dirty" (the camera moved since it last rendered), AND
- *   - we're under the per-frame budget (≤1 mirror render/frame).
- * When you're parked at a shelf the mirrors are free (they reuse their last
- * reflection texture, which is still correct), so browsing runs at full
- * frame-rate. Reflections are frozen while the camera moves and refreshed once
- * it settles (see updateMirrorThrottle) — the reflection is a real render, so
- * shelves are the right size and perspective from wherever you come to rest.
+ * Machines that don't get them fall back to the env-mapped chrome the
+ * softwareGL and WebKitGTK paths already used — free, and it can never go
+ * stale, because an environment map is evaluated per fragment every frame.
+ *
+ * The tier is the calibrated one (src/quality-calibrate.ts measures the GPU),
+ * so 'low' and 'medium' are exactly what "underpowered" already means
+ * everywhere else in the app.
+ */
+export function liveMirrorsAllowed(scene: StoreScene): boolean {
+  return !scene.softwareGL && !scene.webkitGL && scene.effectiveQuality === 'high';
+}
+
+/**
+ * Render stale reflections as their own phase at the top of the frame: at most
+ * one per admitted frame, admitted at MIRROR_REFRESH_HZ rather than frame rate,
+ * and always spent on a mirror the player can actually see.
+ *
+ * WHAT DOES NOT MAKE A REFRESH CHEAPER, all measured on the 4K --full profile,
+ * so nobody repeats them: a refresh costs ~5-8ms and that number will not move.
+ * Dropping the reflector target from 1024px to 256px changes it by nothing.
+ * Hiding every movie box AND every shelf carcass in the store changes it by
+ * nothing either (7.08 -> 7.02ms). It is neither fill nor the scene's draw
+ * calls, which rules out proxy geometry and baked shelf textures — there is
+ * nothing cheaper to reflect.
+ *
+ * Beware one seductive measurement: hoisting these renders out of
+ * onBeforeRender appears to take a refresh to 0.25ms. It does not. That average
+ * is collected while the round-robin is mostly refreshing OFF-SCREEN mirrors,
+ * whose virtual camera faces a wall and renders almost nothing. A mirror you
+ * can see costs the full ~8ms wherever the render is issued from — so the
+ * refresh RATE is the only real lever, which is why the stride below stays.
+ *
+ * Since the cost is fixed, the game is spending the budget well, and that is
+ * what driving the renders from here buys over the stock onBeforeRender hook:
+ * inside the hook a mirror can only refresh itself in scene draw order, so the
+ * budget lands on whichever mirror happens to be drawn first — usually one
+ * behind the camera. Here we can pick. Off-screen mirrors are skipped entirely
+ * and stay sticky-dirty until seen, so every admitted refresh lands on a
+ * reflection someone is looking at. Same cost as the old round-robin, ~8x the
+ * useful freshness in the common one-mirror-in-frame view.
+ *
+ * (Hoisting also keeps the mirror's full scene pass out of the middle of the
+ * composite, where it used to pile onto the shadow rebake and the AO recompute
+ * in one ~37ms frame.)
+ */
+export function renderMirrorsAhead(scene: StoreScene) {
+  if (scene.mirrorsFrozen || reflectorRendering) return;
+  let any = false;
+  for (const m of scene.mirrors) if (m.dirty) { any = true; break; }
+  if (!any) return;
+
+  // Refresh on a STRIDE. These are tilted chrome bands high on the cornice and
+  // soffit, grazing and foreshortened, and nobody resolves a case spine in one,
+  // so ~20Hz under a 60Hz camera is invisible while the skipped full scene
+  // render is very much not: refreshing every frame instead triples total
+  // mirror time (1414ms -> 4254ms over one --full perf session), adds 43% to
+  // the session's draw calls and pushes p99 from 23.8ms to 27.9ms. Dirty flags
+  // are sticky, so nothing is ever lost — a refresh just lands a frame or two
+  // later. Deriving the stride from targetFps keeps that cadence put as the
+  // display changes.
+  const stride = Math.max(1, Math.round(scene.targetFps / MIRROR_REFRESH_HZ));
+  scene.mirrorMotionParity = (scene.mirrorMotionParity + 1) % stride;
+  if (scene.mirrorMotionParity !== 0) return;
+
+  let budget = MIRRORS_PER_FRAME;
+  reflectorRendering = true;
+  // The selection arrow must not appear in a reflection.
+  const arrowWasVisible = scene.selectionArrow ? scene.selectionArrow.visible : false;
+  if (scene.selectionArrow) scene.selectionArrow.visible = false;
+  try {
+    projScreenScratch.multiplyMatrices(
+      scene.camera.projectionMatrix, scene.camera.matrixWorldInverse);
+    frustumScratch.setFromProjectionMatrix(projScreenScratch);
+
+    const draw = (m: MirrorEntry) => {
+      m.dirty = false;
+      m.rendered = true;
+      budget--;
+      perfTrace.count(CT_MIRROR);
+      perfTrace.begin(SP_MIRROR);
+      try { m.original(scene.renderer, scene.scene, scene.camera); }
+      finally { perfTrace.end(SP_MIRROR); }
+    };
+
+    // Round-robin over the mirrors in frame, so several sharing the view share
+    // the budget fairly, but let one that has NEVER rendered jump the queue:
+    // its target is still blank, and a black band in the ceiling is not a
+    // cosmetic problem the way a slightly stale reflection is.
+    const n = scene.mirrors.length;
+    let fallback = -1;
+    for (let k = 0; k < n && budget > 0; k++) {
+      const idx = (scene.mirrorCursor + k) % n;
+      const m = scene.mirrors[idx];
+      if (!m.dirty || !onScreen(m)) continue;
+      if (!m.rendered) { scene.mirrorCursor = (idx + 1) % n; draw(m); break; }
+      if (fallback < 0) fallback = idx;
+    }
+    if (budget > 0 && fallback >= 0) {
+      scene.mirrorCursor = (fallback + 1) % n;
+      draw(scene.mirrors[fallback]);
+    }
+  } finally {
+    if (scene.selectionArrow) scene.selectionArrow.visible = arrowWasVisible;
+    reflectorRendering = false;
+  }
+}
+
+/**
+ * Collect the scene's Reflectors and neuter their built-in render hook.
+ *
+ * A stock Reflector re-renders itself from onBeforeRender every time it is
+ * drawn, and because the pillars face each other and the cornice faces the
+ * room, those renders nest into each other — hundreds of nested scene draws
+ * that overrun the GPU. We keep a reference to that original render function
+ * and call it ourselves, at most once per admitted frame, from
+ * renderMirrorsAhead(); the hook itself becomes a no-op.
+ *
+ * Called once per build, so it resets the list first — a rebuild otherwise
+ * leaves entries pointing at the previous store's destroyed Reflectors, and
+ * the refresh budget gets spent redrawing them.
  */
 export function installMirrorThrottle(scene: StoreScene) {
+  scene.mirrors.length = 0;
+  scene.mirrorCursor = 0;
   scene.scene.traverse((obj) => {
     if (obj instanceof Reflector) {
-      const entry = { r: obj, dirty: true };
-      scene.mirrors.push(entry);
-      const original = obj.onBeforeRender.bind(obj);
-      obj.onBeforeRender = (...args: any[]) => {
-        if (reflectorRendering) return;                 // no mirror-in-mirror nesting
-        if (!entry.dirty || scene.mirrorRenderBudget <= 0) return;  // static view → reuse last reflection
-        entry.dirty = false;
-        scene.mirrorRenderBudget--;
-        reflectorRendering = true;
-
-        // Temporarily hide the selection arrow during mirror renders so it doesn't reflect
-        const arrowWasVisible = scene.selectionArrow ? scene.selectionArrow.visible : false;
-        if (scene.selectionArrow) {
-          scene.selectionArrow.visible = false;
-        }
-
-        perfTrace.count(CT_MIRROR);
-        perfTrace.begin(SP_MIRROR);
-        try { (original as any)(...args); }
-        finally {
-          perfTrace.end(SP_MIRROR);
-          if (scene.selectionArrow) {
-            scene.selectionArrow.visible = arrowWasVisible;
-          }
-          reflectorRendering = false;
-        }
-      };
+      scene.mirrors.push({
+        r: obj, dirty: true, rendered: false, original: obj.onBeforeRender.bind(obj),
+      });
+      obj.onBeforeRender = () => {};  // see renderMirrorsAhead()
     }
   });
 }
 
 /**
- * Called once per frame before rendering. Decides whether any mirror needs
- * a fresh reflection this frame and, if so, admits at most one into the
- * render budget that installMirrorThrottle's onBeforeRender wrapper consumes.
+ * Called once per frame, before renderMirrorsAhead(). Marks reflections stale.
  *
- * - Camera fully still and nothing structural changed: budget = 0, every
- *   mirror reuses its last reflection texture (0 reflector renders/frame).
- * - Camera moving: one mirror is round-robined into the dirty queue per
- *   frame (mirrorRefreshIdx), budget = 1, so reflections track the camera
- *   at ~1 render/frame instead of 4.
- * - Structural change (forceAll — scene rebuild, shelf pop, end-cap/clerk
- *   motion): every mirror is marked dirty, but the budget is still capped
- *   at 1/frame; mirrors that don't get the budget this frame stay dirty
- *   and drain over the next few frames.
+ * A planar reflection of a static scene only changes when the VIEWER moves, so
+ * a parked camera marks nothing and every mirror reuses its last texture — a
+ * still store still costs zero. `forceAll` covers the cases where the scene
+ * changed under a stationary camera instead: rebuilds, shelf pops, end-cap
+ * motion, and the clerk coming to rest.
  */
 export function updateMirrorThrottle(scene: StoreScene, forceAll: boolean) {
   const moved =
@@ -93,36 +197,6 @@ export function updateMirrorThrottle(scene: StoreScene, forceAll: boolean) {
   if (moved || forceAll) {
     scene.lastMirrorCamPos.copy(scene.camera.position);
     scene.lastMirrorCamQuat.copy(scene.camera.quaternion);
-  }
-
-  if (forceAll) {
     for (const m of scene.mirrors) m.dirty = true;
-  } else if (moved && scene.mirrors.length > 0) {
-    scene.mirrors[scene.mirrorRefreshIdx % scene.mirrors.length].dirty = true;
-    scene.mirrorRefreshIdx = (scene.mirrorRefreshIdx + 1) % scene.mirrors.length;
-  }
-
-  // A fresh reflection is a full extra scene render. "One per frame fits a
-  // 60Hz budget" held on the small store; at catalog scale on the 4K kiosk
-  // it does not — a --full perf session there attributes 7.2ms/frame to the
-  // Reflectors, half of all render time, and they dominate ~80% of every
-  // hitch (p90 26.0ms -> 20.2ms with them frozen). So refresh on a STRIDE:
-  // these are tilted chrome bands high on the cornice and soffit, grazing
-  // and foreshortened, and nobody resolves a case spine in one, so ~20Hz
-  // under a 60Hz camera is invisible while the skipped draw-call replay is
-  // not. Dirty flags stay sticky, so nothing is lost — a refresh just lands
-  // a frame or two later, forceAll (clerk/end-cap motion) included. Deriving
-  // the stride from targetFps keeps that cadence put as the display changes;
-  // the old >90fps alternate-frame gate was this with a hardcoded 2.
-  const stride = Math.max(1, Math.round(scene.targetFps / MIRROR_REFRESH_HZ));
-  scene.mirrorMotionParity = (scene.mirrorMotionParity + 1) % stride;
-  const admit = !scene.mirrorsFrozen && scene.mirrorMotionParity === 0;
-
-  scene.mirrorRenderBudget = 0;
-  if (admit) {
-    for (const m of scene.mirrors) {
-      if (m.dirty) { scene.mirrorRenderBudget = 1; break; }
-    }
   }
 }
-

@@ -13,6 +13,7 @@ import { assetUrl } from './asset-url';
 import { posterQueue, loadDecorPosterTexture } from './video-case';
 import { bakeFloorAO, makeWallContactAO } from './lightmap-bake';
 import { Reflector } from 'three/examples/jsm/objects/Reflector.js';
+import { liveMirrorsAllowed } from './store-mirrors';
 import { SlottedFixture } from './fixtures';
 import { AmbientTvs } from './ambient-tvs';
 import { EntranceCheckout } from './entrance';
@@ -1194,7 +1195,7 @@ export function buildStore(scene: StoreScene) {
       trofferFrameMaterial: trofferFrameMat,
       tileX: TILE_X,
       tileZ: TILE_Z,
-      softwareGL: scene.softwareGL || scene.webkitGL,
+      softwareGL: !liveMirrorsAllowed(scene),
       reflectorSize: soffitReflectorSize,
       // bb-2000: all-white soffit body + inset circular can lights, no mirror
       // ring (the perimeter cornice is dropped for that store — user).
@@ -2753,7 +2754,7 @@ export function buildCeilingFrame(scene: StoreScene, storeWidth: number, backWal
     // CPU. A static chrome plane keeps the band's look at zero render cost.
     // WebKitGTK pays the replay too (~14ms blocking per refresh), so it
     // takes the same static plane.
-    if (scene.softwareGL || scene.webkitGL) {
+    if (!liveMirrorsAllowed(scene)) {
       const still = new THREE.Mesh(new THREE.PlaneGeometry(mirrorW, mirrorH), chromeMat);
       const stillPos = mirrorPos.clone();
       stillPos.x += localZOffset * Math.sin(mirrorRotY);

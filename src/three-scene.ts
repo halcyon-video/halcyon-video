@@ -2466,6 +2466,17 @@ export class StoreScene {
     (window as any).getArrangement = () => this.getArrangement();
     (window as any).ARRANGEMENTS = StoreScene.ARRANGEMENTS;
     (window as any).debugResScale = () => this.resScale;
+    // Force the stocked-shelves environment re-bake now instead of waiting for
+    // stockedRebakeDue()'s frame count + input-silence window. Verification
+    // hook: a screenshot never reaches those conditions, so without this the
+    // only reflections a shot can photograph are the EMPTY-SHELL bake taken
+    // before the cases are placed (see pendingStockedRebake).
+    (window as any).debugForceStockedRebake = () => {
+      this.pendingStockedRebake = false;
+      this.outdoor.rebakeEnvironment();
+      this.requestRender();
+      return true;
+    };
     // Partial-composite A/B (see PartialComposite.debugAB): renders the same
     // changed TV picture through the patch path and the full chain in one tick.
     (window as any).debugPartialAB = () => this.partial?.debugAB(
@@ -2812,21 +2823,16 @@ export class StoreScene {
   public updateColsCount() { return stock.updateColsCount(this); }
 
   // Live mirrors, throttled. See installMirrorThrottle().
-  public mirrors: { r: any; dirty: boolean }[] = [];
-  public mirrorRenderBudget = 0;
+  public mirrors: mirrors.MirrorEntry[] = [];
+  // Round-robin cursor for the reflection budget (store-mirrors.ts).
+  public mirrorCursor = 0;
   private static reflectorRendering = false;
   // Camera state as of the last updateMirrorThrottle() call, used to detect
   // whether the view actually changed (see updateMirrorThrottle).
   public lastMirrorCamPos = new THREE.Vector3(Infinity, Infinity, Infinity);
   public lastMirrorCamQuat = new THREE.Quaternion();
-  // Round-robins which mirror gets queued for refresh while the camera is
-  // moving, so all 4 stay reasonably fresh without ever exceeding the
-  // per-frame render budget.
-  public mirrorRefreshIdx = 0;
-  // Frame counter modulo the mirror refresh stride (see updateMirrorThrottle).
+  // Frame counter modulo the mirror refresh stride (see renderMirrorsAhead).
   public mirrorMotionParity = 0;
-  // Live planar reflection refresh target, Hz — deliberately well under any
-  // display rate; updateMirrorThrottle explains what that buys.
   // bb_mirrors=0 — opt-out/measurement knob: freeze reflections at their last
   // render instead of re-rendering the scene as the camera moves.
   public mirrorsFrozen = localStorage.getItem('bb_mirrors') === '0';
@@ -5463,6 +5469,7 @@ export class StoreScene {
       this.clerkMirrorRefresh || updatedMeshes.size > 0 ||
       (forceShadowRefresh && this.shadowRefreshFrames === 0));
     this.clerkMirrorRefresh = false;
+    mirrors.renderMirrorsAhead(this);
 
     // Fixture upkeep: desk terminal cursor blink; TV audio listener sync +
     // VideoTexture upload.
