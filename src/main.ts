@@ -64,6 +64,7 @@ import {
 import { setupTerminalInput } from './store-setup-flow';
 import { registerLibraryToggles } from './library-settings';
 import { getActiveTheme, applyThemeCssVars, THEMES, resolveThemeId } from './themes';
+import { runDeviceGate } from './device-gate';
 import {
   activeMediaCutoff,
   filterLibrariesByCutoff,
@@ -4075,6 +4076,13 @@ async function main() {
     candyCheckoutIndex = candyCheckoutRows.length + 1;
     renderCandyCheckout();
   });
+
+  // A phone or a WebGL2-less browser can't drive the 3D store; offer 2.5D
+  // instead of letting the boot dead-end (see device-gate.ts). Awaited here,
+  // before the boot call below, so the chosen mode is already settled and the
+  // store builds it first time — no 3D scene raised only to be torn down.
+  // Resolves immediately on hardware that's fine, which is every kiosk.
+  await runDeviceGate();
 
   // Check saved credentials and try connection in background (demo mode
   // skips the credential gate entirely and never shows the login overlay).
