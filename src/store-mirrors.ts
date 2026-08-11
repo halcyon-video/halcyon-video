@@ -7,6 +7,21 @@
 //
 // Every function takes the StoreScene as its first parameter and reads/writes
 // scene state exactly as the original methods did.
+//
+// BOX-PROJECTED CUBEMAPS DO NOT WORK HERE — tried 2026-08-11, measured, and
+// reverted, so nobody spends another day on it. The pitch is seductive: bake
+// the room into one cubemap, box-project the reflected ray against the room's
+// bounds, and every mirror becomes one texture fetch with nothing to refresh.
+// Box projection is exact when the reflected geometry lies ON the box, and
+// this store is a rectangular room, so the room IS the box... except it isn't.
+// The room is a box PACKED with 7 ft shelving runs, endcaps, floor displays
+// and a checkout counter, and that furniture — not the walls — is what these
+// mirrors actually reflect. Everything between the capture point and the shell
+// gets projected out onto the shell, so the counter smears across the band at
+// several times its true size and the aisles vanish entirely. It reads as a
+// rendering fault, not a mirror. Per-mirror cubes would fix only the face they
+// were captured for, and an env-mapped cube with no box projection at all is
+// just the chrome fallback below, which already exists.
 import * as THREE from 'three';
 import { Reflector } from 'three/examples/jsm/objects/Reflector.js';
 import { perfTrace } from './perf-trace';
