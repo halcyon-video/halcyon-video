@@ -1607,6 +1607,12 @@ export class StoreScene {
       activeTheme: this.activeTheme,
       gondolaMaterials: this.gondolaMaterials,
       wallSurface: this.wallSurface,
+      liveMirror: mirrors.liveMirrorsAllowed(this)
+        ? (() => {
+            const s = mirrors.reflectorTargetSize(this.renderer);
+            return { textureWidth: s.w, textureHeight: s.h };
+          })()
+        : undefined,
     };
   }
 

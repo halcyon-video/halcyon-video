@@ -1,4 +1,4 @@
-import { FixturePlacement, BOX_SPACING } from './store-layout';
+import { FixturePlacement, BOX_SPACING, STORE_CENTER_X } from './store-layout';
 import { registerFixtureKind } from './fixture-registry';
 import { StructureFootprint } from './fixtures/period-fixtures';
 import { PV_DRAPE_TABLE_POP_KIT } from './fixtures/pv-drape-table';
@@ -44,6 +44,39 @@ export const DEFAULT_FIXTURE_PLACEMENTS: FixturePlacement[] = [
   // the game department took that corner, was removed at user direction —
   // the front corners stay open floor. binIndex 1 kept so the pool slice is
   // unchanged.)
+  // ── Mirrored structural column ────────────────────────────────────────────
+  // A clad four-sided mirror pillar in the open back floor — see
+  // fixtures/mirror-column.ts for what it is and why the chains built them.
+  //
+  // It stands in the BACK CROSS-AISLE — the open floor behind the aisle runs,
+  // between their back ends and the New Releases wall — at the left edge of the
+  // central walkway. That is where a real column lands: in circulation space, on
+  // the building's grid, touching no fixture's working face.
+  //
+  // Why not the store centreline, which is the obvious first guess: it has no
+  // room at any depth. Going back from the front, the corridor chain above
+  // (bargain bin at zOffset 11.5, promo stands at 18 and 24.5) leaves gaps of
+  // 6.5 ft, and two 3 ft clearances plus the column itself need 8.1; and the
+  // one remaining slot, zOffset ~5, is New Releases' own ground. That section
+  // anchors at (STORE_CENTER_X, backWallZ + 4) — store-camera.ts parks the
+  // browse camera and the overview marker there — so a column on the centreline
+  // 5 ft off the back wall does not merely crowd the NR wall, it stands in the
+  // spot the camera flies to.
+  //
+  // (5, backWallZ + 8) clears all of it: 5.9 ft to the bargain bin, 6.9 ft to
+  // the back wall, and it sits 4 ft off the NR camera lane and 6 ft off its
+  // axis, so the wall it could have blocked is browsed past it, not through it.
+  // CENTER_WALKWAY is 16 ft centred on x=11, i.e. x 3..19, so this hugs its
+  // left edge and the corridor stays walkable. The mirrored position (x=17) is
+  // free if the owner wants the flanking pair the bigger stores had — the two
+  // would read as one structural bay.
+  {
+    id: 'mirror-column-back',
+    kind: 'mirror-column',
+    position: { x: STORE_CENTER_X - 6, z: 8 },
+    yaw: 0,
+    options: { relativeToBackWall: true, zOffset: 8 }
+  },
   {
     id: 'bargain-bin-1',
     kind: 'bargain-bin',

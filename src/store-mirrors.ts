@@ -32,14 +32,29 @@ export type MirrorEntry = {
 const frustumScratch = new THREE.Frustum();
 const projScreenScratch = new THREE.Matrix4();
 const sphereScratch = new THREE.Sphere();
+const normalScratch = new THREE.Vector3();
+const centreScratch = new THREE.Vector3();
 
-/** Is this mirror's plane inside the main camera's frustum? */
-function onScreen(m: MirrorEntry): boolean {
+/**
+ * Can the main camera see this mirror's reflective side?
+ *
+ * Frustum test, then a facing test. The facing half matters because mirrors
+ * come in sets that point away from each other — the four faces of a mirrored
+ * column, the cornice bands on opposite walls — and a Reflector's back is
+ * blank. Without it the two faces of a column behind you sit in the frustum's
+ * bounding-sphere test and take turns eating the refresh budget that the face
+ * you are looking at should have had.
+ */
+function onScreen(m: MirrorEntry, cameraPos: THREE.Vector3): boolean {
   const geo = m.r.geometry;
   if (!geo) return false;
   if (!geo.boundingSphere) geo.computeBoundingSphere();
   sphereScratch.copy(geo.boundingSphere).applyMatrix4(m.r.matrixWorld);
-  return frustumScratch.intersectsSphere(sphereScratch);
+  if (!frustumScratch.intersectsSphere(sphereScratch)) return false;
+  // PlaneGeometry faces +Z locally; a Reflector only reflects on that side.
+  normalScratch.set(0, 0, 1).transformDirection(m.r.matrixWorld);
+  centreScratch.setFromMatrixPosition(m.r.matrixWorld);
+  return normalScratch.dot(centreScratch.sub(cameraPos)) < 0;
 }
 
 /**
@@ -56,6 +71,25 @@ function onScreen(m: MirrorEntry): boolean {
  */
 export function liveMirrorsAllowed(scene: StoreScene): boolean {
   return !scene.softwareGL && !scene.webkitGL && scene.effectiveQuality === 'high';
+}
+
+/**
+ * Render-target size for a Reflector, derived from the REAL drawing buffer and
+ * capped by quality tier.
+ *
+ * A Reflector samples its texture with SCREEN-space projective coords, so the
+ * target has to track the drawing buffer's shape and size, not a magic square.
+ * A fixed 512x512 (what shipped once) is a ~7x upscale of a non-mipmapped
+ * target squashed to 1:1 and stretched back over a 20:1 band — the blocky smear
+ * in the feedback pin. Fill cost is the only thing that grows with this; the
+ * reflected scene's draw calls, which are what a refresh actually costs, do not.
+ */
+export function reflectorTargetSize(renderer: THREE.WebGLRenderer): { w: number; h: number } {
+  const buf = renderer.getDrawingBufferSize(new THREE.Vector2());
+  const quality = localStorage.getItem('bb_quality') || 'high';
+  const cap = quality === 'low' ? 256 : quality === 'medium' ? 512 : 1024;
+  const w = Math.max(64, Math.min(cap, Math.round(buf.x)));
+  return { w, h: Math.max(64, Math.round(w * (buf.y / Math.max(1, buf.x)))) };
 }
 
 /**
@@ -135,11 +169,12 @@ export function renderMirrorsAhead(scene: StoreScene) {
     // its target is still blank, and a black band in the ceiling is not a
     // cosmetic problem the way a slightly stale reflection is.
     const n = scene.mirrors.length;
+    const camPos = scene.camera.position;
     let fallback = -1;
     for (let k = 0; k < n && budget > 0; k++) {
       const idx = (scene.mirrorCursor + k) % n;
       const m = scene.mirrors[idx];
-      if (!m.dirty || !onScreen(m)) continue;
+      if (!m.dirty || !onScreen(m, camPos)) continue;
       if (!m.rendered) { scene.mirrorCursor = (idx + 1) % n; draw(m); break; }
       if (fallback < 0) fallback = idx;
     }
