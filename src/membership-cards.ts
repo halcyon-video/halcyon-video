@@ -16,7 +16,8 @@
 // reinterpreted here as its 2D equivalent: a canvas-drawn card face plus a
 // CSS glint sweep and heavy box-shadow to sell the laminated look.
 
-import { authenticateUser, buildUserAvatarUrl, type PublicUser } from './jellyfin';
+import { signInAsPublicUser, buildUserAvatarUrl } from './media-backend.ts';
+import type { PublicUser } from './media-types.ts';
 import { getActiveTheme } from './themes';
 import { BB_ANTON, BB_ARCHIVO_BLACK } from './bundled-fonts';
 import { HALCYON_CREAM } from './logo-spec';
@@ -32,6 +33,13 @@ export interface OpenCardPickerOptions {
   users: PublicUser[];
   /** Last-used user id, if any -- pre-highlighted (not auto-logged-in). */
   lastUserId?: string | null;
+  /**
+   * Session token the user list was fetched with. Jellyfin ignores it (each
+   * card signs in on its own name+password), but Plex needs it: its cards are
+   * Home members of an already-authenticated ACCOUNT, and picking one swaps
+   * the account token for that member's own.
+   */
+  sessionToken?: string;
   onLogin: (session: MembershipLoginSession) => void | Promise<void>;
   onManualLogin: () => void;
   onDemoMode?: () => void;
@@ -454,7 +462,7 @@ async function attemptLogin(opts: OpenCardPickerOptions, user: PublicUser, passw
   const card = cardEls[cardIndex];
   card?.classList.add('mc-loading');
   try {
-    const session = await authenticateUser(opts.serverUrl, user.name, password);
+    const session = await signInAsPublicUser(opts.serverUrl, user, password, opts.sessionToken);
     opts.log?.(`[System] Authenticated as ${session.userName} via membership card.`);
     closeMembershipCardPicker();
     await opts.onLogin(session);
@@ -491,11 +499,11 @@ function buildCardElement(opts: OpenCardPickerOptions, user: PublicUser, index: 
   inner.appendChild(front);
   drawCardFront(front, user, null);
 
-  // Avatars are loaded best-effort: not setting crossOrigin so a Jellyfin
-  // server without CORS headers still renders the image (canvas is only
-  // ever displayed live here, never read back with getImageData/toDataURL,
-  // so a "tainted" canvas is harmless).
-  const avatarUrl = buildUserAvatarUrl(opts.serverUrl, user.id, user.primaryImageTag);
+  // Avatars are loaded best-effort: not setting crossOrigin so a server
+  // without CORS headers still renders the image (canvas is only ever
+  // displayed live here, never read back with getImageData/toDataURL, so a
+  // "tainted" canvas is harmless).
+  const avatarUrl = buildUserAvatarUrl(opts.serverUrl, user);
   if (avatarUrl) {
     const img = new Image();
     img.onload = () => drawCardFront(front, user, img);

@@ -917,10 +917,18 @@ export function registerCoreSettings(): void {
   // exists, but is never persisted (see commitTextSetting's special case).
   const cred = (key: string, label: string, kind: SettingKind, opts?: Partial<SettingDef>): void =>
     registerSetting({ key, label, kind, group: 'Connection', default: '', applyMode: 'reload', ...opts });
-  cred('jellyfin_url', 'Jellyfin URL', 'text');
-  cred('jellyfin_username', 'Jellyfin Username', 'text');
-  cred('jellyfin_password', 'Jellyfin Password', 'secret', {
-    hint: 'Blank keeps session. A password re-authenticates.',
+  // The url/username keys keep their historical `jellyfin_` spelling whichever
+  // server is connected (see media-backend.ts's note on why renaming them would
+  // sign every existing install out), but the LABELS are server-neutral now
+  // that a store can be supplied by either — they're read by a user who may
+  // never have run Jellyfin. Static rather than derived from the active
+  // backend: settings register before a backend is necessarily resolvable.
+  cred('jellyfin_url', 'Media Server URL', 'text', {
+    hint: 'Jellyfin or Plex — the store identifies whichever answers.',
+  });
+  cred('jellyfin_username', 'Media Server Username', 'text');
+  cred('jellyfin_password', 'Media Server Password', 'secret', {
+    hint: 'Blank keeps session. A password re-authenticates. Plex: paste a token here.',
   });
 
   cred('jellyseerr_url', 'Jellyseerr URL', 'text');

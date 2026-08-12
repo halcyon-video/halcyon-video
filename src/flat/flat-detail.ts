@@ -1,4 +1,5 @@
-import { Movie, Episode, fetchSeriesEpisodes, fetchFirstEpisodeOfSeries } from '../jellyfin';
+import type { Movie, Episode } from '../media-types.ts';
+import { fetchSeriesEpisodes, fetchFirstEpisodeOfSeries } from '../media-backend.ts';
 import { launchGame } from '../romm';
 import { retailAudio } from '../audio';
 import { requestMovie, isDiscoveryRequested } from '../jellyseerr';

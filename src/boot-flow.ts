@@ -10,13 +10,19 @@
 // and loaders through initBootFlow(deps); nothing here reaches back into
 // main.ts directly, so the two can't tangle.
 import {
-  fetchJellyfinLibrariesAndMovies,
+  fetchLibrariesAndMovies,
   authenticateUser,
   validateToken,
   fetchPublicUsers,
   normalizeUrl,
-  JellyfinLibrary,
-} from './jellyfin';
+  activeBackend,
+  setActiveBackendKind,
+  persistSession,
+  USERNAME_KEY,
+  TOKEN_KEY,
+  LAST_USER_ID_KEY,
+} from './media-backend.ts';
+import type { JellyfinLibrary } from './media-types.ts';
 import {
   openMembershipCardPicker,
   closeMembershipCardPicker,
@@ -186,7 +192,7 @@ async function syncForSetup(
   try {
     [libs] = await Promise.all([
       Promise.race([
-        fetchJellyfinLibrariesAndMovies(url, session.accessToken, session.userId, onProgress, {
+        fetchLibrariesAndMovies(url, session.accessToken, session.userId, onProgress, {
           excludeLibraryIds: excludedLibraryIds(),
         }),
         stallPromise,
@@ -301,10 +307,7 @@ export function showBootOverlay() {
 async function finishLoginAndLaunch(urlInput: string, session: MembershipLoginSession) {
   if (!deps) return;
   deps.log(`[System] Authenticated successfully as ${session.userName}.`, 'system');
-  localStorage.setItem('jellyfin_url', urlInput);
-  localStorage.setItem('jellyfin_token', session.accessToken);
-  localStorage.setItem('jellyfin_userid', session.userId);
-  localStorage.setItem('jellyfin_last_userid', session.userId); // remembered for next boot's card highlight
+  persistSession(activeBackend().kind, urlInput, session);
 
   deps.log('[System] Downloading movie libraries and catalog metadata...', 'system');
   // Stall watchdog, not a deadline — see the auto-login path for why a fixed
@@ -324,7 +327,7 @@ async function finishLoginAndLaunch(urlInput: string, session: MembershipLoginSe
   try {
     [libs] = await Promise.all([
       Promise.race([
-        fetchJellyfinLibrariesAndMovies(urlInput, session.accessToken, session.userId, armLoginStall, {
+        fetchLibrariesAndMovies(urlInput, session.accessToken, session.userId, armLoginStall, {
           excludeLibraryIds: excludedLibraryIds(),
         }),
         loginTimeout
@@ -363,14 +366,15 @@ export async function showLoginOrCards(reason?: string) {
   const savedUrl = localStorage.getItem('jellyfin_url');
   if (savedUrl) {
     try {
-      const users = await fetchPublicUsers(savedUrl);
+      const users = await fetchPublicUsers(savedUrl, localStorage.getItem(TOKEN_KEY) ?? undefined);
       if (users.length > 0) {
         if (reason) deps.log(`[System] ${reason}`, 'system');
         deps.log(`[System] Found ${users.length} membership card(s) on ${savedUrl}.`, 'system');
         openMembershipCardPicker({
           serverUrl: savedUrl,
           users,
-          lastUserId: localStorage.getItem('jellyfin_last_userid'),
+          sessionToken: localStorage.getItem(TOKEN_KEY) ?? undefined,
+          lastUserId: localStorage.getItem(LAST_USER_ID_KEY),
           onLogin: (session) => finishLoginAndLaunch(savedUrl, session),
           onManualLogin: () => abortBootToLogin(reason),
           onDemoMode: () => {
@@ -450,20 +454,43 @@ export async function checkCredentialsAndLoad() {
   const envUser = (typeof import.meta.env !== 'undefined' ? import.meta.env.VITE_JELLYFIN_USERNAME : undefined) || '';
   const envPass = (typeof import.meta.env !== 'undefined' ? import.meta.env.VITE_JELLYFIN_PASSWORD : undefined) || '';
 
-  let jellyfinUrl = localStorage.getItem('jellyfin_url') || envUrl;
+  // A Plex deployment configures a URL + TOKEN rather than a name/password:
+  // Plex's sign-in lives on plex.tv behind an interactive link flow that a
+  // headless first boot can't drive, so the token is the credential. Get one
+  // from any signed-in Plex client (Account → the X-Plex-Token on a request)
+  // or from the setup terminal after linking once.
+  const envPlexUrl = (typeof import.meta.env !== 'undefined' ? import.meta.env.VITE_PLEX_URL : undefined) || '';
+  const envPlexToken = (typeof import.meta.env !== 'undefined' ? import.meta.env.VITE_PLEX_TOKEN : undefined) || '';
+
+  let jellyfinUrl = localStorage.getItem('jellyfin_url') || envUrl || envPlexUrl;
   let token = localStorage.getItem('jellyfin_token');
   let userId = localStorage.getItem('jellyfin_userid');
+
+  if ((!token || !userId) && envPlexUrl && envPlexToken) {
+    setActiveBackendKind('plex');
+    d.log('[System] File credentials (.env.local) name a Plex server. Adopting the token...', 'system');
+    try {
+      const session = await activeBackend().adoptToken!(envPlexUrl, envPlexToken);
+      // The env token, not the account's — it's what the server was given.
+      const envSession = { ...session, accessToken: envPlexToken };
+      persistSession('plex', envPlexUrl, envSession);
+      localStorage.setItem(USERNAME_KEY, envSession.userName);
+      jellyfinUrl = envPlexUrl;
+      token = envSession.accessToken;
+      userId = envSession.userId;
+      d.log(`[System] Auto-authenticated successfully as ${envSession.userName}.`, 'system');
+    } catch (e: any) {
+      d.log(`[System] The Plex token in .env.local was refused: ${e?.message ?? e}`, 'system');
+    }
+  }
 
   // If no saved token/userId, attempt auto-authentication using credentials stored in .env.local / env
   if ((!token || !userId || !jellyfinUrl) && envUrl && envUser && envPass) {
     d.log('[System] File credentials (.env.local) found. Authenticating automatically...', 'system');
     try {
       const session = await authenticateUser(envUrl, envUser, envPass);
-      localStorage.setItem('jellyfin_url', envUrl);
-      localStorage.setItem('jellyfin_username', envUser);
-      localStorage.setItem('jellyfin_token', session.accessToken);
-      localStorage.setItem('jellyfin_userid', session.userId);
-      localStorage.setItem('jellyfin_last_userid', session.userId);
+      persistSession('jellyfin', envUrl, session);
+      localStorage.setItem(USERNAME_KEY, envUser);
       jellyfinUrl = envUrl;
       token = session.accessToken;
       userId = session.userId;
@@ -543,7 +570,7 @@ export async function checkCredentialsAndLoad() {
         let libs: JellyfinLibrary[];
         [libs] = await Promise.all([
           Promise.race([
-            fetchJellyfinLibrariesAndMovies(jellyfinUrl, activeToken!, activeUserId!, armStall, {
+            fetchLibrariesAndMovies(jellyfinUrl, activeToken!, activeUserId!, armStall, {
               excludeLibraryIds: excludedLibraryIds(),
             }),
             stallPromise

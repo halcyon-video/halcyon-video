@@ -11,8 +11,8 @@
 // Explicit .ts specifiers: tests/playback-flow.test.ts loads this module
 // under `node --test`'s type-stripping loader, which can't resolve a bare
 // sibling specifier (same note as jellyfin.ts's own media-release-date.ts import).
-import type { Movie, Episode } from './jellyfin.ts';
-import { reportPlaybackStart, reportPlaybackProgress, reportPlaybackStopped } from './jellyfin.ts';
+import type { Movie, Episode } from './media-types.ts';
+import { reportPlaybackStart, reportPlaybackProgress, reportPlaybackStopped } from './media-backend.ts';
 
 const TICKS_PER_SECOND = 10_000_000;
 

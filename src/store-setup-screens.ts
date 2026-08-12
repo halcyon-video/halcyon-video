@@ -19,10 +19,22 @@ export type SetupAction =
   | 'change-server' // notice: drop the saved server, back to a blank home
   | 'open-store'    // libraries: choices made, sync + stock
   | 'sign-in'       // manual-auth: authenticate the typed name/password
+  | 'cancel-link'   // link: abandon the pending code and go back
   | 'back-home';    // manual-auth: abandon sign-in
 
-/** One provider row today; the list is the seam PLEX (#32) slots into. */
-export const SETUP_PROVIDERS = ['JELLYFIN'] as const;
+/** Distributors this store can be supplied by (#32). The row is a manual
+ *  override AND the fallback: dial() probes the typed address and switches to
+ *  whatever actually answers, so the row only decides the default port and
+ *  what to assume when nothing identifiable answers. */
+export const SETUP_PROVIDERS = ['JELLYFIN', 'PLEX'] as const;
+
+export type SetupProvider = (typeof SETUP_PROVIDERS)[number];
+
+/** Default address per provider, offered before the user types their own. */
+export const SETUP_PROVIDER_DEFAULTS: Record<SetupProvider, string> = {
+  JELLYFIN: 'http://localhost:8096',
+  PLEX: 'http://localhost:32400',
+};
 
 export interface SetupLibraryRow {
   id: string;
@@ -38,6 +50,7 @@ export type SetupScreen =
   | { kind: 'members'; count: number }
   | { kind: 'manual-auth'; row: number; username: string; password: string; error?: string }
   | { kind: 'libraries'; rows: SetupLibraryRow[]; row: number; error?: string }
+  | { kind: 'link'; provider: string; code: string; verificationUrl: string; step: string }
   | { kind: 'sync'; stage: string; pages: number }
   | { kind: 'arriving' }
   | { kind: 'notice'; address: string; detail: string; row: number };
@@ -98,6 +111,10 @@ export function setupScreenKey(s: SetupScreen, key: SetupKey): { state: SetupScr
       }
       return { state: s };
     }
+    case 'link':
+      // The code is live and being polled; the only thing to decide here is
+      // whether to abandon it.
+      return key === 'back' ? { state: s, action: 'cancel-link' } : { state: s };
     case 'dialing':
     case 'members':
     case 'sync':
@@ -195,6 +212,24 @@ export function setupScreenLines(s: SetupScreen): { lines: string[]; cursorLine:
           s.step.slice(0, 40),
         ],
         cursorLine: 5,
+      };
+    case 'link':
+      return {
+        lines: [
+          'NEW STORE SETUP — OPENING DAY',
+          '',
+          `LINK THIS STORE TO ${s.provider}.`.slice(0, 40),
+          '',
+          'ON ANOTHER DEVICE, OPEN',
+          `  ${s.verificationUrl}`.slice(0, 40),
+          'AND ENTER THIS CODE:',
+          '',
+          // The code is the whole point of the screen — centred and spaced so
+          // it reads across a room from the CRT.
+          `        ${s.code.split('').join(' ')}`.slice(0, 40),
+          s.step.slice(0, 40),
+        ],
+        cursorLine: 8,
       };
     case 'members':
       return {

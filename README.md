@@ -1,6 +1,6 @@
 # Halcyon Video — a 3D video store for your media server
 
-**Your Jellyfin library, rebuilt as a walkable 1990s video rental store.** Every
+**Your Jellyfin or Plex library, rebuilt as a walkable 1990s video rental store.** Every
 movie you own is a case on a shelf. Browse the aisles under warm fluorescents,
 pull *Back to the Future* off the wall, flip it over and read the back of the
 box, carry it to the counter, and watch the clerk drop it in a bag that
@@ -45,7 +45,7 @@ The short answers, so you don't have to go looking for them.
 |---|---|
 | **Run in Docker?** | Yes — one `docker run`, or `docker compose up -d` from a clone. [Quick start ↓](#quick-start) |
 | **Do video games?** | Yes — point it at [RomM](https://github.com/rommapp/romm) and a whole department appears: per-platform bays, period-correct boxes and jewel cases. [More ↓](#the-games-department) |
-| **Work with Plex or Emby?** | Not yet — Jellyfin today. The media layer is one module and adapters are the top roadmap item ([#32](https://github.com/halcyon-video/halcyon-video/issues/32)). |
+| **Work with Plex?** | Yes — Jellyfin and Plex both. Type the address and the store works out which one answered; Plex signs in with a code on `plex.tv/link`, and its Home users become the membership cards. Emby is not supported. [More ↓](#which-media-server) |
 | **Run on a Raspberry Pi?** | Yes — **2.5D mode** runs the same store as plain HTML/CSS. [More ↓](#25d-mode--the-same-store-for-a-raspberry-pi) |
 | **Work away from home?** | Yes — **Remote Play** streams the live store to any browser, with its own TURN relay for off-LAN viewers. [More ↓](#remote-play--the-store-in-your-pocket) |
 | **Look like *my* video store?** | Yes — brand, logo, colors, themes, fixtures and sign art are all data you drop in a folder, not code. [More ↓](#make-it-yours) |
@@ -64,7 +64,7 @@ The short answers, so you don't have to go looking for them.
 ## What it is
 
 A Vite + TypeScript + **three.js** app (optionally Tauri-wrapped) that connects
-to **[Jellyfin](https://jellyfin.org/)** and procedurally builds a period video
+to **[Jellyfin](https://jellyfin.org/)** or **[Plex](https://www.plex.tv/)** and procedurally builds a period video
 store from whatever you have: every library becomes an aisle, genres become
 signposted sections, duplicate quality versions stack behind the face copy, the
 worst-rated titles literally end up in the **Bargain Bin**. It runs 24/7 on an
@@ -73,7 +73,7 @@ renders *nothing at all* and idles at near-zero CPU/GPU for days.
 
 The screenshots in this README show the store running its built-in demo
 catalog — public-domain classics on every shelf, no media server attached
-(the same thing the live demo link runs). Point it at your Jellyfin and every
+(the same thing the live demo link runs). Point it at your own server and every
 case becomes something you own. This isn't a tech demo that gets old in five
 minutes; it's how our family has picked a movie every night for months.
 
@@ -267,7 +267,7 @@ printed for.
   libplacebo and the **original lossless audio** — no transcode, no tens of GB
   of HLS segments. The remote still works: OK pauses, Up cycles subs, Down
   cycles audio, Left/Right scrub.
-- Playback reports back to Jellyfin (start/progress/stop), so resume points and
+- Playback reports back to your server (start/progress/stop), so resume points and
   watch history — which feed the staff picks — stay honest.
 
 ---
@@ -304,7 +304,7 @@ HDR skies) / street-view outside the glass.
 
 ### Membership cards
 
-Jellyfin users appear as **laminated membership cards** — deterministic member
+Server users appear as **laminated membership cards** — deterministic member
 numbers, "MEMBER SINCE", the user's avatar, a glint sweep. Picking your card is
 how you log in; cards flip over for password entry.
 
@@ -392,7 +392,7 @@ default 2) and viewers past the cap are turned away until one frees up.
 
 - The **bargain bin** is genuinely your library's worst-audience-scored titles,
   leaning in a rummage jumble. Critic scores are pointedly ignored.
-- **Four-sided collection displays** rotate a different Jellyfin BoxSet per
+- **Four-sided collection displays** rotate a different collection per
   face, re-picked daily.
 - The candy rack, tape rewinder, "BE KIND — PLEASE REWIND" tents, EAS pedestals,
   the beige security camera aimed exactly along the overview vantage.
@@ -440,7 +440,7 @@ This app's steady state is *days on a shelf*, and it's engineered like it:
 
 | You have | You get |
 |---|---|
-| **Jellyfin** (required — or demo mode) | The store, browsing, walk mode, playback, rentals, living room, clerk, themes, brand editor |
+| **Jellyfin or Plex** (required — or demo mode) | The store, browsing, walk mode, playback, rentals, living room, clerk, themes, brand editor |
 | **Jellyseerr** (optional) | Recommendation clasps, REQUEST / COMING SOON cases, collection gaps, discovery shelving, staff picks, FOR YOU endcaps, "order it for me" |
 | **RomM** (optional) | The video-game department: per-platform bays, real carton proportions, your cover scans |
 | **The server on the same machine as the TV** | mpv playback — real HDR and original lossless audio, no transcode |
@@ -455,7 +455,7 @@ never built, and callers never branch.
 <br>
 
 The store is built to run on your own network. Fonts, textures and every other
-asset ship inside the bundle, and Jellyfin, Jellyseerr and RomM are your own
+asset ship inside the bundle, and your media server, Jellyseerr and RomM are your own
 servers at your own addresses — nothing is fetched from a CDN to draw the store.
 
 Two optional features are the exceptions, and only while you use them:
@@ -467,7 +467,7 @@ Two optional features are the exceptions, and only while you use them:
 
 Jellyseerr returns a TMDB *path* rather than the image itself — its own web UI
 fetches from that same CDN — so there is no copy on your server to serve
-instead. Art for titles you already own always comes from Jellyfin, which is why
+instead. Art for titles you already own always comes from your own server, which is why
 the store proper works with the internet unplugged.
 
 Remote Play sends no video through the STUN server: it is one question ("what
@@ -487,7 +487,7 @@ git clone https://github.com/halcyon-video/halcyon-video
 cd halcyon-video
 npm install
 npm run dev          # dev server on :1420 — first boot shows the login /
-                     # membership cards; enter your Jellyfin URL + credentials
+                     # membership cards; enter your server URL + credentials
 ```
 
 **Docker — the no-fuss way:**
@@ -500,7 +500,7 @@ docker run -d --name halcyon --network host --restart unless-stopped \
 …or, from a clone, `docker compose up -d` (builds the image locally; the
 prebuilt image is published from releases). Then:
 
-1. Open `http://<host>:1420` in a browser and log into your Jellyfin — or
+1. Open `http://<host>:1420` in a browser and log into your media server — or
    append `?demo=1` to try it with no server at all.
 2. Open `http://<host>:1420/remote.html` on a phone, tablet, or set-top box:
    the **container** renders the store and streams it over WebRTC, with your
@@ -549,11 +549,41 @@ No. Render-on-demand means it only draws when something changes, a dynamic
 resolution scaler fits it to your hardware, and the **2.5D mode** runs the
 whole store as HTML/CSS on a Raspberry Pi.
 
+<a id="which-media-server"></a>
 **Does it work with Plex or Emby?**
-Today it speaks Jellyfin (and a no-server demo mode). The media layer is one
-module, and Plex/Emby adapters are the most-asked-about item on the roadmap —
-[issue #32](https://github.com/halcyon-video/halcyon-video/issues/32) is the
-one to watch or chime in on.
+Jellyfin and Plex both; Emby is not supported. The media layer sits behind one
+interface (`src/media-backend.ts`) with a backend on either side of it, and the
+store picks between them by asking the address you typed which one it is — so
+there is no server type to declare, just an address.
+
+The two differ in exactly three places you'll notice:
+
+- **Signing in.** Jellyfin takes a name and password. Plex shows a four-letter
+  code on the counter terminal that you approve at `plex.tv/link` from your
+  phone — no keyboard needed on the HTPC, and the only route that works with
+  two-factor auth. You can also paste an `X-Plex-Token` into the sign-in screen
+  or `VITE_PLEX_TOKEN`, which is what a headless or scripted deploy wants.
+- **Membership cards.** Jellyfin fans out its public user list; Plex fans out
+  your **Plex Home** members, and picking one switches to that member's own
+  token so watch state and resume points land on their history, not yours.
+- **Speed.** A Plex sync is markedly faster — a section listing arrives whole
+  instead of paged, and full metadata comes back comma-batched. A 458-title
+  library syncs in about 3 seconds.
+
+One Plex quirk worth knowing about, because it is Plex's and not ours: a Plex
+Media Server only allows browser requests from `localhost`, and answers every
+other origin with a fixed `app.plex.tv` CORS header — with no setting to add
+your own, the way Jellyfin has. So a store served over the LAN
+(`http://<host>:1420`) would have every request to Plex blocked by the browser.
+Halcyon handles that itself: media-server traffic is routed through its own
+`/plex-proxy` endpoint, host-side, where CORS doesn't apply. Nothing to
+configure — but it is why Plex needs the app's server (`npm run dev` /
+`npm run serve` / Docker) rather than a bare static host. The desktop build
+doesn't go near this: its requests never touch a browser policy.
+
+Everything downstream — shelves, collections, the Bargain Bin, staff picks,
+4K stickers, quality-version pickers, resume, Jellyseerr requests — works the
+same on both.
 
 **Can I run it in Docker?**
 Yes — see [Quick start](#quick-start). One `docker run` with `--network host`,
@@ -610,7 +640,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md).
 *Halcyon Video is a fictional brand created for this project. This repository
 contains no third-party trademarks or brand assets: no real chain's name,
 logo, trade dress, or typefaces are included or distributed. Movie artwork
-visible in screenshots is library metadata from the author's personal Jellyfin
+visible in screenshots is library metadata from the author's personal library
 server. This project is not affiliated with, endorsed by, or connected to any
 video-rental company, past or present — it is a love letter to Friday nights
 at all of them.*

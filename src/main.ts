@@ -2,6 +2,11 @@ import { invoke } from '@tauri-apps/api/core';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { measureDisplayHz } from './display-hz';
 import { installDebugLog, debugLogPath } from './debug-log';
+// Side-effect import: registers the Jellyfin and Plex backends before anything
+// resolves activeBackend(). It sits above the media-layer imports below
+// because module evaluation follows import order — moving it down would let a
+// facade call run against an empty registry.
+import './media-backends.ts';
 
 // Before anything else that might fail: a packaged build has no devtools and
 // no stdout, so without this every console line is written to nowhere.
@@ -17,26 +22,30 @@ function closeApp() { isTauri ? getCurrentWindow().close() : window.close(); }
 import {
   authenticateUser,
   validateToken,
-  Movie,
-  JellyfinLibrary,
   fetchFirstEpisodeOfSeries,
   fetchSeriesEpisodes,
   reportPlaybackStart,
   reportPlaybackStopped,
   reportPlaybackProgress,
   buildHlsStreamUrl,
-  isHevcPassThroughEnabled,
   buildStaticStreamUrl,
   buildSubtitleTrackUrl,
   pickSubtitleDelivery,
-  isDirectPlaySafe,
   fetchItemPlaybackInfo,
+} from './media-backend.ts';
+import {
+  isHevcPassThroughEnabled,
+  isDirectPlaySafe,
+  collectionTmdbIds,
+  collectionSyncStats,
+} from './media-shared.ts';
+import type {
+  Movie,
+  JellyfinLibrary,
   MediaPlaybackInfo,
   MovieVersion,
   Episode,
-  collectionTmdbIds,
-  collectionSyncStats
-} from './jellyfin';
+} from './media-types.ts';
 import {
   fetchComingSoonMovies,
   fetchDiscoverMovies,
@@ -3193,7 +3202,7 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
   // the picture, because there is no client renderer for them.
   const subtitleDelivery = pickSubtitleDelivery(streams, initialSubtitleIndex);
   const subtitleTrackUrl = subtitleDelivery.kind === 'text'
-    ? buildSubtitleTrackUrl(jellyfinUrl, token, playbackId, subtitleDelivery.streamIndex, mediaSourceId)
+    ? (buildSubtitleTrackUrl(jellyfinUrl, token, playbackId, subtitleDelivery.streamIndex, mediaSourceId) ?? undefined)
     : undefined;
   const burnInSubtitleIndex = subtitleDelivery.kind === 'burn-in' ? subtitleDelivery.streamIndex : undefined;
 

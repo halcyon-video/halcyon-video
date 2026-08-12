@@ -25,8 +25,8 @@
 // main.ts never registers anything. Keys are stable per library id, so a
 // choice survives re-syncs and member switches.
 import { registerSetting } from './settings';
-import { knownServerLibraries } from './jellyfin';
-import type { LibrarySummary } from './jellyfin';
+import { knownServerLibraries } from './media-backend.ts';
+import type { LibrarySummary } from './media-types.ts';
 
 export const CARRY_LIB_PREFIX = 'bb_carrylib_';
 export const TV_LIB_PREFIX = 'bb_tvlib_';

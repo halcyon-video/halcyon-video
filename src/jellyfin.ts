@@ -4,172 +4,70 @@ import { invoke } from '@tauri-apps/api/core';
 // sibling specifier (same note as media-date-screen.ts).
 import { activeMediaCutoff, titleReleasedBy } from './media-release-date.ts';
 
-export interface Movie {
-  id: string;
-  title: string;
-  year: number;
-  duration: string;
-  rating: string;
-  overview: string;
-  director: string;
-  actors: string[]; // top-billed cast, at most 5 names
-  genres: string[];
-  localPath: string;
-  posterUrl?: string;
-  backdropUrl?: string;
-  dateCreated?: string;
-  isSeries?: boolean;
-  is4k?: boolean;
-  communityRating?: number; // 0-10 (e.g. 9.0 = 4.5 stars out of 5)
-  criticRating?: number;    // 0-100 Rotten Tomatoes score
-  libraryName?: string;
-  studios?: string[];
-  // Synthesized (see jellyseerr.ts) for a title that's been requested on
-  // Jellyseerr but hasn't finished downloading yet: it gets a display case
-  // with poster art on the New Releases wall but no rental backstock, and
-  // selecting it should show "Coming Soon" rather than allow playback.
-  comingSoon?: boolean;
-  // TMDB id (see jellyseerr.ts's fetchDiscoverMovies) -- required to call
-  // requestMovie() for a discovery title.
-  tmdbId?: number;
-  // Synthesized (see jellyseerr.ts's fetchDiscoverMovies) for a Jellyseerr
-  // trending/popular suggestion that is NOT in the Jellyfin library: it gets
-  // an empty display case shelved inline with the regular stock (REQUEST
-  // corner sticker, no rental backstock), and selecting it lets the user
-  // REQUEST it through Jellyseerr instead of play it.
-  discovery?: boolean;
-  // True when a `discovery` or `collectionGap` title has already been
-  // requested (through this app this session, or because Jellyseerr's own
-  // records say so -- see StoreScene's merge of comingSoon into
-  // discoveryMovies, and fetchCollectionGaps keeping requested gaps). These
-  // cases stamp the gold COMING SOON corner label instead of the blue
-  // REQUEST one; endcap candidates wear the green REQUESTED tag.
-  discoveryRequested?: boolean;
-  // T18: synthesized (see romm.ts's fetchGames) for a video-game title from a
-  // Romm server. It gets a display case (cover art) in the VIDEO GAMES section,
-  // is grouped under `platform` (e.g. "SNES"), and selecting it "rents" -> the
-  // Tauri build launches the configured emulator on `launchPath`; the browser
-  // build shows a "take it to the counter" toast.
-  game?: boolean;
-  platform?: string;
-  launchPath?: string;
-  // Flat scan art for the case's OTHER faces (back panel / spine / disc
-  // label), resolved by romm.ts's gameArtUrls(). Absent for a title whose
-  // library never scraped that media — the faces then keep their generated
-  // fallbacks. Typed loosely here so jellyfin.ts stays free of a romm.ts
-  // import (romm.ts already imports this module).
-  gameArt?: { back?: string; spine?: string; label?: string };
-  // Discs in this title's retail case (romm.ts discCountFrom: distinct
-  // "(Disc N)" tags across the rom + its siblings). Only set when >= 2 —
-  // it thickens a jewel-case platform's box to the multi-disc fat case.
-  discCount?: number;
-  // Audio/subtitle streams of the primary media source (already fetched with
-  // the catalog via Fields=MediaSources) — drives the in-app player's track
-  // picker. Absent for series containers, games, and discovery titles.
-  mediaStreams?: MediaStreamInfo[];
-  // Container + video/audio codecs of the primary media source (same
-  // MediaSources fetch as mediaStreams above) — lets launchVideoPlayback
-  // decide direct-play vs. HLS transcode BEFORE opening the player (see
-  // isDirectPlaySafe). Absent for series containers, games, and discovery
-  // titles; series episodes are probed on demand instead (see
-  // fetchItemPlaybackInfo) since the episode list never fetches MediaSources.
-  mediaPlaybackInfo?: MediaPlaybackInfo;
-  // Width/height ratio of the poster image, straight from Jellyfin's
-  // PrimaryImageAspectRatio field. Lets flat mode size a case to the art
-  // before the lazy poster loads (issue #108) instead of reflowing the row
-  // on every image load. Absent for games, discovery titles, and servers
-  // that haven't probed the image yet.
-  primaryImageAspectRatio?: number;
-  // Alternate quality versions of the same film. Built two ways: a Jellyfin
-  // item whose versions were merged server-side carries several MediaSources
-  // (one version each), and duplicate items of the same film (a 4K rip and a
-  // 1080p rip ingested separately) are collapsed to ONE shelf box by
-  // collapseDuplicateVersions(). Present ONLY when there are 2+ choices,
-  // ordered best-quality-first; pressing Play on such a title opens the
-  // version picker (main.ts) instead of streaming blind.
-  versions?: MovieVersion[];
-  // Name of the Jellyfin collection (BoxSet) this movie belongs to, e.g.
-  // "Harry Potter Collection". Jellyfin list queries don't carry membership on
-  // the item itself, so this is tagged in a separate pass after library sync
-  // (see applyCollectionMembership). Members of one collection file together
-  // on the shelf in premiere order (see shelfTitleCompare in store-layout).
-  collectionName?: string;
-  // ISO premiere date — breaks the chronological tie between same-collection
-  // titles released the same year (ProductionYear alone can't order them).
-  premiereDate?: string;
-  // Synthesized (see jellyseerr.ts's fetchCollectionGaps) for an entry of a
-  // collection the user PARTLY owns — you have 5 of the 8 Harry Potters, so
-  // the other 3 stand in their correct chronological shelf position wearing a
-  // corner sticker, with no rental backstock behind them. Selecting one
-  // requests it through Jellyseerr rather than playing it.
-  //
-  // Jellyfin can't source these on its own: its BoxSet is built from the files
-  // you have, so it has no idea the collection is incomplete. The full member
-  // list comes from TMDB via Jellyseerr, keyed on collectionTmdbId below.
-  collectionGap?: boolean;
-  // Per-user watch state off Jellyfin's UserData (the catalog queries hit the
-  // per-user /Users/{id}/Items endpoint, so this is THIS user's history).
-  // Watched titles are the anchors the staff-picks engine aggregates TMDB
-  // "people who liked this also liked" results over (see staff-picks.ts).
-  played?: boolean;
-  playCount?: number;
-  lastPlayedDate?: string; // ISO — orders anchors by recency
-  // Ticks into the item Jellyfin says THIS user left off at. The server only
-  // ever returns a non-zero PlaybackPositionTicks while the item is still
-  // inside its own resume window (fully watched or never started both come
-  // back unset) — so "present -> resume there" is the same rule every other
-  // Jellyfin client follows, with no separate "start over" affordance needed.
-  resumePositionTicks?: number;
-  // Exact runtime in ticks (Jellyfin's RunTimeTicks), alongside the rounded
-  // `duration` display string above. Lets a natural end-of-file be told apart
-  // from a user quit without a per-path duration probe (see playback-flow.ts).
-  runTimeTicks?: number;
-  // Set by the staff-picks engine on an OWNED title that the aggregated
-  // watch-history recommendations surfaced: its case wears the STAFF PICK
-  // sticker (video-case.ts) and it's eligible for the genre endcaps.
-  staffPick?: boolean;
-  // Top-billed cast as Jellyfin Person references (id + portrait URL), captured
-  // alongside `actors` (name-only) so wall décor (wall-decor.ts) can tally the
-  // library's most-featured actors and pull real portraits without a second
-  // round-trip. Same top-5 cap as `actors`; `imageUrl` is only set when the
-  // person has a PrimaryImageTag in Jellyfin (many crew/cast entries don't).
-  // Undefined on synthesized titles (discovery/collectionGap/game) and the
-  // synthetic demo/harness catalog, which has no Person image data at all.
-  castPeople?: { id: string; name: string; imageUrl?: string }[];
-}
+// The store's domain model lives in media-types.ts now that a second backend
+// (plex.ts) fills the same shapes -- see the note at the top of that file.
+// Re-exported here so the modules that import `Movie` and friends from
+// './jellyfin' keep compiling unchanged.
+import type {
+  Movie,
+  MediaStreamInfo,
+  MovieVersion,
+  MediaPlaybackInfo,
+  HlsStreamOptions,
+  Episode,
+  MediaLibrary,
+  JellyfinLibrary,
+  LibrarySummary,
+  PublicUser,
+  MediaSession,
+} from './media-types.ts';
+export type {
+  Movie,
+  MediaStreamInfo,
+  MovieVersion,
+  MediaPlaybackInfo,
+  HlsStreamOptions,
+  Episode,
+  MediaLibrary,
+  JellyfinLibrary,
+  LibrarySummary,
+  PublicUser,
+  MediaSession,
+};
 
-export interface MediaStreamInfo {
-  /** Jellyfin stream index — pass as AudioStreamIndex/SubtitleStreamIndex. */
-  index: number;
-  type: 'Audio' | 'Subtitle';
-  language?: string;
-  displayTitle?: string;
-  codec?: string;
-  isDefault?: boolean;
-  /** Audio channel count (2 = stereo, 6 = 5.1, 8 = 7.1) — used to print the
-   *  channel layout in the back-cover tech-specs table. Audio streams only. */
-  channels?: number;
-}
-
-/** One playable quality/edition of a film — see Movie.versions. */
-export interface MovieVersion {
-  /** Jellyfin item to stream (and report playback against). */
-  itemId: string;
-  /** Set when this version is one MediaSource of a server-side-merged item;
-   *  passed as MediaSourceId so Jellyfin streams THAT file, not the default. */
-  mediaSourceId?: string;
-  /** Picker row text, e.g. "4K · HDR · HEVC · 54 GB". */
-  label: string;
-  is4k: boolean;
-  /** Video frame size, for best-first ordering. */
-  width?: number;
-  height?: number;
-  /** File path of this version, for the external-player fallback. */
-  localPath?: string;
-  mediaStreams?: MediaStreamInfo[];
-  mediaPlaybackInfo?: MediaPlaybackInfo;
-}
-
+// Backend-neutral media logic (version collapsing, direct-play safety, the
+// collection side-tables, transcode ceilings) lives in media-shared.ts so
+// plex.ts can use the same rules without importing this module. Re-exported
+// for the callers that have always imported them from here.
+import {
+  pickSubtitleDelivery,
+  isTextSubtitleCodec,
+  type SubtitleDelivery,
+  formatBytes,
+  qualityTag,
+  collapseDuplicateVersions,
+  collectionArt,
+  collectionTmdbIds,
+  collectionSyncStats,
+  isHevcPassThroughEnabled,
+  isHevcMain10Supported,
+  isDirectPlaySafe,
+  DEFAULT_VIDEO_BITRATE,
+  COPY_VIDEO_BITRATE,
+} from './media-shared.ts';
+import { knownServerLibraries, rememberKnownLibraries, type MediaBackend } from './media-backend.ts';
+export { knownServerLibraries };
+export {
+  pickSubtitleDelivery,
+  isTextSubtitleCodec,
+  type SubtitleDelivery,
+  collapseDuplicateVersions,
+  collectionArt,
+  collectionTmdbIds,
+  collectionSyncStats,
+  isHevcPassThroughEnabled,
+  isDirectPlaySafe,
+};
 /** Audio + subtitle streams of one media source, for the player's track picker. */
 function extractStreamsFromSource(source: any): MediaStreamInfo[] | undefined {
   const raw = source?.MediaStreams;
@@ -191,23 +89,6 @@ function extractStreamsFromSource(source: any): MediaStreamInfo[] | undefined {
 /** Audio + subtitle streams of an item's first media source. */
 function extractMediaStreams(item: any): MediaStreamInfo[] | undefined {
   return extractStreamsFromSource(item.MediaSources?.[0]);
-}
-
-/** Container + video/audio codecs needed by isDirectPlaySafe. All strings are
- *  lower-cased so callers can compare against fixed allowlists. */
-export interface MediaPlaybackInfo {
-  container?: string;
-  videoCodec?: string;
-  audioCodecs: string[];
-  /** Video frame dimensions of the default source — feed the tech-specs
-   *  table's resolution + aspect-ratio derivation. */
-  width?: number;
-  height?: number;
-  /** Display aspect ratio string straight from Jellyfin (e.g. "16:9",
-   *  "2.40:1"), when the server reports one. */
-  aspectRatio?: string;
-  /** HDR class ("SDR", "HDR10", "DOVI", …) — lets the table flag HDR. */
-  videoRange?: string;
 }
 
 /** Container/codec info of one media source — see MediaPlaybackInfo. */
@@ -233,39 +114,6 @@ function extractPlaybackInfoFromSource(source: any): MediaPlaybackInfo | undefin
 /** Container/codec info of an item's first media source. */
 function extractPlaybackInfo(item: any): MediaPlaybackInfo | undefined {
   return extractPlaybackInfoFromSource(item.MediaSources?.[0]);
-}
-
-export interface Episode {
-  id: string;
-  seriesId: string;
-  seriesName: string;
-  seasonNumber: number;
-  episodeNumber: number;
-  name: string;
-  overview: string;
-  path: string;
-  runTimeTicks?: number;
-  /** This user's UserData.PlaybackPositionTicks — see Movie.resumePositionTicks
-   *  for the same "present -> resume there" rule. */
-  resumePositionTicks?: number;
-  thumbUrl?: string;
-  seasonId?: string;
-  /** Primary (poster, 2:3) image of the Season item this episode belongs to. */
-  seasonPrimaryUrl?: string;
-}
-
-export interface JellyfinLibrary {
-  id: string;
-  name: string;
-  movies: Movie[];
-  genres: string[];
-  /**
-   * Synthesized by games-only.ts: this "library" is one Romm platform, not a
-   * Jellyfin one. Its titles carry no wall categories, so the shelf
-   * planner keeps it un-sectioned and every signboard reads the platform name
-   * (see StorePlan.buildLibraryLayouts).
-   */
-  games?: boolean;
 }
 
 /**
@@ -397,13 +245,6 @@ export async function authenticateUser(
   }
 }
 
-export interface PublicUser {
-  id: string;
-  name: string;
-  hasPassword: boolean;
-  primaryImageTag?: string;
-}
-
 /**
  * Hits Jellyfin's public user list (`/Users/Public`), the same endpoint
  * Jellyfin's own "select user" screen uses -- no auth required. Some
@@ -468,24 +309,6 @@ function checkIs4k(item: any): boolean {
 // ─── Quality versions (4K / 1080p) ───────────────────────────────────────────
 
 /** Human file size for version labels ("54.4 GB"). */
-function formatBytes(bytes: number): string {
-  if (bytes >= 1024 ** 3) return `${(bytes / 1024 ** 3).toFixed(1)} GB`;
-  if (bytes >= 1024 ** 2) return `${Math.round(bytes / 1024 ** 2)} MB`;
-  return `${Math.round(bytes / 1024)} KB`;
-}
-
-/** Resolution bucket name — width AND height checked so scope (1920x800) and
- *  4:3 (1440x1080) content both land in the right bucket. */
-function qualityTag(width?: number, height?: number): string | undefined {
-  const w = width ?? 0;
-  const h = height ?? 0;
-  if (w >= 3200 || h >= 2000) return "4K";
-  if (w >= 1800 || h >= 1030) return "1080p";
-  if (w >= 1150 || h >= 690) return "720p";
-  if (w > 0 || h > 0) return "SD";
-  return undefined;
-}
-
 /** One MovieVersion per MediaSource of a catalog item (best-first sorting and
  *  the 2+-only pruning happen later, in finalizeVersions). Exported for unit
  *  tests only. */
@@ -527,87 +350,6 @@ export function buildItemVersions(item: any): MovieVersion[] {
       mediaPlaybackInfo: extractPlaybackInfoFromSource(source),
     };
   });
-}
-
-// Trailing resolution/format markers stripped when matching duplicate items of
-// the same film ("Heat (4K)" and "Heat" are one movie). Only quality markers —
-// cut markers (Extended, Director's Cut) are left alone: those are genuinely
-// different films content-wise and keep their own shelf box.
-const RES_MARKER_RE =
-  /[\s\-–·]*[[({]?\s*\b(4k|uhd|2160p|1440p|1080[pi]|720p|480p|576p|hdr10\+?|hdr|dolby\s*vision|dv|remux|blu-?ray|web-?(dl|rip)|x26[45]|h\.?26[45]|hevc|av1)\b\s*[\])}]?\s*$/i;
-
-function versionGroupKey(m: Movie): string {
-  let t = m.title.toLowerCase().trim();
-  for (;;) {
-    const stripped = t.replace(RES_MARKER_RE, "").trim();
-    if (stripped === t || stripped.length === 0) break;
-    t = stripped;
-  }
-  return `${t}|${m.year}`;
-}
-
-/** Best-first version order: bigger frame wins; 16:9-normalized so a width-only
- *  entry still ranks against a height-only one. */
-function versionRank(v: MovieVersion): number {
-  return Math.max(v.width ?? 0, ((v.height ?? 0) * 16) / 9, v.is4k ? 3840 : 0);
-}
-
-/** Sort/dedupe a movie's accumulated versions; below 2 real choices the array
- *  is dropped entirely so single-file movies stay exactly as before. */
-function finalizeVersions(m: Movie): void {
-  if (!m.versions || m.versions.length < 2) {
-    m.versions = undefined;
-    return;
-  }
-  const seen = new Set<string>();
-  const versions = m.versions.filter((v) => {
-    const key = `${v.itemId}|${v.mediaSourceId ?? ""}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-  if (versions.length < 2) {
-    m.versions = undefined;
-    return;
-  }
-  versions.sort((a, b) => versionRank(b) - versionRank(a));
-  m.versions = versions;
-  // The single remaining box advertises the best available quality.
-  if (versions.some((v) => v.is4k)) m.is4k = true;
-}
-
-/**
- * Collapse duplicate entries of the same film (same normalized title + year)
- * into ONE shelf box carrying every quality as a Movie.version — the fix for
- * a 4K and a 1080p rip of one movie standing side by side on the shelf. The
- * first-seen entry keeps the shelf spot and its metadata/poster; extra
- * entries contribute their versions and disappear from the catalog. Series,
- * games, and synthesized (discovery/coming-soon) entries never collapse.
- * Exported for unit tests only.
- */
-export function collapseDuplicateVersions(movies: Movie[], context: string): Movie[] {
-  const byKey = new Map<string, Movie>();
-  const out: Movie[] = [];
-  let collapsed = 0;
-  for (const m of movies) {
-    if (m.isSeries || m.game || m.discovery || m.comingSoon || m.collectionGap) {
-      out.push(m);
-      continue;
-    }
-    const prior = byKey.get(versionGroupKey(m));
-    if (!prior) {
-      byKey.set(versionGroupKey(m), m);
-      out.push(m);
-      continue;
-    }
-    prior.versions = [...(prior.versions ?? []), ...(m.versions ?? [])];
-    collapsed++;
-  }
-  for (const m of out) finalizeVersions(m);
-  if (collapsed > 0) {
-    console.info(`[Jellyfin] ${context}: collapsed ${collapsed} duplicate quality version(s) into their main title.`);
-  }
-  return out;
 }
 
 // Item types ingested as shelf titles. "Video" covers Jellyfin's
@@ -787,33 +529,6 @@ export async function fetchMediaCatalog(
  * membership in list queries, so each BoxSet's children are walked once here.
  * A movie in several collections keeps the first one seen — one shelf spot.
  */
-/**
- * Artwork for the collections that survived the version-pair filter, keyed by
- * collection name (the same key `Movie.collectionName` carries). Populated by
- * fetchCollectionMembership; read by the four-sided collection displays to
- * build their signage. Empty when running against the synthetic harness
- * library, in which case the signs fall back to a member title's backdrop.
- */
-export const collectionArt = new Map<string, { posterUrl?: string; backdropUrl?: string }>();
-
-/**
- * Collection name -> TMDB *collection* id, harvested from each BoxSet's
- * ProviderIds during the same membership sync. This is the only bridge from a
- * Jellyfin BoxSet (which knows only what's on disk) to the collection's full
- * member list, so it's what lets fetchCollectionGaps work out which entries
- * are missing. Empty for BoxSets the user assembled by hand (no TmdbCollection
- * id) and in the synthetic harness library — those collections simply show no
- * gaps.
- */
-export const collectionTmdbIds = new Map<string, number>();
-
-/**
- * Counts from the last membership sync, for the boot console's collection-gap
- * status line. jellyfin.ts can't call main.ts's logToConsole (circular), so it
- * records what it saw and main.ts does the talking.
- */
-export const collectionSyncStats = { boxSets: 0, scraped: 0, rejectedVersionPairs: 0 };
-
 async function fetchCollectionMembership(
   url: string,
   token: string,
@@ -995,42 +710,6 @@ async function fetchVideoViews(url: string, token: string, userId: string): Prom
     );
     return keep;
   });
-}
-
-export interface LibrarySummary {
-  id: string;
-  name: string;
-}
-
-const KNOWN_LIBS_KEY = 'bb_known_libraries';
-
-/**
- * Remember the server's FULL video-library list (id + name) whenever a fetch
- * sees it — the fetchers above/below are the only places that ever see the
- * complete list, exclusions and all. localStorage-persisted so the Store
- * Libraries settings page can offer EXCLUDED libraries for re-enabling on
- * every later boot (#41): an excluded library is absent from the synced
- * catalog by design, so the catalog alone can never list it again.
- */
-function rememberKnownLibraries(libs: ReadonlyArray<LibrarySummary>): void {
-  if (typeof localStorage === 'undefined') return;
-  try {
-    localStorage.setItem(KNOWN_LIBS_KEY, JSON.stringify(libs.map((l) => ({ id: l.id, name: l.name }))));
-  } catch { /* quota — the drawer just misses excluded rows until next boot */ }
-}
-
-/** The last-remembered full server library list ([] before any real fetch). */
-export function knownServerLibraries(): LibrarySummary[] {
-  if (typeof localStorage === 'undefined') return [];
-  try {
-    const raw = localStorage.getItem(KNOWN_LIBS_KEY);
-    const parsed = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed)
-      ? parsed.filter((l) => l && typeof l.id === 'string' && typeof l.name === 'string')
-      : [];
-  } catch {
-    return [];
-  }
 }
 
 /**
@@ -1420,61 +1099,6 @@ export async function stopActiveEncoding(playSessionId: string, log?: (msg: stri
   }
 }
 
-// ─── Direct-play safety ───────────────────────────────────────────────────────
-
-/** MediaSource.isTypeSupported, guarded for non-browser contexts. */
-function mseSupports(mime: string): boolean {
-  try {
-    return typeof MediaSource !== 'undefined' && MediaSource.isTypeSupported(mime);
-  } catch {
-    return false;
-  }
-}
-
-// Whether this webview's MSE can decode HEVC, probed once at module load.
-// hvc1.1.6.* = Main (8-bit), hvc1.2.4.* = Main 10 — movie remuxes (and anime
-// especially) are typically 10-bit. When the webview can decode HEVC, HLS
-// requests list it as an allowed codec so Jellyfin STREAM-COPIES the video
-// instead of re-encoding it to H.264 — a cheap remux (audio-only transcode)
-// instead of a full ffmpeg video transcode.
-const HEVC_MAIN_SUPPORTED = mseSupports('video/mp4; codecs="hvc1.1.6.L153.B0"');
-const HEVC_MAIN10_SUPPORTED = mseSupports('video/mp4; codecs="hvc1.2.4.L153.B0"');
-
-const DIRECT_PLAY_SAFE_CONTAINERS = new Set(['mp4', 'm4v', 'mov', 'webm']);
-const DIRECT_PLAY_SAFE_VIDEO_CODECS = new Set(['h264', 'vp8', 'vp9', 'av1']);
-// HEVC direct play only when Main 10 decodes too: MediaPlaybackInfo doesn't
-// carry bit depth, so we can't tell an 8-bit file from a 10-bit one here.
-if (HEVC_MAIN10_SUPPORTED) {
-  DIRECT_PLAY_SAFE_VIDEO_CODECS.add('hevc');
-  DIRECT_PLAY_SAFE_VIDEO_CODECS.add('h265');
-}
-const DIRECT_PLAY_SAFE_AUDIO_CODECS = new Set(['aac', 'mp3', 'opus', 'vorbis', 'flac']);
-
-/** Whether HLS requests allow HEVC stream copy (webview MSE decodes HEVC). */
-export function isHevcPassThroughEnabled(): boolean {
-  return HEVC_MAIN_SUPPORTED;
-}
-
-/**
- * True only when the item's container, video codec, and every audio codec are
- * all in WebKitGTK's known-safe allowlist — i.e. safe to try the raw
- * `stream?static=true` URL. WebKitGTK silently DROPS audio tracks whose codec
- * isn't in its allowlist (AC3/EAC3/DTS are typical movie-rip audio) regardless
- * of installed GStreamer decoders, with no error firing to trigger the normal
- * direct→HLS fallback — so anything missing or unrecognized must default to
- * NOT safe rather than risk silent audio. MKV is deliberately excluded even
- * when its codecs are otherwise fine: WebKit's range-seeking on Matroska is
- * what makes scrubbing take ages; HLS transcode seeks in ~2s by comparison.
- */
-export function isDirectPlaySafe(info: MediaPlaybackInfo | undefined | null): boolean {
-  if (!info) return false;
-  const { container, videoCodec, audioCodecs } = info;
-  if (!container || !DIRECT_PLAY_SAFE_CONTAINERS.has(container)) return false;
-  if (!videoCodec || !DIRECT_PLAY_SAFE_VIDEO_CODECS.has(videoCodec)) return false;
-  if (!audioCodecs || audioCodecs.length === 0) return false;
-  return audioCodecs.every((c) => DIRECT_PLAY_SAFE_AUDIO_CODECS.has(c));
-}
-
 /**
  * On-demand MediaSources probe for an item whose playback info isn't already
  * held in memory. TV episodes are the case in practice: fetchSeriesEpisodes /
@@ -1521,57 +1145,6 @@ export function buildStaticStreamUrl(jellyfinUrl: string, token: string, itemId:
 }
 
 /**
- * Subtitle codecs that are TEXT, and can therefore be fetched as a WebVTT
- * sidecar and rendered by the browser over the video. Everything else — PGS,
- * DVD, DVB, XSUB — is a bitmap the browser cannot draw, so it still has to be
- * burned into the picture server-side (see pickSubtitleDelivery).
- *
- * Jellyfin reports the ffmpeg codec name, which is why both spellings of the
- * common ones are here (`subrip`/`srt`, `ssa`/`ass`); `mov_text` is the MP4
- * flavour and `webvtt`/`vtt` are already what we're asking for.
- */
-const TEXT_SUBTITLE_CODECS = new Set([
-  'subrip', 'srt', 'ass', 'ssa', 'mov_text', 'webvtt', 'vtt', 'text', 'subviewer', 'microdvd',
-]);
-
-/** Is this subtitle stream text (client-renderable) rather than a bitmap? */
-export function isTextSubtitleCodec(codec: string | undefined): boolean {
-  return !!codec && TEXT_SUBTITLE_CODECS.has(codec.toLowerCase());
-}
-
-/**
- * How a chosen subtitle track should be delivered.
- *
- * This is the whole point of the client-side subtitle work: asking the server
- * to burn subtitles in (`SubtitleMethod=Encode`) forces a full video re-encode,
- * so on the browser/Remote Play path merely defaulting captions ON turned every
- * direct-playable file into a transcode. A text track costs the server nothing
- * — it's a sidecar fetch — and switching or disabling it needs no new stream
- * at all. Bitmap subtitles have no client renderer, so they keep the old path
- * and pay the old price.
- */
-export type SubtitleDelivery =
-  | { kind: 'none' }
-  | { kind: 'text'; streamIndex: number }
-  | { kind: 'burn-in'; streamIndex: number };
-
-export function pickSubtitleDelivery(
-  streams: MediaStreamInfo[] | undefined,
-  streamIndex: number | undefined,
-): SubtitleDelivery {
-  if (streamIndex === undefined) return { kind: 'none' };
-  const stream = streams?.find((s) => s.type === 'Subtitle' && s.index === streamIndex);
-  // Unknown stream, or a server that didn't report a codec: assume text and
-  // try the cheap path. The two failure modes are not symmetric — a sidecar
-  // that 404s costs one failed request and leaves the film playing, while a
-  // needless burn-in costs a re-encode of the entire runtime.
-  if (!stream || stream.codec === undefined) return { kind: 'text', streamIndex };
-  return isTextSubtitleCodec(stream.codec)
-    ? { kind: 'text', streamIndex }
-    : { kind: 'burn-in', streamIndex };
-}
-
-/**
  * WebVTT sidecar for one subtitle stream, for a <track> on the <video>.
  * Jellyfin converts SRT/ASS/SSA to VTT on the fly here — styling and
  * positioning are flattened, which is the trade for not re-encoding the film.
@@ -1589,30 +1162,6 @@ export function buildSubtitleTrackUrl(
        + `?api_key=${encodeURIComponent(token)}`;
 }
 
-/** Track/quality overrides for buildHlsStreamUrl (the player's track picker). */
-export interface HlsStreamOptions {
-  /** Jellyfin MediaStream index of the audio track to transcode. */
-  audioStreamIndex?: number;
-  /** Jellyfin MediaStream index of the subtitle track to BURN IN (SubtitleMethod=Encode). */
-  subtitleStreamIndex?: number;
-  /** Video bitrate ceiling in bits/s (default 8 Mbps). */
-  maxBitrate?: number;
-  /** Optional resolution ceiling to pair with a lower bitrate. */
-  maxWidth?: number;
-  /** Absolute item position (ticks) to start the transcode at, so a seek
-   *  lands on an already-offset stream instead of encoding from 0:00 and
-   *  jumping client-side (which is what makes seeking a transcode slow). */
-  startPositionTicks?: number;
-  /** Lower-cased source video codec (MediaPlaybackInfo.videoCodec). HEVC
-   *  pass-through + fMP4 segments are only requested when the source is
-   *  actually HEVC — everything else stays on the battle-tested TS path. */
-  sourceVideoCodec?: string;
-  /** Specific MediaSource of a merged multi-version item to stream
-   *  (MovieVersion.mediaSourceId). Defaults to the item id, i.e. the
-   *  item's default source. */
-  mediaSourceId?: string;
-}
-
 // PlaySessionId baked into the most recently built HLS URL. Exposed via
 // getLastHlsPlaySessionId() so a caller that only has the URL (the player's
 // buildStream callback returns a plain string) can still learn which session
@@ -1622,39 +1171,6 @@ let lastHlsPlaySessionId: string | undefined;
 export function getLastHlsPlaySessionId(): string | undefined {
   return lastHlsPlaySessionId;
 }
-
-// Default video bitrate ceiling (bits/s) for the "Auto" HLS stream. This is
-// NOT a bandwidth limit (the server is on the LAN) — it's a MEMORY limit for
-// the client's MSE SourceBuffer. hls.js buffers ~60-80s ahead regardless of
-// its maxBufferLength/maxBufferSize knobs (verified — it ignores them on a
-// fast VOD source), and the Chromium/Brave webview caps a single video
-// SourceBuffer at ~250 MB. A 38.5 Mbps Blu-ray remux stream-copied verbatim
-// therefore overflows that cap ~35-40s in: hls.js flush-evicts the buffer,
-// punches a hole right in front of the playhead, and playback FREEZES (the
-// "freezes at ~39s" bug, reproduced in Brave). Capping at 20 Mbps keeps
-// ~80s of buffer near ~200 MB, which Brave evicts cleanly with zero stalls
-// (measured). Jellyfin stream-copies sources already under this ceiling and
-// re-encodes heavier remuxes down to it (cheap on the box's QSV/VAAPI); it
-// clamps the encode target to the source bitrate, so this never inflates
-// output. 1080p H.264 at 20 Mbps is visually near-transparent.
-const DEFAULT_VIDEO_BITRATE = 20_000_000;
-
-// Ceiling sent when the source video is being STREAM-COPIED (hevcCopy below).
-// Jellyfin only copies when source bitrate <= requested bitrate, so the 20 Mbps
-// re-encode ceiling above silently forced every 4K remux (94 Mbps for a typical
-// Movies4k title) into a full h264_qsv re-encode — which also drags in a 1440p
-// downscale AND, because Jellyfin's HDR tonemapping doesn't engage on this
-// box's VAAPI-decode pipeline, a `setparams=...bt709` relabel that ships PQ /
-// BT.2020 pixels tagged as Rec.709. That mislabel is what makes 4K HDR titles
-// look washed out. Copying sidesteps all three: the bitstream is untouched, so
-// resolution and HDR10 metadata arrive exactly as mastered.
-//
-// The copy path's real constraint is MEMORY, not bandwidth (LAN server): see
-// HLS_COPY_BUFFER in video-player.ts, which shrinks hls.js's buffer so a
-// 94 Mbps stream stays under Brave's ~250 MB SourceBuffer cap. Keep the two in
-// sync — raising this without shrinking that reintroduces the freeze-at-~39s
-// eviction bug.
-const COPY_VIDEO_BITRATE = 200_000_000;
 
 /**
  * HLS master playlist that asks Jellyfin to transcode (when needed) to
@@ -1675,7 +1191,7 @@ export function buildHlsStreamUrl(jellyfinUrl: string, token: string, itemId: st
   // StartTimeTicks and 500s (see the loader workaround in video-player.ts),
   // so its blast radius is kept to the files that need it.
   const hevcCopy =
-    HEVC_MAIN_SUPPORTED &&
+    isHevcPassThroughEnabled() &&
     (opts?.sourceVideoCodec === "hevc" || opts?.sourceVideoCodec === "h265");
   const segmentContainer = hevcCopy ? "mp4" : "ts";
   const params = new URLSearchParams({
@@ -1700,7 +1216,7 @@ export function buildHlsStreamUrl(jellyfinUrl: string, token: string, itemId: st
   });
   // 10-bit HEVC can't be copied to a webview that only decodes Main — force
   // those back to the h264 transcode rather than hand MSE undecodable video.
-  if (hevcCopy && !HEVC_MAIN10_SUPPORTED) params.set("MaxVideoBitDepth", "8");
+  if (hevcCopy && !isHevcMain10Supported()) params.set("MaxVideoBitDepth", "8");
   if (opts?.maxWidth) params.set("MaxWidth", String(opts.maxWidth));
   if (opts?.startPositionTicks) params.set("StartTimeTicks", String(opts.startPositionTicks));
   if (opts?.audioStreamIndex !== undefined) params.set("AudioStreamIndex", String(opts.audioStreamIndex));
@@ -1730,3 +1246,61 @@ export function isStreamCopyUrl(src: string): boolean {
   }
 }
 
+
+// ─── Backend registration ─────────────────────────────────────────────────────
+
+/**
+ * The Jellyfin implementation of MediaBackend. Everything above is the
+ * implementation; this object is only the wiring, so the free functions stay
+ * directly callable (and unit-testable) exactly as they were.
+ */
+export const jellyfinBackend: MediaBackend = {
+  kind: 'jellyfin',
+  label: 'Jellyfin',
+
+  normalizeUrl,
+  async identify(rawUrl: string): Promise<boolean> {
+    // /System/Info/Public is Jellyfin's unauthenticated "who am I" endpoint.
+    // Emby answers it too and reports its own ProductName; the store has never
+    // been tested against Emby, so only a self-declared Jellyfin counts here
+    // rather than quietly treating one server as the other.
+    try {
+      const url = normalizeUrl(rawUrl);
+      const body = await jellyfinRequest('GET', `${url}/System/Info/Public`);
+      const info = JSON.parse(body);
+      return /jellyfin/i.test(String(info?.ProductName ?? ''));
+    } catch {
+      return false;
+    }
+  },
+
+  validateToken,
+  authenticateUser,
+  fetchPublicUsers: (url: string) => fetchPublicUsers(url),
+  buildUserAvatarUrl: (url: string, user: PublicUser) =>
+    buildUserAvatarUrl(url, user.id, user.primaryImageTag),
+  // Jellyfin has no card-to-session switch: picking a card just pre-fills the
+  // name on the same AuthenticateByName call the manual form makes.
+  signInAsPublicUser: (url: string, user: PublicUser, secret?: string) =>
+    authenticateUser(url, user.name, secret),
+
+  fetchLibraryList,
+  fetchLibrariesAndMovies: fetchJellyfinLibrariesAndMovies,
+
+  fetchSeriesEpisodes,
+  fetchFirstEpisodeOfSeries,
+
+  subtitleDelivery: pickSubtitleDelivery,
+  buildSubtitleTrackUrl,
+
+  fetchItemPlaybackInfo,
+  buildStaticStreamUrl,
+  buildHlsStreamUrl,
+  lastHlsPlaySessionId: getLastHlsPlaySessionId,
+  stopActiveEncoding,
+  isStreamCopyUrl,
+
+  reportPlaybackStart,
+  reportPlaybackProgress,
+  reportPlaybackStopped,
+};

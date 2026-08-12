@@ -332,6 +332,59 @@ fn romm_request(
     Ok(body_str)
 }
 
+// Proxy a Plex request through the host (same rationale as jellyseerr_request:
+// no CORS, and the host can reach a server the sandboxed webview can't).
+//
+// Unlike its siblings this takes an arbitrary header MAP rather than one named
+// credential. Plex needs several headers on every call — `Accept:
+// application/json` (without it the server answers XML) plus the X-Plex-*
+// client identity that its tokens are issued against — and enumerating them as
+// parameters here would mean editing Rust every time the JS side adjusts one.
+#[tauri::command]
+fn plex_request(
+    method: String,
+    url: String,
+    headers: std::collections::HashMap<String, String>,
+    body: Option<String>,
+) -> Result<String, String> {
+    if cfg!(debug_assertions) {
+        println!("[Plex Request] {} {}", method, redact_url(&url));
+    }
+
+    let client = reqwest::blocking::Client::builder()
+        .connect_timeout(std::time::Duration::from_secs(10))
+        .timeout(std::time::Duration::from_secs(60))
+        .build()
+        .map_err(|e| format!("Failed to build reqwest client: {}", e))?;
+
+    let req_method = reqwest::Method::from_bytes(method.as_bytes())
+        .map_err(|e| format!("Invalid HTTP method: {}", e))?;
+
+    let mut req = client.request(req_method, &url)
+        .header("Content-Type", "application/json");
+
+    for (name, value) in headers {
+        req = req.header(name, value);
+    }
+
+    if let Some(b) = body {
+        req = req.body(b);
+    }
+
+    let response = req.send().map_err(|e| format!("Request failed: {}", e))?;
+    let http_code = response.status().as_u16();
+    let body_str = response.text().map_err(|e| format!("Failed to read response body: {}", e))?;
+
+    if http_code >= 400 {
+        return Err(format!("HTTP error {}: {}", http_code, body_str));
+    }
+
+    if cfg!(debug_assertions) {
+        println!("[Plex OK] {} {} -> {} bytes", method, redact_url(&url), body_str.len());
+    }
+    Ok(body_str)
+}
+
 // T18: launch an emulator for a rented game. The command `template` is
 // tokenized on whitespace into an argv array (program + args); the literal
 // token `{path}` is replaced by the rom `path` as a SINGLE argv element, and
@@ -475,6 +528,7 @@ pub fn run() {
             suspend_system,
             check_file_exists,
             jellyfin_request,
+            plex_request,
             jellyseerr_request,
             romm_request,
             launch_game,

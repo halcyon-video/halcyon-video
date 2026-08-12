@@ -45,6 +45,10 @@ COPY . .
 ARG VITE_JELLYFIN_URL
 ARG VITE_JELLYFIN_USERNAME
 ARG VITE_JELLYFIN_PASSWORD
+# Plex is configured with a URL + token instead of a name/password — see
+# .env.local.example for where the token comes from.
+ARG VITE_PLEX_URL
+ARG VITE_PLEX_TOKEN
 
 RUN npm run build
 

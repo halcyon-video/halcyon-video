@@ -1,5 +1,5 @@
 import type Hls from 'hls.js';
-import { stopActiveEncoding, getLastHlsPlaySessionId, isStreamCopyUrl } from './jellyfin';
+import { stopActiveEncoding, getLastHlsPlaySessionId, isStreamCopyUrl } from './media-backend.ts';
 
 let HlsMod: typeof import('hls.js').default | null = null;
 async function loadHls() {

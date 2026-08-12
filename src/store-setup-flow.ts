@@ -16,7 +16,14 @@ import {
   fetchLibraryList,
   authenticateUser,
   normalizeUrl,
-} from './jellyfin';
+  identifyServer,
+  URL_KEY,
+  activeBackend,
+  setActiveBackendKind,
+  persistSession,
+  LAST_USER_ID_KEY,
+  type LinkFlow,
+} from './media-backend.ts';
 import {
   openMembershipCardPicker,
   isMembershipPickerOpen,
@@ -26,6 +33,8 @@ import { excludedLibraryIds, setLibraryCarried } from './library-settings';
 import {
   SetupScreen,
   SetupKey,
+  SETUP_PROVIDERS,
+  type SetupProvider,
   initialHomeScreen,
   setupScreenKey,
   setupScreenChar,
@@ -157,58 +166,179 @@ export function closeSetupTerminal(opts?: { keepCamera?: boolean }): void {
   if (!opts?.keepCamera) deps.scene()?.exitSearchMode();
 }
 
-async function dial(address: string): Promise<void> {
+// The in-flight link flow, so backing out of the screen stops its polling
+// rather than leaving it running against a code nobody will type.
+let pendingLink: LinkFlow | null = null;
+
+function cancelPendingLink(): void {
+  pendingLink?.cancel();
+  pendingLink = null;
+}
+
+/**
+ * Work out which server answers at the typed address and point the store at
+ * it. Falls back to the DISTRIBUTOR row's choice when nothing identifiable
+ * answers, so an address behind a proxy that hides the probe endpoints still
+ * connects if the user picked the right row.
+ */
+async function adoptServerKind(url: string, picked: SetupProvider): Promise<void> {
+  const detected = await identifyServer(url);
+  if (detected) {
+    setActiveBackendKind(detected);
+    deps?.log(`[Setup] ${url} answers as ${activeBackend().label}.`);
+    return;
+  }
+  // `picked` is passed in rather than read off `screen`: dial() has already
+  // replaced the home screen with the dialing one by the time this runs, so
+  // reading the DISTRIBUTOR row here found no row at all and left the store
+  // pointed at whatever it was before — which is how a dialed Plex address
+  // ended up being asked for a Jellyfin user list.
+  setActiveBackendKind(picked === 'PLEX' ? 'plex' : 'jellyfin');
+  deps?.log(`[Setup] ${url} did not identify itself; assuming ${activeBackend().label}.`);
+}
+
+/**
+ * Plex's sign-in-by-code road: show the code on the CRT, poll until the user
+ * approves it on another device, then carry on into the membership cards with
+ * the account token in hand.
+ */
+async function linkFlow(url: string): Promise<void> {
   if (!deps) return;
-  const url = normalizeUrl(address.trim());
-  // Remember the dialed server IMMEDIATELY, not at afterAuth(): both routes to
-  // the CRT sign-in screen below (an empty card list, a refused one) skip
-  // afterAuth entirely, and manualSignIn() reads pendingUrl. Without this it
-  // fell back to localStorage's jellyfin_url — unset on a true first run — and
-  // authenticated against '', i.e. the app's own origin, so a single-user
-  // Jellyfin (public card list empty) could NEVER be connected to from here.
-  pendingUrl = url;
-  screen = { kind: 'dialing', address: url, step: 'LOOKING UP MEMBERSHIP CARDS...' };
+  const backend = activeBackend();
+  if (!backend.beginLink) return;
+  let flow: LinkFlow;
+  try {
+    flow = await backend.beginLink(url);
+  } catch (e: any) {
+    deps.log(`[Setup] Could not get a link code: ${e?.message ?? e}`);
+    // No route to plex.tv (offline box, locked-down network) — the manual
+    // screen still works, and for Plex it accepts a pasted token.
+    screen = { kind: 'manual-auth', row: 0, username: '', password: '',
+               error: 'NO LINK CODE. SIGN IN BY NAME.' };
+    render();
+    return;
+  }
+  pendingLink = flow;
+  screen = {
+    kind: 'link',
+    provider: backend.label.toUpperCase(),
+    code: flow.code,
+    verificationUrl: flow.verificationUrl,
+    step: 'WAITING FOR APPROVAL...',
+  };
   render();
+
+  const session = await flow.wait();
+  if (pendingLink !== flow) return; // cancelled or superseded while waiting
+  pendingLink = null;
+  if (!session) {
+    screen = { ...initialHomeScreen(url), row: 1, error: 'LINK CODE EXPIRED. TRY AGAIN.' };
+    render();
+    return;
+  }
+  deps.log(`[Setup] Linked to ${backend.label} as ${session.userName}.`);
+  await offerMembers(url, session.accessToken, session);
+}
+
+/**
+ * Fan the server's users out as membership cards, or fall through to signing
+ * in by name when it lists none. Shared by both roads into the store: a
+ * Jellyfin dial (no token yet) and a completed Plex link (account token).
+ */
+async function offerMembers(
+  url: string,
+  token: string | undefined,
+  fallback?: MembershipLoginSession
+): Promise<void> {
+  if (!deps) return;
   let users;
   try {
-    users = await fetchPublicUsers(url);
+    users = await fetchPublicUsers(url, token);
   } catch (e: any) {
     const msg = String(e?.message ?? e);
     deps.log(`[Setup] No membership card list from ${url}: ${msg}`);
+    if (fallback) {
+      // Already authenticated (a completed link) — a missing card list is not
+      // a reason to make the user sign in a second time.
+      await afterAuth(url, fallback);
+      return;
+    }
     // A server that ANSWERED and refused the list (public users switched off,
-    // a reverse proxy blocking /Users/Public) is perfectly usable — it just
+    // a reverse proxy blocking the endpoint) is perfectly usable — it just
     // can't fan the cards out. Sign in by name instead of dead-ending on the
     // home screen, which is what the DOM login form has always done. Only a
     // server that said nothing at all is a bad address.
     screen = /HTTP error \d+/.test(msg)
       ? { kind: 'manual-auth', row: 0, username: '', password: '',
           error: 'NO CARD LIST HERE. SIGN IN BY NAME.' }
-      : { ...initialHomeScreen(address), row: 1, error: 'NO ANSWER. CHECK THE ADDRESS + CORS.' };
+      : { ...initialHomeScreen(url), row: 1, error: 'NO ANSWER. CHECK THE ADDRESS + CORS.' };
     render();
     return;
   }
-  if (users.length > 0) {
-    deps.log(`[Setup] Found ${users.length} membership card(s) on ${url}.`);
-    screen = { kind: 'members', count: users.length };
-    render();
-    openMembershipCardPicker({
-      serverUrl: url,
-      users,
-      lastUserId: localStorage.getItem('jellyfin_last_userid'),
-      onLogin: (session) => afterAuth(url, session),
-      // "Sign in manually" from the picker lands on the CRT sign-in screen —
-      // the DOM login form is no longer part of first-run.
-      onManualLogin: () => {
-        screen = { kind: 'manual-auth', row: 0, username: '', password: '' };
-        render();
-      },
-      onDemoMode: () => runDemo(),
-      log: (msg) => deps?.log(msg),
-    });
-  } else {
+  if (users.length === 0) {
+    // Plex already authenticated the ACCOUNT to get here, so a Home list that
+    // comes back empty (a solo account has no Home members) means the account
+    // itself is the member — carry straight on rather than asking again.
+    if (fallback) {
+      await afterAuth(url, fallback);
+      return;
+    }
     screen = { kind: 'manual-auth', row: 0, username: '', password: '' };
     render();
+    return;
   }
+  deps.log(`[Setup] Found ${users.length} membership card(s) on ${url}.`);
+  screen = { kind: 'members', count: users.length };
+  render();
+  openMembershipCardPicker({
+    serverUrl: url,
+    users,
+    sessionToken: token,
+    lastUserId: localStorage.getItem(LAST_USER_ID_KEY),
+    onLogin: (session) => afterAuth(url, session),
+    // "Sign in manually" from the picker lands on the CRT sign-in screen —
+    // the DOM login form is no longer part of first-run.
+    onManualLogin: () => {
+      screen = { kind: 'manual-auth', row: 0, username: '', password: '' };
+      render();
+    },
+    onDemoMode: () => runDemo(),
+    log: (msg) => deps?.log(msg),
+  });
+}
+
+async function dial(address: string): Promise<void> {
+  if (!deps) return;
+  // Read the DISTRIBUTOR row BEFORE the screen is replaced below — it is the
+  // fallback when the address doesn't identify itself.
+  const picked: SetupProvider = screen.kind === 'home' ? SETUP_PROVIDERS[screen.provider] : 'JELLYFIN';
+  const url = normalizeUrl(address.trim());
+  // Remember the dialed server IMMEDIATELY, not at afterAuth(): every route to
+  // the CRT sign-in screen below (an empty card list, a refused one, an
+  // expired link code) skips afterAuth entirely, and manualSignIn() reads
+  // pendingUrl. Without this it fell back to the stored URL — unset on a true
+  // first run — and authenticated against '', i.e. the app's own origin, so a
+  // single-user server (public card list empty) could NEVER be connected to
+  // from here.
+  pendingUrl = url;
+  cancelPendingLink();
+
+  screen = { kind: 'dialing', address: url, step: 'IDENTIFYING DISTRIBUTOR...' };
+  render();
+  await adoptServerKind(url, picked);
+
+  // A backend with a link flow (Plex) has to authenticate the ACCOUNT before
+  // it can list anyone, so the code screen comes first and the cards follow
+  // it. A backend without one (Jellyfin) serves its card list unauthenticated
+  // and goes straight there.
+  if (activeBackend().beginLink) {
+    await linkFlow(url);
+    return;
+  }
+
+  screen = { kind: 'dialing', address: url, step: 'LOOKING UP MEMBERSHIP CARDS...' };
+  render();
+  await offerMembers(url, undefined);
 }
 
 async function manualSignIn(): Promise<void> {
@@ -225,11 +355,24 @@ async function manualSignIn(): Promise<void> {
   }
   screen = { kind: 'dialing', address: url, step: `SIGNING IN ${username.toUpperCase().slice(0, 26)}...` };
   render();
+  const backend = activeBackend();
   try {
     const session = await authenticateUser(url, username.trim(), password);
     await afterAuth(url, session);
   } catch (e: any) {
     const msg = String(e?.message ?? e);
+    // Escape hatch: a backend that can adopt a raw token (Plex) accepts one
+    // pasted into the NAME field with no password. That covers the cases the
+    // link flow can't — an account with 2FA, a box with no route to plex.tv,
+    // a scripted deploy — without a screen of its own.
+    if (backend.adoptToken && !password) {
+      try {
+        const session = await backend.adoptToken(url, username.trim());
+        deps.log(`[Setup] Adopted a pasted ${backend.label} token.`);
+        await afterAuth(url, session);
+        return;
+      } catch { /* not a token either — report the original failure below */ }
+    }
     screen = {
       kind: 'manual-auth', row: 2, username, password: '',
       error: msg.includes('401') ? 'SIGN-IN REFUSED. CHECK NAME + PASSWORD.' : 'SIGN-IN FAILED. SERVER UNREACHABLE.',
@@ -243,10 +386,7 @@ async function afterAuth(url: string, session: MembershipLoginSession): Promise<
   if (!deps) return;
   pendingUrl = url;
   pendingSession = session;
-  localStorage.setItem('jellyfin_url', url);
-  localStorage.setItem('jellyfin_token', session.accessToken);
-  localStorage.setItem('jellyfin_userid', session.userId);
-  localStorage.setItem('jellyfin_last_userid', session.userId);
+  persistSession(activeBackend().kind, url, session);
   deps.log(`[Setup] Authenticated as ${session.userName}.`);
   screen = { kind: 'dialing', address: url, step: 'PULLING THE CATALOG LIST...' };
   render();
@@ -321,8 +461,13 @@ export async function setupTerminalInput(kind: SetupKey): Promise<void> {
     case 'sign-in':
       await manualSignIn();
       return;
+    case 'cancel-link':
+      cancelPendingLink();
+      screen = initialHomeScreen(pendingUrl || localStorage.getItem(URL_KEY));
+      render();
+      return;
     case 'back-home':
-      screen = initialHomeScreen(pendingUrl || localStorage.getItem('jellyfin_url'));
+      screen = initialHomeScreen(pendingUrl || localStorage.getItem(URL_KEY));
       render();
       return;
     case 'open-store':

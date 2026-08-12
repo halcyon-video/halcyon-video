@@ -422,6 +422,114 @@ function integrationProxyPlugin() {
   };
 }
 
+// Reverse proxy for a PLEX MEDIA SERVER, which cannot be reached directly from
+// a browser served on anything but loopback.
+//
+// Measured against PMS 1.41.5: it reflects the request Origin only for
+// localhost / 127.0.0.1, and answers every other origin with a fixed
+// `Access-Control-Allow-Origin: https://app.plex.tv` — so a store served at
+// http://<lan-ip>:1420 (the documented HTPC deployment) has every request to
+// it blocked, including the ones that succeed with a 200. Unlike Jellyfin,
+// Plex has no setting to add an allowed origin. The Tauri build sidesteps this
+// through its Rust-side plex_request; a browser build needs this.
+//
+// Why not /dev-proxy: that one carries the destination in an X-Proxy-Target
+// header, and the things that break here are <img> textures and hls.js segment
+// requests, neither of which can set headers. So the destination has to live in
+// the URL — and to keep that from being an open proxy, it is not IN the URL:
+// the client POSTs the base once (custom header, so a cross-origin caller
+// needs a preflight this never approves), and every later request is forwarded
+// to THAT base only. A foreign page therefore cannot repoint it, and the worst
+// it could do is reach a Plex server the user already configured.
+function plexProxyPlugin() {
+  const PREFIX = "/plex-proxy";
+  let base: string | null = null;
+
+  async function handler(req: any, res: any, next: any) {
+    if (!req.url.startsWith(PREFIX)) return next();
+    const rest = req.url.slice(PREFIX.length);
+
+    // Registration: POST /plex-proxy/__target with X-Proxy-Target.
+    if (rest.startsWith("/__target")) {
+      const target = String(req.headers["x-proxy-target"] || "");
+      if (!/^https?:\/\/[^/]+$/.test(target.replace(/\/$/, ""))) {
+        res.statusCode = 400;
+        res.end("bad or missing X-Proxy-Target");
+        return;
+      }
+      base = target.replace(/\/$/, "");
+      res.statusCode = 204;
+      res.end();
+      return;
+    }
+
+    if (!base) {
+      res.statusCode = 409;
+      res.end("no Plex target registered");
+      return;
+    }
+
+    try {
+      const headers: Record<string, string> = {};
+      // Everything Plex authenticates and negotiates on, plus Range so seeking
+      // a direct-played file still works through the hop.
+      for (const [k, v] of Object.entries(req.headers)) {
+        if (k === "accept" || k === "range" || k === "content-type" || k.startsWith("x-plex-")) {
+          headers[k] = String(v);
+        }
+      }
+      const method = String(req.method || "GET");
+      const chunks: Buffer[] = [];
+      if (method !== "GET" && method !== "HEAD") for await (const c of req) chunks.push(c);
+
+      const upstream = await fetch(base + rest, {
+        method,
+        headers,
+        body: chunks.length ? Buffer.concat(chunks) : undefined,
+      });
+
+      res.statusCode = upstream.status;
+      for (const h of ["content-type", "content-range", "accept-ranges", "cache-control"]) {
+        const v = upstream.headers.get(h);
+        if (v) res.setHeader(h, v);
+      }
+      // Content-Length is forwarded ONLY when the upstream body wasn't encoded.
+      // fetch() negotiates gzip and transparently DECODES the body, so the
+      // upstream Content-Length describes the compressed bytes, not the ones
+      // being written here — passing it through truncates the response at the
+      // compressed length. That silently cut Plex's /identity JSON from 162
+      // bytes to 152, so it no longer parsed and the store decided the address
+      // wasn't a Plex server at all. Without the header Node falls back to
+      // chunked encoding, which is correct for any length; a 206 still carries
+      // its Content-Range, so seeking a direct-played file is unaffected.
+      if (!upstream.headers.get("content-encoding")) {
+        const len = upstream.headers.get("content-length");
+        if (len) res.setHeader("content-length", len);
+      }
+      // Streamed, not buffered: this carries multi-GB direct-play bodies and
+      // HLS segments, and Buffer.concat on those would put the whole film in
+      // the dev server's heap.
+      if (!upstream.body) return res.end();
+      // @ts-expect-error node:stream has no type declarations here (see header)
+      const { Readable } = await import("node:stream");
+      Readable.fromWeb(upstream.body as any).pipe(res);
+    } catch (err) {
+      res.statusCode = 502;
+      res.end(String(err));
+    }
+  }
+
+  return {
+    name: "plex-proxy",
+    configureServer(server: any) {
+      server.middlewares.use(handler);
+    },
+    configurePreviewServer(server: any) {
+      server.middlewares.use(handler);
+    },
+  };
+}
+
 // Same rules vite applies to a Host header (see isHostAllowedWithoutCache):
 // raw IPs and localhost always pass, entries match exactly, and a leading dot
 // matches the domain plus its subdomains.
@@ -503,6 +611,7 @@ export default defineConfig(async () => ({
     feedbackPinPlugin(),
     mpvPlayerPlugin(),
     integrationProxyPlugin(),
+    plexProxyPlugin(),
     remotePlayPlugin(),
   ],
 
