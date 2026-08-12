@@ -5887,19 +5887,33 @@ export function createProgramWarmupMaterials(
   regular: Movie,
   animated: Movie | null,
   series: Movie | null,
+  probeIdx = 0,
 ): { materialSets: THREE.Material[][]; dispose(): void } {
   const materialSets: THREE.Material[][] = [];
   const owned: { dispose(): void }[] = [];
 
-  materialSets.push(createHeroJellyfinMaterials(regular));
-  materialSets.push(createHeroJellyfinMaterials(regular, 'Warmup Name')); // flipped-back highlight flavor
+  // PASS probeIdx. The reflection probe IS the material's envMap, and envMap
+  // presence changes the compiled program (USE_ENVMAP + the cube samplers) —
+  // so a probe-less warm-up compiles a variant the store never draws, and the
+  // real one still links at first draw. That was worth two ~120ms frozen
+  // frames mid-browse (the shrink-wrapped series boxset and the rental
+  // clamshell, the two flavors whose programs nothing else on screen shares).
+  // Any index warms the right program — the 5 probes differ in content, not in
+  // the defines — but 0 is also the cache entry the runtime path asks for
+  // first (store-inspect: `Math.min(scene.selectedLibraryIdx, 4)`).
+  materialSets.push(createHeroJellyfinMaterials(regular, undefined, false, false, probeIdx));
+  materialSets.push(createHeroJellyfinMaterials(regular, 'Warmup Name', false, false, probeIdx)); // flipped-back highlight flavor
+  materialSets.push(createHeroRentalMaterials(regular, false, probeIdx));
+  // Probe-less rental too: the back room and the carried-tape stack build their
+  // clamshells with no probeIdx (back-room.ts, carried-tapes.ts), so the
+  // envMap-free program is a real runtime variant, not a warm-up artifact.
   materialSets.push(createHeroRentalMaterials(regular));
   if (animated) {
-    materialSets.push(createHeroJellyfinMaterials(animated));
-    materialSets.push(createHeroRentalMaterials(animated));
+    materialSets.push(createHeroJellyfinMaterials(animated, undefined, false, false, probeIdx));
+    materialSets.push(createHeroRentalMaterials(animated, false, probeIdx));
   }
   if (series) {
-    materialSets.push(createHeroSeriesBoxsetMaterials(series));
+    materialSets.push(createHeroSeriesBoxsetMaterials(series, undefined, probeIdx));
   }
 
   const px = new Uint8Array(COVER_WIDTH * COVER_HEIGHT * 4).fill(128);
