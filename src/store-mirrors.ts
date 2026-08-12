@@ -43,6 +43,20 @@ export type MirrorEntry = {
   rendered: boolean;
 };
 
+// Stand-in for the OTHER mirrors while one is rendering — see draw(). Chrome
+// with metalness 1 samples the room environment, so a mirror seen inside
+// another mirror reads as polished metal.
+let proxyMat: THREE.MeshStandardMaterial | null = null;
+function mirrorProxyMaterial(): THREE.MeshStandardMaterial {
+  if (!proxyMat) {
+    proxyMat = new THREE.MeshStandardMaterial({
+      color: 0xd6dbe2, metalness: 1.0, roughness: 0.12, envMapIntensity: 1.0,
+    });
+  }
+  return proxyMat;
+}
+const savedMats: Array<{ o: any; m: any }> = [];
+
 // Scratch, module-scoped so the per-frame pass allocates nothing.
 const frustumScratch = new THREE.Frustum();
 const projScreenScratch = new THREE.Matrix4();
@@ -173,10 +187,30 @@ export function renderMirrorsAhead(scene: StoreScene) {
       m.dirty = false;
       m.rendered = true;
       budget--;
+      // MIRROR INSIDE A MIRROR. The recursion guard above stops the nested
+      // RENDER, but it does not stop the other Reflectors from being DRAWN
+      // into this one's reflection — and they sample their texture with
+      // screen-space projective coords solved for the MAIN camera. From this
+      // mirror's virtual camera those coords are meaningless, so the panel
+      // comes out a black hole with stretched slivers down its edge. It only
+      // shows when two mirrors can see each other, which is rare between the
+      // cornice bands and constant once a mirrored column stands in the room.
+      // Swap the others to static chrome for the duration.
+      const proxy = mirrorProxyMaterial();
+      savedMats.length = 0;
+      for (const o of scene.mirrors) {
+        if (o === m) continue;
+        savedMats.push({ o: o.r, m: o.r.material });
+        o.r.material = proxy;
+      }
       perfTrace.count(CT_MIRROR);
       perfTrace.begin(SP_MIRROR);
       try { m.original(scene.renderer, scene.scene, scene.camera); }
-      finally { perfTrace.end(SP_MIRROR); }
+      finally {
+        perfTrace.end(SP_MIRROR);
+        for (const s of savedMats) s.o.material = s.m;
+        savedMats.length = 0;
+      }
     };
 
     // Round-robin over the mirrors in frame, so several sharing the view share
