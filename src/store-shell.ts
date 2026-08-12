@@ -13,6 +13,7 @@ import { assetUrl } from './asset-url';
 import { posterQueue, loadDecorPosterTexture } from './video-case';
 import { bakeFloorAO, makeWallContactAO } from './lightmap-bake';
 import { Reflector } from 'three/examples/jsm/objects/Reflector.js';
+import { liveMirrorsAllowed, reflectorTargetSize } from './store-mirrors';
 import { SlottedFixture } from './fixtures';
 import { AmbientTvs } from './ambient-tvs';
 import { EntranceCheckout } from './entrance';
@@ -1172,14 +1173,7 @@ export function buildStore(scene: StoreScene) {
     // what --quality asked for, and no screenshot could gate the look. The
     // harness's own fast default is quality LOW, which still lands on the cheap
     // tier, so this costs nothing on ordinary shots.
-    const soffitBuf = scene.renderer.getDrawingBufferSize(new THREE.Vector2());
-    const q = localStorage.getItem('bb_quality') || 'high';
-    const soffitCap = q === 'low' ? 256 : q === 'medium' ? 512 : 1024;
-    const soffitW = Math.max(64, Math.min(soffitCap, Math.round(soffitBuf.x)));
-    const soffitReflectorSize = {
-      w: soffitW,
-      h: Math.max(64, Math.round(soffitW * (soffitBuf.y / Math.max(1, soffitBuf.x)))),
-    };
+    const soffitReflectorSize = reflectorTargetSize(scene.renderer);
 
     const soffit = buildFrontSoffit({
       scene: scene.scene,
@@ -1194,7 +1188,7 @@ export function buildStore(scene: StoreScene) {
       trofferFrameMaterial: trofferFrameMat,
       tileX: TILE_X,
       tileZ: TILE_Z,
-      softwareGL: scene.softwareGL || scene.webkitGL,
+      softwareGL: !liveMirrorsAllowed(scene),
       reflectorSize: soffitReflectorSize,
       // bb-2000: all-white soffit body + inset circular can lights, no mirror
       // ring (the perimeter cornice is dropped for that store — user).
@@ -2753,7 +2747,7 @@ export function buildCeilingFrame(scene: StoreScene, storeWidth: number, backWal
     // CPU. A static chrome plane keeps the band's look at zero render cost.
     // WebKitGTK pays the replay too (~14ms blocking per refresh), so it
     // takes the same static plane.
-    if (scene.softwareGL || scene.webkitGL) {
+    if (!liveMirrorsAllowed(scene)) {
       const still = new THREE.Mesh(new THREE.PlaneGeometry(mirrorW, mirrorH), chromeMat);
       const stillPos = mirrorPos.clone();
       stillPos.x += localZOffset * Math.sin(mirrorRotY);
@@ -2769,29 +2763,17 @@ export function buildCeilingFrame(scene: StoreScene, storeWidth: number, backWal
     }
 
     // Reflection resolution (F8 pin 028 — "this is ugly and messed up", filed
-    // on the smeared, stair-stepped strip this band showed above the cornice).
-    // A Reflector renders the whole reflected VIEW into its target and samples
-    // it with SCREEN-space projective coords, so the target has to track the
-    // drawing buffer's shape and size, not a magic square. What shipped was a
-    // fixed 512x512 — on the owner's 3627x2039 kiosk that is a ~7x upscale of
-    // a non-mipmapped target squashed to 1:1 and stretched back out over a
-    // 20:1 band, i.e. exactly the blocky smear in the pin. And headless was
-    // pinned at 64 regardless of quality, so `npm run shot` could never see
-    // what the app shows and no screenshot could gate a fix.
-    //
-    // So: derive it from the real drawing buffer, keep its aspect, and cap by
-    // quality tier. Fill cost is the only thing that grows (the reflected
-    // scene's draw calls are unchanged), which is what a quality tier is for.
-    const bufSize = scene.renderer.getDrawingBufferSize(new THREE.Vector2());
-    const quality = localStorage.getItem('bb_quality') || 'high';
-    const cap = quality === 'low' ? 256 : quality === 'medium' ? 512 : 1024;
-    const texW = Math.max(64, Math.min(cap, Math.round(bufSize.x)));
-    const texH = Math.max(64, Math.round(texW * (bufSize.y / Math.max(1, bufSize.x))));
+    // on the smeared, stair-stepped strip this band showed above the cornice):
+    // a fixed 512x512 target stretched over a 20:1 band is the blocky smear in
+    // that pin, and headless was pinned at 64 regardless of quality, so no
+    // screenshot could gate a fix. reflectorTargetSize derives it from the real
+    // drawing buffer instead — see store-mirrors.ts.
+    const tex = reflectorTargetSize(scene.renderer);
 
     const mirror = new Reflector(new THREE.PlaneGeometry(mirrorW, mirrorH), {
       clipBias: 0.003,
-      textureWidth: texW,
-      textureHeight: texH,
+      textureWidth: tex.w,
+      textureHeight: tex.h,
       color: 0xffffff
     });
     

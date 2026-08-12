@@ -100,8 +100,16 @@ export interface VideoPlayerOptions {
   startPositionTicks?: number;
   /** Audio tracks selectable in the picker (from the item's MediaStreams). */
   audioTracks?: TrackChoice[];
-  /** Subtitle tracks selectable in the picker (burned in server-side). */
+  /** Subtitle tracks selectable in the picker. */
   subtitleTracks?: TrackChoice[];
+  /** WebVTT sidecar for the initially-selected subtitle, when it's a text
+   *  track. Hung on the <video> as a <track>, so the server never re-encodes
+   *  the film just to show captions. */
+  subtitleTrackUrl?: string;
+  /** Ask how a newly-picked subtitle should be delivered: a URL means text
+   *  (swap the sidecar, keep playing), null means bitmap (only a burned-in
+   *  re-encode can render it, so rebuild the stream the old way). */
+  buildSubtitleTrack?: (streamIndex: number) => string | null;
   /** Initial audio MediaStream index (Settings ▸ Playback language pref).
    *  Pre-selects the picker row and rides along on every stream rebuild.
    *  The caller bakes it into the initial hlsSrc itself. */
@@ -200,6 +208,13 @@ export class VideoPlayer {
    *  finished" apart from "the user backed out" — see onClose. */
   private endedNaturally = false;
   private activeSubtitleTrack: TextTrack | null = null;
+  // The <track> carrying the WebVTT sidecar, when subtitles are delivered as
+  // text rather than burned into the video (see setSubtitleSidecar).
+  private subtitleTrackEl: HTMLTrackElement | null = null;
+  // Subtitle stream index the CURRENT stream has burned into the picture
+  // (bitmap tracks only). Non-null means captions are pixels: changing or
+  // removing them costs a new stream, which is what the sidecar path avoids.
+  private burnedInSubtitleIndex: number | null = null;
   private nativeLoadedMetadataListener: (() => void) | null = null;
   private isHidden = false;
   private preHiddenVolume = 1.0;
@@ -379,6 +394,12 @@ export class VideoPlayer {
     this.activeSubtitleTrack = null;
     this.subtitlesBtn.setAttribute('hidden', '');
     this.subtitlesBtn.classList.remove('is-active');
+    // A new title must never inherit the previous one's captions. A sidecar
+    // URL means the caller chose text delivery, so nothing is baked into the
+    // picture; a default index with no sidecar means it is.
+    this.burnedInSubtitleIndex =
+      !opts.subtitleTrackUrl && opts.defaultSubtitleIndex !== undefined ? opts.defaultSubtitleIndex : null;
+    this.setSubtitleSidecar(opts.subtitleTrackUrl ?? null);
     // Default focus for a fresh player: the timeline, ready to seek.
     this.focusTimeline();
 
@@ -1306,6 +1327,44 @@ export class VideoPlayer {
     this.fullscreenBtn.setAttribute('aria-label', isFullscreen ? 'Exit fullscreen' : 'Fullscreen');
   }
 
+  /**
+   * Hang a WebVTT sidecar on the <video> (or clear it). This is what replaced
+   * asking the server to burn subtitles into the picture: a <track> costs the
+   * server a text fetch instead of a full re-encode of the film, and swapping
+   * or clearing it needs no new stream, so switching subtitles is instant and
+   * never interrupts playback.
+   *
+   * The element is recreated rather than re-`src`'d because a <track> that has
+   * already loaded keeps its cues when only the src changes in some engines —
+   * leaving the old language's captions on screen under the new one's name.
+   */
+  private setSubtitleSidecar(url: string | null): void {
+    this.subtitleTrackEl?.remove();
+    this.subtitleTrackEl = null;
+    if (!url) {
+      this.activeSubtitleTrack = null;
+      this.subtitlesBtn.setAttribute('hidden', '');
+      this.subtitlesBtn.classList.remove('is-active');
+      return;
+    }
+    const el = document.createElement('track');
+    el.kind = 'subtitles';
+    el.label = 'Subtitles';
+    el.default = true;
+    el.src = url;
+    // A sidecar that 404s (wrong index, server without the converter) must not
+    // take the film down with it — log and leave the picture playing.
+    el.addEventListener('error', () => {
+      this.opts?.log?.('[Video] Subtitle track failed to load; playing without captions.');
+      this.subtitlesBtn.setAttribute('hidden', '');
+    });
+    this.video.appendChild(el);
+    this.subtitleTrackEl = el;
+    // The TextTrack behind a freshly-appended <track> only becomes usable once
+    // the browser has registered it, hence the deferred hookup.
+    setTimeout(() => this.setupSubtitlesIfAvailable(), 0);
+  }
+
   /** Subtitles are only ever surfaced if the loaded media actually carries a text track. */
   private setupSubtitlesIfAvailable(): void {
     const tracks = this.video.textTracks;
@@ -1412,10 +1471,40 @@ export class VideoPlayer {
     if (!row || row.kind !== 'item') return;
     if (row.group === 'quality') this.qualityPresetIdx = row.value as number;
     else if (row.group === 'audio') this.audioIndex = row.value as number;
-    else if (row.group === 'subs') this.subtitleIndex = row.value as number | null;
+    else if (row.group === 'subs') {
+      this.subtitleIndex = row.value as number | null;
+      // A text subtitle (or turning them off) needs no new stream at all —
+      // swap the sidecar and keep playing. Only a bitmap track, or dropping a
+      // burn-in already baked into the picture, has to go back to the server.
+      if (this.applySubtitleWithoutReload(this.subtitleIndex)) {
+        this.renderTracksMenu();
+        this.nudgeControls();
+        return;
+      }
+    }
     this.renderTracksMenu(); // reflect the new checkmark immediately
     this.applyStreamSelection();
     this.nudgeControls();
+  }
+
+  /**
+   * Try to honour a subtitle pick without rebuilding the stream.
+   * Returns false when only a server-side re-encode can do it, in which case
+   * the caller falls through to applyStreamSelection().
+   */
+  private applySubtitleWithoutReload(streamIndex: number | null): boolean {
+    // Pixels already baked into the video can only be removed or changed by
+    // encoding a new stream.
+    if (this.burnedInSubtitleIndex !== null) return false;
+    if (streamIndex === null) {
+      this.setSubtitleSidecar(null);
+      return true;
+    }
+    const url = this.opts?.buildSubtitleTrack?.(streamIndex);
+    if (!url) return false; // bitmap subtitle — burn-in is the only renderer
+    this.setSubtitleSidecar(url);
+    this.subtitlesBtn.classList.add('is-active');
+    return true;
   }
 
   // Rebuild the HLS stream for the current quality/audio/subtitle picks, then
@@ -1436,11 +1525,26 @@ export class VideoPlayer {
     // orphaned job per track change, all reading the same file concurrently).
     this.stopCurrentEncode();
     const preset = QUALITY_PRESETS[this.qualityPresetIdx] ?? QUALITY_PRESETS[0];
+    // Only ask the server to burn a subtitle in when the client genuinely
+    // cannot draw it. Passing a TEXT track's index here would force a full
+    // re-encode for captions the <track> sidecar renders for free — the exact
+    // cost this path exists to avoid.
+    const burnIn = this.subtitleIndex !== null && this.opts?.buildSubtitleTrack?.(this.subtitleIndex) == null
+      ? this.subtitleIndex
+      : undefined;
+    this.burnedInSubtitleIndex = burnIn ?? null;
+    // The new stream carries its own captions (or none); drop any sidecar so
+    // the two can't both be on screen.
+    if (burnIn !== undefined) this.setSubtitleSidecar(null);
+    else if (this.subtitleIndex !== null) {
+      const url = this.opts?.buildSubtitleTrack?.(this.subtitleIndex);
+      if (url) this.setSubtitleSidecar(url);
+    }
     const sel: StreamSelection = {
       maxBitrate: preset.maxBitrate,
       maxWidth: preset.maxWidth,
       audioStreamIndex: this.audioIndex,
-      subtitleStreamIndex: this.subtitleIndex ?? undefined,
+      subtitleStreamIndex: burnIn,
     };
     const src = build(sel);
     // Adopt the new session id immediately: a second change before this stream

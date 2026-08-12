@@ -1258,7 +1258,9 @@ export function createWallTextures(palette = getActiveTheme().palette): {
   const wallTex = new THREE.CanvasTexture(wallCanvas);
   wallTex.colorSpace = THREE.SRGBColorSpace;
   wallTex.wrapS = wallTex.wrapT = THREE.RepeatWrapping;
-  wallTex.anisotropy = aniso(8);
+  // 16, matching carpet/ceiling/asphalt in this module: the walls are the
+  // longest sightline in the store, so they are the surface that most wants it.
+  wallTex.anisotropy = aniso(16);
 
   // Orange-peel height -> normal map.
   const wallHeight = document.createElement('canvas');
@@ -1756,7 +1758,11 @@ export function createWireMeshTexture(): THREE.Texture {
   tex.generateMipmaps = true;
   tex.minFilter = THREE.LinearMipmapLinearFilter;
   tex.magFilter = THREE.LinearFilter;
-  
+  // The 2000s wire shelving is seen edge-on down the length of every aisle —
+  // the grazing-angle case the rest of this module sets anisotropy for. Without
+  // it the grid collapses into mip mush exactly where the run is longest.
+  tex.anisotropy = aniso(16);
+
   return tex;
 }
 

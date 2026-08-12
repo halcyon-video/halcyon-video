@@ -27,6 +27,8 @@ import {
   buildHlsStreamUrl,
   isHevcPassThroughEnabled,
   buildStaticStreamUrl,
+  buildSubtitleTrackUrl,
+  pickSubtitleDelivery,
   isDirectPlaySafe,
   fetchItemPlaybackInfo,
   MediaPlaybackInfo,
@@ -64,6 +66,7 @@ import {
 import { setupTerminalInput } from './store-setup-flow';
 import { registerLibraryToggles } from './library-settings';
 import { getActiveTheme, applyThemeCssVars, THEMES, resolveThemeId } from './themes';
+import { runDeviceGate } from './device-gate';
 import {
   activeMediaCutoff,
   filterLibrariesByCutoff,
@@ -3183,15 +3186,26 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
     );
   }
 
-  // Direct play can't switch audio tracks, and default-on subtitles are
-  // burned in server-side (SubtitleMethod=Encode) — either preference
-  // forces the HLS transcode path.
-  const directPlayable = isDirectPlaySafe(mediaInfo) && initialAudioIndex === undefined && initialSubtitleIndex === undefined;
+  // How the chosen subtitle reaches the screen decides whether the server has
+  // to re-encode the film at all. A TEXT track is a WebVTT sidecar the browser
+  // draws itself — free, instantly switchable, and it leaves direct play
+  // intact. Only bitmap subtitles (PGS/DVD/DVB) still have to be burned into
+  // the picture, because there is no client renderer for them.
+  const subtitleDelivery = pickSubtitleDelivery(streams, initialSubtitleIndex);
+  const subtitleTrackUrl = subtitleDelivery.kind === 'text'
+    ? buildSubtitleTrackUrl(jellyfinUrl, token, playbackId, subtitleDelivery.streamIndex, mediaSourceId)
+    : undefined;
+  const burnInSubtitleIndex = subtitleDelivery.kind === 'burn-in' ? subtitleDelivery.streamIndex : undefined;
+
+  // Direct play can't switch audio tracks, and burned-in subtitles are encoded
+  // server-side — either forces the HLS transcode path. Text subtitles no
+  // longer do.
+  const directPlayable = isDirectPlaySafe(mediaInfo) && initialAudioIndex === undefined && burnInSubtitleIndex === undefined;
   const hlsSrc = buildHlsStreamUrl(jellyfinUrl, token, playbackId, {
     sourceVideoCodec,
     mediaSourceId,
     audioStreamIndex: initialAudioIndex,
-    subtitleStreamIndex: initialSubtitleIndex,
+    subtitleStreamIndex: burnInSubtitleIndex,
     startPositionTicks: resumeTicks || undefined,
   });
   const hevcCopy = isHevcPassThroughEnabled() && (sourceVideoCodec === 'hevc' || sourceVideoCodec === 'h265');
@@ -3227,6 +3241,17 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
     defaultAudioIndex: initialAudioIndex,
     defaultSubtitleIndex: initialSubtitleIndex,
     subtitlesDefaultOn: wantSubtitles,
+    subtitleTrackUrl,
+    // Picking a subtitle in the player asks here how to deliver it: a URL
+    // means "text — hang this sidecar on the <video>, keep playing"; null
+    // means "bitmap — only a burned-in re-encode can show this", and the
+    // player falls back to rebuilding the stream.
+    buildSubtitleTrack: (streamIndex) => {
+      const d = pickSubtitleDelivery(streams, streamIndex);
+      return d.kind === 'text'
+        ? buildSubtitleTrackUrl(jellyfinUrl, token, playbackId, d.streamIndex, mediaSourceId)
+        : null;
+    },
     startPositionTicks: resumeTicks || undefined,
     hideVideoSurface: diegetic,
     // Non-diegetic playback exits through returnToEntrance() (onClose below)
@@ -4075,6 +4100,13 @@ async function main() {
     candyCheckoutIndex = candyCheckoutRows.length + 1;
     renderCandyCheckout();
   });
+
+  // A phone or a WebGL2-less browser can't drive the 3D store; offer 2.5D
+  // instead of letting the boot dead-end (see device-gate.ts). Awaited here,
+  // before the boot call below, so the chosen mode is already settled and the
+  // store builds it first time — no 3D scene raised only to be torn down.
+  // Resolves immediately on hardware that's fine, which is every kiosk.
+  await runDeviceGate();
 
   // Check saved credentials and try connection in background (demo mode
   // skips the credential gate entirely and never shows the login overlay).

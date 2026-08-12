@@ -4,12 +4,20 @@
 #   docker run -d --name halcyon --network host --restart unless-stopped \
 #     ghcr.io/halcyon-video/halcyon-video
 #
-# Runs on release tags (vX.Y.Z) and by hand (workflow_dispatch). amd64 only
-# for now: the arm64 half of the v0.2.0 publish died in `npm ci` with a V8
-# "Illegal instruction" under QEMU user emulation (the classic node-on-alpine
-# qemu failure), and emulating around it is a losing game — arm64 comes back
-# as a separate job on GitHub's native ubuntu-24.04-arm runners with a
-# manifest merge, tracked as a follow-up.
+# Runs on release tags (vX.Y.Z) and by hand (workflow_dispatch).
+#
+# amd64 AND arm64. The arm64 half of the v0.2.0 publish died in `npm ci` with a
+# V8 "Illegal instruction" under QEMU user emulation (the classic node-on-alpine
+# qemu failure), so arm64 was dropped rather than emulated around. It is back
+# here the way that failure said it had to be: each architecture builds on its
+# OWN native runner (GitHub's ubuntu-24.04-arm is free for public repos), pushes
+# an untagged image BY DIGEST, and a final job stitches the digests into one
+# multi-arch manifest that carries the tags. No QEMU anywhere.
+#
+# This matters more than a nice-to-have: the README and FAQ both pitch running
+# the store on a Raspberry Pi via 2.5D mode, and `docker run` is the documented
+# install — an amd64-only image sent every ARM self-hoster into `exec format
+# error` (issue #48).
 #
 # NOTE: the very first published package is PRIVATE by default — flip it to
 # public once under the org's Packages → halcyon-video → settings, or pulls
@@ -25,13 +33,82 @@ permissions:
   contents: read
   packages: write
 
+env:
+  IMAGE: ghcr.io/${{ github.repository }}
+
 jobs:
-  publish:
-    runs-on: ubuntu-latest
+  build:
+    name: build ${{ matrix.platform }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-latest
+            slug: amd64
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
+            slug: arm64
     steps:
       - uses: actions/checkout@v4
 
-      # No setup-qemu: it existed only to emulate the arm64 build (see header).
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Labels only here — the tags are applied once, by the merge job, to the
+      # manifest list. Tagging each single-arch image would have the two
+      # architectures fight over the same tag, last writer winning.
+      - uses: docker/metadata-action@v5
+        id: meta
+        with:
+          images: ${{ env.IMAGE }}
+
+      - uses: docker/build-push-action@v6
+        id: build
+        with:
+          context: .
+          platforms: ${{ matrix.platform }}
+          labels: ${{ steps.meta.outputs.labels }}
+          outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true
+          # Per-arch cache scope: one shared scope would have each build evict
+          # the other's layers every run.
+          cache-from: type=gha,scope=${{ matrix.slug }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.slug }}
+
+      # The merge job reconstructs image@sha256:<name> from these filenames, so
+      # the "sha256:" prefix is stripped here (shell expansion, not an Actions
+      # expression — those have no substring operators).
+      - name: Export digest
+        shell: bash
+        run: |
+          mkdir -p /tmp/digests
+          digest='${{ steps.build.outputs.digest }}'
+          touch "/tmp/digests/${digest#sha256:}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: digests-${{ matrix.slug }}
+          path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  merge:
+    name: merge manifest
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: /tmp/digests
+          pattern: digests-*
+          merge-multiple: true
+
       - uses: docker/setup-buildx-action@v3
 
       - uses: docker/login-action@v3
@@ -44,18 +121,20 @@ jobs:
       - uses: docker/metadata-action@v5
         id: meta
         with:
-          images: ghcr.io/${{ github.repository }}
+          images: ${{ env.IMAGE }}
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=ref,event=branch
 
-      - uses: docker/build-push-action@v6
-        with:
-          context: .
-          platforms: linux/amd64
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+      - name: Create the multi-arch manifest
+        working-directory: /tmp/digests
+        run: |
+          docker buildx imagetools create \
+            $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< '${{ steps.meta.outputs.json }}') \
+            $(printf '${{ env.IMAGE }}@sha256:%s ' *)
+
+      - name: Show what landed
+        run: |
+          docker buildx imagetools inspect \
+            "${{ env.IMAGE }}:$(jq -cr '.tags[0] | split(":")[1]' <<< '${{ steps.meta.outputs.json }}')"

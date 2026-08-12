@@ -1520,6 +1520,75 @@ export function buildStaticStreamUrl(jellyfinUrl: string, token: string, itemId:
   return `${url}/Videos/${itemId}/stream?static=true&api_key=${encodeURIComponent(token)}${sourceParam}`;
 }
 
+/**
+ * Subtitle codecs that are TEXT, and can therefore be fetched as a WebVTT
+ * sidecar and rendered by the browser over the video. Everything else — PGS,
+ * DVD, DVB, XSUB — is a bitmap the browser cannot draw, so it still has to be
+ * burned into the picture server-side (see pickSubtitleDelivery).
+ *
+ * Jellyfin reports the ffmpeg codec name, which is why both spellings of the
+ * common ones are here (`subrip`/`srt`, `ssa`/`ass`); `mov_text` is the MP4
+ * flavour and `webvtt`/`vtt` are already what we're asking for.
+ */
+const TEXT_SUBTITLE_CODECS = new Set([
+  'subrip', 'srt', 'ass', 'ssa', 'mov_text', 'webvtt', 'vtt', 'text', 'subviewer', 'microdvd',
+]);
+
+/** Is this subtitle stream text (client-renderable) rather than a bitmap? */
+export function isTextSubtitleCodec(codec: string | undefined): boolean {
+  return !!codec && TEXT_SUBTITLE_CODECS.has(codec.toLowerCase());
+}
+
+/**
+ * How a chosen subtitle track should be delivered.
+ *
+ * This is the whole point of the client-side subtitle work: asking the server
+ * to burn subtitles in (`SubtitleMethod=Encode`) forces a full video re-encode,
+ * so on the browser/Remote Play path merely defaulting captions ON turned every
+ * direct-playable file into a transcode. A text track costs the server nothing
+ * — it's a sidecar fetch — and switching or disabling it needs no new stream
+ * at all. Bitmap subtitles have no client renderer, so they keep the old path
+ * and pay the old price.
+ */
+export type SubtitleDelivery =
+  | { kind: 'none' }
+  | { kind: 'text'; streamIndex: number }
+  | { kind: 'burn-in'; streamIndex: number };
+
+export function pickSubtitleDelivery(
+  streams: MediaStreamInfo[] | undefined,
+  streamIndex: number | undefined,
+): SubtitleDelivery {
+  if (streamIndex === undefined) return { kind: 'none' };
+  const stream = streams?.find((s) => s.type === 'Subtitle' && s.index === streamIndex);
+  // Unknown stream, or a server that didn't report a codec: assume text and
+  // try the cheap path. The two failure modes are not symmetric — a sidecar
+  // that 404s costs one failed request and leaves the film playing, while a
+  // needless burn-in costs a re-encode of the entire runtime.
+  if (!stream || stream.codec === undefined) return { kind: 'text', streamIndex };
+  return isTextSubtitleCodec(stream.codec)
+    ? { kind: 'text', streamIndex }
+    : { kind: 'burn-in', streamIndex };
+}
+
+/**
+ * WebVTT sidecar for one subtitle stream, for a <track> on the <video>.
+ * Jellyfin converts SRT/ASS/SSA to VTT on the fly here — styling and
+ * positioning are flattened, which is the trade for not re-encoding the film.
+ */
+export function buildSubtitleTrackUrl(
+  jellyfinUrl: string,
+  token: string,
+  itemId: string,
+  streamIndex: number,
+  mediaSourceId?: string,
+): string {
+  const url = jellyfinUrl.replace(/\/$/, '');
+  const source = mediaSourceId ?? itemId;
+  return `${url}/Videos/${itemId}/${encodeURIComponent(source)}/Subtitles/${streamIndex}/0/Stream.vtt`
+       + `?api_key=${encodeURIComponent(token)}`;
+}
+
 /** Track/quality overrides for buildHlsStreamUrl (the player's track picker). */
 export interface HlsStreamOptions {
   /** Jellyfin MediaStream index of the audio track to transcode. */

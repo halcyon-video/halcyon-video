@@ -298,7 +298,16 @@ export function remotePlayPlugin() {
         await page.evaluateOnNewDocument((kv) => {
           try {
             for (const [k, v] of Object.entries(kv)) localStorage.setItem(k, String(v));
-            localStorage.setItem("bb_remote_play", "0");
+            // bb_remote_play is deliberately NOT written here, in either
+            // direction. It is already stripped from the seed (SEED_SKIP) so
+            // the owner's kiosk setting can't make this instance register as
+            // the shared mirror; ?remoteId= is what makes it host, as host-<id>.
+            // Writing an explicit "0" used to look harmless and was the bug:
+            // applyLiveSettings() replays every EXPLICITLY-SET live setting
+            // once the scene is built, so the instance hosted, finished
+            // booting, then switched its own stream off and left the viewer
+            // stuck on "Store is still booting…". Leaving the key absent is
+            // what keeps it out of that replay.
           } catch { /* storage unavailable */ }
         }, seed);
       }

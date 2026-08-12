@@ -52,6 +52,13 @@ export interface FixtureContext {
   // theme-derived approximation the same way store-shell.ts's own knee
   // walls do.
   wallSurface: { material: THREE.Material; storeWidth: number; roomHeight: number } | null;
+  // Live planar reflections, for fixtures with mirrored surfaces (see
+  // fixtures/mirror-column.ts). Present ONLY when this machine gets live
+  // mirrors at all (store-mirrors.ts's liveMirrorsAllowed) and carrying the
+  // render-target size they should use; absent means "dress the surface in
+  // static env-mapped chrome instead", which is also what the standalone
+  // asset viewer wants — a Reflector in an empty void reflects nothing.
+  liveMirror?: { textureWidth: number; textureHeight: number };
 }
 
 import { Movie } from './jellyfin';
