@@ -211,8 +211,9 @@ at boot. She isn't decoration:
 
 ## Discovery — the store stocks what you're missing
 
-With **[Jellyseerr](https://github.com/fallenbagel/jellyseerr)** connected, the
-store quietly merchandises around your collection:
+With **[Jellyseerr](https://github.com/fallenbagel/jellyseerr)** connected — or
+**[Overseerr](https://github.com/sct/overseerr)**, whose API Jellyseerr forked,
+so either one answers — the store quietly merchandises around your collection:
 
 - **Collection gaps**: own 3 of the 4 Alien films? The missing one stands on
   the shelf as an empty box with a blue **REQUEST** corner label. Select it and
@@ -441,7 +442,7 @@ This app's steady state is *days on a shelf*, and it's engineered like it:
 | You have | You get |
 |---|---|
 | **Jellyfin** (required — or demo mode) | The store, browsing, walk mode, playback, rentals, living room, clerk, themes, brand editor |
-| **Jellyseerr** (optional) | Recommendation clasps, REQUEST / COMING SOON cases, collection gaps, discovery shelving, staff picks, FOR YOU endcaps, "order it for me" |
+| **Jellyseerr / Overseerr** (optional) | Recommendation clasps, REQUEST / COMING SOON cases, collection gaps, discovery shelving, staff picks, FOR YOU endcaps, "order it for me" |
 | **RomM** (optional) | The video-game department: per-platform bays, real carton proportions, your cover scans |
 | **The server on the same machine as the TV** | mpv playback — real HDR and original lossless audio, no transcode |
 | Nothing at all | `?demo=1` — the full store on a synthetic library, no server, playback disabled |

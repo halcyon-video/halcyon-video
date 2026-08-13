@@ -10,12 +10,12 @@
 import { invoke } from '@tauri-apps/api/core';
 import { Movie } from './jellyfin';
 import { isDemoMode } from './demo-mode';
+import { resolveSeerrConfig as resolveSeerr, type SeerrConfig } from './seerr-config';
 import { activeSuggestionWindow, titleInWindow, windowGteParam, windowLteParam } from './media-release-date';
 
-export interface JellyseerrConfig {
-  url: string;
-  apiKey: string;
-}
+// Re-exported under the historical name so existing importers are untouched.
+export type JellyseerrConfig = SeerrConfig;
+export { resolveSeerrConfig } from './seerr-config';
 
 const TMDB_POSTER_BASE = 'https://image.tmdb.org/t/p/w342';
 
@@ -49,18 +49,22 @@ function genreNames(genreIds: unknown): string[] {
 // anything truly available, so those are skipped here to avoid duplicates.)
 const MEDIA_STATUS_AVAILABLE = 5;
 
+// Config resolution (which keys, which aliases, the base64 padding repair)
+// lives in seerr-config.ts so it can be unit-tested without this module's
+// Tauri/DOM imports — see tests/seerr-config.test.ts.
 export function getJellyseerrConfig(): JellyseerrConfig | null {
-  const url = (typeof localStorage !== 'undefined' ? localStorage.getItem('jellyseerr_url') : null) || (typeof import.meta.env !== 'undefined' ? import.meta.env.VITE_JELLYSEERR_URL : null);
-  let apiKey = ((typeof localStorage !== 'undefined' ? localStorage.getItem('jellyseerr_apikey') : null) || (typeof import.meta.env !== 'undefined' ? import.meta.env.VITE_JELLYSEERR_APIKEY : '') || '').trim();
-  if (!url || !apiKey) return null;
-  // Jellyseerr API keys are base64 with their '=' padding included, but
-  // double-click-selecting the key in a browser stops at the '=' signs, so
-  // pasted keys routinely arrive two characters short and every request 403s.
-  // Padding is derivable from length, so restore it rather than reject.
-  if (/^[A-Za-z0-9+/]+$/.test(apiKey) && apiKey.length % 4 >= 2) {
-    apiKey += '='.repeat(4 - (apiKey.length % 4));
-  }
-  return { url: url.replace(/\/$/, ''), apiKey };
+  // import.meta.env members must be referenced literally — vite substitutes
+  // them at build time, so a computed lookup would resolve to nothing.
+  const env: Record<string, string | undefined> = typeof import.meta.env !== 'undefined' ? {
+    jellyseerr_url: import.meta.env.VITE_JELLYSEERR_URL,
+    jellyseerr_apikey: import.meta.env.VITE_JELLYSEERR_APIKEY,
+    seerr_url: import.meta.env.VITE_SEERR_URL,
+    seerr_apikey: import.meta.env.VITE_SEERR_APIKEY,
+    overseerr_url: import.meta.env.VITE_OVERSEERR_URL,
+    overseerr_apikey: import.meta.env.VITE_OVERSEERR_APIKEY,
+  } : {};
+  return resolveSeerr((key) =>
+    (typeof localStorage !== 'undefined' ? localStorage.getItem(key) : null) ?? env[key] ?? null);
 }
 
 // Fixtures that exist to surface recommendations — the shelf-lip "ASK FOR

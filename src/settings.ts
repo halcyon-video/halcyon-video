@@ -977,8 +977,8 @@ export function registerCoreSettings(): void {
     hint: 'Blank keeps session. A password re-authenticates.',
   });
 
-  cred('jellyseerr_url', 'Jellyseerr URL', 'text');
-  cred('jellyseerr_apikey', 'Jellyseerr API Key', 'secret');
+  cred('jellyseerr_url', 'Jellyseerr / Overseerr URL', 'text');
+  cred('jellyseerr_apikey', 'Jellyseerr / Overseerr API Key', 'secret');
 
   // Permanent release-date bounds on everything Jellyseerr SUGGESTS (discovery
   // shelves, staff-pick seeds, un-ordered collection gaps) — a static window
