@@ -14,9 +14,12 @@
 import {
   fetchPublicUsers,
   fetchLibraryList,
-  authenticateUser,
   normalizeUrl,
 } from './jellyfin';
+// Sign-in goes through the provider (GH #32). fetchPublicUsers stays direct:
+// it feeds the membership cards, which want an image tag rather than
+// AccountSummary's resolved URL — the multiUserPicker capability's own step.
+import { activeProvider } from './providers/active-provider';
 import {
   openMembershipCardPicker,
   isMembershipPickerOpen,
@@ -226,7 +229,10 @@ async function manualSignIn(): Promise<void> {
   screen = { kind: 'dialing', address: url, step: `SIGNING IN ${username.toUpperCase().slice(0, 26)}...` };
   render();
   try {
-    const session = await authenticateUser(url, username.trim(), password);
+    const session = await activeProvider().authenticate(url, {
+      username: username.trim(),
+      password,
+    });
     await afterAuth(url, session);
   } catch (e: any) {
     const msg = String(e?.message ?? e);

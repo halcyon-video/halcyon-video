@@ -10,13 +10,11 @@
 // and loaders through initBootFlow(deps); nothing here reaches back into
 // main.ts directly, so the two can't tangle.
 import {
-  fetchJellyfinLibrariesAndMovies,
-  authenticateUser,
-  validateToken,
   fetchPublicUsers,
   normalizeUrl,
   JellyfinLibrary,
 } from './jellyfin';
+import { activeProvider as provider, sessionOf } from './providers/active-provider';
 import {
   openMembershipCardPicker,
   closeMembershipCardPicker,
@@ -33,6 +31,14 @@ import {
   closeSetupTerminal,
   type SetupTerminalScene,
 } from './store-setup-flow';
+
+// Backend access is `provider()` throughout this module (see
+// providers/active-provider.ts). One exception, deliberate: the membership-card
+// picker still reads Jellyfin's public-user shape directly in showLoginOrCards,
+// because the cards want an image tag where AccountSummary carries a resolved
+// URL. Converting it is the multiUserPicker capability's own step — it is also
+// the flow Plex can't support at all, so it wants designing rather than
+// renaming.
 
 export interface BootFlowDeps {
   log: (message: string, type?: 'system' | 'cec' | 'video') => void;
@@ -186,7 +192,7 @@ async function syncForSetup(
   try {
     [libs] = await Promise.all([
       Promise.race([
-        fetchJellyfinLibrariesAndMovies(url, session.accessToken, session.userId, onProgress, {
+        provider().fetchLibraries(url, session, onProgress, {
           excludeLibraryIds: excludedLibraryIds(),
         }),
         stallPromise,
@@ -324,7 +330,7 @@ async function finishLoginAndLaunch(urlInput: string, session: MembershipLoginSe
   try {
     [libs] = await Promise.all([
       Promise.race([
-        fetchJellyfinLibrariesAndMovies(urlInput, session.accessToken, session.userId, armLoginStall, {
+        provider().fetchLibraries(urlInput, session, armLoginStall, {
           excludeLibraryIds: excludedLibraryIds(),
         }),
         loginTimeout
@@ -458,7 +464,7 @@ export async function checkCredentialsAndLoad() {
   if ((!token || !userId || !jellyfinUrl) && envUrl && envUser && envPass) {
     d.log('[System] File credentials (.env.local) found. Authenticating automatically...', 'system');
     try {
-      const session = await authenticateUser(envUrl, envUser, envPass);
+      const session = await provider().authenticate(envUrl, { username: envUser, password: envPass });
       localStorage.setItem('jellyfin_url', envUrl);
       localStorage.setItem('jellyfin_username', envUser);
       localStorage.setItem('jellyfin_token', session.accessToken);
@@ -543,7 +549,7 @@ export async function checkCredentialsAndLoad() {
         let libs: JellyfinLibrary[];
         [libs] = await Promise.all([
           Promise.race([
-            fetchJellyfinLibrariesAndMovies(jellyfinUrl, activeToken!, activeUserId!, armStall, {
+            provider().fetchLibraries(jellyfinUrl, sessionOf(activeToken!, activeUserId!), armStall, {
               excludeLibraryIds: excludedLibraryIds(),
             }),
             stallPromise
@@ -613,13 +619,13 @@ export async function checkCredentialsAndLoad() {
           // Before each retry, check if cached token fails validation. If so, attempt to re-auth from cached credentials.
           const freshToken = localStorage.getItem('jellyfin_token') || token;
           try {
-            const isValid = await validateToken(jellyfinUrl, freshToken!);
+            const isValid = await provider().validateSession(jellyfinUrl, sessionOf(freshToken!, activeUserId ?? ''));
             if (!isValid) {
               const user = localStorage.getItem('jellyfin_username') || envUser;
               const pass = localStorage.getItem('jellyfin_password') || envPass;
               if (user && pass && jellyfinUrl) {
                 d.log('[System] Jellyfin token stale — re-authenticating...', 'system');
-                const session = await authenticateUser(jellyfinUrl, user, pass);
+                const session = await provider().authenticate(jellyfinUrl, { username: user, password: pass });
                 localStorage.setItem('jellyfin_token', session.accessToken);
                 localStorage.setItem('jellyfin_userid', session.userId);
                 d.log('[System] Re-auth OK.', 'system');
@@ -720,7 +726,7 @@ export function setupLoginHandlers() {
 
       try {
         deps?.log(`[System] Contacting Jellyfin server: ${urlInput}`, 'system');
-        const session = await authenticateUser(urlInput, userInput, passInput);
+        const session = await provider().authenticate(urlInput, { username: userInput, password: passInput });
 
         // Only the manual single-login form remembers username (to prefill);
         // the password is never persisted in plaintext localStorage.
