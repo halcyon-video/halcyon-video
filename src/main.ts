@@ -2573,6 +2573,11 @@ async function initializeStoreScene(preservePosterCache = false) {
     // fallback), eject the tape so the room isn't stuck "watching" nothing.
     scene.onBackRoomPlay = (movie) => {
       void launchVideoPlayback(movie, undefined, undefined, false, true).then(() => {
+        // The launch is asynchronous, and an expiring session tears the scene
+        // down mid-flight (expireSession) — this closure still holds the dead
+        // one, so hanging a video texture on it would paint into a room that
+        // no longer exists.
+        if (storeScene !== scene) return;
         if (videoPlayer?.isOpen) {
           scene.attachBackRoomVideo(videoPlayer.videoElement);
         } else {
@@ -2915,6 +2920,59 @@ async function handleGameLaunch(movie: Movie) {
 // token live from localStorage, so this heals streaming without a reload).
 // Any network blip is swallowed — a wake must never wedge the UI.
 let wakeRefreshInFlight = false;
+
+// Bumped once per session teardown. A play action that chose NOT to wait for
+// the token check (the grace race below) captures this and re-reads it after
+// every await, so a teardown landing mid-launch can't be overtaken by a player
+// opening on top of the login screen.
+let sessionGeneration = 0;
+
+/**
+ * Retire a dead Jellyfin session — the ONE path that clears credentials and
+ * sends the user back to the login screen.
+ *
+ * Order matters, and it is the whole point of this function. The player comes
+ * down FIRST: the credentials it is streaming on have just been thrown away,
+ * so it can only sit there showing nothing, and a transport bar stranded over
+ * the login screen was the bug the owner hit — worst in rental mode, where
+ * playback is diegetic (the picture belongs on the back room's CRT, so the
+ * overlay is transparent and you see the login screen straight through the
+ * controls). It also holds the input lock, which would leave the login screen
+ * underneath unreachable. Only once the player is closed do the scene, the
+ * indicator timer and the HUD go.
+ */
+function expireSession(reason: string) {
+  sessionGeneration++;
+  localStorage.removeItem('jellyfin_token');
+  localStorage.removeItem('jellyfin_userid');
+
+  if (videoPlayer?.isOpen) {
+    // close() runs the player's own onClose, which reports the stop, detaches
+    // the back-room CRT texture and clears ui.isPlaybackActive.
+    logToConsole(`[Video] Playback stopped — ${reason}`, 'video');
+    videoPlayer.close();
+  }
+  // A launch that was still in flight never got a player to close, but it may
+  // already have taken the input lock (it is set before the stream is built).
+  ui.isPlaybackActive = false;
+  // Drop the play-flourish handshake too: a reveal firing after this would
+  // otherwise spawn the parked mpv launch on credentials that no longer exist.
+  revealPendingHidden = false;
+  pendingHiddenMpvLaunch = null;
+
+  if (storeScene) {
+    storeScene.destroy();
+    storeScene = null;
+  }
+  if (aisleIndicatorInterval !== null) {
+    clearInterval(aisleIndicatorInterval);
+    aisleIndicatorInterval = null;
+  }
+  updateMovieHUD(null);
+
+  void showLoginOrCards(reason);
+}
+
 async function wakeRefresh() {
   if (wakeRefreshInFlight) return;
   const url = localStorage.getItem('jellyfin_url');
@@ -2926,23 +2984,8 @@ async function wakeRefresh() {
     // unreachable/wedged server throws instead and lands in the catch below,
     // so a network blip can never trigger the logout teardown (issue #125).
     if (await validateToken(url, token)) return; // still good — nothing to do
-    logToConsole('[System] Jellyfin token stale after idle — returning to login screen.', 'system');
-    
-    // Clear stale token/userid credentials
-    localStorage.removeItem('jellyfin_token');
-    localStorage.removeItem('jellyfin_userid');
-    
-    if (storeScene) {
-      storeScene.destroy();
-      storeScene = null;
-    }
-    if (aisleIndicatorInterval !== null) {
-      clearInterval(aisleIndicatorInterval);
-      aisleIndicatorInterval = null;
-    }
-    updateMovieHUD(null);
-    
-    void showLoginOrCards('Session expired. Please log in again.');
+    logToConsole('[System] Jellyfin token stale — returning to login screen.', 'system');
+    expireSession('Session expired. Please log in again.');
   } catch {
     logToConsole('[System] Wake token check failed (will retry on next wake).', 'system');
   } finally {
@@ -2972,6 +3015,14 @@ let seriesQueue: { seriesId: string; episodes: Episode[] } | null = null;
 
 export async function launchVideoPlayback(movie: Movie, overrideItemId?: string, overridePath?: string, startHidden = false, diegetic = false, version?: MovieVersion) {
   revealPendingHidden = false; // fresh launch — clear any stale reveal handshake
+  // The session this launch belongs to. Anything that retires the session
+  // while we're awaiting invalidates the whole attempt — see sessionLost().
+  const launchedInSession = sessionGeneration;
+  const sessionLost = () => {
+    if (sessionGeneration === launchedInSession) return false;
+    logToConsole(`[Video] Session ended before "${movie.title}" could start.`, 'video');
+    return true;
+  };
 
   // Demo mode: no media server, so no stream. Diegetic (back-room CRT) callers
   // check videoPlayer.isOpen right after this resolves and eject the tape
@@ -2991,6 +3042,11 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
   // a short grace period proceed with the cached token; wakeRefresh keeps
   // running in the background and heals a genuinely stale token on its own.
   await Promise.race([wakeRefresh(), new Promise<void>((resolve) => setTimeout(resolve, 1500))]);
+  // wakeRefresh only LOST that race — it is still running, and it can retire
+  // the session at any point from here on. If it already has, the credentials
+  // this launch would stream on are gone; opening a player now would drop a
+  // transport bar on top of the login screen.
+  if (sessionLost()) return;
 
   // A series with no specific episode resolves one from the 3D boxset: the
   // episode highlighted on the boxset's episode-list face if that's what the
@@ -3217,6 +3273,10 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
     `[Video] Streaming "${movie.title}"${version ? ` [${version.label}]` : ''} in-app (${directPlayable ? 'direct play' : `HLS, hevc pass-through ${hevcCopy ? 'on' : 'off'}`}): ${mediaInfoSummary}.`,
     'video',
   );
+  // Last gate before the player exists: the media-info fetch above is another
+  // await the background token check can land inside.
+  if (sessionLost()) { ui.isPlaybackActive = false; return; }
+
   // Fire-and-forget: awaiting here would sever the user-gesture chain before
   // video.play(), tripping autoplay policy. (It never rejects — errors are
   // caught and logged inside.)
