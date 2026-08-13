@@ -21,7 +21,7 @@
 import { isDemoMode } from './demo-mode';
 import { enableFpsMeter, initFpsMeter, FPS_METER_KEY } from './fps-meter';
 import { setRemotePlayEnabled } from './remote-play';
-import { THEMES, resolveThemeId, WALL_PAINT_OPTIONS } from './themes';
+import { THEMES, getActiveTheme, resolveThemeId, WALL_PAINT_OPTIONS } from './themes';
 import { COVER_VARIANTS, USER_WRAP_SPECS, getUserWrap, setUserWrap } from './video-case';
 import type { CaseMedium } from './video-case';
 import { DEFAULT_LOGO_SPECS, getActiveLogoSpec } from './logo-spec';
@@ -32,6 +32,7 @@ import { brandDropReport } from './brand-drop';
 import type { LogoShape, LogoSpec } from './logo-spec';
 import { drawLogo, getLogoFontString } from './logo-renderer';
 import { loadMediaReleasePin, saveMediaReleasePin } from './media-release-date';
+import { formatUnlockLabel, makeRentalRecord, rentalCapacityAt } from './rental-clock';
 import type { StoreScene } from './three-scene';
 
 export type SettingKind = 'toggle' | 'cycle' | 'text' | 'secret';
@@ -234,6 +235,7 @@ export function resolveHint(def: SettingDef): string | undefined {
 
 const THUMBED_SETTINGS = new Set([
   'bb_theme',
+  'bb_93_signage',
   'bb_medium',
   'bb_case_art',
   'bb_cover_vhs',
@@ -358,6 +360,43 @@ function brandPackDiagnostic(): string {
 }
 
 /**
+ * The 1993-dressing row's hint. On the 1993 era the pack is already deployed
+ * (bb93SignageOn reads the era first), so the row is a no-op there — say so
+ * rather than leaving an "Off" that visibly changes nothing.
+ * Both branches fit the footer bar's 62-char clip.
+ */
+function dressing93Hint(): string {
+  let era1993 = false;
+  try { era1993 = getActiveTheme().dressingEra === '1993'; } catch { /* pre-theme boot */ }
+  return era1993
+    ? 'Already on: the 1993 era wears this pack by default.'
+    : 'Adds 1993 fascia blades + ribbon ceiling to this era.';
+}
+
+/**
+ * The rental-mode row's hint, resolved fresh every render so it quotes the rule
+ * that is actually in force AS YOU READ IT: the weeknight/weekend carry limit,
+ * and the wall-clock instant tonight's checkout would lock the store until.
+ *
+ * This row commits you to hours without your own library — a weekend checkout
+ * shuts the store until Monday 8 AM — so the hint leads with that, names the
+ * escape (switching the row off clears the lockout), and never makes anyone
+ * infer it from the word "lockout" alone.
+ */
+function rentalModeHint(): string {
+  const now = new Date();
+  const cap = rentalCapacityAt(now);
+  // Written to fit the footer bar's 62-char clip WHOLE — a warning that gets
+  // truncated mid-sentence is no warning. The full version (what still plays
+  // during the lockout, how to reopen) is logged when the row is switched on.
+  if (getSetting<boolean>('bb_rental_dev')) {
+    return `Checkout locks the store for 5 min (dev timer). Limit ${cap}.`;
+  }
+  const unlock = formatUnlockLabel(makeRentalRecord([], now, false));
+  return `Checkout locks the store until ${unlock}. Limit ${cap} tapes.`;
+}
+
+/**
  * One line describing the SIMPLE DROP — user-assets/brand/. This is the tier
  * with no setting to look at, so the diagnostic is the only way to answer "did
  * it see my file, and what did it make of it?": which file, where the name came
@@ -443,21 +482,32 @@ export function registerCoreSettings(): void {
     hidden: true,
   });
 
+  // Layers the 1993 store-dressing pack (fascia blades over the aisle runs,
+  // ribbon ceiling panels, the flat-oblique NEW RELEASES band, the period
+  // counter/storefront/security props) onto whichever era is selected. The
+  // 1993 era theme turns the same pack on by itself — this row exists to put
+  // it on the OTHER eras.
+  //
+  // It used to be called "1993 Footage Signage" and live on the staff-only
+  // SERVICE page. Both were wrong for what it is (owner report 2026-08-12,
+  // "makes no sense being in the options nest it is in and what does it even
+  // do?"): "Footage" named our reference material — the 1993 store video the
+  // pack was reconstructed from — which means nothing to anyone looking at
+  // the row, and a purely cosmetic choice does not belong among the dev
+  // knobs. It is a look, so it sits in Store Look, directly under the era it
+  // modifies, and says what it adds.
   registerSetting({
     key: 'bb_93_signage',
-    label: '1993 Footage Signage',
+    label: '1993 Store Dressing',
     kind: 'cycle',
     group: 'Store Look',
     values: [
-      { id: 'off', label: 'Classic' },
-      { id: 'on', label: '1993 Footage' },
+      { id: 'off', label: 'Off' },
+      { id: 'on', label: 'On' },
     ],
     default: 'off',
     applyMode: 'rebuild-scene',
-    // The 1993 era theme now turns this pack on by itself; this toggle survives
-    // as a legacy override that layers the 93 dressing onto any other era.
-    hint: '1993 fascia bands + ribbon ceiling layered onto any era.',
-    hidden: true, // service knob: legacy override, superseded by the 1993 theme
+    hint: dressing93Hint,
   });
 
   registerSetting({
@@ -687,13 +737,17 @@ export function registerCoreSettings(): void {
   // lockout in the back room after checkout. Forces carry & checkout ON.
   registerSetting({
     key: 'bb_rental_mode',
-    label: 'Rental mode',
+    label: 'Rental mode (real lockout)',
     kind: 'toggle',
     group: 'Store Look',
     default: false,
     applyMode: 'live',
     apply: (value, scene) => scene.setRentalMode(!!value),
-    hint: 'Halcyon house rules: real due-backs, living room, lockout.',
+    // The consequence, spelled out with TONIGHT'S actual numbers, before the
+    // row is ever pressed. The old hint said "lockout" and left the reader to
+    // guess it meant hours of no store — which is exactly what it means, and
+    // the one thing anyone would want to know first (owner report 2026-08-12).
+    hint: rentalModeHint,
   });
 
   // Dev timer: ships available but OFF (ticket). Read at checkout time, so a
