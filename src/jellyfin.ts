@@ -302,13 +302,19 @@ export async function fetchPublicUsers(jellyfinUrl: string): Promise<PublicUser[
 
 /** Jellyfin avatar image URL for a public user, or null if they have none set. */
 /**
- * Item artwork (poster / backdrop / person portrait) as the provider boundary
- * asks for it. The catalog sync still builds these URLs inline at ten call
- * sites in this file; routing those through here is the tail of the extraction
- * (Phase 4 in tickets/adapter-boundary-design-2026-08-08.md), deliberately not
- * done on this pass so the boundary lands without touching the sync path.
- * Until then this is the shape NEW code must use — nothing outside this module
- * should be assembling an Images/ URL of its own.
+ * Item artwork (poster / backdrop / person portrait) — the ONE place an
+ * Images/ URL is assembled for a catalog item. The sync paths, the collection
+ * walk and the episode list all route through here, so a change to the wire
+ * shape (a token rotation, an api_key -> header move) is a one-line change
+ * rather than a hunt through ten string literals.
+ *
+ * Nothing outside this module should build one of these: a second copy of URL
+ * logic living in a fixture is how ambient-tvs.ts ended up hand-rolling its
+ * own HLS URL. Callers past the boundary ask the provider
+ * (MediaSourceProvider.buildArtworkUrl) instead.
+ *
+ * Cache note: the store's texture caches key on item id, never on the URL this
+ * returns, so changing the shape here does not invalidate cached poster art.
  */
 export function buildItemImageUrl(
   jellyfinUrl: string,
@@ -639,12 +645,12 @@ export async function fetchMediaCatalog(
           .map((p: any) => ({
             id: p.Id,
             name: p.Name,
-            imageUrl: p.PrimaryImageTag ? `${url}/Items/${p.Id}/Images/Primary?api_key=${token}` : undefined,
+            imageUrl: p.PrimaryImageTag ? buildItemImageUrl(url, token, p.Id, 'person') : undefined,
           })),
         genres: item.Genres || [],
         localPath: item.Path || '',
-        posterUrl: `${url}/Items/${item.Id}/Images/Primary?api_key=${token}`,
-        backdropUrl: item.BackdropImageTags && item.BackdropImageTags.length > 0 ? `${url}/Items/${item.Id}/Images/Backdrop/0?api_key=${token}` : undefined,
+        posterUrl: buildItemImageUrl(url, token, item.Id, 'poster'),
+        backdropUrl: item.BackdropImageTags && item.BackdropImageTags.length > 0 ? buildItemImageUrl(url, token, item.Id, 'backdrop') : undefined,
         dateCreated: item.DateCreated || "",
         is4k: checkIs4k(item),
         communityRating: typeof item.CommunityRating === 'number' ? item.CommunityRating : undefined,
@@ -757,10 +763,10 @@ async function fetchCollectionMembership(
       // uses the backdrop as the card with the poster inset, so keep both.
       collectionArt.set(set.Name, {
         posterUrl: set.ImageTags?.Primary
-          ? `${url}/Items/${set.Id}/Images/Primary?api_key=${token}`
+          ? buildItemImageUrl(url, token, set.Id, 'poster')
           : undefined,
         backdropUrl: set.BackdropImageTags && set.BackdropImageTags.length > 0
-          ? `${url}/Items/${set.Id}/Images/Backdrop/0?api_key=${token}`
+          ? buildItemImageUrl(url, token, set.Id, 'backdrop')
           : undefined,
       });
 
@@ -1020,12 +1026,12 @@ export async function fetchJellyfinLibrariesAndMovies(
               .map((p: any) => ({
                 id: p.Id,
                 name: p.Name,
-                imageUrl: p.PrimaryImageTag ? `${url}/Items/${p.Id}/Images/Primary?api_key=${token}` : undefined,
+                imageUrl: p.PrimaryImageTag ? buildItemImageUrl(url, token, p.Id, 'person') : undefined,
               })),
             genres: item.Genres || [],
             localPath: item.Path || '',
-            posterUrl: `${url}/Items/${item.Id}/Images/Primary?api_key=${token}`,
-            backdropUrl: item.BackdropImageTags && item.BackdropImageTags.length > 0 ? `${url}/Items/${item.Id}/Images/Backdrop/0?api_key=${token}` : undefined,
+            posterUrl: buildItemImageUrl(url, token, item.Id, 'poster'),
+            backdropUrl: item.BackdropImageTags && item.BackdropImageTags.length > 0 ? buildItemImageUrl(url, token, item.Id, 'backdrop') : undefined,
             dateCreated: item.DateCreated || "",
             isSeries: item.Type === "Series",
             is4k: checkIs4k(item),
@@ -1184,12 +1190,12 @@ export async function fetchSeriesEpisodes(
           : undefined,
       // Episode "still" — the Primary image on an Episode item. Sized down for
       // the on-box thumbnail; falls back to a placeholder if the load 404s.
-      thumbUrl: `${url}/Items/${item.Id}/Images/Primary?api_key=${token}&maxWidth=400`,
+      thumbUrl: buildItemImageUrl(url, token, item.Id, 'poster', 400),
       // Season this episode belongs to. Jellyfin Episode items carry SeasonId;
       // its Primary image is the season POSTER (2:3), used for the season chip.
       seasonId: item.SeasonId,
       seasonPrimaryUrl: item.SeasonId
-        ? `${url}/Items/${item.SeasonId}/Images/Primary?api_key=${token}&maxWidth=400`
+        ? buildItemImageUrl(url, token, item.SeasonId, 'poster', 400)
         : undefined
     }));
   } catch (e) {
