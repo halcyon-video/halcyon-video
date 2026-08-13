@@ -25,8 +25,16 @@ export function setRentalMode(scene: StoreScene, enabled: boolean): void {
   if (enabled) {
     scene.setCarryMode(true);
     scene.carried?.setCapacity(rentalCapacityAt(new Date()));
+    // Announce the CONSEQUENCE, not just the limit: the next checkout shuts
+    // the store until a real wall-clock instant, so name it here as well as in
+    // the settings row's hint (owner report 2026-08-12 — the option gave no
+    // warning of what it committed you to).
+    const now = new Date();
+    const cap = rentalCapacityAt(now);
+    const unlock = formatUnlockLabel(makeRentalRecord([], now, rentalDevTimerOn(scene)));
     scene.onConsoleLog(
-      `[System] Rental mode ON — ${rentalCapacityAt(new Date())} tape limit tonight. `
+      `[System] Rental mode ON — carry up to ${cap} tape${cap === 1 ? '' : 's'} tonight; `
+      + `checking out shuts the store until ${unlock}. `
       + brandString('rental-rules-note', 'Halcyon house rules.'),
       'system');
   } else {
