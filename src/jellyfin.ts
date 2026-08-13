@@ -3,172 +3,23 @@ import { invoke } from '@tauri-apps/api/core';
 // under `node --test`'s type-stripping loader, which can't resolve the bare
 // sibling specifier (same note as media-date-screen.ts).
 import { activeMediaCutoff, titleReleasedBy } from './media-release-date.ts';
+import type { Movie, MediaStreamInfo, MovieVersion, MediaPlaybackInfo, Episode, JellyfinLibrary } from './providers/media-source-provider.ts';
 
-export interface Movie {
-  id: string;
-  title: string;
-  year: number;
-  duration: string;
-  rating: string;
-  overview: string;
-  director: string;
-  actors: string[]; // top-billed cast, at most 5 names
-  genres: string[];
-  localPath: string;
-  posterUrl?: string;
-  backdropUrl?: string;
-  dateCreated?: string;
-  isSeries?: boolean;
-  is4k?: boolean;
-  communityRating?: number; // 0-10 (e.g. 9.0 = 4.5 stars out of 5)
-  criticRating?: number;    // 0-100 Rotten Tomatoes score
-  libraryName?: string;
-  studios?: string[];
-  // Synthesized (see jellyseerr.ts) for a title that's been requested on
-  // Jellyseerr but hasn't finished downloading yet: it gets a display case
-  // with poster art on the New Releases wall but no rental backstock, and
-  // selecting it should show "Coming Soon" rather than allow playback.
-  comingSoon?: boolean;
-  // TMDB id (see jellyseerr.ts's fetchDiscoverMovies) -- required to call
-  // requestMovie() for a discovery title.
-  tmdbId?: number;
-  // Synthesized (see jellyseerr.ts's fetchDiscoverMovies) for a Jellyseerr
-  // trending/popular suggestion that is NOT in the Jellyfin library: it gets
-  // an empty display case shelved inline with the regular stock (REQUEST
-  // corner sticker, no rental backstock), and selecting it lets the user
-  // REQUEST it through Jellyseerr instead of play it.
-  discovery?: boolean;
-  // True when a `discovery` or `collectionGap` title has already been
-  // requested (through this app this session, or because Jellyseerr's own
-  // records say so -- see StoreScene's merge of comingSoon into
-  // discoveryMovies, and fetchCollectionGaps keeping requested gaps). These
-  // cases stamp the gold COMING SOON corner label instead of the blue
-  // REQUEST one; endcap candidates wear the green REQUESTED tag.
-  discoveryRequested?: boolean;
-  // T18: synthesized (see romm.ts's fetchGames) for a video-game title from a
-  // Romm server. It gets a display case (cover art) in the VIDEO GAMES section,
-  // is grouped under `platform` (e.g. "SNES"), and selecting it "rents" -> the
-  // Tauri build launches the configured emulator on `launchPath`; the browser
-  // build shows a "take it to the counter" toast.
-  game?: boolean;
-  platform?: string;
-  launchPath?: string;
-  // Flat scan art for the case's OTHER faces (back panel / spine / disc
-  // label), resolved by romm.ts's gameArtUrls(). Absent for a title whose
-  // library never scraped that media — the faces then keep their generated
-  // fallbacks. Typed loosely here so jellyfin.ts stays free of a romm.ts
-  // import (romm.ts already imports this module).
-  gameArt?: { back?: string; spine?: string; label?: string };
-  // Discs in this title's retail case (romm.ts discCountFrom: distinct
-  // "(Disc N)" tags across the rom + its siblings). Only set when >= 2 —
-  // it thickens a jewel-case platform's box to the multi-disc fat case.
-  discCount?: number;
-  // Audio/subtitle streams of the primary media source (already fetched with
-  // the catalog via Fields=MediaSources) — drives the in-app player's track
-  // picker. Absent for series containers, games, and discovery titles.
-  mediaStreams?: MediaStreamInfo[];
-  // Container + video/audio codecs of the primary media source (same
-  // MediaSources fetch as mediaStreams above) — lets launchVideoPlayback
-  // decide direct-play vs. HLS transcode BEFORE opening the player (see
-  // isDirectPlaySafe). Absent for series containers, games, and discovery
-  // titles; series episodes are probed on demand instead (see
-  // fetchItemPlaybackInfo) since the episode list never fetches MediaSources.
-  mediaPlaybackInfo?: MediaPlaybackInfo;
-  // Width/height ratio of the poster image, straight from Jellyfin's
-  // PrimaryImageAspectRatio field. Lets flat mode size a case to the art
-  // before the lazy poster loads (issue #108) instead of reflowing the row
-  // on every image load. Absent for games, discovery titles, and servers
-  // that haven't probed the image yet.
-  primaryImageAspectRatio?: number;
-  // Alternate quality versions of the same film. Built two ways: a Jellyfin
-  // item whose versions were merged server-side carries several MediaSources
-  // (one version each), and duplicate items of the same film (a 4K rip and a
-  // 1080p rip ingested separately) are collapsed to ONE shelf box by
-  // collapseDuplicateVersions(). Present ONLY when there are 2+ choices,
-  // ordered best-quality-first; pressing Play on such a title opens the
-  // version picker (main.ts) instead of streaming blind.
-  versions?: MovieVersion[];
-  // Name of the Jellyfin collection (BoxSet) this movie belongs to, e.g.
-  // "Harry Potter Collection". Jellyfin list queries don't carry membership on
-  // the item itself, so this is tagged in a separate pass after library sync
-  // (see applyCollectionMembership). Members of one collection file together
-  // on the shelf in premiere order (see shelfTitleCompare in store-layout).
-  collectionName?: string;
-  // ISO premiere date — breaks the chronological tie between same-collection
-  // titles released the same year (ProductionYear alone can't order them).
-  premiereDate?: string;
-  // Synthesized (see jellyseerr.ts's fetchCollectionGaps) for an entry of a
-  // collection the user PARTLY owns — you have 5 of the 8 Harry Potters, so
-  // the other 3 stand in their correct chronological shelf position wearing a
-  // corner sticker, with no rental backstock behind them. Selecting one
-  // requests it through Jellyseerr rather than playing it.
-  //
-  // Jellyfin can't source these on its own: its BoxSet is built from the files
-  // you have, so it has no idea the collection is incomplete. The full member
-  // list comes from TMDB via Jellyseerr, keyed on collectionTmdbId below.
-  collectionGap?: boolean;
-  // Per-user watch state off Jellyfin's UserData (the catalog queries hit the
-  // per-user /Users/{id}/Items endpoint, so this is THIS user's history).
-  // Watched titles are the anchors the staff-picks engine aggregates TMDB
-  // "people who liked this also liked" results over (see staff-picks.ts).
-  played?: boolean;
-  playCount?: number;
-  lastPlayedDate?: string; // ISO — orders anchors by recency
-  // Ticks into the item Jellyfin says THIS user left off at. The server only
-  // ever returns a non-zero PlaybackPositionTicks while the item is still
-  // inside its own resume window (fully watched or never started both come
-  // back unset) — so "present -> resume there" is the same rule every other
-  // Jellyfin client follows, with no separate "start over" affordance needed.
-  resumePositionTicks?: number;
-  // Exact runtime in ticks (Jellyfin's RunTimeTicks), alongside the rounded
-  // `duration` display string above. Lets a natural end-of-file be told apart
-  // from a user quit without a per-path duration probe (see playback-flow.ts).
-  runTimeTicks?: number;
-  // Set by the staff-picks engine on an OWNED title that the aggregated
-  // watch-history recommendations surfaced: its case wears the STAFF PICK
-  // sticker (video-case.ts) and it's eligible for the genre endcaps.
-  staffPick?: boolean;
-  // Top-billed cast as Jellyfin Person references (id + portrait URL), captured
-  // alongside `actors` (name-only) so wall décor (wall-decor.ts) can tally the
-  // library's most-featured actors and pull real portraits without a second
-  // round-trip. Same top-5 cap as `actors`; `imageUrl` is only set when the
-  // person has a PrimaryImageTag in Jellyfin (many crew/cast entries don't).
-  // Undefined on synthesized titles (discovery/collectionGap/game) and the
-  // synthetic demo/harness catalog, which has no Person image data at all.
-  castPeople?: { id: string; name: string; imageUrl?: string }[];
-}
-
-export interface MediaStreamInfo {
-  /** Jellyfin stream index — pass as AudioStreamIndex/SubtitleStreamIndex. */
-  index: number;
-  type: 'Audio' | 'Subtitle';
-  language?: string;
-  displayTitle?: string;
-  codec?: string;
-  isDefault?: boolean;
-  /** Audio channel count (2 = stereo, 6 = 5.1, 8 = 7.1) — used to print the
-   *  channel layout in the back-cover tech-specs table. Audio streams only. */
-  channels?: number;
-}
-
-/** One playable quality/edition of a film — see Movie.versions. */
-export interface MovieVersion {
-  /** Jellyfin item to stream (and report playback against). */
-  itemId: string;
-  /** Set when this version is one MediaSource of a server-side-merged item;
-   *  passed as MediaSourceId so Jellyfin streams THAT file, not the default. */
-  mediaSourceId?: string;
-  /** Picker row text, e.g. "4K · HDR · HEVC · 54 GB". */
-  label: string;
-  is4k: boolean;
-  /** Video frame size, for best-first ordering. */
-  width?: number;
-  height?: number;
-  /** File path of this version, for the external-player fallback. */
-  localPath?: string;
-  mediaStreams?: MediaStreamInfo[];
-  mediaPlaybackInfo?: MediaPlaybackInfo;
-}
+// The catalog shapes moved to the provider boundary (GH #32) so a second
+// backend can produce them without importing this Jellyfin client. They are
+// re-exported here unchanged because ~50 files import them from this module;
+// each can move to the new path on its own schedule.
+export type {
+  Movie,
+  MediaStreamInfo,
+  MovieVersion,
+  MediaPlaybackInfo,
+  Episode,
+  JellyfinLibrary,
+  Title,
+  TitleVersion,
+  Library,
+} from './providers/media-source-provider.ts';
 
 /** Audio + subtitle streams of one media source, for the player's track picker. */
 function extractStreamsFromSource(source: any): MediaStreamInfo[] | undefined {
@@ -191,23 +42,6 @@ function extractStreamsFromSource(source: any): MediaStreamInfo[] | undefined {
 /** Audio + subtitle streams of an item's first media source. */
 function extractMediaStreams(item: any): MediaStreamInfo[] | undefined {
   return extractStreamsFromSource(item.MediaSources?.[0]);
-}
-
-/** Container + video/audio codecs needed by isDirectPlaySafe. All strings are
- *  lower-cased so callers can compare against fixed allowlists. */
-export interface MediaPlaybackInfo {
-  container?: string;
-  videoCodec?: string;
-  audioCodecs: string[];
-  /** Video frame dimensions of the default source — feed the tech-specs
-   *  table's resolution + aspect-ratio derivation. */
-  width?: number;
-  height?: number;
-  /** Display aspect ratio string straight from Jellyfin (e.g. "16:9",
-   *  "2.40:1"), when the server reports one. */
-  aspectRatio?: string;
-  /** HDR class ("SDR", "HDR10", "DOVI", …) — lets the table flag HDR. */
-  videoRange?: string;
 }
 
 /** Container/codec info of one media source — see MediaPlaybackInfo. */
@@ -233,39 +67,6 @@ function extractPlaybackInfoFromSource(source: any): MediaPlaybackInfo | undefin
 /** Container/codec info of an item's first media source. */
 function extractPlaybackInfo(item: any): MediaPlaybackInfo | undefined {
   return extractPlaybackInfoFromSource(item.MediaSources?.[0]);
-}
-
-export interface Episode {
-  id: string;
-  seriesId: string;
-  seriesName: string;
-  seasonNumber: number;
-  episodeNumber: number;
-  name: string;
-  overview: string;
-  path: string;
-  runTimeTicks?: number;
-  /** This user's UserData.PlaybackPositionTicks — see Movie.resumePositionTicks
-   *  for the same "present -> resume there" rule. */
-  resumePositionTicks?: number;
-  thumbUrl?: string;
-  seasonId?: string;
-  /** Primary (poster, 2:3) image of the Season item this episode belongs to. */
-  seasonPrimaryUrl?: string;
-}
-
-export interface JellyfinLibrary {
-  id: string;
-  name: string;
-  movies: Movie[];
-  genres: string[];
-  /**
-   * Synthesized by games-only.ts: this "library" is one Romm platform, not a
-   * Jellyfin one. Its titles carry no wall categories, so the shelf
-   * planner keeps it un-sectioned and every signboard reads the platform name
-   * (see StorePlan.buildLibraryLayouts).
-   */
-  games?: boolean;
 }
 
 /**
@@ -500,6 +301,28 @@ export async function fetchPublicUsers(jellyfinUrl: string): Promise<PublicUser[
 }
 
 /** Jellyfin avatar image URL for a public user, or null if they have none set. */
+/**
+ * Item artwork (poster / backdrop / person portrait) as the provider boundary
+ * asks for it. The catalog sync still builds these URLs inline at ten call
+ * sites in this file; routing those through here is the tail of the extraction
+ * (Phase 4 in tickets/adapter-boundary-design-2026-08-08.md), deliberately not
+ * done on this pass so the boundary lands without touching the sync path.
+ * Until then this is the shape NEW code must use — nothing outside this module
+ * should be assembling an Images/ URL of its own.
+ */
+export function buildItemImageUrl(
+  jellyfinUrl: string,
+  token: string,
+  itemId: string,
+  kind: 'poster' | 'backdrop' | 'person',
+  maxWidth?: number
+): string {
+  const url = jellyfinUrl.replace(/\/$/, "");
+  const path = kind === 'backdrop' ? 'Images/Backdrop/0' : 'Images/Primary';
+  const width = maxWidth ? `&maxWidth=${maxWidth}` : '';
+  return `${url}/Items/${itemId}/${path}?api_key=${token}${width}`;
+}
+
 export function buildUserAvatarUrl(jellyfinUrl: string, userId: string, primaryImageTag?: string): string | null {
   if (!primaryImageTag) return null;
   const url = jellyfinUrl.replace(/\/$/, "");
