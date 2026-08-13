@@ -10,13 +10,17 @@
 // and loaders through initBootFlow(deps); nothing here reaches back into
 // main.ts directly, so the two can't tangle.
 import {
-  fetchJellyfinLibrariesAndMovies,
-  authenticateUser,
-  validateToken,
   fetchPublicUsers,
   normalizeUrl,
   JellyfinLibrary,
 } from './jellyfin';
+import {
+  createProvider,
+  registerBuiltInProviders,
+  DEFAULT_PROVIDER_KIND,
+  type MediaSourceProvider,
+  type ProviderSession,
+} from './providers';
 import {
   openMembershipCardPicker,
   closeMembershipCardPicker,
@@ -33,6 +37,39 @@ import {
   closeSetupTerminal,
   type SetupTerminalScene,
 } from './store-setup-flow';
+
+/**
+ * The backend this install talks to (GH #32). Resolved once and cached: the
+ * kind can't change without a reconnect, and a provider is cheap but not free
+ * to construct.
+ *
+ * `provider_kind` is absent on every install that predates the boundary, which
+ * is why the default is Jellyfin rather than a prompt — an existing store must
+ * boot into its own library without anyone touching a setting.
+ *
+ * Not yet universal inside this module: the membership-card picker still reads
+ * Jellyfin's public-user shape directly (see showLoginOrCards), because the
+ * cards want an image tag where AccountSummary carries a resolved URL.
+ * Converting it is the multiUserPicker capability's own step — it is also the
+ * flow Plex can't support at all, so it wants designing rather than renaming.
+ */
+let cachedProvider: MediaSourceProvider | null = null;
+function provider(): MediaSourceProvider {
+  if (!cachedProvider) {
+    registerBuiltInProviders();
+    cachedProvider = createProvider(
+      localStorage.getItem('provider_kind') || DEFAULT_PROVIDER_KIND
+    );
+  }
+  return cachedProvider;
+}
+
+/** Wrap loose token/userId strings — what localStorage still holds — as the
+ *  session a provider expects. Phase 3 of the adapter plan stores this shape
+ *  directly and this helper goes away. */
+function sessionOf(accessToken: string, userId: string, userName = ''): ProviderSession {
+  return { accessToken, userId, userName };
+}
 
 export interface BootFlowDeps {
   log: (message: string, type?: 'system' | 'cec' | 'video') => void;
@@ -186,7 +223,7 @@ async function syncForSetup(
   try {
     [libs] = await Promise.all([
       Promise.race([
-        fetchJellyfinLibrariesAndMovies(url, session.accessToken, session.userId, onProgress, {
+        provider().fetchLibraries(url, session, onProgress, {
           excludeLibraryIds: excludedLibraryIds(),
         }),
         stallPromise,
@@ -324,7 +361,7 @@ async function finishLoginAndLaunch(urlInput: string, session: MembershipLoginSe
   try {
     [libs] = await Promise.all([
       Promise.race([
-        fetchJellyfinLibrariesAndMovies(urlInput, session.accessToken, session.userId, armLoginStall, {
+        provider().fetchLibraries(urlInput, session, armLoginStall, {
           excludeLibraryIds: excludedLibraryIds(),
         }),
         loginTimeout
@@ -458,7 +495,7 @@ export async function checkCredentialsAndLoad() {
   if ((!token || !userId || !jellyfinUrl) && envUrl && envUser && envPass) {
     d.log('[System] File credentials (.env.local) found. Authenticating automatically...', 'system');
     try {
-      const session = await authenticateUser(envUrl, envUser, envPass);
+      const session = await provider().authenticate(envUrl, { username: envUser, password: envPass });
       localStorage.setItem('jellyfin_url', envUrl);
       localStorage.setItem('jellyfin_username', envUser);
       localStorage.setItem('jellyfin_token', session.accessToken);
@@ -543,7 +580,7 @@ export async function checkCredentialsAndLoad() {
         let libs: JellyfinLibrary[];
         [libs] = await Promise.all([
           Promise.race([
-            fetchJellyfinLibrariesAndMovies(jellyfinUrl, activeToken!, activeUserId!, armStall, {
+            provider().fetchLibraries(jellyfinUrl, sessionOf(activeToken!, activeUserId!), armStall, {
               excludeLibraryIds: excludedLibraryIds(),
             }),
             stallPromise
@@ -613,13 +650,13 @@ export async function checkCredentialsAndLoad() {
           // Before each retry, check if cached token fails validation. If so, attempt to re-auth from cached credentials.
           const freshToken = localStorage.getItem('jellyfin_token') || token;
           try {
-            const isValid = await validateToken(jellyfinUrl, freshToken!);
+            const isValid = await provider().validateSession(jellyfinUrl, sessionOf(freshToken!, activeUserId ?? ''));
             if (!isValid) {
               const user = localStorage.getItem('jellyfin_username') || envUser;
               const pass = localStorage.getItem('jellyfin_password') || envPass;
               if (user && pass && jellyfinUrl) {
                 d.log('[System] Jellyfin token stale — re-authenticating...', 'system');
-                const session = await authenticateUser(jellyfinUrl, user, pass);
+                const session = await provider().authenticate(jellyfinUrl, { username: user, password: pass });
                 localStorage.setItem('jellyfin_token', session.accessToken);
                 localStorage.setItem('jellyfin_userid', session.userId);
                 d.log('[System] Re-auth OK.', 'system');
@@ -720,7 +757,7 @@ export function setupLoginHandlers() {
 
       try {
         deps?.log(`[System] Contacting Jellyfin server: ${urlInput}`, 'system');
-        const session = await authenticateUser(urlInput, userInput, passInput);
+        const session = await provider().authenticate(urlInput, { username: userInput, password: passInput });
 
         // Only the manual single-login form remembers username (to prefill);
         // the password is never persisted in plaintext localStorage.
