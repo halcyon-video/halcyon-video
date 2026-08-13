@@ -231,17 +231,17 @@
               <!-- Column 2: Jellyseerr -->
               <div class="login-column">
                 <div class="column-header">
-                  <h3 class="column-title">Jellyseerr</h3>
+                  <h3 class="column-title">Jellyseerr / Overseerr</h3>
                 </div>
-                <p class="column-desc">Connect Jellyseerr to enable a "Coming Soon" requests wall inside the store. Cover art for titles you don't own is fetched from TMDB's image CDN — Jellyseerr returns the artwork's address, not the artwork. Everything you already own is served by Jellyfin.</p>
+                <p class="column-desc">Connect Jellyseerr (or Overseerr — same API) to enable a "Coming Soon" requests wall inside the store. Cover art for titles you don't own is fetched from TMDB's image CDN — the request server returns the artwork's address, not the artwork. Everything you already own is served by Jellyfin.</p>
 
                 <div class="input-group">
-                  <label for="login-jellyseerr-url">Jellyseerr Server (optional)</label>
+                  <label for="login-jellyseerr-url">Jellyseerr / Overseerr Server (optional)</label>
                   <input type="text" id="login-jellyseerr-url" placeholder="http://192.168.1.50:5055" />
                 </div>
 
                 <div class="input-group">
-                  <label for="login-jellyseerr-key">Jellyseerr API Key (optional)</label>
+                  <label for="login-jellyseerr-key">Jellyseerr / Overseerr API Key (optional)</label>
                   <input type="password" id="login-jellyseerr-key" placeholder="Enter API key for a Coming Soon wall" />
                 </div>
               </div>

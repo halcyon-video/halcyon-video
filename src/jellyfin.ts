@@ -294,6 +294,72 @@ export async function validateToken(jellyfinUrl: string, token: string): Promise
   }
 }
 
+// Who we say we are. Jellyfin keys its session/device bookkeeping off these
+// four fields, so they belong on EVERY authenticated call, not just the ones
+// that report playback — see buildAuthorization.
+//
+// The DeviceId is PER INSTALL, and has to be. It used to be the constant
+// 'halcyon-htpc-device', baked into every copy of the app — so the kiosk, a
+// laptop, a Remote Play instance and any second clone all presented themselves
+// to Jellyfin as the SAME device. Jellyfin treats a device as one seat: signing
+// in from the second one retires the first one's token, and the first machine
+// discovers this the next time it tries to play something, by being thrown back
+// to the login screen (owner report 2026-08-12 — "I was using it on another
+// laptop at the same time"). Handing each install its own id is what stops the
+// two from evicting each other. It matters more now than it did, because every
+// authenticated request carries this identity, not just the playback reports.
+//
+// Generated once and persisted. Installs that predate this get a fresh id on
+// next boot — a one-off, which costs a new (and from here on, stable) device
+// row in Jellyfin's dashboard.
+const DEVICE_ID_KEY = 'jellyfin_device_id';
+
+/** Fallback for a DOM-less caller (unit tests, tooling) — never persisted. */
+const FALLBACK_DEVICE_ID = 'halcyon-htpc-device';
+
+function jellyfinDeviceId(): string {
+  if (typeof localStorage === 'undefined') return FALLBACK_DEVICE_ID;
+  try {
+    const saved = localStorage.getItem(DEVICE_ID_KEY);
+    if (saved) return saved;
+    const rand = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+    const id = `halcyon-${rand}`;
+    localStorage.setItem(DEVICE_ID_KEY, id);
+    return id;
+  } catch {
+    // Private-mode / quota failures must not take authentication down with
+    // them: fall back to the old shared id rather than throwing.
+    return FALLBACK_DEVICE_ID;
+  }
+}
+
+/** The credential's identity half, resolved fresh so it picks up the stored id. */
+function clientIdentity(): string {
+  return `MediaBrowser Client="Halcyon Video", Device="HTPC", DeviceId="${jellyfinDeviceId()}", Version="0.1.0"`;
+}
+
+/**
+ * The one authentication header Jellyfin wants:
+ *
+ *   Authorization: MediaBrowser Client="…", Device="…", DeviceId="…", Version="…", Token="…"
+ *
+ * Not `X-Emby-Authorization` + `X-MediaBrowser-Token`, which is the Emby
+ * compatibility surface Jellyfin inherited and has been unwinding since 10.9
+ * (GH #53). Both names still answer on 10.x, so this is a forward-compat
+ * change, not a bug fix — nothing is broken today.
+ *
+ * Callers pass a client string, a token, or both; the token-only ones used to
+ * send no identity at all, which left the server guessing at the device. Every
+ * authenticated request now carries the full credential.
+ */
+function buildAuthorization(clientString?: string, token?: string): string | undefined {
+  if (!clientString && !token) return undefined;
+  const identity = clientString || clientIdentity();
+  return token ? `${identity}, Token="${token}"` : identity;
+}
+
 async function jellyfinRequest(
   method: string,
   url: string,
@@ -303,22 +369,22 @@ async function jellyfinRequest(
 ): Promise<string> {
   const hasTauri = typeof window !== "undefined" && (window as any).__TAURI_INTERNALS__ !== undefined;
   if (hasTauri) {
+    // The Rust side (src-tauri/src/lib.rs jellyfin_request) sets the header —
+    // hand it the composed credential rather than the two legacy halves.
     return await invoke<string>("jellyfin_request", {
       method,
       url,
-      authHeader,
-      token,
+      authHeader: buildAuthorization(authHeader, token),
+      token: undefined,
       body
     });
   } else {
     const headers: Record<string, string> = {
       "Content-Type": "application/json"
     };
-    if (authHeader) {
-      headers["X-Emby-Authorization"] = authHeader;
-    }
-    if (token) {
-      headers["X-MediaBrowser-Token"] = token;
+    const authorization = buildAuthorization(authHeader, token);
+    if (authorization) {
+      headers["Authorization"] = authorization;
     }
 
     const controller = new AbortController();
@@ -367,7 +433,7 @@ export async function authenticateUser(
     const responseStr = await jellyfinRequest(
       "POST",
       `${url}/Users/AuthenticateByName`,
-      `MediaBrowser Client="Halcyon Video", Device="HTPC", DeviceId="halcyon-htpc-device", Version="0.1.0"`,
+      clientIdentity(),
       undefined,
       JSON.stringify({
         Username: username,
@@ -719,7 +785,7 @@ export async function fetchMediaCatalog(
     // per-library context, and the store's series flow (episode boxsets)
     // is driven by the per-library sync in fetchJellyfinLibrariesAndMovies.
     const rawItems = await fetchItemsPaged(
-      `${url}/emby/Users/${userId}/Items?IncludeItemTypes=Movie,Video&Recursive=true&Fields=Path,Overview,Genres,ProductionYear,PremiereDate,RunTimeTicks,OfficialRating,DateCreated,Width,Height,MediaSources,CommunityRating,CriticRating,People,BackdropImageTags,Studios,PrimaryImageAspectRatio,ExtraType,ProviderIds,UserData`,
+      `${url}/Users/${userId}/Items?IncludeItemTypes=Movie,Video&Recursive=true&Fields=Path,Overview,Genres,ProductionYear,PremiereDate,RunTimeTicks,OfficialRating,DateCreated,Width,Height,MediaSources,CommunityRating,CriticRating,People,BackdropImageTags,Studios,PrimaryImageAspectRatio,ExtraType,ProviderIds,UserData`,
       token
     );
     const items = filterCatalogItems(rawItems, "global catalog");
@@ -750,12 +816,12 @@ export async function fetchMediaCatalog(
           .map((p: any) => ({
             id: p.Id,
             name: p.Name,
-            imageUrl: p.PrimaryImageTag ? `${url}/emby/Items/${p.Id}/Images/Primary?api_key=${token}` : undefined,
+            imageUrl: p.PrimaryImageTag ? `${url}/Items/${p.Id}/Images/Primary?api_key=${token}` : undefined,
           })),
         genres: item.Genres || [],
         localPath: item.Path || '',
-        posterUrl: `${url}/emby/Items/${item.Id}/Images/Primary?api_key=${token}`,
-        backdropUrl: item.BackdropImageTags && item.BackdropImageTags.length > 0 ? `${url}/emby/Items/${item.Id}/Images/Backdrop/0?api_key=${token}` : undefined,
+        posterUrl: `${url}/Items/${item.Id}/Images/Primary?api_key=${token}`,
+        backdropUrl: item.BackdropImageTags && item.BackdropImageTags.length > 0 ? `${url}/Items/${item.Id}/Images/Backdrop/0?api_key=${token}` : undefined,
         dateCreated: item.DateCreated || "",
         is4k: checkIs4k(item),
         communityRating: typeof item.CommunityRating === 'number' ? item.CommunityRating : undefined,
@@ -827,14 +893,14 @@ async function fetchCollectionMembership(
   // which is how fetchCollectionGaps learns the full member list (Jellyfin
   // only ever reports the members you already have).
   const boxSets = await fetchItemsPaged(
-    `${url}/emby/Users/${userId}/Items?IncludeItemTypes=BoxSet&Recursive=true&Fields=ProviderIds`,
+    `${url}/Users/${userId}/Items?IncludeItemTypes=BoxSet&Recursive=true&Fields=ProviderIds`,
     token
   );
   await Promise.all(
     boxSets.map(async (set: any) => {
       if (!set?.Id || !set?.Name) return;
       const children = await fetchItemsPaged(
-        `${url}/emby/Users/${userId}/Items?ParentId=${set.Id}&Recursive=true`,
+        `${url}/Users/${userId}/Items?ParentId=${set.Id}&Recursive=true`,
         token
       );
       // Jellyfin auto-creates a BoxSet whenever ONE movie has two versions on
@@ -868,10 +934,10 @@ async function fetchCollectionMembership(
       // uses the backdrop as the card with the poster inset, so keep both.
       collectionArt.set(set.Name, {
         posterUrl: set.ImageTags?.Primary
-          ? `${url}/emby/Items/${set.Id}/Images/Primary?api_key=${token}`
+          ? `${url}/Items/${set.Id}/Images/Primary?api_key=${token}`
           : undefined,
         backdropUrl: set.BackdropImageTags && set.BackdropImageTags.length > 0
-          ? `${url}/emby/Items/${set.Id}/Images/Backdrop/0?api_key=${token}`
+          ? `${url}/Items/${set.Id}/Images/Backdrop/0?api_key=${token}`
           : undefined,
       });
 
@@ -968,7 +1034,7 @@ async function applyCollectionMembership(
 async function fetchVideoViews(url: string, token: string, userId: string): Promise<any[]> {
   const viewsResponseStr = await jellyfinRequest(
     "GET",
-    `${url}/emby/Users/${userId}/Views`,
+    `${url}/Users/${userId}/Views`,
     undefined,
     token
   );
@@ -1105,7 +1171,7 @@ export async function fetchJellyfinLibrariesAndMovies(
       onProgress?.(`library "${lib.Name}"`);
       try {
         const rawItems = await fetchItemsPaged(
-          `${url}/emby/Users/${userId}/Items?ParentId=${lib.Id}&IncludeItemTypes=${CATALOG_ITEM_TYPES}&Recursive=true&Fields=Path,Overview,Genres,ProductionYear,PremiereDate,RunTimeTicks,OfficialRating,DateCreated,Width,Height,MediaSources,CommunityRating,CriticRating,People,BackdropImageTags,Studios,PrimaryImageAspectRatio,ExtraType,ProviderIds,UserData`,
+          `${url}/Users/${userId}/Items?ParentId=${lib.Id}&IncludeItemTypes=${CATALOG_ITEM_TYPES}&Recursive=true&Fields=Path,Overview,Genres,ProductionYear,PremiereDate,RunTimeTicks,OfficialRating,DateCreated,Width,Height,MediaSources,CommunityRating,CriticRating,People,BackdropImageTags,Studios,PrimaryImageAspectRatio,ExtraType,ProviderIds,UserData`,
           token
         );
         const items = filterCatalogItems(rawItems, `library "${lib.Name}"`);
@@ -1131,12 +1197,12 @@ export async function fetchJellyfinLibrariesAndMovies(
               .map((p: any) => ({
                 id: p.Id,
                 name: p.Name,
-                imageUrl: p.PrimaryImageTag ? `${url}/emby/Items/${p.Id}/Images/Primary?api_key=${token}` : undefined,
+                imageUrl: p.PrimaryImageTag ? `${url}/Items/${p.Id}/Images/Primary?api_key=${token}` : undefined,
               })),
             genres: item.Genres || [],
             localPath: item.Path || '',
-            posterUrl: `${url}/emby/Items/${item.Id}/Images/Primary?api_key=${token}`,
-            backdropUrl: item.BackdropImageTags && item.BackdropImageTags.length > 0 ? `${url}/emby/Items/${item.Id}/Images/Backdrop/0?api_key=${token}` : undefined,
+            posterUrl: `${url}/Items/${item.Id}/Images/Primary?api_key=${token}`,
+            backdropUrl: item.BackdropImageTags && item.BackdropImageTags.length > 0 ? `${url}/Items/${item.Id}/Images/Backdrop/0?api_key=${token}` : undefined,
             dateCreated: item.DateCreated || "",
             isSeries: item.Type === "Series",
             is4k: checkIs4k(item),
@@ -1227,7 +1293,7 @@ export async function fetchFirstEpisodeOfSeries(
       "GET",
       // Without an explicit sort this returned the server's default order, not
       // S01E01 — see the note in fetchSeriesEpisodes.
-      `${url}/emby/Users/${userId}/Items?ParentId=${seriesId}&IncludeItemTypes=Episode&Recursive=true&SortBy=ParentIndexNumber,IndexNumber&SortOrder=Ascending&Limit=1`,
+      `${url}/Users/${userId}/Items?ParentId=${seriesId}&IncludeItemTypes=Episode&Recursive=true&SortBy=ParentIndexNumber,IndexNumber&SortOrder=Ascending&Limit=1`,
       undefined,
       token
     );
@@ -1264,7 +1330,7 @@ export async function fetchSeriesEpisodes(
       // the season panel's "first episode of season N" lookup, the episode
       // selector's index, and playback's up-next step all walk this array, so
       // they were all reading a mis-ordered series.
-      `${url}/emby/Users/${userId}/Items?ParentId=${seriesId}&IncludeItemTypes=Episode&Recursive=true&Fields=Path,Overview,RunTimeTicks,PremiereDate,UserData&SortBy=ParentIndexNumber,IndexNumber&SortOrder=Ascending&Limit=500`,
+      `${url}/Users/${userId}/Items?ParentId=${seriesId}&IncludeItemTypes=Episode&Recursive=true&Fields=Path,Overview,RunTimeTicks,PremiereDate,UserData&SortBy=ParentIndexNumber,IndexNumber&SortOrder=Ascending&Limit=500`,
       undefined,
       token
     );
@@ -1295,12 +1361,12 @@ export async function fetchSeriesEpisodes(
           : undefined,
       // Episode "still" — the Primary image on an Episode item. Sized down for
       // the on-box thumbnail; falls back to a placeholder if the load 404s.
-      thumbUrl: `${url}/emby/Items/${item.Id}/Images/Primary?api_key=${token}&maxWidth=400`,
+      thumbUrl: `${url}/Items/${item.Id}/Images/Primary?api_key=${token}&maxWidth=400`,
       // Season this episode belongs to. Jellyfin Episode items carry SeasonId;
       // its Primary image is the season POSTER (2:3), used for the season chip.
       seasonId: item.SeasonId,
       seasonPrimaryUrl: item.SeasonId
-        ? `${url}/emby/Items/${item.SeasonId}/Images/Primary?api_key=${token}&maxWidth=400`
+        ? `${url}/Items/${item.SeasonId}/Images/Primary?api_key=${token}&maxWidth=400`
         : undefined
     }));
   } catch (e) {
@@ -1311,8 +1377,10 @@ export async function fetchSeriesEpisodes(
 
 // ─── Playback Reporting ───────────────────────────────────────────────────────
 
-const JELLYFIN_DEVICE_ID = 'halcyon-htpc-device';
-const PLAYBACK_CLIENT = `MediaBrowser Client="Halcyon Video", Device="HTPC", DeviceId="${JELLYFIN_DEVICE_ID}", Version="0.1.0"`;
+// The client identity now lives beside buildAuthorization at the top of the
+// file (clientIdentity/jellyfinDeviceId) — it was duplicated as a literal here
+// and in authenticateUser, which is how the two could have drifted apart, and
+// the DeviceId inside it has to be resolved per install rather than baked in.
 
 /**
  * Report playback start to Jellyfin.
@@ -1328,7 +1396,7 @@ export async function reportPlaybackStart(
     await jellyfinRequest(
       "POST",
       `${url}/Sessions/Playing`,
-      PLAYBACK_CLIENT,
+      clientIdentity(),
       token,
       JSON.stringify({ ItemId: itemId, CanSeek: false, IsPaused: false, IsMuted: false })
     );
@@ -1352,7 +1420,7 @@ export async function reportPlaybackStopped(
     await jellyfinRequest(
       "POST",
       `${url}/Sessions/Playing/Stopped`,
-      PLAYBACK_CLIENT,
+      clientIdentity(),
       token,
       JSON.stringify({ ItemId: itemId, PositionTicks: positionTicks })
     );
@@ -1379,7 +1447,7 @@ export async function reportPlaybackProgress(
     await jellyfinRequest(
       "POST",
       `${url}/Sessions/Playing/Progress`,
-      PLAYBACK_CLIENT,
+      clientIdentity(),
       token,
       JSON.stringify({ ItemId: itemId, PositionTicks: positionTicks, IsPaused: isPaused, CanSeek: true })
     );
@@ -1408,8 +1476,8 @@ export async function stopActiveEncoding(playSessionId: string, log?: (msg: stri
   try {
     await jellyfinRequest(
       "DELETE",
-      `${url}/Videos/ActiveEncodings?deviceId=${encodeURIComponent(JELLYFIN_DEVICE_ID)}&playSessionId=${encodeURIComponent(playSessionId)}`,
-      PLAYBACK_CLIENT,
+      `${url}/Videos/ActiveEncodings?deviceId=${encodeURIComponent(jellyfinDeviceId())}&playSessionId=${encodeURIComponent(playSessionId)}`,
+      clientIdentity(),
       token
     );
   } catch (e: any) {
@@ -1495,7 +1563,7 @@ export async function fetchItemPlaybackInfo(
   try {
     const responseStr = await jellyfinRequest(
       "GET",
-      `${url}/emby/Users/${userId}/Items/${itemId}?Fields=MediaSources`,
+      `${url}/Users/${userId}/Items/${itemId}?Fields=MediaSources`,
       undefined,
       token
     );
@@ -1681,7 +1749,7 @@ export function buildHlsStreamUrl(jellyfinUrl: string, token: string, itemId: st
   const params = new URLSearchParams({
     api_key: token,
     MediaSourceId: opts?.mediaSourceId ?? itemId,
-    DeviceId: JELLYFIN_DEVICE_ID,
+    DeviceId: jellyfinDeviceId(),
     PlaySessionId: playSessionId,
     VideoCodec: hevcCopy ? "h264,hevc" : "h264",
     AudioCodec: "aac,mp3",
