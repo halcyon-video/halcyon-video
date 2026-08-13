@@ -4312,6 +4312,18 @@ export class StoreScene {
     this.lastRenderRequestTime = performance.now();
   }
 
+  /**
+   * Hold the loop awake for a few more composites WITHOUT claiming a user did
+   * something. requestRender() also stamps lastRenderRequestTime, which is the
+   * "is the store idle?" clock the deferred stocked rebake waits on — a
+   * background drain that kept stamping it would starve that rebake forever.
+   * This is the wake for work the renderer owes itself; see the mirror drain in
+   * store-mirrors.ts.
+   */
+  public holdRenderFrames(frames: number) {
+    this.forceRenderFrames = Math.max(this.forceRenderFrames, frames);
+  }
+
   // Programmatic perf snapshot (issue #16) — kept as tooling/console API now
   // that the on-screen HUD is gone. Surfaces the current render-on-demand
   // tier, whether the rAF loop is live, a monotonic rendered-frame counter

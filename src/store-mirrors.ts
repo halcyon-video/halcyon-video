@@ -170,6 +170,44 @@ export function renderMirrorsAhead(scene: StoreScene) {
   // later. Deriving the stride from targetFps keeps that cadence put as the
   // display changes.
   const stride = Math.max(1, Math.round(scene.targetFps / MIRROR_REFRESH_HZ));
+
+  // Frustum first, because it answers two questions: which mirror earns this
+  // frame's refresh, and — below — whether the loop is allowed to sleep yet.
+  // The camera's matrices are brought up to date here rather than waited for:
+  // this runs BEFORE the frame's render, so on the frame after a teleport
+  // matrixWorldInverse would otherwise still describe where the camera used to
+  // be, and every test below would be answered for the wrong viewpoint.
+  scene.camera.updateMatrixWorld();
+  scene.camera.matrixWorldInverse.copy(scene.camera.matrixWorld).invert();
+  projScreenScratch.multiplyMatrices(
+    scene.camera.projectionMatrix, scene.camera.matrixWorldInverse);
+  frustumScratch.setFromProjectionMatrix(projScreenScratch);
+  const camPos = scene.camera.position;
+
+  // DRAIN THE VISIBLE ONES BEFORE SLEEPING (issue #11).
+  //
+  // The loop is render-on-demand: a camera move buys 3 composites, and the
+  // stride admits one mirror refresh in every 3. So a move used to buy exactly
+  // ONE refresh — while a hop across the store leaves a dozen mirrors dirty and
+  // several of them in frame. The losers keep the texture they were last
+  // rendered with, which a Reflector samples in SCREEN space, solved for the
+  // camera that rendered it; from anywhere else those coordinates are
+  // meaningless and the panel resolves to a black slab. Then the loop slept and
+  // it stayed that way — the intermittent "ceiling mirror band renders solid
+  // black", whose intermittency was really which mirror happened to win the one
+  // available refresh, i.e. wherever mirrorCursor had been left by the last few
+  // camera moves.
+  //
+  // So: while any mirror the player can actually SEE is still stale, keep
+  // asking for frames. Deliberately scoped to visible ones — off-screen mirrors
+  // stay sticky-dirty until looked at (that is the whole point of the
+  // scheduler), and holding the loop awake for those would mean never idling.
+  // Self-limiting: each admitted frame cleans one, so the request stops as soon
+  // as the visible set is current — about 4 extra composites after a hop.
+  for (const m of scene.mirrors) {
+    if (m.dirty && onScreen(m, camPos)) { scene.holdRenderFrames(stride + 1); break; }
+  }
+
   scene.mirrorMotionParity = (scene.mirrorMotionParity + 1) % stride;
   if (scene.mirrorMotionParity !== 0) return;
 
@@ -179,10 +217,6 @@ export function renderMirrorsAhead(scene: StoreScene) {
   const arrowWasVisible = scene.selectionArrow ? scene.selectionArrow.visible : false;
   if (scene.selectionArrow) scene.selectionArrow.visible = false;
   try {
-    projScreenScratch.multiplyMatrices(
-      scene.camera.projectionMatrix, scene.camera.matrixWorldInverse);
-    frustumScratch.setFromProjectionMatrix(projScreenScratch);
-
     const draw = (m: MirrorEntry) => {
       m.dirty = false;
       m.rendered = true;
@@ -218,7 +252,6 @@ export function renderMirrorsAhead(scene: StoreScene) {
     // its target is still blank, and a black band in the ceiling is not a
     // cosmetic problem the way a slightly stale reflection is.
     const n = scene.mirrors.length;
-    const camPos = scene.camera.position;
     let fallback = -1;
     for (let k = 0; k < n && budget > 0; k++) {
       const idx = (scene.mirrorCursor + k) % n;
