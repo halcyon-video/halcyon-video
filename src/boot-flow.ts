@@ -14,13 +14,7 @@ import {
   normalizeUrl,
   JellyfinLibrary,
 } from './jellyfin';
-import {
-  createProvider,
-  registerBuiltInProviders,
-  DEFAULT_PROVIDER_KIND,
-  type MediaSourceProvider,
-  type ProviderSession,
-} from './providers';
+import { activeProvider as provider, sessionOf } from './providers/active-provider';
 import {
   openMembershipCardPicker,
   closeMembershipCardPicker,
@@ -38,38 +32,13 @@ import {
   type SetupTerminalScene,
 } from './store-setup-flow';
 
-/**
- * The backend this install talks to (GH #32). Resolved once and cached: the
- * kind can't change without a reconnect, and a provider is cheap but not free
- * to construct.
- *
- * `provider_kind` is absent on every install that predates the boundary, which
- * is why the default is Jellyfin rather than a prompt — an existing store must
- * boot into its own library without anyone touching a setting.
- *
- * Not yet universal inside this module: the membership-card picker still reads
- * Jellyfin's public-user shape directly (see showLoginOrCards), because the
- * cards want an image tag where AccountSummary carries a resolved URL.
- * Converting it is the multiUserPicker capability's own step — it is also the
- * flow Plex can't support at all, so it wants designing rather than renaming.
- */
-let cachedProvider: MediaSourceProvider | null = null;
-function provider(): MediaSourceProvider {
-  if (!cachedProvider) {
-    registerBuiltInProviders();
-    cachedProvider = createProvider(
-      localStorage.getItem('provider_kind') || DEFAULT_PROVIDER_KIND
-    );
-  }
-  return cachedProvider;
-}
-
-/** Wrap loose token/userId strings — what localStorage still holds — as the
- *  session a provider expects. Phase 3 of the adapter plan stores this shape
- *  directly and this helper goes away. */
-function sessionOf(accessToken: string, userId: string, userName = ''): ProviderSession {
-  return { accessToken, userId, userName };
-}
+// Backend access is `provider()` throughout this module (see
+// providers/active-provider.ts). One exception, deliberate: the membership-card
+// picker still reads Jellyfin's public-user shape directly in showLoginOrCards,
+// because the cards want an image tag where AccountSummary carries a resolved
+// URL. Converting it is the multiUserPicker capability's own step — it is also
+// the flow Plex can't support at all, so it wants designing rather than
+// renaming.
 
 export interface BootFlowDeps {
   log: (message: string, type?: 'system' | 'cec' | 'video') => void;
