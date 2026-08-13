@@ -190,12 +190,21 @@ fn jellyfin_request(
     let mut req = client.request(req_method, &url)
         .header("Content-Type", "application/json");
 
-    if let Some(auth) = auth_header {
-        req = req.header("X-Emby-Authorization", auth);
-    }
+    // One `Authorization: MediaBrowser …, Token="…"` header — Jellyfin's own
+    // scheme — instead of the legacy X-Emby-Authorization + X-MediaBrowser-Token
+    // pair it inherited from Emby and has been unwinding since 10.9 (GH #53).
+    // buildAuthorization (src/jellyfin.ts) normally composes the whole
+    // credential and leaves `token` empty, but fold the halves here too so the
+    // bridge is correct however it's called.
+    let authorization = match (auth_header, token) {
+        (Some(a), Some(t)) => Some(format!("{}, Token=\"{}\"", a, t)),
+        (Some(a), None) => Some(a),
+        (None, Some(t)) => Some(format!("MediaBrowser Token=\"{}\"", t)),
+        (None, None) => None,
+    };
 
-    if let Some(t) = token {
-        req = req.header("X-MediaBrowser-Token", t);
+    if let Some(a) = authorization {
+        req = req.header("Authorization", a);
     }
 
     if let Some(b) = body {
