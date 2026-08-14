@@ -20,6 +20,25 @@ const registry = new Map<string, ProviderFactory>();
  *  the migration a no-op for them. */
 export const DEFAULT_PROVIDER_KIND = 'jellyfin';
 
+/** Where the chosen backend is remembered. Lives here rather than in
+ *  active-provider.ts because reading it must not drag in the registered
+ *  implementations: playback-routing.ts needs the KIND on a hot, synchronous
+ *  path, and tests need it without loading Tauri. active-provider.ts
+ *  re-exports both for its existing callers. */
+export const PROVIDER_KIND_KEY = 'provider_kind';
+
+/** Which backend THIS INSTALL is pointed at. Absent on every install that
+ *  predates the boundary, which is why it falls back to Jellyfin rather than
+ *  prompting — an existing store must boot into its own library untouched. */
+export function activeProviderKind(): string {
+  try {
+    return localStorage.getItem(PROVIDER_KIND_KEY) || DEFAULT_PROVIDER_KIND;
+  } catch {
+    // Private-mode/locked storage: still open, on the backend everyone uses.
+    return DEFAULT_PROVIDER_KIND;
+  }
+}
+
 export function registerProvider(kind: string, factory: ProviderFactory): void {
   registry.set(kind, factory);
 }
