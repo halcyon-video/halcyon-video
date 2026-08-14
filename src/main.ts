@@ -21,22 +21,27 @@ import {
   JellyfinLibrary,
   fetchFirstEpisodeOfSeries,
   fetchSeriesEpisodes,
-  reportPlaybackStart,
-  reportPlaybackStopped,
-  reportPlaybackProgress,
-  buildHlsStreamUrl,
   isHevcPassThroughEnabled,
-  buildStaticStreamUrl,
   buildSubtitleTrackUrl,
   pickSubtitleDelivery,
-  isDirectPlaySafe,
-  fetchItemPlaybackInfo,
   MediaPlaybackInfo,
   MovieVersion,
   Episode,
   collectionTmdbIds,
   collectionSyncStats
 } from './jellyfin';
+// Playback endpoints differ per backend; this routes them (GH #32). The
+// catalog went through the provider in 0.5.3 and playback did not, which was
+// invisible until a second backend existed.
+import {
+  directStreamUrl,
+  transcodeStreamUrl,
+  probeItemPlaybackInfo,
+  playbackIsDirectSafe,
+  playbackStarted,
+  playbackProgressed,
+  playbackStopped,
+} from './playback-routing';
 import {
   fetchComingSoonMovies,
   fetchDiscoverMovies,
@@ -3183,7 +3188,7 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
 
   ui.isPlaybackActive = true;
 
-  const staticSrc = buildStaticStreamUrl(jellyfinUrl, token, playbackId, mediaSourceId);
+  const staticSrc = directStreamUrl(jellyfinUrl, token, playbackId, mediaSourceId);
 
   // Decide direct-play vs. HLS transcode from the item's real container/codecs
   // BEFORE playing: WebKitGTK silently drops audio tracks whose codec isn't in
@@ -3192,7 +3197,7 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
   // Movies carry this info from the catalog sync (Fields=MediaSources); a
   // series episode (overrideItemId) isn't in the catalog, so probe it here.
   const mediaInfo: MediaPlaybackInfo | undefined = overrideItemId
-    ? (userId ? await fetchItemPlaybackInfo(jellyfinUrl, token, userId, playbackId) : undefined)
+    ? (userId ? await probeItemPlaybackInfo(jellyfinUrl, token, userId, playbackId) : undefined)
     : (version?.mediaPlaybackInfo ?? movie.mediaPlaybackInfo);
   // Codec hint for buildHlsStreamUrl: HEVC sources get hevc pass-through
   // (fMP4) when the webview can decode it; everything else stays on TS.
@@ -3256,8 +3261,8 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
   // Direct play can't switch audio tracks, and burned-in subtitles are encoded
   // server-side — either forces the HLS transcode path. Text subtitles no
   // longer do.
-  const directPlayable = isDirectPlaySafe(mediaInfo) && initialAudioIndex === undefined && burnInSubtitleIndex === undefined;
-  const hlsSrc = buildHlsStreamUrl(jellyfinUrl, token, playbackId, {
+  const directPlayable = playbackIsDirectSafe(mediaInfo) && initialAudioIndex === undefined && burnInSubtitleIndex === undefined;
+  const hlsSrc = transcodeStreamUrl(jellyfinUrl, token, playbackId, {
     sourceVideoCodec,
     mediaSourceId,
     audioStreamIndex: initialAudioIndex,
@@ -3280,7 +3285,7 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
   // Fire-and-forget: awaiting here would sever the user-gesture chain before
   // video.play(), tripping autoplay policy. (It never rejects — errors are
   // caught and logged inside.)
-  void reportPlaybackStart(jellyfinUrl, token, playbackId);
+  playbackStarted(jellyfinUrl, token, playbackId);
 
   // Yield GPU/CPU to the decoder (only if not hidden). Diegetic playback
   // keeps the renderer alive — the room IS the screen (ambient TVs are
@@ -3319,10 +3324,10 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
     // to dismiss the controls doesn't dump the viewer at the storefront.
     // Couch playback (diegetic) just returns to the room, no confirm needed.
     confirmExit: !diegetic,
-    buildStream: (sel) => buildHlsStreamUrl(jellyfinUrl, token, playbackId, { ...sel, sourceVideoCodec, mediaSourceId }),
+    buildStream: (sel) => transcodeStreamUrl(jellyfinUrl, token, playbackId, { ...sel, sourceVideoCodec, mediaSourceId }),
     log: (msg) => logToConsole(msg, 'video'),
     onProgress: (positionTicks, isPaused) => {
-      reportPlaybackProgress(jellyfinUrl, token, playbackId, positionTicks, isPaused);
+      playbackProgressed(jellyfinUrl, token, playbackId, positionTicks, isPaused);
     },
     onClose: (positionTicks, endedNaturally) => {
       ui.isPlaybackActive = false;
@@ -3330,7 +3335,7 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
         // The WebGL context died while the movie played; the store behind the
         // player is a dead canvas. Report the stop, then take the reload we
         // deferred instead of "resuming" a frozen scene. Issue #70.
-        reportPlaybackStopped(jellyfinUrl, token, playbackId, positionTicks);
+        playbackStopped(jellyfinUrl, token, playbackId, positionTicks, movie.runTimeTicks);
         logToConsole('[System] Applying deferred context-loss reload...', 'system');
         setTimeout(() => location.reload(), 250);
         return;
@@ -3344,7 +3349,7 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
       // for STARTING a title, not for continuing one.
       const nextEp = markWatchedAndFindNext(movie, endedNaturally, seriesQueue, playbackId, () => storeScene?.restockSlottedFixtures());
       if (nextEp) {
-        reportPlaybackStopped(jellyfinUrl, token, playbackId, positionTicks);
+        playbackStopped(jellyfinUrl, token, playbackId, positionTicks, movie.runTimeTicks);
         logToConsole(`[Video] "${movie.title}" — up next: ${episodeLabel(nextEp)}.`, 'video');
         // Diegetic playback keeps the room on screen (the overlay is
         // transparent there), so only the fullscreen path bridges the gap.
@@ -3363,7 +3368,7 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
       // renderer/ambient state was never paused for diegetic playback.
       if (diegetic) {
         storeScene?.detachBackRoomVideo();
-        reportPlaybackStopped(jellyfinUrl, token, playbackId, positionTicks);
+        playbackStopped(jellyfinUrl, token, playbackId, positionTicks, movie.runTimeTicks);
         logToConsole(`[Video] Stopped "${movie.title}". Back on the couch.`, 'video');
         return;
       }
@@ -3373,7 +3378,7 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
       // so shelves can be picked right away.
       storeScene?.returnToEntrance();
       updateMovieHUD(storeScene?.getSelectedMovie() || null);
-      reportPlaybackStopped(jellyfinUrl, token, playbackId, positionTicks);
+      playbackStopped(jellyfinUrl, token, playbackId, positionTicks, movie.runTimeTicks);
       logToConsole(`[Video] Stopped "${movie.title}". Returned through the entrance.`, 'video');
     },
     onFatalError: () => {

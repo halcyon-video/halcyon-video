@@ -3,27 +3,17 @@
 // next). Kept apart from provider-registry.ts because the registry is about
 // what this BUILD can speak, and this is about what this INSTALL is pointed
 // at; conflating them is how a second backend ends up half-selected.
-import { createProvider, DEFAULT_PROVIDER_KIND } from './provider-registry';
+import { createProvider, activeProviderKind, PROVIDER_KIND_KEY } from './provider-registry';
 import { registerBuiltInProviders } from './index';
 import type { MediaSourceProvider, ProviderSession } from './media-source-provider';
 
-/** Where the chosen backend is remembered. Absent on every install that
- *  predates the boundary, which is why reads fall back to Jellyfin rather than
- *  prompting — an existing store must boot into its own library with nobody
- *  touching a setting. */
-export const PROVIDER_KIND_KEY = 'provider_kind';
+// Which kind an install uses now lives in provider-registry.ts, so that reading
+// it doesn't drag in the implementations: playback-routing.ts needs the kind on
+// a synchronous path, and a test needs it without loading Tauri. Re-exported
+// because this is where callers already look for it.
+export { PROVIDER_KIND_KEY, activeProviderKind };
 
 let cached: MediaSourceProvider | null = null;
-
-export function activeProviderKind(): string {
-  try {
-    return localStorage.getItem(PROVIDER_KIND_KEY) || DEFAULT_PROVIDER_KIND;
-  } catch {
-    // Private-mode/locked storage: a store that can't read a preference should
-    // still open, on the backend every existing install uses.
-    return DEFAULT_PROVIDER_KIND;
-  }
-}
 
 /** Resolved once: the kind can't change without a reconnect, and constructing
  *  a provider is cheap but not free. */
