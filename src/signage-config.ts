@@ -53,6 +53,10 @@ export const STATIC_SIGNAGE_SLOT_IDS: readonly string[] = [
   'wall-newrelease-left-wall',
   // 1993 hanging promo cards (store-shell.ts)
   'promo-previously-viewed',
+  // GAMES department ceiling hanger (store-shell.ts). Static rather than a
+  // `ceiling-nav-line-*` slot because it hangs over the game fixtures, not over
+  // a shelving line — it only builds when the store has a games department.
+  'ceiling-nav-games-dept',
 ];
 
 // Ceiling genre/library nav slots are DYNAMIC — one per shelving line, id

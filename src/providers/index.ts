@@ -6,6 +6,7 @@
 // registerProvider line here, done. Nothing in the store's own code changes.
 import { registerProvider } from './provider-registry';
 import { JellyfinProvider } from './jellyfin-provider';
+import { PlexProvider } from './plex-provider';
 
 let registered = false;
 
@@ -14,15 +15,15 @@ export function registerBuiltInProviders(): void {
   if (registered) return;
   registered = true;
   registerProvider('jellyfin', () => new JellyfinProvider());
-  // registerProvider('emby',   () => new EmbyProvider());   -- next, and cheap:
-  //   this client already speaks Emby's wire format (/emby/ paths, the
-  //   X-Emby-Authorization header) because Jellyfin is a fork of it.
-  // registerProvider('plex',   () => new PlexProvider());   -- contributor's
-  //   file; needs the plex.tv PIN flow, so directServerLogin goes false and
-  //   the login UI has to branch.
+  registerProvider('plex', () => new PlexProvider());
+  // registerProvider('emby',   () => new EmbyProvider());   -- next, and no
+  //   longer free: since GH #53 moved this client to Jellyfin-native auth, an
+  //   Emby provider must supply its own header shape and route prefix. Small,
+  //   and mostly transport — everything above it is shared.
 }
 
 export { JellyfinProvider, JELLYFIN_CAPABILITIES } from './jellyfin-provider';
+export { PlexProvider, PLEX_CAPABILITIES } from './plex-provider';
 export {
   registerProvider,
   createProvider,

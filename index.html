@@ -205,26 +205,59 @@
           
           <form id="login-form">
             <div class="login-columns">
-              <!-- Column 1: Jellyfin -->
+              <!-- Column 1: the media server -->
               <div class="login-column">
                 <div class="column-header">
-                  <h3 class="column-title">Jellyfin Server</h3>
+                  <h3 class="column-title" id="login-backend-title">Media Server</h3>
                 </div>
                 <p class="column-desc">Primary library provider for cataloging movies and retrieving poster artwork.</p>
-                
+
+                <div class="input-group">
+                  <label for="login-backend">Server Type</label>
+                  <select id="login-backend">
+                    <option value="jellyfin" selected>Jellyfin</option>
+                    <option value="plex">Plex</option>
+                  </select>
+                </div>
+
                 <div class="input-group">
                   <label for="login-url">Server Address</label>
                   <input type="text" id="login-url" placeholder="http://192.168.1.50:8096" value="http://localhost:8096" required />
                 </div>
-                
-                <div class="input-group">
-                  <label for="login-user">Username</label>
-                  <input type="text" id="login-user" placeholder="Enter username" required />
+
+                <!-- Jellyfin signs in against the server itself. -->
+                <div id="login-direct-creds">
+                  <div class="input-group">
+                    <label for="login-user">Username</label>
+                    <input type="text" id="login-user" placeholder="Enter username" />
+                  </div>
+
+                  <div class="input-group">
+                    <label for="login-pass">Password</label>
+                    <input type="password" id="login-pass" placeholder="Enter password (optional)" />
+                  </div>
                 </div>
-                
-                <div class="input-group">
-                  <label for="login-pass">Password</label>
-                  <input type="password" id="login-pass" placeholder="Enter password (optional)" />
+
+                <!-- Plex has no direct server login: authorize on plex.tv, then
+                     the account's own server list fills the address above. -->
+                <div id="login-plex-signin" style="display:none">
+                  <p class="column-desc">
+                    Plex signs you in through plex.tv. Get a code, enter it on any
+                    device, and your servers will appear here.
+                  </p>
+                  <button type="button" id="btn-plex-pin" class="login-secondary-btn">Get a sign-in code</button>
+                  <div id="plex-pin-panel" style="display:none">
+                    <div class="input-group">
+                      <label>Enter this code at plex.tv/link</label>
+                      <div id="plex-pin-code" class="plex-pin-code"></div>
+                    </div>
+                    <img id="plex-pin-qr" class="plex-pin-qr" alt="Scan to sign in to Plex" />
+                    <div id="plex-pin-status" class="plex-pin-status">Waiting for you to authorize…</div>
+                  </div>
+                  <div class="input-group" id="plex-server-group" style="display:none">
+                    <label for="plex-server">Your Servers</label>
+                    <select id="plex-server"></select>
+                  </div>
                 </div>
               </div>
 

@@ -3,6 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 // under `node --test`'s type-stripping loader, which can't resolve the bare
 // sibling specifier (same note as media-date-screen.ts).
 import { activeMediaCutoff, titleReleasedBy } from './media-release-date.ts';
+import { HEVC_MAIN_SUPPORTED, HEVC_MAIN10_SUPPORTED } from './playback-capability.ts';
 import type { Movie, MediaStreamInfo, MovieVersion, MediaPlaybackInfo, Episode, JellyfinLibrary } from './providers/media-source-provider.ts';
 
 // The catalog shapes moved to the provider boundary (GH #32) so a second
@@ -1318,59 +1319,11 @@ export async function stopActiveEncoding(playSessionId: string, log?: (msg: stri
 }
 
 // ─── Direct-play safety ───────────────────────────────────────────────────────
-
-/** MediaSource.isTypeSupported, guarded for non-browser contexts. */
-function mseSupports(mime: string): boolean {
-  try {
-    return typeof MediaSource !== 'undefined' && MediaSource.isTypeSupported(mime);
-  } catch {
-    return false;
-  }
-}
-
-// Whether this webview's MSE can decode HEVC, probed once at module load.
-// hvc1.1.6.* = Main (8-bit), hvc1.2.4.* = Main 10 — movie remuxes (and anime
-// especially) are typically 10-bit. When the webview can decode HEVC, HLS
-// requests list it as an allowed codec so Jellyfin STREAM-COPIES the video
-// instead of re-encoding it to H.264 — a cheap remux (audio-only transcode)
-// instead of a full ffmpeg video transcode.
-const HEVC_MAIN_SUPPORTED = mseSupports('video/mp4; codecs="hvc1.1.6.L153.B0"');
-const HEVC_MAIN10_SUPPORTED = mseSupports('video/mp4; codecs="hvc1.2.4.L153.B0"');
-
-const DIRECT_PLAY_SAFE_CONTAINERS = new Set(['mp4', 'm4v', 'mov', 'webm']);
-const DIRECT_PLAY_SAFE_VIDEO_CODECS = new Set(['h264', 'vp8', 'vp9', 'av1']);
-// HEVC direct play only when Main 10 decodes too: MediaPlaybackInfo doesn't
-// carry bit depth, so we can't tell an 8-bit file from a 10-bit one here.
-if (HEVC_MAIN10_SUPPORTED) {
-  DIRECT_PLAY_SAFE_VIDEO_CODECS.add('hevc');
-  DIRECT_PLAY_SAFE_VIDEO_CODECS.add('h265');
-}
-const DIRECT_PLAY_SAFE_AUDIO_CODECS = new Set(['aac', 'mp3', 'opus', 'vorbis', 'flac']);
-
-/** Whether HLS requests allow HEVC stream copy (webview MSE decodes HEVC). */
-export function isHevcPassThroughEnabled(): boolean {
-  return HEVC_MAIN_SUPPORTED;
-}
-
-/**
- * True only when the item's container, video codec, and every audio codec are
- * all in WebKitGTK's known-safe allowlist — i.e. safe to try the raw
- * `stream?static=true` URL. WebKitGTK silently DROPS audio tracks whose codec
- * isn't in its allowlist (AC3/EAC3/DTS are typical movie-rip audio) regardless
- * of installed GStreamer decoders, with no error firing to trigger the normal
- * direct→HLS fallback — so anything missing or unrecognized must default to
- * NOT safe rather than risk silent audio. MKV is deliberately excluded even
- * when its codecs are otherwise fine: WebKit's range-seeking on Matroska is
- * what makes scrubbing take ages; HLS transcode seeks in ~2s by comparison.
- */
-export function isDirectPlaySafe(info: MediaPlaybackInfo | undefined | null): boolean {
-  if (!info) return false;
-  const { container, videoCodec, audioCodecs } = info;
-  if (!container || !DIRECT_PLAY_SAFE_CONTAINERS.has(container)) return false;
-  if (!videoCodec || !DIRECT_PLAY_SAFE_VIDEO_CODECS.has(videoCodec)) return false;
-  if (!audioCodecs || audioCodecs.length === 0) return false;
-  return audioCodecs.every((c) => DIRECT_PLAY_SAFE_AUDIO_CODECS.has(c));
-}
+//
+// Moved to playback-capability.ts when the Plex backend landed — it describes
+// the webview's decoder, not Jellyfin. Re-exported here so this module's
+// existing importers keep working.
+export { isDirectPlaySafe, isHevcPassThroughEnabled } from './playback-capability.ts';
 
 /**
  * On-demand MediaSources probe for an item whose playback info isn't already

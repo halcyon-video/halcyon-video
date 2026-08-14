@@ -21,8 +21,15 @@ export type SetupAction =
   | 'sign-in'       // manual-auth: authenticate the typed name/password
   | 'back-home';    // manual-auth: abandon sign-in
 
-/** One provider row today; the list is the seam PLEX (#32) slots into. */
-export const SETUP_PROVIDERS = ['JELLYFIN'] as const;
+/** The DISTRIBUTOR row's choices, in registry order. Display names here; the
+ *  provider kinds they map to are SETUP_PROVIDER_KINDS below (the terminal is
+ *  40 columns of upper-case, the registry is lower-case ids — keeping the two
+ *  lists adjacent is what stops them drifting apart). */
+export const SETUP_PROVIDERS = ['JELLYFIN', 'PLEX'] as const;
+export const SETUP_PROVIDER_KINDS = ['jellyfin', 'plex'] as const;
+/** Whether CONNECT needs an address typed first — false for a backend whose
+ *  account tells us where its servers are (see the guard in setupScreenKey). */
+export const PROVIDER_NEEDS_ADDRESS = [true, false] as const;
 
 export interface SetupLibraryRow {
   id: string;
@@ -37,6 +44,10 @@ export type SetupScreen =
   | { kind: 'dialing'; address: string; step: string }
   | { kind: 'members'; count: number }
   | { kind: 'manual-auth'; row: number; username: string; password: string; error?: string }
+  // Plex authorizes through plex.tv rather than against the server, so the
+  // terminal reads out a code to type somewhere else — the closest thing this
+  // store has to phoning the distributor and quoting an account number.
+  | { kind: 'plex-link'; code: string; step: string; error?: string }
   | { kind: 'libraries'; rows: SetupLibraryRow[]; row: number; error?: string }
   | { kind: 'sync'; stage: string; pages: number }
   | { kind: 'arriving' }
@@ -84,7 +95,12 @@ export function setupScreenKey(s: SetupScreen, key: SetupKey): { state: SetupScr
         if (s.row === 0 || s.row === 1) return { state: { ...s, row: s.row + 1 } }; // BIOS-style: OK advances
         if (s.row === 2) {
           const addr = s.address.trim();
-          if (!addr || addr === 'http://' || addr === 'https://') {
+          const blank = !addr || addr === 'http://' || addr === 'https://';
+          // A blank address is fatal for a distributor you sign into directly,
+          // and fine for one that hands you a server list after you sign in to
+          // the ACCOUNT — Plex discovers its own address, so demanding one up
+          // front would ask for something the person may genuinely not know.
+          if (blank && PROVIDER_NEEDS_ADDRESS[s.provider] !== false) {
             return { state: { ...s, row: 1, error: 'TYPE THE SERVER ADDRESS FIRST.' } };
           }
           return { state: s, action: 'connect' };
@@ -102,6 +118,7 @@ export function setupScreenKey(s: SetupScreen, key: SetupKey): { state: SetupScr
     case 'members':
     case 'sync':
     case 'arriving':
+    case 'plex-link':
       return { state: s }; // in-flight screens take no menu input
     case 'manual-auth': {
       if (key === 'up' || key === 'down') {
@@ -183,6 +200,21 @@ export function setupScreenLines(s: SetupScreen): { lines: string[]; cursorLine:
       ];
       if (s.error) lines.push(s.error.slice(0, 40));
       return { lines, cursorLine: 5 + s.row };
+    }
+    case 'plex-link': {
+      const lines = [
+        'NEW STORE SETUP — OPENING DAY',
+        '',
+        'THE DISTRIBUTOR WANTS AN ACCOUNT',
+        'CODE. GO TO PLEX.TV/LINK AND',
+        'QUOTE THIS:',
+        '',
+        `      ${s.code.toUpperCase()}`,
+        '',
+        s.step.slice(0, 40),
+      ];
+      if (s.error) lines.push(s.error.slice(0, 40));
+      return { lines, cursorLine: 6 };
     }
     case 'dialing':
       return {
