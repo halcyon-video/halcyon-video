@@ -18,6 +18,16 @@ export interface SignDef {
   fixture: 'acrylic-tent' | 'ceiling-hanging' | 'shelf-topper' | 'wall' | 'wire-frame';
   texture: () => THREE.Texture;   // canvas-texture factory
   size: { w: number; h: number }; // feet
+  /**
+   * This sign belongs to a period dressing pack and deploys ONLY where that
+   * pack is on (the era that owns it, or another era with the pack switched on
+   * — see bb93SignageOn). Absent = a house sign, correct in every era.
+   *
+   * The placement config keys by SLOT and knows nothing about eras, so without
+   * this a period prop stands in every era that has the slot. buildSignage
+   * enforces it (fixtures/signage.ts).
+   */
+  dressing?: '1993';
 }
 
 const STATIC_CATALOG: SignDef[] = [
@@ -71,6 +81,7 @@ const STATIC_CATALOG: SignDef[] = [
     id: 'next-register-please',
     category: 'register',
     fixture: 'acrylic-tent',
+    dressing: '1993',
     texture: () => createSignTextTexture('Next Register', 'Please', 'yellow-navy', 0.9 / 0.5),
     size: { w: 0.9, h: 0.5 }
   }

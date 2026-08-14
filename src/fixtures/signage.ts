@@ -249,6 +249,19 @@ export function buildSignage(ctx: FixtureContext, slots: SignSlot[], activeSigna
       return;
     }
 
+    // Period-pack signs belong to the era they were measured from. A sign
+    // tagged `dressing: '1993'` is part of the 1993 footage pack and only
+    // deploys where that pack is on — the 1993 era itself, or another era with
+    // the bb_93_signage row switched on. DEFAULT_SIGNAGE_CONFIG places by SLOT
+    // and has no era vocabulary of its own, so before this the closed-lane
+    // counter tent stood on the 1990, 2000 and 2010 counters too: a 1993 prop
+    // in three eras it never existed in. Gating on the def (data) rather than
+    // on the slot (a special case in the placer) keeps the next period pack a
+    // registry entry instead of another branch here.
+    if (signDef.dressing === '1993' && !bb93SignageOn()) {
+      return;
+    }
+
     // Custom rendering path for New Releases Wall topper slots
     // This replicates the original alternating text/logo pattern along the wall run length.
     // (#41: no minimum length — short runs like the stepped-corner walls take
