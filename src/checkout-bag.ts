@@ -133,6 +133,7 @@ interface BagItem {
 // Scratch (module-level, zero per-frame allocations)
 const _v = new THREE.Vector3();
 const _v2 = new THREE.Vector3();
+const _v3 = new THREE.Vector3();
 const _q = new THREE.Quaternion();
 const _e = new THREE.Euler();
 const _exitQ = new THREE.Quaternion();
@@ -154,6 +155,11 @@ export class CheckoutBag {
   private prev: Float32Array;
   private rest: Float32Array;
   private nodeCount: number;
+  // Which sheet each node belongs to: +1 front, -1 back, 0 for the side-seam
+  // columns (one node serves both sheets there, so it has no side of its own).
+  // collideItems() uses this to keep a sheet in front of the contents it is
+  // supposed to be covering — see the wrong-side branch there.
+  private sheetSide: Int8Array;
   // vertex -> node (verts duplicate nodes only at UV seams)
   private vertNode: Int16Array;
   // constraints
@@ -266,6 +272,22 @@ export class CheckoutBag {
     this.rest = rest;
     this.pos = new Float32Array(rest);
     this.prev = new Float32Array(rest);
+
+    const sheetSide = new Int8Array(this.nodeCount);
+    for (let r = 0; r <= ROWS; r++) {
+      for (let i = 0; i < COLS; i++) {
+        const seam = i === 0 || i === COLS - 1;
+        sheetSide[F(r, i)] = seam ? 0 : 1;
+        if (!seam) sheetSide[B(r, i)] = -1;
+      }
+    }
+    for (let t = 0; t < 2; t++) {
+      for (let i = TAB_I0; i <= TAB_I1; i++) {
+        sheetSide[FT(t, i)] = 1;
+        sheetSide[BT(t, i)] = -1;
+      }
+    }
+    this.sheetSide = sheetSide;
 
     // ── Vertices / UVs / faces ─────────────────────────────────────────────
     // The print maps u = 0..1 left→right ON EACH OUTWARD FACE (the back sheet
@@ -951,6 +973,13 @@ export class CheckoutBag {
       const hy = it.hy + margin;
       const hz = it.hz + margin;
       const r2 = it.radius * it.radius;
+      // Which way the case's own +z points in bag space. The slots tilt every
+      // case (ITEM_SLOTS rotX/rotY), so the plane through its faces is tilted
+      // too, and a FRONT-sheet node above the case's centre line lands on the
+      // NEGATIVE side of it. Resolving that node to the nearest face shoves the
+      // plastic BEHIND the case, which is what left the clamshell standing
+      // outside the bag. Nodes are therefore kept on their own sheet's side.
+      const frontFacing = _v3.set(0, 0, 1).applyQuaternion(m.quaternion).z >= 0 ? 1 : -1;
       for (let i = 0; i < n; i++) {
         const b = i * 3;
         const wx = pos[b] - px;
@@ -965,7 +994,9 @@ export class CheckoutBag {
         const dx = hx - ax;
         const dy = hy - ay;
         const dz = hz - az;
-        if (dz <= dx && dz <= dy) _v.z = _v.z >= 0 ? hz : -hz;
+        const wantZ = this.sheetSide[i] * frontFacing;
+        if (wantZ !== 0 && (_v.z >= 0 ? 1 : -1) !== wantZ) _v.z = wantZ * hz;
+        else if (dz <= dx && dz <= dy) _v.z = _v.z >= 0 ? hz : -hz;
         else if (dx <= dy) _v.x = _v.x >= 0 ? hx : -hx;
         else _v.y = _v.y >= 0 ? hy : -hy;
         _v.applyQuaternion(m.quaternion);
@@ -995,8 +1026,13 @@ export class CheckoutBag {
         const dx = hx - ax;
         const dy = hy - ay;
         const dz = hz - az;
+        // Only an edge whose two ends share a sheet has a side to be kept on;
+        // the seam edges that stitch front to back legitimately cross over.
+        const sideA = this.sheetSide[conA[k]];
+        const wantZ = (sideA === this.sheetSide[conB[k]] ? sideA : 0) * frontFacing;
         _v2.set(0, 0, 0);
-        if (dz <= dx && dz <= dy) _v2.z = _v.z >= 0 ? dz : -dz;
+        if (wantZ !== 0 && (_v.z >= 0 ? 1 : -1) !== wantZ) _v2.z = wantZ * hz - _v.z;
+        else if (dz <= dx && dz <= dy) _v2.z = _v.z >= 0 ? dz : -dz;
         else if (dx <= dy) _v2.x = _v.x >= 0 ? dx : -dx;
         else _v2.y = _v.y >= 0 ? dy : -dy;
         _v2.applyQuaternion(m.quaternion);
