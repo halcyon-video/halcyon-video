@@ -2811,35 +2811,29 @@ export function buildCeilingFrame(scene: StoreScene, storeWidth: number, backWal
   let seamBackX = rightEdge - band;
   let seamRightZ = zBack + band;
   if (scene.hasStep) {
-    // Diagonal run across the stepped corner (issue #53): a single straight
-    // mirror band from the end of the back edge (stepX, zBack) to the start
-    // of the right edge (rightEdge, stepZ) — one hypotenuse instead of the
-    // old step-front + connector pair (one fewer Reflector, no zig-zag).
-    // Its chrome body is part of the mitred ring below.
-    const diagDX = rightEdge - stepX;
-    const diagDZ = stepZ - zBack;
-    const diagLen = Math.hypot(diagDX, diagDZ);
-    const diagYaw = -Math.atan2(diagDZ, diagDX);
-    const diagNX = -diagDZ / diagLen; // inward normal (into the store)
-    const diagNZ = diagDX / diagLen;
-    // Where the diagonal's inner (mirror) face meets the back run's face
-    // (z = zBack + bo) and the right run's face (x = rightEdge - bo). The
-    // mirror strips of all three runs extend to exactly these two points so
-    // the band reads as one continuous surface around the stepped corner
-    // instead of leaving chrome-only gaps at the seams.
-    const diagUX = diagDX / diagLen, diagUZ = diagDZ / diagLen;
-    const diagS1 = (bo * (1 - diagNZ)) / diagUZ; // param along the diag face at the back seam
-    const diagS2 = (diagDX - bo * (1 + diagNX)) / diagUX; // param at the right seam
-    seamBackX = stepX + diagNX * bo + diagS1 * diagUX;
-    seamRightZ = zBack + diagNZ * bo + diagS2 * diagUZ;
-    const diagSMid = (diagS1 + diagS2) / 2;
+    // The cornice turns the stepped corner the way the WALL turns it — back
+    // run, connector, stepped-forward face — each run held off its own wall
+    // face by WALL_GAP, exactly as the 1990 wall stripe traces it
+    // (wall-stripe-1990.ts).
+    //
+    // This replaces a single hypotenuse from (stepX, zBack) to (rightEdge,
+    // stepZ). That chord was cheaper by one Reflector, but the step does not
+    // cut the corner off — it leaves a SOLID block at the back right, and the
+    // chord ran straight through it. The block's inner corner stood 3.1 ft
+    // proud of the chord on the 'wide' setting and 2.2 ft on the default,
+    // both deeper than the 1.8 ft band, so the gold wall sheared clean
+    // through chrome and mirror alike (feedback/062).
+    seamBackX = stepX - bo;
+    seamRightZ = stepZ + bo;
+    // Connector (runs along Z at x = stepX, faces -X into the room).
     addEdge(
-      diagS2 - diagS1,
-      new THREE.Vector3(
-        stepX + diagNX * bo + diagSMid * diagUX, mirrorY,
-        zBack + diagNZ * bo + diagSMid * diagUZ
-      ),
-      diagYaw
+      stepZ - zBack,
+      new THREE.Vector3(stepX - bo, mirrorY, (zBack + stepZ) / 2 + bo), -Math.PI / 2
+    );
+    // Stepped-forward face (runs along X at z = stepZ, faces +Z).
+    addEdge(
+      rightEdge - stepX,
+      new THREE.Vector3((stepX + rightEdge) / 2 - bo, mirrorY, stepZ + bo), 0
     );
   }
   // Chrome body: the whole cornice as ONE mitred ring strip, front-left
@@ -2854,7 +2848,10 @@ export function buildCeilingFrame(scene: StoreScene, storeWidth: number, backWal
       { x: leftEdge, z: zBack },
       { x: stepX, z: zBack },
     ];
-    if (scene.hasStep) plan.push({ x: rightEdge, z: stepZ });
+    if (scene.hasStep) {
+      plan.push({ x: stepX, z: stepZ });      // connector, along the step's -X face
+      plan.push({ x: rightEdge, z: stepZ });  // the stepped-forward face
+    }
     plan.push({ x: rightEdge, z: zFront });
     plan.push({ x: STORE_CENTER_X + connectHalfB, z: zFront });
     buildBodyRing(plan);
