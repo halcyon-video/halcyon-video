@@ -19,7 +19,13 @@ import {
 // Sign-in goes through the provider (GH #32). fetchPublicUsers stays direct:
 // it feeds the membership cards, which want an image tag rather than
 // AccountSummary's resolved URL — the multiUserPicker capability's own step.
-import { activeProvider } from './providers/active-provider';
+import {
+  activeProvider,
+  resetActiveProvider,
+  PROVIDER_KIND_KEY,
+} from './providers/active-provider';
+import { createPlexPin, fetchPlexServers, pollPlexPin } from './plex';
+import { PLEX_ACCOUNT_TOKEN_KEY } from './plex-signin';
 import {
   openMembershipCardPicker,
   isMembershipPickerOpen,
@@ -34,6 +40,7 @@ import {
   setupScreenChar,
   setupScreenBackspace,
   setupScreenLines,
+  SETUP_PROVIDER_KINDS,
 } from './store-setup-screens';
 
 export interface SetupTerminalScene {
@@ -214,6 +221,66 @@ async function dial(address: string): Promise<void> {
   }
 }
 
+/**
+ * The Plex route through the terminal. Different in shape from dial(): there is
+ * no card list to look up, because Plex home users don't come from the server
+ * (capabilities.multiUserPicker is false) — so this goes code → account →
+ * server → libraries, and the membership-card rack never opens.
+ *
+ * The address the person typed is optional here. If they left it blank, the
+ * account's own server list supplies one, which is the whole reason Plex asks
+ * for an account before a server.
+ */
+async function dialPlex(address: string): Promise<void> {
+  if (!deps) return;
+  const typed = normalizeUrl(address.trim());
+  try {
+    const pin = await createPlexPin();
+    screen = { kind: 'plex-link', code: pin.code, step: 'WAITING FOR AUTHORIZATION...' };
+    render();
+    deps.log(`[Setup] Plex sign-in code: ${pin.code}`);
+
+    const deadline = Date.now() + 15 * 60 * 1000;
+    let token: string | null = null;
+    while (Date.now() < deadline && !token) {
+      await new Promise((r) => setTimeout(r, 2000));
+      token = await pollPlexPin(pin.id);
+    }
+    if (!token) {
+      screen = { kind: 'plex-link', code: pin.code, step: '', error: 'THAT CODE EXPIRED. TRY AGAIN.' };
+      render();
+      return;
+    }
+    localStorage.setItem(PLEX_ACCOUNT_TOKEN_KEY, token);
+
+    screen = { kind: 'dialing', address: typed || 'PLEX.TV', step: 'LOOKING UP YOUR SERVERS...' };
+    render();
+
+    let url = typed;
+    if (!url || url === 'http://' || url === 'https://') {
+      const servers = await fetchPlexServers(token);
+      const first = servers.find((s) => s.connections.length)?.connections[0];
+      if (!first) {
+        screen = { ...initialHomeScreen(address), row: 1,
+          error: 'NO SERVERS ON THAT ACCOUNT. TYPE ONE.' };
+        render();
+        return;
+      }
+      url = normalizeUrl(first);
+      deps.log(`[Setup] Plex account supplied ${servers.length} server(s); using ${url}.`);
+    }
+
+    pendingUrl = url;
+    const session = await activeProvider().authenticate(url, { accountToken: token });
+    await afterAuth(url, session as MembershipLoginSession);
+  } catch (e: any) {
+    deps.log(`[Setup] Plex sign-in failed: ${e?.message ?? e}`);
+    screen = { ...initialHomeScreen(address), row: 1,
+      error: String(e?.message ?? e).toUpperCase().slice(0, 40) };
+    render();
+  }
+}
+
 async function manualSignIn(): Promise<void> {
   if (!deps || screen.kind !== 'manual-auth') return;
   const { username, password } = screen;
@@ -319,7 +386,18 @@ export async function setupTerminalInput(kind: SetupKey): Promise<void> {
   }
   switch (action) {
     case 'connect':
-      if (screen.kind === 'home') await dial(screen.address);
+      if (screen.kind === 'home') {
+        const kind = SETUP_PROVIDER_KINDS[screen.provider] ?? 'jellyfin';
+        // The choice has to be stored BEFORE authenticating: activeProvider()
+        // reads provider_kind, and the cached instance predates this press.
+        try {
+          localStorage.setItem(PROVIDER_KIND_KEY, kind);
+        } catch {
+          /* the session still connects on the chosen backend */
+        }
+        resetActiveProvider();
+        await (kind === 'plex' ? dialPlex(screen.address) : dial(screen.address));
+      }
       return;
     case 'demo':
       runDemo();

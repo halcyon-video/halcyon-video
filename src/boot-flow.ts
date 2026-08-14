@@ -14,7 +14,13 @@ import {
   normalizeUrl,
   JellyfinLibrary,
 } from './jellyfin';
-import { activeProvider as provider, sessionOf } from './providers/active-provider';
+import {
+  activeProvider as provider,
+  resetActiveProvider,
+  sessionOf,
+  PROVIDER_KIND_KEY,
+} from './providers/active-provider';
+import { plexAccountToken, selectedBackendKind, setupPlexSignInHandlers } from './plex-signin';
 import {
   openMembershipCardPicker,
   closeMembershipCardPicker,
@@ -691,6 +697,9 @@ export function setupLoginHandlers() {
   const form = document.getElementById('login-form') as HTMLFormElement;
   const errorMsg = document.getElementById('login-error-msg') as HTMLDivElement;
 
+  // The backend picker and the plex.tv PIN flow own the rest of column 1.
+  setupPlexSignInHandlers((m) => deps?.log(m, 'system'));
+
   const demoBtn = document.getElementById('btn-demo-submit') as HTMLButtonElement | null;
   if (demoBtn) {
     demoBtn.addEventListener('click', () => {
@@ -724,13 +733,38 @@ export function setupLoginHandlers() {
       const jellyseerrUrlInput = jellyseerrUrlEl?.value.trim() ?? '';
       const jellyseerrKeyInput = jellyseerrKeyEl?.value.trim() ?? '';
 
+      // Which backend the form is pointed at decides BOTH the credential shape
+      // and which provider instance handles it. resetActiveProvider() is what
+      // makes switching Jellyfin→Plex take effect without a reload: the active
+      // provider is cached, and the cache predates the choice just made.
+      const backendKind = selectedBackendKind();
+      let creds: { username?: string; password?: string; accountToken?: string };
+      if (backendKind === 'plex') {
+        const token = plexAccountToken();
+        if (!token) {
+          if (errorMsg) errorMsg.innerText = 'Get a Plex sign-in code first.';
+          if (submitBtn) { submitBtn.disabled = false; submitBtn.innerText = 'Connect & Sync'; }
+          return;
+        }
+        creds = { accountToken: token };
+      } else {
+        creds = { username: userInput, password: passInput };
+      }
       try {
-        deps?.log(`[System] Contacting Jellyfin server: ${urlInput}`, 'system');
-        const session = await provider().authenticate(urlInput, { username: userInput, password: passInput });
+        localStorage.setItem(PROVIDER_KIND_KEY, backendKind);
+      } catch {
+        /* the session still connects on the chosen backend */
+      }
+      resetActiveProvider();
+
+      try {
+        deps?.log(`[System] Contacting ${backendKind} server: ${urlInput}`, 'system');
+        const session = await provider().authenticate(urlInput, creds);
 
         // Only the manual single-login form remembers username (to prefill);
-        // the password is never persisted in plaintext localStorage.
-        localStorage.setItem('jellyfin_username', userInput);
+        // the password is never persisted in plaintext localStorage. Plex has
+        // no username to remember — the account token is the credential.
+        if (userInput) localStorage.setItem('jellyfin_username', userInput);
 
         if (jellyseerrUrlInput && jellyseerrKeyInput) {
           localStorage.setItem('jellyseerr_url', jellyseerrUrlInput);
