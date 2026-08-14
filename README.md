@@ -1,6 +1,6 @@
 # Halcyon Video — a 3D video store for your media server
 
-**Your Jellyfin library, rebuilt as a walkable 1990s video rental store.** Every
+**Your Jellyfin or Plex library, rebuilt as a walkable 1990s video rental store.** Every
 movie you own is a case on a shelf. Browse the aisles under warm fluorescents,
 pull *Back to the Future* off the wall, flip it over and read the back of the
 box, carry it to the counter, and watch the clerk drop it in a bag that
@@ -45,11 +45,11 @@ The short answers, so you don't have to go looking for them.
 |---|---|
 | **Run in Docker?** | Yes — one `docker run`, or `docker compose up -d` from a clone. [Quick start ↓](#quick-start) |
 | **Do video games?** | Yes — point it at [RomM](https://github.com/rommapp/romm) and a whole department appears: per-platform bays, period-correct boxes and jewel cases. [More ↓](#the-games-department) |
-| **Work with Plex or Emby?** | Not yet — Jellyfin today. The media layer is one module and adapters are the top roadmap item ([#32](https://github.com/halcyon-video/halcyon-video/issues/32)). |
+| **Work with Plex?** | Yes — sign in with a plex.tv code and your servers show up. Emby is the next one ([#32](https://github.com/halcyon-video/halcyon-video/issues/32)). [More ↓](#plex) |
 | **Run on a Raspberry Pi?** | Yes — **2.5D mode** runs the same store as plain HTML/CSS. [More ↓](#25d-mode--the-same-store-for-a-raspberry-pi) |
 | **Work away from home?** | Yes — **Remote Play** streams the live store to any browser, with its own TURN relay for off-LAN viewers. [More ↓](#remote-play--the-store-in-your-pocket) |
 | **Look like *my* video store?** | Yes — brand, logo, colors, themes, fixtures and sign art are all data you drop in a folder, not code. [More ↓](#make-it-yours) |
-| **Work with no media server at all?** | The demo does — it ships its own synthetic catalog, which is the link above. Shelving *your* files needs Jellyfin; there's no built-in folder scanner. |
+| **Work with no media server at all?** | The demo does — it ships its own synthetic catalog, which is the link above. Shelving *your* files needs Jellyfin or Plex; there's no built-in folder scanner. |
 
 ### Jump to
 
@@ -64,7 +64,7 @@ The short answers, so you don't have to go looking for them.
 ## What it is
 
 A Vite + TypeScript + **three.js** app (optionally Tauri-wrapped) that connects
-to **[Jellyfin](https://jellyfin.org/)** and procedurally builds a period video
+to **[Jellyfin](https://jellyfin.org/)** or **[Plex](https://www.plex.tv/)** and procedurally builds a period video
 store from whatever you have: every library becomes an aisle, genres become
 signposted sections, duplicate quality versions stack behind the face copy, the
 worst-rated titles literally end up in the **Bargain Bin**. It runs 24/7 on an
@@ -73,7 +73,7 @@ renders *nothing at all* and idles at near-zero CPU/GPU for days.
 
 The screenshots in this README show the store running its built-in demo
 catalog — public-domain classics on every shelf, no media server attached
-(the same thing the live demo link runs). Point it at your Jellyfin and every
+(the same thing the live demo link runs). Point it at your own server and every
 case becomes something you own. This isn't a tech demo that gets old in five
 minutes; it's how our family has picked a movie every night for months.
 
@@ -441,7 +441,7 @@ This app's steady state is *days on a shelf*, and it's engineered like it:
 
 | You have | You get |
 |---|---|
-| **Jellyfin** (required — or demo mode) | The store, browsing, walk mode, playback, rentals, living room, clerk, themes, brand editor |
+| **Jellyfin or Plex** (one of them — or demo mode) | The store, browsing, walk mode, playback, rentals, living room, clerk, themes, brand editor |
 | **Jellyseerr / Overseerr** (optional) | Recommendation clasps, REQUEST / COMING SOON cases, collection gaps, discovery shelving, staff picks, FOR YOU endcaps, "order it for me" |
 | **RomM** (optional) | The video-game department: per-platform bays, real carton proportions, your cover scans |
 | **The server on the same machine as the TV** | mpv playback — real HDR and original lossless audio, no transcode |
@@ -488,7 +488,7 @@ git clone https://github.com/halcyon-video/halcyon-video
 cd halcyon-video
 npm install
 npm run dev          # dev server on :1420 — first boot shows the login /
-                     # membership cards; enter your Jellyfin URL + credentials
+                     # membership cards; enter your server URL + credentials
 ```
 
 **Docker — the no-fuss way:**
@@ -501,7 +501,7 @@ docker run -d --name halcyon --network host --restart unless-stopped \
 …or, from a clone, `docker compose up -d` (builds the image locally; the
 prebuilt image is published from releases). Then:
 
-1. Open `http://<host>:1420` in a browser and log into your Jellyfin — or
+1. Open `http://<host>:1420` in a browser and log into your media server — or
    append `?demo=1` to try it with no server at all.
 2. Open `http://<host>:1420/remote.html` on a phone, tablet, or set-top box:
    the **container** renders the store and streams it over WebRTC, with your
@@ -551,10 +551,29 @@ resolution scaler fits it to your hardware, and the **2.5D mode** runs the
 whole store as HTML/CSS on a Raspberry Pi.
 
 **Does it work with Plex or Emby?**
-Today it speaks Jellyfin (and a no-server demo mode). The media layer is one
-module, and Plex/Emby adapters are the most-asked-about item on the roadmap —
-[issue #32](https://github.com/halcyon-video/halcyon-video/issues/32) is the
-one to watch or chime in on.
+Plex, yes — see [below](#plex). Emby is next: the media layer is one module
+behind a provider interface, so a backend is a new file rather than a fork of
+the client, and [issue #32](https://github.com/halcyon-video/halcyon-video/issues/32)
+is the one to watch or chime in on.
+
+### Plex
+
+Pick **PLEX** as the distributor on the opening-day terminal (or in the browser
+login form) and press connect. Plex doesn't let other apps take your password,
+so instead the store shows a short code: type it at
+[plex.tv/link](https://plex.tv/link) on any device, and the servers on your
+account appear — you don't have to know your server's address.
+
+Everything the store does with a Jellyfin library it does with a Plex one:
+shelves, artwork, collections as endcaps, series, resume points, watched state
+feeding the clerk's recommendations, direct play with an HLS fallback.
+
+Two differences worth knowing. The fanned **membership cards** don't appear —
+Plex home users hang off your plex.tv account rather than being a list the
+server hands out, so the card rack has nothing to draw and sign-in goes through
+the code instead. And **actor portraits** on the wall décor stay generic: Plex
+only returns cast photos on a per-title request, and fetching one request per
+title to decorate a wall isn't worth what it costs a big library.
 
 **Can I run it in Docker?**
 Yes — see [Quick start](#quick-start). One `docker run` with `--network host`,
