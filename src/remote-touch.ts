@@ -54,16 +54,19 @@ const CSS = `
   flex-direction: column; gap: 10px; align-items: flex-end; }
 .rt-btn {
   display: flex; align-items: center; justify-content: center;
-  background: rgba(10, 25, 68, 0.62); color: #ffd23f;
+  /* Knockout cream, not the old gold. The remote viewer page does not run
+     applyThemeCssVars, so the literal fallbacks here are what a phone actually
+     shows — they have to carry the house colours themselves. */
+  background: rgba(10, 25, 68, 0.62); color: var(--bb-knockout, #f2e8c9);
   border: 1px solid rgba(120, 150, 230, 0.45); border-radius: 12px;
   font: 700 17px/1 system-ui, sans-serif; letter-spacing: 0.04em;
   backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
   transition: background 90ms, transform 90ms;
 }
-.rt-btn.rt-held { background: rgba(255, 210, 63, 0.85); color: #0a1944; transform: scale(0.94); }
+.rt-btn.rt-held { background: rgba(242, 232, 201, 0.85); color: #0a1944; transform: scale(0.94); }
 #rt-pad .rt-btn { font-size: 21px; margin: 3px; }
 #rt-actions .rt-btn { min-width: 76px; height: 50px; padding: 0 16px; }
-#rt-actions .rt-ok { background: rgba(255, 210, 63, 0.9); color: #0a1944; border-color: #ffd23f; }
+#rt-actions .rt-ok { background: rgba(242, 232, 201, 0.9); color: #0a1944; border-color: var(--bb-knockout, #f2e8c9); }
 /* The page's own hint line sits bottom-centre, which is exactly where the pad
    now is: lift it clear and let it wrap, since its phone wording is longer
    than the nowrap desktop one and a 390px screen cuts it off at both ends. */

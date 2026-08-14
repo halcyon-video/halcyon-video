@@ -142,16 +142,28 @@ export const LETTER_HEIGHT_DEFAULT_FT = 2.5;
 // because this module must stay free of runtime imports from themes.ts (see
 // the module comment above).
 //
-// Halcyon Video — the store's own identity: a true-blue board, gold
-// lettering, a gold keyline. (Owner ruling 2026-08-04: the house wears blue
-// and gold; "Halcyon" is the kingfisher — blue and gold IS the bird — and the
-// emblem itself joins later.) The blue/gold pair is deliberately its own:
-// deeper board blue and a warmer gold than any real chain's flat scheme, and
-// the marks (name, board shape, Archivo face) carry the identity.
+// Halcyon Video — the store's own identity: a true-blue board, CREAM
+// lettering, a gold keyline. (Owner ruling 2026-08-04 put gold lettering on
+// the board — "Halcyon" is the kingfisher, and blue and gold IS the bird.
+// SUPERSEDED 2026-08-13 on trademark grounds: DISH's own enforcement filings
+// name "the torn ticket design mark, yellow and blue color scheme, and
+// similar font" as the elements they police, and bright gold lettering on a
+// blue board was the one axis of that list this house sat on. The kingfisher
+// keeps its gold in the KEYLINE and the room trim; the wordmark — the mark
+// that actually identifies the source, and the one that lands in every press
+// screenshot — reads cream on blue.) The remaining marks (name, board shape,
+// Archivo face) carry the identity, and none of them is anyone else's.
 export const HALCYON_BLUE = '#1a49c2';      // brand body; palette.primary
-export const HALCYON_CREAM = '#f2e8c9';        // print stock/knockout cream (paper, not livery)
-export const HALCYON_GOLD = '#e0a81c';        // keyline/trim; palette.secondary
-export const HALCYON_GOLD_HI = '#ffd23f';     // bright gold; palette.accent, --bb-sign, wordmark
+export const HALCYON_CREAM = '#f2e8c9';        // wordmark ink + print stock/knockout cream
+// Trim and accent are CREAM as of 2026-08-13, completing the de-gold: the wall
+// stripe, plaque borders, counter stripe, endcap trim and knee walls all read
+// palette.secondary, so the house wore gold everywhere those touched even after
+// the lettering moved. They stay two separate exports rather than one so a
+// brand pack can still drive trim and accent apart; the house just happens to
+// use one cream for both. (Anything that needs contrast ON cream stock must
+// take palette.primary — see the tip jar's rule.)
+export const HALCYON_TRIM = HALCYON_CREAM;    // keyline/trim; palette.secondary
+export const HALCYON_ACCENT = HALCYON_CREAM;  // highlights; palette.accent
 export const HALCYON_BLUE_LIT = '#1d50cf';  // counter top / lit blue surfaces
 export const HALCYON_INK = '#1c3f9e';          // wrap/print blue ink
 
@@ -176,15 +188,16 @@ export const HALCYON_TILT_DEG = 4;
 
 // Per-theme default specs. All four Halcyon eras wear the SAME board — the era
 // difference lives in the dressing, the toppers and the medium, not in two
-// greens. bodyColor/textColor mirror each theme's palette.primary/secondary so
-// a palette tweak and the emblem can never drift apart.
+// greens. bodyColor mirrors each theme's palette.primary and borderColor its
+// palette.secondary, so a palette tweak and the emblem can never drift apart;
+// textColor is deliberately NOT palette-derived (see the cream ruling above).
 const HALCYON_BASE: Omit<LogoSpec, 'bodyColor'> = {
   version: 1,
   shape: 'rect',
   tornEdge: false,
   tornSeed: 1985,
-  textColor: HALCYON_GOLD_HI,   // gold lettering on the blue board
-  borderColor: HALCYON_GOLD,   // mirrors theme.palette.secondary
+  textColor: HALCYON_CREAM,    // cream lettering on the blue board
+  borderColor: HALCYON_TRIM,   // mirrors theme.palette.secondary
   innerBorder: true,
   mainText: 'HALCYON',
   subText: 'VIDEO',

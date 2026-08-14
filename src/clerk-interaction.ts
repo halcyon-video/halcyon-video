@@ -461,7 +461,8 @@ export class ClerkInteraction {
       position: fixed; left: 50%; bottom: 96px; transform: translateX(-50%) translateY(8px);
       z-index: 60; pointer-events: none; opacity: 0; transition: opacity .18s, transform .18s;
       font-family: 'Courier New', monospace; font-weight: 700; letter-spacing: .04em;
-      color: #ffd54a; background: rgba(10,18,40,.82); border: 1px solid rgba(255,213,74,.55);
+      color: var(--bb-knockout, #eef3ff); background: rgba(10,18,40,.82);
+      border: 1px solid var(--bb-secondary, #f2e8c9);
       padding: 8px 16px; border-radius: 6px; text-shadow: 0 1px 2px #000;
       box-shadow: 0 4px 18px rgba(0,0,0,.5);
     }

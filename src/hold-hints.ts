@@ -24,12 +24,12 @@ function makePill(id: string, label: string, bottomPx: number): HoldPill {
     `position:fixed;left:50%;bottom:${bottomPx}px;transform:translateX(-50%);z-index:58;` +
     'pointer-events:none;opacity:0;transition:opacity .25s;overflow:hidden;' +
     "font-family:var(--font-mono,'Courier New',monospace);font-size:20px;font-weight:400;letter-spacing:.1em;" +
-    'color:#eef3ff;background:rgba(9,16,38,.85);border:2px solid var(--bb-secondary, #ffd54a);' +
+    'color:#eef3ff;background:rgba(9,16,38,.85);border:2px solid var(--bb-secondary, #f2e8c9);' +
     'border-radius:999px;padding:8px 22px;text-shadow:0 1px 2px #000;';
   const fill = document.createElement('div');
   fill.style.cssText =
     'position:absolute;inset:0;transform-origin:left;transform:scaleX(0);' +
-    'background:var(--bb-secondary, #ffd54a);opacity:.32;';
+    'background:var(--bb-secondary, #f2e8c9);opacity:.32;';
   const text = document.createElement('span');
   text.textContent = label;
   text.style.cssText = 'position:relative;';

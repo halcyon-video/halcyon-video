@@ -88,7 +88,7 @@
   font-size: 2.2rem;
   font-weight: 400;
   letter-spacing: 6px;
-  color: var(--bb-secondary, #e0a81c);
+  color: var(--bb-secondary, #f2e8c9);
   /* 3D drop shadow — same technique as the emblem's extruded text */
   text-shadow:
     2px 2px 0 rgba(var(--bb-primary-rgb, 15, 77, 58), 0.75),
@@ -123,7 +123,7 @@
 }
 
 .flat-total-access-yellow {
-  color: var(--bb-secondary, #e0a81c);
+  color: var(--bb-secondary, #f2e8c9);
   background: rgba(0, 0, 0, 0.35);
   padding: 2px 8px;
   border-radius: 2px;
@@ -205,7 +205,7 @@
   color: #ffffff;
   text-shadow: 0 2px 8px rgba(0, 0, 0, 0.7);
   align-self: flex-start;
-  border-left: 5px solid var(--bb-secondary, #e0a81c);
+  border-left: 5px solid var(--bb-secondary, #f2e8c9);
   padding-left: 16px;
   text-transform: uppercase;
 }
@@ -394,7 +394,7 @@
   gap: 8px;
   font-family: var(--font-mono, 'Share Tech Mono'), monospace;
   font-size: 0.9rem;
-  color: var(--bb-secondary, #e0a81c);
+  color: var(--bb-secondary, #f2e8c9);
   letter-spacing: 1.5px;
   margin: 0;
   padding: 5px 16px 4px;
@@ -496,14 +496,14 @@
   margin: 0 0 14px 48px;
   padding: 4px 26px 2px;
   letter-spacing: 3px;
-  color: var(--bb-secondary, #e0a81c);
+  color: var(--bb-secondary, #f2e8c9);
   background: linear-gradient(
     180deg,
     color-mix(in srgb, var(--bb-primary, #1a49c2) 90%, white) 0%,
     var(--bb-primary, #1a49c2) 55%,
     color-mix(in srgb, var(--bb-primary, #1a49c2) 65%, black) 100%
   );
-  border: 2px solid var(--bb-secondary, #e0a81c);
+  border: 2px solid var(--bb-secondary, #f2e8c9);
   border-radius: 3px;
   box-shadow:
     0 4px 10px rgba(0, 0, 0, 0.6),
@@ -591,7 +591,7 @@
   padding: 8px 1px;
   box-sizing: border-box;
   overflow: hidden;
-  color: var(--bb-secondary, #e0a81c);
+  color: var(--bb-secondary, #f2e8c9);
   border-right: 1px solid rgba(255, 255, 255, 0.15);
   pointer-events: none;
   z-index: 1;
@@ -751,8 +751,8 @@
   font-family: var(--font-display, 'Archivo Black'), 'Bebas Neue', sans-serif;
   font-size: 1rem;
   font-weight: 400;
-  color: var(--bb-accent, #ffd23f);
-  border: 2px solid var(--bb-accent, #ffd23f);
+  color: var(--bb-accent, #f2e8c9);
+  border: 2px solid var(--bb-accent, #f2e8c9);
   padding: 2px 8px;
   letter-spacing: 2px;
   opacity: 0.1;
@@ -793,11 +793,11 @@
 .case__badge--4k {
   background-color: #000000;
   color: #ffffff;
-  border: 1px solid var(--bb-accent, #ffd23f);
+  border: 1px solid var(--bb-accent, #f2e8c9);
 }
 
 .case__badge--new {
-  background-color: var(--bb-secondary, #e0a81c);
+  background-color: var(--bb-secondary, #f2e8c9);
   color: var(--bb-primary, #1a49c2);
   border-radius: 7px;
   padding: 2px 7px;
@@ -932,7 +932,7 @@
   text-shadow:
     0 4px 12px rgba(0, 0, 0, 0.5),
     0 0 20px rgba(224, 168, 28,  0.1);
-  border-left: 5px solid var(--bb-secondary, #e0a81c);
+  border-left: 5px solid var(--bb-secondary, #f2e8c9);
   padding-left: 16px;
   text-transform: uppercase;
 }
@@ -1018,7 +1018,7 @@
   font-style: italic;
   font-size: 1rem;
   letter-spacing: 1.5px;
-  color: var(--bb-secondary, #e0a81c);
+  color: var(--bb-secondary, #f2e8c9);
   text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.35);
 }
 
@@ -1413,8 +1413,8 @@
 
 .flat-detail-badge-platform {
   background: var(--bb-primary, #1a49c2);
-  color: var(--bb-secondary, #e0a81c);
-  border: 1.5px solid var(--bb-secondary, #e0a81c);
+  color: var(--bb-secondary, #f2e8c9);
+  border: 1.5px solid var(--bb-secondary, #f2e8c9);
   font-weight: 800;
   font-size: 0.75rem;
   padding: 1px 6px;
@@ -1479,7 +1479,7 @@
 .flat-search-icon {
   font-size: 1.8rem;
   margin-right: 20px;
-  color: var(--bb-accent, #ffd23f);
+  color: var(--bb-accent, #f2e8c9);
   opacity: 0.85;
 }
 
@@ -1505,7 +1505,7 @@
 .flat-search-results-container::-webkit-scrollbar { width: 8px; }
 .flat-search-results-container::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.02); border-radius: 4px; }
 .flat-search-results-container::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 4px; }
-.flat-search-results-container::-webkit-scrollbar-thumb:hover { background: var(--bb-accent, #ffd23f); }
+.flat-search-results-container::-webkit-scrollbar-thumb:hover { background: var(--bb-accent, #f2e8c9); }
 
 .flat-search-results-grid {
   display: grid;
@@ -1734,7 +1734,7 @@
 .flat-menu-item:hover .flat-menu-item-icon,
 .flat-menu-item.is-focused .flat-menu-item-icon {
   opacity: 1;
-  color: var(--bb-secondary, #e0a81c);
+  color: var(--bb-secondary, #f2e8c9);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
