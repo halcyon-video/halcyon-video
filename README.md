@@ -136,7 +136,7 @@ Press `/` and the camera walks you behind the counter and docks to the clerk's
 CRT. Type on amber phosphor; matches come back by title, director, or genre,
 and Enter flies you to the title's spot on the shelf.
 
-![SEARCH> GOONIES](docs/screenshots/search-terminal.jpg)
+![SEARCH> HORROR](docs/screenshots/search-terminal.jpg)
 
 ---
 
@@ -146,14 +146,14 @@ and Enter flies you to the title's spot on the shelf.
 
 - **Carry mode:** take a tape and it joins a hand-fanned stack at the bottom of
   your view. **C** walks you to the counter; **hold Enter** goes straight to
-  checkout with a gold hold-meter pill.
+  checkout with a cream hold-meter pill.
 - **The bag is a real soft body.** The glossy white pillow bag is a ~340-node
   cloth simulation — two welded sheets, die-cut handle punched through both
   layers. Drop a case in and the plastic visibly pushes out around it; pick it
   up and it droops and sways under gravity, then settles. (And then the solver
   goes to sleep, because nothing here is allowed to burn watts at idle.)
 
-![Tapes settled inside the bag](docs/screenshots/checkout-bag.jpg)
+![The checkout bag, a 340-node cloth sim](docs/screenshots/checkout-bag.jpg)
 
 - **The checkout exit is choreographed** — wrap, slide, a first-person
   walk-around while your bag waits at the counter's edge, grab, carry-out.
@@ -217,7 +217,7 @@ so either one answers — the store quietly merchandises around your collection:
 
 - **Collection gaps**: own 3 of the 4 Alien films? The missing one stands on
   the shelf as an empty box with a blue **REQUEST** corner label. Select it and
-  the label restamps **gold COMING SOON**, live, while the clerk toasts that
+  the label restamps **cream COMING SOON**, live, while the clerk toasts that
   she's ordered it.
 - **Discover titles** — trending films you don't own — are shelved *inline*
   with your stock as request cases, not exiled to a separate row.
@@ -611,7 +611,9 @@ See [CONTRIBUTING.md](CONTRIBUTING.md).
 *Halcyon Video is a fictional brand created for this project. This repository
 contains no third-party trademarks or brand assets: no real chain's name,
 logo, trade dress, or typefaces are included or distributed. Movie artwork
-visible in screenshots is library metadata from the author's personal Jellyfin
-server. This project is not affiliated with, endorsed by, or connected to any
+visible in screenshots is the demo catalog's public-domain and CC-BY one-sheets
+(see `public/demo-posters/ATTRIBUTION.md`); the game covers in the games-department
+shots are library metadata from the author's personal RomM server. This project
+is not affiliated with, endorsed by, or connected to any
 video-rental company, past or present — it is a love letter to Friday nights
 at all of them.*
