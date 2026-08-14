@@ -71,7 +71,7 @@ const PAL = {
   tag: '#f6f6f2', tagYellow: '#f2c230',
   iris: '#6b4226', outline: '#241a20',
   mouth: '#8a3a30', mouthOpen: '#571f1c', teeth: '#f4efe8',
-  caseDk: '#0b3327', caseHi: '#155b45', caseLabel: '#ffd23f',
+  caseDk: '#0b3327', caseHi: '#155b45', caseLabel: '#f2e8c9',
 };
 
 /** Lighten (f > 0) / darken (f < 0) a #rrggbb color. */

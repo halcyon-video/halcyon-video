@@ -24,6 +24,7 @@
 import * as THREE from 'three';
 import { drawLogo } from './logo-renderer';
 import { getActiveLogoSpec } from './logo-spec';
+import { registerBrandRepaint } from './brand-live';
 import { getActiveTheme } from './themes';
 
 // ─── Bag dimensions (feet, bag-local: origin at the counter top under the
@@ -446,6 +447,8 @@ export class CheckoutBag {
   // printed big and crisp across the face. The alpha channel carries the
   // punched die-cut hole. u is mirrored per sheet in the UVs, so the print
   // reads correctly from BOTH sides.
+  // The bag's print is the emblem itself (drawLogo below), so it follows a
+  // brand edit the moment the editor commits — see brand-live.ts.
   private buildPrintTexture(): THREE.CanvasTexture {
     const W = 896;
     const H = 1024; // ≈ bag face aspect (1.6 : 1.79 ft)
@@ -453,34 +456,43 @@ export class CheckoutBag {
     canvas.width = W;
     canvas.height = H;
     const ctx = canvas.getContext('2d')!;
-    ctx.fillStyle = '#f8f7f4';
-    ctx.fillRect(0, 0, W, H);
 
-    // Big print-quality brand emblem centred on the body (v runs bottom-up on
-    // the bag; canvas y runs top-down).
-    const spec = getActiveLogoSpec(getActiveTheme());
-    const logoW = W * 1.04; // edge-to-edge print — "fully imprinted"
-    const logoH = logoW * 0.62;
-    const bodyCenterV = (0.47 * BODY_H) / TOTAL_H;
-    drawLogo(ctx, spec, {
-      x: (W - logoW) / 2,
-      y: (1 - bodyCenterV) * H - logoH / 2,
-      w: logoW,
-      h: logoH,
-    });
+    const paint = () => {
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.clearRect(0, 0, W, H);
+      ctx.fillStyle = '#f8f7f4';
+      ctx.fillRect(0, 0, W, H);
 
-    // Punch the handle hole (alphaTest cutout).
-    const pxPerFtX = W / (2 * HALF_W);
-    const holeY = (1 - HOLE_CY / TOTAL_H) * H;
-    ctx.globalCompositeOperation = 'destination-out';
-    ctx.beginPath();
-    ctx.ellipse(W / 2, holeY, HOLE_R * pxPerFtX, HOLE_R * (H / TOTAL_H), 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.globalCompositeOperation = 'source-over';
+      // Big print-quality brand emblem centred on the body (v runs bottom-up on
+      // the bag; canvas y runs top-down). Spec is read here, not captured, so a
+      // repaint prints the CURRENT brand.
+      const spec = getActiveLogoSpec(getActiveTheme());
+      const logoW = W * 1.04; // edge-to-edge print — "fully imprinted"
+      const logoH = logoW * 0.62;
+      const bodyCenterV = (0.47 * BODY_H) / TOTAL_H;
+      drawLogo(ctx, spec, {
+        x: (W - logoW) / 2,
+        y: (1 - bodyCenterV) * H - logoH / 2,
+        w: logoW,
+        h: logoH,
+      });
+
+      // Punch the handle hole (alphaTest cutout). Must be re-punched on every
+      // repaint — the fill above closes it back up.
+      const pxPerFtX = W / (2 * HALF_W);
+      const holeY = (1 - HOLE_CY / TOTAL_H) * H;
+      ctx.globalCompositeOperation = 'destination-out';
+      ctx.beginPath();
+      ctx.ellipse(W / 2, holeY, HOLE_R * pxPerFtX, HOLE_R * (H / TOTAL_H), 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalCompositeOperation = 'source-over';
+    };
+    paint();
 
     const tex = new THREE.CanvasTexture(canvas);
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.anisotropy = 4;
+    registerBrandRepaint(tex, paint);
     return tex;
   }
 

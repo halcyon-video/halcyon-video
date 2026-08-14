@@ -21,7 +21,8 @@
 import { isDemoMode } from './demo-mode';
 import { enableFpsMeter, initFpsMeter, FPS_METER_KEY } from './fps-meter';
 import { setRemotePlayEnabled } from './remote-play';
-import { THEMES, getActiveTheme, resolveThemeId, WALL_PAINT_OPTIONS } from './themes';
+import { THEMES, getActiveTheme, resolveThemeId, WALL_PAINT_OPTIONS, applyThemeCssVars } from './themes';
+import { refreshBrand } from './brand-live';
 import { COVER_VARIANTS, USER_WRAP_SPECS, getUserWrap, setUserWrap } from './video-case';
 import type { CaseMedium } from './video-case';
 import { DEFAULT_LOGO_SPECS, getActiveLogoSpec } from './logo-spec';
@@ -1328,6 +1329,16 @@ export function buildStoreBrandPanel(container: HTMLElement, hooks: BrandPanelHo
       else localStorage.removeItem('bb_logo');
     }
     lastSaved = next;
+    // Re-publish the theme's CSS vars: --bb-knockout is derived from the
+    // emblem's textColor, so a live recolor here has to reach the DOM chrome
+    // (clasp/clerk prompts) immediately rather than waiting for a reload.
+    applyThemeCssVars(getActiveTheme());
+    // …and repaint the 3D store's brand surfaces in place, so the colour you
+    // are choosing is on the signs, the plaque and the bag while you choose it.
+    // onDirty still fires: a few things (box-panel art on shared/per-title case
+    // materials) genuinely can't repaint live and still want the drawer-close
+    // rebuild, and flagging it twice is harmless.
+    refreshBrand();
     hooks.onDirty?.();
   };
 

@@ -13,6 +13,7 @@
 import * as THREE from 'three';
 import { getActiveTheme } from './themes';
 import { getActiveLogoSpec } from './logo-spec';
+import { registerBrandRepaint } from './brand-live';
 import {
   getLogoFontString, buildLogoShapePath, logoShapeInnerBox, logoShapeFitRect,
 } from './logo-renderer';
@@ -178,10 +179,13 @@ export class OverviewCursors {
       const canvas = document.createElement('canvas');
       canvas.width = LABEL_CANVAS_W;
       canvas.height = LABEL_CANVAS_H;
-      paintTicketLabel(canvas.getContext('2d')!, t.label);
+      const ctx2d = canvas.getContext('2d')!;
+      const paint = () => paintTicketLabel(ctx2d, t.label);
+      paint();
       const tex = new THREE.CanvasTexture(canvas);
       tex.colorSpace = THREE.SRGBColorSpace;
       tex.anisotropy = 4;
+      registerBrandRepaint(tex, paint);
       const mat = new THREE.MeshBasicMaterial({
         map: tex,
         transparent: true,

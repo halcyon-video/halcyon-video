@@ -1,8 +1,8 @@
 import type { LogoSpec } from './logo-spec';
 import { getBrandPack } from './brand-pack';
 import {
-  DEFAULT_LOGO_SPECS,
-  HALCYON_BLUE, HALCYON_GOLD, HALCYON_GOLD_HI, HALCYON_BLUE_LIT,
+  DEFAULT_LOGO_SPECS, getActiveLogoSpec,
+  HALCYON_BLUE, HALCYON_TRIM, HALCYON_ACCENT, HALCYON_BLUE_LIT,
 } from './logo-spec';
 
 // Which genre topper an era wears on its shelf-run tops. Read as a data field
@@ -63,8 +63,8 @@ export interface StoreTheme {
 // painted near the top of the wall bays carries the livery, not the paint —
 // owner ruling, both 2026-08-03 and reaffirmed with the blue/gold swap).
 const HALCYON_ROOM_PALETTE = {
-  secondary: HALCYON_GOLD,     // gold trim (knee walls derive: x0.76 -> antique gold)
-  accent: HALCYON_GOLD_HI,     // bright gold: --bb-sign, safety accents
+  secondary: HALCYON_TRIM,     // cream trim (knee walls derive: x0.76 -> warm greige)
+  accent: HALCYON_ACCENT,      // cream highlights; --bb-sign now tracks the knockout
   wall: '#f2cf4a',              // house-yellow drywall
   carpet: '#7086ab',            // dusty, desaturated blue (owner: the first pass read too vibrant)
   counterBody: '#f4f4f0',       // white counter body
@@ -261,7 +261,8 @@ export function themeTrimDarkHex(theme: StoreTheme = getActiveTheme()): string {
 }
 
 // Knee-wall / accent trim derived from the theme's secondary, slightly
-// darkened (brass #e0a81c × 0.76 = the antique brass the knee walls wear).
+// darkened (cream #f2e8c9 × 0.76 = the warm greige the knee walls wear since
+// the 2026-08-13 de-gold; it was an antique brass off #e0a81c before).
 export function themeKneeGoldHex(theme: StoreTheme = getActiveTheme()): string {
   return scaleHex(theme.palette.secondary, 0.76);
 }
@@ -286,7 +287,18 @@ export function applyThemeCssVars(theme: StoreTheme): void {
   style.setProperty('--bb-carpet', theme.palette.carpet);
   style.setProperty('--bb-counter-body', theme.palette.counterBody);
   style.setProperty('--bb-counter-top', theme.palette.counterTop);
-  style.setProperty('--bb-sign', theme.palette.accent);
+
+  // The house KNOCKOUT — the ink the emblem letters in, and so the ink every
+  // sign, topper and HUD prompt letters in. It is deliberately not
+  // palette.accent: accent is a highlight/safety colour, and letting the two
+  // share a token is what let the overhead blades keep the old house ink after
+  // a brand change. DOM chrome reads it as var(--bb-knockout); the canvas
+  // painters read LogoSpec.textColor directly. --bb-sign is the older alias for
+  // the same idea (no consumers today) and now points at the same value rather
+  // than drifting to accent.
+  const knockout = getActiveLogoSpec(theme).textColor;
+  style.setProperty('--bb-knockout', knockout);
+  style.setProperty('--bb-sign', knockout);
 
   // RGB Colors for transparency
   style.setProperty('--bb-primary-rgb', hexToRgbStr(theme.palette.primary));

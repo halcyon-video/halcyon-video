@@ -25,7 +25,7 @@
 // per frame. Pure 2D canvas: no three.js.
 import type { CaseMedium } from './video-case';
 import type { LogoSpec } from './logo-spec';
-import { HALCYON_GOLD, HALCYON_CREAM, HALCYON_BLUE, HALCYON_INK } from './logo-spec';
+import { HALCYON_TRIM, HALCYON_CREAM, HALCYON_BLUE, HALCYON_INK } from './logo-spec';
 import { drawLogo, getLogoFontString } from './logo-renderer';
 import { brandString } from './brand-pack';
 import { bundledFontsReady } from './bundled-fonts';
@@ -55,7 +55,7 @@ function wrapPrintColors(spec: LogoSpec): { body: string; letter: string; stripe
   return {
     body: spec.bodyColor.toLowerCase() === HALCYON_BLUE ? WRAP_PRINT_BODY : spec.bodyColor,
     letter: isDefaultInk ? WRAP_PRINT_LETTER : spec.textColor,
-    stripe: spec.borderColor.toLowerCase() === HALCYON_GOLD ? WRAP_PRINT_LETTER : spec.borderColor,
+    stripe: spec.borderColor.toLowerCase() === HALCYON_TRIM ? WRAP_PRINT_LETTER : spec.borderColor,
   };
 }
 

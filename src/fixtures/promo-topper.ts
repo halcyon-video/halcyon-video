@@ -22,7 +22,8 @@
 // moved. Deriving from the active theme means the stands follow the house (and
 // an installed brand pack) the way every other sign already does.
 import * as THREE from 'three';
-import { createFasciaBladeFactory, FASCIA_BLADE_H, type FasciaColorway } from './genre-fascia';
+import { createFasciaBladeFactory, FASCIA_BLADE_H, repaintHouseBlades, type FasciaColorway } from './genre-fascia';
+import { onBrandChange } from '../brand-live';
 import { getActiveTheme, themeTrimDarkHex } from '../themes';
 import { getActiveLogoSpec } from '../logo-spec';
 
@@ -53,6 +54,7 @@ export interface PromoTopperFactory {
 export function houseBladeColorway(): FasciaColorway {
   const theme = getActiveTheme();
   return {
+    house: true,
     field: theme.palette.primary,
     ink: getActiveLogoSpec(theme).textColor,
     outline: themeTrimDarkHex(theme),
@@ -60,6 +62,10 @@ export function houseBladeColorway(): FasciaColorway {
 }
 
 export function createPromoTopperFactory(): PromoTopperFactory {
+  // Blade textures are module-cached and survive scene rebuilds, so the house
+  // blades need an explicit repaint to follow a live brand edit. Registered per
+  // store build; resetBrandLive() on scene teardown drops the old one.
+  onBrandChange(() => repaintHouseBlades(houseBladeColorway()));
   const blades = createFasciaBladeFactory(houseBladeColorway());
   return {
     height: FASCIA_BLADE_H,

@@ -607,7 +607,7 @@ export function showClerkToast(text: string, ms = 3200): void {
       'box-shadow:0 8px 30px rgba(0,0,0,.55);text-shadow:0 1px 2px #000;';
     const name = document.createElement('span');
     name.textContent = 'CLERK  ';
-    name.style.cssText = 'color:var(--bb-secondary, #ffd54a);letter-spacing:.18em;font-size:20px;font-weight:700;';
+    name.style.cssText = 'color:var(--bb-secondary, #f2e8c9);letter-spacing:.18em;font-size:20px;font-weight:700;';
     toastEl.appendChild(name);
     const body = document.createElement('span');
     body.className = 'clerk-toast-body';

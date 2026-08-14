@@ -375,7 +375,12 @@ function drawRewinderLogo(canvas: HTMLCanvasElement, spec: LogoSpec): void {
     : `"${spec.fontFamily}", "Arial Narrow", sans-serif`;
   c.textBaseline = 'alphabetic';
   c.textAlign = 'left';
-  c.fillStyle = '#ffc20e'; // all yellow, single size (the real plaque)
+  // Single ink, single size (the real plaque). The reference's plaque is all
+  // yellow; the ink itself comes from the emblem knockout like every other
+  // wordmark in the store, so this plaque follows a brand change instead of
+  // wearing the old house forever (signage rule 2 — the sibling painter below
+  // already does this).
+  c.fillStyle = spec.textColor;
   const baseY = 84;
   let x = 22;
   const main = brandString('brand-wordmark', 'HALCYON');

@@ -43,6 +43,14 @@ const fasciaColor = bb93GenreColor;
  * read as an unconverted leftover.
  */
 export interface FasciaColorway {
+  /**
+   * Set by promo-topper's houseBladeColorway(). Marks this entry as wearing the
+   * HOUSE livery rather than a fixed genre colour, which is what lets a live
+   * brand edit know which cached blades to repaint (repaintHouseBlades below).
+   * Genre blades take their field from the era's merchandising convention and
+   * must NOT follow the brand.
+   */
+  house?: boolean;
   /** Field (and edge trim) — a brand's `palette.primary`. */
   field: string;
   /** Letter fill — the emblem's own knockout (`LogoSpec.textColor`). */
@@ -145,6 +153,21 @@ function paintFascia(canvas: HTMLCanvasElement, key: string, way: FasciaColorway
 /** Colorway identity for the texture/material caches (null = genre system). */
 function wayKey(way: FasciaColorway | null): string {
   return way ? `${way.field}${way.ink}${way.outline}` : 'genre';
+}
+
+/**
+ * Repaint every cached blade wearing the HOUSE colorway, in place, with a fresh
+ * one. Blade textures are module-cached and outlive scene rebuilds by design
+ * (see the cache comment above) — which also meant a brand change could never
+ * reach them, rebuild or not. promo-topper wires this to brand-live.
+ */
+export function repaintHouseBlades(fresh: FasciaColorway): void {
+  textureCache.forEach((entry) => {
+    if (!entry.way?.house) return;
+    entry.way = { ...fresh, house: true };
+    paintFascia(entry.tex.image as HTMLCanvasElement, entry.label, entry.way);
+    entry.tex.needsUpdate = true;
+  });
 }
 
 function fasciaTexture(label: string, lengthFt: number, way: FasciaColorway | null): THREE.CanvasTexture {

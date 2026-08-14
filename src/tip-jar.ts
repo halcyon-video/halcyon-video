@@ -15,7 +15,7 @@
 // nothing on the marquee. It is also switchable off entirely (`bb_tip_jar`),
 // because the same build runs on a family TV where a donation ask is not
 // wanted.
-import { getActiveLogoSpec, HALCYON_GOLD, HALCYON_CREAM, HALCYON_BLUE } from './logo-spec';
+import { getActiveLogoSpec, HALCYON_CREAM, HALCYON_BLUE } from './logo-spec';
 import { getActiveTheme } from './themes';
 import { BB_ARCHIVO_BLACK, bundledFontReady, ensureBundledFont } from './bundled-fonts';
 import { getSetting } from './settings';
@@ -128,7 +128,11 @@ export function drawTipCard(c: CanvasRenderingContext2D, W: number, H: number): 
   const bandH = Math.round(H * 0.21);
   c.fillStyle = HALCYON_BLUE;
   c.fillRect(0, 0, W, bandH);
-  c.fillStyle = HALCYON_GOLD;
+  // Rule under the header band. This takes the FIELD colour, not the trim:
+  // the trim went cream in the 2026-08-13 de-gold and the card stock is cream
+  // too (#f6efdc), so a trim-coloured rule on this card is invisible. Anything
+  // that has to read against cream stock takes primary.
+  c.fillStyle = HALCYON_BLUE;
   c.fillRect(0, bandH, W, Math.max(2, Math.round(H * 0.018)));
 
   c.textAlign = 'center';
@@ -196,7 +200,7 @@ const OVERLAY_CSS = `
 #tip-overlay.visible { opacity: 1; }
 #tip-overlay .tip-overlay-card {
   background: var(--tip-stock, ${CARD_STOCK});
-  border: 3px solid var(--tip-rule, ${HALCYON_GOLD});
+  border: 3px solid var(--tip-rule, ${HALCYON_BLUE});
   border-radius: 10px;
   padding: 2.2vh 3vh 2.6vh;
   text-align: center;
@@ -252,7 +256,9 @@ export function openTipOverlay(): void {
   try {
     const p = getActiveTheme().palette;
     el.style.setProperty('--tip-field', p.primary);
-    el.style.setProperty('--tip-rule', p.secondary);
+    // primary, not secondary — see the canvas rule above: cream trim on cream
+    // card stock disappears, so this card's rule tracks the field colour.
+    el.style.setProperty('--tip-rule', p.primary);
     el.style.setProperty('--tip-knockout', getActiveLogoSpec().textColor);
   } catch { /* no theme (pure-DOM callers) — the stylesheet's fallbacks stand */ }
 

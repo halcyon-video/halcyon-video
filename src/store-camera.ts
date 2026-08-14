@@ -10,6 +10,8 @@ import { FIELD_Z_FRONT, BROWSE_WINDOW_SIZE, AISLE_SHELF_HEIGHTS, WALL_SHELF_HEIG
 import { getActiveTheme } from './themes';
 import { OVERVIEW_POS, OVERVIEW_PITCH_MIN, OVERVIEW_PITCH_MAX } from './scene-shared';
 import { BB_ARCHIVO_BLACK } from './bundled-fonts';
+import { getActiveLogoSpec } from './logo-spec';
+import { onBrandChange } from './brand-live';
 import type { StoreScene } from './three-scene';
 
 export function updateLookDownPresent(scene: StoreScene) {
@@ -572,6 +574,16 @@ export function createSelectionArrow(scene: StoreScene) {
 
   scene.selectionArrow = group;
   scene.selectionArrowLabel = { canvas, ctx, tex };
+
+  // Registered ONCE here, not in updateSelectionArrowLabel — that runs on every
+  // cursor move and would pile up a subscriber per section. Clearing the cached
+  // text is what gets the repaint past that function's own no-op guard.
+  onBrandChange(() => {
+    const label = scene.selectionArrowLabelText;
+    if (!scene.selectionArrowLabel || !label) return;
+    scene.selectionArrowLabelText = '';
+    updateSelectionArrowLabel(scene, label);
+  });
 }
 
 export function updateSelectionArrowLabel(scene: StoreScene, text: string) {
@@ -592,8 +604,13 @@ export function updateSelectionArrowLabel(scene: StoreScene, text: string) {
   ctx.strokeStyle = plaquePalette.secondary;
   ctx.stroke();
 
-  // Gold lettering, shrunk to fit the plaque width.
-  ctx.fillStyle = plaquePalette.secondary;
+  // Lettering in the house KNOCKOUT, shrunk to fit the plaque width. This is
+  // the store's most prominent label — the plaque the entrance view puts over
+  // whatever section you're on — and it inked from palette.secondary, i.e. the
+  // TRIM colour, so it wore the keyline gold instead of the emblem's own ink
+  // and no brand change could move it (signage rule 2). The border below stays
+  // on secondary: that one really is trim.
+  ctx.fillStyle = getActiveLogoSpec().textColor;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   let fontSize = 86;

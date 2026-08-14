@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { getActiveTheme, type StoreTheme } from './themes';
 import { getActiveLogoSpec, storefrontBrandGold } from './logo-spec';
 import { bb93SignageOn } from './genre-colors';
+import { registerBrandRepaint } from './brand-live';
 import {
   drawLogo, getLogoFontString, logoFontFamily, buildLogoShapePath, logoShapeInnerBox,
   logoShapeFitRect,
@@ -408,16 +409,15 @@ function drawTicketSign(
  */
 export function createCategorySignTexture(
   categoryName: string,
-  palette = getActiveTheme().palette,
+  // Optional rather than defaulted, so a caller that does NOT pin a palette
+  // gets the LIVE one re-read on every brand refresh. A default parameter is
+  // evaluated once at call time, which would freeze these signs on the palette
+  // that happened to be active when the store was built.
+  palette?: StoreTheme['palette'],
   ribbon = false,
   faceAspect = 4.0,
   blade = false,
 ): THREE.Texture {
-  const canvas = document.createElement('canvas');
-  canvas.width = 1024;
-  canvas.height = 256;
-  const ctx = canvas.getContext('2d')!;
-
   // OPT-IN (bb_93_signage, ceiling-nav only — `ribbon` is passed solely by
   // the ceiling-nav catalog entry so endcap placards etc. never restyle):
   // the 1993 ceiling CATEGORY PLATE. The measured reconstruction and its
@@ -428,6 +428,9 @@ export function createCategorySignTexture(
     return createCategoryPlate1993Texture(categoryName, faceAspect);
   }
 
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d')!;
+
   // The Halcyon board. Every title sign in the store wears the SAME board —
   // colour-coding a title card by genre is the invented bit, not the board
   // (GENRE_SIGN_COLORS lives on for createCollectionSignTexture below).
@@ -435,15 +438,21 @@ export function createCategorySignTexture(
   // Field, rule and ink all track the BRAND, which is what carries an
   // installed pack onto these signs: field = palette.primary, rule =
   // palette.secondary, letters = the emblem's own textColor.
-  canvas.width = 1024;
-  canvas.height = Math.max(2, Math.round(1024 / faceAspect));
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  drawTicketSign(
-    ctx, canvas.width, canvas.height, categoryName,
-    palette.primary, palette.secondary, getActiveLogoSpec().textColor, blade,
-  );
+  const paint = () => {
+    const pal = palette ?? getActiveTheme().palette;
+    canvas.width = 1024;
+    canvas.height = Math.max(2, Math.round(1024 / faceAspect));
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    drawTicketSign(
+      ctx, canvas.width, canvas.height, categoryName,
+      pal.primary, pal.secondary, getActiveLogoSpec().textColor, blade,
+    );
+  };
+  paint();
 
-  return toSignTexture(canvas);
+  const tex = toSignTexture(canvas);
+  registerBrandRepaint(tex, paint);
+  return tex;
 }
 
 /**
@@ -1781,111 +1790,130 @@ export function createSignTextTexture(
   canvas.width = 1024;
   canvas.height = Math.max(96, Math.round(1024 / Math.max(0.25, aspect)));
   const ctx = canvas.getContext('2d')!;
-  const W = canvas.width, H = canvas.height;
-  const theme = getActiveTheme();
-  const palette = theme.palette;
-  // Determine colors based on style
-  let bg = palette.primary;
-  let textCol = palette.accent;
-  let borderCol = palette.accent;
-  // #34: 'standard' used the same theme-accent gold trim as the old ceiling
-  // signs — dropped here too (grep for other signage accent strokes on any
-  // future style; promo/yellow/white already use their own explicit colors,
-  // not the theme accent, so they're left alone). yellow-navy is borderless:
-  // the real tents are a plain yellow card.
-  const hasBorder = style !== 'standard' && style !== 'yellow-navy';
+  // Whole body is a closure so a brand edit can re-run it against the same
+  // canvas (see brand-live.ts). Theme and palette are read INSIDE, never
+  // captured, or a refresh would repaint with the colours it was built on.
+  const paint = () => {
+    const W = canvas.width, H = canvas.height;
+    const theme = getActiveTheme();
+    const palette = theme.palette;
+    // Determine colors based on style.
+    //
+    // House ink comes from the EMBLEM's knockout, not palette.accent. Those had
+    // drifted into two competing sources of "the house letter colour": the board
+    // painters (drawTicketSign, paintTicketLabel, genre-fascia, promo-topper)
+    // all ink from LogoSpec.textColor, while this — the general store-sign
+    // painter, and so the overhead category blades and most generic signs — inked
+    // from palette.accent. A brand change moved one and not the other, which is
+    // exactly the failure signage rule 2 exists to prevent. accent stays what it
+    // says on the tin: a safety/highlight accent, not lettering.
+    let bg = palette.primary;
+    let textCol = getActiveLogoSpec().textColor;
+    let borderCol = palette.accent;
+    // #34: 'standard' used the same theme-accent gold trim as the old ceiling
+    // signs — dropped here too (grep for other signage accent strokes on any
+    // future style; promo/yellow/white already use their own explicit colors,
+    // not the theme accent, so they're left alone). yellow-navy is borderless:
+    // the real tents are a plain yellow card.
+    const hasBorder = style !== 'standard' && style !== 'yellow-navy';
 
-  if (style === 'promo') {
-    bg = '#cc0000'; // Retro red
-    textCol = '#ffffff'; // White text
-    borderCol = '#ecac10'; // Yellow border
-  } else if (style === 'yellow') {
-    bg = '#ffcc00'; // Retro yellow
-    textCol = '#000000'; // Black text
-    borderCol = '#000000';
-  } else if (style === 'yellow-navy') {
-    // The 1993 counter tents: navy bold-italic on yellow, no border box —
-    // measured off the footage's "NEXT REGISTER PLEASE" close-up
-    // (yellow ≈ #ffd400, navy ≈ #1a2a6b).
-    bg = '#ffd400';
-    textCol = '#1a2a6b';
-    borderCol = '#1a2a6b';
-  } else if (style === 'white') {
-    bg = '#ffffff';
-    textCol = '#111111';
-    borderCol = '#333333';
-  }
-
-  // Draw background
-  ctx.fillStyle = bg;
-  ctx.fillRect(0, 0, W, H);
-
-  // Draw border
-  const borderW = Math.round(H * 0.047);
-  if (hasBorder) {
-    ctx.strokeStyle = borderCol;
-    ctx.lineWidth = borderW;
-    ctx.strokeRect(borderW / 2, borderW / 2, W - borderW, H - borderW);
-  }
-
-  // Draw text
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'alphabetic';
-  ctx.shadowColor = 'rgba(0, 0, 0, 0.6)';
-  ctx.shadowBlur = H * 0.02;
-  ctx.shadowOffsetX = H * 0.006;
-  ctx.shadowOffsetY = H * 0.008;
-
-  ctx.fillStyle = textCol;
-
-  const fontName = `${BB_ARCHIVO_BLACK}, sans-serif`;
-  // yellow-navy tents print in heavy oblique, per the footage.
-  const fontPrefix = style === 'yellow-navy' ? 'italic ' : 'normal ';
-
-  // These cards are read across a counter, so the copy fills the plate the way
-  // a real printed insert does. The legacy layout hard-coded 76px/48px into a
-  // 512-tall canvas — ~15% of the card height, i.e. a postage stamp floating in
-  // a field of blue (user report: "the text is way too small"). Sizes are now
-  // fractions of the card, shrunk only as far as the measured run needs to fit
-  // the usable width (never trust a point size against a substituted face).
-  const usable = W - 2 * (hasBorder ? borderW * 2 : W * 0.06);
-  const fit = (label: string, targetPx: number): number => {
-    let size = Math.max(14, Math.round(targetPx));
-    ctx.font = `${fontPrefix}${size}px ${fontName}`;
-    while (size > 14 && ctx.measureText(label).width > usable) {
-      size -= 2;
-      ctx.font = `${fontPrefix}${size}px ${fontName}`;
+    if (style === 'promo') {
+      bg = '#cc0000'; // Retro red
+      textCol = '#ffffff'; // White text
+      borderCol = palette.accent; // house accent, was a hardcoded #ecac10 gold
+    } else if (style === 'yellow') {
+      bg = '#ffcc00'; // Retro yellow
+      textCol = '#000000'; // Black text
+      borderCol = '#000000';
+    } else if (style === 'yellow-navy') {
+      // The 1993 counter tents: bold-italic house ink on a plain card, no border
+      // box. Measured off the footage's "NEXT REGISTER PLEASE" close-up — but
+      // only the LAYOUT is the reference's to give. Its colours (yellow #ffd400,
+      // navy #1a2a6b) were a real chain's exact livery, hardcoded onto a shipped
+      // fixture, which both froze the tent against any brand change (signage
+      // rule 2) and made it the most brand-specific surface in the store. Card
+      // and ink now come from the house.
+      bg = palette.secondary;
+      textCol = palette.primary;
+      borderCol = palette.primary;
+    } else if (style === 'white') {
+      bg = '#ffffff';
+      textCol = '#111111';
+      borderCol = '#333333';
     }
-    return size;
+
+    // Draw background
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, W, H);
+
+    // Draw border
+    const borderW = Math.round(H * 0.047);
+    if (hasBorder) {
+      ctx.strokeStyle = borderCol;
+      ctx.lineWidth = borderW;
+      ctx.strokeRect(borderW / 2, borderW / 2, W - borderW, H - borderW);
+    }
+
+    // Draw text
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'alphabetic';
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.6)';
+    ctx.shadowBlur = H * 0.02;
+    ctx.shadowOffsetX = H * 0.006;
+    ctx.shadowOffsetY = H * 0.008;
+
+    ctx.fillStyle = textCol;
+
+    const fontName = `${BB_ARCHIVO_BLACK}, sans-serif`;
+    // yellow-navy tents print in heavy oblique, per the footage.
+    const fontPrefix = style === 'yellow-navy' ? 'italic ' : 'normal ';
+
+    // These cards are read across a counter, so the copy fills the plate the way
+    // a real printed insert does. The legacy layout hard-coded 76px/48px into a
+    // 512-tall canvas — ~15% of the card height, i.e. a postage stamp floating in
+    // a field of blue (user report: "the text is way too small"). Sizes are now
+    // fractions of the card, shrunk only as far as the measured run needs to fit
+    // the usable width (never trust a point size against a substituted face).
+    const usable = W - 2 * (hasBorder ? borderW * 2 : W * 0.06);
+    const fit = (label: string, targetPx: number): number => {
+      let size = Math.max(14, Math.round(targetPx));
+      ctx.font = `${fontPrefix}${size}px ${fontName}`;
+      while (size > 14 && ctx.measureText(label).width > usable) {
+        size -= 2;
+        ctx.font = `${fontPrefix}${size}px ${fontName}`;
+      }
+      return size;
+    };
+    const inner = H - (hasBorder ? borderW * 3 : H * 0.12);
+
+    if (subtitle) {
+      const TITLE = text.toUpperCase(), SUB = subtitle.toUpperCase();
+      const titleSize = fit(TITLE, inner * 0.46);
+      ctx.font = `${fontPrefix}${titleSize}px ${fontName}`;
+      const titleAsc = ctx.measureText(TITLE).actualBoundingBoxAscent || titleSize * 0.72;
+      const subSize = fit(SUB, inner * 0.30);
+      ctx.font = `${fontPrefix}${subSize}px ${fontName}`;
+      const subAsc = ctx.measureText(SUB).actualBoundingBoxAscent || subSize * 0.72;
+      // Centre the two cap bands (all-caps copy: ascent IS the visible height)
+      // as one block, with a leading gap proportional to the card.
+      const gap = H * 0.10;
+      const top = (H - (titleAsc + gap + subAsc)) / 2;
+
+      ctx.font = `${fontPrefix}${titleSize}px ${fontName}`;
+      ctx.fillText(TITLE, W / 2, top + titleAsc);
+
+      ctx.font = `${fontPrefix}${subSize}px ${fontName}`;
+      ctx.fillStyle = style === 'promo' ? '#ffcc00' : textCol; // Yellow subtitle for promo
+      ctx.fillText(SUB, W / 2, top + titleAsc + gap + subAsc);
+    } else {
+      const TITLE = text.toUpperCase();
+      const size = fit(TITLE, inner * 0.62);
+      ctx.font = `${fontPrefix}${size}px ${fontName}`;
+      const asc = ctx.measureText(TITLE).actualBoundingBoxAscent || size * 0.72;
+      ctx.fillText(TITLE, W / 2, (H + asc) / 2);
+    }
   };
-  const inner = H - (hasBorder ? borderW * 3 : H * 0.12);
-
-  if (subtitle) {
-    const TITLE = text.toUpperCase(), SUB = subtitle.toUpperCase();
-    const titleSize = fit(TITLE, inner * 0.46);
-    ctx.font = `${fontPrefix}${titleSize}px ${fontName}`;
-    const titleAsc = ctx.measureText(TITLE).actualBoundingBoxAscent || titleSize * 0.72;
-    const subSize = fit(SUB, inner * 0.30);
-    ctx.font = `${fontPrefix}${subSize}px ${fontName}`;
-    const subAsc = ctx.measureText(SUB).actualBoundingBoxAscent || subSize * 0.72;
-    // Centre the two cap bands (all-caps copy: ascent IS the visible height)
-    // as one block, with a leading gap proportional to the card.
-    const gap = H * 0.10;
-    const top = (H - (titleAsc + gap + subAsc)) / 2;
-
-    ctx.font = `${fontPrefix}${titleSize}px ${fontName}`;
-    ctx.fillText(TITLE, W / 2, top + titleAsc);
-
-    ctx.font = `${fontPrefix}${subSize}px ${fontName}`;
-    ctx.fillStyle = style === 'promo' ? '#ffcc00' : textCol; // Yellow subtitle for promo
-    ctx.fillText(SUB, W / 2, top + titleAsc + gap + subAsc);
-  } else {
-    const TITLE = text.toUpperCase();
-    const size = fit(TITLE, inner * 0.62);
-    ctx.font = `${fontPrefix}${size}px ${fontName}`;
-    const asc = ctx.measureText(TITLE).actualBoundingBoxAscent || size * 0.72;
-    ctx.fillText(TITLE, W / 2, (H + asc) / 2);
-  }
+  paint();
 
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
@@ -1893,6 +1921,7 @@ export function createSignTextTexture(
   tex.magFilter = THREE.LinearFilter;
   tex.generateMipmaps = true;
   tex.anisotropy = aniso(16);
+  registerBrandRepaint(tex, paint);
   return tex;
 }
 

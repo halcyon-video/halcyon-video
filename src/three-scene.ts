@@ -32,6 +32,7 @@ import * as mirrors from './store-mirrors';
 import { BeautyPass, PartialComposite } from './partial-composite';
 import { FixtureContext, SlottedFixture } from './fixtures';
 import { OverviewCursors, OverviewCursorTarget } from './overview-cursors';
+import { resetBrandLive, setBrandRenderHook } from './brand-live';
 import { AmbientTvs } from './ambient-tvs';
 import { EntranceCheckout } from './entrance';
 import { ExteriorEnvironment } from './exterior-environment';
@@ -1061,6 +1062,9 @@ export class StoreScene {
     this.container = container;
     this.onConsoleLog = onConsoleLog;
     this.libraries = libraries;
+    // The store renders on demand, so a live brand repaint has to ask for a
+    // frame or it sits in the texture unseen until the next input.
+    setBrandRenderHook(() => this.requestRender());
     (window as any).__surfaces = this.surfaces; // debugging: __surfaces.ids() / .get(id)
     this.jellyfinUrl = jellyfinUrl;
     this.jellyfinToken = jellyfinToken;
@@ -5844,6 +5848,11 @@ export class StoreScene {
   public destroy(preservePosterCache = false) {
     this.isRendering = false;
     window.removeEventListener('resize', this.onWindowResize);
+
+    // Every live-brand subscriber holds a canvas or material belonging to THIS
+    // scene. Drop them before the teardown below disposes those resources, or a
+    // later brand edit repaints into a disposed store (see brand-live.ts).
+    resetBrandLive();
 
     // Hero cases + person endcap live outside this.meshes (shared geometry /
     // cached materials), so detach them explicitly.
