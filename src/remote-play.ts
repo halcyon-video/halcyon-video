@@ -206,8 +206,9 @@ async function startHost(token: number): Promise<void> {
 /**
  * Donate this store's connection + look config to the instance manager so
  * "private store" visitors get the user's real library. Only a host that is
- * actually logged into Jellyfin has anything worth donating — the harness
- * and demo mode stay silent, leaving instances on the demo-library fallback.
+ * actually logged into a media server has anything worth donating — the
+ * harness and demo mode stay silent, leaving instances on the demo-library
+ * fallback.
  */
 let seededToken = '';
 
@@ -215,7 +216,7 @@ function pushSeed(): void {
   const token = localStorage.getItem('jellyfin_token');
   if (!localStorage.getItem('jellyfin_url') || !token) return;
   // Re-donate whenever the token changes. The app silently re-authenticates
-  // when Jellyfin rejects a stale token (main.ts), and a seed pushed once at
+  // when the server rejects a stale token (main.ts), and a seed pushed once at
   // boot then holds a dead credential forever — private instances would boot
   // to a login screen, and they can't self-heal because the password is
   // deliberately never seeded.
@@ -224,7 +225,13 @@ function pushSeed(): void {
   const seedConfig: Record<string, string> = {};
   for (let i = 0; i < localStorage.length; i++) {
     const k = localStorage.key(i)!;
-    if (/^(bb_|jellyfin_|jellyseerr_|romm_)/.test(k)) seedConfig[k] = localStorage.getItem(k)!;
+    // jellyfin_* carries the session for BOTH backends (shared keys, see
+    // boot-flow.ts); provider_kind and plex_* are what tell a spawned
+    // instance which one to speak — without them it defaults to Jellyfin
+    // and a Plex-seeded instance would fail every request.
+    if (/^(bb_|jellyfin_|jellyseerr_|romm_|plex_)/.test(k) || k === 'provider_kind') {
+      seedConfig[k] = localStorage.getItem(k)!;
+    }
   }
   void fetch('/__remote/seed', {
     method: 'POST',

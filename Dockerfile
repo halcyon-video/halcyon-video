@@ -3,8 +3,9 @@
 #   docker compose up -d          # or:
 #   docker build -t halcyon-video . && docker run --init -p 1420:1420 halcyon-video
 #
-# Serves http://<host>:1420 — first boot shows the Jellyfin login (append
-# ?demo=1 for the synthetic demo library, no server needed). This runs the
+# Serves http://<host>:1420 — first boot shows the backend picker (Jellyfin
+# or Plex login; append ?demo=1 for the synthetic demo library, no server
+# needed). This runs the
 # project's documented server runtime (`npm run serve`: vite preview plus the
 # middleware in vite.config.ts), so the Jellyseerr/Romm integration proxy,
 # F8 feedback pins and the whole Remote Play stack work — including private

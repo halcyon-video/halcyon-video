@@ -40,6 +40,6 @@ feedback/
 public/user-assets/*
 !public/user-assets/README.md
 
-# Remote Play: kiosk-donated Jellyfin credentials for private instances
+# Remote Play: kiosk-donated media-server credentials for private instances
 .remote-play-seed.json
 .mcp.json

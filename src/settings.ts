@@ -34,6 +34,7 @@ import type { LogoShape, LogoSpec } from './logo-spec';
 import { drawLogo, getLogoFontString } from './logo-renderer';
 import { loadMediaReleasePin, saveMediaReleasePin } from './media-release-date';
 import { formatUnlockLabel, makeRentalRecord, rentalCapacityAt } from './rental-clock';
+import { activeProviderKind } from './providers/provider-registry';
 import type { StoreScene } from './three-scene';
 
 export type SettingKind = 'toggle' | 'cycle' | 'text' | 'secret';
@@ -970,12 +971,20 @@ export function registerCoreSettings(): void {
   // overlay; both write the same localStorage keys, so an edit in either place
   // is picked up by the other. jellyfin_password is registered so the row
   // exists, but is never persisted (see commitTextSetting's special case).
+  // The keys stay jellyfin_* for both backends (renaming them would strand
+  // existing installs' saved sessions) — 'jellyfin_url' holds a Plex server's
+  // address just as well as a Jellyfin one. Username/password re-auth here is
+  // Jellyfin-specific (Plex has no password to type), so those two rows only
+  // show on a Jellyfin install; a Plex reconnect goes through the login/setup
+  // PIN flow instead.
   const cred = (key: string, label: string, kind: SettingKind, opts?: Partial<SettingDef>): void =>
     registerSetting({ key, label, kind, group: 'Connection', default: '', applyMode: 'reload', ...opts });
-  cred('jellyfin_url', 'Jellyfin URL', 'text');
-  cred('jellyfin_username', 'Jellyfin Username', 'text');
+  const jellyfinAuthVisible = (): boolean => activeProviderKind() !== 'plex';
+  cred('jellyfin_url', 'Media Server URL', 'text');
+  cred('jellyfin_username', 'Jellyfin Username', 'text', { visibleWhen: jellyfinAuthVisible });
   cred('jellyfin_password', 'Jellyfin Password', 'secret', {
     hint: 'Blank keeps session. A password re-authenticates.',
+    visibleWhen: jellyfinAuthVisible,
   });
 
   cred('jellyseerr_url', 'Jellyseerr / Overseerr URL', 'text');

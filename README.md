@@ -268,8 +268,8 @@ printed for.
   libplacebo and the **original lossless audio** — no transcode, no tens of GB
   of HLS segments. The remote still works: OK pauses, Up cycles subs, Down
   cycles audio, Left/Right scrub.
-- Playback reports back to Jellyfin (start/progress/stop), so resume points and
-  watch history — which feed the staff picks — stay honest.
+- Playback reports back to your media server (start/progress/stop), so resume
+  points and watch history — which feed the staff picks — stay honest.
 
 ---
 
@@ -307,7 +307,9 @@ HDR skies) / street-view outside the glass.
 
 Jellyfin users appear as **laminated membership cards** — deterministic member
 numbers, "MEMBER SINCE", the user's avatar, a glint sweep. Picking your card is
-how you log in; cards flip over for password entry.
+how you log in; cards flip over for password entry. Plex has no public user
+list to draw cards from, so a Plex install signs in through the plex.tv PIN
+screen instead.
 
 ---
 
@@ -393,8 +395,9 @@ default 2) and viewers past the cap are turned away until one frees up.
 
 - The **bargain bin** is genuinely your library's worst-audience-scored titles,
   leaning in a rummage jumble. Critic scores are pointedly ignored.
-- **Four-sided collection displays** rotate a different Jellyfin BoxSet per
-  face, re-picked daily.
+- **Four-sided collection displays** rotate a different collection (Jellyfin
+  BoxSet or Plex collection, including Plex's rule-built smart collections)
+  per face, re-picked daily.
 - The candy rack, tape rewinder, "BE KIND — PLEASE REWIND" tents, EAS pedestals,
   the beige security camera aimed exactly along the overview vantage.
 - All the retail audio is **synthesized live** — door chime, footsteps, case
@@ -456,8 +459,9 @@ never built, and callers never branch.
 <br>
 
 The store is built to run on your own network. Fonts, textures and every other
-asset ship inside the bundle, and Jellyfin, Jellyseerr and RomM are your own
-servers at your own addresses — nothing is fetched from a CDN to draw the store.
+asset ship inside the bundle, and your media server (Jellyfin or Plex),
+Jellyseerr and RomM are your own servers at your own addresses — nothing is
+fetched from a CDN to draw the store.
 
 Two optional features are the exceptions, and only while you use them:
 
@@ -468,8 +472,8 @@ Two optional features are the exceptions, and only while you use them:
 
 Jellyseerr returns a TMDB *path* rather than the image itself — its own web UI
 fetches from that same CDN — so there is no copy on your server to serve
-instead. Art for titles you already own always comes from Jellyfin, which is why
-the store proper works with the internet unplugged.
+instead. Art for titles you already own always comes from your media server,
+which is why the store proper works with the internet unplugged.
 
 Remote Play sends no video through the STUN server: it is one question ("what
 address did this reach you from?") and one answer, during connection setup. Your
