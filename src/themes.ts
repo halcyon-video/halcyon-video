@@ -196,18 +196,52 @@ export function resolveThemeId(id: string | null | undefined): string {
   return THEME_ALIASES[id] ?? id;
 }
 
-// Pack-merged themes, one clone per (theme id, pack id). getActiveTheme() is
-// called ~100 times across the build (and inside default parameters), so the
-// merge must not allocate per call; neither input can change without a reload,
-// which is what makes a plain memo correct here.
+// Brand-merged themes, one clone per (theme id, pack id, derived livery).
+// getActiveTheme() is called ~100 times across the build (and inside default
+// parameters), so the merge must not allocate per call. Theme and pack can't
+// change without a reload, but the livery CAN — the brand editor rewrites
+// bb_logo live — which is why it is part of the key rather than assumed
+// constant, and why getActiveTheme bounds this map's size.
 const mergedThemeCache = new Map<string, StoreTheme>();
 
+// The LIVERY the signs key off — palette primary/secondary/accent — follows the
+// active emblem, so choosing a brand repaints the endcaps, the wall bays and
+// every topper that reads palette.primary instead of leaving a yellow store
+// wearing blue fixtures. The ROOM (wall, carpet, counter tops) is deliberately
+// left alone: per brand-drop.ts's header, "a logo is evidence about a logo, not
+// about what colour someone painted their walls".
+//
+// This is the EDITOR half of a mapping brand-drop.ts already did for a dropped
+// logo.svg (bodyColor -> primary), which is exactly why a file drop repainted
+// the signage and an editor preset did not — the drawer writes a LogoSpec and
+// nothing ever carried its colours across to the palette.
+//
+// secondary/accent come from borderColor rather than the drop's textColor
+// because the editor HAS a border field and logo-spec.ts's own defaults mirror
+// borderColor onto palette.secondary; a drop has no border to sample and must
+// fall back to the lettering.
+//
+// Returns null when the derived livery already equals the theme's, which is
+// every default install — all four eras have palette.primary === HALCYON_BLUE
+// === DEFAULT_LOGO_SPECS[era].bodyColor, and borderColor === HALCYON_TRIM ===
+// palette.secondary. That keeps the untouched-store path returning the THEMES
+// entry itself, byte-for-byte as before.
+function liveryFromLogo(base: StoreTheme):
+Pick<StoreTheme['palette'], 'primary' | 'secondary' | 'accent'> | null {
+  const spec = getActiveLogoSpec(base);
+  const primary = spec.bodyColor || base.palette.primary;
+  const secondary = spec.borderColor || base.palette.secondary;
+  if (primary === base.palette.primary && secondary === base.palette.secondary) return null;
+  return { primary, secondary, accent: secondary };
+}
+
 /**
- * The theme every surface reads, with the installed brand pack's identity
- * merged over it: palette entries the pack declares, its brand name, and its
- * signage set. Everything else — id, era behaviour, topper style, shelving —
- * stays the theme's, so a pack re-skins a store rather than becoming a new
- * era. With no pack this returns the THEMES entry itself, exactly as before.
+ * The theme every surface reads, with the active brand merged over it: the
+ * livery inferred from the emblem, then any palette entries an installed pack
+ * declares, its brand name, and its signage set. Everything else — id, era
+ * behaviour, topper style, shelving — stays the theme's, so a brand re-skins a
+ * store rather than becoming a new era. An untouched store returns the THEMES
+ * entry itself, exactly as before.
  *
  * The result is shared and cached: treat it as immutable (the THEMES entries
  * always were).
@@ -219,25 +253,38 @@ export function getActiveTheme(): StoreTheme {
     if (THEMES[saved]) base = THEMES[saved];
   }
   const pack = getBrandPack();
-  if (!pack) return base;
-  const key = `${base.id}|${pack.id}`;
+  const livery = liveryFromLogo(base);
+  if (!pack && !livery) return base;
+  const key = `${base.id}|${pack?.id ?? '-'}|${livery ? `${livery.primary}${livery.secondary}` : '-'}`;
   let merged = mergedThemeCache.get(key);
   if (!merged) {
     merged = {
       ...base,
-      // Pack palette, then that era's own deviations from it — a chain that
-      // spans decades repaints, and without the second spread every era would
-      // wear the one the pack was authored in.
-      palette: { ...base.palette, ...(pack.palette ?? {}), ...(pack.themes?.[base.id]?.palette ?? {}) },
+      // Livery inferred from the emblem FIRST, then the pack's own declarations
+      // over it: a brand.json that names a palette is an explicit statement and
+      // outranks anything read off the board's colours (brand-drop.ts's header
+      // — "a brand.json is how you say the room changes too"). Then that era's
+      // deviations, since a chain that spans decades repaints, and without the
+      // last spread every era would wear the one the pack was authored in.
+      palette: {
+        ...base.palette,
+        ...(livery ?? {}),
+        ...(pack?.palette ?? {}),
+        ...(pack?.themes?.[base.id]?.palette ?? {}),
+      },
       brand: {
         ...base.brand,
-        name: pack.name ?? base.brand.name,
+        name: pack?.name ?? base.brand.name,
         // getActiveLogoSpec applies the pack's logo partial itself (it also
         // serves callers that have no theme), so brand.logo stays the theme's
         // default here — merging it twice would just be the same result.
       },
-      signageSet: pack.signageSet ?? base.signageSet,
+      signageSet: pack?.signageSet ?? base.signageSet,
     };
+    // The livery is now part of the key, and the brand editor rewrites bb_logo
+    // live, so a colour-picker drag can mint an entry per frame. Bounded rather
+    // than unbounded: the hot path is one key and this only ever trips mid-edit.
+    if (mergedThemeCache.size > 64) mergedThemeCache.clear();
     mergedThemeCache.set(key, merged);
   }
   return merged;
