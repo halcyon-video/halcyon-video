@@ -37,6 +37,32 @@ around in. [More ↓](#make-it-yours)
 | ![Three floor plans](docs/screenshots/shelf-arrangement.gif) | ![VHS or DVD](docs/screenshots/media-format.gif) |
 | **Three floor plans** — herringbone, straight, or diagonal shelf runs, packed to fit the room. | **VHS or DVD** — the whole store re-cased, on correctly-proportioned rental shells. |
 
+### It doesn't have to be *my* store
+
+Halcyon Video is a chain I made up, and nothing about it is compiled in. Put
+your own logo in **`public/user-assets/brand/`**, reload, and the store
+rebrands itself — the sign over the door, the aisle boards, and the rental
+clamshell every movie goes home in. The colors come out of the artwork you
+dropped: no settings page, no manifest, no code.
+
+| | |
+|:--:|:--:|
+| ![The example logo.svg](docs/screenshots/brand-logo-file.jpg) | ![The storefront wearing that logo](docs/screenshots/brand-storefront.jpg) |
+| **1. Drop `logo.svg` in the folder.** This one is in [`docs/brand-example/`](docs/brand-example) — a green card, a yellow star. | **2. Reload** (restart, on the desktop app). The biggest shape in the file becomes the emblem over the door — and the silhouette every signboard inside is cut to. |
+| ![Yellow on green, sampled from the logo](docs/screenshots/brand-wrap-green.jpg) | ![Amber on plum, wordmark in another face](docs/screenshots/brand-wrap-plum.jpg) |
+| **Yellow on green, straight off the artwork** — the rental case takes the sampled colors down to the rules and the house copy. Add `brand.txt` with one line and it's your store's name on the box, the spine and the POS. | **Or set it by hand.** The brand editor in the settings drawer changes colors, wordmark and typeface live — this is amber on plum with the wordmark in Bebas Neue instead of Archivo Black. |
+
+```
+public/user-assets/brand/
+  logo.svg     ← your mark (or logo.png — its alpha is traced so the signs still die-cut)
+  brand.txt    ← optional, one line: STARLITE VIDEO
+```
+
+That folder is git-ignored, so your brand — or your recreation of the one from
+your childhood — stays on your machine. Going further (full palettes, your own
+display font, per-era looks, scanned box wraps) is a **brand pack**:
+[Make it yours ↓](#make-it-yours)
+
 ### Does it…?
 
 The short answers, so you don't have to go looking for them.
@@ -48,7 +74,7 @@ The short answers, so you don't have to go looking for them.
 | **Work with Plex?** | Yes — sign in with a plex.tv code and your servers show up. Emby is the next one ([#32](https://github.com/halcyon-video/halcyon-video/issues/32)). [More ↓](#plex) |
 | **Run on a Raspberry Pi?** | Yes — **2.5D mode** runs the same store as plain HTML/CSS. [More ↓](#25d-mode--the-same-store-for-a-raspberry-pi) |
 | **Work away from home?** | Yes — **Remote Play** streams the live store to any browser, with its own TURN relay for off-LAN viewers. [More ↓](#remote-play--the-store-in-your-pocket) |
-| **Look like *my* video store?** | Yes — brand, logo, colors, themes, fixtures and sign art are all data you drop in a folder, not code. [More ↓](#make-it-yours) |
+| **Look like *my* video store?** | Yes — brand, logo, colors, themes, fixtures and sign art are all data you drop in a folder, not code. [See it ↑](#it-doesnt-have-to-be-my-store) · [More ↓](#make-it-yours) |
 | **Work with no media server at all?** | The demo does — it ships its own synthetic catalog, which is the link above. Shelving *your* files needs Jellyfin or Plex; there's no built-in folder scanner. |
 
 ### Jump to
@@ -331,8 +357,10 @@ the works. No manifest, no settings, presence = active.
 One level deeper, a **brand pack** (`public/user-assets/brands/<id>/` with a
 `brand.json`) controls everything individually: palette, display fonts, vector
 emblem paths, per-sign art, wrap prints, rendered strings. There's also a live
-**brand editor** in the settings drawer with complete original presets in the
-box (Megahit Video, Reel Time, and Night Owl — "OPEN ALL NIGHT"). Run
+**brand editor** in the settings drawer — emblem shape, both wordmark lines,
+colors, tilt, storefront extrusion, and the typeface (four bundled display
+faces, plus whatever your pack registers), with two complete original identities
+in the box to start from (Megahit Video and Reel Time). Run
 `node tools/list-slots.mjs` for the full manifest of every overridable surface,
 and `npm run build` validates an installed pack so a typo fails loudly.
 
