@@ -39,29 +39,27 @@ around in. [More ↓](#make-it-yours)
 
 ### It doesn't have to be *my* store
 
-Halcyon Video is a chain I made up, and nothing about it is compiled in. Put
-your own logo in **`public/user-assets/brand/`**, reload, and the store
-rebrands itself — the sign over the door, the aisle boards, and the rental
-clamshell every movie goes home in. The colors come out of the artwork you
-dropped: no settings page, no manifest, no code.
+Halcyon Video is a chain I made up. Paint over it.
 
-| | |
-|:--:|:--:|
-| ![The example logo.svg](docs/screenshots/brand-logo-file.jpg) | ![The storefront wearing that logo](docs/screenshots/brand-storefront.jpg) |
-| **1. Drop `logo.svg` in the folder.** This one is in [`docs/brand-example/`](docs/brand-example) — a green card, a yellow star. | **2. Reload** (restart, on the desktop app). The biggest shape in the file becomes the emblem over the door — and the silhouette every signboard inside is cut to. |
-| ![Yellow on green, sampled from the logo](docs/screenshots/brand-wrap-green.jpg) | ![Amber on plum, wordmark in another face](docs/screenshots/brand-wrap-plum.jpg) |
-| **Yellow on green, straight off the artwork** — the rental case takes the sampled colors down to the rules and the house copy. Add `brand.txt` with one line and it's your store's name on the box, the spine and the POS. | **Or set it by hand.** The brand editor in the settings drawer changes colors, wordmark and typeface live — this is amber on plum with the wordmark in Bebas Neue instead of Archivo Black. |
+Name, colors, emblem shape and typeface live in the store's own settings
+drawer, and they don't stop at the sign over the door: pick them and every
+rental clamshell in the building gets reprinted to match, down to the pinstripe
+and the small print on the back. Same tape, three stores.
 
-```
-public/user-assets/brand/
-  logo.svg     ← your mark (or logo.png — its alpha is traced so the signs still die-cut)
-  brand.txt    ← optional, one line: STARLITE VIDEO
-```
+| | | |
+|:--:|:--:|:--:|
+| ![Banana Entertainment, brown on yellow](docs/screenshots/brand-case-banana.jpg) | ![Whatever Games, white on red with a black pinstripe](docs/screenshots/brand-case-whatever.jpg) | ![Video World, yellow on green](docs/screenshots/brand-case-videoworld.jpg) |
+| **Banana Entertainment** — brown on yellow, set in Archivo Black. | **Whatever Games** — white on red, black pinstripe, set in Anton. | **Video World** — yellow on green, set in Bebas Neue. |
 
-That folder is git-ignored, so your brand — or your recreation of the one from
-your childhood — stays on your machine. Going further (full palettes, your own
-display font, per-era looks, scanned box wraps) is a **brand pack**:
-[Make it yours ↓](#make-it-yours)
+Rather draw it than type it? Put a `logo.svg` — or a PNG with alpha — in
+**`public/user-assets/brand/`** and reload. The biggest shape in the file
+becomes your emblem, every signboard in the store is cut to that silhouette,
+and the house colors come out of the artwork itself. There's no setting to
+switch on. The file being there is the setting.
+
+That folder is git-ignored, so your brand stays on your machine and can't wander
+into a commit. Per-era palettes, your own display font, scanned box wraps — that
+tier is a **brand pack**: [Make it yours ↓](#make-it-yours)
 
 ### Does it…?
 
