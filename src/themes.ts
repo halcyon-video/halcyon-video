@@ -204,12 +204,19 @@ export function resolveThemeId(id: string | null | undefined): string {
 // constant, and why getActiveTheme bounds this map's size.
 const mergedThemeCache = new Map<string, StoreTheme>();
 
-// The LIVERY the signs key off — palette primary/secondary/accent — follows the
-// active emblem, so choosing a brand repaints the endcaps, the wall bays and
-// every topper that reads palette.primary instead of leaving a yellow store
-// wearing blue fixtures. The ROOM (wall, carpet, counter tops) is deliberately
-// left alone: per brand-drop.ts's header, "a logo is evidence about a logo, not
-// about what colour someone painted their walls".
+// The LIVERY the signs key off — palette primary/secondary/accent, plus the
+// counter top — follows the active emblem, so choosing a brand repaints the
+// endcaps, the wall bays, every topper that reads palette.primary and the
+// checkout counter, instead of leaving a yellow store wearing blue fixtures.
+// The ROOM (wall, carpet, counter BODY) is still left alone: per
+// brand-drop.ts's header, "a logo is evidence about a logo, not about what
+// colour someone painted their walls".
+//
+// The counter top moved from room to livery on the owner's ruling 2026-08-15:
+// once the signage followed the brand, the counter was the last object still
+// wearing the era's blue in an otherwise repainted store, and read as a bug
+// rather than as restraint. Its BODY is white (#f4f4f0), not the era's colour,
+// so it stays room — nothing about it looked unbranded.
 //
 // This is the EDITOR half of a mapping brand-drop.ts already did for a dropped
 // logo.svg (bodyColor -> primary), which is exactly why a file drop repainted
@@ -226,13 +233,24 @@ const mergedThemeCache = new Map<string, StoreTheme>();
 // === DEFAULT_LOGO_SPECS[era].bodyColor, and borderColor === HALCYON_TRIM ===
 // palette.secondary. That keeps the untouched-store path returning the THEMES
 // entry itself, byte-for-byte as before.
+// The counter top is the house colour "a touch brighter — it sits under lamps"
+// (HALCYON_ROOM_PALETTE.counterTop). The eras carry a hand-picked #1d50cf for
+// that rather than a formula, so this factor is only ever applied to a BRANDED
+// store: the default path returns null below and leaves the hand-picked hex
+// exactly as it is. 1.09 is the mean per-channel ratio of that very pair
+// (#1a49c2 -> #1d50cf), i.e. the same lift the house shade already carries.
+const COUNTER_TOP_LIFT = 1.09;
+
 function liveryFromLogo(base: StoreTheme):
-Pick<StoreTheme['palette'], 'primary' | 'secondary' | 'accent'> | null {
+Pick<StoreTheme['palette'], 'primary' | 'secondary' | 'accent' | 'counterTop'> | null {
   const spec = getActiveLogoSpec(base);
   const primary = spec.bodyColor || base.palette.primary;
   const secondary = spec.borderColor || base.palette.secondary;
   if (primary === base.palette.primary && secondary === base.palette.secondary) return null;
-  return { primary, secondary, accent: secondary };
+  return {
+    primary, secondary, accent: secondary,
+    counterTop: scaleHex(primary, COUNTER_TOP_LIFT),
+  };
 }
 
 /**
