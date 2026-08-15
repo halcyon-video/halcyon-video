@@ -1178,20 +1178,17 @@ const BRAND_SHAPES: { id: LogoShape; label: string }[] = [
   { id: 'none', label: 'None (text only)' },
 ];
 
-// Display names for the picker. Archivo Black, Outfit and Anton are BUNDLED
-// and mapped onto their shipped files when the emblem is painted to canvas
-// (logo-renderer's BUNDLED_BRAND_FAMILY). The Google-Fonts @import in
-// styles.css that used to be their only source was a network fetch, i.e.
-// absent on an offline kiosk boot; it is gone as of 2026-08-06 and every face
-// now ships in src/assets.
+// Display names for the picker. All four are BUNDLED and mapped onto their
+// shipped files when the emblem is painted to canvas (logo-renderer's
+// BUNDLED_BRAND_FAMILY). The Google-Fonts @import in styles.css that used to
+// be their only source was a network fetch, i.e. absent on an offline kiosk
+// boot; it is gone as of 2026-08-06 and every face now ships in src/assets.
 //
-// Bebas Neue is the one still not canvas-safe. It is bundled now, so the DOM
-// chrome gets it from disk, but it has no BB-prefixed FontFace registration in
-// bundled-fonts.ts and no BUNDLED_BRAND_FAMILY entry — so an emblem that names
-// it still paints in whatever the system sans is, silently. Registering it is
-// a few lines and the file is already here; it needs a look at the rendered
-// emblem before it lands, so it is deliberately NOT bundled into the
-// remove-the-@import change.
+// Anton and Bebas Neue were the two that still substituted: bundled, offered
+// here, but missing from BUNDLED_BRAND_FAMILY, so an emblem naming either
+// painted in whatever the system sans is — silently, and the Reel Time preset
+// below is one of them. Both registered 2026-08-14 (rendered emblems checked
+// against the wrap). Adding a name here means adding it there too.
 const BRAND_FONTS = ['Archivo Black', 'Bebas Neue', 'Outfit', 'Anton'];
 
 /**
