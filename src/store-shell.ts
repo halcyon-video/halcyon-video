@@ -51,7 +51,6 @@ import { buildStorefrontLogo3D } from './logo-storefront';
 import { create3DDoubleLayeredSign, markSignMesh, auditSignMeshes } from './sign-builders';
 import { retailAudio } from './audio';
 import { buildSignage, SignSlot } from './fixtures/signage';
-import { buildWallBand } from './wall-band';
 import { buildWallStripe1990 } from './wall-stripe-1990';
 import { isJellyseerrAvailable } from './jellyseerr';
 import type { StoreScene } from './three-scene';
@@ -2529,13 +2528,6 @@ export function buildStore(scene: StoreScene) {
   ];
 
   buildSignage(scene.fixtureContext(), signageSlots, scene.activeSignageObjects);
-
-  // bb-2010 store fabric: the painted NEW RELEASES / CHARTBUSTERS band over
-  // the same wall runs (see wall-band.ts). It supersedes that theme's topper
-  // lettering — buildSignage stands down for those slots — and no-ops on every
-  // other theme. Added to scene.scene directly (shell surface, not signage),
-  // so it must come after buildSignage clears activeSignageObjects.
-  buildWallBand(scene, signageSlots);
 
   // bb-1990 store fabric: the blue/yellow wall stripe riding near the top of
   // EVERY wall of the sales floor (see wall-stripe-1990.ts) — it reads the
