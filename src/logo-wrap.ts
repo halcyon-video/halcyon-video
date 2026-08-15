@@ -50,6 +50,40 @@ const IMG_H: Record<CaseMedium, number> = { vhs: 762, dvd: 683 };
 const WRAP_PRINT_LETTER = '#b5731f'; // rust-brass lettering ink
 const WRAP_PRINT_BODY = HALCYON_INK; // deeper emerald for the printed panels
 
+// This print is drawn for a DARK house panel: the giant wordmark is knocked
+// out in paper cream, and the care copy sets in white. Both vanish the moment
+// somebody's brand is yellow, and a brand is user data — yellow is a normal
+// thing to pick. So the copy ink follows the panel it prints on instead of the
+// tradition it was traced from. Threshold is a plain luminance one; the
+// committed brands (deep blue, deeper emerald) sit far below it.
+function panelLuma(color: string): number {
+  const m = /^#?([0-9a-f]{6})$/i.exec(color.trim());
+  if (!m) return 0;
+  const n = parseInt(m[1], 16);
+  return (0.2126 * ((n >> 16) & 255) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255)) / 255;
+}
+
+const LIGHT_PANEL = 0.45;
+
+/**
+ * The giant front wordmark's colour. On a dark panel it is KNOCKED OUT — the
+ * paper shows through the letters, which is how a one-ink print gets a second
+ * colour. A light panel has no such trick, so it prints in the house ink like
+ * a real second pass would, falling back to the print's own near-black when
+ * the house ink is too close to the panel to read.
+ */
+function knockoutInk(panel: string, letter: string, medium: CaseMedium): string {
+  if (panelLuma(panel) <= LIGHT_PANEL) return STOCK[medium];
+  return Math.abs(panelLuma(panel) - panelLuma(letter)) >= 0.22 ? letter : INK[medium];
+}
+
+/** Same call for the small care copy, which sets translucent. */
+function copyInk(panel: string, medium: CaseMedium, alpha: number): string {
+  if (panelLuma(panel) <= LIGHT_PANEL) return `rgba(255,255,255,${alpha})`;
+  const n = parseInt(INK[medium].slice(1), 16);
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${alpha})`;
+}
+
 function wrapPrintColors(spec: LogoSpec): { body: string; letter: string; stripe: string } {
   const isDefaultInk = spec.textColor.toLowerCase() === HALCYON_CREAM;
   return {
@@ -327,6 +361,8 @@ function printedPanelPath(_rand: () => number, x0: number, x1: number, yTop: num
 function drawVhsTemplateWrap(spec: LogoSpec): HTMLCanvasElement {
   const W = IMG_W, H = IMG_H.vhs; // 1024×762
   const stock = STOCK.vhs, ink = INK.vhs;
+  const pcInit = wrapPrintColors(spec);
+  const knockout = knockoutInk(pcInit.body, pcInit.letter, 'vhs');
   const canvas = document.createElement('canvas');
   canvas.width = W;
   canvas.height = H;
@@ -361,7 +397,7 @@ function drawVhsTemplateWrap(spec: LogoSpec): HTMLCanvasElement {
   // Rights micro-print down the panel's left edge, where a real sleeve prints
   // its corporate line. Fictional by construction; a pack overrides it.
   vTextDown(ctx, brandString('wrap-rights-line', `${brandName} — ALL RIGHTS RESERVED`),
-    74, 112, '8.5px Arial, sans-serif', 'rgba(255,255,255,0.92)');
+    74, 112, '8.5px Arial, sans-serif', copyInk(pc.body, 'vhs', 0.92));
 
   // Label window: stock card set into the panel. Interior x 104-400 with the
   // printed heading ending y≈140 — the typist types the title from y 152.
@@ -386,7 +422,7 @@ function drawVhsTemplateWrap(spec: LogoSpec): HTMLCanvasElement {
     return yy;
   };
   const body = (t: string, y: number): number => {
-    ctx.fillStyle = 'rgba(255,255,255,0.95)';
+    ctx.fillStyle = copyInk(pc.body, 'vhs', 0.95);
     ctx.font = '10.5px Arial, sans-serif';
     let yy = y;
     for (const ln of wrapLines(ctx, t, 291)) { ctx.fillText(ln, 104, yy); yy += 12; }
@@ -531,13 +567,13 @@ function drawVhsTemplateWrap(spec: LogoSpec): HTMLCanvasElement {
   ctx.font = getLogoFontString(spec, mpx);
   const mlen = ctx.measureText(main).width;
   const mainBottom = colMidY + mlen / 2;
-  vTextUp(ctx, main, mainCx, mainBottom, getLogoFontString(spec, mpx), stock);
+  vTextUp(ctx, main, mainCx, mainBottom, getLogoFontString(spec, mpx), knockout);
   if (hasSub) {
     const sub = spec.subText.toUpperCase();
     const spx = fitSpecFontPx(ctx, spec, sub, mpx * 0.42, colLen * 0.6, 10);
     ctx.font = getLogoFontString(spec, spx);
     const slen = ctx.measureText(sub).width;
-    vTextUp(ctx, sub, 655 + RW * 0.78, mainBottom - mlen + slen, getLogoFontString(spec, spx), stock);
+    vTextUp(ctx, sub, 655 + RW * 0.78, mainBottom - mlen + slen, getLogoFontString(spec, spx), knockout);
   }
   drawFrontPlaceholder(ctx, spec, 'vhs');
   return canvas;
@@ -676,6 +712,8 @@ function drawDvdTemplateWrap(spec: LogoSpec): HTMLCanvasElement {
 function drawDvdBlueTemplateWrap(spec: LogoSpec): HTMLCanvasElement {
   const W = IMG_W, H = IMG_H.dvd; // 1024×683
   const stock = STOCK.vhs, ink = INK.vhs; // same cream-stock print family as the VHS wrap
+  const pcInit = wrapPrintColors(spec);
+  const knockout = knockoutInk(pcInit.body, pcInit.letter, 'vhs');
   const canvas = document.createElement('canvas');
   canvas.width = W;
   canvas.height = H;
@@ -708,7 +746,7 @@ function drawDvdBlueTemplateWrap(spec: LogoSpec): HTMLCanvasElement {
   ctx.fill(backPanel);
   // Rights micro-print down the panel's left edge, like the VHS wrap's.
   vTextDown(ctx, brandString('wrap-rights-line', `${brandName} — ALL RIGHTS RESERVED`),
-    27, 108, '8px Arial, sans-serif', 'rgba(255,255,255,0.92)');
+    27, 108, '8px Arial, sans-serif', copyInk(pc.body, 'vhs', 0.92));
 
   // Label window: stock card set into the panel. Shared bounds with
   // video-case.ts's drawDvdBlueOverlays (wx/wMax/windowBottom there derive
@@ -737,7 +775,7 @@ function drawDvdBlueTemplateWrap(spec: LogoSpec): HTMLCanvasElement {
     return yy;
   };
   const body = (t: string, y: number): number => {
-    ctx.fillStyle = 'rgba(255,255,255,0.95)';
+    ctx.fillStyle = copyInk(pc.body, 'vhs', 0.95);
     ctx.font = '9.5px Arial, sans-serif';
     let yy = y;
     for (const ln of wrapLines(ctx, t, careMax)) { ctx.fillText(ln, careX, yy); yy += 11; }
@@ -859,13 +897,13 @@ function drawDvdBlueTemplateWrap(spec: LogoSpec): HTMLCanvasElement {
   ctx.font = getLogoFontString(spec, mpx);
   const mlen = ctx.measureText(main).width;
   const mainBottom = colMidY + mlen / 2;
-  vTextUp(ctx, main, mainCx, mainBottom, getLogoFontString(spec, mpx), stock);
+  vTextUp(ctx, main, mainCx, mainBottom, getLogoFontString(spec, mpx), knockout);
   if (hasSub) {
     const sub = spec.subText.toUpperCase();
     const spx = fitSpecFontPx(ctx, spec, sub, mpx * 0.42, colLen * 0.6, 9);
     ctx.font = getLogoFontString(spec, spx);
     const slen = ctx.measureText(sub).width;
-    vTextUp(ctx, sub, 625 + RW * 0.78, mainBottom - mlen + slen, getLogoFontString(spec, spx), stock);
+    vTextUp(ctx, sub, 625 + RW * 0.78, mainBottom - mlen + slen, getLogoFontString(spec, spx), knockout);
   }
 
   // Front right-edge title placeholder — SAME column the plain DVD wrap
