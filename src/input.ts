@@ -2,6 +2,7 @@
 import { gamepadEverConnected } from './gamepad-tracker';
 import { notifyUserActivity } from './video-case';
 import { markUserActivity } from './user-activity';
+import { keyboardOwnedByControl } from './text-entry-focus';
 
 export interface InputCallbacks {
   onLeft: () => void;
@@ -191,8 +192,11 @@ export class InputManager {
         return;
       }
 
-      const tag = document.activeElement?.tagName;
-      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') {
+      // A VISIBLE field owns the keyboard; a focused field whose overlay is
+      // already down is stranded and gets blurred so this very key lands in
+      // the store (see text-entry-focus.ts — the login form used to leave the
+      // remote dead for the whole session).
+      if (keyboardOwnedByControl()) {
         return;
       }
 

@@ -1,6 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { measureDisplayHz } from './display-hz';
+import { keyboardOwnedByControl, textEntryHasFocus } from './text-entry-focus';
 import { installDebugLog, debugLogPath } from './debug-log';
 
 // Before anything else that might fail: a packaged build has no devtools and
@@ -3563,8 +3564,7 @@ async function main() {
     if (e.key.length !== 1 || e.ctrlKey || e.altKey || e.metaKey) {
       return;
     }
-    const tag = document.activeElement?.tagName;
-    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') {
+    if (keyboardOwnedByControl()) {
       return;
     }
     e.preventDefault();
@@ -3581,10 +3581,7 @@ async function main() {
     // Only text-entry fields block F8. A plain tag check would also match the
     // video player's volume slider (<input type=range>), which keeps focus
     // after a click and made F8 dead for the rest of playback.
-    const el = document.activeElement as HTMLElement | null;
-    const typing = el && (el.tagName === 'TEXTAREA' || el.isContentEditable ||
-      (el.tagName === 'INPUT' && !['range', 'checkbox', 'radio', 'button'].includes((el as HTMLInputElement).type)));
-    if (typing) return;
+    if (textEntryHasFocus()) return;
     e.preventDefault();
     openFeedbackPin();
   });

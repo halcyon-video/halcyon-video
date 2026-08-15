@@ -21,6 +21,7 @@ import {
   PROVIDER_KIND_KEY,
 } from './providers/active-provider';
 import { plexAccountToken, selectedBackendKind, setupPlexSignInHandlers } from './plex-signin';
+import { blurFocusWithin } from './text-entry-focus';
 import {
   openMembershipCardPicker,
   closeMembershipCardPicker,
@@ -282,6 +283,12 @@ export function hideLoginOverlay() {
   if (deps) deps.ui.isLoginOpen = false;
   const overlay = document.getElementById('login-overlay');
   if (overlay) {
+    // The overlay hides by opacity alone — display stays flex and visibility
+    // stays visible — so the field showLoginOverlay() focused would otherwise
+    // keep focus straight into the store, where every keyboard guard bails on
+    // it and the remote goes dead for the whole session. Hand focus back
+    // before the form goes down.
+    blurFocusWithin(overlay);
     overlay.classList.remove('visible');
   }
 }

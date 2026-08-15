@@ -15,6 +15,7 @@ import {
 } from './video-case';
 import { setSurfaceKtx2Renderer } from './surface-textures';
 import { pendingTextureUploads } from './poster-textures';
+import { keyboardOwnedByControl } from './text-entry-focus';
 // @ts-ignore
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
@@ -3726,8 +3727,7 @@ export class StoreScene {
   /** 'E' while standing at a clasp — the same verb as talking to the clerk. */
   private onClaspKey = (e: KeyboardEvent) => {
     if (e.key !== 'e' && e.key !== 'E') return;
-    const tag = document.activeElement?.tagName;
-    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+    if (keyboardOwnedByControl()) return;
     if (!this.isWalkAroundMode || this.claspCursorActive) return;
     if (!this.shelfClasps.focusedMesh) return;
     e.preventDefault();
@@ -6032,11 +6032,10 @@ export class StoreScene {
     this.requestRender();
     if (!this.isWalkAroundMode) return;
 
-    const tag = document.activeElement?.tagName;
-    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') {
+    if (keyboardOwnedByControl()) {
       return;
     }
-    
+
     switch (e.key) {
       case 'w':
       case 'W':

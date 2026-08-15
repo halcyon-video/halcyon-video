@@ -1,5 +1,6 @@
 import type Hls from 'hls.js';
 import { stopActiveEncoding, getLastHlsPlaySessionId, isStreamCopyUrl } from './jellyfin';
+import { keyboardOwnedByControl } from './text-entry-focus';
 
 let HlsMod: typeof import('hls.js').default | null = null;
 async function loadHls() {
@@ -1171,8 +1172,7 @@ export class VideoPlayer {
     // system (space/arrows/escape are wired in main.ts via InputManager).
     document.addEventListener('keydown', (e) => {
       if (!this._isOpen || this.isHidden) return;
-      const tag = document.activeElement?.tagName;
-      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      if (keyboardOwnedByControl()) return;
       switch (e.key) {
         case 'f':
         case 'F':
