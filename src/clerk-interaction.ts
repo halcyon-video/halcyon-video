@@ -1,5 +1,6 @@
 import type { Movie } from './jellyfin';
 import { recommend } from './clerk-recommend';
+import { keyboardOwnedByControl } from './text-entry-focus';
 import { brandString } from './brand-pack';
 
 /**
@@ -179,8 +180,7 @@ export class ClerkInteraction {
   // ── Internals ──────────────────────────────────────────────────────────────
 
   private onKeyDown = (e: KeyboardEvent) => {
-    const tag = document.activeElement?.tagName;
-    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+    if (keyboardOwnedByControl()) return;
 
     if (this.open) {
       if (e.key === 'Escape') {

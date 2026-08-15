@@ -2,8 +2,8 @@
 
 Runs the Halcyon store 24/7 on the HTPC as a systemd **user** service that
 auto-restarts on crash, OOM, or `kill -9`, and boots straight into the store
-using cached Jellyfin credentials (no blocking dialogs on an unattended
-restart).
+using cached media-server credentials (Jellyfin or Plex; no blocking dialogs
+on an unattended restart).
 
 ## Quick install
 

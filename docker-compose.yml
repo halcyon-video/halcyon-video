@@ -33,9 +33,10 @@ services:
     volumes:
       # The Remote Play "seed": log into the store from any browser once
       # and flip Settings → Connection → Remote Play ON — that donates
-      # your Jellyfin login (minus the password) to the server, so every
-      # /remote.html visitor gets their own private instance of your real
-      # library. This volume keeps it across container rebuilds.
+      # your media-server login (Jellyfin or Plex, minus any password) to
+      # the server, so every /remote.html visitor gets their own private
+      # instance of your real library. This volume keeps it across
+      # container rebuilds.
       - halcyon-data:/data
       # Keep F8 feedback pins (in-app visual bug reports) on the host:
       # - ./feedback:/app/feedback

@@ -5,10 +5,10 @@
 //  1. Signaling mailbox — WebRTC handshake relay between the store host(s)
 //     and /remote.html viewers. Long-poll GETs (~25s) instead of WebSockets
 //     keep it dependency-free. Media never touches this server.
-//  2. Seed store — when the real app hosts Remote Play it pushes its
-//     Jellyfin credentials + bb_* look settings here (persisted to the
-//     gitignored .remote-play-seed.json), so private instances can boot the
-//     user's actual store, not just the demo.
+//  2. Seed store — when the real app hosts Remote Play it pushes its media-
+//     server credentials (Jellyfin or Plex) + bb_* look settings here
+//     (persisted to the gitignored .remote-play-seed.json), so private
+//     instances can boot the user's actual store, not just the demo.
 //  3. TURN relay — an optional coturn child bound to this machine's VPN/LAN
 //     address, so viewers with no direct path to the store (see startTurn)
 //     still get a media route. Its credentials ride along in /__remote/status.
@@ -92,7 +92,13 @@ export function remotePlayPlugin() {
     seed = validSeed(JSON.parse(fs.readFileSync(SEED_FILE, "utf8")));
   } catch { /* no seed yet — instances fall back to the demo library */ }
 
-  const SEED_KEY = /^(bb_|jellyfin_|jellyseerr_|romm_)/;
+  // jellyfin_* carries the session for BOTH backends (shared keys); provider_kind
+  // and plex_* are what tell a spawned instance which one it's speaking to —
+  // without them it defaults to Jellyfin and a Plex-seeded instance fails every
+  // request (see src/remote-play.ts's pushSeed, which filters the same way).
+  const SEED_KEY = /^(bb_|jellyfin_|jellyseerr_|romm_|plex_)/;
+  const SEED_EXTRA_KEYS = new Set(["provider_kind"]);
+  const isSeedKey = (k) => SEED_KEY.test(k) || SEED_EXTRA_KEYS.has(k);
   // Never seeded into instances: hosting flags (an instance must not become a
   // second shared host), the kiosk's rental-lockout state, and credentials
   // the app itself never persists.
@@ -399,7 +405,7 @@ export function remotePlayPlugin() {
         if (!validSeed(body)) return json(res, 400, { error: "need jellyfin_url + jellyfin_token" });
         const clean = {};
         for (const [k, v] of Object.entries(body)) {
-          if (SEED_KEY.test(k) && !SEED_SKIP.has(k) && typeof v === "string") clean[k] = v;
+          if (isSeedKey(k) && !SEED_SKIP.has(k) && typeof v === "string") clean[k] = v;
         }
         seed = clean;
         try { fs.writeFileSync(SEED_FILE, JSON.stringify(clean, null, 2)); } catch { /* ro fs — memory-only seed */ }

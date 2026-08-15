@@ -21,6 +21,7 @@ import {
   PROVIDER_KIND_KEY,
 } from './providers/active-provider';
 import { plexAccountToken, selectedBackendKind, setupPlexSignInHandlers } from './plex-signin';
+import { blurFocusWithin } from './text-entry-focus';
 import {
   openMembershipCardPicker,
   closeMembershipCardPicker,
@@ -148,7 +149,7 @@ export function maybeOpenSetupTerminal(): void {
  */
 export function logOutToOpeningDay(): void {
   if (!deps) return;
-  deps.log('[System] Logging out and resetting Jellyfin session...', 'system');
+  deps.log(`[System] Logging out and resetting ${provider().displayName} session...`, 'system');
   localStorage.removeItem('jellyfin_url');
   localStorage.removeItem('jellyfin_username');
   localStorage.removeItem('jellyfin_password');
@@ -183,7 +184,7 @@ async function syncForSetup(
     stallTimer = setTimeout(() => onStall?.(), LOGIN_STALL_MS);
   };
   const stallPromise = new Promise<never>((_, reject) => {
-    onStall = () => reject(new Error(`No response from Jellyfin for ${LOGIN_STALL_MS / 1000}s`));
+    onStall = () => reject(new Error(`No response from ${provider().displayName} for ${LOGIN_STALL_MS / 1000}s`));
     armStall();
   });
   let pages = 0;
@@ -282,6 +283,12 @@ export function hideLoginOverlay() {
   if (deps) deps.ui.isLoginOpen = false;
   const overlay = document.getElementById('login-overlay');
   if (overlay) {
+    // The overlay hides by opacity alone — display stays flex and visibility
+    // stays visible — so the field showLoginOverlay() focused would otherwise
+    // keep focus straight into the store, where every keyboard guard bails on
+    // it and the remote goes dead for the whole session. Hand focus back
+    // before the form goes down.
+    blurFocusWithin(overlay);
     overlay.classList.remove('visible');
   }
 }
@@ -329,7 +336,7 @@ async function finishLoginAndLaunch(urlInput: string, session: MembershipLoginSe
     loginStallTimer = setTimeout(() => onLoginStall?.(), LOGIN_STALL_MS);
   };
   const loginTimeout = new Promise<never>((_, reject) => {
-    onLoginStall = () => reject(new Error(`No response from Jellyfin for ${LOGIN_STALL_MS / 1000}s`));
+    onLoginStall = () => reject(new Error(`No response from ${provider().displayName} for ${LOGIN_STALL_MS / 1000}s`));
     armLoginStall();
   });
   let libs: JellyfinLibrary[];
@@ -519,7 +526,7 @@ export async function checkCredentialsAndLoad() {
   document.addEventListener('click', bootEscape);
 
   if (jellyfinUrl && token && userId) {
-    d.log('[System] Saved Jellyfin credentials found. Connecting...', 'system');
+    d.log(`[System] Saved ${provider().displayName} credentials found. Connecting...`, 'system');
 
     // A STALL timeout, not a deadline. This was a flat 20s cap on the whole
     // multi-library sync, which a large enough catalog can never beat: the
@@ -547,7 +554,7 @@ export async function checkCredentialsAndLoad() {
         stallTimer = setTimeout(() => onStall?.(), STALL_MS);
       };
       const stallPromise = new Promise<never>((_, reject) => {
-        onStall = () => reject(new Error(`No response from Jellyfin for ${STALL_MS / 1000}s`));
+        onStall = () => reject(new Error(`No response from ${provider().displayName} for ${STALL_MS / 1000}s`));
         armStall();
       });
 
@@ -578,7 +585,7 @@ export async function checkCredentialsAndLoad() {
         d.setLibraries(libs);
         const gapCount = await d.mergeCollectionGaps(libs);
         const totalMoviesCount = libs.reduce((acc, lib) => acc + lib.movies.length, 0);
-        d.log(`[System] Connected to Jellyfin. Sync'd ${libs.length} libraries (${totalMoviesCount} movies total).`, 'system');
+        d.log(`[System] Connected to ${provider().displayName}. Sync'd ${libs.length} libraries (${totalMoviesCount} movies total).`, 'system');
         await d.logJellyseerrStatus(gapCount);
         if (d.gameCount() > 0) {
           d.log(`[System] Romm: ${d.gameCount()} game(s) loaded for the Video Games section.`, 'system');
@@ -630,7 +637,7 @@ export async function checkCredentialsAndLoad() {
               const user = localStorage.getItem('jellyfin_username') || envUser;
               const pass = localStorage.getItem('jellyfin_password') || envPass;
               if (user && pass && jellyfinUrl) {
-                d.log('[System] Jellyfin token stale — re-authenticating...', 'system');
+                d.log(`[System] ${provider().displayName} token stale — re-authenticating...`, 'system');
                 const session = await provider().authenticate(jellyfinUrl, { username: user, password: pass });
                 localStorage.setItem('jellyfin_token', session.accessToken);
                 localStorage.setItem('jellyfin_userid', session.userId);
@@ -790,11 +797,11 @@ export function setupLoginHandlers() {
       } catch (err: any) {
         deps?.log(`[System] Connection error: ${err.message}`, 'system');
         if (errorMsg) {
-          let userMsg = err.message || 'Failed to connect to Jellyfin server';
+          let userMsg = err.message || `Failed to connect to ${provider().displayName} server`;
           if (userMsg.includes('HTTP error 401')) {
             userMsg = 'Invalid username or password.';
           } else if (userMsg.includes('Failed to fetch') || userMsg.includes('NetworkError')) {
-            userMsg = `Unable to connect to "${urlInput}". Check the server address, CORS settings, and verify Jellyfin is online.`;
+            userMsg = `Unable to connect to "${urlInput}". Check the server address, CORS settings, and verify ${provider().displayName} is online.`;
           }
           errorMsg.innerText = userMsg;
         }

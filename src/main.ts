@@ -1,6 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { measureDisplayHz } from './display-hz';
+import { keyboardOwnedByControl, textEntryHasFocus } from './text-entry-focus';
 import { installDebugLog, debugLogPath } from './debug-log';
 
 // Before anything else that might fail: a packaged build has no devtools and
@@ -16,11 +17,8 @@ const isTauri = !!(window as any).__TAURI_INTERNALS__;
 function closeApp() { isTauri ? getCurrentWindow().close() : window.close(); }
 import {
   authenticateUser,
-  validateToken,
   Movie,
   JellyfinLibrary,
-  fetchFirstEpisodeOfSeries,
-  fetchSeriesEpisodes,
   isHevcPassThroughEnabled,
   buildSubtitleTrackUrl,
   pickSubtitleDelivery,
@@ -42,6 +40,7 @@ import {
   playbackProgressed,
   playbackStopped,
 } from './playback-routing';
+import { activeProvider as provider, sessionOf } from './providers/active-provider';
 import {
   fetchComingSoonMovies,
   fetchDiscoverMovies,
@@ -960,7 +959,7 @@ const GROUP_HINTS: Record<SettingGroup, string> = {
   'Playback': 'Audio language, captions, and candy delivery.',
   'Video Games': 'Enable the game section and pick platforms.',
   'Performance': 'Graphics quality, render mode, FPS cap and counter.',
-  'Connection': 'Jellyfin, Jellyseerr and Romm servers.',
+  'Connection': 'Media server, Jellyseerr and Romm servers.',
 };
 
 /** One-line blurbs under each sub-page's "›" row on its group page. */
@@ -2508,7 +2507,7 @@ async function initializeStoreScene(preservePosterCache = false) {
       const token = localStorage.getItem('jellyfin_token');
       const userId = localStorage.getItem('jellyfin_userid');
       if (!jellyfinUrl || !token || !userId) return [];
-      return fetchSeriesEpisodes(jellyfinUrl, token, userId, movie.id);
+      return provider().fetchSeriesEpisodes(jellyfinUrl, sessionOf(token, userId), movie.id);
     };
 
     // Canvas click on an already-selected slot: confirm selection directly,
@@ -2985,11 +2984,15 @@ async function wakeRefresh() {
   if (!url || !token) return;
   wakeRefreshInFlight = true;
   try {
-    // validateToken resolves false only on a definitive 401/403; a merely
+    // validateSession resolves false only on a definitive 401/403; a merely
     // unreachable/wedged server throws instead and lands in the catch below,
     // so a network blip can never trigger the logout teardown (issue #125).
-    if (await validateToken(url, token)) return; // still good — nothing to do
-    logToConsole('[System] Jellyfin token stale — returning to login screen.', 'system');
+    // Routed through the provider (not jellyfin.ts's validateToken directly)
+    // so a Plex install checks its own token shape instead of Jellyfin's
+    // /Users/Me, which a real Plex server rejects as unauthorized on every
+    // wake and would otherwise log Plex users out constantly.
+    if (await provider().validateSession(url, sessionOf(token, ''))) return; // still good — nothing to do
+    logToConsole(`[System] ${provider().displayName} token stale — returning to login screen.`, 'system');
     expireSession('Session expired. Please log in again.');
   } catch {
     logToConsole('[System] Wake token check failed (will retry on next wake).', 'system');
@@ -3068,7 +3071,7 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
       const token = localStorage.getItem('jellyfin_token');
       const userId = localStorage.getItem('jellyfin_userid');
       const first = (jellyfinUrl && token && userId)
-        ? await fetchFirstEpisodeOfSeries(jellyfinUrl, token, userId, movie.id)
+        ? await provider().fetchFirstEpisodeOfSeries(jellyfinUrl, sessionOf(token, userId), movie.id)
         : null;
       if (!first) {
         logToConsole(`[Video] Could not resolve an episode for "${movie.title}".`, 'video');
@@ -3090,10 +3093,10 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
   const token = localStorage.getItem('jellyfin_token');
   const userId = localStorage.getItem('jellyfin_userid');
 
-  // Without a Jellyfin endpoint there's nothing to stream into the webview —
-  // fall back to the external player on the original file.
+  // Without a media-server endpoint there's nothing to stream into the webview
+  // — fall back to the external player on the original file.
   if (!jellyfinUrl || !token) {
-    logToConsole('[Video] No Jellyfin stream available; using external player.', 'video');
+    logToConsole(`[Video] No ${provider().displayName} stream available; using external player.`, 'video');
     await playExternally(localPath);
     return;
   }
@@ -3104,7 +3107,7 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
   if (movie.isSeries) {
     let episodes = storeScene?.getSeriesEpisodes(movie.id) ?? null;
     if (!episodes?.length && userId) {
-      episodes = await fetchSeriesEpisodes(jellyfinUrl, token, userId, movie.id);
+      episodes = await provider().fetchSeriesEpisodes(jellyfinUrl, sessionOf(token, userId), movie.id);
     }
     seriesQueue = episodes?.length ? { seriesId: movie.id, episodes } : null;
   } else {
@@ -3561,8 +3564,7 @@ async function main() {
     if (e.key.length !== 1 || e.ctrlKey || e.altKey || e.metaKey) {
       return;
     }
-    const tag = document.activeElement?.tagName;
-    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') {
+    if (keyboardOwnedByControl()) {
       return;
     }
     e.preventDefault();
@@ -3579,10 +3581,7 @@ async function main() {
     // Only text-entry fields block F8. A plain tag check would also match the
     // video player's volume slider (<input type=range>), which keeps focus
     // after a click and made F8 dead for the rest of playback.
-    const el = document.activeElement as HTMLElement | null;
-    const typing = el && (el.tagName === 'TEXTAREA' || el.isContentEditable ||
-      (el.tagName === 'INPUT' && !['range', 'checkbox', 'radio', 'button'].includes((el as HTMLInputElement).type)));
-    if (typing) return;
+    if (textEntryHasFocus()) return;
     e.preventDefault();
     openFeedbackPin();
   });

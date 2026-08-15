@@ -501,7 +501,11 @@ export async function detectBrandDrop(
 
   if (bodyColor) logo.bodyColor = bodyColor;
   if (textColor) { logo.textColor = textColor; logo.borderColor = textColor; }
-  if (name && logo.mainText !== '') logo.mainText = name.toUpperCase();
+  if (name && logo.mainText !== '') {
+    const split = splitBrandName(name);
+    logo.mainText = split.main;
+    if (split.sub !== undefined) logo.subText = split.sub;
+  }
 
   const manifest: BrandPackManifest = {
     version: 1,
@@ -530,6 +534,22 @@ export async function detectBrandDrop(
 }
 
 /**
+ * The wordmark's second line, which the emblem and every box wrap print AFTER
+ * mainText. A brand.txt reading "STARLITE VIDEO" is the store's whole name, so
+ * dropping it into mainText alone left the theme's own sub line under it and
+ * every wrap read "STARLITE VIDEO VIDEO". Split the trailing word off when it
+ * IS that second line; any other name keeps today's behaviour (the name on
+ * line one, the theme's sub line beneath).
+ */
+const BRAND_SUB_WORDS = ['VIDEO', 'VIDEOS', 'ENTERTAINMENT'];
+
+function splitBrandName(name: string): { main: string; sub?: string } {
+  const caps = name.toUpperCase().trim();
+  const m = /^(.*\S)\s+(\S+)$/.exec(caps);
+  return m && BRAND_SUB_WORDS.includes(m[2]) ? { main: m[1], sub: m[2] } : { main: caps };
+}
+
+/**
  * The rendered strings a NAME alone can honestly fill in. Only the ones where
  * the store's name is the entire variable — the POS header, the titlebar, the
  * clerk's hello, the exit prompt. Anything with real copy in it (taglines,
@@ -538,11 +558,18 @@ export async function detectBrandDrop(
  */
 function nameStrings(name: string): Record<string, string> {
   const caps = name.toUpperCase();
+  // 'brand-wordmark' and the terminal's exit row are the SHORT mark (defaults
+  // 'HALCYON' / 'CLOSE HALCYON APP'), so they get the name without its
+  // VIDEO/VIDEOS line — the same split the emblem makes.
+  const short = splitBrandName(name).main;
   return {
-    'brand-wordmark': caps,
+    'brand-wordmark': short,
     'brand-wordmark-video': caps,
     'app-titlebar-brand': caps,
     'pos-system-title': `${caps} RENTAL SYSTEM`,
+    // Missed until 2026-08-14: a rebranded store's own manager terminal still
+    // offered to close the HALCYON app.
+    'terminal-exit-label': `CLOSE ${short} APP`,
     'exit-confirm-prompt': `CLOSE ${caps} AND RETURN TO THE SYSTEM?`,
     'app-closing-log': `Closing ${name} app...`,
     'clerk-greeting': `Hey there! Welcome to ${name}. What can I help you find?`,

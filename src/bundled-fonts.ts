@@ -29,6 +29,7 @@
 // these as bundle assets.
 import antonUrl from './assets/anton.ttf';
 import archivoBlackUrl from './assets/archivo-black.ttf';
+import bebasNeueUrl from './assets/bebas-neue.ttf';
 import outfitUrl from './assets/outfit.ttf';
 import orbitronUrl from './assets/orbitron.ttf';
 import yellowtailUrl from './assets/yellowtail.ttf';
@@ -38,6 +39,15 @@ import shareTechMonoUrl from './assets/share-tech-mono.ttf';
 export const BB_ANTON = 'BBAnton';
 /** Archivo Black — the Arial-Black-class heavy grotesque. */
 export const BB_ARCHIVO_BLACK = 'BBArchivoBlack';
+/**
+ * Bebas Neue — the tall condensed caps the DOM chrome sets its titles in
+ * (styles.css --font-title). The brand editor has always offered it as a
+ * wordmark face; until it was registered here, choosing it painted the emblem
+ * in the system sans, because the stylesheet's copy is declared under the bare
+ * family name and a canvas that names a bare family cannot tell "this face is
+ * registered" from "the host substituted something".
+ */
+export const BB_BEBAS = 'BBBebasNeue';
 /** Outfit (variable 100–900) — the tech-spec panel's body/display sans. */
 export const BB_OUTFIT = 'BBOutfit';
 /** Orbitron (variable 400–900) — the tech-spec panel's label/technical face. */
@@ -71,6 +81,7 @@ interface FaceSpec {
 const FACES: Record<string, FaceSpec> = {
   [BB_ANTON]: { url: antonUrl, descriptors: { weight: '100 900' } },
   [BB_ARCHIVO_BLACK]: { url: archivoBlackUrl, descriptors: { weight: '100 900' } },
+  [BB_BEBAS]: { url: bebasNeueUrl, descriptors: { weight: '100 900' } },
   [BB_OUTFIT]: { url: outfitUrl, descriptors: { weight: '100 900' } },
   [BB_ORBITRON]: { url: orbitronUrl, descriptors: { weight: '400 900' } },
   [BB_BRUSH]: { url: yellowtailUrl, descriptors: { weight: '100 900' } },

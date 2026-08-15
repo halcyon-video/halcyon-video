@@ -1,6 +1,6 @@
 # Halcyon Video store — systemd *user* service (issue #16).
 #
-# Runs the 3D Jellyfin storefront 24/7 on the HTPC and auto-restarts it on
+# Runs the 3D media-server storefront 24/7 on the HTPC and auto-restarts it on
 # crash, OOM, or `kill -9`. This is a **user** unit (systemctl --user), so it
 # starts inside the graphical login session where WAYLAND_DISPLAY / DISPLAY are
 # available. See deploy/README.md for install + linger setup.
@@ -10,7 +10,7 @@
 # instead, see the commented ExecStart below and `npm run tauri build`.
 
 [Unit]
-Description=Halcyon Video store (Jellyfin 3D frontend)
+Description=Halcyon Video store (3D storefront)
 Documentation=https://github.com/halcyon-video/halcyon-video
 # Only meaningful once a graphical session exists (needs the Wayland/X11 socket).
 After=graphical-session.target

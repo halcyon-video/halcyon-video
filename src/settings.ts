@@ -34,6 +34,7 @@ import type { LogoShape, LogoSpec } from './logo-spec';
 import { drawLogo, getLogoFontString } from './logo-renderer';
 import { loadMediaReleasePin, saveMediaReleasePin } from './media-release-date';
 import { formatUnlockLabel, makeRentalRecord, rentalCapacityAt } from './rental-clock';
+import { activeProviderKind } from './providers/provider-registry';
 import type { StoreScene } from './three-scene';
 
 export type SettingKind = 'toggle' | 'cycle' | 'text' | 'secret';
@@ -970,12 +971,20 @@ export function registerCoreSettings(): void {
   // overlay; both write the same localStorage keys, so an edit in either place
   // is picked up by the other. jellyfin_password is registered so the row
   // exists, but is never persisted (see commitTextSetting's special case).
+  // The keys stay jellyfin_* for both backends (renaming them would strand
+  // existing installs' saved sessions) — 'jellyfin_url' holds a Plex server's
+  // address just as well as a Jellyfin one. Username/password re-auth here is
+  // Jellyfin-specific (Plex has no password to type), so those two rows only
+  // show on a Jellyfin install; a Plex reconnect goes through the login/setup
+  // PIN flow instead.
   const cred = (key: string, label: string, kind: SettingKind, opts?: Partial<SettingDef>): void =>
     registerSetting({ key, label, kind, group: 'Connection', default: '', applyMode: 'reload', ...opts });
-  cred('jellyfin_url', 'Jellyfin URL', 'text');
-  cred('jellyfin_username', 'Jellyfin Username', 'text');
+  const jellyfinAuthVisible = (): boolean => activeProviderKind() !== 'plex';
+  cred('jellyfin_url', 'Media Server URL', 'text');
+  cred('jellyfin_username', 'Jellyfin Username', 'text', { visibleWhen: jellyfinAuthVisible });
   cred('jellyfin_password', 'Jellyfin Password', 'secret', {
     hint: 'Blank keeps session. A password re-authenticates.',
+    visibleWhen: jellyfinAuthVisible,
   });
 
   cred('jellyseerr_url', 'Jellyseerr / Overseerr URL', 'text');
@@ -1169,20 +1178,17 @@ const BRAND_SHAPES: { id: LogoShape; label: string }[] = [
   { id: 'none', label: 'None (text only)' },
 ];
 
-// Display names for the picker. Archivo Black, Outfit and Anton are BUNDLED
-// and mapped onto their shipped files when the emblem is painted to canvas
-// (logo-renderer's BUNDLED_BRAND_FAMILY). The Google-Fonts @import in
-// styles.css that used to be their only source was a network fetch, i.e.
-// absent on an offline kiosk boot; it is gone as of 2026-08-06 and every face
-// now ships in src/assets.
+// Display names for the picker. All four are BUNDLED and mapped onto their
+// shipped files when the emblem is painted to canvas (logo-renderer's
+// BUNDLED_BRAND_FAMILY). The Google-Fonts @import in styles.css that used to
+// be their only source was a network fetch, i.e. absent on an offline kiosk
+// boot; it is gone as of 2026-08-06 and every face now ships in src/assets.
 //
-// Bebas Neue is the one still not canvas-safe. It is bundled now, so the DOM
-// chrome gets it from disk, but it has no BB-prefixed FontFace registration in
-// bundled-fonts.ts and no BUNDLED_BRAND_FAMILY entry — so an emblem that names
-// it still paints in whatever the system sans is, silently. Registering it is
-// a few lines and the file is already here; it needs a look at the rendered
-// emblem before it lands, so it is deliberately NOT bundled into the
-// remove-the-@import change.
+// Anton and Bebas Neue were the two that still substituted: bundled, offered
+// here, but missing from BUNDLED_BRAND_FAMILY, so an emblem naming either
+// painted in whatever the system sans is — silently, and the Reel Time preset
+// below is one of them. Both registered 2026-08-14 (rendered emblems checked
+// against the wrap). Adding a name here means adding it there too.
 const BRAND_FONTS = ['Archivo Black', 'Bebas Neue', 'Outfit', 'Anton'];
 
 /**

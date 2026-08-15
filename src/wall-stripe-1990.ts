@@ -78,7 +78,7 @@ export function wallStripe1990Active(theme: StoreTheme = getActiveTheme()): bool
 
 // Bumped per build so an in-flight user-asset load from a torn-down store
 // discards itself instead of swapping onto a dead material (same guard shape
-// as wall-band.ts's bandGeneration).
+// as the retired wall-band's bandGeneration).
 let bandGeneration = 0;
 
 /** One straight painted run: centre point, length along the wall, facing yaw. */
@@ -165,7 +165,7 @@ export function buildWallStripe1990(scene: StoreScene): void {
   for (const run of runs) {
     const geo = new THREE.PlaneGeometry(run.len, BAND_H_FT);
     // Bake the physical tile scale into the UVs so every run shares ONE map
-    // and merges into ONE draw call (same trick as wall-band.ts).
+    // and merges into ONE draw call.
     const repeat = run.len / TILE_LEN_FT;
     const uv = geo.attributes.uv as THREE.BufferAttribute;
     for (let i = 0; i < uv.count; i++) uv.setX(i, uv.getX(i) * repeat);

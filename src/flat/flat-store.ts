@@ -1,6 +1,7 @@
 import './flat.css';
 import awningFilmStrip from '../assets/awning-film-strip.png';
 import { JellyfinLibrary, Movie } from '../jellyfin';
+import { activeProvider as provider } from '../providers/active-provider';
 import type { StoreTheme } from '../themes';
 import { getActiveTheme, applyThemeCssVars } from '../themes';
 import { getActiveLogoSpec } from '../logo-spec';
@@ -259,7 +260,7 @@ export function bootFlatStore(
     emptyGrid.innerHTML = `
       <span class="flat-library-empty-icon">🔌</span>
       <h3 class="flat-library-empty-title">No Libraries Synced</h3>
-      <p class="flat-library-empty-text">Please open settings or reconnect to Jellyfin to synchronize your media libraries.</p>
+      <p class="flat-library-empty-text">Please open settings or reconnect to ${provider().displayName} to synchronize your media libraries.</p>
     `;
     content.appendChild(emptyGrid);
   } else {

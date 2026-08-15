@@ -24,7 +24,6 @@ import {
   createNewReleasesStarBadgeTexture
 } from '../canvas-textures';
 import { bb93SignageOn } from '../genre-colors';
-import { wallBandSupersedesTopper } from '../wall-band';
 import { getActiveTheme } from '../themes';
 import { createExtrudedMaterials, create3DDoubleLayeredSign, create3DExtrudedSign } from '../sign-builders';
 import { SECTION_COLS, BOX_SPACING } from '../store-layout';
@@ -268,7 +267,6 @@ export function buildSignage(ctx: FixtureContext, slots: SignSlot[], activeSigna
     // the single auto-sized fallback below instead of a fixed 11ft wallSign
     // that would overhang a run shorter than itself.)
     if (slot.category === 'wall-newrelease' && slot.length) {
-      if (wallBandSupersedesTopper()) return; // bb-2010: wall-band.ts paints this run instead
       // 1990: no painted/lettered wall — owner ruling (2026-08-03). Genre
       // signage in that era lives on propped ticket cards on the gondola
       // tops (genre-signboard-1990), not this wall run; the
