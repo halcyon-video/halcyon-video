@@ -48,6 +48,13 @@ const SETTING_SHORTCUTS: [string, string][] = [
  * those stay in harness.ts, where the modules they need are already loaded.
  */
 export function applyHarnessSettingParams(params: URLSearchParams): void {
+  // A screenshot must be the same picture twice. The app plays a bundled promo
+  // loop on the ceiling/wall CRTs whenever there's no server to stream from
+  // (ambient-tvs.ts) — which is always, here — so every still would catch a
+  // different video frame. Off by default in the harness; `--set
+  // bb_tv_demo_loop=1` (below, since explicit --set lands last) turns it back
+  // on for the shots that are ABOUT the screens playing.
+  localStorage.setItem('bb_tv_demo_loop', '0');
   if (params.get('flat')) {
     localStorage.setItem('bb_render_mode', 'flat');
   }

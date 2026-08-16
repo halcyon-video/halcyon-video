@@ -20,6 +20,31 @@ import { makeCurvedScreenGeometry, makeTubeOverlayMaterial, makeCrtTestCardTextu
 import { makeCrtGlassMaterial } from './glass-reflection';
 import { tvPoolLibraryIds } from './library-settings';
 import { TV_PATCH_LAYER } from './scene-shared';
+import { assetUrl } from './asset-url';
+
+// The bundled in-store promo loop the screens fall back to with no server to
+// stream from — a 30s Big Buck Bunny extract, CC BY 3.0 (Blender Foundation).
+// Full provenance and the exact ffmpeg recipe: public/demo-clip/ATTRIBUTION.md.
+//
+// VP9/Opus, deliberately, where the STREAMED path asks Jellyfin for H.264/AAC.
+// That path has no choice — H.264 is what the server transcodes to — but a file
+// this project ships does, and royalty-free means it plays on the distro
+// Chromium builds that omit the proprietary codecs, with no licensing question
+// hanging over a bundled asset in a GPL repo.
+const DEMO_LOOP_PATH = 'demo-clip/big-buck-bunny.webm';
+
+/**
+ * Whether the bundled loop may play. On unless `bb_tv_demo_loop=0` — the switch
+ * exists so a run can insist on dead glass: the screenshot harness defaults it
+ * off, since a decoding video makes every still it takes differ frame to frame.
+ */
+function demoLoopEnabled(): boolean {
+  try {
+    return localStorage.getItem('bb_tv_demo_loop') !== '0';
+  } catch {
+    return true; // no storage (SSR/worker) — the loop is the friendlier default
+  }
+}
 
 // Front bezel: a flat rounded-rect frame with a rectangular aperture, extruded
 // a little proud of the shell's front face. Shared by the ceiling sets and the
@@ -172,12 +197,27 @@ export class AmbientTvs implements StoreFixture {
         this.playingMovie = movie;
         this.ctx.log(`[System] CRT TVs: "${movie.title}" from ~${Math.round(seekSec / 60)}min`, 'system');
       }
-    } else if (pool.length > 0 && localStorage.getItem('bb_tv_testcard') === '1') {
-      // Same harness/dev stand-in as the test-card picture below: with no
-      // Jellyfin stream there's nothing to actually decode, but resolving a
-      // "playing" identity too keeps the TV-peek Select action (jump to the
-      // box of what's playing) testable offline.
+    } else if (pool.length > 0) {
+      // Nothing here to stream: the public demo, a catalog with nothing
+      // playable — or a PLEX store, which reaches this branch by construction.
+      // This fixture speaks the Jellyfin HLS endpoint and reads jellyfin_url /
+      // jellyfin_token, and a Plex sign-in writes neither (plex-signin.ts keeps
+      // its own keys), so every Plex install hung dead glass over the aisles
+      // until this path existed.
+      //
+      // A video store's monitors always had SOMETHING on them, and a dark tube
+      // reads as broken hardware — so run the bundled 30-second promo loop.
+      //
+      // Resolving a "playing" identity here regardless keeps the TV-peek Select
+      // action (jump to the box of what's playing) working offline; the loop is
+      // house promo footage, not that title, exactly as the test card was.
       this.playingMovie = pool[Math.floor(Math.random() * pool.length)];
+      // bb_tv_testcard wins when set: the static card is the DETERMINISTIC
+      // stand-in the screenshot rigs pin the tube treatment against, and a
+      // moving picture would make those shots differ frame to frame.
+      if (localStorage.getItem('bb_tv_testcard') !== '1' && demoLoopEnabled()) {
+        videoTex = this.makeDemoLoopTexture();
+      }
     }
     this.buildHardware(videoTex);
   }
@@ -255,6 +295,54 @@ export class AmbientTvs implements StoreFixture {
         video.addEventListener('loadedmetadata', seekAndPlay, { once: true });
       }
     });
+
+    return videoTex;
+  }
+
+  /**
+   * The no-server path: the bundled promo loop instead of an HLS stream. Same
+   * <video> + VideoTexture contract as makeVideoTexture (so setupTvAudio, the
+   * pause/resume gates, the frame-upload chain and dispose() all work on it
+   * unchanged) — just a plain looping file source, no HLS, no seek.
+   *
+   * The clip is already 640 wide and in the screens' own ballpark, so there is
+   * nothing to negotiate: it starts at 0 and loops forever.
+   */
+  private makeDemoLoopTexture(): THREE.VideoTexture | null {
+    const video = document.createElement('video');
+    video.setAttribute('style', 'position:fixed;left:-9999px;width:1px;height:1px;');
+    video.loop = true;
+    video.volume = 1.0; // gain controlled by Web Audio PannerNode
+    video.muted = true; // autoplay policy: boot muted; unmuted on first user gesture
+    video.playsInline = true;
+    video.preload = 'auto';
+    video.src = assetUrl(DEMO_LOOP_PATH);
+    document.body.appendChild(video);
+    this.video = video;
+
+    const videoTex = new THREE.VideoTexture(video);
+    videoTex.colorSpace = THREE.SRGBColorSpace;
+    this.videoTex = videoTex;
+
+    // Full-frame fill onto the 4:3 face, same conformance the streamed path
+    // applies — see the long note in makeVideoTexture.
+    const applyFullFill = () => {
+      videoTex.repeat.set(1, 1);
+      videoTex.offset.set(0, 0);
+    };
+    applyFullFill();
+    video.addEventListener('resize', applyFullFill);
+    this.refitVideoCrop = applyFullFill;
+
+    // Fire-and-forget: a missing/undecodable file leaves the tubes dark exactly
+    // as they were before this path existed, and never blocks the store build.
+    video.addEventListener('loadedmetadata', () => {
+      applyFullFill();
+      video.play().catch(() => {});
+    }, { once: true });
+    video.addEventListener('error', () => {
+      console.warn('[ambient-tvs] demo loop failed to load — screens stay dark');
+    }, { once: true });
 
     return videoTex;
   }
