@@ -79,6 +79,7 @@ import {
   eraThemeIdForDate,
   toDateOnly,
 } from './media-release-date';
+import { refreshStoreDateStamp, destroyStoreDateStamp } from './media-date-badge';
 import { retailAudio } from './audio';
 import { BB_ARCHIVO_BLACK, bundledFontsReady } from './bundled-fonts';
 import { brandString, loadBrandPack } from './brand-pack';
@@ -175,6 +176,12 @@ function refreshStoreCatalog() {
   storeGameMovies = cutoff ? filterMoviesByCutoff(catalog.games, cutoff) : catalog.games;
   storeComingSoon = cutoff ? filterMoviesByCutoff(comingSoonMovies, cutoff) : comingSoonMovies;
   storeDiscovery = cutoff ? filterMoviesByCutoff(discoveryMovies, cutoff) : discoveryMovies;
+  // The corner STORE DATE stamp reads the cutoff THIS build was filtered with,
+  // so the caption can never drift from the stock it describes (the pin rolls
+  // forward daily; the shelves only change on a rebuild). Raised here, at the
+  // one funnel, so 3D and 2.5D boots and every rebuild all get it — and so
+  // clearing the pin takes it down on the same pass that restocks the store.
+  refreshStoreDateStamp(cutoff);
   if (!cutoff) return;
   // MATCH STORE ERA: the decor tracks the pin's effective date (and crosses
   // era boundaries as the rolling date does). Persist-only — we're already
@@ -2973,6 +2980,9 @@ function expireSession(reason: string) {
     aisleIndicatorInterval = null;
   }
   updateMovieHUD(null);
+  // There is no store left to caption — and the next member to sign in may not
+  // be browsing a pinned one. The build funnel raises it again if they are.
+  destroyStoreDateStamp();
 
   void showLoginOrCards(reason);
 }
