@@ -125,22 +125,27 @@ export interface PlexPin {
   expiresAt: string;
 }
 
+// `strong=true` mints a 25-character code, and that code CANNOT be typed at
+// plex.tv/link — the box there takes four characters. It is meant for the
+// app.plex.tv/auth# redirect, where the code rides in the URL and nobody reads
+// it. Every surface this app puts a code on is the opposite case: the setup
+// terminal is a CRT with no browser to hand off to, so the code exists to be
+// read off the screen and typed somewhere else. So mint the plain PIN, which is
+// the four-character one Plex's own TV apps use.
 export async function createPlexPin(): Promise<PlexPin> {
-  const res = await fetch(`${PLEX_TV}/api/v2/pins?strong=true`, {
+  const res = await fetch(`${PLEX_TV}/api/v2/pins`, {
     method: 'POST',
     headers: plexHeaders(),
   });
   if (!res.ok) throw new Error(`Plex PIN request failed (HTTP ${res.status})`);
   const pin = JSON.parse(await res.text());
-  const params = new URLSearchParams({
-    clientID: plexClientIdentifier(),
-    code: pin.code,
-    'context[device][product]': 'Halcyon Video',
-  });
   return {
     id: pin.id,
     code: pin.code,
-    authUrl: `https://app.plex.tv/auth#?${params.toString()}`,
+    // The same address plex.tv's own QR for this PIN encodes: the link page
+    // with the code already filled in. Opening it and typing the code by hand
+    // land in the identical place, so the screen can only ever say one thing.
+    authUrl: `https://www.plex.tv/link/?pin=${encodeURIComponent(pin.code)}`,
     qrUrl: pin.qr ?? `${PLEX_TV}/api/v2/pins/qr/${pin.code}`,
     expiresAt: pin.expiresAt,
   };
