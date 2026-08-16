@@ -19,11 +19,19 @@
 //
 // WHAT A DROP DOES NOT DO. Colours are sampled from the art for the BRAND
 // surfaces — the emblem body/lettering and the livery the signs key off — and
-// stop there. The ROOM (walls, carpet, counter tops) keeps the store's own
+// stop there. The ROOM (walls, carpet, counter body) keeps the store's own
 // palette: a logo is evidence about a logo, not about what colour someone
 // painted their walls, and a store repainted from the dominant channel of a
 // PNG is how "automatic" becomes "unusable". A brand.json is how you say the
 // room changes too.
+//
+// The counter TOP is livery, not room (owner ruling 2026-08-15). It used to be
+// listed here as room, on the reading that a counter is furniture. But it wears
+// the house colour, not a neutral — the body under it is white — so once the
+// signage followed the brand it was the one blue object left in a repainted
+// store, which reads as a bug rather than as restraint. themes.ts's
+// liveryFromLogo derives it; see the note there on why the lift factor never
+// touches the eras' own hand-picked shade.
 //
 // NO three.js: this runs inside brand-pack.ts's boot load, before the store
 // builds. It DOES use the DOM — deliberately, for the SVG route: rather than

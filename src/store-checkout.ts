@@ -14,6 +14,7 @@ import { CandyRow } from './fixtures/period-fixtures';
 import { retailAudio } from './audio';
 import { CarriedTapes, CarryPose, showClerkToast, CARRY_STORAGE_KEY, DEFAULT_CARRY_CAPACITY } from './carried-tapes';
 import { saveRentalRecord, makeRentalRecord, rentalCapacityAt } from './rental-clock';
+import { tipJarEnabled } from './tip-jar';
 import {
   _bagBaseFallback, _checkoutBagFallback, _checkoutCarry, _checkoutStand,
   _checkoutWalkPos, _checkoutWalkAhead,
@@ -211,7 +212,14 @@ export function enterCheckout(scene: StoreScene): void {
   if (n > 0) {
     scene.onConsoleLog(`[System] At the checkout counter with ${n} tape(s). Enter to check out.`, 'system');
   } else {
-    scene.onConsoleLog('[System] At the checkout counter. Left opens the manager terminal, Up talks to the clerk.', 'system');
+    // Right is named here only when there IS a jar (bb_tip_jar off is the
+    // owner's "not in my living room" switch, and a hint for a key that does
+    // nothing is worse than no hint). Pin 060 asked for the QR to be plainly
+    // visible AT CHECKOUT: the overlay it opens is the part a person can
+    // actually scan from the couch, so the counter has to say it exists.
+    scene.onConsoleLog(
+      '[System] At the checkout counter. Left opens the manager terminal, Up talks to the clerk'
+      + (tipJarEnabled() ? ', Right shows the tip QR' : '') + '.', 'system');
   }
 }
 

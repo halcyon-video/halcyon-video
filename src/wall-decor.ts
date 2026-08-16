@@ -68,11 +68,19 @@ const CEILING_MARGIN = 2.3;
 const MIN_SPAN_LEN = 3.0;       // a clear run shorter than this isn't worth decorating
 const MIN_PORTRAIT_GAP = 1.2;   // minimum breathing room between/around frames — "evenly spread", never crammed
 
-// Was 6 for a single wall's one span; the décor now runs the combined
-// left+back+right wall length (roughly 3x), so the cap scales with it. Still
-// just a ceiling — planPortraitSlots drops slots (fewer, or none per span)
-// rather than ever crowding past MIN_PORTRAIT_GAP.
-const MAX_PORTRAITS = 18;
+// SIX, for the whole room — owner ruling 2026-08-15 (feedback pin 059: "there
+// are too many of these actor portraits in general. total, I'd say the whole
+// room should have like 6"), filed against the 18 this carried after the décor
+// widened from one wall's span to the combined left+back+right run. The count
+// is a ROOM total, not a per-wall one: planPortraitSlots divides it across
+// whatever spans exist, so a store with three long walls hangs the same six,
+// further apart, rather than scaling them back up with the wall length. The
+// film strip still runs every span end to end — the ribbon is the continuous
+// element, the portraits are the punctuation.
+//
+// Still just a ceiling: planPortraitSlots drops slots (fewer, or none per
+// span) rather than ever crowding past MIN_PORTRAIT_GAP.
+const MAX_PORTRAITS = 6;
 const PORTRAIT_H = 2.4;
 const PORTRAIT_ASPECT = 2 / 3;  // width / height, matching the poster-card convention elsewhere
 const PORTRAIT_W = PORTRAIT_H * PORTRAIT_ASPECT;
@@ -354,6 +362,12 @@ export function buildWallDecor(scene: StoreScene, storeWidth: number, backWallZ:
   });
 
   const actors = tallyFeaturedActors(scene, MAX_PORTRAITS);
+  const slots = actors.length ? planPortraitSlots(spans, actors.length) : [];
+  // The count is the thing under review here (pin 059), and a portrait needs a
+  // catalog with cast art to appear at all — so say what was hung, rather than
+  // leaving "no portraits" ambiguous between "capped" and "nothing qualified".
+  console.log(`[wall-decor] ${spans.length} span(s), ${slots.length} portrait(s) `
+    + `from ${actors.length} qualifying actor(s), room cap ${MAX_PORTRAITS}`);
   if (actors.length === 0) return;
 
   const frameMat = new THREE.MeshStandardMaterial({
@@ -362,7 +376,6 @@ export function buildWallDecor(scene: StoreScene, storeWidth: number, backWallZ:
     metalness: 0.15,
   });
 
-  const slots = planPortraitSlots(spans, actors.length);
   slots.forEach((slot, i) => {
     const actor = actors[i];
     if (!actor) return;

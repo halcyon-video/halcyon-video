@@ -1,4 +1,5 @@
-// The tip jar — a cup and a 9-inch card on the checkout counter's band top.
+// The tip jar — a cup, and a 12-inch card in a slant-back acrylic sign holder,
+// on the checkout counter's band top.
 //
 // This is a NEW sign for a fictional chain, so there is no reference photo to
 // rectify against: nothing about it is a recreation of a real object, and the
@@ -22,6 +23,7 @@ import { FixturePlacement } from '../store-layout';
 import { FixtureContext, StoreFixture } from '../fixtures';
 import { Footprint } from '../layout-validator';
 import { markSignMesh } from '../sign-builders';
+import { addGlassReflectionPane } from '../glass-reflection';
 import { getActiveTheme, themeTrimDarkHex } from '../themes';
 import { ensureTipCardFont, paintTipCardCanvas, TIP_CARD_ASPECT, tipJarEnabled } from '../tip-jar';
 
@@ -32,20 +34,40 @@ type Disposable = { geo?: THREE.BufferGeometry; mat?: THREE.Material; tex?: THRE
 const CUP_R_TOP = 0.165;
 const CUP_R_BOT = 0.135;
 const CUP_H = 0.36;
-// GH #10: the QR card read too small to bother scanning from where a
-// customer actually stands — scaled ~1.5x (9 in wide, was 6 in).
-const CARD_W = 0.75;
+// Feedback pin 060: "this tips thing needs to be bigger. it is too small to
+// scan the code... maybe with an acryllic stand and face". So the print goes
+// to 12 x 9.6 in (was 9 in wide after GH #10, 6 in before that) and the wire
+// easel behind it becomes the object a register actually holds a notice in: a
+// slant-back acrylic sign holder, the print sandwiched between a leaning back
+// panel and a clear front face, standing on its own foot.
+//
+// 12 in is where this stops: it is the widest landscape insert the stock
+// countertop holders take, and the fixture has to share the band top with the
+// mug without either crowding the other (see CUP_X/CARD_X below). Scanning the
+// QR off the TV is not what this size buys — no counter prop is scannable from
+// a couch, which is what the full-screen overlay (► at the counter,
+// src/tip-jar.ts) is for. What it buys is a notice you can READ from where a
+// customer stands, which is what the pin asked of the object itself.
+const CARD_W = 1.0;
 const CARD_H = CARD_W / TIP_CARD_ASPECT;
 const CARD_T = 0.012;
 const CARD_LEAN = 0.20;       // rad — an easel card leans back about 11 deg
+// The holder around the print: margin on each side, a deeper one at the
+// bottom for the lip the insert rests on, and a foot running back under it.
+const HOLDER_SIDE_PAD = 0.05;
+const HOLDER_TOP_PAD = 0.03;
+const HOLDER_LIP_H = 0.07;
+const PANEL_W = CARD_W + HOLDER_SIDE_PAD * 2;
+const PANEL_H = CARD_H + HOLDER_LIP_H + HOLDER_TOP_PAD;
+const ACRYLIC_T = 0.022;      // 1/4 in sheet
+const FOOT_D = 0.34;
 // They stand SIDE BY SIDE, not card-behind-cup: a 4 in card behind a 4.3 in
 // cup is a card nobody can read (first build, caught in the counter shot).
-// Pushed further apart than a naive centre-scale to keep clearance as the
-// card grew (GH #10): the cup nudges left, the card nudges right, so the
-// gap between the cup's band and the card's near edge is actually WIDER
-// than it was at the old size instead of shrinking into the mug.
-const CUP_X = -0.40;
-const CARD_X = 0.36;
+// Pushed further apart again as the print grew to 12 in (pin 060): the cup
+// nudges left, the holder nudges right, so the gap between the cup's band and
+// the holder's near edge stays ~3 in — wider than the 9 in card ever had.
+const CUP_X = -0.46;
+const CARD_X = 0.45;
 const CARD_TEX_W = 1536;
 
 export class TipJar implements StoreFixture {
@@ -164,28 +186,86 @@ export class TipJar implements StoreFixture {
     const faceMat = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.8, metalness: 0.0 });
     const edgeMat = new THREE.MeshStandardMaterial({ color: 0xe8e0c8, roughness: 0.9 });
     const cardGeo = new THREE.BoxGeometry(CARD_W, CARD_H, CARD_T);
+
+    // ── The acrylic holder ─────────────────────────────────────────────────
+    // A slant-back countertop sign holder (pin 060). Everything that leans
+    // lives in one group tilted about X, so the panel, the print, the lip and
+    // the front face share a frame and cannot drift apart: inside it +Y runs
+    // up the panel and +Z out of its face, toward the customer.
+    //
+    // The acrylic is the store's ONE unlit-looking material by physical
+    // right — clear plastic — so it is built the way the rest of the store's
+    // glazing is: a nearly transmissive body carrying no diffuse colour of its
+    // own, with the reflection added ON TOP as an additive pane
+    // (glass-reflection.ts). A flat 50%-white slab was tried first and read as
+    // fog over the print, which is exactly the failure that recipe exists to
+    // prevent.
+    const acrylicMat = new THREE.MeshPhysicalMaterial({
+      color: 0xffffff,
+      transparent: true,
+      opacity: 0.14,
+      roughness: 0.06,
+      metalness: 0.0,
+      ior: 1.49,               // acrylic, not glass (1.52)
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    });
+    this.disposables.push({ mat: acrylicMat });
+
+    const holder = new THREE.Group();
+    // Sits ON its own foot, hence the foot's thickness in Y.
+    holder.position.set(CARD_X, ACRYLIC_T, 0);
+    holder.rotation.x = -CARD_LEAN;
+    group.add(holder);
+
+    // Back panel: the sheet the print is held against.
+    const backGeo = new THREE.BoxGeometry(PANEL_W, PANEL_H, ACRYLIC_T);
+    const backPanel = new THREE.Mesh(backGeo, acrylicMat);
+    backPanel.position.set(0, PANEL_H / 2, -ACRYLIC_T / 2 - 0.001);
+    holder.add(backPanel);
+    this.disposables.push({ geo: backGeo });
+
+    // The print itself, resting on the lip.
     // BoxGeometry face order (+x, -x, +y, -y, +z, -z): the print is on +Z, the
     // face the placement's yaw points at.
     const card = markSignMesh(
       new THREE.Mesh(cardGeo, [edgeMat, edgeMat, edgeMat, edgeMat, faceMat, edgeMat]),
       { casts: true },
     );
-    card.position.set(CARD_X, CARD_H / 2 * Math.cos(CARD_LEAN) + 0.01, 0);
-    card.rotation.x = -CARD_LEAN;
-    group.add(card);
+    card.position.set(0, HOLDER_LIP_H + CARD_H / 2, CARD_T / 2 + 0.001);
+    holder.add(card);
     this.disposables.push({ geo: cardGeo, mat: faceMat, tex }, { mat: edgeMat });
 
-    // A wire easel leg so the card isn't floating at a lean.
-    const legGeo = new THREE.BoxGeometry(0.02, CARD_H * 0.72, 0.02);
-    const legMat = new THREE.MeshStandardMaterial({ color: 0x8d8d8d, roughness: 0.45, metalness: 0.6 });
-    const leg = new THREE.Mesh(legGeo, legMat);
-    leg.position.set(CARD_X, CARD_H * 0.34, -CARD_H * 0.30);
-    leg.rotation.x = 0.42;
-    leg.castShadow = true;
-    group.add(leg);
-    this.disposables.push({ geo: legGeo, mat: legMat });
+    // Front face: the clear sheet over the print, and the reflection that
+    // makes it read as one. Kept off the print's own +Z by a hair so the two
+    // never z-fight at grazing angles.
+    const faceGeo = new THREE.PlaneGeometry(CARD_W + 0.04, CARD_H + 0.04);
+    const frontFace = new THREE.Mesh(faceGeo, acrylicMat);
+    frontFace.position.set(0, HOLDER_LIP_H + CARD_H / 2, CARD_T + 0.006);
+    frontFace.renderOrder = 2;
+    holder.add(frontFace);
+    addGlassReflectionPane(frontFace, holder, { envMapIntensity: 1.1, roughness: 0.04 });
+    this.disposables.push({ geo: faceGeo });
 
-    this.targets = [cup, band, card];
+    // The lip the insert stands on — the visible tell that this is a holder
+    // with something slotted into it rather than a card glued to a sheet.
+    const lipGeo = new THREE.BoxGeometry(PANEL_W, 0.016, 0.034);
+    const lip = new THREE.Mesh(lipGeo, acrylicMat);
+    lip.position.set(0, HOLDER_LIP_H - 0.008, 0.017);
+    holder.add(lip);
+    this.disposables.push({ geo: lipGeo });
+
+    // Foot: the flat sheet the panel rises from, running back under the lean.
+    // Flat on the band top, so it is NOT part of the leaning group.
+    const footGeo = new THREE.BoxGeometry(PANEL_W, ACRYLIC_T, FOOT_D);
+    const foot = new THREE.Mesh(footGeo, acrylicMat);
+    foot.position.set(CARD_X, ACRYLIC_T / 2, -FOOT_D / 2 + 0.03);
+    group.add(foot);
+    this.disposables.push({ geo: footGeo });
+
+    // The holder is as clickable as the card: in walk mode you point at the
+    // object, not at the 12 in of print inside it.
+    this.targets = [cup, band, card, backPanel, frontFace, foot];
     this.ctx.scene.add(group);
     this.ctx.requestShadowRefresh();
   }

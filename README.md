@@ -42,13 +42,19 @@ around in. [More ↓](#make-it-yours)
 Halcyon Video is a chain I made up. Paint over it.
 
 Name, colors, emblem shape and typeface live in the store's own settings
-drawer, and they don't stop at the sign over the door: pick them and every
-rental clamshell in the building gets reprinted to match, down to the pinstripe
-and the small print on the back. Same tape, three stores.
+drawer, and they don't stop at the sign over the door. Every rental clamshell
+in the building is reprinted to match, down to the pinstripe and the small
+print on the back — then the room itself follows: endcaps, wall bays, the
+hanging aisle signs, the perimeter band, the checkout counter, even the
+clerk's polo. The walls, the carpet and the ceiling stay the era's own, because
+a logo is evidence about a logo, not about what colour someone painted their
+walls. Same tape, same floor plan, three stores.
 
 | | | |
 |:--:|:--:|:--:|
 | ![Banana Entertainment, brown on yellow](docs/screenshots/brand-case-banana.jpg) | ![Whatever Games, white on red with a black pinstripe](docs/screenshots/brand-case-whatever.jpg) | ![Video World, yellow on green](docs/screenshots/brand-case-videoworld.jpg) |
+| ![The 1990 sales floor in Banana Entertainment livery](docs/screenshots/brand-store-banana.jpg) | ![The 1990 sales floor in Whatever Games livery](docs/screenshots/brand-store-whatever.jpg) | ![The 1990 sales floor in Video World livery](docs/screenshots/brand-store-videoworld.jpg) |
+| ![A Banana Entertainment carry-out bag](docs/screenshots/brand-bag-banana.jpg) | ![A Whatever Games carry-out bag](docs/screenshots/brand-bag-whatever.jpg) | ![A Video World carry-out bag](docs/screenshots/brand-bag-videoworld.jpg) |
 | **Banana Entertainment** — brown on yellow, set in Archivo Black. | **Whatever Games** — white on red, black pinstripe, set in Anton. | **Video World** — yellow on green, set in Bebas Neue. |
 
 Rather draw it than type it? Put a `logo.svg` — or a PNG with alpha — in
