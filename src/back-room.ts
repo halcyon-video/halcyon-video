@@ -10,16 +10,17 @@
 // studio-style BACKDROP: a flat gradient cyc plane + matching floor (see
 // createBackdropTexture — the single swap point for a real photo backdrop).
 // What remains is only what the rental fiction needs: the coffee table with
-// the rented clamshells (+ receipt), and the TV/deck stack — the
-// TV's screen plane IS the diegetic playback surface (attachVideo maps the
-// in-app player's <video> onto it, with HRTF audio at the set).
+// the rented clamshells (+ receipt), and the TV/deck stack. The set is a PROP,
+// not a screen — a tape confirmed here plays fullscreen like every other title
+// in the app (owner ruling 2026-08-16), so the tube stays dark glass and the
+// only thing the deck does is swallow the tape and hand it back.
 //
 // Owned by StoreScene (which stays the camera/mode brain); this module owns
 // the backdrop, the rented-tape browsing (focus / inspect / flip — the tapes
 // are rental clamshells: getRentalCaseGeometry +
-// createHeroRentalMaterials), the CRT screen plane + HRTF positional
-// audio (the ambient-TVs recipe), the VCR clock, and every tween. update()
-// runs only on composited frames and allocates nothing per frame.
+// createHeroRentalMaterials), the CRT screen plane, the VCR clock, and every
+// tween. update() runs only on composited frames and allocates nothing per
+// frame.
 //
 // Props come from the T24 registry (getPropOrFallback): the set looks right
 // with the sized primitive stand-ins and upgrades automatically when the real
@@ -140,15 +141,7 @@ export class BackRoom {
   // never sees them).
   private screenOverlay: THREE.Mesh | null = null;
   private screenGloss: THREE.Mesh | null = null;
-  private screenCenterWorld = new THREE.Vector3();
-  private videoTex: THREE.VideoTexture | null = null;
-  private video: HTMLVideoElement | null = null;
-  private lastVideoTime = -1;
-  private refitVideoCrop: (() => void) | null = null;
   private tvGlow: THREE.PointLight | null = null;
-
-  // HRTF audio graph for the attached player video (see capturedAudio below).
-  private audioNodes: { ctx: AudioContext; source: MediaElementAudioSourceNode; gain: GainNode; panner: PannerNode } | null = null;
 
   // VCR mouth (where the insert beat lands), local coords.
   private vcrMouth = new THREE.Vector3(0, 1.0, -4.35);
@@ -164,8 +157,6 @@ export class BackRoom {
   private readonly _pose = { pos: new THREE.Vector3(), look: new THREE.Vector3() };
   // Scratch (no per-frame allocations)
   private readonly _v = new THREE.Vector3();
-  private readonly _camFwd = new THREE.Vector3();
-  private readonly _camUp = new THREE.Vector3();
 
   constructor(
     private scene: THREE.Scene,
@@ -511,10 +502,9 @@ export class BackRoom {
     plane.position.copy(rect.center).addScaledVector(fwd, 0.015);
     this.scene.add(plane); // world-space (rect already includes the room offset)
     this.screenMesh = plane;
-    this.screenCenterWorld.copy(rect.center);
 
-    // Corners/vignette/scanlines only darken, so they are safe over both the
-    // idle dark tube and attached playback.
+    // Corners/vignette/scanlines only darken, so they are safe over the idle
+    // dark tube (which is all this set is ever asked to be).
     const overlay = new THREE.Mesh(
       makeCurvedScreenGeometry(rect.width, rect.height, bulge),
       makeTubeOverlayMaterial());
@@ -914,7 +904,7 @@ export class BackRoom {
   /**
    * The insert beat: the inspected case dives to the deck and slides in
    * (~1.7s, two simple tweens — no rigged animation), then `onInserted` fires
-   * (the owner starts diegetic playback there).
+   * (the owner starts fullscreen playback there).
    */
   beginInsert(onInserted: () => void): boolean {
     if (this.state !== 'inspect' || this.tapes.length === 0) return false;
@@ -981,105 +971,20 @@ export class BackRoom {
     };
   }
 
-  // ── Video on the CRT (in-app player's <video>, ambient-TVs recipe) ─────────
+  // ── Watching (the movie plays FULLSCREEN, never on this CRT) ──────────────
 
   /**
-   * Map the in-app player's <video> onto the CRT screen plane and route its
-   * audio through an HRTF panner at the TV's position. The element is captured
-   * into a Web Audio graph ONCE ever (see capturedAudio) — detachVideo()
-   * restores a straight-to-destination route so normal fullscreen playback
-   * keeps its sound afterwards.
+   * Playback from the couch is over — or never started. The tape rides back
+   * out of the deck onto the table and the tube goes dark again.
+   *
+   * The room's CRT is a prop, not a screen: a tape confirmed here plays
+   * fullscreen like every other title in the app (owner ruling 2026-08-16),
+   * so there is no texture to detach and no audio graph to unpick — the only
+   * thing that has to be undone is the insert beat.
    */
-  attachVideo(video: HTMLVideoElement): void {
-    if (!this.screenMat || this.video === video) return;
-    this.detachVideoInternal(false);
-    this.video = video;
-    this.lastVideoTime = -1;
-
-    const tex = new THREE.VideoTexture(video);
-    tex.colorSpace = THREE.SRGBColorSpace;
-    this.videoTex = tex;
-    this.screenMat.map = tex;
-    this.screenMat.color.setHex(0xffffff);
-    this.screenMat.needsUpdate = true;
-    if (this.tvGlow) this.tvGlow.intensity = 7;
-
-    // Full-frame FILL (CSS object-fit: fill): stretch the WHOLE video across
-    // the 4:3-ish tube face (default 0..1 UV) so it reaches every edge with NO
-    // letterbox/pillarbox bars and NO cropping — conformed to the CRT's own
-    // aspect, matching AmbientTvs.makeVideoTexture. The function/callsites stay
-    // intact so the 'resize' listener + refitVideoCrop just re-assert the
-    // identity UV rect.
-    const applyFullFill = () => {
-      tex.repeat.set(1, 1);
-      tex.offset.set(0, 0);
-    };
-    applyFullFill();
-    video.addEventListener('resize', applyFullFill);
-    this.refitVideoCrop = applyFullFill;
-
-    // HRTF positional audio at the TV.
-    try {
-      const captured = getCapturedAudio(video);
-      captured.ctx.resume().catch(() => {});
-      const gain = captured.ctx.createGain();
-      gain.gain.value = 1.0;
-      const panner = captured.ctx.createPanner();
-      panner.panningModel = 'HRTF';
-      panner.distanceModel = 'inverse';
-      panner.refDistance = 6;
-      panner.rolloffFactor = 1.4;
-      panner.setPosition(this.screenCenterWorld.x, this.screenCenterWorld.y, this.screenCenterWorld.z);
-      captured.source.disconnect();
-      captured.source.connect(gain);
-      gain.connect(panner);
-      panner.connect(captured.ctx.destination);
-      this.audioNodes = { ctx: captured.ctx, source: captured.source, gain, panner };
-    } catch {
-      // Web Audio unavailable — the element's own output still plays flat.
-    }
-    this.opts.log('[System] The CRT hums to life.');
-  }
-
-  /** Player closed/stopped: dead glass again, audio route restored, tape ejects. */
-  detachVideo(): void {
-    this.detachVideoInternal(true);
-  }
-
-  private detachVideoInternal(eject: boolean): void {
-    if (this.video && this.refitVideoCrop) {
-      this.video.removeEventListener('resize', this.refitVideoCrop);
-    }
-    this.refitVideoCrop = null;
-    if (this.audioNodes) {
-      // Un-route the diegetic graph and give the element its plain output
-      // back (the MediaElementSource capture is permanent per spec, so a
-      // straight source→destination hop IS the "normal" path from now on).
-      try {
-        this.audioNodes.source.disconnect();
-        this.audioNodes.gain.disconnect();
-        this.audioNodes.panner.disconnect();
-        this.audioNodes.source.connect(this.audioNodes.ctx.destination);
-      } catch { /* context already closed */ }
-      this.audioNodes = null;
-    }
-    if (this.screenMat) {
-      this.screenMat.map = null;
-      this.screenMat.color.setHex(0x05070d);
-      this.screenMat.needsUpdate = true;
-    }
-    this.videoTex?.dispose();
-    this.videoTex = null;
-    this.video = null;
+  endWatching(): void {
     if (this.tvGlow) this.tvGlow.intensity = 0;
-    if (eject && (this.state === 'watching' || this.state === 'inserting')) {
-      this.ejectTape();
-    }
-  }
-
-  /** VIDEO render tier while the CRT is actually presenting frames. */
-  isPlaying(): boolean {
-    return !!(this.video && !this.video.paused && !this.video.ended && this.video.readyState >= 2);
+    if (this.state === 'watching' || this.state === 'inserting') this.ejectTape();
   }
 
   /** Pins the ACTIVE tier while any tape tween runs. */
@@ -1117,7 +1022,7 @@ export class BackRoom {
 
   // ── Per-composited-frame update (no allocations) ───────────────────────────
 
-  update(now: number, camera: THREE.PerspectiveCamera): void {
+  update(now: number, _camera: THREE.PerspectiveCamera): void {
     // Tape tweens (smoothstep; rotation lerped component-wise — all our poses
     // are built from the same YXZ ranges so no wrap-around occurs).
     for (let i = 0; i < this.tapes.length; i++) {
@@ -1139,32 +1044,6 @@ export class BackRoom {
       }
     }
 
-    // Video frame upload — only when the decoder actually advanced.
-    if (this.videoTex && this.video && !this.video.paused) {
-      const t = this.video.currentTime;
-      if (t !== this.lastVideoTime) {
-        this.lastVideoTime = t;
-        this.videoTex.needsUpdate = true;
-      }
-    }
-
-    // HRTF listener follows the camera (couch view is static, but the lerp
-    // into the room and any future pose changes stay correct for free).
-    if (this.audioNodes && this.audioNodes.ctx.state === 'running') {
-      const al = this.audioNodes.ctx.listener;
-      const p = camera.position;
-      this._camFwd.set(0, 0, -1).applyQuaternion(camera.quaternion);
-      this._camUp.set(0, 1, 0).applyQuaternion(camera.quaternion);
-      if (al.positionX !== undefined) {
-        al.positionX.value = p.x; al.positionY.value = p.y; al.positionZ.value = p.z;
-        al.forwardX.value = this._camFwd.x; al.forwardY.value = this._camFwd.y; al.forwardZ.value = this._camFwd.z;
-        al.upX.value = this._camUp.x; al.upY.value = this._camUp.y; al.upZ.value = this._camUp.z;
-      } else {
-        al.setPosition(p.x, p.y, p.z);
-        al.setOrientation(this._camFwd.x, this._camFwd.y, this._camFwd.z, this._camUp.x, this._camUp.y, this._camUp.z);
-      }
-    }
-
     // Diegetic clocks — cheap change-detection, repaint only when the shown
     // value ticks over (and only on frames the scene composited anyway).
     this.redrawClocks(false);
@@ -1174,7 +1053,6 @@ export class BackRoom {
 
   dispose(): void {
     this.disposed = true;
-    this.detachVideoInternal(false);
 
     // Tape meshes use module-cached rental geometry/materials
     // (roomOwnedShared) — nothing per-tape to release here.
@@ -1238,28 +1116,6 @@ export class BackRoom {
     this.tvGlow = null;
     this.scene.remove(this.group);
   }
-}
-
-// ── One-shot media-element audio capture ─────────────────────────────────────
-// createMediaElementSource() may be called ONCE per element, ever, and the
-// capture permanently reroutes the element's output through Web Audio. The
-// player reuses a single #vp-video element for its whole life, so the context
-// + source node are cached here for the page's lifetime; attach/detach above
-// merely re-patch the graph between "HRTF at the TV" and "straight out".
-interface CapturedAudio {
-  ctx: AudioContext;
-  source: MediaElementAudioSourceNode;
-}
-const capturedAudio = new WeakMap<HTMLMediaElement, CapturedAudio>();
-
-function getCapturedAudio(video: HTMLVideoElement): CapturedAudio {
-  let captured = capturedAudio.get(video);
-  if (!captured) {
-    const ctx = new AudioContext();
-    captured = { ctx, source: ctx.createMediaElementSource(video) };
-    capturedAudio.set(video, captured);
-  }
-  return captured;
 }
 
 // ── Black fade overlay (checkout → back room → store transitions) ────────────

@@ -134,10 +134,7 @@ export function exitBackRoomToStore(scene: StoreScene, force = false): void {
   const room = scene.backRoom;
   scene.backRoom = null;
   scene.backRoomReadyPromise = Promise.resolve();
-  if (room) {
-    room.detachVideo();
-    room.dispose();
-  }
+  room?.dispose();
   if (scene.mode !== 'backroom') return; // rental toggled off from the store side
   scene.requestRender();
   scene.resumeAmbientTvs();
@@ -210,13 +207,14 @@ export function checkRentalClock(scene: StoreScene): void {
   scene.onConsoleLog('[System] Rental period over — the door back to the store just unlocked. (Escape to head out.)', 'system');
 }
 
-export function attachBackRoomVideo(scene: StoreScene, video: HTMLVideoElement): void {
-  scene.backRoom?.attachVideo(video);
-  scene.requestRender();
-}
-
-export function detachBackRoomVideo(scene: StoreScene): void {
-  scene.backRoom?.detachVideo();
+/**
+ * Playback launched from the couch has ended (or never started): the tape
+ * rides back out of the deck onto the table. A rented tape plays FULLSCREEN
+ * like every other title — the room's CRT is a prop, never a screen (owner
+ * ruling 2026-08-16) — so this is the whole of "stop watching".
+ */
+export function endBackRoomWatching(scene: StoreScene): void {
+  scene.backRoom?.endWatching();
   scene.updateCameraTarget();
   scene.requestRender();
 }

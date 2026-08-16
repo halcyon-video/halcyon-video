@@ -1012,7 +1012,7 @@ export class StoreScene {
   // re-check the wall clock (registered while a lockout is active only).
   public readonly onRentalWake = () => this.checkRentalClock();
   public rentalWakeHooked = false;
-  /** Fired after the insert beat — the owner starts diegetic playback on the CRT. */
+  /** Fired after the insert beat — the owner starts fullscreen playback. */
   public onBackRoomPlay?: (movie: Movie) => void;
   public overviewYaw = 0;   // radians; 0 faces the back wall, positive turns LEFT
   public overviewPitch = 0; // radians; positive looks up
@@ -3300,13 +3300,10 @@ export class StoreScene {
 
   public checkRentalClock(): void { return rental.checkRentalClock(this); }
 
-  // ── Diegetic playback plumbing (owner: main.ts's launchVideoPlayback) ──────
+  // ── Couch playback plumbing (owner: main.ts's launchVideoPlayback) ─────────
 
-  /** Map the in-app player's <video> onto the room's CRT (screen + HRTF). */
-  public attachBackRoomVideo(video: HTMLVideoElement): void { return rental.attachBackRoomVideo(this, video); }
-
-  /** Player closed: dead glass, audio route restored, tape ejects to the table. */
-  public detachBackRoomVideo(): void { return rental.detachBackRoomVideo(this); }
+  /** Playback from the couch ended (or never started): the tape ejects. */
+  public endBackRoomWatching(): void { return rental.endBackRoomWatching(this); }
 
   // ── Harness hooks ──────────────────────────────────────────────────────────
 
@@ -4778,7 +4775,6 @@ export class StoreScene {
     // frozen, so the tier must be free to drop to IDLE.
     const videoPlaying = !active && (
       (!!this.ambientTvs && this.ambientTvs.isPlaying()) ||
-      (!!this.backRoom && this.backRoom.isPlaying()) ||
       (arrowVisible && arrowBobAwake && !this.softwareGL));
     // IDLE gate (IDLE_TIER_INPUT_MS): the tier may only drop to IDLE once 30s
     // have passed since the last real user input (keyboard/mouse/gamepad, see
@@ -5020,7 +5016,7 @@ export class StoreScene {
     const patchable = !!this.partial && !active && videoPlaying && !forceWake &&
       !mustRenderThisFrame && !settleRefine &&
       !!this.ambientTvs?.isPlaying() &&
-      !this.backRoom?.isPlaying() && !(arrowVisible && arrowBobAwake) &&
+      !(arrowVisible && arrowBobAwake) &&
       this.mode !== 'backroom' && !this.checkoutRunning &&
       this.shadowRefreshFrames === 0 && !this.clerkMirrorRefresh &&
       !this.stockedRebakeDue(time) && this.marqueeAnimMode !== 'chase' &&
@@ -5877,7 +5873,6 @@ export class StoreScene {
     // reload during a lockout must boot right back into the room.
     this.clearRentalUnlockSchedule();
     if (this.backRoom) {
-      this.backRoom.detachVideo();
       this.backRoom.dispose();
       this.backRoom = null;
     }
