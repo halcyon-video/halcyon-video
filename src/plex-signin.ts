@@ -19,7 +19,7 @@ import { PROVIDER_KIND_KEY } from './providers/active-provider';
 export const PLEX_ACCOUNT_TOKEN_KEY = 'plex_account_token';
 
 const POLL_INTERVAL_MS = 2000;
-/** plex.tv expires a PIN after 30 minutes; stop before it does. */
+/** plex.tv gives a plain (four-character) PIN 15 minutes; don't outlive it. */
 const POLL_TIMEOUT_MS = 15 * 60 * 1000;
 
 type El<T extends HTMLElement = HTMLElement> = T | null;

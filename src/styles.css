@@ -2424,17 +2424,6 @@ html, body {
   background: #000;
 }
 
-/* T23 diegetic mode: the movie shows on the back room's CRT (a VideoTexture
-   sampling #vp-video), so the fullscreen surface hides and the overlay goes
-   transparent — only the control bars float over the 3D room. `visibility`
-   (not display) keeps the element decoding frames for the texture. */
-#video-player-overlay.vp-diegetic {
-  background: transparent;
-}
-#video-player-overlay.vp-diegetic #vp-video {
-  visibility: hidden;
-}
-
 /* Controls (+ their scrims) fade out smoothly during playback, reappear on input. */
 #video-player-overlay .vp-top-bar,
 #video-player-overlay .vp-control-bar {

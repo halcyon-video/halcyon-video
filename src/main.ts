@@ -2579,21 +2579,22 @@ async function initializeStoreScene(preservePosterCache = false) {
     };
 
     // T23: a rented tape confirmed from the couch (after the insert beat) —
-    // start the in-app player in diegetic mode and map its <video> onto the
-    // room's CRT. If the player never opened (no Jellyfin — external mpv
-    // fallback), eject the tape so the room isn't stuck "watching" nothing.
+    // play it FULLSCREEN, exactly like every other title in the app. The
+    // room's CRT never shows the picture (owner ruling 2026-08-16); the only
+    // thing the couch changes is where playback lets you out, which is back
+    // into the room rather than the store entrance (see finishPlayback).
     scene.onBackRoomPlay = (movie) => {
       void launchVideoPlayback(movie, undefined, undefined, false, true).then(() => {
         // The launch is asynchronous, and an expiring session tears the scene
         // down mid-flight (expireSession) — this closure still holds the dead
-        // one, so hanging a video texture on it would paint into a room that
-        // no longer exists.
+        // one, so touching the room here would poke a room that no longer
+        // exists.
         if (storeScene !== scene) return;
-        if (videoPlayer?.isOpen) {
-          scene.attachBackRoomVideo(videoPlayer.videoElement);
-        } else {
-          scene.detachBackRoomVideo();
-        }
+        // Nothing started at all (demo mode, no stream, a refused external
+        // player): don't leave the room stuck "watching" nothing. mpv counts
+        // as started even though it opens no in-app player — it sets
+        // isPlaybackActive as it spawns.
+        if (!videoPlayer?.isOpen && !ui.isPlaybackActive) scene.endBackRoomWatching();
       });
     };
 
@@ -2945,12 +2946,9 @@ let sessionGeneration = 0;
  * Order matters, and it is the whole point of this function. The player comes
  * down FIRST: the credentials it is streaming on have just been thrown away,
  * so it can only sit there showing nothing, and a transport bar stranded over
- * the login screen was the bug the owner hit — worst in rental mode, where
- * playback is diegetic (the picture belongs on the back room's CRT, so the
- * overlay is transparent and you see the login screen straight through the
- * controls). It also holds the input lock, which would leave the login screen
- * underneath unreachable. Only once the player is closed do the scene, the
- * indicator timer and the HUD go.
+ * the login screen was the bug the owner hit. It also holds the input lock,
+ * which would leave the login screen underneath unreachable. Only once the
+ * player is closed do the scene, the indicator timer and the HUD go.
  */
 function expireSession(reason: string) {
   sessionGeneration++;
@@ -3014,11 +3012,12 @@ async function wakeRefresh() {
 
 // ─── Video Playback ───────────────────────────────────────────────────────────
 
-// `diegetic` (T23): the movie is presented on the back room's CRT screen plane
-// instead of the fullscreen surface — the player overlay opens transparent
-// (controls only, hideVideoSurface) and the 3D scene keeps rendering in the
-// VIDEO tier. The caller attaches videoPlayer.videoElement to the room after
-// this resolves; onClose detaches it and stays in the room.
+// `fromCouch` (T23): the tape was started from the back room's couch. It plays
+// FULLSCREEN like every other title — the room's CRT is a prop, not a screen
+// (owner ruling 2026-08-16, replacing the diegetic-CRT presentation) — so the
+// only thing this changes is the exit: playback lets you out back into the
+// room, tape ejected, instead of at the store entrance. It has to, since the
+// rental lockout is still running and the store is exactly where you can't be.
 // `version` (4K/1080p picker, see resolvePlayVersion): the specific quality
 // version to stream. Absent on a multi-version title, the movie's own item /
 // default media source plays — callers that can't sensibly show the picker
@@ -3031,7 +3030,33 @@ async function wakeRefresh() {
 // playback-flow.ts — shared with the mpv exit handler below.
 let seriesQueue: { seriesId: string; episodes: Episode[] } | null = null;
 
-export async function launchVideoPlayback(movie: Movie, overrideItemId?: string, overridePath?: string, startHidden = false, diegetic = false, version?: MovieVersion) {
+/**
+ * Where playback lets you out, once nothing is left to roll into.
+ *
+ * From the couch (T23) that is the back room, tape ejected. It cannot be the
+ * store entrance: the rental lockout that put you home is still running, and
+ * the store's ambient TVs stay paused precisely because you are still in the
+ * room — exitBackRoomToStore is what resumes them, when the door opens.
+ * Everything else fades back in at the entrance in library-select, so shelves
+ * can be picked right away.
+ *
+ * Callers report the stop themselves (the ids differ per path) and call this
+ * last.
+ */
+function finishPlayback(movie: Movie, fromCouch: boolean): void {
+  storeScene?.resumeRendering();
+  if (fromCouch) {
+    storeScene?.endBackRoomWatching();
+    logToConsole(`[Video] Stopped "${movie.title}". Back on the couch.`, 'video');
+    return;
+  }
+  storeScene?.resumeAmbientTvs();
+  storeScene?.returnToEntrance();
+  updateMovieHUD(storeScene?.getSelectedMovie() || null);
+  logToConsole(`[Video] Stopped "${movie.title}". Returned through the entrance.`, 'video');
+}
+
+export async function launchVideoPlayback(movie: Movie, overrideItemId?: string, overridePath?: string, startHidden = false, fromCouch = false, version?: MovieVersion) {
   revealPendingHidden = false; // fresh launch — clear any stale reveal handshake
   // The session this launch belongs to. Anything that retires the session
   // while we're awaiting invalidates the whole attempt — see sessionLost().
@@ -3042,12 +3067,12 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
     return true;
   };
 
-  // Demo mode: no media server, so no stream. Diegetic (back-room CRT) callers
-  // check videoPlayer.isOpen right after this resolves and eject the tape
-  // gracefully when the player never opened — keep that path overlay-free.
-  // Everything else lands on the fullscreen PLAYBACK DISABLED card instead.
+  // Demo mode: no media server, so no stream. The couch caller checks right
+  // after this resolves and ejects the tape gracefully when nothing started —
+  // keep that path overlay-free. Everything else lands on the fullscreen
+  // PLAYBACK DISABLED card instead.
   if (isDemoMode) {
-    if (diegetic) {
+    if (fromCouch) {
       logToConsole(`[Video] Demo mode: no media server to stream "${movie.title}" — the tape ejects.`, 'video');
       return;
     }
@@ -3143,7 +3168,7 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
   // the human is somewhere else entirely — isRemotelyDriven() is what sees it.
   const clientIsServerMachine =
     isTauri || ['localhost', '127.0.0.1', '::1', '[::1]'].includes(window.location.hostname);
-  if (localPath && !diegetic && clientIsServerMachine && !isRemotelyDriven()
+  if (localPath && clientIsServerMachine && !isRemotelyDriven()
       && getSetting<boolean>('bb_local_mpv') !== false) {
     const spawnMpv = async (): Promise<boolean> => {
       const started = await playLocalWithMpv(
@@ -3156,14 +3181,10 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
           const nextEp = markWatchedAndFindNext(movie, endedNaturally, seriesQueue, playbackId, () => storeScene?.restockSlottedFixtures());
           if (nextEp) {
             logToConsole(`[Video] "${movie.title}" — up next: ${episodeLabel(nextEp)}.`, 'video');
-            void launchVideoPlayback(movie, nextEp.id, nextEp.path || undefined, false, false);
+            void launchVideoPlayback(movie, nextEp.id, nextEp.path || undefined, false, fromCouch);
             return;
           }
-          storeScene?.resumeRendering();
-          storeScene?.resumeAmbientTvs();
-          storeScene?.returnToEntrance();
-          updateMovieHUD(storeScene?.getSelectedMovie() || null);
-          logToConsole(`[Video] Stopped "${movie.title}". Returned through the entrance.`, 'video');
+          finishPlayback(movie, fromCouch);
         },
         (msg) => logToConsole(msg, 'video'),
       );
@@ -3187,7 +3208,7 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
         // The local endpoint refused/vanished during the flourish — fall back
         // to the in-app player, revealed immediately (the ritual already ran).
         ui.isPlaybackActive = false;
-        await launchVideoPlayback(movie, overrideItemId, overridePath, false, false, version);
+        await launchVideoPlayback(movie, overrideItemId, overridePath, false, fromCouch, version);
       };
       return;
     }
@@ -3300,10 +3321,11 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
   // caught and logged inside.)
   playbackStarted(jellyfinUrl, token, playbackId);
 
-  // Yield GPU/CPU to the decoder (only if not hidden). Diegetic playback
-  // keeps the renderer alive — the room IS the screen (ambient TVs are
-  // already paused for the lockout).
-  if (!diegetic && !startHidden) {
+  // Yield GPU/CPU to the decoder (only if not hidden). Couch playback yields
+  // too now that it is fullscreen: nothing of the room is on screen behind it.
+  // (Its pauseAmbientTvs is a no-op — being home already paused them, and
+  // finishPlayback deliberately leaves them that way.)
+  if (!startHidden) {
     storeScene?.pauseAmbientTvs();
     storeScene?.pauseRendering();
   }
@@ -3331,12 +3353,11 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
         : null;
     },
     startPositionTicks: resumeTicks || undefined,
-    hideVideoSurface: diegetic,
-    // Non-diegetic playback exits through returnToEntrance() (onClose below)
-    // — gate user-initiated exits behind an "are you sure?" so a Back meant
-    // to dismiss the controls doesn't dump the viewer at the storefront.
-    // Couch playback (diegetic) just returns to the room, no confirm needed.
-    confirmExit: !diegetic,
+    // Store playback exits through returnToEntrance() (onClose below) — gate
+    // user-initiated exits behind an "are you sure?" so a Back meant to
+    // dismiss the controls doesn't dump the viewer at the storefront. Couch
+    // playback just drops back onto the couch, so no confirm is needed.
+    confirmExit: !fromCouch,
     buildStream: (sel) => transcodeStreamUrl(jellyfinUrl, token, playbackId, { ...sel, sourceVideoCodec, mediaSourceId }),
     log: (msg) => logToConsole(msg, 'video'),
     onProgress: (positionTicks, isPaused) => {
@@ -3356,18 +3377,14 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
       // Optimistic local watch-state update + up-next lookup (see
       // markWatchedAndFindNext in playback-flow.ts, shared with the mpv exit
       // handler above) — only a natural end counts as "watched"/advances.
-      // The player reuses one <video> element, so a diegetic (back-room CRT)
-      // advance keeps its existing VideoTexture mapping — no re-attach
-      // needed. startHidden stays false: the tape animation is the gesture
-      // for STARTING a title, not for continuing one.
+      // startHidden stays false: the tape animation is the gesture for
+      // STARTING a title, not for continuing one.
       const nextEp = markWatchedAndFindNext(movie, endedNaturally, seriesQueue, playbackId, () => storeScene?.restockSlottedFixtures());
       if (nextEp) {
         playbackStopped(jellyfinUrl, token, playbackId, positionTicks, movie.runTimeTicks);
         logToConsole(`[Video] "${movie.title}" — up next: ${episodeLabel(nextEp)}.`, 'video');
-        // Diegetic playback keeps the room on screen (the overlay is
-        // transparent there), so only the fullscreen path bridges the gap.
-        if (!diegetic) videoPlayer?.beginTransition(`Up next — ${episodeLabel(nextEp)}`);
-        void launchVideoPlayback(movie, nextEp.id, nextEp.path || undefined, false, diegetic)
+        videoPlayer?.beginTransition(`Up next — ${episodeLabel(nextEp)}`);
+        void launchVideoPlayback(movie, nextEp.id, nextEp.path || undefined, false, fromCouch)
           .finally(() => {
             // The next episode bailed before opening (no stream, external
             // fallback): drop the holding overlay so the store isn't stuck
@@ -3376,23 +3393,8 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
           });
         return;
       }
-      // T23: stopping a couch movie returns to the room view (the CRT goes
-      // dark, the tape ejects) — never through the store entrance, and the
-      // renderer/ambient state was never paused for diegetic playback.
-      if (diegetic) {
-        storeScene?.detachBackRoomVideo();
-        playbackStopped(jellyfinUrl, token, playbackId, positionTicks, movie.runTimeTicks);
-        logToConsole(`[Video] Stopped "${movie.title}". Back on the couch.`, 'video');
-        return;
-      }
-      storeScene?.resumeRendering();
-      storeScene?.resumeAmbientTvs();
-      // Fade back in from white standing at the entrance, in library-select
-      // so shelves can be picked right away.
-      storeScene?.returnToEntrance();
-      updateMovieHUD(storeScene?.getSelectedMovie() || null);
       playbackStopped(jellyfinUrl, token, playbackId, positionTicks, movie.runTimeTicks);
-      logToConsole(`[Video] Stopped "${movie.title}". Returned through the entrance.`, 'video');
+      finishPlayback(movie, fromCouch);
     },
     onFatalError: () => {
       logToConsole('[Video] In-app playback failed; opening external player.', 'video');
@@ -3420,10 +3422,11 @@ let revealPendingHidden = false;
 let pendingHiddenMpvLaunch: (() => Promise<void>) | null = null;
 
 // ─── Demo playback block ─────────────────────────────────────────────────────
-// The public demo has no media server, so every non-diegetic play lands on a
-// fullscreen PLAYBACK DISABLED card instead of a stream. It follows the real
-// player's lifecycle: honors startHidden until revealVideoPlayback() (so the
-// walk-to-the-exit play animation still runs over a live scene), pauses
+// The public demo has no media server, so every play that isn't a rented tape
+// on the couch lands on a fullscreen PLAYBACK DISABLED card instead of a
+// stream (a couch tape just ejects — see launchVideoPlayback). It follows the
+// real player's lifecycle: honors startHidden until revealVideoPlayback() (so
+// the walk-to-the-exit play animation still runs over a live scene), pauses
 // rendering while up, and closes through the same Back/Power input paths and
 // return-to-entrance tail the real player's onClose uses. Open/closed state
 // rides on ui.isPlaybackActive — in demo mode the real player never opens.

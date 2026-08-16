@@ -125,16 +125,12 @@ export interface VideoPlayerOptions {
    *  the quality/audio/subtitle picker button appears; the player reloads the
    *  returned URL at the current position. */
   buildStream?: (sel: StreamSelection) => string;
-  /** T23 diegetic mode: hide the fullscreen <video> surface and make the
-   *  overlay transparent so only the control bars float over the 3D scene —
-   *  the picture is presented elsewhere (the back room CRT samples this
-   *  player's <video> into a VideoTexture; see BackRoom.attachVideo). */
-  hideVideoSurface?: boolean;
   /** Ask "are you sure?" before a USER-initiated exit (Back button/key).
-   *  Set for non-diegetic playback, where closing tears the session down and
-   *  drops the viewer back at the store entrance — a stray Back press meant
-   *  to dismiss the on-screen controls shouldn't cost them their spot in the
-   *  movie. Natural end-of-video and fatal errors always close directly. */
+   *  Set for store playback, where closing drops the viewer back at the store
+   *  entrance — a stray Back press meant to dismiss the on-screen controls
+   *  shouldn't cost them their spot in the movie. Couch playback, which just
+   *  lets out onto the couch, leaves it off. Natural end-of-video and fatal
+   *  errors always close directly. */
   confirmExit?: boolean;
   /** Fired when the user backs out or the video ends. `endedNaturally` is true
    *  only when playback ran to the end of the stream, which is what lets a
@@ -355,8 +351,6 @@ export class VideoPlayer {
     this._isOpen = true;
     this.endedNaturally = false;
     this.isHidden = startHidden;
-    // T23 diegetic mode (see VideoPlayerOptions.hideVideoSurface).
-    this.overlay.classList.toggle('vp-diegetic', !!opts.hideVideoSurface);
 
     // Try cheap direct play first; only fall back to server-side HLS transcode
     // if the webview can't decode the original file. When the caller has
@@ -606,7 +600,6 @@ export class VideoPlayer {
     this.teardownPlayback();
     this.closeTracksMenu();
     this.overlay.classList.remove('visible');
-    this.overlay.classList.remove('vp-diegetic');
     this.opts = null;
 
     onClose?.(ticks, endedNaturally);

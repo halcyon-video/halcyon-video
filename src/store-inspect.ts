@@ -64,8 +64,8 @@ export function selectAction(scene: StoreScene): 'inspect' | 'play' | 'request' 
           scene.onBackRoomPlay(movie);
         } else {
           // Harness / no player wired: nothing streams, put the tape back.
-          scene.onConsoleLog(`[System] (No player attached) "${movie.title}" would play on the CRT now.`, 'system');
-          room.detachVideo();
+          scene.onConsoleLog(`[System] (No player attached) "${movie.title}" would start playing now.`, 'system');
+          room.endWatching();
         }
       });
       if (started) {
