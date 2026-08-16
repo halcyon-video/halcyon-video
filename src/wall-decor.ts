@@ -51,7 +51,6 @@ import * as THREE from 'three';
 import type { StoreScene } from './three-scene';
 import { STORE_CENTER_X, HIGH_CEILING_Y } from './store-layout';
 import { SIDE_RIBBON_FRONT_Z, rightSideDoorZone } from './storefront-facade';
-import { CORNICE_DROP } from './store-shell';
 import { getActiveTheme, themeTrimDarkHex, type StoreTheme } from './themes';
 import { markSignMesh } from './sign-builders';
 
@@ -60,12 +59,6 @@ const WALL_INSET = 0.06;        // flush-mount depth off the wall plane (matches
                                  // used as the "clean butt" gap between two walls' décor planes at a shared corner
 const CORNER_MARGIN = 0.6;      // breathing room off a corner that has NO décor on the other side (the step notch, the vestibule end)
 const DOOR_MARGIN = 0.4;        // extra clearance beyond the door/frame's own footprint
-// Clearance below the VISIBLE ceiling line: the chrome mirror cornice hangs
-// CORNICE_DROP below the true ceiling and occludes anything painted above
-// that from every normal viewing angle (see wall-stripe-1990.ts), and on
-// bb-1990 the painted wall stripe itself sits in the top ~1.5 ft below that
-// line. Staying this far clear keeps the décor visible and clear of both.
-const CEILING_MARGIN = 2.3;
 const MIN_SPAN_LEN = 3.0;       // a clear run shorter than this isn't worth decorating
 const MIN_PORTRAIT_GAP = 1.2;   // minimum breathing room between/around frames — "evenly spread", never crammed
 
@@ -84,34 +77,50 @@ const MIN_PORTRAIT_GAP = 1.2;   // minimum breathing room between/around frames 
 const MAX_PORTRAITS = 6;
 // Owner ask 2026-08-15, straight after the cut to six: "about 2.5x bigger".
 // Fewer, bigger frames — six 2.4 ft portraits on a 40 ft wall read as stickers
-// stuck on the ribbon rather than as the wall's subject.
+// stuck on the ribbon rather than as the wall's subject. The ask is a REQUEST:
+// the band has hard edges, and what the geometry allows is logged next to what
+// was asked so the two never silently become one number.
+// What the band actually is, measured off a built store rather than guessed
+// (traverse of every mesh near the back wall, world-space bounding boxes, 1993
+// / high ceiling / wide corner):
 //
-// The ask is a REQUEST, not the final size, because the band it hangs in has a
-// hard floor and a hard ceiling. The top edge is pinned at PORTRAIT_TOP_Y (the
-// visible ceiling less CEILING_MARGIN), so height only grows DOWNWARD, and
-// below the band is the New Releases wall shelving: its topmost tier sits at
-// WALL_SHELF_HEIGHTS' last value (6.545) carrying a leaning case (0.667 tall,
-// ~0.657 after the 10° lean), so its stock tops out at ~7.20 ft. A portrait
-// that hangs into that is the clipping this whole module was written to end.
+//   7.20   top of the New Releases wall stock (last shelf tier + a leaning case)
+//   8.57   NEW RELEASES wall lettering, sign plane -- glyphs sit ~8.8-9.7
+//  10.23   ... top of that sign plane
+//  13.10   upper wall band (blue valance + bulb run), the whole wall's width
+//  15.30   visible ceiling line (the mirror cornice's bottom edge)
 //
-// So: ask for 2.5x, take what the band has room for, and say which happened.
-// (The gate only builds on the high-ceiling shell, so these are constants
-// rather than per-store measurements — see the ceilingY check in
-// buildWallDecor.)
-const BAND_FLOOR_Y = 7.7;       // ~0.5 ft of air over the wall bays' top stock
-const PORTRAIT_TOP_Y = HIGH_CEILING_Y - CORNICE_DROP - CEILING_MARGIN;
-const PORTRAIT_H_REQUESTED = 2.4 * 2.5;
-const PORTRAIT_H = Math.min(PORTRAIT_H_REQUESTED, PORTRAIT_TOP_Y - BAND_FLOOR_Y);
+// Two hard objects, one soft one. The valance and the stock are geometry and
+// the décor stays out of both. The lettering is PAINT, and a frame standing
+// proud of it is a frame hung on a painted wall — allowed, and unavoidable at
+// any size worth calling bigger (the clear gap between lettering and valance
+// is only 2.87 ft).
+const BAND_FLOOR_Y = 7.7;        // ~0.5 ft of air over the wall bays' top stock
+const VALANCE_FLOOR_Y = 13.05;   // just under the upper wall band at 13.10
+const LETTERING_GLYPH_TOP_Y = 9.75;
 
-// The ribbon's own line, FIXED. It used to be derived from the portrait height
-// — strip and portraits shared one centre — which was invisible while the
-// frames were small and wrong the moment they grew: a taller portrait pushed
-// the shared centre down and dragged the ribbon with it, onto the New Releases
-// wall lettering at y 9.4. The strip is the constant element on this wall; it
-// hangs where it always has (the line the 2.4 ft portraits centred on), and
-// the portraits now grow DOWNWARD from PORTRAIT_TOP_Y around it, the way
-// frames hang off a picture rail.
-const STRIP_CENTER_Y = PORTRAIT_TOP_Y - 1.2;
+// Owner ask 2026-08-15: the portraits centre on the film strip's own line.
+// They were TOP-hung from the band's ceiling, so the strip crossed their upper
+// third; the ask reads as "move them up", but the probe above says they cannot
+// go up — their tops already sit 0.01 ft under the valance. So the ribbon comes
+// down to their centre instead, as far as it can while keeping clear air over
+// the NEW RELEASES glyphs, and the portraits are sized to what that leaves.
+//
+// The line is DERIVED, not picked: the glyph top plus the ribbon's own half
+// height plus GLYPH_CLEARANCE puts it at 10.70 (the strip running 10.05-11.35),
+// so re-measuring the lettering moves the ribbon with it. That leaves the
+// frames 4.7 ft: not the 6.0 ft a literal 2.5x asks for -- centring spends
+// height symmetrically, so the shorter side of the strip line sets the size --
+// but still nearly 2x the 2.4 ft they started at, and every edge clears.
+const STRIP_H = 1.3;
+const STRIP_CELL_FT = 1.3;      // world-space width baked into one texture "cell"
+const GLYPH_CLEARANCE = 0.3;    // air between the ribbon's lower edge and the lettering
+const STRIP_CENTER_Y = LETTERING_GLYPH_TOP_Y + STRIP_H / 2 + GLYPH_CLEARANCE;
+const PORTRAIT_H_REQUESTED = 2.4 * 2.5;
+const PORTRAIT_H = Math.min(
+  PORTRAIT_H_REQUESTED,
+  2 * Math.min(VALANCE_FLOOR_Y - STRIP_CENTER_Y, STRIP_CENTER_Y - BAND_FLOOR_Y),
+);
 
 // How far the frames stand off the wall. The New Releases lettering is a wall
 // sign at localZ 0.08, and a portrait hung at the old 0.02/0.035 sat BEHIND
@@ -126,9 +135,6 @@ const PORTRAIT_W = PORTRAIT_H * PORTRAIT_ASPECT;
 const FRAME_PAD = 0.09;         // per side
 const PORTRAIT_FRAMED_W = PORTRAIT_W + FRAME_PAD * 2;
 const PORTRAIT_FRAMED_H = PORTRAIT_H + FRAME_PAD * 2;
-
-const STRIP_H = 1.3;
-const STRIP_CELL_FT = 1.3;      // world-space width baked into one texture "cell"
 
 type WallId = 'left' | 'back' | 'right';
 
@@ -372,9 +378,8 @@ export function buildWallDecor(scene: StoreScene, storeWidth: number, backWallZ:
   if (spans.length === 0) return;
 
   const theme = getActiveTheme();
-  // Portraits hang from the top of the band down; the ribbon holds its own
-  // fixed line (see STRIP_CENTER_Y).
-  const centerY = PORTRAIT_TOP_Y - PORTRAIT_H / 2;
+  // One line for both: the strip's centre IS the portraits' centre.
+  const centerY = STRIP_CENTER_Y;
 
   // Film strip: one segment per clear span (on whichever of the three walls
   // it belongs to), floating flush on the wall. Always built when décor is
@@ -399,7 +404,7 @@ export function buildWallDecor(scene: StoreScene, storeWidth: number, backWallZ:
     });
     const band = markSignMesh(new THREE.Mesh(new THREE.PlaneGeometry(len, STRIP_H), mat));
     const group = new THREE.Group();
-    group.position.set(mid.x, STRIP_CENTER_Y, mid.z);
+    group.position.set(mid.x, centerY, mid.z);
     group.rotation.y = rotY; // face into the store; local +Z -> world "into the room" for every wall
     group.add(band);
     scene.scene.add(group);
