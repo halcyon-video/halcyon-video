@@ -51,20 +51,14 @@ import * as THREE from 'three';
 import type { StoreScene } from './three-scene';
 import { STORE_CENTER_X, HIGH_CEILING_Y } from './store-layout';
 import { SIDE_RIBBON_FRONT_Z, rightSideDoorZone } from './storefront-facade';
-import { CORNICE_DROP } from './store-shell';
 import { getActiveTheme, themeTrimDarkHex, type StoreTheme } from './themes';
+import { markSignMesh } from './sign-builders';
 
 // ── Tunables ─────────────────────────────────────────────────────────────
 const WALL_INSET = 0.06;        // flush-mount depth off the wall plane (matches the old rightX inset); also
                                  // used as the "clean butt" gap between two walls' décor planes at a shared corner
 const CORNER_MARGIN = 0.6;      // breathing room off a corner that has NO décor on the other side (the step notch, the vestibule end)
 const DOOR_MARGIN = 0.4;        // extra clearance beyond the door/frame's own footprint
-// Clearance below the VISIBLE ceiling line: the chrome mirror cornice hangs
-// CORNICE_DROP below the true ceiling and occludes anything painted above
-// that from every normal viewing angle (see wall-stripe-1990.ts), and on
-// bb-1990 the painted wall stripe itself sits in the top ~1.5 ft below that
-// line. Staying this far clear keeps the décor visible and clear of both.
-const CEILING_MARGIN = 2.3;
 const MIN_SPAN_LEN = 3.0;       // a clear run shorter than this isn't worth decorating
 const MIN_PORTRAIT_GAP = 1.2;   // minimum breathing room between/around frames — "evenly spread", never crammed
 
@@ -81,15 +75,66 @@ const MIN_PORTRAIT_GAP = 1.2;   // minimum breathing room between/around frames 
 // Still just a ceiling: planPortraitSlots drops slots (fewer, or none per
 // span) rather than ever crowding past MIN_PORTRAIT_GAP.
 const MAX_PORTRAITS = 6;
-const PORTRAIT_H = 2.4;
+// Owner ask 2026-08-15, straight after the cut to six: "about 2.5x bigger".
+// Fewer, bigger frames — six 2.4 ft portraits on a 40 ft wall read as stickers
+// stuck on the ribbon rather than as the wall's subject. The ask is a REQUEST:
+// the band has hard edges, and what the geometry allows is logged next to what
+// was asked so the two never silently become one number.
+// What the band actually is, measured off a built store rather than guessed
+// (traverse of every mesh near the back wall, world-space bounding boxes, 1993
+// / high ceiling / wide corner):
+//
+//   7.20   top of the New Releases wall stock (last shelf tier + a leaning case)
+//   8.57   NEW RELEASES wall lettering, sign plane -- glyphs sit ~8.8-9.7
+//  10.23   ... top of that sign plane
+//  13.10   upper wall band (blue valance + bulb run), the whole wall's width
+//  15.30   visible ceiling line (the mirror cornice's bottom edge)
+//
+// Two hard objects, one soft one. The valance and the stock are geometry and
+// the décor stays out of both. The lettering is PAINT, and a frame standing
+// proud of it is a frame hung on a painted wall — allowed, and unavoidable at
+// any size worth calling bigger (the clear gap between lettering and valance
+// is only 2.87 ft).
+const BAND_FLOOR_Y = 7.7;        // ~0.5 ft of air over the wall bays' top stock
+const VALANCE_FLOOR_Y = 13.05;   // just under the upper wall band at 13.10
+const LETTERING_GLYPH_TOP_Y = 9.75;
+
+// Owner ask 2026-08-15: the portraits centre on the film strip's own line.
+// They were TOP-hung from the band's ceiling, so the strip crossed their upper
+// third; the ask reads as "move them up", but the probe above says they cannot
+// go up — their tops already sit 0.01 ft under the valance. So the ribbon comes
+// down to their centre instead, as far as it can while keeping clear air over
+// the NEW RELEASES glyphs, and the portraits are sized to what that leaves.
+//
+// The line is DERIVED, not picked: the glyph top plus the ribbon's own half
+// height plus GLYPH_CLEARANCE puts it at 10.70 (the strip running 10.05-11.35),
+// so re-measuring the lettering moves the ribbon with it. That leaves the
+// frames 4.7 ft: not the 6.0 ft a literal 2.5x asks for -- centring spends
+// height symmetrically, so the shorter side of the strip line sets the size --
+// but still nearly 2x the 2.4 ft they started at, and every edge clears.
+const STRIP_H = 1.3;
+const STRIP_CELL_FT = 1.3;      // world-space width baked into one texture "cell"
+const GLYPH_CLEARANCE = 0.3;    // air between the ribbon's lower edge and the lettering
+const STRIP_CENTER_Y = LETTERING_GLYPH_TOP_Y + STRIP_H / 2 + GLYPH_CLEARANCE;
+const PORTRAIT_H_REQUESTED = 2.4 * 2.5;
+const PORTRAIT_H = Math.min(
+  PORTRAIT_H_REQUESTED,
+  2 * Math.min(VALANCE_FLOOR_Y - STRIP_CENTER_Y, STRIP_CENTER_Y - BAND_FLOOR_Y),
+);
+
+// How far the frames stand off the wall. The New Releases lettering is a wall
+// sign at localZ 0.08, and a portrait hung at the old 0.02/0.035 sat BEHIND
+// its plane — fine while the frames were small enough to stay above the
+// lettering band entirely, a z-fight once they reach down past it. A frame
+// standing ~1.5 in proud of a painted band is also just what a hung frame
+// does.
+const FRAME_STANDOFF = 0.05;
+const PORTRAIT_STANDOFF = 0.065;
 const PORTRAIT_ASPECT = 2 / 3;  // width / height, matching the poster-card convention elsewhere
 const PORTRAIT_W = PORTRAIT_H * PORTRAIT_ASPECT;
 const FRAME_PAD = 0.09;         // per side
 const PORTRAIT_FRAMED_W = PORTRAIT_W + FRAME_PAD * 2;
 const PORTRAIT_FRAMED_H = PORTRAIT_H + FRAME_PAD * 2;
-
-const STRIP_H = 1.3;
-const STRIP_CELL_FT = 1.3;      // world-space width baked into one texture "cell"
 
 type WallId = 'left' | 'back' | 'right';
 
@@ -333,8 +378,8 @@ export function buildWallDecor(scene: StoreScene, storeWidth: number, backWallZ:
   if (spans.length === 0) return;
 
   const theme = getActiveTheme();
-  const visibleCeilingY = scene.ceilingY - CORNICE_DROP;
-  const centerY = visibleCeilingY - CEILING_MARGIN - PORTRAIT_H / 2;
+  // One line for both: the strip's centre IS the portraits' centre.
+  const centerY = STRIP_CENTER_Y;
 
   // Film strip: one segment per clear span (on whichever of the three walls
   // it belongs to), floating flush on the wall. Always built when décor is
@@ -346,14 +391,18 @@ export function buildWallDecor(scene: StoreScene, storeWidth: number, backWallZ:
     const len = span.s1 - span.s0;
     const { fixed, rotY } = wallFrame(span.wall, storeWidth, backWallZ);
     const mid = wallPoint(span.wall, (span.s0 + span.s1) / 2, fixed);
+    // No emissive term: pin 058 — "they need not to glow like that. they need
+    // to have in-room lighting and be the same lighting as the wall". A strip
+    // carrying its own primary-coloured emissive stayed lit where the wall
+    // behind it fell into shadow, which is what read as a glow. markSignMesh
+    // puts it under auditSignMeshes, so a future emissive here fails loudly
+    // instead of quietly glowing again.
     const mat = new THREE.MeshStandardMaterial({
       map: makeFilmStripTexture(theme, len),
       roughness: 0.85,
       metalness: 0.0,
-      emissive: new THREE.Color(theme.palette.primary).multiplyScalar(0.12),
-      emissiveIntensity: 1.0,
     });
-    const band = new THREE.Mesh(new THREE.PlaneGeometry(len, STRIP_H), mat);
+    const band = markSignMesh(new THREE.Mesh(new THREE.PlaneGeometry(len, STRIP_H), mat));
     const group = new THREE.Group();
     group.position.set(mid.x, centerY, mid.z);
     group.rotation.y = rotY; // face into the store; local +Z -> world "into the room" for every wall
@@ -366,8 +415,13 @@ export function buildWallDecor(scene: StoreScene, storeWidth: number, backWallZ:
   // The count is the thing under review here (pin 059), and a portrait needs a
   // catalog with cast art to appear at all — so say what was hung, rather than
   // leaving "no portraits" ambiguous between "capped" and "nothing qualified".
+  const sized = PORTRAIT_H < PORTRAIT_H_REQUESTED - 1e-6
+    ? `${PORTRAIT_H.toFixed(2)} ft tall (asked ${PORTRAIT_H_REQUESTED.toFixed(2)}, clamped to the band)`
+    : `${PORTRAIT_H.toFixed(2)} ft tall`;
   console.log(`[wall-decor] ${spans.length} span(s), ${slots.length} portrait(s) `
-    + `from ${actors.length} qualifying actor(s), room cap ${MAX_PORTRAITS}`);
+    + `from ${actors.length} qualifying actor(s), room cap ${MAX_PORTRAITS}; `
+    + `${sized}, hanging ${(centerY - PORTRAIT_H / 2).toFixed(2)}-${(centerY + PORTRAIT_H / 2).toFixed(2)} ft, `
+    + `strip line ${STRIP_CENTER_Y.toFixed(2)} ft`);
   if (actors.length === 0) return;
 
   const frameMat = new THREE.MeshStandardMaterial({
@@ -385,15 +439,26 @@ export function buildWallDecor(scene: StoreScene, storeWidth: number, backWallZ:
     group.position.set(p.x, centerY, p.z);
     group.rotation.y = rotY;
 
-    const frame = new THREE.Mesh(new THREE.PlaneGeometry(PORTRAIT_FRAMED_W, PORTRAIT_FRAMED_H), frameMat);
-    frame.position.z = 0.02; // proud of the strip (local +Z -> toward the store interior)
+    const frame = markSignMesh(new THREE.Mesh(new THREE.PlaneGeometry(PORTRAIT_FRAMED_W, PORTRAIT_FRAMED_H), frameMat));
+    frame.position.z = FRAME_STANDOFF; // proud of the strip AND of the wall lettering (local +Z -> into the room)
     group.add(frame);
 
     // Neutral placeholder fill until the real portrait decodes; never a
     // broken/missing-texture look.
-    const portraitMat = new THREE.MeshBasicMaterial({ color: 0x2a2620, side: THREE.DoubleSide });
-    const portrait = new THREE.Mesh(new THREE.PlaneGeometry(PORTRAIT_W, PORTRAIT_H), portraitMat);
-    portrait.position.z = 0.035;
+    //
+    // STANDARD, not Basic (pin 058): a MeshBasicMaterial ignores scene
+    // lighting outright, so every portrait rendered at full print brightness
+    // no matter what the wall around it was doing — the "glow" in the pin. It
+    // is a photograph pinned to a wall; it takes the troffers' light and the
+    // wall's shadows like the paint it hangs on.
+    const portraitMat = new THREE.MeshStandardMaterial({
+      color: 0x2a2620,
+      roughness: 0.9,
+      metalness: 0.0,
+      side: THREE.DoubleSide,
+    });
+    const portrait = markSignMesh(new THREE.Mesh(new THREE.PlaneGeometry(PORTRAIT_W, PORTRAIT_H), portraitMat));
+    portrait.position.z = PORTRAIT_STANDOFF;
     group.add(portrait);
 
     loadPersonPortrait(actor.imageUrl, (tex) => {
