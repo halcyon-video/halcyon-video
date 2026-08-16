@@ -41,7 +41,7 @@ export function setMaxAnisotropy(n: number): void {
 let cheapMaterials = false;
 export function setCheapMaterials(on: boolean): void { cheapMaterials = on; }
 export function useCheapMaterials(): boolean { return cheapMaterials; }
-function aniso(desired: number): number {
+export function aniso(desired: number): number {
   return Math.min(desired, maxAnisotropy);
 }
 

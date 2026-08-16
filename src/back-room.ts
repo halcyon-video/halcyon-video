@@ -41,6 +41,7 @@ import type { RentalRecord } from './rental-clock';
 import { formatUnlockLabel, formatCheckoutStamp } from './rental-clock';
 import { brandString } from './brand-pack';
 import { BB_MONO, ensureBundledFont, bundledFontReady } from './bundled-fonts';
+import { aniso, useCheapMaterials } from './canvas-textures';
 
 // Room origin: +200ft in X from the store centreline (x=11) — far outside the
 // shell, past every wall, mural, exterior pano and light probe.
@@ -142,6 +143,10 @@ export class BackRoom {
   private screenOverlay: THREE.Mesh | null = null;
   private screenGloss: THREE.Mesh | null = null;
   private tvGlow: THREE.PointLight | null = null;
+
+  // World point at the far (header) end of the receipt's print — one half of
+  // what the couch view's focal plane is aimed between. Set by buildDueNote.
+  private notePrintFar: THREE.Vector3 | null = null;
 
   // VCR mouth (where the insert beat lands), local coords.
   private vcrMouth = new THREE.Vector3(0, 1.0, -4.35);
@@ -609,12 +614,32 @@ export class BackRoom {
     // it nearer the pile's focal plane into the bargain. Texel size is
     // 0.36/512 whatever H is, so nothing about the type changes.
     const W = 512, H = 1450;
+    // Painted at 2x and scaled back down, so every coordinate below still reads
+    // in the 512-wide layout the measurements were taken in while the print
+    // carries twice the texels. It needs them at BOTH ends: the near end of the
+    // slip is magnified on a 4K panel (512 across ~0.36ft fills ~1100 px there),
+    // and the far end is minified into a third of that. Not on the low tier,
+    // which is every software-GL run: 12 MB of canvas for print that tier's
+    // resolution cannot resolve anyway.
+    const SS = useCheapMaterials() ? 1 : 2;
     const canvas = document.createElement('canvas');
-    canvas.width = W;
-    canvas.height = H;
+    canvas.width = W * SS;
+    canvas.height = H * SS;
     const ctx = canvas.getContext('2d')!;
+    ctx.scale(SS, SS);
     const tex = new THREE.CanvasTexture(canvas);
     tex.colorSpace = THREE.SRGBColorSpace;
+    // The slip lies FLAT and runs away from the lens, so its texture is sampled
+    // at a grazing angle: ~1 texel per pixel across the width, ~4 down the
+    // length. At the CanvasTexture default (anisotropy 1) the GPU picks one mip
+    // for the worst axis, which blurs the readable axis just as hard — that is
+    // what turned the header block into mush, more than the depth of field did.
+    // Same treatment every other printed texture in the app gets (toSignTexture
+    // in canvas-textures.ts).
+    tex.minFilter = THREE.LinearMipmapLinearFilter;
+    tex.magFilter = THREE.LinearFilter;
+    tex.generateMipmaps = true;
+    tex.anisotropy = aniso(16);
 
     const paint = () => {
       const mono = bundledFontReady(BB_MONO) ? BB_MONO : 'monospace';
@@ -625,24 +650,46 @@ export class BackRoom {
       // warm key: the lamp lifts the paper and crushes the contrast, and a
       // faithful violet came out invisible on screen. Overdriving to near-black
       // navy is what reads AS violet ink once the room has had its way with it.
-      const INK = '#141634', PAPER = '#f5f2e9';
+      const INK = '#0d0e26', PAPER = '#f5f2e9';
       const L = 34, R = W - 34, CX = W / 2;
       ctx.fillStyle = PAPER;
       ctx.fillRect(0, 0, W, H);
       ctx.fillStyle = INK;
       ctx.textBaseline = 'alphabetic';
 
+      // RIBBON BLEED, and the reason the body used to be unreadable from the
+      // couch. Body type is 21px on 3-inch stock, so from the couch a glyph
+      // stem lands about ONE screen pixel wide — and a stem that only half
+      // covers its pixel can only ever be half ink, whatever colour it is.
+      // Measured on the render before this: the darkest pixel in the totals
+      // block reached 142/255 against 227 paper, 1.55:1, while DUE BACK (thick
+      // enough to cover whole pixels) hit 6.13:1 off the SAME ink.
+      //
+      // So the fix is more ink on the paper rather than darker ink: outline
+      // every glyph with a hairline in its own colour, which fattens the stem
+      // by ~0.3px each side and pushes coverage past 1. That is also what the
+      // artifact does — an impact head hammers the ribbon into the stock and
+      // the ink spreads, which is why receipt type looks blunt and heavy up
+      // close and never hairline-thin.
+      ctx.strokeStyle = INK;
+      ctx.lineWidth = 0.62;
+      ctx.lineJoin = 'round';
+      const ink = (t: string, x: number, y: number) => {
+        ctx.fillText(t, x, y);
+        ctx.strokeText(t, x, y);
+      };
+
       const px = 21;
       const line = (y: number, size = px) => { ctx.font = `${size}px "${mono}", monospace`; return y; };
-      const left = (t: string, y: number, x = L) => { ctx.textAlign = 'left'; ctx.fillText(t, x, line(y)); };
-      const right = (t: string, y: number) => { ctx.textAlign = 'right'; ctx.fillText(t, R, line(y)); };
-      const mid = (t: string, y: number) => { ctx.textAlign = 'center'; ctx.fillText(t, CX, line(y)); };
+      const left = (t: string, y: number, x = L) => { ctx.textAlign = 'left'; ink(t, x, line(y)); };
+      const right = (t: string, y: number) => { ctx.textAlign = 'right'; ink(t, R, line(y)); };
+      const mid = (t: string, y: number) => { ctx.textAlign = 'center'; ink(t, CX, line(y)); };
       // Emphasis on a printer with no bold face: strike the row twice, a hair
       // apart, the way an impact head was made to shout.
       const heavy = (t: string, y: number, size: number) => {
         ctx.textAlign = 'center';
-        ctx.fillText(t, CX, line(y, size));
-        ctx.fillText(t, CX + 0.9, y);
+        ink(t, CX, line(y, size));
+        ink(t, CX + 0.9, y);
       };
       // A rule is a printed row of characters, not a drawn line — the printer
       // had no graphics, which is why the reference's rules are asterisks.
@@ -654,7 +701,7 @@ export class BackRoom {
       // Price rows: label left, an aligned dollar column, amount flush right.
       const money = (label: string, amount: string, y: number, indent = 0) => {
         left(label, y, L + indent);
-        ctx.textAlign = 'left'; ctx.fillText('$', R - 118, line(y));
+        ctx.textAlign = 'left'; ink('$', R - 118, line(y));
         right(amount, y);
       };
 
@@ -684,10 +731,10 @@ export class BackRoom {
         money('Rental', f(RENT), y, 22); y += 30;
       }
       y += 6;
-      ctx.textAlign = 'right'; ctx.fillText('----------', R, line(y)); y += 30;
+      ctx.textAlign = 'right'; ink('----------', R, line(y)); y += 30;
       money('Subtotal', f(sub), y); y += 26;
       money('Total Tax', f(tax), y); y += 12;
-      ctx.textAlign = 'right'; ctx.fillText('==========', R, line(y + 14)); y += 44;
+      ctx.textAlign = 'right'; ink('==========', R, line(y + 14)); y += 44;
       money('Amount Due', f(sub + tax), y); y += 44;
       money('Tendered VISA', f(sub + tax), y); y += 26;
       money('Change Due', '0.00', y); y += 46;
@@ -741,6 +788,12 @@ export class BackRoom {
     // what a receipt dropped on a table in front of you actually looks like.
     note.position.set(0.66, tableTopY + 0.006, 1.58);
     this.addOwned(note);
+    // The far end of the print — the header block, the deepest thing on this
+    // table anyone is asked to READ. focusDistance() balances the depth of
+    // field between here and the tape pile; measured off the geometry rather
+    // than typed in, so moving or resizing the slip re-aims the focus with it.
+    note.updateMatrixWorld(true);
+    this.notePrintFar = note.localToWorld(new THREE.Vector3(0, 0.36 * (H / W) * 0.40, 0));
   }
 
   private buildVcrClock(): void {
@@ -998,14 +1051,26 @@ export class BackRoom {
   // ── Camera poses for StoreScene's lerp ─────────────────────────────────────
 
   /**
-   * Distance from the couch eye point to the tape pile — the focal plane for
-   * the depth-of-field pass in this view. The pile, not the look target: the
-   * look target sits between the tapes and the receipt so both frame well, and
-   * focusing there would leave the spine (the thing being read) soft.
+   * Focal plane for this view's depth-of-field pass, as a distance from the
+   * couch eye point.
+   *
+   * TWO subjects share this table and both are read: the tape pile's spine,
+   * and the receipt — which lies flat and runs AWAY from the lens, so its print
+   * spans a foot of depth on its own (measured: the slip's bbox runs 0.57 to
+   * 1.60 ft out, against a pile at 1.14). Pinning the plane on the pile, as
+   * this used to, put the receipt's header a third of the focal distance
+   * BEYOND it and blurred the top half of the slip into mush — the owner's
+   * report, 2026-08-16.
+   *
+   * So aim between the two: the pile, and the far end of the print (the
+   * deepest line anyone has to read). With the aperture the couch view now
+   * uses, that band covers the whole slip and the spine alike, while the TV
+   * seven feet back still falls apart exactly as before.
    */
   focusDistance(): number {
     const eye = this._pose.pos.set(VIEW_POS.x, VIEW_POS.y, VIEW_POS.z).add(BACK_ROOM_ORIGIN);
     const pile = this._v.set(0, this.stackBaseY, 1.42).add(BACK_ROOM_ORIGIN);
+    if (this.notePrintFar) pile.lerp(this.notePrintFar, 0.5);
     return eye.distanceTo(pile);
   }
 

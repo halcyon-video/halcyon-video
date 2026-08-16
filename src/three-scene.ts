@@ -4699,8 +4699,8 @@ export class StoreScene {
         // out toward the lens, so a wide aperture softened the print that this
         // framing exists to show. The TV is ~7 ft past a ~1.3 ft focus, which
         // still defocuses hard at this setting.
-        u['aperture'].value = 0.0062;
-        u['maxblur'].value = 0.011;
+        u['aperture'].value = 0.0025;
+        u['maxblur'].value = 0.006;
       } else if (dofOn) {
         // Focal plane on the FACE of the held case, not on the look target (the
         // case centre) and — the bug this replaced — not on a 1.5 floor that sat
