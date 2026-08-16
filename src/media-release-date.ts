@@ -265,11 +265,21 @@ export function windowGteParam(win: SuggestionWindow): string | null {
   return win.min ? toDateOnly(win.min) : null;
 }
 
+const MONTHS_ABBR = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+
+/**
+ * A cutoff instant as the store's own date string, e.g. "12-JUN-1996". The one
+ * spelling of the store date in the whole app: the counter CRT's status row and
+ * the on-screen corner stamp (media-date-badge.ts) both read it from here, so a
+ * user who sets the pin at the terminal sees the same characters in the corner.
+ */
+export function formatCutoffDate(d: Date): string {
+  return `${d.getDate().toString().padStart(2, '0')}-${MONTHS_ABBR[d.getMonth()]}-${d.getFullYear()}`;
+}
+
 /** Terminal/status label for a pin, e.g. "12-JUN-1996" (effective, not base). */
 export function formatCutoffLabel(pin: MediaReleasePin, now: Date): string {
-  const d = effectiveCutoff(pin, now);
-  const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
-  return `${d.getDate().toString().padStart(2, '0')}-${months[d.getMonth()]}-${d.getFullYear()}`;
+  return formatCutoffDate(effectiveCutoff(pin, now));
 }
 
 // ── localStorage plumbing (guarded so the pure math above stays node-testable) ──
