@@ -79,11 +79,12 @@ The short answers, so you don't have to go looking for them.
 | **Run on a Raspberry Pi?** | Yes — **2.5D mode** runs the same store as plain HTML/CSS. [More ↓](#25d-mode--the-same-store-for-a-raspberry-pi) |
 | **Work away from home?** | Yes — **Remote Play** streams the live store to any browser, with its own TURN relay for off-LAN viewers. [More ↓](#remote-play--the-store-in-your-pocket) |
 | **Look like *my* video store?** | Yes — brand, logo, colors, themes, fixtures and sign art are all data you drop in a folder, not code. [See it ↑](#it-doesnt-have-to-be-my-store) · [More ↓](#make-it-yours) |
+| **Show me my library as it was in 1996?** | Yes — pin a **Media Release Date** and everything released after it leaves the store entirely. The pin rolls forward a day per day. [More ↓](#media-release-date--the-store-as-it-stood-on-a-date) |
 | **Work with no media server at all?** | The demo does — it ships its own synthetic catalog, which is the link above. Shelving *your* files needs Jellyfin or Plex; there's no built-in folder scanner. |
 
 ### Jump to
 
-**Get it running:** [Quick start](#quick-start) — npm, Docker, or HTPC kiosk · [FAQ](#faq)
+**Get it running:** [Quick start](#quick-start) — one click, npm, Docker, or HTPC kiosk · [FAQ](#faq)
 
 **See it:** [Browse the aisles](#browse-the-aisles) · [Pick up a case](#pick-up-a-case) · [Rent it like it's 1994](#rent-it-like-its-1994) · [The clerk](#the-clerk) · [Discovery](#discovery--the-store-stocks-what-youre-missing) · [Games](#the-games-department) · [Watching something](#watching-something)
 
@@ -128,6 +129,16 @@ minutes; it's how our family has picked a movie every night for months.
 - **Doors swing open** as you approach. Footsteps alternate ears. The ceiling
   CRTs are playing something family-safe from your own library, with positional
   audio that gets louder as you walk under them.
+
+![Three wall-mounted CRTs above the New Releases wall, all playing the same feed](docs/screenshots/store-tvs.gif)
+
+**The screens are really playing.** Not a looping texture of a screen — a live
+video decoding onto the tube, the same one on every set, panned into place so
+it swells as you walk under it. Most eras hang two sets from the ceiling; the
+2000 store mounts a bank of three flush to the back wall, above the case grid.
+On Jellyfin they pull from libraries you pick (Settings → Playback → Overhead
+TVs). Everywhere else — the demo, a first boot, a Plex install — they play a
+bundled 30-second loop, because a dark tube reads as broken hardware.
 
 ![First-person walk mode](docs/screenshots/walk-mode.jpg)
 
@@ -333,6 +344,34 @@ HDR skies) / street-view outside the glass.
 
 ![The same store at night](docs/screenshots/facade-night.jpg)
 
+### Media Release Date — the store as it stood on a date
+
+![The MEDIA RELEASE DATE screen on the counter CRT, with the store date stamped in the corner of the screen](docs/screenshots/media-release-date.jpg)
+
+Pin the catalog to a day and the store becomes the store as it was on that day.
+Anything released later is simply **gone** — not greyed out, not filtered in a
+sidebar: not on a shelf, not in search, not on the New Releases wall, not a
+staff pick, not something the clerk will offer you. A series that started in
+time still shelves, but the episodes that hadn't aired yet aren't there either.
+A library that is entirely too new doesn't even get an aisle.
+
+The pin **rolls**. Set 12-JUN-1996 today and tomorrow the store is 13-JUN-1996 —
+one real day per real day, permanently offset from now. Titles arrive on the
+anniversary of their release, so a store pinned to 1996 goes on having new
+release weeks.
+
+- **The date is on screen**, bottom right, for as long as a pin is in effect —
+  so an aisle with nothing recent in it reads as the whole point rather than as
+  a sync that went wrong.
+- **Match store era** puts the decor on the same clock, and crosses into the
+  next era on the day the rolling date does. Leave it off and the two stay
+  independent: a 2010-dressed store can carry a 1996 catalog.
+- Recommendations can carry their own permanent **release-date window**, so a
+  period store never gets offered something that came out last month.
+
+Set it at the counter — **Left**, then **MEDIA RELEASE DATE**. Clearing the pin
+restocks the store back to live.
+
 ### Membership cards
 
 Jellyfin users appear as **laminated membership cards** — deterministic member
@@ -518,6 +557,20 @@ that the query happens whenever a session negotiates, including on your own LAN
 ---
 
 ## Quick start
+
+**Clone and click.** Grab the repo, then double-click the launcher for your
+platform — it checks Node, installs dependencies the first time, builds, serves
+on :1420, and opens your browser at it:
+
+| | |
+|---|---|
+| **Windows** | `start.cmd` |
+| **macOS** | `start.command` |
+| **Linux** | `start.sh` |
+
+Add `demo` (`./start.sh demo`) to open the built-in catalog instead of the login
+screen, or `dev` for the hot-reloading dev server. `HALCYON_PORT=1421` moves it
+off :1420. Nothing in there is magic — it runs the npm commands below in order:
 
 ```sh
 git clone https://github.com/halcyon-video/halcyon-video
