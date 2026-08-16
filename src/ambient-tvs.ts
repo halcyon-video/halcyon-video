@@ -83,6 +83,43 @@ const SCREEN_BULGE = 0.035;
 // sets, which are flatter and further away than the desk terminals.
 const CEILING_GLASS_GAIN = 1.7;
 
+/**
+ * Conform the picture to the tube face: FIT VERTICALLY (owner ruling
+ * 2026-08-16). The movie's full HEIGHT spans the full height of the glass, its
+ * aspect ratio is preserved, and whatever hangs off the sides is cropped evenly
+ * — which for any widescreen source on these 4:3 tubes means losing a slice of
+ * the outer left and right edges. That is the intended trade: a real store's
+ * monitors were fed a 4:3 pan-and-scan feed, and both alternatives read as
+ * faults — letterbox bars look like broken glass at this size, and the former
+ * edge-to-edge stretch squashed every face on screen.
+ *
+ * Implemented as a UV rect on the shared VideoTexture, so it costs nothing per
+ * frame and every set fed by this texture picks it up at once. A source
+ * NARROWER than the tube (4:3 or academy content) can't be cropped sideways, so
+ * it fills the width and gives up a sliver of top and bottom instead — the one
+ * rule that always holds is that the picture is never distorted. Note the UV
+ * rect can only ever crop: repeat > 1 would sample outside the frame and smear
+ * clamped edge pixels, hence the min().
+ *
+ * Called with no decoded frame yet (videoWidth 0), it leaves the identity rect
+ * in place; the 'resize'/'loadedmetadata' listeners re-run it the moment the
+ * real dimensions land.
+ */
+function fitVideoToTube(tex: THREE.Texture, video: HTMLVideoElement, screenAspect: number): void {
+  const vw = video.videoWidth, vh = video.videoHeight;
+  if (!vw || !vh || !isFinite(screenAspect) || screenAspect <= 0) {
+    tex.repeat.set(1, 1);
+    tex.offset.set(0, 0);
+    return;
+  }
+  const videoAspect = vw / vh;
+  const repeatX = Math.min(1, screenAspect / videoAspect); // < 1 => sides cropped
+  const repeatY = Math.min(1, videoAspect / screenAspect); // < 1 => top/bottom cropped
+  tex.repeat.set(repeatX, repeatY);
+  tex.offset.set((1 - repeatX) / 2, (1 - repeatY) / 2); // centre the crop
+  (window as any).__tvVideoFit = { vw, vh, videoAspect, screenAspect, repeatX, repeatY };
+}
+
 // Tag one whole SET for the partial-composite patch (see
 // src/partial-composite.ts): while the camera is parked and the picture is the
 // only thing moving, these meshes are re-drawn on their own over the cached
@@ -113,11 +150,15 @@ interface TvParts {
 }
 
 export class AmbientTvs implements StoreFixture {
-  // The CRT tube face is ~4:3; the video is stretched to FILL it edge to edge
-  // (see makeVideoTexture), so no stored screen-aspect drives any UV crop.
-  // Re-asserts the full-frame FILL UV mapping (set up by makeVideoTexture;
-  // re-invoked after the GLB swap reshapes the screen) so the movie always
-  // covers the whole tube edge to edge with no bars.
+  // Aspect of the glass the video is mapped onto, w/h. Both built tube shapes
+  // are 4:3, but the async GLB upgrade re-cuts the ceiling screens to the real
+  // model's glass rect — so this is a field the crop reads at call time, not a
+  // constant. Set by buildHardware/buildWallBank and again at the GLB swap.
+  private screenAspect = 4 / 3;
+  // Re-applies the fit-vertically UV crop (fitVideoToTube) to the live video
+  // texture: on an HLS rendition switch (the <video> 'resize' event) and after
+  // the GLB swap reshapes the screen, both of which change one side of the
+  // ratio the crop is solved from. Null when there's no video.
   private refitVideoCrop: (() => void) | null = null;
 
   private hls: Hls | null = null;
@@ -254,28 +295,17 @@ export class AmbientTvs implements StoreFixture {
     videoTex.colorSpace = THREE.SRGBColorSpace;
     this.videoTex = videoTex;
 
-    // Full-frame FILL (CSS object-fit: fill): stretch the WHOLE video across
-    // the TV's 4:3 face (default 0..1 UV) so the picture reaches every edge with
-    // NO letterbox/pillarbox bars and NO cropping — the movie is conformed to
-    // the TV's own aspect ratio, exactly what the user wants for these ambient
-    // sets. This neutralizes the former crop-to-fill (issue #142) while keeping
-    // the function + its callsites (the 'resize' listener and refitVideoCrop /
-    // GLB-swap re-fit at buildRealTube) intact and harmless — they just re-assert
-    // the identity UV rect after a rendition switch or screen-shape change.
-    const applyFullFill = () => {
-      // Reset to the identity UV rect: whole frame → whole quad, filled edge to
-      // edge in the screen's aspect (screenAspect no longer participates).
-      videoTex.repeat.set(1, 1);
-      videoTex.offset.set(0, 0);
-    };
+    // Fit the movie VERTICALLY to the tube, cropping the widescreen overhang
+    // off both sides — see fitVideoToTube.
+    const applyFit = () => fitVideoToTube(videoTex, video, this.screenAspect);
     // 'resize' fires whenever the decoded frame size changes (e.g. an HLS ABR
-    // ladder switch to a different rendition) — harmless to re-run; keeps the
-    // full-fill mapping in force if the source dimensions ever change.
-    video.addEventListener('resize', applyFullFill);
-    this.refitVideoCrop = applyFullFill;
+    // ladder switch to a rendition with a different shape) — re-solve the crop
+    // against the new source dimensions.
+    video.addEventListener('resize', applyFit);
+    this.refitVideoCrop = applyFit;
 
     const seekAndPlay = () => {
-      applyFullFill(); // re-assert the full-frame fill once metadata is available
+      applyFit(); // solve the crop now that the real frame size is known
       const maxSec = isFinite(video.duration) ? video.duration * 0.70 : durationMin * 60;
       video.currentTime = Math.min(seekSec, maxSec);
       video.play().catch(() => {});
@@ -324,20 +354,18 @@ export class AmbientTvs implements StoreFixture {
     videoTex.colorSpace = THREE.SRGBColorSpace;
     this.videoTex = videoTex;
 
-    // Full-frame fill onto the 4:3 face, same conformance the streamed path
-    // applies — see the long note in makeVideoTexture.
-    const applyFullFill = () => {
-      videoTex.repeat.set(1, 1);
-      videoTex.offset.set(0, 0);
-    };
-    applyFullFill();
-    video.addEventListener('resize', applyFullFill);
-    this.refitVideoCrop = applyFullFill;
+    // Fit vertically onto the tube face, same conformance the streamed path
+    // applies — see fitVideoToTube. The bundled clip is 640x360 (16:9), so it
+    // is the crop's normal case, not an edge one.
+    const applyFit = () => fitVideoToTube(videoTex, video, this.screenAspect);
+    applyFit();
+    video.addEventListener('resize', applyFit);
+    this.refitVideoCrop = applyFit;
 
     // Fire-and-forget: a missing/undecodable file leaves the tubes dark exactly
     // as they were before this path existed, and never blocks the store build.
     video.addEventListener('loadedmetadata', () => {
-      applyFullFill();
+      applyFit();
       video.play().catch(() => {});
     }, { once: true });
     video.addEventListener('error', () => {
@@ -370,6 +398,7 @@ export class AmbientTvs implements StoreFixture {
     const bodyW = 2.6, bodyH = 2.2, bodyD = 2.2;
     const screenW = 2.1, screenH = 1.575;
     const poleLen = 2.0;
+    this.screenAspect = screenW / screenH; // what the video crop is solved against
 
     // CRT body: RoundedBoxGeometry gives soft plastic edges (boxier than before —
     // matches the squared-off desk-monitor shell rather than a rounded set), then
@@ -598,6 +627,7 @@ export class AmbientTvs implements StoreFixture {
   // bezel + curved tube is the final look here.
   private buildWallBank(screenMat: THREE.Material, scanMat: THREE.Material): void {
     const screenW = 2.1, screenH = screenW * 0.75; // 4:3 — a substantial set
+    this.screenAspect = screenW / screenH; // what the video crop is solved against
     const bezelPad = 0.2;
     const outerW = screenW + bezelPad * 2, outerH = screenH + bezelPad * 2;
     const pitch = outerW + 1.0; // + a stretch of periwinkle wall between sets
@@ -829,7 +859,10 @@ export class AmbientTvs implements StoreFixture {
     this.bezelMat = null;
 
     if (rect && newH > 0) {
-      this.refitVideoCrop?.(); // re-assert full-frame FILL on the reshaped screen
+      // The real tube's glass is rarely exactly 4:3 — re-solve the vertical fit
+      // against the shape actually on screen now.
+      this.screenAspect = SCREEN_W / newH;
+      this.refitVideoCrop?.();
     }
 
     // Recompute the frustum-gating spheres for the reshaped screens.
