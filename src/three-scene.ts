@@ -87,6 +87,9 @@ import {
   _checkoutWalkAhead,
   CAMERA_GLIDE_LERP,
   HERO_SPINE_YAW,
+  INSPECT_FAN_X,
+  INSPECT_CASE_Z,
+  INSPECT_RETAIL_Z_LEAD,
   updatedMeshes,
   CLERK_SLEEP_INPUT_MS,
 } from './scene-shared';
@@ -129,7 +132,7 @@ import { RentalRecord, loadRentalRecord, clearRentalRecord, isLockedOut, formatU
 import { perfTrace, perfSlot } from './perf-trace';
 import { ShelfClasps, type ClaspTarget } from './fixtures/shelf-clasp';
 import { requestMovie } from './jellyseerr';
-import { displayHz, computeFpsCap } from './display-hz';
+import { displayHz, computeFpsCap, computeScalerTargetFps } from './display-hz';
 import { type LibraryIndex } from './recommend-why';
 import type { ClerkSuggestion } from './clerk-interaction';
 
@@ -4268,8 +4271,15 @@ export class StoreScene {
     // on the RX 9070 XT: motion-frame cost is mostly pixel-independent (AO
     // recompute + draw-call submission), so a tighter band just parks scale
     // at the floor for no fps — 0.83× is the right down-threshold here too.
-    const downAt = this.targetFps * 0.83;
-    const upAt = this.targetFps * 0.97;
+    //
+    // Bounded by SCALER_TARGET_FPS_CAP: that same pixel-independence means a
+    // GPU short of the panel's refresh cannot buy the difference with
+    // resolution, so scaling the thresholds all the way up with an uncapped
+    // 144/165Hz display parks resScale at the floor permanently. See
+    // computeScalerTargetFps.
+    const scalerTarget = computeScalerTargetFps(this.targetFps);
+    const downAt = scalerTarget * 0.83;
+    const upAt = scalerTarget * 0.97;
     if (fps < downAt && this.resScale > this.resScaleMin) {
       this.resScale = Math.max(this.resScaleMin, round2(this.resScale - StoreScene.RES_SCALE_STEP));
       this.resScaleGoodStreak = 0;
@@ -5195,8 +5205,8 @@ export class StoreScene {
         }
 
         if (this.mode === 'inspect') {
-          targetFrontX = 0.28;
-          targetFrontZ = 0.10;
+          targetFrontX = INSPECT_FAN_X;
+          targetFrontZ = INSPECT_CASE_Z + INSPECT_RETAIL_Z_LEAD;
           // Both cases flip: the retail case shows its back (cast list) and the
           // rental copy its rental-info back. Opposite spin directions so
           // they read like a book opening.
@@ -5212,8 +5222,8 @@ export class StoreScene {
             targetFrontRotY = this.heroFaceRot;
           }
 
-          targetBackX = -0.28;
-          targetBackZ = 0.10;
+          targetBackX = -INSPECT_FAN_X;
+          targetBackZ = INSPECT_CASE_Z;
           // Spine stop: only the rental copy turns (the retail case sits
           // back at its front pose beside it) — spine to the camera, angled a
           // touch short of square so a bit of the front cover stays visible.

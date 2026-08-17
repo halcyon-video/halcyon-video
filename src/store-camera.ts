@@ -8,7 +8,7 @@ import * as THREE from 'three';
 import { CASE_WIDTH, CASE_HEIGHT } from './video-case';
 import { FIELD_Z_FRONT, BROWSE_WINDOW_SIZE, AISLE_SHELF_HEIGHTS, WALL_SHELF_HEIGHTS, BOX_SPACING, UNIT_FRAME_HEIGHT, unitDepthAtHeight, BACK_WALL_UNIT_IDX, extraCopiesCount, MovieSlot, STORE_CENTER_X } from './store-layout';
 import { getActiveTheme } from './themes';
-import { OVERVIEW_POS, OVERVIEW_PITCH_MIN, OVERVIEW_PITCH_MAX } from './scene-shared';
+import { OVERVIEW_POS, OVERVIEW_PITCH_MIN, OVERVIEW_PITCH_MAX, INSPECT_FAN_X, INSPECT_CASE_Z, INSPECT_FIT_MARGIN } from './scene-shared';
 import { BB_ARCHIVO_BLACK } from './bundled-fonts';
 import { getActiveLogoSpec } from './logo-spec';
 import { onBrandChange } from './brand-live';
@@ -385,10 +385,14 @@ export function updateCameraTarget(scene: StoreScene) {
     const vFov = (scene.camera.fov * Math.PI) / 180;
     const aspect = scene.camera.aspect;
     
-    const totalWidth = 0.56 + actualBoxWidth; // Centers are at -0.28 and 0.28 (dist = 0.56)
+    const totalWidth = 2 * INSPECT_FAN_X + actualBoxWidth; // the pair's full span
     const totalHeight = actualBoxHeight;
-    const margin = 1.8; // Adjusted margin to bring selected boxes closer to camera
-    
+    const margin = INSPECT_FIT_MARGIN;
+
+    // Height governs at every ordinary aspect: both distances scale with the
+    // same margin, and distH > distW whenever totalHeight * aspect > totalWidth
+    // (0.667 * 1.78 = 1.19 against a 0.93 span). So `margin` reads directly as
+    // "the pair fills 1/margin of the frame HEIGHT" — 1.8 is about 56%.
     const distH = (totalHeight * margin) / (2 * Math.tan(vFov / 2));
     const distW = (totalWidth * margin) / (2 * Math.tan(vFov / 2) * aspect);
     
@@ -465,8 +469,13 @@ export function updateCameraTarget(scene: StoreScene) {
       // here is the face's screen-right axis for every unit orientation, so
       // a 0 lateral offset centers the pair on all of them (the aspect fit
       // above already sizes the distance for the full two-case span).
+      // NOTE the pair is NOT the same apparent size even when coplanar: the
+      // rental clamshell is physically taller than the sleeve it holds
+      // (VHS_RIM_VERTICAL_FT — 0.727ft against 0.667ft), so at equal distance it
+      // already stands ~9% taller on screen. That is the baseline any
+      // INSPECT_RETAIL_Z_LEAD is judged against, not a coplanar pair.
       const targetFrontX = 0.0;
-      const targetFrontZ = 0.10;
+      const targetFrontZ = INSPECT_CASE_Z;
 
       const fWorldX = targetX + targetFrontX * Math.cos(targetRotY) + targetFrontZ * Math.sin(targetRotY);
       const fWorldZ = targetZ - targetFrontX * Math.sin(targetRotY) + targetFrontZ * Math.cos(targetRotY);

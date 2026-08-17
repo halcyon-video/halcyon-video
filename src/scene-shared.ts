@@ -91,6 +91,55 @@ export const CT_HERO = perfSlot('heroBind'); // selection moved onto a new title
 // sliver of the front cover visible so the box still reads as a 3D object.
 export const HERO_SPINE_YAW = Math.PI / 2 - 0.28;
 
+// ─── INSPECT POSE ────────────────────────────────────────────────────────────
+// Where the two cases stand when one is picked up, in the SLOT's local frame:
+// local +X is the shopper's screen-right for every unit orientation, local +Z is
+// the outward normal (toward the shopper). The retail cover box fans to +X, the
+// rental clamshell to -X.
+//
+// Named here because store-camera.ts has to agree with the poses store-scene's
+// updateHeroCase writes — it solves the camera distance from the pair's total
+// span and anchors the look target on their midpoint, so a bare 0.28 edited in
+// one file and not the other silently decentres the framing (which is the bug
+// GH #43 fixed by hand).
+export const INSPECT_FAN_X = 0.28;   // lateral half-separation of the pair
+export const INSPECT_CASE_Z = 0.10;  // how far the pair stands out toward the shopper
+
+// Extra forward offset for the RETAIL cover box only, on top of INSPECT_CASE_Z —
+// i.e. presenting the cover art nearer the lens than the rental copy beside it.
+//
+// ZERO, after measuring it (2026-08-17). Worth writing down, because "push the
+// cover box forward a little" is an obvious-sounding idea that does not survive
+// contact with the flip cycle:
+//
+//  - The pair is NOT the same apparent size to begin with. The clamshell is
+//    physically taller than the sleeve it holds (VHS_RIM_VERTICAL_FT: 0.727ft vs
+//    0.667ft), so unflipped the cover box measures ~8% shorter on screen
+//    (measured 0.922). A ~0.09ft lead cancels that exactly (measured 1.014).
+//  - But the clamshell DROPS to the plain, un-widened case geometry the moment
+//    the pair flips or turns to its spine (see updateBackCoverHighlight — the rim
+//    widening reads as a stray edge strip once nothing occludes it). At those
+//    stops the two are naturally the SAME height, so the same lead makes the
+//    retail box ~11% TALLER instead. The lead does not remove the mismatch, it
+//    moves it from the front stop to the back stop and slightly enlarges it.
+//  - And the 8% it "fixes" is not a defect: a real store's clamshell genuinely
+//    is bigger than the box art inside it.
+//
+// Legibility — the actual goal — came from decoding the front at 3x instead
+// (hero-front-detail.ts), which is worth far more than 9% of linear size. If this
+// is ever revived, it has to become stop-dependent (no lead while isFlipped ||
+// heroSpine) or it just relocates the problem. DOF is not the obstacle: the focal
+// plane follows the front mesh (heroFocusDistance) and 0.09ft measured no visible
+// softening on the clamshell print.
+export const INSPECT_RETAIL_Z_LEAD = 0;
+
+// Camera framing: the pair's span is fitted to this fraction of the frame's
+// smaller extent, so LOWER means the cases sit larger/closer. Height governs at
+// every ordinary aspect (see the arithmetic in store-camera.ts).
+// 1.80 -> 1.55 on owner direction, 2026-08-17: the pair reads ~16% larger, which
+// buys real legibility now that the front carries the pixels to earn it.
+export const INSPECT_FIT_MARGIN = 1.55;
+
 // Instanced meshes touched by the current slot-pose pass; cleared per frame.
 export const updatedMeshes = new Set<THREE.InstancedMesh>();
 
