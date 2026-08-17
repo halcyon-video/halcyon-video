@@ -617,6 +617,38 @@ sudo loginctl enable-linger $USER
 
 **Demo, no server:** https://halcyon-video.github.io/halcyon-video/ — or append `?demo=1` to any deployment.
 
+**Updating.** How you update depends on how you installed — and the two Docker
+routes above do *not* update the same way:
+
+| Installed with | Update with |
+|---|---|
+| `docker run ghcr.io/…` (prebuilt image) | `docker pull`, then recreate the container |
+| `docker compose up -d` from a clone | `git pull`, then `docker compose up -d --build` |
+| Clone + launcher, or `npm` | `git pull`, then re-run the launcher (or `npm install && npm run build`) |
+
+```sh
+# Prebuilt image — no clone involved, nothing to git pull:
+docker pull ghcr.io/halcyon-video/halcyon-video
+docker rm -f halcyon && docker run -d --name halcyon --network host \
+  --restart unless-stopped ghcr.io/halcyon-video/halcyon-video
+
+# From a clone — compose builds the image itself, so the new code arrives by git:
+git pull && docker compose up -d --build
+```
+
+`docker compose pull` is **not** the compose update path. This repo's
+[`docker-compose.yml`](docker-compose.yml) builds from the clone (`build: .`)
+instead of naming a published image, so compose skips the service with
+`No image to be pulled` and exits successfully — leaving you on the old build
+with nothing on screen to say so. `git pull` is what fetches the new code and
+`--build` is what turns it into a new image. (Uncomment the `image:` line in
+that file to run the prebuilt image under compose instead; then it *is*
+`docker compose pull`.)
+
+A container started with `--restart unless-stopped` keeps running its existing
+image forever — restarting it, or rebooting the host, never picks up a new
+release on its own.
+
 **Development:** `npm run build` must pass (tsc + line budgets +
 signage-config validation). Unit suites: `npm run test:rental`, `test:nav`,
 `test:why`, `test:picks`, `test:shelf`, `test:versions`, `test:promo`,
