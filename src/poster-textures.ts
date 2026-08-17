@@ -264,7 +264,13 @@ function processUploads() {
     count++;
   }
 
-  if (textureUploadQueue.length > 0) {
+  // Both lanes, not just the bulk one: the loop above drains PRIORITY first,
+  // so a frame that hits the per-frame cap on priority tasks alone (fresh
+  // decodes of titles whose uploads were already queued push nothing into the
+  // bulk lane) would leave the rest of that lane stranded with no rAF pending —
+  // and those posters never flip their loaded flag, so their cover boxes sit
+  // unpainted until some unrelated enqueue happens to restart the pump.
+  if (pendingUploads() > 0) {
     requestAnimationFrame(processUploads);
   } else {
     isUploading = false;
