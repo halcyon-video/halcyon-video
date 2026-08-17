@@ -13,7 +13,7 @@
 // boot-flow.ts through the callbacks it was initialized with.
 import {
   fetchPublicUsers,
-  fetchLibraryList,
+  rememberKnownLibraries,
   normalizeUrl,
 } from './jellyfin';
 // Sign-in goes through the provider (GH #32). fetchPublicUsers stays direct:
@@ -324,7 +324,12 @@ async function afterAuth(url: string, session: MembershipLoginSession): Promise<
   screen = { kind: 'dialing', address: url, step: 'PULLING THE CATALOG LIST...' };
   render();
   try {
-    const libs = await fetchLibraryList(url, session.accessToken, session.userId);
+    // Through the provider: this used to call jellyfin.ts's fetchLibraryList
+    // directly, which asks for /Users/<id>/Views — a route no Plex server has,
+    // so every Plex install failed setup here with COULD NOT LIST LIBRARIES
+    // however healthy the connection was.
+    const libs = await activeProvider().listLibraries(url, session);
+    rememberKnownLibraries(libs);
     if (libs.length === 0) {
       screen = { ...initialHomeScreen(url), error: 'THE DISTRIBUTOR LISTS NO LIBRARIES.' };
       render();

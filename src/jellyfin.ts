@@ -4,7 +4,7 @@ import { invoke } from '@tauri-apps/api/core';
 // sibling specifier (same note as media-date-screen.ts).
 import { activeMediaCutoff, titleReleasedBy } from './media-release-date.ts';
 import { HEVC_MAIN_SUPPORTED, HEVC_MAIN10_SUPPORTED } from './playback-capability.ts';
-import type { Movie, MediaStreamInfo, MovieVersion, MediaPlaybackInfo, Episode, JellyfinLibrary } from './providers/media-source-provider.ts';
+import type { Movie, MediaStreamInfo, MovieVersion, MediaPlaybackInfo, Episode, JellyfinLibrary, LibrarySummary } from './providers/media-source-provider.ts';
 
 // The catalog shapes moved to the provider boundary (GH #32) so a second
 // backend can produce them without importing this Jellyfin client. They are
@@ -20,6 +20,7 @@ export type {
   Title,
   TitleVersion,
   Library,
+  LibrarySummary,
 } from './providers/media-source-provider.ts';
 
 /** Audio + subtitle streams of one media source, for the player's track picker. */
@@ -893,11 +894,6 @@ async function fetchVideoViews(url: string, token: string, userId: string): Prom
   });
 }
 
-export interface LibrarySummary {
-  id: string;
-  name: string;
-}
-
 const KNOWN_LIBS_KEY = 'bb_known_libraries';
 
 /**
@@ -908,7 +904,7 @@ const KNOWN_LIBS_KEY = 'bb_known_libraries';
  * every later boot (#41): an excluded library is absent from the synced
  * catalog by design, so the catalog alone can never list it again.
  */
-function rememberKnownLibraries(libs: ReadonlyArray<LibrarySummary>): void {
+export function rememberKnownLibraries(libs: ReadonlyArray<LibrarySummary>): void {
   if (typeof localStorage === 'undefined') return;
   try {
     localStorage.setItem(KNOWN_LIBS_KEY, JSON.stringify(libs.map((l) => ({ id: l.id, name: l.name }))));

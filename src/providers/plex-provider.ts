@@ -18,6 +18,7 @@ import {
   buildPlexImageUrl,
   fetchPlexItemPlaybackInfo,
   fetchPlexLibrariesAndMovies,
+  fetchPlexLibraryList,
   fetchPlexFirstEpisodeOfSeries,
   fetchPlexSeriesEpisodes,
   fetchPlexServers,
@@ -33,6 +34,7 @@ import type {
   ArtworkRef,
   Episode,
   Library,
+  LibrarySummary,
   MediaPlaybackInfo,
   MediaSourceProvider,
   PlaybackProgress,
@@ -121,6 +123,10 @@ export class PlexProvider implements MediaSourceProvider {
   // listSelectableAccounts is deliberately absent — capabilities.multiUserPicker
   // is false, and the contract is that a caller checks the flag rather than
   // probing for the method.
+
+  async listLibraries(server: string, session: ProviderSession): Promise<LibrarySummary[]> {
+    return fetchPlexLibraryList(server, session.accessToken);
+  }
 
   async fetchLibraries(
     server: string,
