@@ -4,7 +4,6 @@ import { Movie, Episode } from './jellyfin';
 import { loadGameFaceTexture, isTwoFlapSpine, jewelSpineComposite, uprightSpine } from './game-case-art';
 import { isJewelCasePlatform, JEWEL_FAT_DEPTH_IN } from './jewel-case';
 import { getReviewSnippetForMovie } from './review-snippets';
-import { isDiscoveryRequested } from './jellyseerr';
 import { getActiveTheme } from './themes';
 import { getActiveLogoSpec } from './logo-spec';
 import { drawLogo } from './logo-renderer';
@@ -17,6 +16,11 @@ import { drawTechSpecsTable, TECH_SPECS_TABLE_H } from './tech-specs';
 import { perfTrace, perfSlot } from './perf-trace';
 import { LruByteCache } from './lru-byte-cache';
 import { getLowResFrontMaterial, disposeLowResFrontMaterials } from './hero-lowres-front';
+// The inspected case's front is decoded at 3x by its own module, which also owns
+// the shared badge stamper the poster queue above calls. Cycle is function-level
+// only (that file reads every binding from here inside a function, never at
+// module scope) — same arrangement as hero-lowres-front.
+import { stampPosterBadges, getHeroFrontMaterial, disposeHeroFrontDetail, restampHeroFront, heroDetailArtEnabled } from './hero-front-detail';
 // The two DVD typed-metadata passes live in their own module (this file is at
 // its line budget — see dvd-overlays.ts's header). They import this file's
 // shared text/measure helpers back; the cycle is function-level only.
@@ -827,8 +831,8 @@ export function initCaseMedium() {
 initCaseMedium();
 
 // Texture dimensions
-const COVER_WIDTH = 320;
-const COVER_HEIGHT = 480;
+export const COVER_WIDTH = 320;
+export const COVER_HEIGHT = 480;
 // The spine texture maps onto the case's -X face (depth × height), so its
 // canvas must match that face's physical aspect per medium or the print
 // stretches — one fixed 80×480 canvas is what squished the DVD spine. Keep a
@@ -1355,6 +1359,8 @@ export function clearVideoCaseCache(mode: 'full' | 'rebuild' = 'full') {
   leftmostColorCache.clear();
   edgeBusyCache.clear();
   backCoverTextPlacementCache.clear();
+  disposeHeroFrontDetail();
+  disposeHeroBackdrop();
   posterQueue.clear();
 }
 
@@ -1411,6 +1417,8 @@ function disposeMediumScopedCaches() {
   posterPixelCache.clear();
   lowResCache.clear();
   disposeLowResFrontMaterials();
+  disposeHeroFrontDetail();
+  disposeHeroBackdrop();
   // The array layers on the GPU hold art decoded for the OUTGOING medium, so
   // the rebuild fast path must not keep them — force a real reallocation.
   invalidatePosterLayers();
@@ -1475,7 +1483,11 @@ class WorkerPool {
     }
   }
 
-  public async decode(url: string, mode: DecodeMode, faceAspect?: number): Promise<{ highResData: Uint8Array, lowResData: Uint8Array, leftmostColor: string, edgeBusy: boolean, bandEnergy: number }> {
+  // `scale`/`forceLetterbox` (see the worker's decodeImageBytes): the inspected
+  // case asks for a HERO_COVER_SCALE decode of the same art, pinning the fit
+  // decision the shelf decode already made so the swap on pickup is a sharpen
+  // in place rather than a reframe.
+  public async decode(url: string, mode: DecodeMode, faceAspect?: number, scale?: number, forceLetterbox?: boolean): Promise<{ highResData: Uint8Array, lowResData: Uint8Array, leftmostColor: string, edgeBusy: boolean, bandEnergy: number }> {
     // In the Tauri app, fetch the image bytes through the same host that proxies
     // metadata so box art loads wherever the catalog does — even when the saved
     // Jellyfin URL points at a host the webview can't reach directly (e.g.
@@ -1489,20 +1501,20 @@ class WorkerPool {
       this.nextWorkerIndex = (this.nextWorkerIndex + 1) % this.workers.length;
       if (buffer) {
         // Always include the URL so the worker can use it as a pixel-cache key.
-        worker.postMessage({ buffer, url, id, mode, faceAspect }, { transfer: [buffer] });
+        worker.postMessage({ buffer, url, id, mode, faceAspect, scale, forceLetterbox }, { transfer: [buffer] });
       } else {
         // Web fallback (no Tauri proxy): the app is served from the same host
         // that runs Jellyfin, so a saved URL pointing at localhost/127.0.0.1
         // won't resolve from a remote browser. Rewrite it to the host the user
         // actually connected to.
-        worker.postMessage({ url: rewriteLocalhost(url), id, mode, faceAspect });
+        worker.postMessage({ url: rewriteLocalhost(url), id, mode, faceAspect, scale, forceLetterbox });
       }
     });
   }
 }
 
 const workerCount = Math.min(Math.max(navigator.hardwareConcurrency || 4, 2), 8);
-const posterWorkerPool = new WorkerPool(workerCount);
+export const posterWorkerPool = new WorkerPool(workerCount);
 
 
 
@@ -1544,7 +1556,7 @@ export function createClonedCaseGeometry(
   return geo;
 }
 
-function getMovieOffsets(id: string) {
+export function getMovieOffsets(id: string) {
   let hash = 0;
   for (let i = 0; i < id.length; i++) {
     hash = id.charCodeAt(i) + ((hash << 5) - hash);
@@ -1570,7 +1582,7 @@ function getMovieOffsets(id: string) {
 // reading COMING SOON, and stamped slightly larger so a live re-stamp covers
 // the original label completely — the clerk slapping a new sticker over the
 // old one.
-function stampCollectionGapSticker(
+export function stampCollectionGapSticker(
   data: Uint8Array,
   w: number,
   h: number,
@@ -1663,6 +1675,11 @@ function stampCollectionGapSticker(
  * update.
  */
 export function restampCollectionGapCase(movie: Movie): void {
+  // The inspected case's 3x front holds its own copy of the pixels, so it needs
+  // the new label painted on too — you order FROM the inspect view, and without
+  // this the box in your hands would keep the blue REQUEST while every other
+  // surface went gold.
+  restampHeroFront(movie);
   const high = posterPixelCache.get(movie.id);
   if (high) {
     const stamped = stampCollectionGapSticker(high, COVER_WIDTH, COVER_HEIGHT, movie.id, true);
@@ -1708,7 +1725,7 @@ export function restampCollectionGapCase(movie: Movie): void {
 // bottom-right, the 4K badge the right side, and the discovery banner the
 // poster's bottom edge (the starburst sits just above it), so every
 // combination that can co-occur stays readable.
-function stampStaffPickSticker(data: Uint8Array, w: number, h: number, movieId: string): Uint8Array {
+export function stampStaffPickSticker(data: Uint8Array, w: number, h: number, movieId: string): Uint8Array {
   const { r1, r2, r3 } = getMovieOffsets(movieId);
   const spec = wrapLogoSpec();
 
@@ -1879,106 +1896,14 @@ class PosterLoadingQueue {
         leftmostColorCache.set(item.movieId, leftmostColor);
         edgeBusyCache.set(item.movieId, edgeBusy);
 
-        let finalHighRes = highResData;
-        let finalLowRes = lowResData;
-
-        if (item.movie.is4k) {
-          const { r1, r2, r3 } = getMovieOffsets(item.movieId);
-          const dx = r1 * 5;
-          const dy = r2 * 5;
-          const angle = r3 * 0.15;
-
-          const dx_low = r1 * 1.0;
-          const dy_low = r2 * 1.0;
-
-          // Draw high-res sticker
-          const canvas = document.createElement('canvas');
-          canvas.width = 320;
-          canvas.height = 480;
-          const ctx = canvas.getContext('2d')!;
-          
-          const imgData = ctx.createImageData(320, 480);
-          imgData.data.set(highResData);
-          ctx.putImageData(imgData, 0, 0);
-          
-          ctx.save();
-          ctx.translate(245 + dx, 400 + dy);
-          ctx.rotate(angle);
-          
-          ctx.fillStyle = '#ffeb3b'; // circular yellow sticker
-          ctx.beginPath();
-          ctx.arc(0, 0, 35, 0, 2 * Math.PI);
-          ctx.fill();
-          
-          ctx.lineWidth = 1.5;
-          ctx.strokeStyle = '#fbc02d'; // sticker border
-          ctx.stroke();
-          
-          ctx.scale(1.0, -1.45); // flip and stretch text only
-          ctx.fillStyle = '#0d47a1'; // house-color letters 4K
-          ctx.font = `bold 36px ${BB_ARCHIVO_BLACK}, sans-serif`;
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          ctx.fillText('4K', 0, -1.5); // shift text up slightly (negative Y shifts up on flipped canvas)
-          
-          ctx.restore();
-          
-          finalHighRes = new Uint8Array(ctx.getImageData(0, 0, 320, 480).data);
-          
-          // Draw low-res sticker
-          const lowResCanvas = document.createElement('canvas');
-          lowResCanvas.width = 64;
-          lowResCanvas.height = 96;
-          const lowResCtx = lowResCanvas.getContext('2d')!;
-          
-          const lowResImgData = lowResCtx.createImageData(64, 96);
-          lowResImgData.data.set(lowResData);
-          lowResCtx.putImageData(lowResImgData, 0, 0);
-          
-          lowResCtx.save();
-          lowResCtx.translate(49 + dx_low, 80 + dy_low);
-          lowResCtx.rotate(angle);
-          
-          lowResCtx.fillStyle = '#ffeb3b';
-          lowResCtx.beginPath();
-          lowResCtx.arc(0, 0, 7, 0, 2 * Math.PI);
-          lowResCtx.fill();
-          
-          lowResCtx.scale(1.0, -1.45); // flip and stretch text only
-          lowResCtx.fillStyle = '#0d47a1';
-          lowResCtx.font = `bold 8px ${BB_ARCHIVO_BLACK}, sans-serif`;
-          lowResCtx.textAlign = 'center';
-          lowResCtx.textBaseline = 'middle';
-          lowResCtx.fillText('4K', 0, -0.3); // shift text up slightly (negative Y shifts up on flipped canvas)
-          
-          lowResCtx.restore();
-          
-          finalLowRes = new Uint8Array(lowResCtx.getImageData(0, 0, 64, 96).data);
-        }
-
-        // A case standing in for a title the store doesn't have — a missing
-        // entry of a collection you partly own (jellyseerr.ts's
-        // fetchCollectionGaps) or an inline discovery suggestion
-        // (fetchDiscoverMovies, shelved with the regular stock) — wears the
-        // corner label: blue REQUEST, flipping to gold COMING SOON once
-        // ordered. Requested state is read here at decode time so an ordered
-        // case comes back gold after a reload, not just in the session that
-        // ordered it.
-        if (item.movie.collectionGap || item.movie.discovery) {
-          const requested = !!item.movie.discoveryRequested || isDiscoveryRequested(item.movie.tmdbId);
-          finalHighRes = stampCollectionGapSticker(finalHighRes, 320, 480, item.movieId, requested);
-          finalLowRes = stampCollectionGapSticker(finalLowRes, 64, 96, item.movieId, requested);
-        }
-
-        // A watch-history staff pick (see staff-picks.ts) wears the gold
-        // starburst — endcap order candidates ONLY, where it stacks with the
-        // discovery banner ("we loved it, not in stock"). Owned titles are
-        // never flagged: no sticker of any kind on stock you already have
-        // (user direction after pin 012).
-        if (item.movie.staffPick) {
-          finalHighRes = stampStaffPickSticker(finalHighRes, 320, 480, item.movieId);
-          finalLowRes = stampStaffPickSticker(finalLowRes, 64, 96, item.movieId);
-        }
+        // Every badge the case wears — 4K, the not-in-stock corner label, the
+        // staff-pick starburst — stamped by fraction of the buffer, so the same
+        // pass serves the 320x480 shelf art, the 64x96 distance layer and the
+        // inspected case's 960x1440 front (hero-front-detail.ts). Keeping ONE
+        // stamping site is what stops a case from gaining or losing a sticker
+        // purely by being picked up.
+        const finalHighRes = stampPosterBadges(highResData, COVER_WIDTH, COVER_HEIGHT, item.movie);
+        const finalLowRes = stampPosterBadges(lowResData, 64, 96, item.movie);
 
         lowResCache.set(item.movieId, finalLowRes);
 
@@ -2304,7 +2229,7 @@ function getJellyfinBackMaterial(movie: Movie, probeIdx?: number): THREE.MeshSta
 // throwing away scan detail AND get sharp typed text, but stay bounded by the
 // scan. The retail front is a decoded poster and is bounded by that decode
 // (posterPixelCache is COVER_WIDTH×COVER_HEIGHT) — unaffected by this.
-const HERO_COVER_SCALE = 3;
+export const HERO_COVER_SCALE = 3;
 
 interface HeroFaceSlot {
   canvas: HTMLCanvasElement;
@@ -3694,6 +3619,52 @@ const backdropImageCache = new Map<string, CachedArt>();
 const backdropLoadingMap = new Map<string, Array<() => void>>();
 const backdropKey = (movie: Movie) => movie.backdropUrl || movie.id;
 
+// The widest region a SHELF back cover paints a backdrop into (COVER_WIDTH's
+// top half, with headroom).
+const SHELF_BACKDROP_MAX_W = 640;
+
+// HERO BACK BACKDROP — the inspected case's back is COVER_WIDTH * HERO_COVER_SCALE
+// wide, so the art spans ~960 logical px there and the shelf cap above upscales
+// it 1.5x: the printed text on that face went sharp when it moved to the 3x
+// canvas while the photo behind it stayed soft, which reads as a bad scan rather
+// than a budget.
+//
+// One slot, not a second cache. backdropImageCache is unbounded and keyed by URL
+// — every title flipped leaves a bitmap in it — so simply raising its cap would
+// have tripled the bytes of a cache that already grows with the session. Only
+// one case is ever inspected, so the hero copy is a single entry, replaced when
+// the inspected title changes.
+let heroBackdropKey: string | null = null;
+let heroBackdrop: CachedArt | null = null;
+let heroBackdropPending: string | null = null;
+
+/**
+ * The hero-resolution backdrop for `movie`, or null while it loads (the caller
+ * falls back to the shelf copy, so the face is never blank — it sharpens once
+ * this lands, exactly like the hero front). Kicks off the load on a miss.
+ */
+function heroBackdropFor(movie: Movie, onLoaded?: () => void): CachedArt | null {
+  const key = backdropKey(movie);
+  if (heroBackdropKey === key) return heroBackdrop;
+  if (!movie.backdropUrl || heroBackdropPending === key) return null;
+  heroBackdropPending = key;
+  loadArt(movie.backdropUrl, COVER_WIDTH * HERO_COVER_SCALE, (art) => {
+    if (heroBackdropPending !== key) return; // selection moved on mid-load
+    heroBackdropPending = null;
+    if (!art) return;
+    heroBackdropKey = key;
+    heroBackdrop = art;
+    if (onLoaded) onLoaded();
+  });
+  return null;
+}
+
+function disposeHeroBackdrop() {
+  heroBackdropKey = null;
+  heroBackdrop = null;
+  heroBackdropPending = null;
+}
+
 function loadBackdropImage(movie: Movie, onLoaded: () => void) {
   const key = backdropKey(movie);
   if (backdropImageCache.has(key)) {
@@ -3715,8 +3686,9 @@ function loadBackdropImage(movie: Movie, onLoaded: () => void) {
     return;
   }
 
-  // Backdrops paint into a ≤640-logical-px region of the back cover.
-  loadArt(movie.backdropUrl, 640, (art) => {
+  // Backdrops paint into a ≤640-logical-px region of a SHELF back cover. The
+  // inspected case's back is drawn 3x larger and takes the hero copy below.
+  loadArt(movie.backdropUrl, SHELF_BACKDROP_MAX_W, (art) => {
     if (art) {
       backdropImageCache.set(key, art);
       // Pre-pay both pixel analyses (GPU→CPU readbacks) here in the async
@@ -4302,7 +4274,12 @@ function drawJellyfinBackImpl(
   const regions: BackCoverRegion[] = [];
   const corner = getBackCoverCorner(movie);
 
-  const backdrop = backdropImageCache.get(backdropKey(movie));
+  // A face this wide is the inspected case's 3x back (heroFaceSlot 'jfback'),
+  // where the shelf backdrop's 640px cap shows — prefer the hero copy, falling
+  // back to the shelf one until it lands.
+  const wantHeroArt = w > SHELF_BACKDROP_MAX_W && heroDetailArtEnabled();
+  const backdrop = (wantHeroArt ? heroBackdropFor(movie, onUpdate) : null)
+    ?? backdropImageCache.get(backdropKey(movie));
   if (!backdrop && movie.backdropUrl) {
     loadBackdropImage(movie, () => {
       if (onUpdate) onUpdate();
@@ -5293,7 +5270,16 @@ export function createHeroJellyfinMaterials(movie: Movie, highlightedName?: stri
   // Series season boxsets keep the loose shrink-wrap film (ROADMAP B3);
   // movie cases get the medium's finish (paperboard / amaray polywrap).
   const finish = movie.isSeries ? 'shrinkwrap' as const : undefined;
-  const front = getPosterMaterial(movie.id, probeIdx, isAnimated, !!movie.game, pinEndcap ? 'endcap' : 'none', finish);
+  // heroDetail (the case actually being INSPECTED) takes the 3x front if its
+  // decode has already landed — the front is the one face that was still stuck
+  // at shelf resolution while its siblings below went hero-res. Null until then,
+  // which falls through to the shelf material exactly as before; store-inspect's
+  // heroFrontMaterials kicks the decode off and swaps it in when it arrives, so
+  // picking a box up sharpens rather than flashing a placeholder.
+  const front = (heroDetail
+    ? getHeroFrontMaterial(movie, probeIdx, isAnimated, !!movie.game, finish)
+    : null)
+    ?? getPosterMaterial(movie.id, probeIdx, isAnimated, !!movie.game, pinEndcap ? 'endcap' : 'none', finish);
 
   return [
     edgeMat,

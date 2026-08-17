@@ -87,6 +87,9 @@ import {
   _checkoutWalkAhead,
   CAMERA_GLIDE_LERP,
   HERO_SPINE_YAW,
+  INSPECT_FAN_X,
+  INSPECT_CASE_Z,
+  INSPECT_RETAIL_Z_LEAD,
   updatedMeshes,
   CLERK_SLEEP_INPUT_MS,
 } from './scene-shared';
@@ -5202,8 +5205,8 @@ export class StoreScene {
         }
 
         if (this.mode === 'inspect') {
-          targetFrontX = 0.28;
-          targetFrontZ = 0.10;
+          targetFrontX = INSPECT_FAN_X;
+          targetFrontZ = INSPECT_CASE_Z + INSPECT_RETAIL_Z_LEAD;
           // Both cases flip: the retail case shows its back (cast list) and the
           // rental copy its rental-info back. Opposite spin directions so
           // they read like a book opening.
@@ -5219,8 +5222,8 @@ export class StoreScene {
             targetFrontRotY = this.heroFaceRot;
           }
 
-          targetBackX = -0.28;
-          targetBackZ = 0.10;
+          targetBackX = -INSPECT_FAN_X;
+          targetBackZ = INSPECT_CASE_Z;
           // Spine stop: only the rental copy turns (the retail case sits
           // back at its front pose beside it) — spine to the camera, angled a
           // touch short of square so a bit of the front cover stays visible.

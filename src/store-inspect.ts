@@ -7,6 +7,7 @@
 // methods did.
 import * as THREE from 'three';
 import { Movie, Episode } from './jellyfin';
+import { requestHeroFrontDetail } from './hero-front-detail';
 import { posterQueue, CASE_MEDIUM, leftmostColorCache, posterPixelCache, getCaseGeometry, getRentalCaseGeometry, createHeroJellyfinMaterials, createHeroRentalMaterials, applyGameCaseArt, backCoverRegions, getSeriesBoxsetGeometry, createHeroSeriesBoxsetMaterials, drawSeriesBrandPanel, drawSeriesEpisodeBackCover, drawSeriesSeasonPanel, gameCaseDims, gameRentalDims } from './video-case';
 import { syncJewelDressing } from './jewel-case';
 import { AISLE_SHELF_HEIGHTS, WALL_SHELF_HEIGHTS, BACK_WALL_UNIT_IDX, MovieSlot } from './store-layout';
@@ -675,7 +676,20 @@ export function heroFrontMaterials(scene: StoreScene, movie: Movie): THREE.Mater
   // face here too, not just via ensureHeroCases (this is the path flip and
   // cast-row navigation come back through).
   if (movie.isSeries) return createHeroSeriesBoxsetMaterials(movie, scene.highlightedBackRegionName, probeIdx);
-  const mats = createHeroJellyfinMaterials(movie, scene.highlightedBackRegionName, false, scene.mode === 'inspect', probeIdx);
+  const heroDetail = scene.mode === 'inspect';
+  const mats = createHeroJellyfinMaterials(movie, scene.highlightedBackRegionName, false, heroDetail, probeIdx);
+  // The cover art is the reason you picked the box up, and at shelf resolution it
+  // was the softest face on it (see hero-front-detail.ts). Decode it at 3x for
+  // the inspected title only. Fire and forget for the same reason as the game
+  // scans below: this runs on every browse keypress that lands in inspect, and
+  // the swap mutates `mats` in place, so the mesh already holding the array picks
+  // it up a frame later under render-on-demand.
+  if (heroDetail) {
+    requestHeroFrontDetail(movie, mats, probeIdx,
+      CASE_MEDIUM === 'vhs' && movie.libraryName === 'Animated Movies', !!movie.game,
+      movie.isSeries ? 'shrinkwrap' : undefined)
+      .then((changed) => { if (changed) scene.requestRender(); });
+  }
   // A game's real back/spine scans arrive over the network. Fire and forget,
   // UNLIKE the asset viewer, which awaits: this runs on every browse keypress
   // and blocking the hero rebuild on a fetch would stall the cursor. The swap

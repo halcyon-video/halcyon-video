@@ -123,7 +123,27 @@ function checkEdgeBusy(lowResPixels: Uint8ClampedArray): { edgeBusy: boolean; ba
   return { edgeBusy: bandEnergy > EDGE_BUSY_THRESHOLD, bandEnergy };
 }
 
-async function decodeImageBytes(bytes: ArrayBuffer, mode: DecodeMode, faceAspect?: number): Promise<{ highResData: ArrayBuffer; lowResData: ArrayBuffer; hexColor: string; edgeBusy: boolean; bandEnergy: number }> {
+// `scale` multiplies the 320x480 face the fit math is written against (see
+// BASE_W/BASE_H). 1 is the shelf decode every case on the floor is drawn from;
+// the INSPECTED case asks for HERO_COVER_SCALE so its cover art has the pixels
+// to survive being magnified across a 4K frame (hero-front-detail.ts). Every
+// literal below is expressed against W/H — a hardcoded 320 here would frame the
+// hero decode differently from the shelf one, and the swap on pickup would read
+// as the art jumping rather than sharpening.
+//
+// `forceLetterbox` overrides the 'vhs' edge-busy test with a decision already
+// made at scale 1. The test samples a 64x96 downsample, which is NOT bit-identical
+// between a 320-wide and a 960-wide source canvas, so a title sitting on the
+// threshold could letterbox at one scale and cover-crop at the other — the same
+// reframe-on-pickup, arrived at from the other direction.
+const BASE_W = 320;
+const BASE_H = 480;
+
+async function decodeImageBytes(bytes: ArrayBuffer, mode: DecodeMode, faceAspect?: number, scale = 1, forceLetterbox?: boolean): Promise<{ highResData: ArrayBuffer; lowResData: ArrayBuffer; hexColor: string; edgeBusy: boolean; bandEnergy: number }> {
+  const W = Math.max(1, Math.round(BASE_W * scale));
+  const H = Math.max(1, Math.round(BASE_H * scale));
+  const sx = W / BASE_W;
+  const sy = H / BASE_H;
   const blob = new Blob([bytes]);
   const sourceImage = await createImageBitmap(blob, { imageOrientation: 'flipY' });
 
@@ -153,12 +173,12 @@ async function decodeImageBytes(bytes: ArrayBuffer, mode: DecodeMode, faceAspect
     imgAspect = imgWidth / imgHeight;
   }
 
-  const canvas = new OffscreenCanvas(320, 480);
+  const canvas = new OffscreenCanvas(W, H);
   const ctx = canvas.getContext('2d')!;
 
   if (mode === 'fill') {
     // Stretch to fill the whole face — complete art, no bars, no crop.
-    ctx.drawImage(processedImage, 0, 0, imgWidth, imgHeight, 0, 0, 320, 480);
+    ctx.drawImage(processedImage, 0, 0, imgWidth, imgHeight, 0, 0, W, H);
   } else if (mode === 'cart') {
     // Contain-fit onto the cartridge clamshell face. The 2:3 canvas is
     // displayed on the narrower VHS-shaped face (w/h 0.365/0.667 — mirrors
@@ -169,36 +189,36 @@ async function decodeImageBytes(bytes: ArrayBuffer, mode: DecodeMode, faceAspect
     // passed in because this worker can't import it); fall back to the generic
     // clamshell for platforms with no box shape of their own.
     const face = faceAspect && faceAspect > 0 ? faceAspect : 0.365 / 0.667;
-    const canvasAspect = 320 / 480;
+    const canvasAspect = W / H;
     const drawnAspect = imgAspect * (canvasAspect / face);
-    let dw = 320, dh = Math.round(320 / drawnAspect);
-    if (dh > 480) { dh = 480; dw = Math.round(480 * drawnAspect); }
-    const dx = Math.round((320 - dw) / 2);
-    const dy = Math.round((480 - dh) / 2);
+    let dw = W, dh = Math.round(W / drawnAspect);
+    if (dh > H) { dh = H; dw = Math.round(H * drawnAspect); }
+    const dx = Math.round((W - dw) / 2);
+    const dy = Math.round((H - dh) / 2);
     ctx.drawImage(processedImage, 0, 0, imgWidth, imgHeight, dx, dy, dw, dh);
 
     // Bars pick up the scan's own edge colors (same trick as the 'vhs'
     // letterbox below): sample just inside each edge of the drawn region.
     // The canvas is Y-flipped at this point, so "top of the art" is dy+dh.
     if (dy > 0) {
-      const bottomC = ctx.getImageData(Math.min(319, dx + dw / 2), Math.min(479, dy + 1), 1, 1).data;
-      const topC = ctx.getImageData(Math.min(319, dx + dw / 2), Math.max(0, dy + dh - 2), 1, 1).data;
+      const bottomC = ctx.getImageData(Math.min(W - 1, dx + dw / 2), Math.min(H - 1, dy + 1), 1, 1).data;
+      const topC = ctx.getImageData(Math.min(W - 1, dx + dw / 2), Math.max(0, dy + dh - 2), 1, 1).data;
       ctx.fillStyle = `rgb(${bottomC[0]}, ${bottomC[1]}, ${bottomC[2]})`;
-      ctx.fillRect(0, 0, 320, dy);
+      ctx.fillRect(0, 0, W, dy);
       ctx.fillStyle = `rgb(${topC[0]}, ${topC[1]}, ${topC[2]})`;
-      ctx.fillRect(0, dy + dh, 320, 480 - dy - dh);
+      ctx.fillRect(0, dy + dh, W, H - dy - dh);
     }
     if (dx > 0) {
-      const leftC = ctx.getImageData(Math.min(319, dx + 1), 240, 1, 1).data;
-      const rightC = ctx.getImageData(Math.min(319, dx + dw - 2), 240, 1, 1).data;
+      const leftC = ctx.getImageData(Math.min(W - 1, dx + 1), Math.round(H / 2), 1, 1).data;
+      const rightC = ctx.getImageData(Math.min(W - 1, dx + dw - 2), Math.round(H / 2), 1, 1).data;
       ctx.fillStyle = `rgb(${leftC[0]}, ${leftC[1]}, ${leftC[2]})`;
-      ctx.fillRect(0, 0, dx, 480);
+      ctx.fillRect(0, 0, dx, H);
       ctx.fillStyle = `rgb(${rightC[0]}, ${rightC[1]}, ${rightC[2]})`;
-      ctx.fillRect(dx + dw, 0, 320 - dx - dw, 480);
+      ctx.fillRect(dx + dw, 0, W - dx - dw, H);
     }
   } else {
-    // object-fit: cover into 320×480
-    const canvasAspect = 320 / 480;
+    // object-fit: cover into the face
+    const canvasAspect = W / H;
     let drawW = imgWidth, drawH = imgHeight, drawX = 0, drawY = 0;
     if (imgAspect > canvasAspect) {
       drawW = imgHeight * canvasAspect;
@@ -207,13 +227,14 @@ async function decodeImageBytes(bytes: ArrayBuffer, mode: DecodeMode, faceAspect
       drawH = imgWidth / canvasAspect;
       drawY = (imgHeight - drawH) / 2;
     }
-    ctx.drawImage(processedImage, drawX, drawY, drawW, drawH, 0, 0, 320, 480);
+    ctx.drawImage(processedImage, drawX, drawY, drawW, drawH, 0, 0, W, H);
   }
 
-  // Sample leftmost column for spine color
-  const leftEdge = ctx.getImageData(4, 0, 1, 480).data;
+  // Sample leftmost column for spine color. Inset and step scale with the
+  // canvas so a hero decode averages the same band of the same art.
+  const leftEdge = ctx.getImageData(Math.max(1, Math.round(4 * sx)), 0, 1, H).data;
   let rSum = 0, gSum = 0, bSum = 0, n = 0;
-  for (let y = 0; y < 480; y += 8, n++) {
+  for (let y = 0; y < H; y += Math.max(1, Math.round(8 * sy)), n++) {
     const i = y * 4;
     rSum += leftEdge[i]; gSum += leftEdge[i + 1]; bSum += leftEdge[i + 2];
   }
@@ -224,51 +245,56 @@ async function decodeImageBytes(bytes: ArrayBuffer, mode: DecodeMode, faceAspect
   // Scale down to low-res (must happen before getImageData on the high-res canvas)
   const lowResCanvas = new OffscreenCanvas(64, 96);
   const lowResCtx = lowResCanvas.getContext('2d')!;
-  lowResCtx.drawImage(canvas, 0, 0, 320, 480, 0, 0, 64, 96);
+  lowResCtx.drawImage(canvas, 0, 0, W, H, 0, 0, 64, 96);
 
   const lowResDataCheck = lowResCtx.getImageData(0, 0, 64, 96).data.buffer;
-  const { edgeBusy, bandEnergy } = checkEdgeBusy(new Uint8ClampedArray(lowResDataCheck));
+  const measured = checkEdgeBusy(new Uint8ClampedArray(lowResDataCheck));
+  const bandEnergy = measured.bandEnergy;
+  const edgeBusy = forceLetterbox === undefined ? measured.edgeBusy : forceLetterbox;
 
   // VHS ONLY (GH #93): contain-fit (letterbox) instead of the cover-crop
   // above when either the edges look busy (text/art would be cut by the VHS
   // face's horizontal crop, #21) or the source is landscape. DVD ('crop') and
   // game ('fill') faces must never be letterboxed.
   if (mode === 'vhs' && (edgeBusy || imgAspect > 1.05)) {
-    ctx.clearRect(0, 0, 320, 480);
+    ctx.clearRect(0, 0, W, H);
     ctx.fillStyle = hexColor;
-    ctx.fillRect(0, 0, 320, 480);
+    ctx.fillRect(0, 0, W, H);
 
     // Fit the source into a 262x393 box PRESERVING ITS ASPECT (the old code
     // stretched the full frame into the box, squashing non-2:3 art), centered
     // on the canvas.
-    const scale = Math.min(262 / imgWidth, 393 / imgHeight);
-    const dw = Math.round(imgWidth * scale);
-    const dh = Math.round(imgHeight * scale);
-    const dx = Math.round((320 - dw) / 2);
-    const dy = Math.round((480 - dh) / 2);
+    const boxW = 262 * sx;
+    const boxH = 393 * sy;
+    const fit = Math.min(boxW / imgWidth, boxH / imgHeight);
+    const dw = Math.round(imgWidth * fit);
+    const dh = Math.round(imgHeight * fit);
+    const dx = Math.round((W - dw) / 2);
+    const dy = Math.round((H - dh) / 2);
     ctx.drawImage(processedImage, 0, 0, imgWidth, imgHeight, dx, dy, dw, dh);
 
     // Since imageOrientation is 'flipY', the poster is drawn upside-down on
     // the canvas: the poster's bottom edge is at y=dy, its top at y=dy+dh.
-    const bottomColorData = ctx.getImageData(160, Math.min(479, dy + 1), 1, 1).data;
-    const topColorData = ctx.getImageData(160, Math.max(0, dy + dh - 2), 1, 1).data;
+    const midX = Math.round(W / 2);
+    const bottomColorData = ctx.getImageData(midX, Math.min(H - 1, dy + 1), 1, 1).data;
+    const topColorData = ctx.getImageData(midX, Math.max(0, dy + dh - 2), 1, 1).data;
 
     const bottomColor = `rgb(${bottomColorData[0]}, ${bottomColorData[1]}, ${bottomColorData[2]})`;
     const topColor = `rgb(${topColorData[0]}, ${topColorData[1]}, ${topColorData[2]})`;
 
     // Extend the poster's own edge colors into the horizontal bars.
     ctx.fillStyle = bottomColor;
-    ctx.fillRect(0, 0, 320, dy);
+    ctx.fillRect(0, 0, W, dy);
     ctx.fillStyle = topColor;
-    ctx.fillRect(0, dy + dh, 320, 480 - dy - dh);
+    ctx.fillRect(0, dy + dh, W, H - dy - dh);
 
     // Re-draw low-res canvas with the new letterboxed image
     lowResCtx.clearRect(0, 0, 64, 96);
-    lowResCtx.drawImage(canvas, 0, 0, 320, 480, 0, 0, 64, 96);
+    lowResCtx.drawImage(canvas, 0, 0, W, H, 0, 0, 64, 96);
   }
 
   const lowResData = lowResCtx.getImageData(0, 0, 64, 96).data.buffer;
-  const highResData = ctx.getImageData(0, 0, 320, 480).data.buffer;
+  const highResData = ctx.getImageData(0, 0, W, H).data.buffer;
 
   sourceImage.close();
   return { highResData, lowResData, hexColor, edgeBusy, bandEnergy };
@@ -283,6 +309,16 @@ self.onmessage = async (e) => {
   // Pixels are baked to one face shape; only reuse a 'cart' entry fitted to the
   // same one (rounded — the aspect is derived from floats on the main thread).
   const faKey = faceAspect ? Math.round(faceAspect * 1000) / 1000 : undefined;
+  const scale: number = typeof e.data.scale === 'number' && e.data.scale > 0 ? e.data.scale : 1;
+  const forceLetterbox: boolean | undefined =
+    typeof e.data.forceLetterbox === 'boolean' ? e.data.forceLetterbox : undefined;
+  // Scaled decodes (the inspected case's hero front) neither READ nor WRITE the
+  // 'pixels' store: it holds one entry per URL sized for the shelves, and a
+  // 960x1440 buffer is 5.5MB — persisting one per title the user picks up would
+  // grow IndexedDB by gigabytes to cache a face that only ever shows one at a
+  // time. The 'posters' raw-bytes cache below is still used, so a hero decode
+  // costs no network fetch.
+  const usePixelStore = scale === 1;
   try {
     const db = url ? await getDB() : null;
 
@@ -290,7 +326,7 @@ self.onmessage = async (e) => {
     // decoding. This is the common case after the first session has warmed up.
     // The fit mode is baked into the stored pixels, so a hit requires the same
     // mode (a medium swap re-decodes from the still-cached raw bytes).
-    if (db && url) {
+    if (db && url && usePixelStore) {
       const cached = await dbGet<PixelEntry>(db, 'pixels', url);
       if (cached && cached.v === PIXELS_VERSION && cached.mode === mode
           && (mode !== 'cart' || cached.fa === faKey)) {
@@ -356,10 +392,11 @@ self.onmessage = async (e) => {
       }
     }
 
-    const { highResData, lowResData, hexColor, edgeBusy, bandEnergy } = await decodeImageBytes(rawBytes, mode, faceAspect);
+    const { highResData, lowResData, hexColor, edgeBusy, bandEnergy } =
+      await decodeImageBytes(rawBytes, mode, faceAspect, scale, forceLetterbox);
 
     // Persist decoded pixels so the next session skips decode entirely.
-    if (db && url) {
+    if (db && url && usePixelStore) {
       dbPut(db, 'pixels', url, { high: highResData.slice(0), low: lowResData.slice(0), color: hexColor, edgeBusy, bandEnergy, mode, fa: faKey, v: PIXELS_VERSION });
     }
 
