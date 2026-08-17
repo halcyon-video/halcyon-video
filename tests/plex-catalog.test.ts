@@ -12,6 +12,7 @@ import assert from 'node:assert/strict';
 import { createServer, type Server } from 'node:http';
 import {
   fetchPlexLibrariesAndMovies,
+  fetchPlexLibraryList,
   fetchPlexSeriesEpisodes,
   buildPlexImageUrl,
   buildPlexHlsStreamUrl,
@@ -205,6 +206,39 @@ test('excludeLibraryIds skips a library at sync rather than hiding it after', as
       excludeLibraryIds: new Set(['2']),
     });
     assert.deepEqual(libs.map((l) => l.name), ['Movies']);
+  });
+});
+
+// The setup terminal draws its "which libraries does this store carry?" rows
+// from this, and it used to call jellyfin.ts's fetchLibraryList (/Users/<id>/
+// Views) no matter which backend was selected — so every Plex install failed
+// first-run setup with COULD NOT LIST LIBRARIES, reported from the field.
+test('the library list names the sections without pulling any catalog', async () => {
+  await withMock(async (base) => {
+    const libs = await fetchPlexLibraryList(base, 'tok');
+    assert.deepEqual(libs, [
+      { id: '1', name: 'Movies' },
+      { id: '2', name: 'TV Shows' },
+    ], 'the music section has no shelf, so it must not be offered as a toggle');
+  });
+});
+
+// The invariant that makes the toggles mean anything: the id shown on a
+// checkbox row is the id the sync matches excludeLibraryIds against. If these
+// two ever drift, every toggle silently governs nothing.
+test('a library-list id is the same id excludeLibraryIds honours', async () => {
+  await withMock(async (base) => {
+    const listed = await fetchPlexLibraryList(base, 'tok');
+    const tvId = listed.find((l) => l.name === 'TV Shows')!.id;
+    const stocked = await fetchPlexLibrariesAndMovies(base, 'tok', undefined, {
+      excludeLibraryIds: new Set([tvId]),
+    });
+    assert.deepEqual(stocked.map((l) => l.name), ['Movies']);
+    // …and the ids agree in the other direction too.
+    assert.deepEqual(
+      listed.map((l) => l.id),
+      (await fetchPlexLibrariesAndMovies(base, 'tok')).map((l) => l.id)
+    );
   });
 });
 

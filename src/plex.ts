@@ -19,6 +19,7 @@
 import type {
   Episode,
   Library,
+  LibrarySummary,
   MediaPlaybackInfo,
   MediaStreamInfo,
   Movie,
@@ -479,6 +480,27 @@ async function applyPlexCollections(
  * fetched on demand by fetchPlexItemPlaybackInfo when the player opens, the
  * same shape the Jellyfin side uses for episodes.
  */
+/**
+ * Section names only — what the setup terminal's "which libraries does this
+ * store carry?" rows are drawn from, before any catalog is pulled.
+ *
+ * Deliberately mirrors fetchPlexLibrariesAndMovies below: same `key` as the id
+ * (which is what excludeLibraryIds is matched against) and the same movie/show
+ * filter. A photo or music section offered here would be a toggle that governs
+ * nothing, since that section never becomes a shelf.
+ */
+export async function fetchPlexLibraryList(
+  server: string,
+  token: string
+): Promise<LibrarySummary[]> {
+  const base = normalizePlexUrl(server);
+  const secRes = await plexJson<any>(`${base}/library/sections`, token);
+  const sections: any[] = secRes?.MediaContainer?.Directory ?? [];
+  return sections
+    .filter((s) => s?.type === 'movie' || s?.type === 'show')
+    .map((s) => ({ id: String(s.key), name: String(s.title ?? s.key) }));
+}
+
 export async function fetchPlexLibrariesAndMovies(
   server: string,
   token: string,

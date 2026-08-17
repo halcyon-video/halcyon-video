@@ -14,6 +14,7 @@ import {
   validateToken,
   fetchPublicUsers,
   fetchJellyfinLibrariesAndMovies,
+  fetchLibraryList,
   fetchSeriesEpisodes,
   fetchFirstEpisodeOfSeries,
   reportPlaybackStart,
@@ -33,6 +34,7 @@ import type {
   ArtworkRef,
   Episode,
   Library,
+  LibrarySummary,
   MediaPlaybackInfo,
   MediaSourceProvider,
   PlaybackProgress,
@@ -98,6 +100,10 @@ export class JellyfinProvider implements MediaSourceProvider {
       hasPassword: u.hasPassword,
       avatarUrl: buildUserAvatarUrl(server, u.id, u.primaryImageTag),
     }));
+  }
+
+  async listLibraries(server: string, session: ProviderSession): Promise<LibrarySummary[]> {
+    return fetchLibraryList(server, session.accessToken, session.userId);
   }
 
   async fetchLibraries(

@@ -290,6 +290,12 @@ export interface ProviderCredentials {
   accountToken?: string;
 }
 
+/** One library as the "which do we carry?" toggles know it: id + name, no items. */
+export interface LibrarySummary {
+  id: string;
+  name: string;
+}
+
 export interface ProviderSession {
   accessToken: string;
   userId: string;
@@ -368,6 +374,20 @@ export interface MediaSourceProvider {
   validateSession(server: string, session: ProviderSession): Promise<boolean>;
   /** capability: multiUserPicker */
   listSelectableAccounts?(server: string): Promise<AccountSummary[]>;
+
+  /**
+   * Just the id + name of every library the backend would shelve — no items.
+   * The setup terminal and the Store Libraries drawer ask this to draw their
+   * "which of these does this store carry?" rows (#41), and asking for the
+   * whole catalog to render a checkbox list would mean syncing a library the
+   * person is about to exclude.
+   *
+   * Must agree with fetchLibraries about BOTH halves or the toggles silently
+   * do nothing: the same `id` that excludeLibraryIds is matched against, and
+   * the same filtering — a section that never becomes a shelf must not appear
+   * here offering to be excluded.
+   */
+  listLibraries(server: string, session: ProviderSession): Promise<LibrarySummary[]>;
 
   fetchLibraries(
     server: string,
