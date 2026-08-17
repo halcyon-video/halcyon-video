@@ -510,6 +510,13 @@ class TextureArrayManager {
    * bank rather than the first bank's preview. The shader subtracts it.
    */
   public lowResBase = 0;
+  /**
+   * LUT slot that is never minted to any title, so its loaded flag stays 0 for
+   * the life of the allocation. getIndex() hands it to titles past the layer
+   * budget: the shader reads "no art here" and paints the house rental wrap
+   * instead of whatever title happens to own layer 0.
+   */
+  public unpaintedIndex = 0;
   private layerBudgetWarned = false;
 
   public lowResArray: THREE.DataArrayTexture | null = null;
@@ -632,8 +639,12 @@ class TextureArrayManager {
       ? this.maxMovies
       : this.maxMovies - this.bankSize);
 
-    // Allocate loaded flags LUT (1D texture)
-    const lutSize = THREE.MathUtils.ceilPowerOfTwo(this.maxMovies);
+    // Allocate loaded flags LUT (1D texture). Sized for one entry BEYOND the
+    // last mintable layer: getIndex() only ever hands out [0, maxMovies), so
+    // index maxMovies is guaranteed to keep the zero it allocates with — that
+    // is `unpaintedIndex`, the shader's "no art for this title" address.
+    const lutSize = THREE.MathUtils.ceilPowerOfTwo(this.maxMovies + 1);
+    this.unpaintedIndex = this.maxMovies;
     this.loadedFlags = new Uint8Array(lutSize);
     this.loadedFlagsTexture = new THREE.DataTexture(
       this.loadedFlags,
@@ -676,10 +687,14 @@ class TextureArrayManager {
     if (this.movieToIndex.has(movieId)) {
       return this.movieToIndex.get(movieId)!;
     }
-    // Out of layers: hand back index 0 WITHOUT recording it, so the title
-    // never gets a loaded flag, hasArt() stays false, and its cover box is
-    // left out of the scene entirely (the same path an art-less title takes)
-    // rather than painting some other title's poster onto it.
+    // Out of layers: hand back the PERMANENTLY-UNPAINTED index WITHOUT
+    // recording it, so the title never gets a loaded flag and hasArt() stays
+    // false. That index's LUT entry is never written, so the case shader takes
+    // its loadStatus == 0 branch and the box wears the house rental wrap —
+    // the same thing a title whose art hasn't streamed in yet shows. It used
+    // to hand back 0, which was safe only because the box was then collapsed
+    // out of the scene entirely; a visible box at index 0 samples the FIRST
+    // title's poster, i.e. every over-budget case wearing one shared cover.
     if (this.nextIndex >= this.maxMovies) {
       if (!this.layerBudgetWarned) {
         this.layerBudgetWarned = true;
@@ -688,7 +703,7 @@ class TextureArrayManager {
           'further titles shelve without cover art.'
         );
       }
-      return 0;
+      return this.unpaintedIndex;
     }
     const idx = this.nextIndex++;
     this.movieToIndex.set(movieId, idx);

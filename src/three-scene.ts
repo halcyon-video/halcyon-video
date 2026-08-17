@@ -5332,8 +5332,14 @@ export class StoreScene {
         // yields a usable front (real art or placeholder) and the miss path
         // now fires an async redecode + requestRender, so eviction shows
         // placeholder-then-swap instead of nothing.
+        //
+        // Same escape hatch as the instanced path below: hiding the cover box
+        // only reads as "sleeve still out" when there IS a clamshell to read
+        // instead. With bScale 0 (a series boxset, bargain-bin stock) it hid
+        // the selection entirely.
         hf.visible = posterPixelCache.has(slot.movie.id)
-          || textureArrayManager.hasArt(slot.movie.id);
+          || textureArrayManager.hasArt(slot.movie.id)
+          || bScale <= 0.0001;
         hb.visible = bScale > 0.0001;
         hf.position.set(fWorldX, fWorldY, fWorldZ);
         hf.rotation.set(slot.currentRotX, slot.frontRotY + theta, 0, CASE_EULER_ORDER);
@@ -5376,7 +5382,16 @@ export class StoreScene {
       // Cover box collapses to nothing until its art has streamed in (the
       // rental clamshell behind it carries the slot on its own meanwhile). The
       // poster callback re-dirties the slot, so it pops in when the art lands.
-      const fs = textureArrayManager.hasArt(slot.movie.id) ? s : 0;
+      //
+      // ONLY when that clamshell is actually there, though. A series boxset IS
+      // its own rental copy, so bScale is forced to 0 above (as it is for
+      // noRentalCase bargain stock) — collapsing the cover box as well left the
+      // shelf position EMPTY, and a whole TV/anime library then reads as a bare
+      // fixture rather than a store still putting its sleeves out. Unpainted,
+      // the box wears the house rental wrap, which is exactly how an unpainted
+      // movie already reads. (Reported against v0.7.3: shelves rendering empty
+      // while the same title showed its cover the moment it was selected.)
+      const fs = (textureArrayManager.hasArt(slot.movie.id) || bScale <= 0.0001) ? s : 0;
       tempScale.set(fs, fs, fs * seriesZMult);
       tempMatrix.compose(tempPosition, tempQuaternion, tempScale);
       slot.frontMesh.setMatrixAt(slot.instanceIdx, tempMatrix);
