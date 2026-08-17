@@ -20,6 +20,7 @@
     "test:releasedate": "node --experimental-strip-types --test tests/media-release-date.test.ts tests/media-date-screen.test.ts",
     "test:playbackflow": "node --experimental-strip-types --test tests/playback-flow.test.ts",
     "test:setup": "node --experimental-strip-types --test tests/store-setup-screens.test.ts",
+    "test:displayhz": "node --experimental-strip-types --test tests/display-hz.test.ts",
     "test:subs": "node --experimental-strip-types --test tests/subtitle-delivery.test.ts",
     "tauri": "tauri"
   },

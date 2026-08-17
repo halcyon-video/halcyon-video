@@ -45,6 +45,41 @@ export function computeFpsCap(hz: number, override: string | null): number {
 }
 
 /**
+ * Ceiling on the fps target the RESOLUTION SCALER chases — deliberately not the
+ * same number as the presentation cap above.
+ *
+ * Uncapped presentation (`bb_fps_cap` '0', which the calibrated supersample
+ * grant turns on by default) makes computeFpsCap return the panel's real
+ * refresh, and updateDynamicResolution derives its step thresholds from that:
+ * on a 144Hz display it will not step resolution back up until the scene holds
+ * ~140fps. A mid-range GPU cannot reach that in this scene at ANY resolution —
+ * motion-frame cost here is largely pixel-independent (AO recompute + draw-call
+ * submission), the same measurement the 0.83x down-threshold rests on. So the
+ * scaler walks resScale down 0.05/s to its floor, can never climb back, and the
+ * store renders permanently soft — while the settle frame, an ABSOLUTE pixel
+ * target divided by resScale, stays sharp. Every camera nudge then pops between
+ * the two, which reads as the resolution flickering rather than as a scaler
+ * doing its job.
+ *
+ * Chasing a rate the pixel budget cannot buy was never the scaler's job: it
+ * exists so frames that must land in 16ms do. Bound its target here and leave
+ * presentation uncapped, so capable hardware still chases the panel (owner
+ * ruling 2026-08-05) while the scaler defends a reachable floor.
+ */
+export const SCALER_TARGET_FPS_CAP = 60;
+
+/**
+ * The fps target updateDynamicResolution measures against. Below the cap the
+ * scaler still defends whatever the render cap asked for (an explicit
+ * bb_fps_cap of 30 is defended at 30); above it, the extra refresh is a
+ * presentation concern, not a resolution one.
+ */
+export function computeScalerTargetFps(targetFps: number): number {
+  if (!Number.isFinite(targetFps) || targetFps <= 0) return SCALER_TARGET_FPS_CAP;
+  return Math.min(targetFps, SCALER_TARGET_FPS_CAP);
+}
+
+/**
  * Fire-and-forget boot sampling: ~45 rAF ticks (≲0.5s), fastest decile wins.
  * Boot-time texture decode janks individual frames, which only ever makes
  * deltas LONGER — the fastest ticks are the compositor's true cadence. The
