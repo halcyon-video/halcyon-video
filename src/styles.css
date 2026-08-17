@@ -1522,7 +1522,12 @@ html, body {
 
 .login-columns {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  /* minmax(0, …), not a bare 1fr: a 1fr track will not shrink below its
+     content's min-content width, and a <select> is as wide as its longest
+     option. Once Plex discovery fills "Your Servers" with "<name> — <url>",
+     that one option made the first column 416px and pushed the third off the
+     grid — the wider the server's address, the worse. */
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 24px;
   margin-top: 10px;
   margin-bottom: 10px;
