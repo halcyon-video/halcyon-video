@@ -1,0 +1,19 @@
+# The issue tracker is deliberately not open — this is a one-person project and
+# development happens in one head (see CONTRIBUTING.md). Without this file,
+# someone with a bug to report or a question to ask hits a wall and leaves.
+# With it, GitHub sends them to the Discord instead, which is where reports,
+# questions and screenshots are genuinely wanted.
+blank_issues_enabled: false
+contact_links:
+  - name: Bug reports, questions, and showing off your store
+    url: https://discord.gg/SN6FnJgQe
+    about: >-
+      The Discord is the place for all three. Setup help, release notes, and
+      #your-store for screenshots of the store you built. Press F8 in the app
+      to capture a bug with the exact camera pose, settings and screenshot
+      attached, then post it there.
+  - name: How this project is run
+    url: https://github.com/halcyon-video/halcyon-video/blob/master/CONTRIBUTING.md
+    about: >-
+      Why this repo doesn't take pull requests, what is welcome instead, and
+      the one hard rule about third-party brand assets.
