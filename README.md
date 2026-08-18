@@ -1,5 +1,11 @@
 # Halcyon Video — a 3D video store for your media server
 
+[![Discord](https://img.shields.io/badge/Discord-join%20the%20store-5865F2?logo=discord&logoColor=white)](https://discord.gg/SN6FnJgQe)
+[![Live demo](https://img.shields.io/badge/demo-no%20signup%2C%20no%20server-E9A93D)](https://halcyon-video.github.io/halcyon-video/)
+[![Version](https://img.shields.io/github/v/tag/halcyon-video/halcyon-video?label=version&color=4c9a72)](https://github.com/halcyon-video/halcyon-video/releases)
+[![License](https://img.shields.io/badge/license-GPL--3.0-6a737d)](LICENSE)
+[![Stars](https://img.shields.io/github/stars/halcyon-video/halcyon-video?color=6a737d)](https://github.com/halcyon-video/halcyon-video/stargazers)
+
 **Your Jellyfin or Plex library, rebuilt as a walkable 1990s video rental store.** Every
 movie you own is a case on a shelf. Browse the aisles under warm fluorescents,
 pull *Back to the Future* off the wall, flip it over and read the back of the
@@ -18,6 +24,10 @@ board on the gable, your movie posters in the windows.
 **Try it right now, no server, no signup:** https://halcyon-video.github.io/halcyon-video/ — the full store running
 on a synthetic demo library. Or take the
 [**45-second tour ▶**](https://youtu.be/TCkEpeL8Y3w) first.
+
+**Got it running?** There's a [**Discord**](https://discord.gg/SN6FnJgQe) — setup help, release
+notes, and `#your-store`, which is for screenshots of yours wearing whatever
+livery you gave it. That last one is my favourite thing to get.
 
 > **Heads-up:** the demo boots the entire ~2,000-title store into your browser —
 > expect a few GB of memory and real GPU use, and prefer a plugged-in machine
