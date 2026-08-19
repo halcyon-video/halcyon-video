@@ -1,0 +1,111 @@
+name: Bug report
+description: Something in the store is broken, wrong, or crashes. Bugs only — see CONTRIBUTING.md.
+title: "[bug] "
+labels: ["bug", "unverified"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **This tracker takes bug reports only.** Feature requests, ideas, design
+        suggestions and "it would be cool if" are closed unread — not out of
+        rudeness, but because this project's direction lives in one head (see
+        [CONTRIBUTING.md](https://github.com/halcyon-video/halcyon-video/blob/master/CONTRIBUTING.md)).
+        The Discord is the place for those, and for questions.
+
+        **Do not attach third-party brand assets.** No logos, wordmarks, traces,
+        typefaces, rental-wrap scans or store photography belonging to a real
+        chain — not even "just for reference". Crop or blur them out of any
+        screenshot before you upload it.
+
+  - type: checkboxes
+    id: acknowledgements
+    attributes:
+      label: Before you file
+      options:
+        - label: This is a bug — something behaves differently than it should — not a feature request or an idea.
+          required: true
+        - label: My screenshots and logs contain no third-party brand assets.
+          required: true
+        - label: I searched the existing issues and this isn't already filed.
+          required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you saw, in one or two sentences.
+      placeholder: The clerk walks through the endcap on the way to the back wall.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected instead
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: >-
+        Numbered steps, starting from a fresh launch. If you can't reproduce it
+        on demand, say so and describe what you were doing when it happened.
+      value: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: The version string from the manager terminal, or the tag/commit you built.
+      placeholder: v1.4.2
+    validations:
+      required: true
+
+  - type: dropdown
+    id: backend
+    attributes:
+      label: Media server
+      options:
+        - Jellyfin
+        - Plex
+        - Demo library (no server)
+        - Other / not sure
+    validations:
+      required: true
+
+  - type: dropdown
+    id: platform
+    attributes:
+      label: How you're running it
+      options:
+        - Desktop app (Tauri)
+        - Browser
+        - Docker image
+        - Built from source
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Console output or logs
+      description: Paste anything the browser console or the app log printed around the failure. Automatically formatted as code.
+      render: text
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshot or F8 capture
+      description: >-
+        Press F8 in the app to capture the exact camera pose, live settings and a
+        screenshot together — that's the single most useful thing you can attach,
+        because it lets the bug be replayed shot-for-shot instead of guessed at.
+        Brand-free images only.
