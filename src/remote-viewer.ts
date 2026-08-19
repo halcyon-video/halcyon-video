@@ -90,14 +90,29 @@ function diagHint(): string {
 function showDiag(): void {
   if (pc?.connectionState === 'connected') return;
   diag.hint = diagHint();
+  showMessage(diag.hint);
+}
+
+/** The pill, re-laid-out as a readable paragraph for anything longer than it. */
+function showMessage(text: string): void {
   statusEl.style.display = '';
   statusEl.style.whiteSpace = 'normal';
   statusEl.style.maxWidth = 'min(88vw, 640px)';
   statusEl.style.textAlign = 'center';
   statusEl.style.textTransform = 'none';
   statusEl.style.lineHeight = '1.5';
-  statusEl.textContent = diag.hint;
+  statusEl.textContent = text;
 }
+
+// A store that has told us it can never host (no GPU on the server, a renderer
+// that threw). Retrying is pointless and would respawn the same doomed
+// instance every few seconds, so the message stands and the loop stops.
+let fatalMessage = '';
+
+// How long a store may answer "still booting" before the pill starts naming
+// the usual causes. A cold private instance with a real library takes ~30s.
+const SLOW_BOOT_MS = 120_000;
+let retryingSince = 0;
 
 // ─── Signaling (HTTP mailbox on the store's server) ─────────────────────────
 
@@ -156,6 +171,14 @@ async function requestInstance(): Promise<string | null> {
       signal: AbortSignal.timeout(90_000),
     });
     if (r.status === 503) {
+      // Two different 503s: every private store busy (wait), or this server
+      // can't render one at all (permanent, and it says why).
+      const body = await r.json().catch(() => ({}));
+      if (body?.error === 'no-webgl2') {
+        fatalMessage = String(body.message ?? '').trim()
+          || 'This store server can’t render a private session.';
+        return null;
+      }
       setStatus('All private stores are in use — retrying…');
       return null;
     }
@@ -206,6 +229,7 @@ async function onOffer(sdp: string) {
   pc.onconnectionstatechange = () => {
     if (pc?.connectionState === 'connected') {
       if (stallTimer) { clearTimeout(stallTimer); stallTimer = 0; }
+      retryingSince = 0; // a later reconnect gets the full patience again
       statusEl.style.whiteSpace = 'nowrap'; // restore pill styling for reuse
       setStatus(null);
       hintEl.style.opacity = '1';
@@ -252,10 +276,26 @@ async function session(patienceMs: number): Promise<void> {
           }
         } catch { /* stale candidate after a re-offer — harmless */ }
       } else if (m.type === 'retry') {
-        setStatus('Store is still booting…');
+        // A boot that has gone on this long is usually not a boot any more:
+        // most often the store server is sitting on a sign-in it can't
+        // complete, or is rendering without a GPU. Say what to check rather
+        // than showing the same three words indefinitely.
+        if (!retryingSince) retryingSince = Date.now();
+        if (Date.now() - retryingSince > SLOW_BOOT_MS) {
+          showMessage('The store server has been starting for a while. It may be waiting on a '
+            + 'media-server sign-in it can’t finish on its own, or rendering without a GPU. '
+            + 'Check the machine running the store.');
+        } else {
+          setStatus('Store is still booting…');
+        }
         await sleep(3000);
         await signalSend('hello');
         helloAt = Date.now();
+      } else if (m.type === 'fatal') {
+        // Permanent: the store told us it can never produce a stream.
+        fatalMessage = String(m.payload?.reason ?? '').trim()
+          || 'This store server can’t render a private session.';
+        return;
       } else if (m.type === 'bye') {
         return;
       }
@@ -286,6 +326,21 @@ async function main() {
       setStatus('Store server unreachable — retrying…');
       await sleep(2500);
       continue;
+    }
+    // Told outright that a private store here can never host. The kiosk's
+    // shared mirror may still be perfectly fine, so hand the visitor to it if
+    // one is up; otherwise keep the reason on screen and stop, since looping
+    // would just respawn the same doomed instance every few seconds.
+    if (fatalMessage) {
+      if (st.hostOnline && !explicitPrivate) {
+        fatalMessage = '';
+        privateMode = false;
+        retryingSince = 0;
+      } else {
+        showMessage(fatalMessage);
+        updateModeBtn(st);
+        return;
+      }
     }
     // No kiosk mirroring right now but the server can mint private stores:
     // serve one instead of a dead end — and hand the mirror back the moment

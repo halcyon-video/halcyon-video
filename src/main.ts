@@ -70,7 +70,7 @@ import {
 import { setupTerminalInput } from './store-setup-flow';
 import { registerLibraryToggles } from './library-settings';
 import { getActiveTheme, applyThemeCssVars, THEMES, resolveThemeId } from './themes';
-import { runDeviceGate } from './device-gate';
+import { runDeviceGate, detectGateReason } from './device-gate';
 import {
   activeMediaCutoff,
   filterLibrariesByCutoff,
@@ -87,7 +87,7 @@ import type { StoreScene } from './three-scene';
 import { InputManager } from './input';
 import type { InputCallbacks } from './input';
 import { refreshHoldHints, setHoldCheckoutProgress, setHoldDismissProgress } from './hold-hints';
-import { setupRemotePlay, isRemoteInstance, isRemotelyDriven } from './remote-play';
+import { setupRemotePlay, isRemoteInstance, isRemotelyDriven, reportRemoteFatal } from './remote-play';
 import { enableFpsMeter, FPS_METER_KEY } from './fps-meter';
 import { VideoPlayer } from './video-player';
 // initCaseMedium and refreshPosterCrop are dynamically imported to avoid loading Three.js on boot in 2.5D mode.
@@ -2417,6 +2417,13 @@ async function initializeStoreScene(preservePosterCache = false) {
       }
     }
     bootFlatStore(storeLibraries, canvasContainer, storeGameMovies, storeDiscovery);
+    // 2.5D is DOM, not a canvas, so a spawned instance in this mode has
+    // nothing to capture and would leave its viewer waiting forever. The
+    // server strips bb_render_mode out of the seed precisely so this can't
+    // happen — say so plainly if one ever gets here anyway.
+    if (isRemoteInstance()) {
+      reportRemoteFatal('The store server is running in 2.5D mode, which has no 3D view to stream.');
+    }
     hideBootOverlay();
     return;
   }
@@ -2729,6 +2736,14 @@ async function initializeStoreScene(preservePosterCache = false) {
   } catch (err: any) {
     console.error('[System] Failed to initialize 3D Store Scene:', err);
     logToConsole(`[System] 3D graphics initialization failed: ${err.message || err}. Falling back to 2D UI.`, 'system');
+    // Remote Play streams the 3D canvas; with no scene there is nothing to
+    // capture and this instance can never host. Falling back to the 2.5D DOM
+    // store is the right answer for a person sitting here, but a remote viewer
+    // sees only a black screen — so say what happened rather than leaving them
+    // on a "still booting" message that will never come true.
+    if (isRemoteInstance()) {
+      reportRemoteFatal(`The store server couldn’t start its 3D renderer: ${err?.message || err}`);
+    }
     hideBootOverlay();
   }
 }
@@ -4183,7 +4198,28 @@ async function main() {
   // before the boot call below, so the chosen mode is already settled and the
   // store builds it first time — no 3D scene raised only to be torn down.
   // Resolves immediately on hardware that's fine, which is every kiosk.
-  await runDeviceGate();
+  //
+  // EXCEPT inside a spawned Remote Play instance, where there is nobody at the
+  // screen to answer it: awaiting a modal no one can dismiss hangs the boot
+  // forever, and since the whole page exists to host a stream, every viewer is
+  // parked on "Store is still booting…" for as long as the instance lives.
+  // That is exactly what a GPU-less container does — no WebGL2, so the gate
+  // fires — and it is why Remote Play never loaded under Docker Desktop, which
+  // cannot pass a GPU into a container. Tell the viewer instead, and let the
+  // boot carry on (a scene that still can't build reports through the same
+  // channel from initializeStoreScene's catch).
+  if (isRemoteInstance()) {
+    if (detectGateReason() === 'no-webgl2') {
+      reportRemoteFatal(
+        'This store server has no GPU available, so it can’t render the 3D store for a '
+        + 'private session. In Docker, map a GPU into the container (devices: /dev/dri) — '
+        + 'Docker Desktop on Mac and Windows can’t. Otherwise open the store in a browser '
+        + 'on a machine with a display and turn Remote Play on: viewers then share that view.'
+      );
+    }
+  } else {
+    await runDeviceGate();
+  }
 
   // Check saved credentials and try connection in background (demo mode
   // skips the credential gate entirely and never shows the login overlay).

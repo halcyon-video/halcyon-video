@@ -52,12 +52,37 @@ const stats = {
   running: false,
   viewers: 0,
   inputsApplied: 0,
+  fatal: '', // set when this store can never host (see reportRemoteFatal)
   get remotelyDriven() { return isRemotelyDriven(); },
   get streamingPlayback() { return !!playbackVideoTrack(); },
 };
 (window as any).__remotePlay = stats;
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+// ─── Permanent failures ─────────────────────────────────────────────────────
+//
+// "No scene yet" is normally a wait: a store mid-boot answers a viewer's hello
+// with 'retry' and the viewer re-hellos. Some failures never resolve, though —
+// a container with no GPU has no WebGL2 at all, so the 3D store cannot start,
+// this page will never have a canvas to capture, and every hello for the rest
+// of the instance's life would get another 'retry'. From the viewer's side
+// that is indistinguishable from a slow boot: a black screen reading "Store is
+// still booting…" forever, with nothing to act on (reported from Docker
+// Desktop on a Mac, which cannot pass a GPU into a container at all).
+//
+// So a blocker that we know is permanent is recorded here and sent to viewers
+// as 'fatal' + a reason they can read and act on.
+let fatalReason = '';
+
+/** Record why this store can never host, and tell anyone already waiting. */
+export function reportRemoteFatal(reason: string): void {
+  if (fatalReason) return; // first cause is the useful one
+  fatalReason = reason;
+  stats.fatal = reason;
+  console.error(`[RemotePlay] cannot host: ${reason}`);
+  for (const id of [...viewers.keys()]) signalSend(id, 'fatal', { reason });
+}
 
 // ICE config the server hands out (a TURN relay when it runs one — viewers
 // off the LAN have no other way in). Refreshed hourly because the relay's
@@ -394,7 +419,10 @@ async function createViewer(id: string): Promise<void> {
   const scene = getScene();
   const stream = ensureStream();
   if (!scene || !stream) {
-    signalSend(id, 'retry'); // still booting — viewer waits and re-hellos
+    // A known-permanent blocker is worth saying out loud; anything else is a
+    // store still coming up, and the viewer waits and re-hellos.
+    if (fatalReason) signalSend(id, 'fatal', { reason: fatalReason });
+    else signalSend(id, 'retry');
     return;
   }
   await refreshIceServers(); // credentials are time-stamped; re-read hourly
