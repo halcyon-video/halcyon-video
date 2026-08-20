@@ -13,6 +13,7 @@
 !src
 !public
 !tools/check-file-budget.mjs
+!tools/check-provider-boundary.mjs
 !tools/list-slots.mjs
 !tools/remote-play-server.mjs
 
