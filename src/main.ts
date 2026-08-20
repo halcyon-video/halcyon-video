@@ -2526,6 +2526,15 @@ async function initializeStoreScene(preservePosterCache = false) {
     await calibrateQualityIfNeeded();
 
     const { StoreScene } = await import('./three-scene');
+    // The constructor below is one uninterrupted stretch of main thread — floor
+    // plan, every fixture, every case, and the first bind of each shader
+    // program — and nothing on screen can change until it returns. Measured at
+    // 9.5s for a 6000-title catalog on a fast desktop GPU, and the shader links
+    // in it are far slower on integrated graphics. So name the wait BEFORE
+    // entering it: this line is the last thing the boot log can say for a
+    // while, and silence here is what makes a slow open look like a hang.
+    const plannedTitles = storeLibraries.reduce((n, l) => n + l.movies.length, 0);
+    logToConsole(`[System] Planning the store floor for ${plannedTitles} title(s)...`, 'system');
     const scene = new StoreScene(canvasContainer, storeLibraries, logToConsole, jfUrl, jfToken, storeComingSoon, storeDiscovery, storeGameMovies, staffPicks);
     armQualityBackstop();
 
@@ -2798,7 +2807,39 @@ async function initializeStoreScene(preservePosterCache = false) {
   }
 }
 
+/**
+ * Resolve once the browser has actually PAINTED a frame — two rAFs, because
+ * the first callback runs before that frame's paint and the second only fires
+ * after it. Raced against a short timer: rAF is throttled to a standstill in a
+ * hidden tab (the kiosk's own host tab, among others), and a boot that waits
+ * for a frame that never comes would be a worse bug than the one this fixes.
+ */
+function nextPaintedFrame(timeoutMs = 250): Promise<void> {
+  return new Promise((resolve) => {
+    let settled = false;
+    const done = () => { if (!settled) { settled = true; resolve(); } };
+    setTimeout(done, timeoutMs);
+    requestAnimationFrame(() => requestAnimationFrame(done));
+  });
+}
+
 async function waitForFontsAndInit() {
+  // Let the boot overlay reach the screen before anything long-running starts.
+  // Every caller (openStore, enterOpeningDay, the demo) raises the overlay and
+  // hands straight to this function, and on a warm cache each await below can
+  // settle without the browser ever getting a rendering opportunity — so the
+  // `visible` class was set but never painted, and the store build's long
+  // synchronous stretch began with the PREVIOUS frame still on screen. At
+  // catalog scale that stretch is ~10s of dead thread (measured, 6000-title
+  // library, fast desktop GPU), and what stays up through it is whatever the
+  // counter CRT last painted: the CATALOG SYNC readout, frozen mid-sync. It is
+  // indistinguishable from a crash, and it is what a #help report described as
+  // "stuck on this page for about an hour" — see
+  // tickets/catalog-scale-2026-08-20.md. Pairs with showBootOverlay(), which
+  // raises the overlay without its fade so this one frame shows it at full
+  // opacity rather than 2% of the way in. Debug-only override, never surfaced
+  // in Settings, kept for the A/B that proved it: bb_debug_no_boot_paint=1.
+  if (!localStorage.getItem('bb_debug_no_boot_paint')) await nextPaintedFrame();
   if (document.fonts) {
     try {
       // Explicitly wait for the display face used in canvas texture rendering.

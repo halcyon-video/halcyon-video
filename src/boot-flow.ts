@@ -296,6 +296,9 @@ export function hideLoginOverlay() {
 export function hideBootOverlay() {
   const overlay = document.getElementById('boot-overlay');
   if (overlay) {
+    // Restore the stylesheet's fade for the way OUT (showBootOverlay suppresses
+    // it for the way in — see there).
+    overlay.style.transition = '';
     overlay.classList.remove('visible');
   }
 }
@@ -306,6 +309,22 @@ export function hideBootOverlay() {
 export function showBootOverlay() {
   const overlay = document.getElementById('boot-overlay');
   if (overlay) {
+    // Raise it INSTANTLY, not over the stylesheet's 0.6s fade. What follows a
+    // showBootOverlay() call is always the store build, which holds the main
+    // thread for seconds at catalog scale — so a fade that has not finished by
+    // then is frozen part-way, and on a webview whose compositor does not
+    // advance without the main thread it never starts at all, leaving the
+    // player looking at the screen underneath (the counter CRT's CATALOG SYNC
+    // readout) for the entire build. The fade OUT, which runs when the store is
+    // ready and the thread is free, is the one worth keeping; hideBootOverlay
+    // puts it back. Debug-only override, never surfaced in Settings: set
+    // bb_debug_no_boot_paint=1 to restore the old behaviour for A/B runs.
+    if (!localStorage.getItem('bb_debug_no_boot_paint')) {
+      overlay.style.transition = 'none';
+      overlay.classList.add('visible');
+      void overlay.offsetHeight; // flush the style change into this frame
+      return;
+    }
     overlay.classList.add('visible');
   }
 }
