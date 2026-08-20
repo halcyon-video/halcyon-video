@@ -248,6 +248,10 @@ export class AmbientTvs implements StoreFixture {
   private streamWatchdog: ReturnType<typeof setTimeout> | null = null;
   // Fast decoder-liveness timer — see DECODE_LIVENESS_MS / armDecodeLivenessCheck.
   private livenessWatchdog: ReturnType<typeof setTimeout> | null = null;
+  // The library this fixture is allowed to draw from (build()'s `pool`,
+  // retained so a title reaching its end (#70) can pick another one from the
+  // same set without recomputing the library selection).
+  private pool: Movie[] = [];
   // Every built screen, and the one material they share, so the picture can be
   // replaced by the dead-tube phosphor after the fact — see goDeadGlass.
   private screenMeshes: THREE.Mesh[] = [];
@@ -324,12 +328,13 @@ export class AmbientTvs implements StoreFixture {
       size: pool.length,
       libs: [...new Set(pool.map(m => m.libraryName))].sort(),
     };
+    this.pool = pool;
 
     // The TVs are store furniture — they hang from the ceiling regardless of
     // whether a stream is available; without a server they just show dead glass.
     let videoTex: THREE.VideoTexture | null = null;
     if (pool.length > 0 && this.ctx.jellyfinUrl && this.ctx.jellyfinToken) {
-      const movie = pool[Math.floor(Math.random() * pool.length)];
+      const movie = this.pickPoolTitle(null);
       const seekSec = tvStartOffsetSec(movie);
       videoTex = this.makeVideoTexture(movie, seekSec);
       if (videoTex) {
@@ -349,7 +354,7 @@ export class AmbientTvs implements StoreFixture {
       // Resolving a "playing" identity here regardless keeps the TV-peek Select
       // action (jump to the box of what's playing) working offline; the loop is
       // house promo footage, not that title, exactly as the test card was.
-      this.playingMovie = pool[Math.floor(Math.random() * pool.length)];
+      this.playingMovie = this.pickPoolTitle(null);
       // bb_tv_testcard wins when set: the static card is the DETERMINISTIC
       // stand-in the screenshot rigs pin the tube treatment against, and a
       // moving picture would make those shots differ frame to frame.
@@ -373,7 +378,15 @@ export class AmbientTvs implements StoreFixture {
     const video = document.createElement('video');
     video.setAttribute('style', 'position:fixed;left:-9999px;width:1px;height:1px;');
     video.crossOrigin = 'anonymous';
-    video.loop = true;
+    // OFF by default (#70): a looping stream that wraps around can make
+    // hls.js reload a manifest whose earliest segments have already fallen
+    // out of the server's window, which is what turned into a fatal
+    // manifestLoadError. The honest behaviour on reaching the end of a title
+    // is to play a DIFFERENT one — see the 'ended' listener below — so the
+    // stream path leaves this false and lets 'ended' fire the normal way.
+    // playDemoLoop turns it back on for the one bundled clip, which has
+    // nowhere else to advance to and is meant to run forever.
+    video.loop = false;
     video.volume = 1.0; // gain controlled by Web Audio PannerNode
     video.muted = true; // autoplay policy: boot muted; unmuted on first user gesture
     video.playsInline = true;
@@ -409,6 +422,12 @@ export class AmbientTvs implements StoreFixture {
       if (this.pictureSource === 'stream') this.giveUpOnStream(code, { decoderFault });
       else if (this.pictureSource === 'loop') this.goDeadGlass(`demo loop ${code}`);
     });
+    // The stream reached its natural end (only fires with loop off, i.e. on
+    // the stream path — see the comment above). Move on to another title
+    // rather than sitting on a black/frozen tube (#70).
+    video.addEventListener('ended', () => {
+      if (this.pictureSource === 'stream') void this.advanceToNextTitle();
+    });
     // First decoded frame of ANY source: the element THINKS the picture is
     // real, so stand the slow watchdog down and re-solve the crop against the
     // true frame size — but that belief is exactly what #72 found lying on a
@@ -441,6 +460,60 @@ export class AmbientTvs implements StoreFixture {
     this.armStreamWatchdog();
     void this.openStream(movie, seekSec, video);
     return videoTex;
+  }
+
+  // Pick a title from the pool this fixture was built against, preferring
+  // not to immediately repeat `exclude` when there's another option — used
+  // both for the opening choice (exclude: null) and for moving on at the end
+  // of a title (#70).
+  private pickPoolTitle(exclude: Movie | null): Movie {
+    const pool = this.pool;
+    let next = pool[Math.floor(Math.random() * pool.length)];
+    if (exclude && pool.length > 1) {
+      for (let tries = 0; tries < 5 && next.id === exclude.id; tries++) {
+        next = pool[Math.floor(Math.random() * pool.length)];
+      }
+    }
+    return next;
+  }
+
+  /**
+   * A title reached its end honestly (#70) — not a network failure, just the
+   * runtime running out. `video.loop` is off for the stream path exactly so
+   * this can happen: a real store's monitors didn't freeze on the last frame
+   * or silently rewind, they moved to another tape.
+   *
+   * All the screens this fixture builds — the two ceiling sets, or the 2000
+   * theme's three-wide wall bank — already share this ONE <video>/HLS
+   * pipeline (see the class comment); that sharing predates this fix and
+   * settles the "independent or in step" question the ticket raises before
+   * it's even asked here. There is only ever one active transcode for the
+   * whole fixture, so advancing every screen together isn't a design choice
+   * made in this method — it's what the existing architecture already does.
+   * Giving each screen its own encode would multiply the transcode cost #69
+   * is about, for a loop-desync nobody watching a wall of monitors would
+   * ever register.
+   */
+  private async advanceToNextTitle(): Promise<void> {
+    if (this.disposed || this.pictureSource !== 'stream') return;
+    const video = this.video;
+    if (!video || this.pool.length === 0) {
+      this.goDeadGlass('title ended, no next title to advance to');
+      return;
+    }
+    // The title that just finished stops billing the server NOW, same as
+    // every other step-down here — not deferred to the next teardown.
+    this.cancelTranscode();
+    if (this.hls) {
+      this.hls.destroy();
+      this.hls = null;
+    }
+    const next = this.pickPoolTitle(this.playingMovie);
+    this.playingMovie = next;
+    const seekSec = tvStartOffsetSec(next);
+    this.ctx.log(`[System] CRT TVs: "${next.title}" from ~${Math.round(seekSec / 60)}min`, 'system');
+    this.armStreamWatchdog();
+    await this.openStream(next, seekSec, video);
   }
 
   /**
@@ -765,10 +838,10 @@ export class AmbientTvs implements StoreFixture {
    * ceiling TVs abandon one every time the scene is rebuilt — which the Overhead
    * TVs toggles themselves do, being applyMode 'rebuild-scene'.
    *
-   * Capability-gated rather than probed, per the note on the interface. Note
-   * for anyone chasing a still-running Plex encode: PlexProvider recovers the
-   * server address from `rememberConnection`, and NOTHING in the app calls that
-   * yet — so this is a no-op on Plex until the boot flow wires it.
+   * Capability-gated rather than probed, per the note on the interface. As of
+   * #69, PlexProvider remembers its own connection internally (invoked from
+   * authenticate()/fetchLibraries()/resolvePlaybackSource()), so this call is
+   * effective on both backends — no separate wiring needed here.
    */
   private cancelTranscode(): void {
     const sessionId = this.transcodeSessionId;
