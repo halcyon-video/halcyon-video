@@ -121,12 +121,14 @@ export class PlexProvider implements MediaSourceProvider {
     const match = servers.find((s) =>
       s.connections.some((c) => normalizePlexUrl(c) === target)
     );
-    return {
+    const session: ProviderSession = {
       accessToken: match?.accessToken || accountToken,
       userId: match?.machineIdentifier || '',
       userName: match?.name || 'Plex',
       raw: { accountToken, machineIdentifier: match?.machineIdentifier },
     };
+    this.rememberConnection(target, session);
+    return session;
   }
 
   async validateSession(server: string, session: ProviderSession): Promise<boolean> {
@@ -147,6 +149,12 @@ export class PlexProvider implements MediaSourceProvider {
     onProgress?: (stage: string) => void,
     opts?: { excludeLibraryIds?: ReadonlySet<string> }
   ): Promise<Library[]> {
+    // A catalog sync is the one call every connect path makes before the store
+    // can be stocked — fresh sign-in, a saved session restored on boot, and the
+    // setup terminal's re-sync all end up here even though only the first also
+    // calls authenticate(). Remembering the connection on both entry points
+    // means neither can be the seam that gets bypassed.
+    this.rememberConnection(server, session);
     return fetchPlexLibrariesAndMovies(server, session.accessToken, onProgress, opts);
   }
 
@@ -189,6 +197,11 @@ export class PlexProvider implements MediaSourceProvider {
     itemId: string,
     opts?: PlaybackRequestOptions & { kind?: 'direct' | 'transcode' }
   ): Promise<PlaybackSource> {
+    // Belt-and-suspenders alongside authenticate()/fetchLibraries(): this is
+    // the exact call that can mint a transcode session id, so the connection
+    // used to cancel one later is always the connection that just started it
+    // — never a stale one from whatever ran first at boot.
+    this.rememberConnection(server, session);
     if (opts?.kind !== 'transcode') {
       const probe = await fetchPlexItemPlaybackInfo(server, session.accessToken, itemId);
       if (probe.partKey) {
@@ -237,10 +250,10 @@ export class PlexProvider implements MediaSourceProvider {
 
   /**
    * The interface passes only a session id, but Plex's stop endpoint is on the
-   * SERVER — so the address and token are recovered from the session this
-   * provider last authenticated. Held here rather than widening the interface
-   * for one backend; see the note in media-source-provider.ts on cancelActive
-   * Transcode being capability-gated.
+   * SERVER — so the address and token are recovered from the connection this
+   * provider last saw itself (rememberConnection, below). Held here rather
+   * than widening the interface for one backend; see the note in
+   * media-source-provider.ts on cancelActiveTranscode being capability-gated.
    */
   async cancelActiveTranscode(sessionId: string, log?: (msg: string) => void): Promise<void> {
     if (!this.lastServer || !this.lastToken) return;
@@ -250,9 +263,22 @@ export class PlexProvider implements MediaSourceProvider {
   private lastServer = '';
   private lastToken = '';
 
-  /** Called by the boot flow after a successful connect so transcode teardown
-   *  has an address to aim at. */
-  rememberConnection(server: string, session: ProviderSession): void {
+  /**
+   * GH #69: this used to be a public method the boot flow was supposed to call
+   * once, separately, after a successful connect — and nothing ever did,
+   * which is exactly the shape of a seam that gets bypassed. There are three
+   * ways this app reaches a connected Plex session (a fresh sign-in through
+   * authenticate(), a saved token/server restored on boot straight into
+   * fetchLibraries(), and the setup terminal's own re-sync, also through
+   * fetchLibraries()), so telling the provider about the connection from the
+   * OUTSIDE meant getting all three call sites right forever. Instead the
+   * provider now notices its own connection as a side effect of the calls it
+   * already has to serve — authenticate(), fetchLibraries(), and
+   * resolvePlaybackSource() each call this on entry — so a future connect
+   * path only has to call an existing MediaSourceProvider method to stay
+   * covered, not remember a fourth thing to wire up.
+   */
+  private rememberConnection(server: string, session: ProviderSession): void {
     this.lastServer = normalizePlexUrl(server);
     this.lastToken = session.accessToken;
   }
