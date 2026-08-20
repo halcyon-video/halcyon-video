@@ -20,6 +20,22 @@
       padding: 6px 14px; border-radius: 8px; pointer-events: none; white-space: nowrap;
       transition: opacity 1.2s; opacity: 0;
     }
+    #hint b { color: #ffd23f; font-weight: 700; }
+    /* Four legends, one shown: store vs. playback (the host tells us which, over
+       the input channel) crossed with keyboard vs. touch. Static text rather
+       than an import — remote-viewer.ts stays free of app modules on purpose. */
+    #hint .play, #hint .tt { display: none; }
+    body.playing #hint .store { display: none; }
+    body.playing #hint .play { display: inline; }
+    body.touch #hint .kb { display: none; }
+    body.touch #hint .tt { display: inline; }
+    #helpbtn {
+      position: absolute; top: 14px; left: 14px; display: none; cursor: pointer;
+      font: 700 15px/1 system-ui, sans-serif; color: #0a1944; background: #ffd23f;
+      border-radius: 999px; width: 34px; height: 34px; text-align: center; line-height: 34px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5); user-select: none; z-index: 41;
+    }
+    body.touch #helpbtn { display: block; }
     #modebtn {
       position: absolute; top: 14px; right: 14px; display: none; cursor: pointer;
       font: 700 11px/1 system-ui, sans-serif; letter-spacing: 0.08em;
@@ -33,7 +49,8 @@
   <div id="stage"><video id="screen" autoplay playsinline muted></video></div>
   <div id="status">Looking for the store…</div>
   <div id="modebtn"></div>
-  <div id="hint">WASD / arrows browse &nbsp;·&nbsp; Enter select &nbsp;·&nbsp; Q back &nbsp;·&nbsp; F walk &nbsp;·&nbsp; L mouse look &nbsp;·&nbsp; click to pick</div>
+  <div id="helpbtn" title="Show the controls">?</div>
+  <div id="hint"><span class="store"><span class="kb">WASD / arrows browse &nbsp;·&nbsp; Enter select &nbsp;·&nbsp; Q back &nbsp;·&nbsp; F walk &nbsp;·&nbsp; L mouse look &nbsp;·&nbsp; click to pick &nbsp;·&nbsp; <b>H</b> shows this again</span><span class="tt">D-pad browses &nbsp;·&nbsp; OK selects &nbsp;·&nbsp; drag to look around &nbsp;·&nbsp; tap a case to pick it &nbsp;·&nbsp; <b>?</b> shows this again</span></span><span class="play"><span class="kb">Now playing &nbsp;·&nbsp; Enter pause / resume &nbsp;·&nbsp; Q stop &nbsp;·&nbsp; F fullscreen &nbsp;·&nbsp; M mute &nbsp;·&nbsp; <b>H</b> shows this again</span><span class="tt">Now playing &nbsp;·&nbsp; OK pauses / resumes &nbsp;·&nbsp; BACK stops &nbsp;·&nbsp; <b>?</b> shows this again</span></span></div>
   <script type="module" src="/src/remote-viewer.ts"></script>
 </body>
 </html>

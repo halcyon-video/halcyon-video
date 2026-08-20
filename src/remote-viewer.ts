@@ -38,8 +38,54 @@ let iceServers: RTCIceServer[] = [{ urls: 'stun:stun.l.google.com:19302' }];
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 function setStatus(text: string | null) {
+  // A store that told us WHY it can't stream keeps saying so: the connection
+  // chatter underneath ("Connecting…", "Store is still booting…") would
+  // otherwise paper the reason over a second later and leave a viewer watching
+  // a spinner for a thing that already failed.
+  if (fatalMessage) return;
   statusEl.style.display = text ? '' : 'none';
   if (text) statusEl.textContent = text;
+}
+
+// ─── Control legend ─────────────────────────────────────────────────────────
+//
+// The store's own HUD, help page, hold-hints and player OSD are all DOM
+// siblings of the canvas on the host, so NONE of them are in the captured
+// stream. This line is the only controls reference a viewer has — which is why
+// it must be recallable rather than shown once and lost (it used to fade out
+// after 9 seconds, forever), and why it swaps to the playback keys when the
+// host tells us a film is on the wire (the keys work; nothing said so).
+const HINT_MS = 9000;        // first showing, on connect
+const HINT_RECALL_MS = 12000; // deliberately asked for — give it longer to read
+let hintTimer = 0;
+let hintShown = false;
+
+function showHint(ms: number): void {
+  hintEl.style.opacity = '1';
+  hintShown = true;
+  if (hintTimer) clearTimeout(hintTimer);
+  hintTimer = window.setTimeout(hideHint, ms);
+}
+
+function hideHint(): void {
+  if (hintTimer) { clearTimeout(hintTimer); hintTimer = 0; }
+  hintEl.style.opacity = '0';
+  hintShown = false;
+}
+
+/** H / ? on a keyboard, the corner button on a touchscreen. */
+function toggleHint(): void {
+  if (hintShown) hideHint();
+  else showHint(HINT_RECALL_MS);
+}
+
+/** The host says a film is (or is no longer) what these frames are. */
+function setPlaybackLegend(on: boolean): void {
+  const was = document.body.classList.contains('playing');
+  document.body.classList.toggle('playing', on);
+  // A film starting is the one moment the picture changes under the viewer
+  // with no chrome at all to explain it — say which keys still work, briefly.
+  if (on && !was) showHint(6000);
 }
 
 // ─── Connection diagnostics ─────────────────────────────────────────────────
@@ -105,9 +151,13 @@ function showMessage(text: string): void {
 }
 
 // A store that has told us it can never host (no GPU on the server, a renderer
-// that threw). Retrying is pointless and would respawn the same doomed
-// instance every few seconds, so the message stands and the loop stops.
+// that threw, a kiosk switched into 2.5D). Retrying a PRIVATE instance is
+// pointless and would respawn the same doomed copy every few seconds, so the
+// message stands and the loop stops. A SHARED kiosk is different: the reason is
+// usually something the owner can undo at the machine, so we hold the message
+// on screen and keep hello-ing quietly until it comes back.
 let fatalMessage = '';
+let fatalFromShared = false;
 
 // How long a store may answer "still booting" before the pill starts naming
 // the usual causes. A cold private instance with a real library takes ~30s.
@@ -177,6 +227,7 @@ async function requestInstance(): Promise<string | null> {
       if (body?.error === 'no-webgl2') {
         fatalMessage = String(body.message ?? '').trim()
           || 'This store server can’t render a private session.';
+        fatalFromShared = false;
         return null;
       }
       setStatus('All private stores are in use — retrying…');
@@ -215,6 +266,14 @@ async function onOffer(sdp: string) {
   };
   pc.ondatachannel = (ev) => {
     dc = ev.channel;
+    // The channel carries input up and store state down (see notifyViewer in
+    // remote-play.ts) — currently just "are these frames a film or the store".
+    dc.onmessage = (m) => {
+      try {
+        const msg = JSON.parse(String(m.data));
+        if (msg?.t === 'state') setPlaybackLegend(!!msg.playback);
+      } catch { /* malformed frame — drop it */ }
+    };
   };
   pc.onicecandidate = (ev) => {
     if (ev.candidate?.candidate) diag.local.add(candFlavour(ev.candidate.candidate));
@@ -230,10 +289,12 @@ async function onOffer(sdp: string) {
     if (pc?.connectionState === 'connected') {
       if (stallTimer) { clearTimeout(stallTimer); stallTimer = 0; }
       retryingSince = 0; // a later reconnect gets the full patience again
+      // Frames are arriving, so whatever the store last called permanent isn't:
+      // a kiosk switched into 2.5D and back is exactly this case.
+      fatalMessage = '';
       statusEl.style.whiteSpace = 'nowrap'; // restore pill styling for reuse
       setStatus(null);
-      hintEl.style.opacity = '1';
-      setTimeout(() => { hintEl.style.opacity = '0'; }, 9000);
+      showHint(HINT_MS);
     }
   };
   // If a whole offer/answer/ICE round doesn't reach "connected", the pill would
@@ -292,9 +353,11 @@ async function session(patienceMs: number): Promise<void> {
         await signalSend('hello');
         helloAt = Date.now();
       } else if (m.type === 'fatal') {
-        // Permanent: the store told us it can never produce a stream.
+        // The store told us it can't produce a stream, and why.
+        fatalFromShared = hostPeer === 'host';
         fatalMessage = String(m.payload?.reason ?? '').trim()
           || 'This store server can’t render a private session.';
+        showMessage(fatalMessage); // an attached viewer learns this mid-session
         return;
       } else if (m.type === 'bye') {
         return;
@@ -326,6 +389,24 @@ async function main() {
       setStatus('Store server unreachable — retrying…');
       await sleep(2500);
       continue;
+    }
+    // The KIOSK MIRROR itself said it can't stream — switched into 2.5D, most
+    // likely, which has no 3D canvas to capture. Handing the visitor back to
+    // that same host would only put them on "Store is still booting…" for a
+    // store that isn't booting, so the reason stays on screen while we keep
+    // hello-ing: the moment someone switches it back, an offer arrives and the
+    // connect handler clears the message.
+    if (fatalMessage && fatalFromShared) {
+      if (!st.hostOnline) {
+        fatalMessage = ''; // the kiosk is gone; its last reason no longer applies
+      } else {
+        showMessage(fatalMessage);
+        updateModeBtn(st);
+        hostPeer = 'host';
+        await session(20_000);
+        await sleep(1500);
+        continue;
+      }
     }
     // Told outright that a private store here can never host. The kiosk's
     // shared mirror may still be perfectly fine, so hand the visitor to it if
@@ -405,6 +486,9 @@ const PREVENT = new Set(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' ',
 window.addEventListener('keydown', (e) => {
   if (e.ctrlKey || e.metaKey || e.altKey) return; // leave browser chords alone
   if (e.key === 'l' || e.key === 'L') { toggleMouseLook(); return; } // viewer-local
+  // Also viewer-local, and unclaimed by the store's key vocabulary
+  // (a d w s e q f c r x p / + arrows/Enter/Space/Esc/Backspace).
+  if (e.key === 'h' || e.key === 'H' || e.key === '?') { toggleHint(); return; }
   if (PREVENT.has(e.key)) e.preventDefault();
   unmute();
   sendInput({ t: 'key', et: 'down', key: e.key, code: e.code, repeat: e.repeat });
@@ -412,6 +496,7 @@ window.addEventListener('keydown', (e) => {
 window.addEventListener('keyup', (e) => {
   if (e.ctrlKey || e.metaKey || e.altKey) return;
   if (e.key === 'l' || e.key === 'L') return;
+  if (e.key === 'h' || e.key === 'H' || e.key === '?') return;
   sendInput({ t: 'key', et: 'up', key: e.key, code: e.code });
 });
 
@@ -487,7 +572,11 @@ if (isTouchPrimary()) {
     unmute,
     setDragging: (v) => { touchDragging = v; },
   });
-  hintEl.textContent = 'D-pad browses · OK selects · drag to look around · tap a case to pick it';
+  // Swaps the legend to the touch wording (remote.html carries both) and
+  // reveals the corner "?" — a phone has no H key to recall it with.
+  document.body.classList.add('touch');
+  const helpBtn = document.getElementById('helpbtn') as HTMLDivElement | null;
+  if (helpBtn) helpBtn.onclick = () => toggleHint();
 }
 
 // Verification hook (tools/verify_remote_play.mjs).
@@ -495,6 +584,19 @@ if (isTouchPrimary()) {
   peerId,
   get dcOpen() { return dcOpen(); },
   get connectionState() { return pc?.connectionState ?? 'none'; },
+  // Control legend: whether it's up, and which of the four variants is showing
+  // (store/playback × keyboard/touch). The visible text is the assertion — the
+  // whole point of the legend is that a viewer can read the keys.
+  get hint() {
+    // getClientRects() rather than computed display: a leaf inside a
+    // display:none parent still computes 'inline', and the legend's own
+    // hidden state is opacity, which keeps its rects — so this reports the
+    // one variant actually laid out, in either state.
+    const shown = [...hintEl.querySelectorAll('.kb, .tt')]
+      .filter((el) => el.getClientRects().length > 0)
+      .map((el) => (el.textContent ?? '').replace(/\s+/g, ' ').trim());
+    return { visible: hintShown, playing: document.body.classList.contains('playing'), text: shown.join(' | ') };
+  },
   // Connection diagnostics: candidate flavours each side offered, live ICE
   // state, and the best-guess cause when a connection stalls.
   get diag() {
