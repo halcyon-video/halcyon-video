@@ -2550,8 +2550,13 @@ async function initializeStoreScene(preservePosterCache = false) {
       if (isDemoMode) return makeSyntheticEpisodes(movie);
       const jellyfinUrl = localStorage.getItem('jellyfin_url');
       const token = localStorage.getItem('jellyfin_token');
-      const userId = localStorage.getItem('jellyfin_userid');
-      if (!jellyfinUrl || !token || !userId) return [];
+      // Address and token are the credentials; a user id is not one (GH #66).
+      // It is a Jellyfin concept, and a Plex session's is empty whenever
+      // plex.tv didn't resolve the server — so requiring it here returned []
+      // for every Plex series and painted the season panel NONE. It is still
+      // PASSED, because the Jellyfin provider needs it; the provider decides.
+      const userId = localStorage.getItem('jellyfin_userid') ?? '';
+      if (!jellyfinUrl || !token) return [];
       return provider().fetchSeriesEpisodes(jellyfinUrl, sessionOf(token, userId), movie.id);
     };
 
@@ -3155,8 +3160,8 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
     } else {
       const jellyfinUrl = localStorage.getItem('jellyfin_url');
       const token = localStorage.getItem('jellyfin_token');
-      const userId = localStorage.getItem('jellyfin_userid');
-      const first = (jellyfinUrl && token && userId)
+      const userId = localStorage.getItem('jellyfin_userid') ?? '';
+      const first = (jellyfinUrl && token)
         ? await provider().fetchFirstEpisodeOfSeries(jellyfinUrl, sessionOf(token, userId), movie.id)
         : null;
       if (!first) {
@@ -3177,7 +3182,9 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
 
   const jellyfinUrl = localStorage.getItem('jellyfin_url');
   const token = localStorage.getItem('jellyfin_token');
-  const userId = localStorage.getItem('jellyfin_userid');
+  // Never a credential test — see the note on onFetchEpisodes. Carried so the
+  // Jellyfin provider can address /Users/<id>/..., empty on Plex by design.
+  const userId = localStorage.getItem('jellyfin_userid') ?? '';
 
   // Without a media-server endpoint there's nothing to stream into the webview
   // — fall back to the external player on the original file.
@@ -3192,7 +3199,7 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
   // back-room couch, an auto-advance step) fetches it once here.
   if (movie.isSeries) {
     let episodes = storeScene?.getSeriesEpisodes(movie.id) ?? null;
-    if (!episodes?.length && userId) {
+    if (!episodes?.length) {
       episodes = await provider().fetchSeriesEpisodes(jellyfinUrl, sessionOf(token, userId), movie.id);
     }
     seriesQueue = episodes?.length ? { seriesId: movie.id, episodes } : null;
@@ -3281,8 +3288,16 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
   // the player's own direct→HLS error fallback never has a chance to trigger.
   // Movies carry this info from the catalog sync (Fields=MediaSources); a
   // series episode (overrideItemId) isn't in the catalog, so probe it here.
+  // The `userId &&` that used to guard this probe skipped it on every Plex
+  // install, so a Plex EPISODE reached the direct-play decision with no
+  // container or codec information at all — exactly the blind spot the comment
+  // above warns about, and the audio would go silently missing. Plex doesn't
+  // use the user id here anyway (probeItemPlaybackInfo branches to
+  // fetchPlexItemPlaybackInfo, which takes only server/token/itemId), and the
+  // Jellyfin branch is unchanged because a Jellyfin install always has one —
+  // it also already returns undefined rather than throwing if the probe fails.
   const mediaInfo: MediaPlaybackInfo | undefined = overrideItemId
-    ? (userId ? await probeItemPlaybackInfo(jellyfinUrl, token, userId, playbackId) : undefined)
+    ? await probeItemPlaybackInfo(jellyfinUrl, token, userId, playbackId)
     : (version?.mediaPlaybackInfo ?? movie.mediaPlaybackInfo);
   // Codec hint for buildHlsStreamUrl: HEVC sources get hevc pass-through
   // (fMP4) when the webview can decode it; everything else stays on TS.
