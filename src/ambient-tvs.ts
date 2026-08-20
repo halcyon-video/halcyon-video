@@ -76,6 +76,10 @@ const DEMO_LOOP_PATH = 'demo-clip/big-buck-bunny.webm';
  * nothing.
  */
 function tvStartOffsetSec(movie: Movie): number {
+  // A series container's runtime, where a backend reports one at all, describes
+  // the SHOW — it says nothing about the length of the one episode that is
+  // about to play. Start those at the beginning.
+  if (movie.isSeries) return 0;
   let runtimeSec = 0;
   if (movie.runTimeTicks && movie.runTimeTicks > 0) {
     runtimeSec = movie.runTimeTicks / TICKS_PER_SECOND;
@@ -275,9 +279,18 @@ export class AmbientTvs implements StoreFixture {
     const allMovies: Movie[] = [];
     const chosenMovies: Movie[] = [];
     this.ctx.libraries.forEach(lib => lib.movies.forEach(m => {
+      // A library the user EXPLICITLY picked contributes everything it shelves,
+      // series containers included (#67). Dropping those before the library
+      // check meant a TV-Shows library contributed nothing whatever its toggle
+      // said — the first reporter had switched TV shows on and it could never
+      // have done anything. A series container isn't itself streamable, but it
+      // names an episode that is; openStream resolves one.
+      if (chosen.has(lib.id)) chosenMovies.push(m);
+      // The unselected default is still films only. That heuristic is what runs
+      // on every store that has never opened the drawer, and quietly putting
+      // television on their monitors is not this fix's to make.
       if (m.isSeries) return;
       allMovies.push(m);
-      if (chosen.has(lib.id)) chosenMovies.push(m);
     }));
     let pool: Movie[];
     if (chosenMovies.length > 0) {
@@ -513,6 +526,26 @@ export class AmbientTvs implements StoreFixture {
         this.ctx.jellyfinToken,
         localStorage.getItem('jellyfin_userid') ?? ''
       );
+
+      // A series container has no file behind it — what a TV-Shows library
+      // actually contributes to the monitors is an EPISODE (#67). The first one
+      // of the run: an ambient screen wants somewhere sensible to come in, and
+      // dropping a stranger into the middle of a season is not it.
+      let itemId = movie.id;
+      if (movie.isSeries) {
+        const episode = await provider.fetchFirstEpisodeOfSeries(
+          this.ctx.jellyfinUrl,
+          session,
+          movie.id
+        );
+        if (this.disposed) return;
+        if (!episode) {
+          this.giveUpOnStream(`"${movie.title}" has no episodes to play`);
+          return;
+        }
+        itemId = episode.id;
+      }
+
       // Both built-in providers accept a `kind` alongside PlaybackRequestOptions
       // (jellyfin-provider.ts, plex-provider.ts) but the interface hasn't grown
       // it, so it rides in on a widening intersection rather than a cast. It
@@ -532,7 +565,7 @@ export class AmbientTvs implements StoreFixture {
       const source = await provider.resolvePlaybackSource(
         this.ctx.jellyfinUrl,
         session,
-        movie.id,
+        itemId,
         req
       );
       url = source.url;
