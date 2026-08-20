@@ -1,4 +1,5 @@
-import { Movie, Episode, fetchSeriesEpisodes, fetchFirstEpisodeOfSeries } from '../jellyfin';
+import type { Movie, Episode } from '../jellyfin';
+import { activeProvider, sessionOf } from '../providers/active-provider';
 import { launchGame } from '../romm';
 import { retailAudio } from '../audio';
 import { requestMovie, isDiscoveryRequested } from '../jellyseerr';
@@ -37,6 +38,26 @@ function logSystemMessage(message: string): void {
     }
     container.scrollTop = container.scrollHeight;
   }
+}
+
+/**
+ * The stored connection in the shape a provider wants. The `jellyfin_*` key
+ * names are historical: they hold whatever backend this install actually
+ * signed in to (see providers/active-provider.ts), so nothing read out of them
+ * may assume Jellyfin.
+ *
+ * `userId` is deliberately NOT part of the "are we connected?" test. It is a
+ * Jellyfin concept — a Plex session legitimately carries an empty one — and
+ * treating it as a required credential is the gate that made series drill-down
+ * dead on Plex installs (GH #66). Token plus address is the whole test; the
+ * provider decides for itself whether it needs a user id.
+ */
+function storedConnection(): { server: string; session: ReturnType<typeof sessionOf> } | null {
+  const server = localStorage.getItem('jellyfin_url') || '';
+  const token = localStorage.getItem('jellyfin_token') || '';
+  if (!server || !token) return null;
+  const userId = localStorage.getItem('jellyfin_userid') || '';
+  return { server, session: sessionOf(token, userId) };
 }
 
 // The active emblem as a data URL, cached for the session.
@@ -299,12 +320,17 @@ export function openDetailsOverlay(
   const playEpisode = async (ep: Episode) => {
     let path = ep.path;
     if (!path) {
-      const jellyfinUrl = localStorage.getItem('jellyfin_url');
-      const token = localStorage.getItem('jellyfin_token');
-      const userId = localStorage.getItem('jellyfin_userid');
-      if (jellyfinUrl && token && userId) {
-        const resolved = await fetchFirstEpisodeOfSeries(jellyfinUrl, token, userId, ep.id);
-        path = resolved?.path || '';
+      const conn = storedConnection();
+      if (conn) {
+        try {
+          const resolved = await activeProvider()
+            .fetchFirstEpisodeOfSeries(conn.server, conn.session, ep.id);
+          path = resolved?.path || '';
+        } catch (e) {
+          // Same degradation as before the provider hop: hand the player the
+          // item id with no path and let it resolve a stream itself.
+          console.error('Error resolving an episode path:', e);
+        }
       }
     }
     await launchVideoPlaybackFn?.(movie, ep.id, path);
@@ -424,11 +450,20 @@ export function openDetailsOverlay(
   // Fetch episodes if series
   if (movie.isSeries) {
     const listContainer = overlayEl.querySelector('.flat-detail-episodes-list') as HTMLElement;
-    const jellyfinUrl = localStorage.getItem('jellyfin_url') || '';
-    const token = localStorage.getItem('jellyfin_token') || '';
-    const userId = localStorage.getItem('jellyfin_userid') || '';
 
-    fetchSeriesEpisodes(jellyfinUrl, token, userId, movie.id)
+    // Through the ACTIVE provider, never straight at jellyfin.ts. This file
+    // called Jellyfin's episode endpoints by hand, so on a Plex install the
+    // request went to a Plex server in Jellyfin's shape, 404'd, and every
+    // series in 2.5D read "No episodes found." (GH #66). Wrapped in an async
+    // function so an unresolvable provider kind rejects into the catch below
+    // rather than throwing out of the overlay build.
+    const loadEpisodes = async (): Promise<Episode[]> => {
+      const conn = storedConnection();
+      if (!conn) return [];
+      return activeProvider().fetchSeriesEpisodes(conn.server, conn.session, movie.id);
+    };
+
+    loadEpisodes()
       .then(episodes => {
         episodesList = episodes;
         if (listContainer) {
