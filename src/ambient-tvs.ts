@@ -38,6 +38,19 @@ const TICKS_PER_SECOND = 10_000_000;
 const TV_STREAM_MAX_WIDTH = 640;
 const TV_STREAM_BITRATE = 600_000;
 
+// How long the server gets to put a first frame on the glass before the
+// fixture stops waiting on it — see armStreamWatchdog.
+const STREAM_WATCHDOG_MS = 20_000;
+
+// Dead tube: near-black phosphor. It carries NO reflection of its own — the
+// glass pane in front owns every reflection on this set, so an off screen and
+// a playing screen catch the room identically. Built by two paths (a set that
+// never had a source, and one that gave up on the picture it had), hence a
+// module-level maker rather than a literal in buildHardware.
+function makeDeadTubeMaterial(): THREE.MeshStandardMaterial {
+  return new THREE.MeshStandardMaterial({ color: 0x0b0e14, roughness: 0.4, metalness: 0 });
+}
+
 // The bundled in-store promo loop the screens fall back to with no server to
 // stream from — a 30s Big Buck Bunny extract, CC BY 3.0 (Blender Foundation).
 // Full provenance and the exact ffmpeg recipe: public/demo-clip/ATTRIBUTION.md.
@@ -207,6 +220,16 @@ export class AmbientTvs implements StoreFixture {
   // one back (PlaybackSource.sessionId). Null on a direct stream, on the
   // bundled loop, and once the encode has been cancelled.
   private transcodeSessionId: string | null = null;
+  // What the shared <video> is currently carrying. 'stream' = the media
+  // server's; 'loop' = the bundled promo clip; 'dead' = nothing, tubes dark.
+  // The fallback ladder only ever descends, so this doubles as the guard that
+  // keeps a late error from re-running a step already taken.
+  private pictureSource: 'stream' | 'loop' | 'dead' = 'dead';
+  private streamWatchdog: ReturnType<typeof setTimeout> | null = null;
+  // Every built screen, and the one material they share, so the picture can be
+  // replaced by the dead-tube phosphor after the fact — see goDeadGlass.
+  private screenMeshes: THREE.Mesh[] = [];
+  private pictureMat: THREE.Material | null = null;
   private video: HTMLVideoElement | null = null;
   private videoTex: THREE.VideoTexture | null = null;
   // Last video time we uploaded, so we skip redundant GPU re-uploads of an
@@ -306,14 +329,16 @@ export class AmbientTvs implements StoreFixture {
     this.buildHardware(videoTex);
   }
 
-  // Spin up the hidden <video> feeding the ceiling TVs, and set the stream
-  // resolving behind it. The ELEMENT and its VideoTexture are created
-  // synchronously — build() has to hand buildHardware() a texture in the same
-  // turn — while the stream URL is resolved through the provider, which is
-  // necessarily async. Everything downstream (the audio graph, the crop, the
-  // frame-upload chain, dispose) binds to the element, not to the source, so
-  // the source can arrive late, and can be swapped out again.
-  private makeVideoTexture(movie: Movie, seekSec: number): THREE.VideoTexture {
+  /**
+   * The ONE hidden <video> every set shares, and the VideoTexture on it.
+   *
+   * Deliberately independent of where the picture comes from: the audio graph,
+   * the UV crop, the frame-upload chain and dispose() all bind to the ELEMENT,
+   * so its source can arrive late and can be swapped out again mid-life without
+   * any of them noticing. That is what lets a stream that turns out to be
+   * unobtainable hand over to the bundled loop on the same glass.
+   */
+  private makeSharedVideo(): { video: HTMLVideoElement; videoTex: THREE.VideoTexture } {
     const video = document.createElement('video');
     video.setAttribute('style', 'position:fixed;left:-9999px;width:1px;height:1px;');
     video.crossOrigin = 'anonymous';
@@ -328,7 +353,7 @@ export class AmbientTvs implements StoreFixture {
     videoTex.colorSpace = THREE.SRGBColorSpace;
     this.videoTex = videoTex;
 
-    // Fit the movie VERTICALLY to the tube, cropping the widescreen overhang
+    // Fit the picture VERTICALLY to the tube, cropping the widescreen overhang
     // off both sides — see fitVideoToTube.
     const applyFit = () => fitVideoToTube(videoTex, video, this.screenAspect);
     // 'resize' fires whenever the decoded frame size changes (e.g. an HLS ABR
@@ -337,8 +362,122 @@ export class AmbientTvs implements StoreFixture {
     video.addEventListener('resize', applyFit);
     this.refitVideoCrop = applyFit;
 
+    // One error listener for the element's whole life, routed on which source
+    // is currently loaded — the stream steps down to the loop, the loop steps
+    // down to dark. Registered here rather than per-source so a swap can't
+    // leave a stale handler behind that fires for the wrong phase.
+    video.addEventListener('error', () => {
+      const code = video.error ? `media error ${video.error.code}` : 'media error';
+      if (this.pictureSource === 'stream') this.giveUpOnStream(code);
+      else if (this.pictureSource === 'loop') this.goDeadGlass(`demo loop ${code}`);
+    });
+    // First decoded frame of ANY source: the picture is real, so stand the
+    // watchdog down and re-solve the crop against the true frame size.
+    video.addEventListener('loadeddata', () => {
+      this.clearStreamWatchdog();
+      this.refitVideoCrop?.();
+    });
+
+    return { video, videoTex };
+  }
+
+  // Spin up the shared <video> against the server's stream. The element and its
+  // texture are created synchronously — build() has to hand buildHardware() a
+  // texture in the same turn — while the URL resolves through the provider,
+  // which is necessarily async.
+  private makeVideoTexture(movie: Movie, seekSec: number): THREE.VideoTexture {
+    const { video, videoTex } = this.makeSharedVideo();
+    this.pictureSource = 'stream';
+    this.armStreamWatchdog();
     void this.openStream(movie, seekSec, video);
     return videoTex;
+  }
+
+  /**
+   * Give the server a bounded amount of time to actually produce a picture.
+   *
+   * The error handlers below catch the loud failures — a 404, a refused
+   * connection, an undecodable segment — and they catch them in milliseconds.
+   * This covers the quiet ones: a server that accepts the request and then
+   * never finishes starting the encode, a transcode the box hasn't the CPU to
+   * begin, a manifest that parses and yields no media. Generous on purpose,
+   * because a NAS spinning up a transcode is slow but not broken; the point is
+   * only that a tube is never left black forever with nothing said.
+   */
+  private armStreamWatchdog(): void {
+    this.clearStreamWatchdog();
+    this.streamWatchdog = setTimeout(() => {
+      this.streamWatchdog = null;
+      const video = this.video;
+      if (video && video.readyState >= 2) return; // a picture arrived; nothing to do
+      this.giveUpOnStream(`no picture after ${Math.round(STREAM_WATCHDOG_MS / 1000)}s`);
+    }, STREAM_WATCHDOG_MS);
+  }
+
+  private clearStreamWatchdog(): void {
+    if (this.streamWatchdog !== null) {
+      clearTimeout(this.streamWatchdog);
+      this.streamWatchdog = null;
+    }
+  }
+
+  /**
+   * The stream is not going to happen — put SOMETHING on the glass (#67).
+   *
+   * The old code decided between "stream" and "bundled loop" once, up front, on
+   * whether a URL and a token existed. That is the wrong question: it can only
+   * ever describe the store's configuration, never whether a picture came back.
+   * A store configured against a server that cannot serve this fixture — the
+   * whole of the Plex bug, but equally an unreachable server, a refused
+   * transcode, a codec a distro Chromium omits — committed to a doomed stream
+   * and then had no second move, because the loop lived in the ELSE of that
+   * same gate. The configured-but-broken case got the worst outcome available
+   * and the unconfigured case got the graceful one.
+   *
+   * So the question asked here is the honest one, and it is asked late: did we
+   * get a playable stream? Any answer of no lands on the loop, or on the
+   * dead-tube look when the loop is switched off.
+   */
+  private giveUpOnStream(reason: string): void {
+    if (this.disposed || this.pictureSource !== 'stream') return;
+    this.clearStreamWatchdog();
+    this.ctx.log(`[System] CRT TVs: no picture from the server (${reason}).`, 'system');
+    // The encode is abandoned NOW, not at teardown — the server is still
+    // burning CPU on a stream nobody will ever read.
+    this.cancelTranscode();
+    if (this.hls) {
+      this.hls.destroy();
+      this.hls = null;
+    }
+    const video = this.video;
+    if (!video || !demoLoopEnabled()) {
+      this.goDeadGlass(reason);
+      return;
+    }
+    this.ctx.log('[System] CRT TVs: running the in-store promo loop instead.', 'system');
+    this.pictureSource = 'loop';
+    this.playDemoLoop(video);
+  }
+
+  /**
+   * Nothing left to show: retire the video pipeline and put the dead-tube
+   * phosphor on the glass — the same near-black material the fixture builds
+   * when there was never a source, rather than a MeshBasicMaterial holding an
+   * empty VideoTexture. They are not the same thing to look at: one is a switched
+   * -off television catching the room, the other is a hole cut in the set.
+   */
+  private goDeadGlass(reason: string): void {
+    if (this.disposed || this.pictureSource === 'dead') return;
+    this.pictureSource = 'dead';
+    console.warn(`[ambient-tvs] ${reason} — screens stay dark`);
+    this.teardownVideo();
+    const dead = makeDeadTubeMaterial();
+    for (const mesh of this.screenMeshes) mesh.material = dead;
+    // The scene-wide teardown disposes whatever material is ATTACHED to a mesh,
+    // so the one just detached would otherwise never be freed.
+    this.pictureMat?.dispose();
+    this.pictureMat = dead;
+    this.ctx.requestRender();
   }
 
   // Start playing whatever source has just been attached: re-solve the crop now
@@ -402,6 +541,7 @@ export class AmbientTvs implements StoreFixture {
       if (source.kind === 'transcode') this.transcodeSessionId = source.sessionId ?? null;
     } catch (e: any) {
       console.warn('[ambient-tvs] could not resolve a stream:', e);
+      this.giveUpOnStream(`server would not name a stream (${e?.message ?? e})`);
       return;
     }
     if (this.disposed) return;
@@ -418,6 +558,14 @@ export class AmbientTvs implements StoreFixture {
     if (this.disposed) return;
     if (HlsClass && HlsClass.isSupported()) {
       const hls = new HlsClass({ startLevel: -1 });
+      // The missing handler that made the Plex 404 invisible. hls.js reports
+      // its own failures here and NOWHERE else — a manifest that 404s never
+      // reaches the <video>, so the element's error event never fires and the
+      // tube just sits black. Only fatal errors step down; hls.js recovers from
+      // the rest on its own and a stutter is not a reason to drop the film.
+      hls.on(HlsClass.Events.ERROR, (_evt: unknown, data: { fatal?: boolean; details?: string }) => {
+        if (data?.fatal) this.giveUpOnStream(`hls ${data.details ?? 'fatal error'}`);
+      });
       hls.on(HlsClass.Events.MANIFEST_PARSED, () => {
         video.addEventListener('loadedmetadata', () => this.startPlayback(video), { once: true });
       });
@@ -427,6 +575,10 @@ export class AmbientTvs implements StoreFixture {
     } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
       video.src = url;
       video.addEventListener('loadedmetadata', () => this.startPlayback(video), { once: true });
+    } else {
+      // No MSE and no native HLS: this webview cannot play the only thing the
+      // server offered.
+      this.giveUpOnStream('no HLS support in this webview');
     }
   }
 
@@ -464,41 +616,35 @@ export class AmbientTvs implements StoreFixture {
    * The clip is already 640 wide and in the screens' own ballpark, so there is
    * nothing to negotiate: it starts at 0 and loops forever.
    */
-  private makeDemoLoopTexture(): THREE.VideoTexture | null {
-    const video = document.createElement('video');
-    video.setAttribute('style', 'position:fixed;left:-9999px;width:1px;height:1px;');
+  private makeDemoLoopTexture(): THREE.VideoTexture {
+    const { video, videoTex } = this.makeSharedVideo();
+    this.pictureSource = 'loop';
+    this.playDemoLoop(video);
+    return videoTex;
+  }
+
+  /**
+   * Point the shared element at the bundled clip. Reached two ways: as the
+   * opening source when there is no server at all, and as the step down from a
+   * stream that never produced a picture (#67) — which is why it works on an
+   * element that may already have had another source on it.
+   *
+   * The clip is already 640 wide and in the screens' own ballpark, so there is
+   * nothing to negotiate: it starts at 0 and loops forever. A missing or
+   * undecodable file falls through to the element's error handler and the
+   * dead-tube look, and never blocks the store build.
+   */
+  private playDemoLoop(video: HTMLVideoElement): void {
+    if (this.hls) {
+      this.hls.destroy();
+      this.hls = null;
+    }
+    video.removeAttribute('src'); // drop any MediaSource blob hls.js attached
     video.loop = true;
-    video.volume = 1.0; // gain controlled by Web Audio PannerNode
-    video.muted = true; // autoplay policy: boot muted; unmuted on first user gesture
-    video.playsInline = true;
     video.preload = 'auto';
     video.src = assetUrl(DEMO_LOOP_PATH);
-    document.body.appendChild(video);
-    this.video = video;
-
-    const videoTex = new THREE.VideoTexture(video);
-    videoTex.colorSpace = THREE.SRGBColorSpace;
-    this.videoTex = videoTex;
-
-    // Fit vertically onto the tube face, same conformance the streamed path
-    // applies — see fitVideoToTube. The bundled clip is 640x360 (16:9), so it
-    // is the crop's normal case, not an edge one.
-    const applyFit = () => fitVideoToTube(videoTex, video, this.screenAspect);
-    applyFit();
-    video.addEventListener('resize', applyFit);
-    this.refitVideoCrop = applyFit;
-
-    // Fire-and-forget: a missing/undecodable file leaves the tubes dark exactly
-    // as they were before this path existed, and never blocks the store build.
-    video.addEventListener('loadedmetadata', () => {
-      applyFit();
-      video.play().catch(() => {});
-    }, { once: true });
-    video.addEventListener('error', () => {
-      console.warn('[ambient-tvs] demo loop failed to load — screens stay dark');
-    }, { once: true });
-
-    return videoTex;
+    video.addEventListener('loadedmetadata', () => this.startPlayback(video), { once: true });
+    video.load();
   }
 
   // Build the two ceiling-hung TVs themselves (pole mounts, shells, screens,
@@ -508,6 +654,7 @@ export class AmbientTvs implements StoreFixture {
     this.tvWorldSpheres = [];
     this.tvParts = [];
     this.screenPoses = [];
+    this.screenMeshes = [];
 
     // Harness/dev stand-in: with no Jellyfin stream the screens are dead
     // glass, which makes the curved-tube treatment unverifiable offline —
@@ -558,10 +705,10 @@ export class AmbientTvs implements StoreFixture {
     const poleMat = new THREE.MeshStandardMaterial({ color: 0x505050, roughness: 0.35, metalness: 0.88 });
     const screenMat = screenTex
       ? new THREE.MeshBasicMaterial({ map: screenTex })
-      // Dead tube: near-black phosphor. It carries NO reflection of its own —
-      // the glass pane in front owns every reflection on this set, so an off
-      // screen and a playing screen catch the room identically.
-      : new THREE.MeshStandardMaterial({ color: 0x0b0e14, roughness: 0.4, metalness: 0 });
+      : makeDeadTubeMaterial();
+    // Kept so goDeadGlass can retire the picture later: whether a source turns
+    // out to be playable is not knowable at build time.
+    this.pictureMat = screenMat;
     // Static tube overlay (crt-tube.ts): rounded corners falling off dark,
     // edge vignette, faint scanlines — the PHOSPHOR side of the tube, all of
     // which only darkens. The room reflection is the glass pane below.
@@ -643,6 +790,7 @@ export class AmbientTvs implements StoreFixture {
       const screen = new THREE.Mesh(makeCurvedScreenGeometry(screenW, screenH, SCREEN_BULGE), screenMat);
       screen.position.z = bodyD / 2 + 0.01;
       tvG.add(screen);
+      this.screenMeshes.push(screen);
 
       const scan = new THREE.Mesh(makeCurvedScreenGeometry(screenW, screenH, SCREEN_BULGE), scanMat);
       scan.position.z = screen.position.z + 0.002;
@@ -829,6 +977,7 @@ export class AmbientTvs implements StoreFixture {
       const screen = new THREE.Mesh(makeCurvedScreenGeometry(screenW, screenH, SCREEN_BULGE), screenMat);
       screen.position.z = 0.03; // deep in the aperture
       g.add(screen);
+      this.screenMeshes.push(screen);
       const scan = new THREE.Mesh(makeCurvedScreenGeometry(screenW, screenH, SCREEN_BULGE), scanMat);
       scan.position.z = 0.036;
       g.add(scan);
@@ -1155,14 +1304,14 @@ export class AmbientTvs implements StoreFixture {
     }
   }
 
-  dispose(): void {
-    this.disposed = true; // gates the async GLB upgrade against a dead scene
-    this.refitVideoCrop = null;
-    if (this.gestureUnlock) {
-      window.removeEventListener('pointerdown', this.gestureUnlock, true);
-      window.removeEventListener('keydown', this.gestureUnlock, true);
-      this.gestureUnlock = null;
-    }
+  /**
+   * Retire the whole video pipeline: the encode the server is running for us,
+   * the HLS transmuxer, the element, its texture and the positional-audio
+   * graph. Shared by dispose() and by goDeadGlass(), which reaches this same
+   * state mid-life when there turns out to be nothing to show.
+   */
+  private teardownVideo(): void {
+    this.clearStreamWatchdog();
     // Before the pipeline goes: tell the server to stop encoding for us.
     this.cancelTranscode();
     if (this.hls) {
@@ -1179,13 +1328,26 @@ export class AmbientTvs implements StoreFixture {
       this.videoTex.dispose();
       this.videoTex = null;
     }
-    if (this.testCardTex) {
-      this.testCardTex.dispose();
-      this.testCardTex = null;
-    }
+    this.refitVideoCrop = null;
     if (this.audioCtx) {
       this.audioCtx.close().catch(() => {});
       this.audioCtx = null;
+    }
+  }
+
+  dispose(): void {
+    this.disposed = true; // gates the async GLB upgrade against a dead scene
+    if (this.gestureUnlock) {
+      window.removeEventListener('pointerdown', this.gestureUnlock, true);
+      window.removeEventListener('keydown', this.gestureUnlock, true);
+      this.gestureUnlock = null;
+    }
+    this.teardownVideo();
+    this.screenMeshes = [];
+    this.pictureMat = null; // owned by the mesh it's on; the scene sweep frees it
+    if (this.testCardTex) {
+      this.testCardTex.dispose();
+      this.testCardTex = null;
     }
   }
 }
