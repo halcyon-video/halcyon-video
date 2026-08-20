@@ -525,7 +525,18 @@ export async function checkCredentialsAndLoad() {
   document.addEventListener('keydown', bootEscape);
   document.addEventListener('click', bootEscape);
 
-  if (jellyfinUrl && token && userId) {
+  // Address and token, never userId (GH #66). A user id is a JELLYFIN concept:
+  // a Plex session's is a server machineIdentifier that resolves to '' whenever
+  // the plex.tv resource lookup fails or the saved address isn't byte-equal to
+  // an advertised connection URI — i.e. any LAN-reached NAS, the reported case.
+  // Requiring it here asked "did plex.tv answer?" and, on a no, disowned a
+  // perfectly good saved session and dropped the user on the login screen on
+  // EVERY launch. Nothing is loosened by removing it: every path that clears
+  // the user id (switchMember, logOutToOpeningDay, changeServer, expireSession,
+  // the two connection-edit tails) clears the token in the same breath, so a
+  // real "no session" still fails the `token` test and still lands on the card
+  // picker below.
+  if (jellyfinUrl && token) {
     d.log(`[System] Saved ${provider().displayName} credentials found. Connecting...`, 'system');
 
     // A STALL timeout, not a deadline. This was a flat 20s cap on the whole
@@ -545,7 +556,11 @@ export async function checkCredentialsAndLoad() {
       if (escaped) return;
 
       const activeToken = localStorage.getItem('jellyfin_token') || token;
-      const activeUserId = localStorage.getItem('jellyfin_userid') || userId;
+      // Falls back to '' rather than null: reaching here with no stored user id
+      // is now normal (Plex), and ProviderSession.userId is typed a string —
+      // the Jellyfin provider interpolates it straight into /Users/<id>/Items,
+      // where a null would have gone out as the literal "null".
+      const activeUserId = localStorage.getItem('jellyfin_userid') || userId || '';
 
       let stallTimer: ReturnType<typeof setTimeout> | null = null;
       let onStall: (() => void) | null = null;
@@ -562,7 +577,7 @@ export async function checkCredentialsAndLoad() {
         let libs: JellyfinLibrary[];
         [libs] = await Promise.all([
           Promise.race([
-            provider().fetchLibraries(jellyfinUrl, sessionOf(activeToken!, activeUserId!), armStall, {
+            provider().fetchLibraries(jellyfinUrl, sessionOf(activeToken!, activeUserId), armStall, {
               excludeLibraryIds: excludedLibraryIds(),
             }),
             stallPromise
@@ -632,7 +647,7 @@ export async function checkCredentialsAndLoad() {
           // Before each retry, check if cached token fails validation. If so, attempt to re-auth from cached credentials.
           const freshToken = localStorage.getItem('jellyfin_token') || token;
           try {
-            const isValid = await provider().validateSession(jellyfinUrl, sessionOf(freshToken!, activeUserId ?? ''));
+            const isValid = await provider().validateSession(jellyfinUrl, sessionOf(freshToken!, activeUserId));
             if (!isValid) {
               const user = localStorage.getItem('jellyfin_username') || envUser;
               const pass = localStorage.getItem('jellyfin_password') || envPass;
