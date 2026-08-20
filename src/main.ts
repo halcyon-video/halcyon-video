@@ -89,7 +89,7 @@ import type { InputCallbacks } from './input';
 import { refreshHoldHints, setHoldCheckoutProgress, setHoldDismissProgress } from './hold-hints';
 import {
   setupRemotePlay, isRemoteInstance, isRemotelyDriven, reportRemoteFatal,
-  clearRemoteFatal, remoteViewerCount,
+  clearRemoteFatal, remoteViewerCount, notifyStoreRebuilt,
 } from './remote-play';
 import { enableFpsMeter, FPS_METER_KEY } from './fps-meter';
 import { VideoPlayer } from './video-player';
@@ -2720,6 +2720,15 @@ async function initializeStoreScene(preservePosterCache = false) {
       // without this, switching a kiosk to 2D and back would leave Remote Play
       // answering 'fatal' forever, and only a page reload would revive it.
       clearRemoteFatal();
+      // Same "there is a fresh canvas" moment matters to an already-attached
+      // Remote Play viewer, not just the fatal-state cache: without this call,
+      // ensureStream() only notices a rebuild's canvas swap on its next
+      // signalling long-poll iteration — up to 35s away — leaving a live
+      // viewer frozen on the old canvas's last frame the whole time (issue
+      // #73). Must run AFTER `storeScene = scene` above, so notifyStoreRebuilt
+      // captures THIS new canvas rather than re-capturing the one just
+      // disposed.
+      notifyStoreRebuilt();
       (window as any).storeScene = storeScene;
       (window as any).librariesList = storeLibraries;
       // Which overlay owns the keyboard, as the app itself sees it. Several
