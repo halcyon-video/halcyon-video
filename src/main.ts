@@ -87,7 +87,10 @@ import type { StoreScene } from './three-scene';
 import { InputManager } from './input';
 import type { InputCallbacks } from './input';
 import { refreshHoldHints, setHoldCheckoutProgress, setHoldDismissProgress } from './hold-hints';
-import { setupRemotePlay, isRemoteInstance, isRemotelyDriven, reportRemoteFatal } from './remote-play';
+import {
+  setupRemotePlay, isRemoteInstance, isRemotelyDriven, reportRemoteFatal,
+  clearRemoteFatal, remoteViewerCount,
+} from './remote-play';
 import { enableFpsMeter, FPS_METER_KEY } from './fps-meter';
 import { VideoPlayer } from './video-player';
 // initCaseMedium and refreshPosterCrop are dynamically imported to avoid loading Three.js on boot in 2.5D mode.
@@ -574,11 +577,36 @@ let cecDisplayAssumedOn = true;
 // SERVICE MODE settings page (review §4.3), and MEDIA RELEASE DATE (#42),
 // the catalog-pin sub-screen. Inserted just above RETURN TO STORE so the
 // safe exit stays last.
-const counterTerminalButtons = (() => {
+const COUNTER_TERMINAL_ALL_ROWS = (() => {
   const ids = [...powerButtons];
   ids.splice(ids.indexOf('btn-cancel'), 0, MEDIA_DATE_BUTTON_ID, 'btn-service');
   return ids;
 })();
+// The row list the CRT is actually drawing. counter-terminal-flow.ts holds this
+// array BY REFERENCE and re-reads it on every render, so rewriting its contents
+// in place is how the menu changes shape between openings.
+const counterTerminalButtons = [...COUNTER_TERMINAL_ALL_ROWS];
+// Rows a remote viewer must never be offered. SWITCH TO 2D MODE destroys the 3D
+// scene, and the stream IS that scene's canvas — so the one system menu a
+// viewer can reach (the glass power menu is DOM, invisible to them) used to
+// carry the row that kills their own session, with no way back through it.
+const REMOTE_HIDDEN_TERMINAL_ROWS = ['btn-flat-mode'];
+
+/**
+ * Open the desk CRT, having first rebuilt its rows for whoever is driving.
+ * "Remotely driven" is a live condition, not a boot-time one, so the filter
+ * runs at open time — and only at open time, since the menu index is reset
+ * there too and a list that changed length mid-menu would move the cursor.
+ */
+function openCounterTerminal(): void {
+  const remote = isRemotelyDriven();
+  const rows = COUNTER_TERMINAL_ALL_ROWS.filter(
+    (id) => !(remote && REMOTE_HIDDEN_TERMINAL_ROWS.includes(id)),
+  );
+  counterTerminalButtons.length = 0;
+  counterTerminalButtons.push(...rows);
+  counterTerminalOpen();
+}
 
 // Settings drawer navigation state. `settingsRowKeys` is the flat top-to-bottom
 // order of focusable rows generated from the registry, with the sentinel
@@ -2417,12 +2445,15 @@ async function initializeStoreScene(preservePosterCache = false) {
       }
     }
     bootFlatStore(storeLibraries, canvasContainer, storeGameMovies, storeDiscovery);
-    // 2.5D is DOM, not a canvas, so a spawned instance in this mode has
-    // nothing to capture and would leave its viewer waiting forever. The
-    // server strips bb_render_mode out of the seed precisely so this can't
-    // happen — say so plainly if one ever gets here anyway.
-    if (isRemoteInstance()) {
-      reportRemoteFatal('The store server is running in 2.5D mode, which has no 3D view to stream.');
+    // 2.5D is DOM, not a canvas, so there is nothing for Remote Play to
+    // capture and every viewer freezes on their last store frame — a new one
+    // just gets "Store is still booting…" for a store that isn't booting.
+    // A spawned instance can't BOOT into this mode (the server strips
+    // bb_render_mode out of the seed), but a shared kiosk with viewers
+    // attached can be SWITCHED into it at any time, so both are told.
+    if (isRemoteInstance() || remoteViewerCount() > 0) {
+      reportRemoteFatal('The store is in 2.5D mode, which has no 3D view to stream. '
+        + 'Switch it back to 3D Store Mode on the machine running the store.');
     }
     hideBootOverlay();
     return;
@@ -2618,7 +2649,7 @@ async function initializeStoreScene(preservePosterCache = false) {
     };
 
     // Left at the checkout counter reaches for the clerk's terminal.
-    scene.onCounterTerminal = () => counterTerminalOpen();
+    scene.onCounterTerminal = () => openCounterTerminal();
     scene.onOpenSearch = () => { void openSearch(); };
     scene.onEnterFlatMode = () => executePowerMenuAction('btn-flat-mode');
 
@@ -2679,6 +2710,11 @@ async function initializeStoreScene(preservePosterCache = false) {
 
     scene.texturesReadyPromise.then(() => {
       storeScene = scene;
+      // There is a canvas to capture again, so any "can never host" this store
+      // reported earlier (2.5D, a renderer that threw) has stopped being true —
+      // without this, switching a kiosk to 2D and back would leave Remote Play
+      // answering 'fatal' forever, and only a page reload would revive it.
+      clearRemoteFatal();
       (window as any).storeScene = storeScene;
       (window as any).librariesList = storeLibraries;
       // Which overlay owns the keyboard, as the app itself sees it. Several
@@ -3913,6 +3949,13 @@ async function main() {
 
       if (ui.isPowerMenuOpen) {
         closePowerMenu();
+      } else if (isRemotelyDriven()) {
+        // A remote viewer sees the WebGL canvas and nothing else: the glass
+        // power menu is a DOM sibling of it, so P looked like a dead key from
+        // over there. The desk CRT is the same menu (same ids, same
+        // executePowerMenuAction) drawn INSIDE the scene, so it reaches them —
+        // and it docks its own camera, so there's no positional precondition.
+        openCounterTerminal();
       } else {
         openPowerMenu();
       }
