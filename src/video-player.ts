@@ -1,6 +1,7 @@
 import type Hls from 'hls.js';
 import { stopActiveEncoding, getLastHlsPlaySessionId, isStreamCopyUrl } from './jellyfin';
 import { keyboardOwnedByControl } from './text-entry-focus';
+import { getSegmentFixLoader } from './hls-segment-fix';
 
 let HlsMod: typeof import('hls.js').default | null = null;
 async function loadHls() {
@@ -8,40 +9,9 @@ async function loadHls() {
   return HlsMod;
 }
 
-// Jellyfin rejects any SEGMENT request whose query carries StartTimeTicks
-// ("StartTimeTicks is not allowed", ArgumentException in GetDynamicSegment).
-// When a stream is built at a resume/seek position, the media playlist's
-// segment URIs (and the fMP4 EXT-X-MAP init URI) inherit the playlist
-// request's query verbatim — so every fetch hls.js makes gets rejected and
-// playback dies in a silent retry loop ("buffering forever"). StartTimeTicks
-// is a playlist-level parameter (it tells the server where to start the
-// transcode job); segments are addressed purely by index, so dropping it from
-// segment fetches is always safe. Playlist (.m3u8) requests keep it.
-let segmentFixLoader: unknown = null;
-// Matches /hls1/<name>/<segmentIndex>.<container> — including the fMP4 init
-// segment, which Jellyfin addresses as index -1.
-const HLS_SEGMENT_PATH = /\/hls1\/[^/]+\/-?\d+\.[a-z0-9]+$/i;
-function getSegmentFixLoader(HlsClass: typeof import('hls.js').default): unknown {
-  if (segmentFixLoader) return segmentFixLoader;
-  const Base = HlsClass.DefaultConfig.loader as new (...args: any[]) => any;
-  segmentFixLoader = class extends Base {
-    load(context: any, config: any, callbacks: any) {
-      if (typeof context?.url === 'string') {
-        try {
-          const u = new URL(context.url);
-          if (HLS_SEGMENT_PATH.test(u.pathname) && u.searchParams.has('StartTimeTicks')) {
-            u.searchParams.delete('StartTimeTicks');
-            context.url = u.toString();
-          }
-        } catch {
-          // Not an absolute URL — leave it untouched.
-        }
-      }
-      super.load(context, config, callbacks);
-    }
-  };
-  return segmentFixLoader;
-}
+// The StartTimeTicks-on-segments workaround for Jellyfin's GetDynamicSegment
+// now lives in its own module — the ceiling TVs need the identical loader
+// (#67), and one copy is the point. See hls-segment-fix.ts for the mechanism.
 
 const TICKS_PER_SECOND = 10_000_000;
 const CONTROLS_HIDE_MS = 3500;

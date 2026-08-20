@@ -24,6 +24,7 @@ import { TV_PATCH_LAYER } from './scene-shared';
 import { assetUrl } from './asset-url';
 import { activeProvider, sessionOf } from './providers/active-provider';
 import type { PlaybackRequestOptions } from './providers/media-source-provider';
+import { getSegmentFixLoader } from './hls-segment-fix';
 
 // Media-server position unit: 100ns ticks, the currency PlaybackRequestOptions
 // speaks in (Jellyfin StartTimeTicks; the Plex adapter divides back down to the
@@ -389,6 +390,15 @@ export class AmbientTvs implements StoreFixture {
     video.addEventListener('loadeddata', () => {
       this.clearStreamWatchdog();
       this.refitVideoCrop?.();
+      // The other half of the breadcrumb giveUpOnStream writes: what actually
+      // ended up on the glass, decided by a decoded frame rather than by
+      // configuration. Cheap, and it is the one question a support log about
+      // the ceiling TVs always has to answer first.
+      (window as any).__tvStream = {
+        ok: true,
+        source: this.pictureSource,
+        title: this.playingMovie?.title ?? null,
+      };
     });
 
     return { video, videoTex };
@@ -450,10 +460,30 @@ export class AmbientTvs implements StoreFixture {
    * So the question asked here is the honest one, and it is asked late: did we
    * get a playable stream? Any answer of no lands on the loop, or on the
    * dead-tube look when the loop is switched off.
+   *
+   * And it says so at WARNING level, every time. Reaching this method at all
+   * means the store IS configured against a server — the stream path is only
+   * entered with a URL and a token in hand — so a failure here is never the
+   * ordinary offline case, it is a server that was asked for a picture and did
+   * not produce one. The fallback below is deliberately invisible (that is its
+   * job: the ceiling is never blank), and for one evening that invisibility hid
+   * a total Jellyfin outage behind a cheerfully playing promo loop. console.warn
+   * is what puts the reason and the backend into the session log
+   * (debug-log.ts tees it to disk, tagged [WARN]), so the next silent failure
+   * is one grep away instead of a rebuild away.
    */
   private giveUpOnStream(reason: string): void {
     if (this.disposed || this.pictureSource !== 'stream') return;
     this.clearStreamWatchdog();
+    let backend = 'unknown backend';
+    try {
+      backend = localStorage.getItem('provider_kind') ?? 'jellyfin';
+    } catch { /* no storage — the label is a nicety, not a gate */ }
+    console.warn(
+      `[ambient-tvs] ${backend}: the configured server produced no picture for ` +
+      `"${this.playingMovie?.title ?? 'the chosen title'}" (${reason}) — falling back.`
+    );
+    (window as any).__tvStream = { backend, ok: false, reason, title: this.playingMovie?.title ?? null };
     this.ctx.log(`[System] CRT TVs: no picture from the server (${reason}).`, 'system');
     // The encode is abandoned NOW, not at teardown — the server is still
     // burning CPU on a stream nobody will ever read.
@@ -590,7 +620,17 @@ export class AmbientTvs implements StoreFixture {
     const HlsClass = await loadHls();
     if (this.disposed) return;
     if (HlsClass && HlsClass.isSupported()) {
-      const hls = new HlsClass({ startLevel: -1 });
+      const hls = new HlsClass({
+        startLevel: -1,
+        // The SAME loader the full-screen player uses (hls-segment-fix.ts), and
+        // for the same reason: this fixture asks the server to start the encode
+        // at an offset, and Jellyfin then 400s every segment request that
+        // inherits StartTimeTicks from the playlist query. Without it a real
+        // Jellyfin store loses essentially EVERY movie stream — tvStartOffsetSec
+        // never returns 0 for a film — while a series, which starts at 0, plays
+        // fine and hides the fault (#67).
+        loader: getSegmentFixLoader(HlsClass) as any,
+      });
       // The missing handler that made the Plex 404 invisible. hls.js reports
       // its own failures here and NOWHERE else — a manifest that 404s never
       // reaches the <video>, so the element's error event never fires and the
