@@ -8,6 +8,7 @@ import { getActiveTheme } from '../themes';
 import { getActiveLogoSpec } from '../logo-spec';
 import { drawLogo } from '../logo-renderer';
 import { flatSignal } from './flat-lifecycle';
+import { resolveEpisodePlaybackArgs } from './flat-playback';
 
 let launchVideoPlaybackFn: ((movie: Movie, overrideItemId?: string, overridePath?: string) => Promise<void>) | null = null;
 
@@ -317,23 +318,16 @@ export function openDetailsOverlay(
     }, 250);
   };
 
+  // GH #71 (latent, do not naively fix): ep.path can legitimately be ''.
+  // That does NOT need "recovering" here — resolveEpisodePlaybackArgs's own
+  // comment has the full trap this replaced (a prior version passed an
+  // episode id where fetchFirstEpisodeOfSeries wants a series id; "fixing"
+  // that argument instead of removing the call would start playing the
+  // series' first episode no matter which one was clicked). Read it before
+  // touching this function.
   const playEpisode = async (ep: Episode) => {
-    let path = ep.path;
-    if (!path) {
-      const conn = storedConnection();
-      if (conn) {
-        try {
-          const resolved = await activeProvider()
-            .fetchFirstEpisodeOfSeries(conn.server, conn.session, ep.id);
-          path = resolved?.path || '';
-        } catch (e) {
-          // Same degradation as before the provider hop: hand the player the
-          // item id with no path and let it resolve a stream itself.
-          console.error('Error resolving an episode path:', e);
-        }
-      }
-    }
-    await launchVideoPlaybackFn?.(movie, ep.id, path);
+    const { itemId, path } = resolveEpisodePlaybackArgs(ep);
+    await launchVideoPlaybackFn?.(movie, itemId, path);
   };
 
   const handleKeydown = (e: KeyboardEvent) => {
