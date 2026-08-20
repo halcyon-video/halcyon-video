@@ -311,9 +311,12 @@ export function promoStandPlacements(backWallZ: number): FixturePlacement[] {
       position: { x: 24.0, z: -3.0 },
       yaw: 0,
       options: {
-        // studio-spotlight:2 (not :1) so that if a store has no watch history
-        // at all this stand can't land on the same studio as front-right's
-        // own fallback.
+        // studio-spotlight:2: each stand owns exactly one studio-spotlight
+        // index (0/1/2 below), never more than one per chain and never
+        // shared with another stand's chain — see the CALLER CONTRACT note
+        // on studioSpotlight() in promo-campaigns.ts. Index 2 keeps this
+        // stand clear of both of the others' indices even when they're not
+        // built (a shallow store drops promo-stand-front-right entirely).
         campaigns: ['recently-played', 'studio-spotlight:2'],
       },
     },
@@ -338,7 +341,14 @@ export function promoStandPlacements(backWallZ: number): FixturePlacement[] {
       options: {
         relativeToBackWall: true,
         zOffset: 24.5,
-        campaigns: ['seasonal:adult', 'studio-spotlight:1', 'studio-spotlight:0'],
+        // FIXED (issue #26 — "duplicate facings"): this used to fall back
+        // to studio-spotlight:0 when :1 wasn't viable, which is promo-stand-
+        // front's own index — on a library with only one strong studio, both
+        // stands landed on it and showed the identical tower twice. A stand
+        // with no viable campaign at all correctly builds nothing (see
+        // FourSidedDisplay.ensureCampaign); that is the right degradation,
+        // not this collision.
+        campaigns: ['seasonal:adult', 'studio-spotlight:1'],
       },
     });
   }
