@@ -48,6 +48,12 @@ let runToken = 0; // bumping this retires any in-flight poll loop
 const viewers = new Map<string, Viewer>();
 let capturedCanvas: HTMLCanvasElement | null = null;
 let canvasStream: MediaStream | null = null;
+// Unlike canvasStream, this one does NOT need a rebuild notify (issue #73):
+// retailAudio (audio.ts) is a module-level singleton whose AudioContext and
+// masterBus live for the whole page lifetime, untouched by StoreScene
+// disposal/recreation — a rebuild swaps the renderer's canvas, never the SFX
+// bus. captureRemoteTrack() is called once (guarded by `if (!audioTrack)`
+// in createViewer) and that same track stays valid across every rebuild.
 let audioTrack: MediaStreamTrack | null = null;
 
 // Verification hook (tools/verify_remote_play.mjs, verify_remote_playback.mjs)
@@ -57,6 +63,8 @@ const stats = {
   viewers: 0,
   inputsApplied: 0,
   fatal: '', // set when this store can never host (see reportRemoteFatal)
+  canvasSwaps: 0, // bumped every time ensureStream() captures a genuinely NEW
+  lastCanvasSwapAt: 0, // canvas (issue #73 regression guard — see notifyStoreRebuilt)
   get remotelyDriven() { return isRemotelyDriven(); },
   get streamingPlayback() { return !!playbackVideoTrack(); },
 };
@@ -332,6 +340,8 @@ function ensureStream(): MediaStream | null {
     canvasStream?.getTracks().forEach((t) => t.stop());
     canvasStream = stream;
     capturedCanvas = canvas;
+    stats.canvasSwaps++;
+    stats.lastCanvasSwapAt = Date.now();
     // Never steer senders back to the canvas mid-film: stopPlaybackStream owns
     // that hand-back, and a settings rebuild during playback must not undo it.
     if (track && !playbackStream) {
@@ -342,6 +352,36 @@ function ensureStream(): MediaStream | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * Tell Remote Play a scene rebuild just published a new canvas (issue #73).
+ * Without this, `ensureStream()` only re-checks canvas identity once per
+ * signalling long-poll iteration (up to 35s between iterations — see the
+ * loop in startHost), so a viewer already attached when a settings change
+ * rebuilds the store would sit on the OLD canvas's frozen last frame until
+ * the next poll happened to return. `createViewer()` already calls
+ * ensureStream() itself, so a viewer joining AFTER a rebuild was never
+ * affected — only someone already watching through one.
+ *
+ * Call this AFTER the new scene is published (i.e. after the getter this
+ * module was handed via setupRemotePlay()/getScene would return it) — main.ts
+ * does so right where it already clears any stale `reportRemoteFatal` state
+ * for the same reason ("there is a canvas to capture again"). Calling it
+ * before the swap would just re-capture the OLD canvas: ensureStream()'s
+ * identity check would then find nothing changed on the NEXT real call
+ * either, leaving the poll loop believing it's already caught up — worse
+ * than doing nothing, since that's the exact case the poll would otherwise
+ * still catch within 35s.
+ *
+ * Cheap no-op when Remote Play isn't hosting (guards the common case: most
+ * rebuilds happen with the feature off). Safe to call redundantly — repeat
+ * calls hit ensureStream()'s canvas-identity cache and do no work — so every
+ * call site that publishes a fresh scene can call it unconditionally.
+ */
+export function notifyStoreRebuilt(): void {
+  if (!running) return;
+  ensureStream();
 }
 
 // ─── Keeping frames flowing ─────────────────────────────────────────────────

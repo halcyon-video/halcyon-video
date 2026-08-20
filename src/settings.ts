@@ -35,7 +35,9 @@ import { drawLogo, getLogoFontString } from './logo-renderer';
 import { loadMediaReleasePin, saveMediaReleasePin } from './media-release-date';
 import { formatUnlockLabel, makeRentalRecord, rentalCapacityAt } from './rental-clock';
 import { activeProviderKind } from './providers/provider-registry';
+import { topStudiosInLibrary } from './promo-campaigns';
 import type { StoreScene } from './three-scene';
+import type { JellyfinLibrary } from './jellyfin';
 
 export type SettingKind = 'toggle' | 'cycle' | 'text' | 'secret';
 export type ApplyMode = 'live' | 'rebuild-scene' | 'reload';
@@ -427,6 +429,25 @@ function brandDropDiagnostic(): string {
   return bits.join(' · ') + (drop.notes.length ? ` — ${drop.notes.join('; ')}` : '');
 }
 
+/**
+ * The Featured Studios row's hint: as many names off topStudiosInLibrary's
+ * ranking (the row's candidate menu — see promo-campaigns.ts) as the footer
+ * bar's 62-char clip has room for. Reads window.storeScene directly:
+ * main.ts's only external handle on the live catalog, and this is a
+ * batched-rebuild row (applyMode 'rebuild-scene'), not a 'live' one with its
+ * own scene reference to read instead.
+ */
+function studioPicksHint(): string {
+  const libs = (window as unknown as { storeScene?: { libraries?: JellyfinLibrary[] } }).storeScene?.libraries;
+  if (!libs?.length) return 'Comma-separated studio names. Blank = a curated fallback list.';
+  const names = topStudiosInLibrary(libs, 20).map((t) => t.name);
+  if (!names.length) return 'No studio data in your library yet. Blank = a curated fallback list.';
+  const prefix = 'Top studios: ';
+  const room = 62 - prefix.length;
+  const list = names.join(', ');
+  return prefix + (list.length > room ? `${list.slice(0, Math.max(0, room - 1))}…` : list);
+}
+
 export function registerCoreSettings(): void {
   if (coreRegistered) return;
   coreRegistered = true;
@@ -510,6 +531,24 @@ export function registerCoreSettings(): void {
     default: 'off',
     applyMode: 'rebuild-scene',
     hint: dressing93Hint,
+  });
+
+  // Studio-spotlight floor stands used to pick from a fixed curated list
+  // (PROMO_STUDIOS in promo-campaigns.ts) — meaningless to a library with
+  // none of those houses in it, and prone to two stands landing on the same
+  // studio when few curated entries were viable (issue #26, "duplicate
+  // facings"). This row lets the user pick from their OWN library's most-
+  // represented studios instead (topStudiosInLibrary); blank keeps the old
+  // curated-list behavior, which is still the right default for a library
+  // with no saved preference.
+  registerSetting({
+    key: 'bb_studio_picks',
+    label: 'Featured Studios',
+    kind: 'text',
+    group: 'Store Look',
+    default: '',
+    applyMode: 'rebuild-scene',
+    hint: studioPicksHint,
   });
 
   registerSetting({

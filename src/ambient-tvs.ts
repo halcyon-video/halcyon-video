@@ -43,6 +43,21 @@ const TV_STREAM_BITRATE = 600_000;
 // fixture stops waiting on it — see armStreamWatchdog.
 const STREAM_WATCHDOG_MS = 20_000;
 
+// How long a source gets, once the element itself claims a picture is ready
+// (readyState >= HAVE_CURRENT_DATA / 'loadeddata'), to actually present one
+// decoded frame — see armDecodeLivenessCheck. Deliberately far shorter than
+// STREAM_WATCHDOG_MS: that timer covers a slow SERVER (a NAS spinning up a
+// transcode, a manifest that takes a while to arrive), where readyState
+// staying low for seconds is normal. This one only starts once the element
+// says it already has data, so a healthy decoder has nothing left to wait
+// on — the first frame of anything playable lands in well under a second.
+// (#72: on this project's own broken-hardware-decode test box, readyState
+// reaches HAVE_ENOUGH_DATA almost immediately and then nothing ever decodes —
+// the 20s watchdog's `readyState >= 2` early-out treats that as success and
+// never fires, which is exactly how a dead decoder was able to sit on the
+// page indefinitely, poisoning Remote Play's canvas capture the whole time.)
+const DECODE_LIVENESS_MS = 3_000;
+
 // Dead tube: near-black phosphor. It carries NO reflection of its own — the
 // glass pane in front owns every reflection on this set, so an off screen and
 // a playing screen catch the room identically. Built by two paths (a set that
@@ -231,6 +246,12 @@ export class AmbientTvs implements StoreFixture {
   // keeps a late error from re-running a step already taken.
   private pictureSource: 'stream' | 'loop' | 'dead' = 'dead';
   private streamWatchdog: ReturnType<typeof setTimeout> | null = null;
+  // Fast decoder-liveness timer — see DECODE_LIVENESS_MS / armDecodeLivenessCheck.
+  private livenessWatchdog: ReturnType<typeof setTimeout> | null = null;
+  // The library this fixture is allowed to draw from (build()'s `pool`,
+  // retained so a title reaching its end (#70) can pick another one from the
+  // same set without recomputing the library selection).
+  private pool: Movie[] = [];
   // Every built screen, and the one material they share, so the picture can be
   // replaced by the dead-tube phosphor after the fact — see goDeadGlass.
   private screenMeshes: THREE.Mesh[] = [];
@@ -307,12 +328,13 @@ export class AmbientTvs implements StoreFixture {
       size: pool.length,
       libs: [...new Set(pool.map(m => m.libraryName))].sort(),
     };
+    this.pool = pool;
 
     // The TVs are store furniture — they hang from the ceiling regardless of
     // whether a stream is available; without a server they just show dead glass.
     let videoTex: THREE.VideoTexture | null = null;
     if (pool.length > 0 && this.ctx.jellyfinUrl && this.ctx.jellyfinToken) {
-      const movie = pool[Math.floor(Math.random() * pool.length)];
+      const movie = this.pickPoolTitle(null);
       const seekSec = tvStartOffsetSec(movie);
       videoTex = this.makeVideoTexture(movie, seekSec);
       if (videoTex) {
@@ -332,7 +354,7 @@ export class AmbientTvs implements StoreFixture {
       // Resolving a "playing" identity here regardless keeps the TV-peek Select
       // action (jump to the box of what's playing) working offline; the loop is
       // house promo footage, not that title, exactly as the test card was.
-      this.playingMovie = pool[Math.floor(Math.random() * pool.length)];
+      this.playingMovie = this.pickPoolTitle(null);
       // bb_tv_testcard wins when set: the static card is the DETERMINISTIC
       // stand-in the screenshot rigs pin the tube treatment against, and a
       // moving picture would make those shots differ frame to frame.
@@ -356,7 +378,15 @@ export class AmbientTvs implements StoreFixture {
     const video = document.createElement('video');
     video.setAttribute('style', 'position:fixed;left:-9999px;width:1px;height:1px;');
     video.crossOrigin = 'anonymous';
-    video.loop = true;
+    // OFF by default (#70): a looping stream that wraps around can make
+    // hls.js reload a manifest whose earliest segments have already fallen
+    // out of the server's window, which is what turned into a fatal
+    // manifestLoadError. The honest behaviour on reaching the end of a title
+    // is to play a DIFFERENT one — see the 'ended' listener below — so the
+    // stream path leaves this false and lets 'ended' fire the normal way.
+    // playDemoLoop turns it back on for the one bundled clip, which has
+    // nowhere else to advance to and is meant to run forever.
+    video.loop = false;
     video.volume = 1.0; // gain controlled by Web Audio PannerNode
     video.muted = true; // autoplay policy: boot muted; unmuted on first user gesture
     video.playsInline = true;
@@ -380,13 +410,28 @@ export class AmbientTvs implements StoreFixture {
     // is currently loaded — the stream steps down to the loop, the loop steps
     // down to dark. Registered here rather than per-source so a swap can't
     // leave a stale handler behind that fires for the wrong phase.
+    //
+    // MEDIA_ERR_DECODE (#72) is flagged as a decoder fault: the element is
+    // telling us the pipeline itself broke, not that a URL 404'd or a
+    // connection was refused, and a broken decoder will fail identically on
+    // the next source too — see giveUpOnStream's decoderFault branch.
     video.addEventListener('error', () => {
-      const code = video.error ? `media error ${video.error.code}` : 'media error';
-      if (this.pictureSource === 'stream') this.giveUpOnStream(code);
+      const mediaError = video.error;
+      const code = mediaError ? `media error ${mediaError.code}` : 'media error';
+      const decoderFault = mediaError?.code === MediaError.MEDIA_ERR_DECODE;
+      if (this.pictureSource === 'stream') this.giveUpOnStream(code, { decoderFault });
       else if (this.pictureSource === 'loop') this.goDeadGlass(`demo loop ${code}`);
     });
-    // First decoded frame of ANY source: the picture is real, so stand the
-    // watchdog down and re-solve the crop against the true frame size.
+    // The stream reached its natural end (only fires with loop off, i.e. on
+    // the stream path — see the comment above). Move on to another title
+    // rather than sitting on a black/frozen tube (#70).
+    video.addEventListener('ended', () => {
+      if (this.pictureSource === 'stream') void this.advanceToNextTitle();
+    });
+    // First decoded frame of ANY source: the element THINKS the picture is
+    // real, so stand the slow watchdog down and re-solve the crop against the
+    // true frame size — but that belief is exactly what #72 found lying on a
+    // broken decoder, so arm the fast liveness check before trusting it.
     video.addEventListener('loadeddata', () => {
       this.clearStreamWatchdog();
       this.refitVideoCrop?.();
@@ -399,6 +444,7 @@ export class AmbientTvs implements StoreFixture {
         source: this.pictureSource,
         title: this.playingMovie?.title ?? null,
       };
+      this.armDecodeLivenessCheck(video);
     });
 
     return { video, videoTex };
@@ -414,6 +460,60 @@ export class AmbientTvs implements StoreFixture {
     this.armStreamWatchdog();
     void this.openStream(movie, seekSec, video);
     return videoTex;
+  }
+
+  // Pick a title from the pool this fixture was built against, preferring
+  // not to immediately repeat `exclude` when there's another option — used
+  // both for the opening choice (exclude: null) and for moving on at the end
+  // of a title (#70).
+  private pickPoolTitle(exclude: Movie | null): Movie {
+    const pool = this.pool;
+    let next = pool[Math.floor(Math.random() * pool.length)];
+    if (exclude && pool.length > 1) {
+      for (let tries = 0; tries < 5 && next.id === exclude.id; tries++) {
+        next = pool[Math.floor(Math.random() * pool.length)];
+      }
+    }
+    return next;
+  }
+
+  /**
+   * A title reached its end honestly (#70) — not a network failure, just the
+   * runtime running out. `video.loop` is off for the stream path exactly so
+   * this can happen: a real store's monitors didn't freeze on the last frame
+   * or silently rewind, they moved to another tape.
+   *
+   * All the screens this fixture builds — the two ceiling sets, or the 2000
+   * theme's three-wide wall bank — already share this ONE <video>/HLS
+   * pipeline (see the class comment); that sharing predates this fix and
+   * settles the "independent or in step" question the ticket raises before
+   * it's even asked here. There is only ever one active transcode for the
+   * whole fixture, so advancing every screen together isn't a design choice
+   * made in this method — it's what the existing architecture already does.
+   * Giving each screen its own encode would multiply the transcode cost #69
+   * is about, for a loop-desync nobody watching a wall of monitors would
+   * ever register.
+   */
+  private async advanceToNextTitle(): Promise<void> {
+    if (this.disposed || this.pictureSource !== 'stream') return;
+    const video = this.video;
+    if (!video || this.pool.length === 0) {
+      this.goDeadGlass('title ended, no next title to advance to');
+      return;
+    }
+    // The title that just finished stops billing the server NOW, same as
+    // every other step-down here — not deferred to the next teardown.
+    this.cancelTranscode();
+    if (this.hls) {
+      this.hls.destroy();
+      this.hls = null;
+    }
+    const next = this.pickPoolTitle(this.playingMovie);
+    this.playingMovie = next;
+    const seekSec = tvStartOffsetSec(next);
+    this.ctx.log(`[System] CRT TVs: "${next.title}" from ~${Math.round(seekSec / 60)}min`, 'system');
+    this.armStreamWatchdog();
+    await this.openStream(next, seekSec, video);
   }
 
   /**
@@ -445,6 +545,67 @@ export class AmbientTvs implements StoreFixture {
   }
 
   /**
+   * The fast half of the fallback machinery (#72). armStreamWatchdog only
+   * ever fires while `readyState < 2` — the moment the element claims to
+   * have *any* current data it bails out and trusts that a picture is on the
+   * way. On this project's broken-hardware-decode test box that claim is
+   * false: readyState reaches HAVE_ENOUGH_DATA almost immediately and then
+   * nothing ever actually decodes, so the slow watchdog's early-out let a
+   * dead decoder sit on the page indefinitely — which is what starved Remote
+   * Play's canvas capture to zero frames while the store rendered fine.
+   *
+   * So once 'loadeddata' fires, this asks the one question the fast way:
+   * did an actual frame reach the screen? `requestVideoFrameCallback` is the
+   * precise signal — it only runs for a frame that was really decoded and
+   * presented — with a `currentTime` delta as the fallback for a webview
+   * that lacks it. Three seconds is generous for ANY working decoder (first-
+   * frame latency on buffered data is normally well under one) and eighteen
+   * times shorter than the no-data watchdog it complements, because there is
+   * nothing left to wait ON here — the element already claims the data is in
+   * hand.
+   */
+  private armDecodeLivenessCheck(video: HTMLVideoElement): void {
+    this.clearLivenessWatchdog();
+    let sawFrame = false;
+    const rvfc = (video as any).requestVideoFrameCallback;
+    if (typeof rvfc === 'function') {
+      rvfc.call(video, () => { sawFrame = true; });
+    }
+    const startTime = video.currentTime;
+    this.livenessWatchdog = setTimeout(() => {
+      this.livenessWatchdog = null;
+      if (this.disposed || this.pictureSource === 'dead') return;
+      if (sawFrame || video.currentTime - startTime > 0.05) return; // a real frame landed
+      this.onDecoderFault(`no frame decoded ${Math.round(DECODE_LIVENESS_MS / 1000)}s after data claimed ready`);
+    }, DECODE_LIVENESS_MS);
+  }
+
+  private clearLivenessWatchdog(): void {
+    if (this.livenessWatchdog !== null) {
+      clearTimeout(this.livenessWatchdog);
+      this.livenessWatchdog = null;
+    }
+  }
+
+  /**
+   * The liveness check came up empty: whatever is attached to the element
+   * cannot actually be decoded. Route it through the SAME step-down ladder a
+   * network failure uses (giveUpOnStream), tagged as a decoder fault so it
+   * skips the demo-loop rung — see that method's decoderFault branch for why.
+   * Reached on the loop source itself (no stream configured at all — the
+   * demo, or a store with no server) goes straight to dead glass: it is
+   * already the bottom rung, there is nothing lower to fall back to.
+   */
+  private onDecoderFault(reason: string): void {
+    if (this.disposed || this.pictureSource === 'dead') return;
+    if (this.pictureSource === 'stream') {
+      this.giveUpOnStream(reason, { decoderFault: true });
+    } else {
+      this.goDeadGlass(reason);
+    }
+  }
+
+  /**
    * The stream is not going to happen — put SOMETHING on the glass (#67).
    *
    * The old code decided between "stream" and "bundled loop" once, up front, on
@@ -472,9 +633,10 @@ export class AmbientTvs implements StoreFixture {
    * (debug-log.ts tees it to disk, tagged [WARN]), so the next silent failure
    * is one grep away instead of a rebuild away.
    */
-  private giveUpOnStream(reason: string): void {
+  private giveUpOnStream(reason: string, opts: { decoderFault?: boolean } = {}): void {
     if (this.disposed || this.pictureSource !== 'stream') return;
     this.clearStreamWatchdog();
+    this.clearLivenessWatchdog();
     let backend = 'unknown backend';
     try {
       backend = localStorage.getItem('provider_kind') ?? 'jellyfin';
@@ -493,7 +655,15 @@ export class AmbientTvs implements StoreFixture {
       this.hls = null;
     }
     const video = this.video;
-    if (!video || !demoLoopEnabled()) {
+    // decoderFault (#72) skips the demo-loop rung entirely: every OTHER
+    // reason this method runs is about THIS stream (a bad URL, a refused
+    // connection, a manifest that never arrived), so trying a different
+    // source is reasonable. A dead decoder is the machine's video pipeline,
+    // not the stream's fault — handing it the loop file would just feed the
+    // same broken pipeline another video and keep a dead decoder attached to
+    // the page, which is precisely what starved Remote Play's canvas capture
+    // to zero frames while the store rendered fine.
+    if (opts.decoderFault || !video || !demoLoopEnabled()) {
       this.goDeadGlass(reason);
       return;
     }
@@ -636,8 +806,15 @@ export class AmbientTvs implements StoreFixture {
       // reaches the <video>, so the element's error event never fires and the
       // tube just sits black. Only fatal errors step down; hls.js recovers from
       // the rest on its own and a stutter is not a reason to drop the film.
-      hls.on(HlsClass.Events.ERROR, (_evt: unknown, data: { fatal?: boolean; details?: string }) => {
-        if (data?.fatal) this.giveUpOnStream(`hls ${data.details ?? 'fatal error'}`);
+      hls.on(HlsClass.Events.ERROR, (_evt: unknown, data: { fatal?: boolean; details?: string; type?: string }) => {
+        if (!data?.fatal) return;
+        // hls.js already sorts its own fatal errors into network vs. media —
+        // MEDIA_ERROR is its name for the decode-pipeline class (#72), the
+        // same distinction the plain <video> 'error' listener draws from
+        // MediaError.MEDIA_ERR_DECODE. A manifest 404 or a refused connection
+        // still falls through to the demo loop as before.
+        const decoderFault = data.type === HlsClass.ErrorTypes.MEDIA_ERROR;
+        this.giveUpOnStream(`hls ${data.details ?? 'fatal error'}`, { decoderFault });
       });
       hls.on(HlsClass.Events.MANIFEST_PARSED, () => {
         video.addEventListener('loadedmetadata', () => this.startPlayback(video), { once: true });
@@ -661,10 +838,10 @@ export class AmbientTvs implements StoreFixture {
    * ceiling TVs abandon one every time the scene is rebuilt — which the Overhead
    * TVs toggles themselves do, being applyMode 'rebuild-scene'.
    *
-   * Capability-gated rather than probed, per the note on the interface. Note
-   * for anyone chasing a still-running Plex encode: PlexProvider recovers the
-   * server address from `rememberConnection`, and NOTHING in the app calls that
-   * yet — so this is a no-op on Plex until the boot flow wires it.
+   * Capability-gated rather than probed, per the note on the interface. As of
+   * #69, PlexProvider remembers its own connection internally (invoked from
+   * authenticate()/fetchLibraries()/resolvePlaybackSource()), so this call is
+   * effective on both backends — no separate wiring needed here.
    */
   private cancelTranscode(): void {
     const sessionId = this.transcodeSessionId;
@@ -1385,6 +1562,7 @@ export class AmbientTvs implements StoreFixture {
    */
   private teardownVideo(): void {
     this.clearStreamWatchdog();
+    this.clearLivenessWatchdog();
     // Before the pipeline goes: tell the server to stop encoding for us.
     this.cancelTranscode();
     if (this.hls) {

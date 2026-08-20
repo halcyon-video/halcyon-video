@@ -16,6 +16,8 @@ import {
   buildPromoCampaign,
   layoutFace,
   ratingBand,
+  topStudiosInLibrary,
+  featuredStudioPicks,
   MIN_DISTINCT_PER_FACE,
   PROMO_FACE_COUNT,
 } from '../src/promo-campaigns.ts';
@@ -192,6 +194,163 @@ test('a studio too thin for a whole stand is not viable', () => {
   const libs = [lib('Movies', Array.from({ length: 8 }, (_, i) =>
     mk(`Ghibli ${i}`, { studios: ['Studio Ghibli'] })))];
   assert.equal(buildPromoCampaign(['studio-spotlight:0'], libs, ROWS, COLS), null);
+});
+
+test('a stand never falls back to a DIFFERENT index\'s studio (issue #26, "duplicate facings")', () => {
+  // Only ONE curated studio clears the viability floor in this library.
+  const libs = [lib('Movies', Array.from({ length: 20 }, (_, i) =>
+    mk(`Ghibli ${i}`, { studios: ['Studio Ghibli'] })))];
+  assert.equal(buildPromoCampaign(['studio-spotlight:0'], libs, ROWS, COLS)!.topper, 'STUDIO GHIBLI');
+  // Asking for the next index must DECLINE, not repeat index 0's studio.
+  // Two stands whose chains list studio-spotlight:1 with a studio-spotlight:0
+  // fallback (as promo-stand-front-right's config used to) would otherwise
+  // both land on Studio Ghibli — the same tower shown twice in the store,
+  // which is what the issue reported. See the CALLER CONTRACT note on
+  // studioSpotlight() in promo-campaigns.ts and the fixed chain in
+  // store-fixtures-config.ts.
+  assert.equal(buildPromoCampaign(['studio-spotlight:1'], libs, ROWS, COLS), null);
+});
+
+test('every face of a studio stand is 9/9 with no title repeated ACROSS faces', () => {
+  // Exactly at the viability floor: PROMO_FACE_COUNT * MIN_DISTINCT_PER_FACE
+  // distinct titles for the whole studio, none to spare — de-duplication
+  // under the most pressure it can be.
+  const total = PROMO_FACE_COUNT * MIN_DISTINCT_PER_FACE;
+  const libs = [lib('Movies', Array.from({ length: total }, (_, i) =>
+    mk(`Thin ${i}`, { studios: ['Studio Ghibli'] })))];
+  const c = buildPromoCampaign(['studio-spotlight:0'], libs, ROWS, COLS)!;
+  assert.ok(c, 'a pool at exactly the viability floor should still be viable');
+  assert.equal(c.faces.length, PROMO_FACE_COUNT);
+  const seenAcrossFaces = new Set<string>();
+  c.faces.forEach((f) => {
+    assert.equal(f.movies.length, PER_FACE, 'every face must be 9/9 — a short face is the bug this replaced');
+    // WITHIN a face, a short pool legitimately repeats down a column
+    // (layoutFace) — that's documented, intentional behavior. What must
+    // never happen is the SAME title landing on two DIFFERENT faces.
+    new Set(f.movies.map((m) => m.id)).forEach((id) => {
+      assert.ok(!seenAcrossFaces.has(id), `title ${id} appeared on more than one face`);
+      seenAcrossFaces.add(id);
+    });
+  });
+  assert.equal(seenAcrossFaces.size, total, 'all distinct titles used exactly once, across the 4 faces');
+});
+
+// ─── user-configurable studio picks (issue #26) ─────────────────────────────
+// The old hardcoded PROMO_STUDIOS pick meant nothing to a library it had no
+// curated entry for. featuredStudioPicks() reads the user's own choice
+// (settings row "Featured Studios", localStorage key bb_studio_picks) off a
+// menu built by topStudiosInLibrary — see promo-campaigns.ts for why handing
+// that ranking to a human, rather than auto-selecting off it, is what keeps
+// this from walking into the exact "distributor wins" trap PROMO_STUDIOS was
+// created to avoid.
+
+function withStudioPicks(picks: string, fn: () => void) {
+  const g = globalThis as { localStorage?: unknown };
+  const had = 'localStorage' in g;
+  const prev = g.localStorage;
+  g.localStorage = { getItem: (k: string) => (k === 'bb_studio_picks' ? picks : null) };
+  try { fn(); } finally {
+    if (had) g.localStorage = prev; else delete g.localStorage;
+  }
+}
+
+test('with no saved picks, the curated list still guards against the distributor trap', () => {
+  const libs = [lib('Movies', [
+    ...Array.from({ length: 80 }, (_, i) => mk(`WB ${i}`, { studios: ['Warner Bros. Pictures'] })),
+    ...Array.from({ length: 15 }, (_, i) => mk(`Ghibli ${i}`, { studios: ['Studio Ghibli'] })),
+  ])];
+  assert.equal(featuredStudioPicks().length, 0);
+  const c = buildPromoCampaign(['studio-spotlight:0'], libs, ROWS, COLS)!;
+  assert.equal(c.topper, 'STUDIO GHIBLI', 'Warner Bros has 5x the titles but is not curated');
+});
+
+test('saved picks override the curated list outright, ranked by title count', () => {
+  const libs = [lib('Movies', [
+    ...Array.from({ length: 15 }, (_, i) => mk(`A24 ${i}`, { studios: ['A24'] })),
+    ...Array.from({ length: 20 }, (_, i) => mk(`BH ${i}`, { studios: ['Blumhouse Productions'] })),
+  ])];
+  withStudioPicks('A24, Blumhouse Productions', () => {
+    assert.deepEqual(featuredStudioPicks(), ['A24', 'Blumhouse Productions']);
+    const a = buildPromoCampaign(['studio-spotlight:0'], libs, ROWS, COLS)!;
+    const b = buildPromoCampaign(['studio-spotlight:1'], libs, ROWS, COLS)!;
+    assert.equal(a.topper, 'BLUMHOUSE PRODUCTIONS'); // 20 titles, biggest pool first
+    assert.equal(b.topper, 'A24');
+  });
+});
+
+test('a picked studio absent from the curated list still works — it is real user data, not a regex', () => {
+  const libs = [lib('Movies', Array.from({ length: 15 }, (_, i) =>
+    mk(`Indie ${i}`, { studios: ['Neon'] })))];
+  withStudioPicks('Neon', () => {
+    const c = buildPromoCampaign(['studio-spotlight:0'], libs, ROWS, COLS)!;
+    assert.equal(c.topper, 'NEON');
+  });
+});
+
+test('picks match the raw Studios field case-insensitively', () => {
+  const libs = [lib('Movies', Array.from({ length: 15 }, (_, i) =>
+    mk(`Indie ${i}`, { studios: ['neon'] })))];
+  withStudioPicks('NEON', () => {
+    const c = buildPromoCampaign(['studio-spotlight:0'], libs, ROWS, COLS)!;
+    assert.equal(c.topper, 'NEON');
+  });
+});
+
+test('a picked studio too thin for a whole stand is not viable, and does not fall back to a sibling pick', () => {
+  const libs = [lib('Movies', [
+    ...Array.from({ length: 8 }, (_, i) => mk(`Thin ${i}`, { studios: ['Small House'] })),
+    ...Array.from({ length: 15 }, (_, i) => mk(`Big ${i}`, { studios: ['Big House'] })),
+  ])];
+  withStudioPicks('Small House, Big House', () => {
+    // Big House (15) outranks Small House, but Small House (8) never clears
+    // PROMO_FACE_COUNT * MIN_DISTINCT_PER_FACE and drops out of the scored
+    // list entirely, so pick 1 must be null — not a second wrap of Big House.
+    assert.equal(buildPromoCampaign(['studio-spotlight:0'], libs, ROWS, COLS)!.topper, 'BIG HOUSE');
+    assert.equal(buildPromoCampaign(['studio-spotlight:1'], libs, ROWS, COLS), null);
+  });
+});
+
+// ─── topStudiosInLibrary (the settings-row candidate menu) ─────────────────
+
+test('top studios rank by distinct title count, most-represented first', () => {
+  const libs = [lib('Movies', [
+    ...Array.from({ length: 5 }, (_, i) => mk(`Small ${i}`, { studios: ['Small House'] })),
+    ...Array.from({ length: 20 }, (_, i) => mk(`Big ${i}`, { studios: ['Big House'] })),
+  ])];
+  const top = topStudiosInLibrary(libs);
+  assert.deepEqual(top.map((t) => t.name), ['Big House', 'Small House']);
+  assert.equal(top[0].count, 20);
+});
+
+test('a movie shared across libraries counts once toward its studio', () => {
+  const libs = [
+    lib('Movies', [mk('Shared', { id: 'shared-1', studios: ['One Studio'] })]),
+    lib('4K Movies', [mk('Shared (4K)', { id: 'shared-1', studios: ['One Studio'] })]),
+  ];
+  const top = topStudiosInLibrary(libs);
+  assert.equal(top.find((t) => t.name === 'One Studio')?.count, 1);
+});
+
+test('studio names group case-insensitively, keeping one display casing', () => {
+  const libs = [lib('Movies', [
+    mk('A', { studios: ['A24'] }),
+    mk('B', { studios: ['a24'] }),
+    mk('C', { studios: ['A24'] }),
+  ])];
+  const top = topStudiosInLibrary(libs);
+  assert.equal(top.length, 1);
+  assert.equal(top[0].count, 3);
+});
+
+test('titles with no rental copy do not inflate a studio\'s count', () => {
+  const libs = [lib('Movies', [mk('A', { studios: ['Ghost House'], collectionGap: true })])];
+  assert.equal(topStudiosInLibrary(libs).length, 0);
+});
+
+test('the candidate menu is capped at `limit`', () => {
+  const libs = [lib('Movies', Array.from({ length: 25 }, (_, i) =>
+    mk(`T${i}`, { studios: [`Studio ${i}`] })))];
+  assert.equal(topStudiosInLibrary(libs, 20).length, 20);
 });
 
 // ─── seasonal + the rating split ────────────────────────────────────────────

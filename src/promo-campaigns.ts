@@ -196,6 +196,16 @@ function matchesSeason(m: Movie, s: Season): boolean {
 // distributors, so "the studio with the most titles" would hand every library
 // a WARNER BROS. tower, which means nothing as a promotion. These are the
 // names a store would actually have built an endcap around.
+//
+// This is the DEFAULT only, for a library with no saved preference (issue
+// #26). The user can pick their OWN studios to feature instead — see
+// `featuredStudioPicks`/`topStudiosInLibrary` below — which sidesteps the
+// distributor trap a different way: `topStudiosInLibrary` ranks the library's
+// *raw* Studios field the naive way (most titles wins, distributors and all),
+// but that ranking is only ever offered to a HUMAN as a menu on the settings
+// row, never auto-selected. The user recognizes "Warner Bros. Pictures" as
+// noise and skips it, the same editorial judgment that built this list in the
+// first place — just applied to their own library instead of a fixed one.
 
 interface PromoStudio { display: string; match: RegExp; }
 
@@ -223,6 +233,48 @@ const PROMO_STUDIOS: PromoStudio[] = [
   { display: 'WANDERLARK PICTURES', match: /^wanderlark pictures$/i },
   { display: 'HOLLOWLIGHT FILMS', match: /^hollowlight films$/i },
 ];
+
+export interface StudioTally { name: string; count: number; }
+
+/**
+ * Every distinct studio credited on a stock title, most-represented first —
+ * the CANDIDATE MENU the "Featured Studios" settings row offers, never
+ * picked automatically (see the PROMO_STUDIOS comment above). Counts distinct
+ * TITLES, same unit MIN_DISTINCT_PER_FACE and the curated list's own viability
+ * check use, so a number here means the same thing a pick's pool size does.
+ */
+export function topStudiosInLibrary(libs: JellyfinLibrary[], limit = 20): StudioTally[] {
+  const counts = new Map<string, StudioTally>();
+  dedupedMovies(libs).forEach((m) => {
+    (m.studios || []).forEach((raw) => {
+      const name = (raw || '').trim();
+      if (!name) return;
+      const key = name.toLowerCase();
+      const entry = counts.get(key);
+      if (entry) entry.count++;
+      else counts.set(key, { name, count: 1 });
+    });
+  });
+  return [...counts.values()]
+    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
+    .slice(0, limit);
+}
+
+/**
+ * The user's own choice of studios to feature (settings row `bb_studio_picks`
+ * — a comma-separated pick from `topStudiosInLibrary`'s candidate menu).
+ * Reads localStorage directly, same reason `promoToday()` does above: this
+ * module stays import-free so it keeps running under bare `node --test` type
+ * stripping. Empty (unset or blank) means "no preference saved yet" — the
+ * caller falls back to the curated PROMO_STUDIOS list, not to an empty stand.
+ */
+export function featuredStudioPicks(): string[] {
+  try {
+    const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('bb_studio_picks') : null;
+    if (!raw) return [];
+    return raw.split(',').map((s) => s.trim()).filter(Boolean);
+  } catch { return []; } // no localStorage (headless/SSR) — no saved preference
+}
 
 // ─── Shared selection helpers ───────────────────────────────────────────────
 
@@ -413,19 +465,50 @@ function recentlyPlayed(libs: JellyfinLibrary[], rows: number, cols: number): Pr
   return faces ? { id: 'recently-played', topper: PREVIOUSLY_VIEWED, faces } : null;
 }
 
-/** One studio across all four sides. `pick` is the Nth-best studio by title
- *  count, which is how two stands select different studios without sharing
- *  any state — same trick the old displayIndex used. */
-function studioSpotlight(libs: JellyfinLibrary[], rows: number, cols: number, pick: number): PromoCampaign | null {
+/** Candidate studios + their stock pool, in the order `pick` indexes into.
+ *  User picks (if any) win outright — see `featuredStudioPicks` — matched by
+ *  exact case-insensitive name against Movie.studios, since these came
+ *  straight out of the library's own data rather than a curated regex. No
+ *  picks saved yet falls back to the curated PROMO_STUDIOS list. */
+function studioCandidates(libs: JellyfinLibrary[], picks: string[]): { display: string; pool: Movie[] }[] {
   const all = dedupedMovies(libs);
-  const scored = PROMO_STUDIOS
-    .map((s) => ({ s, pool: all.filter((m) => (m.studios || []).some((name) => s.match.test(name))) }))
+  if (picks.length) {
+    return picks.map((name) => ({
+      display: name.toUpperCase(),
+      pool: all.filter((m) => (m.studios || []).some((s) => (s || '').trim().toLowerCase() === name.toLowerCase())),
+    }));
+  }
+  return PROMO_STUDIOS.map((s) => ({
+    display: s.display,
+    pool: all.filter((m) => (m.studios || []).some((name) => s.match.test(name))),
+  }));
+}
+
+/**
+ * One studio across all four sides. `pick` is the Nth-best studio by title
+ * count, which is how two stands select different studios without sharing
+ * any state — same trick the old displayIndex used.
+ *
+ * CALLER CONTRACT (issue #26): a single stand's `campaigns` chain must list
+ * at most one `studio-spotlight:N` entry, and different stands must use
+ * different N. Chaining `studio-spotlight:1` with a `studio-spotlight:0`
+ * fallback used to seem like a safety net for a thin candidate list, but it
+ * means two DIFFERENT stands can both land on index 0 — the same studio,
+ * same stock, on two towers in the same store, which is the "duplicate
+ * facings" the issue reported. A stand whose one index isn't viable should
+ * fall through to a different KIND of campaign (or build nothing, which is
+ * correct on a thin library — see FourSidedDisplay.ensureCampaign), never to
+ * another stand's index.
+ */
+function studioSpotlight(libs: JellyfinLibrary[], rows: number, cols: number, pick: number): PromoCampaign | null {
+  const candidates = studioCandidates(libs, featuredStudioPicks());
+  const scored = candidates
     .filter((x) => x.pool.length >= PROMO_FACE_COUNT * MIN_DISTINCT_PER_FACE)
-    .sort((a, b) => b.pool.length - a.pool.length || a.s.display.localeCompare(b.s.display));
+    .sort((a, b) => b.pool.length - a.pool.length || a.display.localeCompare(b.display));
   const chosen = scored[pick];
   if (!chosen) return null;
-  const faces = spreadFaces(chosen.s.display, chosen.pool.slice().sort(byPromoOrder), PROMO_FACE_COUNT, rows, cols);
-  return faces ? { id: `studio-spotlight:${pick}`, topper: chosen.s.display, faces } : null;
+  const faces = spreadFaces(chosen.display, chosen.pool.slice().sort(byPromoOrder), PROMO_FACE_COUNT, rows, cols);
+  return faces ? { id: `studio-spotlight:${pick}`, topper: chosen.display, faces } : null;
 }
 
 /** The current month's seasonal promotion, in one rating band. */

@@ -487,6 +487,16 @@ const POSTER_BANKS = 2;
 const FALLBACK_BANK_LAYERS = 2048;
 
 function maxArrayLayers(renderer?: THREE.WebGLRenderer): number {
+  // Dev/test override (issue #60 verification): reproduce a specific driver's
+  // GL_MAX_ARRAY_TEXTURE_LAYERS — 2048 is the common Windows/ANGLE figure —
+  // on hardware that reports a different real value, so the surfaced-
+  // shortfall path below can be exercised without building a catalog large
+  // enough to exceed this machine's actual (8192-class) budget. Never set in
+  // the shipped app; `--set bb_debug_layer_cap=<n>` from tools/shot.mjs.
+  if (typeof localStorage !== 'undefined') {
+    const override = Number(localStorage.getItem('bb_debug_layer_cap'));
+    if (override > 0) return override;
+  }
   const gl = renderer?.getContext() as WebGL2RenderingContext | undefined;
   const limit = gl?.getParameter?.(gl.MAX_ARRAY_TEXTURE_LAYERS);
   return typeof limit === 'number' && limit > 0 ? limit : FALLBACK_BANK_LAYERS;
@@ -524,6 +534,19 @@ class TextureArrayManager {
    */
   public unpaintedIndex = 0;
   private layerBudgetWarned = false;
+  /**
+   * Titles beyond the poster layer budget on the CURRENT catalog (0 = no
+   * shortfall). Settled synchronously inside init(), straight off the
+   * `totalMovies` argument — layers themselves mint lazily as slots build
+   * (see getIndex), but this number does not: it does not depend on how many
+   * layers have actually been minted yet, only on the catalog size and the
+   * budget, both known the instant init() is called. Safe to read any time
+   * after a store build starts (see entrance/index.ts's refreshIdleTerminal,
+   * called once buildAllMovieBoxes() returns) — see counter-terminal #60.
+   */
+  public shortfall = 0;
+  /** The poster layer budget `shortfall` (if any) was measured against. */
+  public layerBudget = 0;
 
   public lowResArray: THREE.DataArrayTexture | null = null;
   public highResArray: THREE.DataArrayTexture | null = null;
@@ -557,6 +580,10 @@ class TextureArrayManager {
     const haveArrays = !!(this.lowResArray && this.highResArray && this.loadedFlagsTexture);
     if (haveArrays && !posterLayersInvalid && totalMovies <= this.maxMovies &&
         this.maxMovies - this.nextIndex >= LAYER_CHURN_HEADROOM / 2) {
+      // Re-settle the shortfall against this call's (possibly smaller, on a
+      // catalog refresh) totalMovies — this.layerBudget is still correct,
+      // fixed by the last full allocation, so this stays cheap and settled.
+      this.shortfall = Math.max(0, totalMovies - this.layerBudget);
       // Re-upload the mirrored pixels into the new GL context on first use.
       const maxAniso = renderer ? Math.min(8, renderer.capabilities.getMaxAnisotropy()) : 0;
       for (const tex of [this.lowResArray!, this.highResArray!]) {
@@ -584,6 +611,8 @@ class TextureArrayManager {
     // and reallocate anyway, and the fast path would never engage.
     this.bankSize = maxArrayLayers(renderer);
     const layerBudget = this.bankSize * POSTER_BANKS;
+    this.layerBudget = layerBudget;
+    this.shortfall = Math.max(0, totalMovies - layerBudget);
     this.maxMovies = Math.max(1, Math.min(totalMovies + LAYER_CHURN_HEADROOM, layerBudget));
     // Overflow: the low-res array stops being every title's preview and becomes
     // the second bank (see the POSTER_BANKS note).

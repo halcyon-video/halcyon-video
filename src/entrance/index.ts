@@ -55,6 +55,8 @@ import { ReturnSlot } from './return-slot';
 import type { Movie } from '../jellyfin';
 import { CRT_BLACK, CRT_GOLD, CRT_INK, CRT_TEXT } from '../crt-theme';
 import { brandString } from '../brand-pack';
+import { textureArrayManager } from '../poster-textures';
+import { posterShortfallLines } from '../counter-terminal';
 
 export class EntranceCheckout implements StoreFixture {
   // The counter's store-facing point Z (used by StoreScene to frame the checkout camera move).
@@ -935,6 +937,15 @@ export class EntranceCheckout implements StoreFixture {
     // The idle screen is also the manager terminal's only in-world signpost
     // (UX pass 2026-08): the Left press at the counter was taught nowhere,
     // and "/" is keyboard-only advice — a remote user needs the other line.
+    //
+    // #60: past the poster layer budget (see poster-textures.ts), titles
+    // shelve without cover art with no explanation. posterShortfallLines
+    // returns [] on a healthy store (below budget), so the idle screen is
+    // byte-for-byte the original 8 lines whenever nothing is wrong — a
+    // diagnostic that shows a scary number on every install would be worse
+    // than the silence it replaced. It only appears here, not on the
+    // MANAGER MENU screen (counter-terminal.ts): that screen is already at
+    // its 10-line capacity (see maxLines below) with the full button ring.
     const lines = this.terminalLines ?? [
       'STORE #55746   GREEN BAY, WI',
       '',
@@ -942,6 +953,7 @@ export class EntranceCheckout implements StoreFixture {
       '',
       'PRESS / TO SEARCH CATALOG',
       'AT COUNTER: LEFT = MANAGER MENU',
+      ...posterShortfallLines(textureArrayManager.shortfall, textureArrayManager.layerBudget),
       '',
       '>',
     ];
@@ -1005,6 +1017,20 @@ export class EntranceCheckout implements StoreFixture {
     this.terminalLines = lines;
     this.terminalCursorLine = cursorLine ?? null;
     this.drawTerminal();
+  }
+
+  // #60: the FIRST drawTerminal() call happens inside build(), which runs
+  // before textureArrayManager.init() has counted this store's catalog
+  // against the poster layer budget (buildStore() constructs the entrance
+  // before buildAllMovieBoxes() stocks the shelves — see three-scene.ts) —
+  // so that first paint always shows shortfall=0, whether or not one exists.
+  // StoreScene calls this right after buildAllMovieBoxes() returns, once the
+  // real number is settled, to repaint the idle screen with it. A no-op
+  // while the terminal is showing anything else (menu, search, a sub-screen)
+  // — those already redraw themselves from their own live state whenever it
+  // changes, and this must never stomp a screen a user is mid-interaction with.
+  refreshIdleTerminal(): void {
+    if (this.terminalLines === null) this.drawTerminal();
   }
 
   // Camera dock pose for the diegetic search terminal: stand on the far side
