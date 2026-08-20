@@ -24,6 +24,10 @@ interface Viewer {
   pc: RTCPeerConnection;
   videoSender: RTCRtpSender | null;
   audioSender: RTCRtpSender | null;
+  // The input channel, kept so the host can talk BACK on it (see notifyViewers):
+  // the viewer's on-screen control legend has to know whether it is looking at
+  // the store or at a film, and a replaceTrack swap is invisible from over there.
+  dc: RTCDataChannel | null;
 }
 
 const SEND_URL = '/__remote/send';
@@ -52,12 +56,55 @@ const stats = {
   running: false,
   viewers: 0,
   inputsApplied: 0,
+  fatal: '', // set when this store can never host (see reportRemoteFatal)
   get remotelyDriven() { return isRemotelyDriven(); },
   get streamingPlayback() { return !!playbackVideoTrack(); },
 };
 (window as any).__remotePlay = stats;
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+// ─── Permanent failures ─────────────────────────────────────────────────────
+//
+// "No scene yet" is normally a wait: a store mid-boot answers a viewer's hello
+// with 'retry' and the viewer re-hellos. Some failures never resolve, though —
+// a container with no GPU has no WebGL2 at all, so the 3D store cannot start,
+// this page will never have a canvas to capture, and every hello for the rest
+// of the instance's life would get another 'retry'. From the viewer's side
+// that is indistinguishable from a slow boot: a black screen reading "Store is
+// still booting…" forever, with nothing to act on (reported from Docker
+// Desktop on a Mac, which cannot pass a GPU into a container at all).
+//
+// So a blocker that we know is permanent is recorded here and sent to viewers
+// as 'fatal' + a reason they can read and act on.
+let fatalReason = '';
+
+/** Record why this store can never host, and tell anyone already waiting. */
+export function reportRemoteFatal(reason: string): void {
+  if (fatalReason) return; // first cause is the useful one
+  fatalReason = reason;
+  stats.fatal = reason;
+  console.error(`[RemotePlay] cannot host: ${reason}`);
+  for (const id of [...viewers.keys()]) signalSend(id, 'fatal', { reason });
+}
+
+/**
+ * "Permanent" is only permanent while it lasts. A SHARED kiosk can be switched
+ * into 2.5D — which really does leave nothing to capture — and then switched
+ * straight back; without this the host would keep answering 'fatal' with a
+ * reason that stopped being true, and Remote Play would stay dead until
+ * somebody reloaded the page. Called from the 3D build once a scene exists.
+ */
+export function clearRemoteFatal(): void {
+  if (!fatalReason) return;
+  fatalReason = '';
+  stats.fatal = '';
+}
+
+/** Viewers attached right now — 0 when Remote Play is off or nobody is watching. */
+export function remoteViewerCount(): number {
+  return viewers.size;
+}
 
 // ICE config the server hands out (a TURN relay when it runs one — viewers
 // off the LAN have no other way in). Refreshed hourly because the relay's
@@ -352,6 +399,24 @@ function playbackVideoTrack(): MediaStreamTrack | null {
   return t && t.readyState === 'live' ? t : null;
 }
 
+/**
+ * Tell a viewer what it is looking at. The player's own OSD lives in DOM
+ * siblings of the canvas, so a film reaches viewers as bare frames with no
+ * seek bar and no hint that Enter still pauses and Q still stops — the keys
+ * work, blind (main.ts routes remote KeyboardEvents to the player ahead of the
+ * store). One flag on the existing input channel is enough for the viewer page
+ * to switch its own control legend over, which costs no per-frame work; a real
+ * OSD would mean blitting every frame of the film through a canvas.
+ */
+function notifyViewer(v: Viewer): void {
+  if (v.dc?.readyState !== 'open') return;
+  try { v.dc.send(JSON.stringify({ t: 'state', playback: !!playbackVideoTrack() })); } catch { /* channel died */ }
+}
+
+function notifyViewers(): void {
+  for (const v of viewers.values()) notifyViewer(v);
+}
+
 /** Attach the swap to the player element the first time an entry point has one. */
 function watchPlayer(): void {
   const el = getPlayerVideo();
@@ -377,6 +442,7 @@ function startPlaybackStream(el: HTMLVideoElement): void {
     void v.videoSender?.replaceTrack(video);
     if (audio) void v.audioSender?.replaceTrack(audio);
   }
+  notifyViewers(); // their legend switches to the playback keys
 }
 
 function stopPlaybackStream(): void {
@@ -387,6 +453,7 @@ function stopPlaybackStream(): void {
     if (canvasTrack) void v.videoSender?.replaceTrack(canvasTrack);
     if (audioTrack) void v.audioSender?.replaceTrack(audioTrack);
   }
+  notifyViewers(); // back to the store legend
   burstRender(); // the store is back on screen — give it frames immediately
 }
 
@@ -394,12 +461,15 @@ async function createViewer(id: string): Promise<void> {
   const scene = getScene();
   const stream = ensureStream();
   if (!scene || !stream) {
-    signalSend(id, 'retry'); // still booting — viewer waits and re-hellos
+    // A known-permanent blocker is worth saying out loud; anything else is a
+    // store still coming up, and the viewer waits and re-hellos.
+    if (fatalReason) signalSend(id, 'fatal', { reason: fatalReason });
+    else signalSend(id, 'retry');
     return;
   }
   await refreshIceServers(); // credentials are time-stamped; re-read hourly
   const pc = new RTCPeerConnection({ iceServers });
-  const v: Viewer = { pc, videoSender: null, audioSender: null };
+  const v: Viewer = { pc, videoSender: null, audioSender: null, dc: null };
   viewers.set(id, v);
   stats.viewers = viewers.size;
 
@@ -413,12 +483,16 @@ async function createViewer(id: string): Promise<void> {
   if (sendAudio) v.audioSender = pc.addTrack(sendAudio, stream);
 
   const dc = pc.createDataChannel('input', { ordered: true });
+  v.dc = dc;
   dc.onmessage = (ev) => {
     try {
       applyInput(JSON.parse(String(ev.data)));
     } catch { /* malformed input frame — drop it */ }
   };
-  dc.onopen = () => burstRender(); // hand the newcomer real frames, not one
+  dc.onopen = () => {
+    burstRender();   // hand the newcomer real frames, not one
+    notifyViewer(v); // someone joining mid-film gets the playback legend
+  };
 
   pc.onicecandidate = (ev) => signalSend(id, 'ice', ev.candidate ? ev.candidate.toJSON() : null);
   pc.onconnectionstatechange = () => {

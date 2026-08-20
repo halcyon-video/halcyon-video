@@ -1,7 +1,8 @@
-// Ceiling-hung CRT TVs playing an ambient family movie streamed from Jellyfin,
-// with HRTF positional audio. Self-contained fixture: owns its <video> element,
-// HLS pipeline, VideoTexture, and AudioContext, and tears them all down in
-// dispose(). Swap this class out (via FixtureContext) for a different TV layout.
+// Ceiling-hung CRT TVs playing an ambient movie streamed from the store's media
+// server, with HRTF positional audio. Self-contained fixture: owns its <video>
+// element, HLS pipeline, VideoTexture, and AudioContext, and tears them all down
+// in dispose(). Swap this class out (via FixtureContext) for a different TV
+// layout.
 import * as THREE from 'three';
 import type Hls from 'hls.js';
 
@@ -21,6 +22,35 @@ import { makeCrtGlassMaterial } from './glass-reflection';
 import { tvPoolLibraryIds } from './library-settings';
 import { TV_PATCH_LAYER } from './scene-shared';
 import { assetUrl } from './asset-url';
+import { activeProvider, sessionOf } from './providers/active-provider';
+import type { PlaybackRequestOptions } from './providers/media-source-provider';
+import { getSegmentFixLoader } from './hls-segment-fix';
+
+// Media-server position unit: 100ns ticks, the currency PlaybackRequestOptions
+// speaks in (Jellyfin StartTimeTicks; the Plex adapter divides back down to the
+// seconds its transcoder wants).
+const TICKS_PER_SECOND = 10_000_000;
+
+// What this fixture asks the server to encode. The CRT screen mesh covers a few
+// hundred pixels on-screen — decoding and re-uploading it at source resolution
+// wastes decode CPU, HLS bandwidth, and server transcode capacity for no visible
+// gain. (A backend whose transcoder ignores one of these, as Plex's does with
+// width, simply sends more than we need.)
+const TV_STREAM_MAX_WIDTH = 640;
+const TV_STREAM_BITRATE = 600_000;
+
+// How long the server gets to put a first frame on the glass before the
+// fixture stops waiting on it — see armStreamWatchdog.
+const STREAM_WATCHDOG_MS = 20_000;
+
+// Dead tube: near-black phosphor. It carries NO reflection of its own — the
+// glass pane in front owns every reflection on this set, so an off screen and
+// a playing screen catch the room identically. Built by two paths (a set that
+// never had a source, and one that gave up on the picture it had), hence a
+// module-level maker rather than a literal in buildHardware.
+function makeDeadTubeMaterial(): THREE.MeshStandardMaterial {
+  return new THREE.MeshStandardMaterial({ color: 0x0b0e14, roughness: 0.4, metalness: 0 });
+}
 
 // The bundled in-store promo loop the screens fall back to with no server to
 // stream from — a 30s Big Buck Bunny extract, CC BY 3.0 (Blender Foundation).
@@ -32,6 +62,35 @@ import { assetUrl } from './asset-url';
 // Chromium builds that omit the proprietary codecs, with no licensing question
 // hanging over a bundled asset in a GPL repo.
 const DEMO_LOOP_PATH = 'demo-clip/big-buck-bunny.webm';
+
+/**
+ * How far into a title to drop in — you never walk into a store and find every
+ * monitor at frame one. A fraction of the RUNTIME, and only when the runtime is
+ * actually known: `runTimeTicks` first (both backends set it), the display
+ * string second, and otherwise the beginning.
+ *
+ * The old code guessed 90 minutes for anything it couldn't parse and leaned on
+ * a client-side `min(seek, duration * 0.7)` clamp once metadata arrived to undo
+ * the guess. The offset is a server-side request parameter now (it has to be —
+ * it's how Plex's transcoder takes it), so there is no second chance to correct
+ * it: an offset past the end is a transcode that never produces a frame. Guess
+ * nothing.
+ */
+function tvStartOffsetSec(movie: Movie): number {
+  // A series container's runtime, where a backend reports one at all, describes
+  // the SHOW — it says nothing about the length of the one episode that is
+  // about to play. Start those at the beginning.
+  if (movie.isSeries) return 0;
+  let runtimeSec = 0;
+  if (movie.runTimeTicks && movie.runTimeTicks > 0) {
+    runtimeSec = movie.runTimeTicks / TICKS_PER_SECOND;
+  } else {
+    const mins = parseInt(movie.duration, 10);
+    if (Number.isFinite(mins) && mins > 0) runtimeSec = mins * 60;
+  }
+  if (runtimeSec <= 0) return 0;
+  return runtimeSec * (0.05 + Math.random() * 0.60);
+}
 
 /**
  * Whether the bundled loop may play. On unless `bb_tv_demo_loop=0` — the switch
@@ -162,6 +221,20 @@ export class AmbientTvs implements StoreFixture {
   private refitVideoCrop: (() => void) | null = null;
 
   private hls: Hls | null = null;
+  // Handle on the server-side encode feeding the sets, when the backend gave
+  // one back (PlaybackSource.sessionId). Null on a direct stream, on the
+  // bundled loop, and once the encode has been cancelled.
+  private transcodeSessionId: string | null = null;
+  // What the shared <video> is currently carrying. 'stream' = the media
+  // server's; 'loop' = the bundled promo clip; 'dead' = nothing, tubes dark.
+  // The fallback ladder only ever descends, so this doubles as the guard that
+  // keeps a late error from re-running a step already taken.
+  private pictureSource: 'stream' | 'loop' | 'dead' = 'dead';
+  private streamWatchdog: ReturnType<typeof setTimeout> | null = null;
+  // Every built screen, and the one material they share, so the picture can be
+  // replaced by the dead-tube phosphor after the fact — see goDeadGlass.
+  private screenMeshes: THREE.Mesh[] = [];
+  private pictureMat: THREE.Material | null = null;
   private video: HTMLVideoElement | null = null;
   private videoTex: THREE.VideoTexture | null = null;
   // Last video time we uploaded, so we skip redundant GPU re-uploads of an
@@ -207,9 +280,18 @@ export class AmbientTvs implements StoreFixture {
     const allMovies: Movie[] = [];
     const chosenMovies: Movie[] = [];
     this.ctx.libraries.forEach(lib => lib.movies.forEach(m => {
+      // A library the user EXPLICITLY picked contributes everything it shelves,
+      // series containers included (#67). Dropping those before the library
+      // check meant a TV-Shows library contributed nothing whatever its toggle
+      // said — the first reporter had switched TV shows on and it could never
+      // have done anything. A series container isn't itself streamable, but it
+      // names an episode that is; openStream resolves one.
+      if (chosen.has(lib.id)) chosenMovies.push(m);
+      // The unselected default is still films only. That heuristic is what runs
+      // on every store that has never opened the drawer, and quietly putting
+      // television on their monitors is not this fix's to make.
       if (m.isSeries) return;
       allMovies.push(m);
-      if (chosen.has(lib.id)) chosenMovies.push(m);
     }));
     let pool: Movie[];
     if (chosenMovies.length > 0) {
@@ -231,20 +313,18 @@ export class AmbientTvs implements StoreFixture {
     let videoTex: THREE.VideoTexture | null = null;
     if (pool.length > 0 && this.ctx.jellyfinUrl && this.ctx.jellyfinToken) {
       const movie = pool[Math.floor(Math.random() * pool.length)];
-      const durationMin = parseInt(movie.duration) || 90;
-      const seekSec = durationMin * 60 * (0.05 + Math.random() * 0.60);
-      videoTex = this.makeVideoTexture(movie, durationMin, seekSec);
+      const seekSec = tvStartOffsetSec(movie);
+      videoTex = this.makeVideoTexture(movie, seekSec);
       if (videoTex) {
         this.playingMovie = movie;
         this.ctx.log(`[System] CRT TVs: "${movie.title}" from ~${Math.round(seekSec / 60)}min`, 'system');
       }
     } else if (pool.length > 0) {
-      // Nothing here to stream: the public demo, a catalog with nothing
-      // playable — or a PLEX store, which reaches this branch by construction.
-      // This fixture speaks the Jellyfin HLS endpoint and reads jellyfin_url /
-      // jellyfin_token, and a Plex sign-in writes neither (plex-signin.ts keeps
-      // its own keys), so every Plex install hung dead glass over the aisles
-      // until this path existed.
+      // No server to stream from at all: the public demo, or a store whose
+      // credentials have been cleared (the change-server / logged-out path).
+      // Both fields are provider-neutral — boot-flow.ts writes jellyfin_url /
+      // jellyfin_token for WHICHEVER backend authenticated — so reaching here
+      // means there is nothing configured, not that the backend is unfamiliar.
       //
       // A video store's monitors always had SOMETHING on them, and a dark tube
       // reads as broken hardware — so run the bundled 30-second promo loop.
@@ -263,24 +343,16 @@ export class AmbientTvs implements StoreFixture {
     this.buildHardware(videoTex);
   }
 
-  // Spin up the hidden <video> + HLS pipeline feeding the ceiling TVs. Returns
-  // null when streaming isn't possible (no server, no MSE) — the TVs still get
-  // built, just with dead screens.
-  private makeVideoTexture(movie: Movie, durationMin: number, seekSec: number): THREE.VideoTexture | null {
-    const base = this.ctx.jellyfinUrl.replace(/\/$/, '');
-    const qs = new URLSearchParams({
-      api_key: this.ctx.jellyfinToken,
-      MediaSourceId: movie.id,
-      VideoCodec: 'h264', AudioCodec: 'aac',
-      // The CRT screen mesh covers a few hundred pixels on-screen — decoding
-      // and re-uploading it at source resolution wastes decode CPU, HLS
-      // bandwidth, and server transcode capacity for no visible gain.
-      MaxWidth: '640', VideoBitrate: '600000', AudioBitrate: '128000',
-      MaxAudioChannels: '2', TranscodingProtocol: 'hls',
-      TranscodingContainer: 'ts', MinSegments: '1', BreakOnNonKeyFrames: 'true',
-    });
-    const hlsSrc = `${base}/Videos/${movie.id}/master.m3u8?${qs}`;
-
+  /**
+   * The ONE hidden <video> every set shares, and the VideoTexture on it.
+   *
+   * Deliberately independent of where the picture comes from: the audio graph,
+   * the UV crop, the frame-upload chain and dispose() all bind to the ELEMENT,
+   * so its source can arrive late and can be swapped out again mid-life without
+   * any of them noticing. That is what lets a stream that turns out to be
+   * unobtainable hand over to the bundled loop on the same glass.
+   */
+  private makeSharedVideo(): { video: HTMLVideoElement; videoTex: THREE.VideoTexture } {
     const video = document.createElement('video');
     video.setAttribute('style', 'position:fixed;left:-9999px;width:1px;height:1px;');
     video.crossOrigin = 'anonymous';
@@ -295,7 +367,7 @@ export class AmbientTvs implements StoreFixture {
     videoTex.colorSpace = THREE.SRGBColorSpace;
     this.videoTex = videoTex;
 
-    // Fit the movie VERTICALLY to the tube, cropping the widescreen overhang
+    // Fit the picture VERTICALLY to the tube, cropping the widescreen overhang
     // off both sides — see fitVideoToTube.
     const applyFit = () => fitVideoToTube(videoTex, video, this.screenAspect);
     // 'resize' fires whenever the decoded frame size changes (e.g. an HLS ABR
@@ -304,29 +376,308 @@ export class AmbientTvs implements StoreFixture {
     video.addEventListener('resize', applyFit);
     this.refitVideoCrop = applyFit;
 
-    const seekAndPlay = () => {
-      applyFit(); // solve the crop now that the real frame size is known
-      const maxSec = isFinite(video.duration) ? video.duration * 0.70 : durationMin * 60;
-      video.currentTime = Math.min(seekSec, maxSec);
-      video.play().catch(() => {});
-    };
-
-    loadHls().then((HlsClass) => {
-      if (HlsClass && HlsClass.isSupported()) {
-        const hls = new HlsClass({ startLevel: -1 });
-        hls.loadSource(hlsSrc);
-        hls.attachMedia(video);
-        hls.on(HlsClass.Events.MANIFEST_PARSED, () => {
-          video.addEventListener('loadedmetadata', seekAndPlay, { once: true });
-        });
-        this.hls = hls;
-      } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-        video.src = hlsSrc;
-        video.addEventListener('loadedmetadata', seekAndPlay, { once: true });
-      }
+    // One error listener for the element's whole life, routed on which source
+    // is currently loaded — the stream steps down to the loop, the loop steps
+    // down to dark. Registered here rather than per-source so a swap can't
+    // leave a stale handler behind that fires for the wrong phase.
+    video.addEventListener('error', () => {
+      const code = video.error ? `media error ${video.error.code}` : 'media error';
+      if (this.pictureSource === 'stream') this.giveUpOnStream(code);
+      else if (this.pictureSource === 'loop') this.goDeadGlass(`demo loop ${code}`);
+    });
+    // First decoded frame of ANY source: the picture is real, so stand the
+    // watchdog down and re-solve the crop against the true frame size.
+    video.addEventListener('loadeddata', () => {
+      this.clearStreamWatchdog();
+      this.refitVideoCrop?.();
+      // The other half of the breadcrumb giveUpOnStream writes: what actually
+      // ended up on the glass, decided by a decoded frame rather than by
+      // configuration. Cheap, and it is the one question a support log about
+      // the ceiling TVs always has to answer first.
+      (window as any).__tvStream = {
+        ok: true,
+        source: this.pictureSource,
+        title: this.playingMovie?.title ?? null,
+      };
     });
 
+    return { video, videoTex };
+  }
+
+  // Spin up the shared <video> against the server's stream. The element and its
+  // texture are created synchronously — build() has to hand buildHardware() a
+  // texture in the same turn — while the URL resolves through the provider,
+  // which is necessarily async.
+  private makeVideoTexture(movie: Movie, seekSec: number): THREE.VideoTexture {
+    const { video, videoTex } = this.makeSharedVideo();
+    this.pictureSource = 'stream';
+    this.armStreamWatchdog();
+    void this.openStream(movie, seekSec, video);
     return videoTex;
+  }
+
+  /**
+   * Give the server a bounded amount of time to actually produce a picture.
+   *
+   * The error handlers below catch the loud failures — a 404, a refused
+   * connection, an undecodable segment — and they catch them in milliseconds.
+   * This covers the quiet ones: a server that accepts the request and then
+   * never finishes starting the encode, a transcode the box hasn't the CPU to
+   * begin, a manifest that parses and yields no media. Generous on purpose,
+   * because a NAS spinning up a transcode is slow but not broken; the point is
+   * only that a tube is never left black forever with nothing said.
+   */
+  private armStreamWatchdog(): void {
+    this.clearStreamWatchdog();
+    this.streamWatchdog = setTimeout(() => {
+      this.streamWatchdog = null;
+      const video = this.video;
+      if (video && video.readyState >= 2) return; // a picture arrived; nothing to do
+      this.giveUpOnStream(`no picture after ${Math.round(STREAM_WATCHDOG_MS / 1000)}s`);
+    }, STREAM_WATCHDOG_MS);
+  }
+
+  private clearStreamWatchdog(): void {
+    if (this.streamWatchdog !== null) {
+      clearTimeout(this.streamWatchdog);
+      this.streamWatchdog = null;
+    }
+  }
+
+  /**
+   * The stream is not going to happen — put SOMETHING on the glass (#67).
+   *
+   * The old code decided between "stream" and "bundled loop" once, up front, on
+   * whether a URL and a token existed. That is the wrong question: it can only
+   * ever describe the store's configuration, never whether a picture came back.
+   * A store configured against a server that cannot serve this fixture — the
+   * whole of the Plex bug, but equally an unreachable server, a refused
+   * transcode, a codec a distro Chromium omits — committed to a doomed stream
+   * and then had no second move, because the loop lived in the ELSE of that
+   * same gate. The configured-but-broken case got the worst outcome available
+   * and the unconfigured case got the graceful one.
+   *
+   * So the question asked here is the honest one, and it is asked late: did we
+   * get a playable stream? Any answer of no lands on the loop, or on the
+   * dead-tube look when the loop is switched off.
+   *
+   * And it says so at WARNING level, every time. Reaching this method at all
+   * means the store IS configured against a server — the stream path is only
+   * entered with a URL and a token in hand — so a failure here is never the
+   * ordinary offline case, it is a server that was asked for a picture and did
+   * not produce one. The fallback below is deliberately invisible (that is its
+   * job: the ceiling is never blank), and for one evening that invisibility hid
+   * a total Jellyfin outage behind a cheerfully playing promo loop. console.warn
+   * is what puts the reason and the backend into the session log
+   * (debug-log.ts tees it to disk, tagged [WARN]), so the next silent failure
+   * is one grep away instead of a rebuild away.
+   */
+  private giveUpOnStream(reason: string): void {
+    if (this.disposed || this.pictureSource !== 'stream') return;
+    this.clearStreamWatchdog();
+    let backend = 'unknown backend';
+    try {
+      backend = localStorage.getItem('provider_kind') ?? 'jellyfin';
+    } catch { /* no storage — the label is a nicety, not a gate */ }
+    console.warn(
+      `[ambient-tvs] ${backend}: the configured server produced no picture for ` +
+      `"${this.playingMovie?.title ?? 'the chosen title'}" (${reason}) — falling back.`
+    );
+    (window as any).__tvStream = { backend, ok: false, reason, title: this.playingMovie?.title ?? null };
+    this.ctx.log(`[System] CRT TVs: no picture from the server (${reason}).`, 'system');
+    // The encode is abandoned NOW, not at teardown — the server is still
+    // burning CPU on a stream nobody will ever read.
+    this.cancelTranscode();
+    if (this.hls) {
+      this.hls.destroy();
+      this.hls = null;
+    }
+    const video = this.video;
+    if (!video || !demoLoopEnabled()) {
+      this.goDeadGlass(reason);
+      return;
+    }
+    this.ctx.log('[System] CRT TVs: running the in-store promo loop instead.', 'system');
+    this.pictureSource = 'loop';
+    this.playDemoLoop(video);
+  }
+
+  /**
+   * Nothing left to show: retire the video pipeline and put the dead-tube
+   * phosphor on the glass — the same near-black material the fixture builds
+   * when there was never a source, rather than a MeshBasicMaterial holding an
+   * empty VideoTexture. They are not the same thing to look at: one is a switched
+   * -off television catching the room, the other is a hole cut in the set.
+   */
+  private goDeadGlass(reason: string): void {
+    if (this.disposed || this.pictureSource === 'dead') return;
+    this.pictureSource = 'dead';
+    console.warn(`[ambient-tvs] ${reason} — screens stay dark`);
+    this.teardownVideo();
+    const dead = makeDeadTubeMaterial();
+    for (const mesh of this.screenMeshes) mesh.material = dead;
+    // The scene-wide teardown disposes whatever material is ATTACHED to a mesh,
+    // so the one just detached would otherwise never be freed.
+    this.pictureMat?.dispose();
+    this.pictureMat = dead;
+    this.ctx.requestRender();
+  }
+
+  // Start playing whatever source has just been attached: re-solve the crop now
+  // that a real frame size is known, and let it run.
+  private startPlayback(video: HTMLVideoElement): void {
+    this.refitVideoCrop?.();
+    video.play().catch(() => {});
+  }
+
+  /**
+   * Ask THE STORE'S BACKEND for a stream — never a hand-built URL (#67).
+   *
+   * This fixture used to assemble `${server}/Videos/${id}/master.m3u8` itself
+   * and gate on `jellyfinUrl && jellyfinToken`. Those two fields are shared by
+   * every backend (boot-flow.ts writes them for whichever provider
+   * authenticated), so on a Plex install the gate passed with a Plex address, a
+   * Plex token and a ratingKey, and requested a route Plex does not have: 404,
+   * and two independent field reports of black glass over the aisles. Exactly
+   * the bug class playback-routing.ts was created to kill for the main player.
+   *
+   * The provider's async resolvePlaybackSource is the seam taken here rather
+   * than that module's synchronous builders, because it is the one that hands
+   * back the transcode's SESSION ID — see cancelTranscode(). The player can't
+   * await (its URL is rebuilt inside a user-gesture chain); a fixture building
+   * at scene-build time can.
+   */
+  private async openStream(movie: Movie, seekSec: number, video: HTMLVideoElement): Promise<void> {
+    let url: string;
+    let kind: 'direct' | 'transcode';
+    try {
+      const provider = activeProvider();
+      const session = sessionOf(
+        this.ctx.jellyfinToken,
+        localStorage.getItem('jellyfin_userid') ?? ''
+      );
+
+      // A series container has no file behind it — what a TV-Shows library
+      // actually contributes to the monitors is an EPISODE (#67). The first one
+      // of the run: an ambient screen wants somewhere sensible to come in, and
+      // dropping a stranger into the middle of a season is not it.
+      let itemId = movie.id;
+      if (movie.isSeries) {
+        const episode = await provider.fetchFirstEpisodeOfSeries(
+          this.ctx.jellyfinUrl,
+          session,
+          movie.id
+        );
+        if (this.disposed) return;
+        if (!episode) {
+          this.giveUpOnStream(`"${movie.title}" has no episodes to play`);
+          return;
+        }
+        itemId = episode.id;
+      }
+
+      // Both built-in providers accept a `kind` alongside PlaybackRequestOptions
+      // (jellyfin-provider.ts, plex-provider.ts) but the interface hasn't grown
+      // it, so it rides in on a widening intersection rather than a cast. It
+      // matters: without it a backend defaults to DIRECT play, and handing a
+      // 40 Mbps remux to a screen this size is the opposite of what's wanted.
+      const req: PlaybackRequestOptions & { kind: 'transcode' } = {
+        kind: 'transcode',
+        maxWidth: TV_STREAM_MAX_WIDTH,
+        maxBitrate: TV_STREAM_BITRATE,
+        // Drop in mid-film SERVER-side. The old code seeked the element after
+        // metadata arrived; expressing it as an offset in the request is what
+        // both backends actually take (Jellyfin StartTimeTicks, Plex `offset`),
+        // and it saves the seek round-trip on a stream that is already being
+        // transcoded to order.
+        startPositionTicks: Math.round(seekSec * TICKS_PER_SECOND),
+      };
+      const source = await provider.resolvePlaybackSource(
+        this.ctx.jellyfinUrl,
+        session,
+        itemId,
+        req
+      );
+      url = source.url;
+      kind = source.kind;
+      // Held so the encode can be torn down again — see cancelTranscode().
+      if (source.kind === 'transcode') this.transcodeSessionId = source.sessionId ?? null;
+    } catch (e: any) {
+      console.warn('[ambient-tvs] could not resolve a stream:', e);
+      this.giveUpOnStream(`server would not name a stream (${e?.message ?? e})`);
+      return;
+    }
+    if (this.disposed) return;
+
+    if (kind === 'direct') {
+      // A backend with no transcoder hands back the file itself; the element
+      // plays it with no HLS pipeline to build.
+      video.src = url;
+      video.addEventListener('loadedmetadata', () => this.startPlayback(video), { once: true });
+      return;
+    }
+
+    const HlsClass = await loadHls();
+    if (this.disposed) return;
+    if (HlsClass && HlsClass.isSupported()) {
+      const hls = new HlsClass({
+        startLevel: -1,
+        // The SAME loader the full-screen player uses (hls-segment-fix.ts), and
+        // for the same reason: this fixture asks the server to start the encode
+        // at an offset, and Jellyfin then 400s every segment request that
+        // inherits StartTimeTicks from the playlist query. Without it a real
+        // Jellyfin store loses essentially EVERY movie stream — tvStartOffsetSec
+        // never returns 0 for a film — while a series, which starts at 0, plays
+        // fine and hides the fault (#67).
+        loader: getSegmentFixLoader(HlsClass) as any,
+      });
+      // The missing handler that made the Plex 404 invisible. hls.js reports
+      // its own failures here and NOWHERE else — a manifest that 404s never
+      // reaches the <video>, so the element's error event never fires and the
+      // tube just sits black. Only fatal errors step down; hls.js recovers from
+      // the rest on its own and a stutter is not a reason to drop the film.
+      hls.on(HlsClass.Events.ERROR, (_evt: unknown, data: { fatal?: boolean; details?: string }) => {
+        if (data?.fatal) this.giveUpOnStream(`hls ${data.details ?? 'fatal error'}`);
+      });
+      hls.on(HlsClass.Events.MANIFEST_PARSED, () => {
+        video.addEventListener('loadedmetadata', () => this.startPlayback(video), { once: true });
+      });
+      hls.loadSource(url);
+      hls.attachMedia(video);
+      this.hls = hls;
+    } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+      video.src = url;
+      video.addEventListener('loadedmetadata', () => this.startPlayback(video), { once: true });
+    } else {
+      // No MSE and no native HLS: this webview cannot play the only thing the
+      // server offered.
+      this.giveUpOnStream('no HLS support in this webview');
+    }
+  }
+
+  /**
+   * Tear down the server-side encode this fixture started. An abandoned
+   * transcode pins the user's server CPU until it times out on its own, and the
+   * ceiling TVs abandon one every time the scene is rebuilt — which the Overhead
+   * TVs toggles themselves do, being applyMode 'rebuild-scene'.
+   *
+   * Capability-gated rather than probed, per the note on the interface. Note
+   * for anyone chasing a still-running Plex encode: PlexProvider recovers the
+   * server address from `rememberConnection`, and NOTHING in the app calls that
+   * yet — so this is a no-op on Plex until the boot flow wires it.
+   */
+  private cancelTranscode(): void {
+    const sessionId = this.transcodeSessionId;
+    this.transcodeSessionId = null;
+    if (!sessionId) return;
+    try {
+      const provider = activeProvider();
+      if (!provider.capabilities.transcoding) return;
+      provider.cancelActiveTranscode?.(sessionId)?.catch(() => {});
+    } catch {
+      // Teardown never throws: an unknown provider kind here would mean the
+      // install was downgraded mid-session, and the encode times out anyway.
+    }
   }
 
   /**
@@ -338,41 +689,35 @@ export class AmbientTvs implements StoreFixture {
    * The clip is already 640 wide and in the screens' own ballpark, so there is
    * nothing to negotiate: it starts at 0 and loops forever.
    */
-  private makeDemoLoopTexture(): THREE.VideoTexture | null {
-    const video = document.createElement('video');
-    video.setAttribute('style', 'position:fixed;left:-9999px;width:1px;height:1px;');
+  private makeDemoLoopTexture(): THREE.VideoTexture {
+    const { video, videoTex } = this.makeSharedVideo();
+    this.pictureSource = 'loop';
+    this.playDemoLoop(video);
+    return videoTex;
+  }
+
+  /**
+   * Point the shared element at the bundled clip. Reached two ways: as the
+   * opening source when there is no server at all, and as the step down from a
+   * stream that never produced a picture (#67) — which is why it works on an
+   * element that may already have had another source on it.
+   *
+   * The clip is already 640 wide and in the screens' own ballpark, so there is
+   * nothing to negotiate: it starts at 0 and loops forever. A missing or
+   * undecodable file falls through to the element's error handler and the
+   * dead-tube look, and never blocks the store build.
+   */
+  private playDemoLoop(video: HTMLVideoElement): void {
+    if (this.hls) {
+      this.hls.destroy();
+      this.hls = null;
+    }
+    video.removeAttribute('src'); // drop any MediaSource blob hls.js attached
     video.loop = true;
-    video.volume = 1.0; // gain controlled by Web Audio PannerNode
-    video.muted = true; // autoplay policy: boot muted; unmuted on first user gesture
-    video.playsInline = true;
     video.preload = 'auto';
     video.src = assetUrl(DEMO_LOOP_PATH);
-    document.body.appendChild(video);
-    this.video = video;
-
-    const videoTex = new THREE.VideoTexture(video);
-    videoTex.colorSpace = THREE.SRGBColorSpace;
-    this.videoTex = videoTex;
-
-    // Fit vertically onto the tube face, same conformance the streamed path
-    // applies — see fitVideoToTube. The bundled clip is 640x360 (16:9), so it
-    // is the crop's normal case, not an edge one.
-    const applyFit = () => fitVideoToTube(videoTex, video, this.screenAspect);
-    applyFit();
-    video.addEventListener('resize', applyFit);
-    this.refitVideoCrop = applyFit;
-
-    // Fire-and-forget: a missing/undecodable file leaves the tubes dark exactly
-    // as they were before this path existed, and never blocks the store build.
-    video.addEventListener('loadedmetadata', () => {
-      applyFit();
-      video.play().catch(() => {});
-    }, { once: true });
-    video.addEventListener('error', () => {
-      console.warn('[ambient-tvs] demo loop failed to load — screens stay dark');
-    }, { once: true });
-
-    return videoTex;
+    video.addEventListener('loadedmetadata', () => this.startPlayback(video), { once: true });
+    video.load();
   }
 
   // Build the two ceiling-hung TVs themselves (pole mounts, shells, screens,
@@ -382,6 +727,7 @@ export class AmbientTvs implements StoreFixture {
     this.tvWorldSpheres = [];
     this.tvParts = [];
     this.screenPoses = [];
+    this.screenMeshes = [];
 
     // Harness/dev stand-in: with no Jellyfin stream the screens are dead
     // glass, which makes the curved-tube treatment unverifiable offline —
@@ -432,10 +778,10 @@ export class AmbientTvs implements StoreFixture {
     const poleMat = new THREE.MeshStandardMaterial({ color: 0x505050, roughness: 0.35, metalness: 0.88 });
     const screenMat = screenTex
       ? new THREE.MeshBasicMaterial({ map: screenTex })
-      // Dead tube: near-black phosphor. It carries NO reflection of its own —
-      // the glass pane in front owns every reflection on this set, so an off
-      // screen and a playing screen catch the room identically.
-      : new THREE.MeshStandardMaterial({ color: 0x0b0e14, roughness: 0.4, metalness: 0 });
+      : makeDeadTubeMaterial();
+    // Kept so goDeadGlass can retire the picture later: whether a source turns
+    // out to be playable is not knowable at build time.
+    this.pictureMat = screenMat;
     // Static tube overlay (crt-tube.ts): rounded corners falling off dark,
     // edge vignette, faint scanlines — the PHOSPHOR side of the tube, all of
     // which only darkens. The room reflection is the glass pane below.
@@ -517,6 +863,7 @@ export class AmbientTvs implements StoreFixture {
       const screen = new THREE.Mesh(makeCurvedScreenGeometry(screenW, screenH, SCREEN_BULGE), screenMat);
       screen.position.z = bodyD / 2 + 0.01;
       tvG.add(screen);
+      this.screenMeshes.push(screen);
 
       const scan = new THREE.Mesh(makeCurvedScreenGeometry(screenW, screenH, SCREEN_BULGE), scanMat);
       scan.position.z = screen.position.z + 0.002;
@@ -703,6 +1050,7 @@ export class AmbientTvs implements StoreFixture {
       const screen = new THREE.Mesh(makeCurvedScreenGeometry(screenW, screenH, SCREEN_BULGE), screenMat);
       screen.position.z = 0.03; // deep in the aperture
       g.add(screen);
+      this.screenMeshes.push(screen);
       const scan = new THREE.Mesh(makeCurvedScreenGeometry(screenW, screenH, SCREEN_BULGE), scanMat);
       scan.position.z = 0.036;
       g.add(scan);
@@ -1029,14 +1377,16 @@ export class AmbientTvs implements StoreFixture {
     }
   }
 
-  dispose(): void {
-    this.disposed = true; // gates the async GLB upgrade against a dead scene
-    this.refitVideoCrop = null;
-    if (this.gestureUnlock) {
-      window.removeEventListener('pointerdown', this.gestureUnlock, true);
-      window.removeEventListener('keydown', this.gestureUnlock, true);
-      this.gestureUnlock = null;
-    }
+  /**
+   * Retire the whole video pipeline: the encode the server is running for us,
+   * the HLS transmuxer, the element, its texture and the positional-audio
+   * graph. Shared by dispose() and by goDeadGlass(), which reaches this same
+   * state mid-life when there turns out to be nothing to show.
+   */
+  private teardownVideo(): void {
+    this.clearStreamWatchdog();
+    // Before the pipeline goes: tell the server to stop encoding for us.
+    this.cancelTranscode();
     if (this.hls) {
       this.hls.destroy();
       this.hls = null;
@@ -1051,13 +1401,26 @@ export class AmbientTvs implements StoreFixture {
       this.videoTex.dispose();
       this.videoTex = null;
     }
-    if (this.testCardTex) {
-      this.testCardTex.dispose();
-      this.testCardTex = null;
-    }
+    this.refitVideoCrop = null;
     if (this.audioCtx) {
       this.audioCtx.close().catch(() => {});
       this.audioCtx = null;
+    }
+  }
+
+  dispose(): void {
+    this.disposed = true; // gates the async GLB upgrade against a dead scene
+    if (this.gestureUnlock) {
+      window.removeEventListener('pointerdown', this.gestureUnlock, true);
+      window.removeEventListener('keydown', this.gestureUnlock, true);
+      this.gestureUnlock = null;
+    }
+    this.teardownVideo();
+    this.screenMeshes = [];
+    this.pictureMat = null; // owned by the mesh it's on; the scene sweep frees it
+    if (this.testCardTex) {
+      this.testCardTex.dispose();
+      this.testCardTex = null;
     }
   }
 }

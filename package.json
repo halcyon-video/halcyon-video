@@ -1,11 +1,11 @@
 {
   "name": "halcyon-video",
   "private": true,
-  "version": "0.7.5",
+  "version": "0.7.6",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "node tools/check-file-budget.mjs && node tools/list-slots.mjs --check && tsc && vite build",
+    "build": "node tools/check-file-budget.mjs && node tools/check-provider-boundary.mjs && node tools/list-slots.mjs --check && tsc && vite build",
     "preview": "vite preview",
     "serve": "vite preview --port 1420 --strictPort --host",
     "test": "node --experimental-strip-types --test tests/*.test.ts",

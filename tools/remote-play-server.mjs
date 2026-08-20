@@ -102,7 +102,15 @@ export function remotePlayPlugin() {
   // Never seeded into instances: hosting flags (an instance must not become a
   // second shared host), the kiosk's rental-lockout state, and credentials
   // the app itself never persists.
-  const SEED_SKIP = new Set(["bb_remote_play", "bb_rental", "jellyfin_password"]);
+  //
+  // Nor the donor's RENDER MODE or their answer to the device gate. An
+  // instance exists to stream the 3D canvas; inheriting "2.5D" from whoever
+  // happened to donate the seed builds a DOM store with no canvas at all, so
+  // it can never produce a frame and every viewer waits on it forever.
+  const SEED_SKIP = new Set([
+    "bb_remote_play", "bb_rental", "jellyfin_password",
+    "bb_render_mode", "bb_device_gate",
+  ]);
 
   // ── TURN relay ────────────────────────────────────────────────────────────
   //
@@ -263,6 +271,30 @@ export function remotePlayPlugin() {
     reaper.unref?.();
   }
 
+  // Hardware GL is what makes a private instance usable at all — a
+  // software-rendered store measures ~3fps at a quarter of the resolution. So
+  // ask for it explicitly, but only where a GPU is actually visible: forcing
+  // ANGLE's native-EGL backend on a Linux box without one does not fall back
+  // gracefully, it leaves the page with NO WebGL context whatsoever
+  // ("BindToCurrentSequence failed"), and the store then never builds. That is
+  // every container without a /dev/dri mapping — including all of Docker
+  // Desktop, which cannot pass a GPU into its VM. Off Linux there is no
+  // /dev/dri to read and Chrome's own default already picks the platform's
+  // hardware backend (Metal, D3D), so we say nothing and let it.
+  function glArgs() {
+    if (process.platform !== "linux") return [];
+    let gpu = false;
+    try {
+      gpu = fs.readdirSync("/dev/dri").some((f) => f.startsWith("render") || f.startsWith("card"));
+    } catch { /* no /dev/dri at all */ }
+    return gpu ? ["--enable-gpu", "--use-gl=angle", "--use-angle=gl-egl"] : [];
+  }
+
+  // Cached once found: this machine's browser cannot make a WebGL2 context, so
+  // no instance spawned here will ever render. Without this every viewer poll
+  // launches another headless Chromium that boots to nothing.
+  let noWebGl = "";
+
   async function spawnInstance(fast) {
     // Reap browsers leaked by a previous crashed server (same recipe as
     // shot.mjs: chrome binary + our port-scoped marker argv).
@@ -278,9 +310,11 @@ export function remotePlayPlugin() {
       const browser = await puppeteer.launch({
         args: [
           "--no-sandbox", "--disable-setuid-sandbox",
-          // Real GPU GL — a SwiftShader store is unusable, and the hardware
-          // encoder is what makes N simultaneous streams cheap.
-          "--enable-gpu", "--use-gl=angle", "--use-angle=gl-egl",
+          // Real GPU GL where there is a GPU — a software-rendered store is
+          // unusable, and the hardware encoder is what makes N simultaneous
+          // streams cheap. See glArgs(): asking for it where there is none
+          // costs the page WebGL entirely.
+          ...glArgs(),
           // WebAudio may start without a gesture (remote input is synthetic,
           // so a gesture never "really" happens inside the instance).
           "--autoplay-policy=no-user-gesture-required",
@@ -300,6 +334,28 @@ export function remotePlayPlugin() {
         if (instances.get(id) === rec) instances.delete(id);
       });
       const page = await browser.newPage();
+      // Preflight, on the blank page before the store loads: a browser with no
+      // WebGL2 can never build the 3D scene, so this instance would boot to
+      // nothing and answer every viewer "still booting" for as long as it
+      // lived. One cheap probe turns that into a refusal with a reason.
+      const canRender = await page.evaluate(() => {
+        try {
+          const gl = document.createElement("canvas").getContext("webgl2");
+          if (!gl) return false;
+          gl.getExtension("WEBGL_lose_context")?.loseContext();
+          return true;
+        } catch { return false; }
+      }).catch(() => true); // probe itself broke — let the boot decide
+      if (!canRender) {
+        noWebGl = "This store server has no GPU available, so it can’t render a private store. "
+          + "In Docker, map a GPU into the container (devices: /dev/dri) — Docker Desktop on Mac "
+          + "and Windows can’t. Otherwise open the store in a browser on a machine with a display "
+          + "and turn Remote Play on, and viewers will share that view.";
+        console.log(`[remote-play] no WebGL2 in this browser — private instances disabled. ${noWebGl}`);
+        const err = new Error(noWebGl);
+        err.code = "no-webgl2";
+        throw err;
+      }
       if (seed) {
         await page.evaluateOnNewDocument((kv) => {
           try {
@@ -432,10 +488,15 @@ export function remotePlayPlugin() {
           reuse.lastBeat = now;
           return json(res, 200, { id: reuse.id, fresh: false });
         }
+        // Already known to be unable to render: answer instantly with the
+        // reason rather than launching another browser that boots to nothing.
+        if (noWebGl) return json(res, 503, { error: "no-webgl2", message: noWebGl });
         if (instances.size >= CAP) return json(res, 503, { error: "at capacity" });
         spawnInstance(!!body.fast)
           .then((id) => json(res, 200, { id, fresh: true }))
-          .catch((err) => json(res, 500, { error: String(err) }));
+          .catch((err) => err?.code === "no-webgl2"
+            ? json(res, 503, { error: "no-webgl2", message: err.message })
+            : json(res, 500, { error: String(err) }));
       });
     }
 

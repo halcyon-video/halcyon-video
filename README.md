@@ -463,9 +463,21 @@ any device's browser at `/remote.html` and the server does the rendering;
 the box just decodes a video stream, so even the weakest smart-TV browser
 walks the aisles at full fidelity. Until someone donates a login
 (**Settings → Connection → Remote Play**, from any logged-in browser), the
-instances boot the demo library. Give the server hardware GL (`/dev/dri`)
-for the smoothest streams; instances are capped (`REMOTE_PLAY_MAX_INSTANCES`,
-default 2) and viewers past the cap are turned away until one frees up.
+instances boot the demo library. Instances are capped
+(`REMOTE_PLAY_MAX_INSTANCES`, default 2) and viewers past the cap are turned
+away until one frees up.
+
+> **Private instances need a GPU on the server** — they render the real 3D
+> store, so the machine (or container) needs working hardware GL. In Docker
+> that means mapping one in: `devices: [/dev/dri:/dev/dri]`, or
+> `--device /dev/dri`. Without it the container has no WebGL at all and a
+> private store can never start; `/remote.html` now says so instead of waiting.
+> **Docker Desktop on macOS and Windows cannot pass a GPU to a container**, so
+> private instances don't work there at all. Use the **shared mirror** instead:
+> open the store in a browser on the Mac or PC itself (which has a GPU), turn
+> **Settings → Connection → Remote Play** on, and leave that window open —
+> viewers at `/remote.html` get that store. Linux hosts with a `/dev/dri`
+> mapping get both flavors.
 
 ---
 
@@ -607,7 +619,10 @@ prebuilt image is published from releases). Then:
    taps flowing back as input — see [Remote Play](#remote-play--the-store-in-your-pocket).
    To stream *your* library (not the demo), log in once from any browser and
    flip **Settings → Connection → Remote Play** on; that donates your login
-   to the server.
+   to the server. This needs a GPU in the container (`--device /dev/dri`), so
+   it is a Linux-host feature — on **Docker Desktop for Mac/Windows** use the
+   shared mirror instead, as described under
+   [Remote Play](#remote-play--the-store-in-your-pocket).
 
 `--network host` is what lets WebRTC offer an address other devices can
 actually reach; if you only want in-browser use, `-p 1420:1420` on a normal

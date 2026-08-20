@@ -92,6 +92,19 @@ export class PlexProvider implements MediaSourceProvider {
    * session carrying the account token — an unclaimed server on the LAN answers
    * to it, and refusing outright would lock out exactly the person testing a
    * fresh install.
+   *
+   * READ THIS BEFORE TREATING `session.userId` AS A CREDENTIAL. Plex has no
+   * user id in Jellyfin's sense, and the field below is a SERVER
+   * machineIdentifier standing in for one. It is empty far more often than it
+   * looks: whenever the plex.tv resource lookup above fails (a LAN-only or
+   * firewalled NAS, CORS, a plex.tv blip — all swallowed on purpose) or the
+   * address the user typed isn't byte-equal to one of the account's advertised
+   * connection URIs, `match` is undefined and this resolves to `''`. Nothing in
+   * the Plex backend reads it back: every call in this file authenticates with
+   * `session.accessToken` alone. So a caller that gates on a truthy userId is
+   * not checking whether it is signed in, it is checking whether plex.tv
+   * happened to answer — which is how series drill-down came to be dead on
+   * Synology installs (GH #66). Gate on the token.
    */
   async authenticate(server: string, creds: ProviderCredentials): Promise<ProviderSession> {
     const accountToken = creds.accountToken;

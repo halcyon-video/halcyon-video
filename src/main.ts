@@ -70,7 +70,7 @@ import {
 import { setupTerminalInput } from './store-setup-flow';
 import { registerLibraryToggles } from './library-settings';
 import { getActiveTheme, applyThemeCssVars, THEMES, resolveThemeId } from './themes';
-import { runDeviceGate } from './device-gate';
+import { runDeviceGate, detectGateReason } from './device-gate';
 import {
   activeMediaCutoff,
   filterLibrariesByCutoff,
@@ -87,7 +87,10 @@ import type { StoreScene } from './three-scene';
 import { InputManager } from './input';
 import type { InputCallbacks } from './input';
 import { refreshHoldHints, setHoldCheckoutProgress, setHoldDismissProgress } from './hold-hints';
-import { setupRemotePlay, isRemoteInstance, isRemotelyDriven } from './remote-play';
+import {
+  setupRemotePlay, isRemoteInstance, isRemotelyDriven, reportRemoteFatal,
+  clearRemoteFatal, remoteViewerCount,
+} from './remote-play';
 import { enableFpsMeter, FPS_METER_KEY } from './fps-meter';
 import { VideoPlayer } from './video-player';
 // initCaseMedium and refreshPosterCrop are dynamically imported to avoid loading Three.js on boot in 2.5D mode.
@@ -574,11 +577,36 @@ let cecDisplayAssumedOn = true;
 // SERVICE MODE settings page (review §4.3), and MEDIA RELEASE DATE (#42),
 // the catalog-pin sub-screen. Inserted just above RETURN TO STORE so the
 // safe exit stays last.
-const counterTerminalButtons = (() => {
+const COUNTER_TERMINAL_ALL_ROWS = (() => {
   const ids = [...powerButtons];
   ids.splice(ids.indexOf('btn-cancel'), 0, MEDIA_DATE_BUTTON_ID, 'btn-service');
   return ids;
 })();
+// The row list the CRT is actually drawing. counter-terminal-flow.ts holds this
+// array BY REFERENCE and re-reads it on every render, so rewriting its contents
+// in place is how the menu changes shape between openings.
+const counterTerminalButtons = [...COUNTER_TERMINAL_ALL_ROWS];
+// Rows a remote viewer must never be offered. SWITCH TO 2D MODE destroys the 3D
+// scene, and the stream IS that scene's canvas — so the one system menu a
+// viewer can reach (the glass power menu is DOM, invisible to them) used to
+// carry the row that kills their own session, with no way back through it.
+const REMOTE_HIDDEN_TERMINAL_ROWS = ['btn-flat-mode'];
+
+/**
+ * Open the desk CRT, having first rebuilt its rows for whoever is driving.
+ * "Remotely driven" is a live condition, not a boot-time one, so the filter
+ * runs at open time — and only at open time, since the menu index is reset
+ * there too and a list that changed length mid-menu would move the cursor.
+ */
+function openCounterTerminal(): void {
+  const remote = isRemotelyDriven();
+  const rows = COUNTER_TERMINAL_ALL_ROWS.filter(
+    (id) => !(remote && REMOTE_HIDDEN_TERMINAL_ROWS.includes(id)),
+  );
+  counterTerminalButtons.length = 0;
+  counterTerminalButtons.push(...rows);
+  counterTerminalOpen();
+}
 
 // Settings drawer navigation state. `settingsRowKeys` is the flat top-to-bottom
 // order of focusable rows generated from the registry, with the sentinel
@@ -2417,6 +2445,16 @@ async function initializeStoreScene(preservePosterCache = false) {
       }
     }
     bootFlatStore(storeLibraries, canvasContainer, storeGameMovies, storeDiscovery);
+    // 2.5D is DOM, not a canvas, so there is nothing for Remote Play to
+    // capture and every viewer freezes on their last store frame — a new one
+    // just gets "Store is still booting…" for a store that isn't booting.
+    // A spawned instance can't BOOT into this mode (the server strips
+    // bb_render_mode out of the seed), but a shared kiosk with viewers
+    // attached can be SWITCHED into it at any time, so both are told.
+    if (isRemoteInstance() || remoteViewerCount() > 0) {
+      reportRemoteFatal('The store is in 2.5D mode, which has no 3D view to stream. '
+        + 'Switch it back to 3D Store Mode on the machine running the store.');
+    }
     hideBootOverlay();
     return;
   }
@@ -2512,8 +2550,13 @@ async function initializeStoreScene(preservePosterCache = false) {
       if (isDemoMode) return makeSyntheticEpisodes(movie);
       const jellyfinUrl = localStorage.getItem('jellyfin_url');
       const token = localStorage.getItem('jellyfin_token');
-      const userId = localStorage.getItem('jellyfin_userid');
-      if (!jellyfinUrl || !token || !userId) return [];
+      // Address and token are the credentials; a user id is not one (GH #66).
+      // It is a Jellyfin concept, and a Plex session's is empty whenever
+      // plex.tv didn't resolve the server — so requiring it here returned []
+      // for every Plex series and painted the season panel NONE. It is still
+      // PASSED, because the Jellyfin provider needs it; the provider decides.
+      const userId = localStorage.getItem('jellyfin_userid') ?? '';
+      if (!jellyfinUrl || !token) return [];
       return provider().fetchSeriesEpisodes(jellyfinUrl, sessionOf(token, userId), movie.id);
     };
 
@@ -2611,7 +2654,7 @@ async function initializeStoreScene(preservePosterCache = false) {
     };
 
     // Left at the checkout counter reaches for the clerk's terminal.
-    scene.onCounterTerminal = () => counterTerminalOpen();
+    scene.onCounterTerminal = () => openCounterTerminal();
     scene.onOpenSearch = () => { void openSearch(); };
     scene.onEnterFlatMode = () => executePowerMenuAction('btn-flat-mode');
 
@@ -2672,6 +2715,11 @@ async function initializeStoreScene(preservePosterCache = false) {
 
     scene.texturesReadyPromise.then(() => {
       storeScene = scene;
+      // There is a canvas to capture again, so any "can never host" this store
+      // reported earlier (2.5D, a renderer that threw) has stopped being true —
+      // without this, switching a kiosk to 2D and back would leave Remote Play
+      // answering 'fatal' forever, and only a page reload would revive it.
+      clearRemoteFatal();
       (window as any).storeScene = storeScene;
       (window as any).librariesList = storeLibraries;
       // Which overlay owns the keyboard, as the app itself sees it. Several
@@ -2729,6 +2777,14 @@ async function initializeStoreScene(preservePosterCache = false) {
   } catch (err: any) {
     console.error('[System] Failed to initialize 3D Store Scene:', err);
     logToConsole(`[System] 3D graphics initialization failed: ${err.message || err}. Falling back to 2D UI.`, 'system');
+    // Remote Play streams the 3D canvas; with no scene there is nothing to
+    // capture and this instance can never host. Falling back to the 2.5D DOM
+    // store is the right answer for a person sitting here, but a remote viewer
+    // sees only a black screen — so say what happened rather than leaving them
+    // on a "still booting" message that will never come true.
+    if (isRemoteInstance()) {
+      reportRemoteFatal(`The store server couldn’t start its 3D renderer: ${err?.message || err}`);
+    }
     hideBootOverlay();
   }
 }
@@ -3104,8 +3160,8 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
     } else {
       const jellyfinUrl = localStorage.getItem('jellyfin_url');
       const token = localStorage.getItem('jellyfin_token');
-      const userId = localStorage.getItem('jellyfin_userid');
-      const first = (jellyfinUrl && token && userId)
+      const userId = localStorage.getItem('jellyfin_userid') ?? '';
+      const first = (jellyfinUrl && token)
         ? await provider().fetchFirstEpisodeOfSeries(jellyfinUrl, sessionOf(token, userId), movie.id)
         : null;
       if (!first) {
@@ -3126,7 +3182,9 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
 
   const jellyfinUrl = localStorage.getItem('jellyfin_url');
   const token = localStorage.getItem('jellyfin_token');
-  const userId = localStorage.getItem('jellyfin_userid');
+  // Never a credential test — see the note on onFetchEpisodes. Carried so the
+  // Jellyfin provider can address /Users/<id>/..., empty on Plex by design.
+  const userId = localStorage.getItem('jellyfin_userid') ?? '';
 
   // Without a media-server endpoint there's nothing to stream into the webview
   // — fall back to the external player on the original file.
@@ -3141,7 +3199,7 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
   // back-room couch, an auto-advance step) fetches it once here.
   if (movie.isSeries) {
     let episodes = storeScene?.getSeriesEpisodes(movie.id) ?? null;
-    if (!episodes?.length && userId) {
+    if (!episodes?.length) {
       episodes = await provider().fetchSeriesEpisodes(jellyfinUrl, sessionOf(token, userId), movie.id);
     }
     seriesQueue = episodes?.length ? { seriesId: movie.id, episodes } : null;
@@ -3230,8 +3288,16 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
   // the player's own direct→HLS error fallback never has a chance to trigger.
   // Movies carry this info from the catalog sync (Fields=MediaSources); a
   // series episode (overrideItemId) isn't in the catalog, so probe it here.
+  // The `userId &&` that used to guard this probe skipped it on every Plex
+  // install, so a Plex EPISODE reached the direct-play decision with no
+  // container or codec information at all — exactly the blind spot the comment
+  // above warns about, and the audio would go silently missing. Plex doesn't
+  // use the user id here anyway (probeItemPlaybackInfo branches to
+  // fetchPlexItemPlaybackInfo, which takes only server/token/itemId), and the
+  // Jellyfin branch is unchanged because a Jellyfin install always has one —
+  // it also already returns undefined rather than throwing if the probe fails.
   const mediaInfo: MediaPlaybackInfo | undefined = overrideItemId
-    ? (userId ? await probeItemPlaybackInfo(jellyfinUrl, token, userId, playbackId) : undefined)
+    ? await probeItemPlaybackInfo(jellyfinUrl, token, userId, playbackId)
     : (version?.mediaPlaybackInfo ?? movie.mediaPlaybackInfo);
   // Codec hint for buildHlsStreamUrl: HEVC sources get hevc pass-through
   // (fMP4) when the webview can decode it; everything else stays on TS.
@@ -3898,6 +3964,13 @@ async function main() {
 
       if (ui.isPowerMenuOpen) {
         closePowerMenu();
+      } else if (isRemotelyDriven()) {
+        // A remote viewer sees the WebGL canvas and nothing else: the glass
+        // power menu is a DOM sibling of it, so P looked like a dead key from
+        // over there. The desk CRT is the same menu (same ids, same
+        // executePowerMenuAction) drawn INSIDE the scene, so it reaches them —
+        // and it docks its own camera, so there's no positional precondition.
+        openCounterTerminal();
       } else {
         openPowerMenu();
       }
@@ -4183,7 +4256,28 @@ async function main() {
   // before the boot call below, so the chosen mode is already settled and the
   // store builds it first time — no 3D scene raised only to be torn down.
   // Resolves immediately on hardware that's fine, which is every kiosk.
-  await runDeviceGate();
+  //
+  // EXCEPT inside a spawned Remote Play instance, where there is nobody at the
+  // screen to answer it: awaiting a modal no one can dismiss hangs the boot
+  // forever, and since the whole page exists to host a stream, every viewer is
+  // parked on "Store is still booting…" for as long as the instance lives.
+  // That is exactly what a GPU-less container does — no WebGL2, so the gate
+  // fires — and it is why Remote Play never loaded under Docker Desktop, which
+  // cannot pass a GPU into a container. Tell the viewer instead, and let the
+  // boot carry on (a scene that still can't build reports through the same
+  // channel from initializeStoreScene's catch).
+  if (isRemoteInstance()) {
+    if (detectGateReason() === 'no-webgl2') {
+      reportRemoteFatal(
+        'This store server has no GPU available, so it can’t render the 3D store for a '
+        + 'private session. In Docker, map a GPU into the container (devices: /dev/dri) — '
+        + 'Docker Desktop on Mac and Windows can’t. Otherwise open the store in a browser '
+        + 'on a machine with a display and turn Remote Play on: viewers then share that view.'
+      );
+    }
+  } else {
+    await runDeviceGate();
+  }
 
   // Check saved credentials and try connection in background (demo mode
   // skips the credential gate entirely and never shows the login overlay).

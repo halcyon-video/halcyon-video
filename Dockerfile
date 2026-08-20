@@ -20,7 +20,14 @@ WORKDIR /app
 # Chromium renders Remote Play private instances server-side; coturn relays
 # WebRTC for viewers the store can't reach directly (VPN / hostile NAT).
 # This layer is ~800MB — most of the image — and it's what makes
-# remote.html work out of the box on a headless server.
+# remote.html work on a headless server.
+#
+# Those private instances render the real 3D store, so they need a GPU mapped
+# into the container (`--device /dev/dri`, or the devices: block in
+# docker-compose.yml). Without one there is no WebGL in here at all and the
+# instance manager refuses with that reason rather than spawning a browser
+# that boots to nothing. Docker Desktop (macOS/Windows) can't map a GPU, so
+# there use the shared mirror from a browser on the host instead.
 RUN apk add --no-cache chromium coturn nss freetype harfbuzz ca-certificates ttf-freefont
 
 # Puppeteer is a devDependency for local visual tooling; skip its own

@@ -41,8 +41,19 @@ services:
       # Keep F8 feedback pins (in-app visual bug reports) on the host:
       # - ./feedback:/app/feedback
 
-    # Hardware GL + video encode for smoother Remote Play streams on an
-    # Intel/AMD box (otherwise Chromium renders on CPU):
+    # Hardware GL — REQUIRED for Remote Play "private instances" (the mode
+    # where the container itself renders a store per visitor). Those run the
+    # real 3D store in a headless Chromium, and a container with no GPU has no
+    # WebGL at all, so the store never builds and /remote.html can only report
+    # why. Uncomment on a Linux host with an Intel/AMD/NVIDIA render node; it
+    # also buys hardware video encode, which is what makes several
+    # simultaneous streams cheap.
+    #
+    # Docker Desktop on macOS and Windows cannot pass a GPU into its VM, so
+    # private instances are not available there — browse in a normal browser
+    # and use the SHARED MIRROR (Settings → Connection → Remote Play) to serve
+    # viewers from a machine that has a display. Everything else in the
+    # container (the store itself, the web UI, the seed) works regardless.
     # devices:
     #   - /dev/dri:/dev/dri
 
