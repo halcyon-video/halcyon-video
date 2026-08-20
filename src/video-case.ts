@@ -15,6 +15,10 @@ import { getRommConfig, authHeader } from './romm';
 import { drawTechSpecsTable, TECH_SPECS_TABLE_H } from './tech-specs';
 import { perfTrace, perfSlot } from './perf-trace';
 import { LruByteCache } from './lru-byte-cache';
+import { reflectionProbes, setReflectionProbes, onProbesReplaced } from './case-env-probes';
+// Re-exported so the probes keep their long-standing import site: three-scene
+// and store-stock have always reached them through this module.
+export { reflectionProbes, setReflectionProbes };
 import { getLowResFrontMaterial, disposeLowResFrontMaterials } from './hero-lowres-front';
 // The inspected case's front is decoded at 3x by its own module, which also owns
 // the shared badge stamper the poster queue above calls. Cycle is function-level
@@ -969,13 +973,19 @@ function caseMaterialLRUSet(key: string, mat: THREE.MeshStandardMaterial) {
   }
 }
 
-export let reflectionProbes: THREE.Texture[] = [];
 let plasticWrinkleNormalTex: THREE.Texture | null = null;
 let plasticSmudgeRoughnessTex: THREE.Texture | null = null;
 
-export function setReflectionProbes(probes: THREE.Texture[]) {
-  reflectionProbes = probes;
-}
+// These caches outlive a scene, so they are the ones whose envMap can be left
+// pointing at a disposed probe. See case-env-probes.ts for what goes wrong
+// without this (feedback/066: the clamshell and boxset render near-black).
+onProbesReplaced((repoint) => {
+  heroFaceMaterialCache.forEach(repoint);
+  caseMaterialLRU.forEach(repoint);
+  posterMaterialCache.forEach(repoint);
+  jellyfinSpineCache.forEach(repoint);
+  repoint(seriesBackPanel?.mat);
+});
 
 // Shrink-wrap crease normal map. This drives the *clearcoat* normal — the glossy
 // plastic film on top of the matte printed insert — so highlights ripple across

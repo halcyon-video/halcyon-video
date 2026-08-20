@@ -53,6 +53,7 @@ import {
   type CaseFinish,
 } from './video-case';
 import { isDiscoveryRequested } from './jellyseerr';
+import { onProbesReplaced } from './case-env-probes';
 import { uploadTextureNow } from './poster-textures';
 import { BB_ARCHIVO_BLACK } from './bundled-fonts';
 import type { DecodeMode } from './poster-worker';
@@ -178,6 +179,11 @@ interface HeroSlot {
 }
 
 let slot: HeroSlot | null = null;
+// The slot survives a scene, and its variantKey encodes the probe INDEX rather
+// than the probe itself — so a new generation at the same index would never
+// trigger a rebuild, and the inspected front would keep sampling a disposed
+// cube map and render unlit (see case-env-probes.ts).
+onProbesReplaced((repoint) => repoint(slot?.mat));
 // In-flight decode target. Compared against on completion so a fast browse
 // through several titles lands only the one still selected.
 let pending: string | null = null;

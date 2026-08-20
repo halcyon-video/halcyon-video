@@ -56,6 +56,7 @@ import {
   type CaseFinish,
 } from './video-case';
 import { uploadTextureNow, textureArrayManager } from './poster-textures';
+import { onProbesReplaced } from './case-env-probes';
 
 // The low-res thumbnails the decode worker produces (see video-case's decode
 // path, which stamps both tiers at these exact dimensions).
@@ -86,6 +87,11 @@ interface LowResEntry {
   cropped: THREE.Texture | null; // crop clone owns its own GL texture — dispose separately
 }
 const lowResFrontLRU = new Map<string, LowResEntry>();
+
+// These survive a scene, so a fresh probe generation has to be handed to them —
+// otherwise they sample a disposed cube map and render unlit (see
+// case-env-probes.ts).
+onProbesReplaced((repoint) => lowResFrontLRU.forEach((e) => repoint(e.mat)));
 
 function disposeEntry(e: LowResEntry) {
   if (e.cropped && e.cropped !== e.tex) e.cropped.dispose();
