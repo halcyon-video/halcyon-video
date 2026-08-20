@@ -1450,6 +1450,12 @@ export class StoreScene {
     this.bootstrapRoomEnv = null;
     this.generateReflectionProbes();
     this.buildAllMovieBoxes();
+    // #60: the poster layer shortfall (if any) is settled the instant
+    // buildAllMovieBoxes() returns (textureArrayManager.init() computes it
+    // straight off the catalog size, not off streaming progress) — but the
+    // counter's idle CRT already painted once, before this, showing no
+    // notice unconditionally. Repaint it now that the real number exists.
+    this.entrance?.refreshIdleTerminal();
     this.rebuildMovieBoxes();
     // A second bake with STOCKED shelves can't happen here: case instances are
     // placed asynchronously by animate()'s dirty-slot pass as posters stream in

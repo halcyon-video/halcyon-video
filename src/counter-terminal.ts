@@ -45,3 +45,21 @@ export function counterTerminalLines(ids: string[], selectedIndex: number): {
   // Two header rows precede the options, so the cursor tracks the selection.
   return { lines, cursorLine: 2 + selectedIndex };
 }
+
+// #60: the poster-layer budget (two DataArrayTexture banks — see
+// poster-textures.ts's POSTER_BANKS note) is a hard driver ceiling. A catalog
+// past it used to shelve titles with no cover art and no explanation — the
+// only signal was a console.warn nobody reads. This is the plain-language
+// version, for the idle CRT screen (entrance/index.ts's drawTerminal): a
+// pure formatter, like counterTerminalLines above, so it stays testable and
+// the harness can render it without booting main.ts. Returns [] when there
+// is no shortfall — a diagnostic that shows a scary number on every healthy
+// install is worse than the silence it replaced, so the caller should only
+// splice this in when it's non-empty.
+export function posterShortfallLines(shortfall: number, layerBudget: number): string[] {
+  if (shortfall <= 0) return [];
+  return [
+    `NOTICE: ${shortfall} TITLES HAVE NO COVER ART`,
+    `(YOUR GPU CAPS COVERS AT ${layerBudget} TITLES)`,
+  ];
+}
