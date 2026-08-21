@@ -33,7 +33,7 @@ let heroWasNRCase = false;
 // one redraw when the box is picked up, never one per keypress.
 let heroDetailKey: string | null = null;
 
-export function selectAction(scene: StoreScene): 'inspect' | 'play' | 'request' | 'launch' | 'genre-menu' | 'start-browsing' | 'take' | 'checkout' | null {
+export function selectAction(scene: StoreScene): 'inspect' | 'play' | 'request' | 'launch' | 'streaming' | 'genre-menu' | 'start-browsing' | 'take' | 'checkout' | null {
   // Browse cursor parked on a recommendation clasp: Enter calls the clerk
   // over. Handled before anything else, since the cursor is not on a movie
   // slot and every branch below assumes it is.
@@ -249,6 +249,13 @@ export function selectAction(scene: StoreScene): 'inspect' | 'play' | 'request' 
         return null;
       }
       return 'request';
+    }
+    // GH #86: a streaming-service title has no rental copy and nothing to
+    // request either -- it already exists, just not here. The same confirm
+    // press hands off to the service's page for it (main.ts's
+    // handleStreamingLaunch) instead of entering play/checkout/carry.
+    if (inspectedMovie?.streaming) {
+      return 'streaming';
     }
     // T18: a game title has no video to play -- renting it launches the
     // configured emulator (Tauri) or shows a counter toast (browser). See

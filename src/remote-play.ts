@@ -321,6 +321,26 @@ function signalSend(to: string, type: string, payload?: unknown): void {
   }).catch(() => { /* mailbox hiccup — viewer side retries */ });
 }
 
+// The engine's default send budget (~2.5 Mbps) plus the 'detail' content hint
+// (degrade by DROPPING FRAMES, never resolution) reads as a blocky slideshow
+// on a TV panel: the store is a full-screen 3D scene and a LAN carries far
+// more than the default. Ask for a real budget and balanced degradation so
+// the encoder scales a little of both axes before sacrificing either one
+// wholesale. Parameters live on the sender, so they survive the
+// replaceTrack() swaps playback does.
+const VIDEO_MAX_BITRATE = 12_000_000;
+const VIDEO_MAX_FRAMERATE = 60;
+function tuneVideoSender(sender: RTCRtpSender): void {
+  try {
+    const p = sender.getParameters();
+    p.degradationPreference = 'balanced';
+    if (!p.encodings || !p.encodings.length) p.encodings = [{}];
+    p.encodings[0].maxBitrate = VIDEO_MAX_BITRATE;
+    p.encodings[0].maxFramerate = VIDEO_MAX_FRAMERATE;
+    void sender.setParameters(p).catch(() => { /* advisory — defaults stand */ });
+  } catch { /* an engine without setParameters keeps its defaults */ }
+}
+
 /**
  * Capture the current scene's canvas (no frame-rate argument: frames are
  * produced exactly when the on-demand loop paints). A settings rebuild swaps
@@ -342,6 +362,7 @@ function ensureStream(): MediaStream | null {
     capturedCanvas = canvas;
     stats.canvasSwaps++;
     stats.lastCanvasSwapAt = Date.now();
+    updateCapturePacer(); // viewers may predate the (re)captured canvas
     // Never steer senders back to the canvas mid-film: stopPlaybackStream owns
     // that hand-back, and a settings rebuild during playback must not undo it.
     if (track && !playbackStream) {
@@ -512,15 +533,26 @@ async function createViewer(id: string): Promise<void> {
   const v: Viewer = { pc, videoSender: null, audioSender: null, dc: null };
   viewers.set(id, v);
   stats.viewers = viewers.size;
+  updateCapturePacer();
 
   // Joining mid-film gets the film, not a frozen store.
   const videoTrack = playbackVideoTrack() ?? stream.getVideoTracks()[0];
-  if (videoTrack) v.videoSender = pc.addTrack(videoTrack, stream);
+  if (videoTrack) {
+    v.videoSender = pc.addTrack(videoTrack, new MediaStream([videoTrack]));
+    tuneVideoSender(v.videoSender);
+  }
   if (!audioTrack) audioTrack = retailAudio.captureRemoteTrack();
-  // Same stream handle for both tracks so the viewer's ontrack sees one
-  // MediaStream carrying video + audio.
+  // SEPARATE stream handles per track, deliberately: tracks that share a
+  // MediaStream form an RTP sync group, and the receiver's lip-sync governor
+  // holds VIDEO to reconcile it with the continuous audio clock — measured at
+  // 470-1100 ms of receive buffer against this on-demand canvas (frames only
+  // when the store paints), which was the whole perceived input lag. Split
+  // streams carry no sync group; both tracks still leave one machine on one
+  // clock, so a film's lip alignment is bounded by the (near-zero) receive
+  // buffers. The viewer routes per track kind and never needed the combined
+  // stream anyway.
   const sendAudio = (playbackStream?.getAudioTracks()[0] ?? null) || audioTrack;
-  if (sendAudio) v.audioSender = pc.addTrack(sendAudio, stream);
+  if (sendAudio) v.audioSender = pc.addTrack(sendAudio, new MediaStream([sendAudio]));
 
   const dc = pc.createDataChannel('input', { ordered: true });
   v.dc = dc;
@@ -551,8 +583,36 @@ function dropViewer(id: string, sayBye: boolean): void {
   if (!v) return;
   viewers.delete(id);
   stats.viewers = viewers.size;
+  updateCapturePacer();
   try { v.pc.close(); } catch { /* already closed */ }
   if (sayBye) signalSend(id, 'bye');
+}
+
+// ─── Capture pacer ──────────────────────────────────────────────────────────
+//
+// The on-demand render loop emits capture frames in BURSTS (a glide paints,
+// then nothing), and a receiver fed bursts reads the gaps as network jitter —
+// its buffer was measured holding frames ~700 ms even with jitterBufferTarget
+// zeroed. While viewers are connected, tick requestFrame() at ~30 Hz so the
+// cadence is steady: re-emitting an UNCHANGED canvas costs the encoder almost
+// nothing (skip blocks), the scene is not re-rendered, and with no viewers
+// the timer is off — idle still costs nothing by construction.
+let capturePacer = 0;
+function updateCapturePacer(): void {
+  const want = viewers.size > 0 && !!canvasStream;
+  if (want && !capturePacer) {
+    capturePacer = window.setInterval(() => {
+      const track = canvasStream?.getVideoTracks()[0] as
+        | (MediaStreamTrack & { requestFrame?: () => void })
+        | undefined;
+      track?.requestFrame?.();
+    }, 33); // ~30 Hz: matches the software encoder's real throughput at this
+            // resolution — measured 60 Hz pacing QUEUED frames (349 ms buffer
+            // vs 230 ms) because the encoder can't drain that cadence
+  } else if (!want && capturePacer) {
+    clearInterval(capturePacer);
+    capturePacer = 0;
+  }
 }
 
 // ─── Input replay ───────────────────────────────────────────────────────────

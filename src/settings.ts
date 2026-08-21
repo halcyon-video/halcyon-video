@@ -36,6 +36,7 @@ import { loadMediaReleasePin, saveMediaReleasePin } from './media-release-date';
 import { formatUnlockLabel, makeRentalRecord, rentalCapacityAt } from './rental-clock';
 import { activeProviderKind } from './providers/provider-registry';
 import { topStudiosInLibrary } from './promo-campaigns';
+import { ALL_DEFAULT_STREAMING_SERVICES_CSV } from './streaming-catalog';
 import type { StoreScene } from './three-scene';
 import type { JellyfinLibrary } from './jellyfin';
 
@@ -1029,6 +1030,17 @@ export function registerCoreSettings(): void {
   cred('jellyseerr_url', 'Jellyseerr / Overseerr URL', 'text');
   cred('jellyseerr_apikey', 'Jellyseerr / Overseerr API Key', 'secret');
 
+  // Streaming-service sections' primary source (GH #86 follow-up, owner
+  // correction 2026-08-21): a direct TMDB key works with no Jellyseerr
+  // install at all -- see src/tmdb.ts + streaming-catalog.ts's
+  // resolveStreamingSource. Accepts either TMDB credential shape (a v3 key or
+  // a v4 read-access token; src/tmdb.ts tells them apart). Hidden alongside
+  // the bb_streaming_* rows below (no drawer UI yet -- same follow-up).
+  cred('tmdb_apikey', 'TMDB API Key', 'secret', {
+    hint: 'A v3 API key or v4 Read Access Token. Powers streaming-service sections directly, no Jellyseerr required.',
+    hidden: true,
+  });
+
   // Permanent release-date bounds on everything Jellyseerr SUGGESTS (discovery
   // shelves, staff-pick seeds, un-ordered collection gaps) — a static window
   // that does NOT move with the clock, unlike the terminal's rolling Media
@@ -1041,6 +1053,46 @@ export function registerCoreSettings(): void {
   cred('jellyseerr_suggest_until', 'Suggestions Until', 'text', {
     visibleWhen: seerrOn,
     hint: 'YYYY or YYYY-MM-DD. Never suggest titles released later. The Media Release Date pin still applies if tighter.',
+  });
+
+  // Streaming-service sections (GH #86): movies on subscriptions the owner
+  // actually has, sourced from TMDB watch-provider data — directly
+  // (src/tmdb.ts) when tmdb_apikey is set, via Jellyseerr
+  // (jellyseerr.ts's fetchStreamingMovies) as a fallback, or the bundled
+  // snapshot (streaming-snapshot.ts) with neither configured; see
+  // streaming-catalog.ts's resolveStreamingSource for the ladder.
+  //
+  // bb_streaming_services is the CHOICE itself (owner ruling 2026-08-21):
+  // blank means none chosen, which is a fresh LOCAL install's default — no
+  // streaming aisles, the opening-day empty store (#41) stands as-is until
+  // the setup terminal's STREAMING SERVICES step (store-setup-screens.ts)
+  // picks some. The HOSTED DEMO build (isDemoMode) defaults to the full
+  // eight instead, so a visitor's very first boot is already stocked — "a
+  // user should be able to click into a hosted site and it just works".
+  // Hidden (no drawer UI yet beyond the opening-day terminal): both rows
+  // still register so getSetting parses bb_streaming_enabled as a real
+  // boolean and both are reachable from SERVICE MODE / a direct localStorage
+  // or harness --set in the meantime.
+  registerSetting({
+    key: 'bb_streaming_enabled',
+    label: 'Streaming-service sections',
+    kind: 'toggle',
+    group: 'Connection',
+    default: true,
+    applyMode: 'rebuild-scene',
+    hint: 'Shelve watch-provider titles per streaming service. Off = no streaming aisles built.',
+    hidden: true,
+  });
+  registerSetting({
+    key: 'bb_streaming_services',
+    label: 'Streaming services',
+    kind: 'text',
+    group: 'Connection',
+    default: isDemoMode ? ALL_DEFAULT_STREAMING_SERVICES_CSV : '',
+    applyMode: 'rebuild-scene',
+    hint: 'Comma list of CHOSEN streaming services (Netflix, Prime Video, Disney+, Hulu, Max, Apple TV+, Paramount+, Peacock). Blank = none.',
+    hidden: true,
+    visibleWhen: () => getSetting<boolean>('bb_streaming_enabled'),
   });
 
   // Remote Play: stream this running store, peer-to-peer, to any browser on

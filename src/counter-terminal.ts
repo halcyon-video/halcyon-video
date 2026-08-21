@@ -6,7 +6,18 @@
 // This module is the part the 3D harness also needs (it boots StoreScene
 // without main.ts's DOM shell), so the row text lives here as pure data +
 // a pure formatter rather than inside main.ts.
-import { brandString } from './brand-pack';
+// Brand seam: the one branded row (CLOSE <BRAND> APP) reads through a late-
+// bound resolver instead of importing brand-pack, which drags DOM-flavored
+// modules behind it and would break this file's node-testability — the whole
+// reason the row text lives here (see header). brand-pack.ts installs the
+// real brandString at its module eval (it is loaded before any CRT draws);
+// until then, and in node tests, the fallback literal is the answer — which
+// is exactly brandString's own behavior with no pack loaded.
+type BrandStringResolver = (key: string, fallback: string) => string;
+let brandStringResolver: BrandStringResolver = (_key, fallback) => fallback;
+export function setBrandStringResolver(fn: BrandStringResolver): void {
+  brandStringResolver = fn;
+}
 
 // Short labels for the CRT. drawTerminal() in entrance/index.ts hard-clips each
 // line at 40 characters, and the "> " selection prefix eats two of them, so
@@ -20,7 +31,7 @@ export const COUNTER_TERMINAL_LABELS: Record<string, string> = {
   'btn-logout': 'CHANGE SERVER / LOG OUT',
   // Lazy: this object is built at module eval, long before the brand pack
   // has loaded, so the one branded row reads through a getter.
-  get 'btn-exit'() { return brandString('terminal-exit-label', 'CLOSE HALCYON APP'); },
+  get 'btn-exit'() { return brandStringResolver('terminal-exit-label', 'CLOSE HALCYON APP'); },
   // CRT-only row (not in the glass power menu): the diegetic door into the
   // SERVICE MODE settings page — the staff knobs hidden from the couch tree.
   'btn-service': 'MANAGER OVERRIDE (STAFF ONLY)',
@@ -44,6 +55,30 @@ export function counterTerminalLines(ids: string[], selectedIndex: number): {
   });
   // Two header rows precede the options, so the cursor tracks the selection.
   return { lines, cursorLine: 2 + selectedIndex };
+}
+
+// #77: drawTerminal (entrance/index.ts) seats the body between the title bar
+// and the pinned footer — ~10 rows at the default 1.24 leading — and the
+// manager menu's full ring is 12 rows. Its old maxLines slice() dropped the
+// overflow silently, so MANAGER OVERRIDE and RETURN TO STORE simply never
+// rendered. This picks the row pitch instead: the default when everything
+// fits, else tightened toward 1.0 leading (fontPx — authentic text-mode
+// density) so the whole list seats before anything is clipped. maxLines
+// still comes back for the caller's loud-clip path (a list too long even at
+// the floor pitch). Pure math so the node tests can pin the real 1024x768
+// geometry against the real ring lengths.
+export function fitTerminalPitch(
+  lineCount: number,
+  defaultLineH: number,
+  fontPx: number,
+  bodySpan: number,
+): { lineH: number; maxLines: number } {
+  let lineH = defaultLineH;
+  if ((lineCount + 0.4) * lineH > bodySpan) {
+    lineH = Math.max(fontPx, Math.floor(bodySpan / (lineCount + 0.4)));
+  }
+  const maxLines = Math.max(1, Math.floor(bodySpan / lineH - 0.4));
+  return { lineH, maxLines };
 }
 
 // #60: the poster-layer budget (two DataArrayTexture banks — see

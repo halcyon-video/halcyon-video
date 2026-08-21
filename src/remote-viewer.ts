@@ -9,6 +9,8 @@
 // old laptop — the whole point of server-side rendering the store.
 
 import { installTouchControls, isTouchPrimary } from './remote-touch';
+import { installTvControls, isTvViewer } from './remote-tv';
+import { installGamepadForwarding } from './remote-gamepad';
 
 const video = document.getElementById('screen') as HTMLVideoElement;
 const stage = document.getElementById('stage') as HTMLDivElement;
@@ -261,8 +263,29 @@ async function onOffer(sdp: string) {
   diag.offerAt = Date.now();
   pc = new RTCPeerConnection({ iceServers, iceTransportPolicy: forceRelay ? 'relay' : 'all' });
   pc.ontrack = (ev) => {
-    const stream = ev.streams[0] ?? new MediaStream([ev.track]);
-    if (video.srcObject !== stream) video.srcObject = stream;
+    // Interactive stream: decode as soon as frames arrive. The default
+    // jitter buffer trades latency for smoothness, which reads as input lag
+    // when every frame is a response to a keypress.
+    try {
+      const r = ev.receiver as unknown as { jitterBufferTarget?: number; playoutDelayHint?: number };
+      if ('jitterBufferTarget' in r) r.jitterBufferTarget = 0;
+      if ('playoutDelayHint' in r) r.playoutDelayHint = 0;
+    } catch { /* advisory knobs — absent engines keep their defaults */ }
+    // Play the tracks through SEPARATE elements. In one element, lip-sync
+    // OVERRIDES the zeroed jitter buffer: the store's audio bus is a
+    // continuous clock while canvas frames arrive only when the on-demand
+    // loop paints, and the sync governor reconciles them by holding video —
+    // measured at 470-1100 ms behind live on a 0 ms localhost link, which is
+    // the whole perceived input lag. Split, video plays as it decodes and
+    // the SFX bus keeps its own (imperceptible) buffer. Film playback
+    // arrives via replaceTrack on the same receivers, so this split holds
+    // mid-film; lip-sync inside the film costs at most the same few frames.
+    if (ev.track.kind === 'video') {
+      video.srcObject = new MediaStream([ev.track]);
+    } else {
+      audioSink.srcObject = new MediaStream([ev.track]);
+      void audioSink.play().catch(() => { /* gesture-gated — unmute() retries */ });
+    }
   };
   pc.ondatachannel = (ev) => {
     dc = ev.channel;
@@ -468,16 +491,51 @@ window.addEventListener('pagehide', () => {
 const dcOpen = () => !!dc && dc.readyState === 'open';
 function sendInput(msg: unknown) {
   if (!dcOpen()) return;
+  // Congestion guard: the channel is ordered and reliable, so a network stall
+  // queues everything and then applies it in a burst — the classic remote-play
+  // rubber band. Key REPEATS are droppable by definition (downs, ups and taps
+  // are not); shedding them while the buffer is backed up turns a burst of
+  // stale steps into none.
+  const m = msg as { t?: string; repeat?: boolean };
+  if (m.t === 'key' && m.repeat && dc!.bufferedAmount > 2048) return;
   try { dc!.send(JSON.stringify(msg)); } catch { /* channel died mid-send */ }
 }
 
+// The audio sink: its own element so the video element never has an audio
+// track to lip-sync against (see ontrack). Muted until the first gesture,
+// like the video used to be.
+const audioSink = new Audio();
+audioSink.autoplay = true;
+audioSink.muted = true;
+
 // The stream arrives muted (autoplay policy); the first real gesture unmutes.
 function unmute() {
-  if (video.muted) {
-    video.muted = false;
-    void video.play().catch(() => { /* still blocked — stays muted */ });
+  if (audioSink.muted) {
+    audioSink.muted = false;
+    void audioSink.play().catch(() => { /* still blocked — stays muted */ });
   }
 }
+
+// A TV browser drives with the remote: BACK becomes the store's back action,
+// the media keys join the store's vocabulary, MENU recalls the legend
+// (src/remote-tv.ts). Everything it sends is an ordinary key message.
+const tvControls = isTvViewer()
+  ? installTvControls({
+      sendKey: (key, code, down, repeat) => {
+        unmute();
+        sendInput({ t: 'key', et: down ? 'down' : 'up', key, code, repeat });
+      },
+      toggleHint,
+    })
+  : null;
+
+// A controller paired to THIS device (a TV especially — see remote-gamepad.ts)
+// forwards as ordinary key messages in every mode.
+installGamepadForwarding({
+  sendKey: (key, code, down, repeat) =>
+    sendInput({ t: 'key', et: down ? 'down' : 'up', key, code, repeat }),
+  unmute,
+});
 
 // Keys whose page default (scrolling, find-as-you-type, back-nav) must not
 // fire under the store's controls.
@@ -485,6 +543,16 @@ const PREVENT = new Set(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' ',
 
 window.addEventListener('keydown', (e) => {
   if (e.ctrlKey || e.metaKey || e.altKey) return; // leave browser chords alone
+  if (tvControls) {
+    const m = tvControls.mapKey(e);
+    if (m === 'hint') { e.preventDefault(); toggleHint(); return; } // viewer-local
+    if (m) {
+      e.preventDefault();
+      unmute();
+      sendInput({ t: 'key', et: 'down', key: m.key, code: m.code, repeat: e.repeat });
+      return;
+    }
+  }
   if (e.key === 'l' || e.key === 'L') { toggleMouseLook(); return; } // viewer-local
   // Also viewer-local, and unclaimed by the store's key vocabulary
   // (a d w s e q f c r x p / + arrows/Enter/Space/Esc/Backspace).
@@ -495,6 +563,14 @@ window.addEventListener('keydown', (e) => {
 });
 window.addEventListener('keyup', (e) => {
   if (e.ctrlKey || e.metaKey || e.altKey) return;
+  if (tvControls) {
+    const m = tvControls.mapKey(e);
+    if (m === 'hint') return;
+    if (m) {
+      sendInput({ t: 'key', et: 'up', key: m.key, code: m.code });
+      return;
+    }
+  }
   if (e.key === 'l' || e.key === 'L') return;
   if (e.key === 'h' || e.key === 'H' || e.key === '?') return;
   sendInput({ t: 'key', et: 'up', key: e.key, code: e.code });
@@ -563,7 +639,7 @@ stage.addEventListener('click', (e) => {
 // don't have and a pointer lock iOS Safari won't grant (src/remote-touch.ts).
 // Everything it sends is an ordinary key/look message, so the host is unaware
 // there's a phone on the other end.
-if (isTouchPrimary()) {
+if (!tvControls && isTouchPrimary()) {
   installTouchControls({
     stage,
     sendKey: (key, code, down, repeat) =>
@@ -592,10 +668,59 @@ if (isTouchPrimary()) {
     // display:none parent still computes 'inline', and the legend's own
     // hidden state is opacity, which keeps its rects — so this reports the
     // one variant actually laid out, in either state.
-    const shown = [...hintEl.querySelectorAll('.kb, .tt')]
+    const shown = [...hintEl.querySelectorAll('.kb, .tt, .tvl')]
       .filter((el) => el.getClientRects().length > 0)
       .map((el) => (el.textContent ?? '').replace(/\s+/g, ' ').trim());
     return { visible: hintShown, playing: document.body.classList.contains('playing'), text: shown.join(' | ') };
+  },
+  // Inbound video numbers for the stream-quality probe: fps/resolution as the
+  // decoder sees them, plus cumulative counters the caller can delta.
+  stats: async () => {
+    if (!pc) return null;
+    const report = await pc.getStats();
+    let video: any = null;
+    let rtt: number | null = null;
+    const codecs = new Map<string, string>();
+    report.forEach((s: any) => {
+      if (s.type === 'codec') codecs.set(s.id, s.mimeType);
+      if (s.type === 'inbound-rtp' && s.kind === 'video') video = s;
+      if (s.type === 'candidate-pair' && s.state === 'succeeded' && s.nominated) {
+        rtt = s.currentRoundTripTime ?? null;
+      }
+    });
+    if (!video) return null;
+    return {
+      fps: video.framesPerSecond ?? null,
+      width: video.frameWidth ?? null,
+      height: video.frameHeight ?? null,
+      framesDecoded: video.framesDecoded ?? 0,
+      framesDropped: video.framesDropped ?? 0,
+      bytesReceived: video.bytesReceived ?? 0,
+      // Cumulative: delta these two for average buffered ms per frame.
+      jitterBufferDelay: video.jitterBufferDelay ?? 0,
+      jitterBufferEmittedCount: video.jitterBufferEmittedCount ?? 0,
+      rttMs: rtt === null ? null : Math.round(rtt * 1000),
+      codec: codecs.get(video.codecId) ?? null,
+      timestamp: video.timestamp,
+      // What the latency knob actually reads back as, per receiver.
+      receivers: pc.getReceivers().map((r) => ({
+        kind: r.track?.kind ?? '?',
+        jitterBufferTarget: (r as any).jitterBufferTarget ?? null,
+        playoutDelayHint: (r as any).playoutDelayHint ?? null,
+      })),
+    };
+  },
+  // TV mode: the active flag plus the pure key mapping, so the rig can assert
+  // both without a WebRTC session on the wire.
+  get tv() {
+    return {
+      active: !!tvControls,
+      map: (key: string): string | null => {
+        if (!tvControls) return null;
+        const m = tvControls.mapKey(new KeyboardEvent('keydown', { key }));
+        return m === 'hint' ? 'hint' : (m ? m.key : null);
+      },
+    };
   },
   // Connection diagnostics: candidate flavours each side offered, live ICE
   // state, and the best-guess cause when a connection stalls.

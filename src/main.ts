@@ -34,6 +34,7 @@ import {
 import {
   directStreamUrl,
   transcodeStreamUrl,
+  transcodeStreamUrlSync,
   probeItemPlaybackInfo,
   playbackIsDirectSafe,
   playbackStarted,
@@ -50,10 +51,14 @@ import {
   requestMovie,
   isDiscoveryRequested,
   getJellyseerrConfig,
-  pingJellyseerr
+  pingJellyseerr,
+  fetchStreamingMovies,
 } from './jellyseerr';
 import { fetchGames, launchGame } from './romm';
 import { isGamesOnly, storeCatalog } from './games-only';
+import { buildStreamingLibraries, resolveEnabledServices, resolveStreamingSource } from './streaming-catalog';
+import { fetchStreamingMoviesFromTmdb, getTmdbConfig } from './tmdb';
+import { fetchStreamingMoviesFromSnapshot } from './streaming-snapshot';
 import { isMembershipPickerOpen } from './membership-cards';
 import {
   initBootFlow,
@@ -151,6 +156,16 @@ let discoveryMovies: Movie[] = [];
 // section -- see romm.ts. Stays [] if Romm isn't configured/reachable, same
 // never-block-boot treatment as the Jellyseerr lists above.
 let gameMovies: Movie[] = [];
+// GH #86: streaming-service titles from TMDB watch-provider data, straight
+// from TMDB (tmdb.ts) or via Jellyseerr as a fallback (see
+// streaming-catalog.ts's resolveStreamingSource). Stays [] if neither source
+// is configured/reachable or the master switch is off, same never-block-boot
+// treatment as the other Jellyseerr-adjacent lists above.
+let streamingMovies: Movie[] = [];
+/** `true` unless the owner switched streaming sections off (default ON). */
+function streamingEnabled(): boolean {
+  return getSetting<boolean>('bb_streaming_enabled') !== false;
+}
 // What the STORE is built from, as opposed to what was fetched. Normally these
 // alias librariesList/gameMovies exactly; with GAMES ONLY on (games-only.ts)
 // the Romm platforms stand in as the libraries and the game department empties,
@@ -166,16 +181,26 @@ let storeComingSoon: Movie[] = [];
 let storeDiscovery: Movie[] = [];
 function refreshStoreCatalog() {
   const catalog = storeCatalog(librariesList, gameMovies);
+  // GH #86: one synthetic library per streaming service with surviving stock,
+  // appended after games-only's own library swap so a streaming aisle can
+  // stand alongside either the real libraries or (unusually) a games-only
+  // floor plan. Built fresh every call (cheap — capped at ~24 titles/service)
+  // rather than cached, so toggling the master switch off and back on without
+  // a re-fetch still reflects the current setting immediately.
+  const streamingLibs = streamingEnabled()
+    ? buildStreamingLibraries(streamingMovies, resolveEnabledServices(getSetting<string>('bb_streaming_services')))
+    : [];
+  const mergedLibraries = [...catalog.libraries, ...streamingLibs];
   // Per-library toggles (#41 Store Libraries / #39 Overhead TVs) register
   // here — the one funnel that sees every catalog, login, demo and rebuild
   // alike. The drawer builds its pages at open time, so late registration is
-  // enough. Synthetic games-only "libraries" are platforms, not libraries.
-  registerLibraryToggles(catalog.libraries.filter((l) => !l.games).map((l) => ({ id: l.id, name: l.name })));
+  // enough. Synthetic games-only/streaming "libraries" aren't real libraries.
+  registerLibraryToggles(mergedLibraries.filter((l) => !l.games && !l.streaming).map((l) => ({ id: l.id, name: l.name })));
   // Media Release Date pin (#42): everything premiering after the rolling
   // cutoff is absent from the store entirely. Filtered COPIES of the fetched
   // lists — clearing the pin is a rebuild, never a re-sync.
   const cutoff = activeMediaCutoff();
-  storeLibraries = cutoff ? filterLibrariesByCutoff(catalog.libraries, cutoff) : catalog.libraries;
+  storeLibraries = cutoff ? filterLibrariesByCutoff(mergedLibraries, cutoff) : mergedLibraries;
   storeGameMovies = cutoff ? filterMoviesByCutoff(catalog.games, cutoff) : catalog.games;
   storeComingSoon = cutoff ? filterMoviesByCutoff(comingSoonMovies, cutoff) : comingSoonMovies;
   storeDiscovery = cutoff ? filterMoviesByCutoff(discoveryMovies, cutoff) : discoveryMovies;
@@ -209,6 +234,89 @@ let storeScene: StoreScene | null = null;
 let videoPlayer: VideoPlayer | null = null;
 // WebGL context died during playback; reload when the player closes (issue #70).
 let pendingContextLostReload = false;
+
+// Bounded-retry bookkeeping for a context loss that hits DURING boot/rebuild
+// (storeScene is null the whole time the store is being built — see
+// installContextLossRecovery below). sessionStorage, not a module variable,
+// because the recovery for a boot-time loss IS a reload — the counter has to
+// survive that reload to ever notice a repeating cause. Cleared once a boot
+// actually finishes so an old, fully-recovered loss never eats into a later,
+// unrelated one's budget.
+const BOOT_CONTEXT_LOSS_KEY = 'bb_boot_context_loss_attempts';
+const BOOT_CONTEXT_LOSS_MAX_ATTEMPTS = 3;
+// Set once a boot-time loss exceeds the bound above and this run stops
+// retrying. texturesReadyPromise tracks DECODE, not GPU upload (see its
+// resolution in initializeStoreScene) — image decode keeps running on the CPU
+// even with the GPU context dead and preventDefault()ed, and on the demo's
+// small, browser-cached poster set it can still finish and resolve that
+// promise seconds later. Without this flag that resolution would go on to
+// call hideBootOverlay() anyway, silently swapping the give-up message for a
+// "ready" store that can't actually render anything — the exact blank-canvas
+// failure this fix exists to prevent, just delayed instead of immediate.
+let contextLossGaveUp = false;
+
+/**
+ * WebGL context-loss recovery for the store canvas, wired ONCE per canvas
+ * (a fresh canvas is born with every `new StoreScene(...)` — cold boot and
+ * every settings rebuild alike, see initializeStoreScene). On a 24/7 kiosk
+ * the GPU context can be lost (driver reset, GPU hang, VRAM pressure) at any
+ * point in the store's life, including the heaviest GPU window there is: the
+ * boot/rebuild texture load itself. That window used to have NO listener at
+ * all (it was installed only after texturesReadyPromise resolved), so a loss
+ * there left a permanently blank, dead canvas with nothing watching it and
+ * nothing on screen to explain why (issue #78). Registering here, right
+ * after the canvas exists, closes that gap; everything after boot keeps the
+ * behaviour issue #70 already established (defer the reload past an active
+ * movie), unified into this one handler instead of a second competing one.
+ */
+function installContextLossRecovery(canvas: HTMLCanvasElement) {
+  canvas.addEventListener('webglcontextlost', (event) => {
+    // Without this, the browser treats the loss as permanent and never fires
+    // webglcontextrestored — reload is the only escape either way, but a
+    // future GPU-side recovery (or three.js's own restore path) needs this
+    // call to even be possible.
+    event.preventDefault();
+
+    if (!storeScene) {
+      // Still booting or rebuilding: texturesReadyPromise hasn't resolved
+      // (storeScene is set only once it has — see initializeStoreScene), so
+      // there is no scene to fall back on and no movie that could be
+      // playing. A transient loss here is worth a couple of automatic
+      // retries, but a DETERMINISTIC cause (a broken video decoder, a GPU
+      // that can't actually run this app) must not turn into an endless
+      // reload loop — bound it and say so on screen instead.
+      const attempts = Number(sessionStorage.getItem(BOOT_CONTEXT_LOSS_KEY) || '0') + 1;
+      sessionStorage.setItem(BOOT_CONTEXT_LOSS_KEY, String(attempts));
+      if (attempts > BOOT_CONTEXT_LOSS_MAX_ATTEMPTS) {
+        contextLossGaveUp = true;
+        logToConsole(
+          `[System] WebGL context lost during startup (attempt ${attempts}) — giving up after ${BOOT_CONTEXT_LOSS_MAX_ATTEMPTS} retries. `
+          + 'Close and reopen Halcyon, or restart this device, to try again.',
+          'system'
+        );
+        return;
+      }
+      logToConsole(`[System] WebGL context lost during startup (attempt ${attempts}/${BOOT_CONTEXT_LOSS_MAX_ATTEMPTS}) — restarting...`, 'system');
+      setTimeout(() => location.reload(), 1000);
+      return;
+    }
+
+    if (ui.isPlaybackActive) {
+      // Don't interrupt the movie — but re-arm the reload so the store
+      // doesn't come back as a permanently dead context when playback
+      // ends (the player's onClose checks this flag). Issue #70.
+      pendingContextLostReload = true;
+      logToConsole('[System] WebGL context lost during playback — reload deferred to playback end.', 'system');
+      return;
+    }
+    logToConsole('[System] WebGL context lost — restarting front-end...', 'system');
+    setTimeout(() => location.reload(), 1000);
+  });
+
+  canvas.addEventListener('webglcontextrestored', () => {
+    logToConsole('[System] WebGL context restored.', 'system');
+  });
+}
 
 /**
  * Fetch Jellyseerr's coming-soon titles without ever letting a failure there
@@ -248,6 +356,45 @@ async function loadDiscoveryMovies(): Promise<void> {
   } catch (e) {
     console.warn('[Jellyseerr] Failed to load discovery titles:', e);
     discoveryMovies = [];
+  }
+}
+
+/**
+ * GH #86: fetch the CHOSEN streaming services' watch-provider stock, same
+ * never-block-boot treatment as the other Jellyseerr loaders. A no-op — []
+ * without a single request — while the master switch is off, or while
+ * nothing is chosen (bb_streaming_services blank -- a fresh local install's
+ * default, owner ruling 2026-08-21), so neither costs anything extra.
+ *
+ * Source ladder: a direct TMDB key (tmdb_apikey) is a full replacement
+ * source, not icing on Jellyseerr — it wins when both are configured (see
+ * streaming-catalog.ts's resolveStreamingSource for why), Jellyseerr is the
+ * fallback, and neither configured falls back to the bundled snapshot
+ * (streaming-snapshot.ts) — the floor of the ladder, so a chosen service
+ * ALWAYS stocks, including the hosted demo and a bare local install with
+ * nothing set up at all.
+ */
+async function loadStreamingMovies(): Promise<void> {
+  if (!streamingEnabled()) {
+    streamingMovies = [];
+    return;
+  }
+  const servicesOverride = getSetting<string>('bb_streaming_services');
+  if (resolveEnabledServices(servicesOverride).length === 0) {
+    streamingMovies = []; // nothing chosen -- no network round trip needed
+    return;
+  }
+  const TIMEOUT_MS = 15_000;
+  const timeoutPromise = new Promise<Movie[]>((resolve) => setTimeout(() => resolve([]), TIMEOUT_MS));
+  const source = resolveStreamingSource(!!getTmdbConfig(), !!getJellyseerrConfig());
+  const fetchPromise = source === 'tmdb' ? fetchStreamingMoviesFromTmdb(servicesOverride)
+    : source === 'jellyseerr' ? fetchStreamingMovies(servicesOverride)
+    : fetchStreamingMoviesFromSnapshot(servicesOverride);
+  try {
+    streamingMovies = await Promise.race([fetchPromise, timeoutPromise]);
+  } catch (e) {
+    console.warn('[Streaming] Failed to load streaming-service titles:', e);
+    streamingMovies = [];
   }
 }
 
@@ -2526,8 +2673,29 @@ async function initializeStoreScene(preservePosterCache = false) {
     await calibrateQualityIfNeeded();
 
     const { StoreScene } = await import('./three-scene');
+    // The constructor below is one uninterrupted stretch of main thread — floor
+    // plan, every fixture, every case, and the first bind of each shader
+    // program — and nothing on screen can change until it returns. Measured at
+    // 9.5s for a 6000-title catalog on a fast desktop GPU, and the shader links
+    // in it are far slower on integrated graphics. So name the wait BEFORE
+    // entering it: this line is the last thing the boot log can say for a
+    // while, and silence here is what makes a slow open look like a hang.
+    const plannedTitles = storeLibraries.reduce((n, l) => n + l.movies.length, 0);
+    logToConsole(`[System] Planning the store floor for ${plannedTitles} title(s)...`, 'system');
     const scene = new StoreScene(canvasContainer, storeLibraries, logToConsole, jfUrl, jfToken, storeComingSoon, storeDiscovery, storeGameMovies, staffPicks);
     armQualityBackstop();
+    // A fresh attempt is underway — any earlier give-up no longer applies (it
+    // could only be reached again via a brand-new page load, which is a fresh
+    // JS environment anyway, or a rebuild the user triggered by hand).
+    contextLossGaveUp = false;
+    // Wire context-loss recovery the moment the canvas exists — long before
+    // the texture load below even starts, let alone finishes. See
+    // installContextLossRecovery for why this can't wait for
+    // texturesReadyPromise. The scene constructor above always builds a
+    // fresh canvas (three-scene.ts appends it in its own constructor), so
+    // this fires on every boot AND every rebuild.
+    const glCanvas = canvasContainer.querySelector('canvas');
+    if (glCanvas) installContextLossRecovery(glCanvas);
 
     let lastLoggedPct = -1;
     scene.onTextureLoadProgress = (loaded, total) => {
@@ -2589,6 +2757,8 @@ async function initializeStoreScene(preservePosterCache = false) {
         else if (choice === 'dismiss') handleGapDismiss();
       } else if (action === 'launch' && movie) {
         await handleGameLaunch(movie);
+      } else if (action === 'streaming' && movie) {
+        handleStreamingLaunch(movie);
       }
     };
 
@@ -2714,7 +2884,20 @@ async function initializeStoreScene(preservePosterCache = false) {
     logToConsole('[System] Loading store textures...', 'system');
 
     scene.texturesReadyPromise.then(() => {
+      if (contextLossGaveUp) {
+        // A boot-time context loss already exhausted its retries and put the
+        // give-up message on screen (see installContextLossRecovery) — decode
+        // finishing later doesn't change that the GPU context is still dead,
+        // so don't swap that message for a "ready" reveal nothing can render.
+        logToConsole('[System] Textures finished decoding after the context-loss give-up — staying on the error message rather than revealing an unrenderable store.', 'system');
+        return;
+      }
       storeScene = scene;
+      // The boot/rebuild that just finished got past every texture upload
+      // without a context loss (or recovered from one) — a fully separate,
+      // later loss shouldn't inherit whatever was left of this run's retry
+      // budget. See installContextLossRecovery.
+      sessionStorage.removeItem(BOOT_CONTEXT_LOSS_KEY);
       // There is a canvas to capture again, so any "can never host" this store
       // reported earlier (2.5D, a renderer that threw) has stopped being true —
       // without this, switching a kiosk to 2D and back would leave Remote Play
@@ -2760,27 +2943,6 @@ async function initializeStoreScene(preservePosterCache = false) {
       // You've just come in through the doors — ring the entry chime. (May stay
       // silent if the browser hasn't seen a user gesture yet; that's fine.)
       scene.playDoorChime();
-
-      // WebGL context-loss recovery. On a 24/7 kiosk the GPU context can be
-      // lost (driver reset, GPU hang, VRAM pressure). Without handling this the
-      // scene silently freezes/blanks forever. We can't cheaply restore all GPU
-      // resources, so the simplest robust recovery is a full front-end reload.
-      // Skip the auto-reload during active playback so we don't interrupt a
-      // movie for a transient loss the player itself may survive.
-      const glCanvas = canvasContainer.querySelector('canvas');
-      glCanvas?.addEventListener('webglcontextlost', (event) => {
-        event.preventDefault();
-        if (ui.isPlaybackActive) {
-          // Don't interrupt the movie — but re-arm the reload so the store
-          // doesn't come back as a permanently dead context when playback
-          // ends (the player's onClose checks this flag). Issue #70.
-          pendingContextLostReload = true;
-          logToConsole('[System] WebGL context lost during playback — reload deferred to playback end.', 'system');
-          return;
-        }
-        logToConsole('[System] WebGL context lost — restarting front-end...', 'system');
-        setTimeout(() => location.reload(), 1000);
-      });
     });
 
   } catch (err: any) {
@@ -2798,7 +2960,39 @@ async function initializeStoreScene(preservePosterCache = false) {
   }
 }
 
+/**
+ * Resolve once the browser has actually PAINTED a frame — two rAFs, because
+ * the first callback runs before that frame's paint and the second only fires
+ * after it. Raced against a short timer: rAF is throttled to a standstill in a
+ * hidden tab (the kiosk's own host tab, among others), and a boot that waits
+ * for a frame that never comes would be a worse bug than the one this fixes.
+ */
+function nextPaintedFrame(timeoutMs = 250): Promise<void> {
+  return new Promise((resolve) => {
+    let settled = false;
+    const done = () => { if (!settled) { settled = true; resolve(); } };
+    setTimeout(done, timeoutMs);
+    requestAnimationFrame(() => requestAnimationFrame(done));
+  });
+}
+
 async function waitForFontsAndInit() {
+  // Let the boot overlay reach the screen before anything long-running starts.
+  // Every caller (openStore, enterOpeningDay, the demo) raises the overlay and
+  // hands straight to this function, and on a warm cache each await below can
+  // settle without the browser ever getting a rendering opportunity — so the
+  // `visible` class was set but never painted, and the store build's long
+  // synchronous stretch began with the PREVIOUS frame still on screen. At
+  // catalog scale that stretch is ~10s of dead thread (measured, 6000-title
+  // library, fast desktop GPU), and what stays up through it is whatever the
+  // counter CRT last painted: the CATALOG SYNC readout, frozen mid-sync. It is
+  // indistinguishable from a crash, and it is what a #help report described as
+  // "stuck on this page for about an hour" — see
+  // tickets/catalog-scale-2026-08-20.md. Pairs with showBootOverlay(), which
+  // raises the overlay without its fade so this one frame shows it at full
+  // opacity rather than 2% of the way in. Debug-only override, never surfaced
+  // in Settings, kept for the A/B that proved it: bb_debug_no_boot_paint=1.
+  if (!localStorage.getItem('bb_debug_no_boot_paint')) await nextPaintedFrame();
   if (document.fonts) {
     try {
       // Explicitly wait for the display face used in canvas texture rendering.
@@ -2986,6 +3180,27 @@ async function handleGameLaunch(movie: Movie) {
     logToConsole(`[System] "${movie.title}" is ready — take it to the counter to play (emulator launch is only available in the desktop app).`, 'system');
   } else {
     logToConsole(`[System] Couldn't launch "${movie.title}" — check the Romm launch command in settings.`, 'system');
+  }
+}
+
+// ─── GH #86: streaming-service titles -> hand off to the service ───────────
+/**
+ * The streaming-section equivalent of "play": there is no local copy to
+ * stream, so selecting the case opens the service's own page for the title in
+ * a new tab/window instead — never checkout, never a bag, never the player.
+ * Never throws; a title synthesized without a link (shouldn't happen —
+ * synthesizeStreamingMovie always sets one) just logs and does nothing.
+ */
+function handleStreamingLaunch(movie: Movie) {
+  if (!movie.streamingUrl) {
+    logToConsole(`[System] "${movie.title}" has no streaming link.`, 'system');
+    return;
+  }
+  logToConsole(`[System] Opening ${movie.streamingServiceName || 'the streaming service'} for "${movie.title}"...`, 'system');
+  try {
+    window.open(movie.streamingUrl, '_blank', 'noopener');
+  } catch {
+    logToConsole(`[System] Couldn't open the link for "${movie.title}" (popup blocked?).`, 'system');
   }
 }
 
@@ -3371,13 +3586,23 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
   // server-side — either forces the HLS transcode path. Text subtitles no
   // longer do.
   const directPlayable = playbackIsDirectSafe(mediaInfo) && initialAudioIndex === undefined && burnInSubtitleIndex === undefined;
-  const hlsSrc = transcodeStreamUrl(jellyfinUrl, token, playbackId, {
-    sourceVideoCodec,
-    mediaSourceId,
-    audioStreamIndex: initialAudioIndex,
-    subtitleStreamIndex: burnInSubtitleIndex,
-    startPositionTicks: resumeTicks || undefined,
-  });
+  let hlsSrc: string;
+  try {
+    hlsSrc = await transcodeStreamUrl(jellyfinUrl, token, playbackId, {
+      sourceVideoCodec,
+      mediaSourceId,
+      audioStreamIndex: initialAudioIndex,
+      subtitleStreamIndex: burnInSubtitleIndex,
+      startPositionTicks: resumeTicks || undefined,
+    });
+  } catch (e: any) {
+    // On Plex this is where a failed /decision pre-flight surfaces (#76) —
+    // the real playback error, not a bare hls.js 400 the player would
+    // otherwise have to guess the cause of.
+    logToConsole(`[Video] Could not start "${movie.title}": ${e?.message ?? e}`, 'video');
+    ui.isPlaybackActive = false;
+    return;
+  }
   const hevcCopy = isHevcPassThroughEnabled() && (sourceVideoCodec === 'hevc' || sourceVideoCodec === 'h265');
   const mediaInfoSummary =
     `container=${mediaInfo?.container ?? 'unknown'} video=${mediaInfo?.videoCodec ?? 'unknown'} ` +
@@ -3387,8 +3612,9 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
     `[Video] Streaming "${movie.title}"${version ? ` [${version.label}]` : ''} in-app (${directPlayable ? 'direct play' : `HLS, hevc pass-through ${hevcCopy ? 'on' : 'off'}`}): ${mediaInfoSummary}.`,
     'video',
   );
-  // Last gate before the player exists: the media-info fetch above is another
-  // await the background token check can land inside.
+  // Last gate before the player exists: the media-info fetch and the stream
+  // URL build above are more awaits the background token check can land
+  // inside.
   if (sessionLost()) { ui.isPlaybackActive = false; return; }
 
   // Fire-and-forget: awaiting here would sever the user-gesture chain before
@@ -3433,7 +3659,7 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
     // dismiss the controls doesn't dump the viewer at the storefront. Couch
     // playback just drops back onto the couch, so no confirm is needed.
     confirmExit: !fromCouch,
-    buildStream: (sel) => transcodeStreamUrl(jellyfinUrl, token, playbackId, { ...sel, sourceVideoCodec, mediaSourceId }),
+    buildStream: (sel) => transcodeStreamUrlSync(jellyfinUrl, token, playbackId, { ...sel, sourceVideoCodec, mediaSourceId }),
     log: (msg) => logToConsole(msg, 'video'),
     onProgress: (positionTicks, isPaused) => {
       playbackProgressed(jellyfinUrl, token, playbackId, positionTicks, isPaused);
@@ -3624,6 +3850,7 @@ async function main() {
     loadComingSoon: loadComingSoonMovies,
     loadDiscovery: loadDiscoveryMovies,
     loadGames: loadGameMovies,
+    loadStreaming: loadStreamingMovies,
     mergeCollectionGaps,
     logJellyseerrStatus,
     gameCount: () => gameMovies.length,
@@ -3886,6 +4113,8 @@ async function main() {
         else if (choice === 'dismiss') handleGapDismiss();
       } else if (action === 'launch' && movie) {
         await handleGameLaunch(movie);
+      } else if (action === 'streaming' && movie) {
+        handleStreamingLaunch(movie);
       }
     },
     onBack: () => {

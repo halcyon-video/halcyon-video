@@ -6,15 +6,19 @@ import { isJewelCasePlatform, JEWEL_FAT_DEPTH_IN } from './jewel-case';
 import { getReviewSnippetForMovie } from './review-snippets';
 import { getActiveTheme } from './themes';
 import { getActiveLogoSpec } from './logo-spec';
-import { drawLogo } from './logo-renderer';
 import { buildCustomTemplateWrap, buildCustomTicketWrap, buildDvdBlueTemplateWrap, customWrapLabel, ensureWrapFontsLoaded } from './logo-wrap';
 import type { BrandPackWrapSpec } from './brand-pack';
 import { brandAssetUrl, brandString, getBrandPack } from './brand-pack';
 import type { DecodeMode } from './poster-worker';
 import { getRommConfig, authHeader } from './romm';
 import { drawTechSpecsTable, TECH_SPECS_TABLE_H } from './tech-specs';
+import { stampCollectionGapSticker } from './case-corner-stickers';
 import { perfTrace, perfSlot } from './perf-trace';
 import { LruByteCache } from './lru-byte-cache';
+import { reflectionProbes, setReflectionProbes, onProbesReplaced } from './case-env-probes';
+// Re-exported so the probes keep their long-standing import site: three-scene
+// and store-stock have always reached them through this module.
+export { reflectionProbes, setReflectionProbes };
 import { getLowResFrontMaterial, disposeLowResFrontMaterials } from './hero-lowres-front';
 // The inspected case's front is decoded at 3x by its own module, which also owns
 // the shared badge stamper the poster queue above calls. Cycle is function-level
@@ -969,13 +973,19 @@ function caseMaterialLRUSet(key: string, mat: THREE.MeshStandardMaterial) {
   }
 }
 
-export let reflectionProbes: THREE.Texture[] = [];
 let plasticWrinkleNormalTex: THREE.Texture | null = null;
 let plasticSmudgeRoughnessTex: THREE.Texture | null = null;
 
-export function setReflectionProbes(probes: THREE.Texture[]) {
-  reflectionProbes = probes;
-}
+// These caches outlive a scene, so they are the ones whose envMap can be left
+// pointing at a disposed probe. See case-env-probes.ts for what goes wrong
+// without this (feedback/066: the clamshell and boxset render near-black).
+onProbesReplaced((repoint) => {
+  heroFaceMaterialCache.forEach(repoint);
+  caseMaterialLRU.forEach(repoint);
+  posterMaterialCache.forEach(repoint);
+  jellyfinSpineCache.forEach(repoint);
+  repoint(seriesBackPanel?.mat);
+});
 
 // Shrink-wrap crease normal map. This drives the *clearcoat* normal — the glossy
 // plastic film on top of the matte printed insert — so highlights ripple across
@@ -1568,98 +1578,11 @@ export function getMovieOffsets(id: string) {
   return { r1, r2, r3 };
 }
 
-// A case for a title the store doesn't have — a missing entry of a collection
-// you partly own (see jellyseerr.ts's fetchCollectionGaps) or an inline
-// discovery suggestion (fetchDiscoverMovies): it stands in its real
-// alphabetical/chronological spot on the shelf, so it needs to read as "not
-// ours" up close without shouting across the aisle. A small store-logo
-// sticker in the bottom-right corner does that — and with extraCopiesCount
-// returning 0 there are no backstock copies behind it, which is the cue you
-// actually notice from a distance.
-//
-// Once the title has been ORDERED through Jellyseerr the label flips to the
-// requested variant: brand colours swapped (gold body, blue lettering),
-// reading COMING SOON, and stamped slightly larger so a live re-stamp covers
-// the original label completely — the clerk slapping a new sticker over the
-// old one.
-export function stampCollectionGapSticker(
-  data: Uint8Array,
-  w: number,
-  h: number,
-  movieId: string,
-  requested: boolean
-): Uint8Array {
-  // Same hand-applied jitter the 4K badge uses, so a shelf of gaps doesn't
-  // look machine-stickered. A gap title is never is4k (you don't own the
-  // file), so the two stickers can't collide.
-  const { r1, r2, r3 } = getMovieOffsets(movieId);
-  const spec = wrapLogoSpec();
-  const label = requested
-    ? { ...spec, bodyColor: spec.textColor, textColor: spec.bodyColor, borderColor: spec.bodyColor }
-    : spec;
-
-  const canvas = document.createElement('canvas');
-  canvas.width = w;
-  canvas.height = h;
-  const ctx = canvas.getContext('2d')!;
-  const imgData = ctx.createImageData(w, h);
-  imgData.data.set(data);
-  ctx.putImageData(imgData, 0, 0);
-
-  // Geometry as a fraction of the poster so both resolutions place
-  // the sticker identically. Note the poster buffer is stored
-  // bottom-up, so the BOTTOM-right corner is a LOW y here — the same
-  // inversion the 4K badge compensates for when it draws its text.
-  const stickerW = w * (requested ? 0.37 : 0.34);
-  const stickerH = stickerW / 1.647; // the logo board's 1400x850 aspect
-  const cx = w * 0.76 + r1 * (w * 0.012);
-  const cy = h * 0.13 + r2 * (h * 0.010);
-  const radius = stickerW * 0.10;
-
-  ctx.save();
-  ctx.translate(cx, cy);
-  ctx.rotate(r3 * 0.12);
-
-  // Clip to the label before painting the emblem: drawLogo composes
-  // a whole sign (board, ticket, wordmark) sized to its own aspect,
-  // and without this its body bleeds past the sticker edge.
-  ctx.beginPath();
-  ctx.roundRect(-stickerW / 2, -stickerH / 2, stickerW, stickerH, radius);
-  ctx.save();
-  ctx.clip();
-
-  // Backing colour shows through wherever the emblem doesn't reach,
-  // so the label is opaque over any poster.
-  ctx.fillStyle = label.bodyColor;
-  ctx.fillRect(-stickerW / 2, -stickerH / 2, stickerW, stickerH);
-
-  if (w >= 320) {
-    // Flip back for the emblem. Pure -1 — the 4K badge's extra 1.45
-    // is a stretch on its lettering, not a buffer correction, and
-    // would squash the ticket.
-    ctx.scale(1, -1);
-    drawLogo(ctx, label, {
-      x: -stickerW / 2,
-      y: -stickerH / 2,
-      w: stickerW,
-      h: stickerH,
-      textOverride: requested ? 'COMING SOON' : 'REQUEST',
-    });
-  }
-  // At 64x96 the emblem is a few pixels tall and renders as mud, so
-  // the low-res layer stays a plain colour chip — enough to say "a
-  // sticker is there" until the high-res layer lands.
-
-  ctx.restore(); // drop the clip, keep the transform
-  // Die-cut white edge on top, so the label reads as something stuck
-  // ON the art rather than printed into it.
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.92)';
-  ctx.lineWidth = Math.max(1.5, w * 0.008);
-  ctx.stroke();
-
-  ctx.restore();
-  return new Uint8Array(ctx.getImageData(0, 0, w, h).data);
-}
+// The REQUEST/COMING SOON corner label (collection-gap/discovery titles) and
+// the WATCH ON <SERVICE> one (GH #86 streaming titles) live in
+// case-corner-stickers.ts — extracted so this file stays under its line
+// budget (tools/check-file-budget.mjs). restampCollectionGapCase below still
+// calls stampCollectionGapSticker (imported at the top of this file).
 
 /**
  * Live restyle for a not-in-stock case (collection gap or inline discovery

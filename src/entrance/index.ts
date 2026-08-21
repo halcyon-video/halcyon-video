@@ -56,7 +56,7 @@ import type { Movie } from '../jellyfin';
 import { CRT_BLACK, CRT_GOLD, CRT_INK, CRT_TEXT } from '../crt-theme';
 import { brandString } from '../brand-pack';
 import { textureArrayManager } from '../poster-textures';
-import { posterShortfallLines } from '../counter-terminal';
+import { fitTerminalPitch, posterShortfallLines } from '../counter-terminal';
 
 export class EntranceCheckout implements StoreFixture {
   // The counter's store-facing point Z (used by StoreScene to frame the checkout camera move).
@@ -944,8 +944,9 @@ export class EntranceCheckout implements StoreFixture {
     // byte-for-byte the original 8 lines whenever nothing is wrong — a
     // diagnostic that shows a scary number on every install would be worse
     // than the silence it replaced. It only appears here, not on the
-    // MANAGER MENU screen (counter-terminal.ts): that screen is already at
-    // its 10-line capacity (see maxLines below) with the full button ring.
+    // MANAGER MENU screen (counter-terminal.ts): that screen spends its rows
+    // on the button ring — which already outgrew the default pitch (#77) —
+    // and a diagnostic would crowd it further.
     const lines = this.terminalLines ?? [
       'STORE #55746   GREEN BAY, WI',
       '',
@@ -965,13 +966,28 @@ export class EntranceCheckout implements StoreFixture {
     // (verified against counterterm shots): anything below ~80% of the canvas
     // vanishes behind the bezel, so the footer bar is pinned above that line
     // rather than mirrored off PAD_Y.
+    //
+    // #77: the body box seats ~10 default-pitch rows and the manager menu is
+    // 12 — the old maxLines slice() dropped MANAGER OVERRIDE and RETURN TO
+    // STORE with no trace. fitTerminalPitch keeps this pitch when everything
+    // fits and tightens toward 1.0 leading when it doesn't (the bars above
+    // and below stay at the default pitch). If even the floor pitch can't
+    // seat the list, the clip is loud: a MORE marker in the last visible row
+    // plus a console.warn, never a silent drop.
     const bodyTop = PAD_Y + LINE_H * 2;
     const footTop = Math.round(H * 0.73);
-    const maxLines = Math.max(1, Math.floor((footTop - LINE_H * 0.4 - bodyTop) / LINE_H));
+    const { lineH, maxLines } = fitTerminalPitch(lines.length, LINE_H, FONT_PX, footTop - bodyTop);
     const shown = Math.min(lines.length, maxLines);
+    if (lines.length > maxLines) {
+      console.warn(`[terminal] body overflow: ${lines.length} lines, ${maxLines} fit at floor pitch — clipping`);
+    }
     const cursorIdx = this.terminalCursorLine ?? shown - 1;
-    lines.slice(0, maxLines).forEach((line, i) => {
-      const y = bodyTop + i * LINE_H;
+    const drawn = lines.slice(0, shown);
+    if (lines.length > shown && shown > 0) {
+      drawn[shown - 1] = `-- ${lines.length - shown + 1} MORE --`;
+    }
+    drawn.forEach((line, i) => {
+      const y = bodyTop + i * lineH;
       const text = line.slice(0, 40);
       ctx.fillText(text, PAD_X, y);
       if (i === cursorIdx && this.terminalCursorOn) {

@@ -62,6 +62,8 @@ export interface BootFlowDeps {
   loadComingSoon: () => Promise<void>;
   loadDiscovery: () => Promise<void>;
   loadGames: () => Promise<void>;
+  /** GH #86: streaming-service sections (Jellyseerr watch-provider data). */
+  loadStreaming: () => Promise<void>;
   mergeCollectionGaps: (libs: JellyfinLibrary[]) => Promise<number>;
   logJellyseerrStatus: (gapCount: number) => Promise<void>;
   gameCount: () => number;
@@ -207,6 +209,7 @@ async function syncForSetup(
       d.loadComingSoon(),
       d.loadDiscovery(),
       d.loadGames(),
+      d.loadStreaming(),
     ]);
   } finally {
     if (stallTimer) clearTimeout(stallTimer);
@@ -296,6 +299,9 @@ export function hideLoginOverlay() {
 export function hideBootOverlay() {
   const overlay = document.getElementById('boot-overlay');
   if (overlay) {
+    // Restore the stylesheet's fade for the way OUT (showBootOverlay suppresses
+    // it for the way in — see there).
+    overlay.style.transition = '';
     overlay.classList.remove('visible');
   }
 }
@@ -306,6 +312,22 @@ export function hideBootOverlay() {
 export function showBootOverlay() {
   const overlay = document.getElementById('boot-overlay');
   if (overlay) {
+    // Raise it INSTANTLY, not over the stylesheet's 0.6s fade. What follows a
+    // showBootOverlay() call is always the store build, which holds the main
+    // thread for seconds at catalog scale — so a fade that has not finished by
+    // then is frozen part-way, and on a webview whose compositor does not
+    // advance without the main thread it never starts at all, leaving the
+    // player looking at the screen underneath (the counter CRT's CATALOG SYNC
+    // readout) for the entire build. The fade OUT, which runs when the store is
+    // ready and the thread is free, is the one worth keeping; hideBootOverlay
+    // puts it back. Debug-only override, never surfaced in Settings: set
+    // bb_debug_no_boot_paint=1 to restore the old behaviour for A/B runs.
+    if (!localStorage.getItem('bb_debug_no_boot_paint')) {
+      overlay.style.transition = 'none';
+      overlay.classList.add('visible');
+      void overlay.offsetHeight; // flush the style change into this frame
+      return;
+    }
     overlay.classList.add('visible');
   }
 }
@@ -350,7 +372,8 @@ async function finishLoginAndLaunch(urlInput: string, session: MembershipLoginSe
       ]),
       deps.loadComingSoon(),
       deps.loadDiscovery(),
-      deps.loadGames()
+      deps.loadGames(),
+      deps.loadStreaming()
     ]);
   } finally {
     if (loginStallTimer) clearTimeout(loginStallTimer);
@@ -440,7 +463,7 @@ function abortBootToLogin(reason?: string) {
  * fetch, no login overlay ever — stock the store from the synthetic demo
  * library and hand off to the normal texture-gated reveal.
  */
-export function startDemoAndLoad() {
+export async function startDemoAndLoad() {
   if (!deps) return;
   // First visit defaults to daytime out the windows (the scene otherwise
   // rolls day/night 50/50 per boot); user-changeable in Store Look after.
@@ -456,6 +479,15 @@ export function startDemoAndLoad() {
   deps.log('[System] Demo mode: stocking the store with a placeholder library (no media server).', 'system');
   deps.setLibraries(buildDemoLibraries(900));
   deps.setGames(buildDemoGames(60));
+  // GH #86 zero-setup follow-up (owner ruling 2026-08-21): the demo's own
+  // bb_streaming_services setting default is the full eight (settings.ts),
+  // and this is the ONE loader that was never wired into the demo boot at
+  // all — every other credential path races it alongside the sync, but the
+  // demo has no sync to race it into. Awaited (not raced against a timeout
+  // here) because loadStreamingMovies() already races its own network calls
+  // against a 15s cap internally, and the bundled-snapshot path it lands on
+  // with no config makes no network call to begin with.
+  await deps.loadStreaming();
   deps.launchStore();
 }
 
@@ -584,7 +616,8 @@ export async function checkCredentialsAndLoad() {
           ]),
           d.loadComingSoon(),
           d.loadDiscovery(),
-          d.loadGames()
+          d.loadGames(),
+          d.loadStreaming()
         ]);
         if (stallTimer) { clearTimeout(stallTimer); stallTimer = null; }
 

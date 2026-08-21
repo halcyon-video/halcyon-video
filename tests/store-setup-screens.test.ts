@@ -106,15 +106,41 @@ test('libraries: OK toggles a row; OPEN THE STORE needs one carried', () => {
   assert.equal(setupScreenKey({ ...(s as any), row: 2 }, 'ok').action, 'open-store');
 });
 
-test('libraries: long lists window around the cursor and keep OPEN last', () => {
+test('libraries: long lists window around the cursor and keep CONTINUE last', () => {
   const rows = Array.from({ length: 12 }, (_, i) => ({ id: String(i), name: `Library ${i}`, carried: true }));
   const s: SetupScreen = { kind: 'libraries', rows, row: 11 };
   const { lines: ls, cursorLine } = setupScreenLines(s);
   assert.match(ls[cursorLine], /LIBRARY 11/);
-  assert.match(ls[ls.length - 1], /OPEN THE STORE/);
+  assert.match(ls[ls.length - 1], /CONTINUE/);
   const home: SetupScreen = { kind: 'libraries', rows, row: 0 };
   const first = setupScreenLines(home);
   assert.match(first.lines[first.cursorLine], /LIBRARY 0/);
+});
+
+test('streaming: OK toggles a row; zero chosen is allowed (no error, still emits open-store)', () => {
+  let s: SetupScreen = {
+    kind: 'streaming',
+    rows: [
+      { id: 'netflix', name: 'NETFLIX', carried: false },
+      { id: 'hulu', name: 'HULU', carried: false },
+    ],
+    row: 0,
+  };
+  s = setupScreenKey(s, 'ok').state;
+  assert.equal((s as any).rows[0].carried, true);
+  s = setupScreenKey(s, 'ok').state; // toggle back off
+  assert.equal((s as any).rows[0].carried, false);
+  const confirmed = setupScreenKey({ ...(s as any), row: 2 }, 'ok');
+  assert.equal(confirmed.action, 'open-store');
+  assert.equal((confirmed.state as any).error, undefined);
+});
+
+test('streaming: long lists window around the cursor and keep OPEN THE STORE last', () => {
+  const rows = Array.from({ length: 8 }, (_, i) => ({ id: String(i), name: `SERVICE ${i}`, carried: false }));
+  const s: SetupScreen = { kind: 'streaming', rows, row: 7 };
+  const { lines: ls, cursorLine } = setupScreenLines(s);
+  assert.match(ls[cursorLine], /SERVICE 7/);
+  assert.match(ls[ls.length - 1], /OPEN THE STORE/);
 });
 
 test('notice: rows emit retry / change-server / demo', () => {
@@ -132,6 +158,7 @@ test('every screen honors the 40-column CRT clip', () => {
     { kind: 'members', count: 12 },
     { kind: 'manual-auth', row: 0, username: 'u'.repeat(60), password: 'p'.repeat(60) },
     { kind: 'libraries', rows: [{ id: 'a', name: 'N'.repeat(80), carried: true }], row: 0 },
+    { kind: 'streaming', rows: [{ id: 'a', name: 'N'.repeat(80), carried: true }], row: 0 },
     { kind: 'sync', stage: 'S'.repeat(80), pages: 12345 },
     { kind: 'arriving' },
     { kind: 'notice', address: long, detail: 'D'.repeat(80), row: 0 },
@@ -150,6 +177,7 @@ test('cursorLine always points at a real line', () => {
     { kind: 'members', count: 2 },
     { kind: 'manual-auth', row: 3, username: '', password: '' },
     { kind: 'libraries', rows: [{ id: 'a', name: 'Movies', carried: true }], row: 1 },
+    { kind: 'streaming', rows: [{ id: 'a', name: 'NETFLIX', carried: false }], row: 1 },
     { kind: 'sync', stage: 'SYNC', pages: 0 },
     { kind: 'arriving' },
     { kind: 'notice', address: 'http://tv', detail: 'NO ANSWER', row: 2 },

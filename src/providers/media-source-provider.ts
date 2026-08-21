@@ -146,6 +146,18 @@ export interface Title {
   // Undefined on synthesized titles (discovery/collectionGap/game) and the
   // synthetic demo/harness catalog, which has no person image data at all.
   castPeople?: { id: string; name: string; imageUrl?: string }[];
+  // Synthesized (see streaming-catalog.ts + jellyseerr.ts's fetchStreamingMovies)
+  // for a title on one of the owner's streaming subscriptions, per TMDB's
+  // watch-provider data proxied through Jellyseerr: it gets a display case in
+  // that service's own synthetic Library (GH #86), no rental backstock
+  // (isUnstockedTitle), and a "WATCH ON <SERVICE>" corner label instead of the
+  // REQUEST/COMING SOON one. Selecting it never enters checkout/carry -- it
+  // opens streamingUrl (the service's page for the title, or a TMDB watch-page
+  // fallback) instead of playing.
+  streaming?: boolean;
+  streamingServiceId?: string;
+  streamingServiceName?: string;
+  streamingUrl?: string;
 }
 
 export interface MediaStreamInfo {
@@ -226,6 +238,15 @@ export interface Library {
    * (see StorePlan.buildLibraryLayouts).
    */
   games?: boolean;
+  /**
+   * Synthesized by streaming-catalog.ts: this "library" is one streaming
+   * service's watch-provider stock (GH #86), not a media-server one. Same
+   * un-sectioned treatment as a games?:true library, for the same reason --
+   * every signboard reads the service's own name. Excluded from the per-library
+   * "carry"/"feed the ceiling TVs" toggles (registerLibraryToggles), which talk
+   * about syncing a real server library.
+   */
+  streaming?: boolean;
 }
 
 /** Back-compat aliases — see the naming note at the top of this file. */

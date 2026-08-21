@@ -4,7 +4,11 @@
 // shelves" to a stocked store: distributor row → server address typed on the
 // CRT → membership card pick (the existing DOM picker; CRT sign-in when the
 // server lists no public users) → library checkbox rows (which aisles this
-// store carries, persisted via library-settings) → FIRST SHIPMENT ARRIVING.
+// store carries, persisted via library-settings) → streaming-service
+// checkbox rows (GH #86 zero-setup follow-up, owner ruling 2026-08-21: which
+// streaming apps the player has, persisted to bb_streaming_services -- blank
+// stays this local install's default of NO streaming aisles) → FIRST
+// SHIPMENT ARRIVING.
 //
 // Same split as counter-terminal-flow.ts: the screens themselves are pure
 // (store-setup-screens.ts, unit-tested); this file is only glue — render onto
@@ -32,9 +36,11 @@ import {
   type MembershipLoginSession,
 } from './membership-cards';
 import { excludedLibraryIds, setLibraryCarried } from './library-settings';
+import { DEFAULT_STREAMING_SERVICES, resolveEnabledServices } from './streaming-catalog';
 import {
   SetupScreen,
   SetupKey,
+  SetupLibraryRow,
   initialHomeScreen,
   setupScreenKey,
   setupScreenChar,
@@ -349,9 +355,28 @@ async function afterAuth(url: string, session: MembershipLoginSession): Promise<
   }
 }
 
+/**
+ * GH #86 zero-setup follow-up (owner ruling 2026-08-21): which streaming apps
+ * the player has, offered right after the library checkboxes. Pre-checked
+ * against whatever is already persisted (a "Change Server" re-entry keeps
+ * an earlier choice) -- a true first run reads blank, i.e. none checked,
+ * per the local-install default.
+ */
+function initialStreamingScreen(): SetupScreen {
+  const chosen = new Set(resolveEnabledServices(localStorage.getItem('bb_streaming_services')).map((d) => d.id));
+  return {
+    kind: 'streaming',
+    rows: DEFAULT_STREAMING_SERVICES.map((d) => ({ id: d.id, name: d.name, carried: chosen.has(d.id) })),
+    row: 0,
+  };
+}
+
+function persistStreamingChoice(rows: SetupLibraryRow[]): void {
+  localStorage.setItem('bb_streaming_services', rows.filter((r) => r.carried).map((r) => r.id).join(','));
+}
+
 async function runSync(): Promise<void> {
-  if (!deps || screen.kind !== 'libraries' || !pendingSession) return;
-  for (const row of screen.rows) setLibraryCarried(row.id, row.carried);
+  if (!deps || !pendingSession) return;
   const url = pendingUrl;
   const session = pendingSession;
   screen = { kind: 'sync', stage: 'CONTACTING DISTRIBUTOR...', pages: 0 };
@@ -415,7 +440,19 @@ export async function setupTerminalInput(kind: SetupKey): Promise<void> {
       render();
       return;
     case 'open-store':
-      await runSync();
+      // Two screens funnel through this one action: 'libraries' confirming
+      // moves on to the streaming checkboxes; 'streaming' confirming is the
+      // real "go" -- persist the choice and run the catalog sync.
+      if (screen.kind === 'libraries') {
+        for (const row of screen.rows) setLibraryCarried(row.id, row.carried);
+        screen = initialStreamingScreen();
+        render();
+        return;
+      }
+      if (screen.kind === 'streaming') {
+        persistStreamingChoice(screen.rows);
+        await runSync();
+      }
       return;
     case 'retry':
       screen = { kind: 'dialing', address: localStorage.getItem('jellyfin_url') || '', step: 'RETRYING NOW...' };

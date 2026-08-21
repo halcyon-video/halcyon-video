@@ -45,14 +45,15 @@ import {
   hasRealGameBox,
   gameFaceAspect,
   getMovieOffsets,
-  stampCollectionGapSticker,
   stampStaffPickSticker,
   makePlasticMaterial,
   cropFrontTextureForMedium,
   applyWhiteBorderShader,
   type CaseFinish,
 } from './video-case';
+import { stampCollectionGapSticker, stampStreamingSticker } from './case-corner-stickers';
 import { isDiscoveryRequested } from './jellyseerr';
+import { onProbesReplaced } from './case-env-probes';
 import { uploadTextureNow } from './poster-textures';
 import { BB_ARCHIVO_BLACK } from './bundled-fonts';
 import type { DecodeMode } from './poster-worker';
@@ -151,6 +152,13 @@ export function stampPosterBadges(data: Uint8Array, w: number, h: number, movie:
     const requested = !!movie.discoveryRequested || isDiscoveryRequested(movie.tmdbId);
     out = stampCollectionGapSticker(out, w, h, movie.id, requested);
   }
+  // GH #86: a streaming-service title -- "WATCH ON <SERVICE>", never REQUEST/
+  // COMING SOON (it isn't orderable). Mutually exclusive with the block above
+  // (streaming-catalog.ts never sets collectionGap/discovery) and with is4k
+  // (a streaming title has no local file to have a resolution at all).
+  if (movie.streaming) {
+    out = stampStreamingSticker(out, w, h, movie.id, movie.streamingServiceName || 'STREAMING');
+  }
   // Watch-history staff pick (staff-picks.ts): endcap order candidates only.
   if (movie.staffPick) out = stampStaffPickSticker(out, w, h, movie.id);
   return out;
@@ -178,6 +186,11 @@ interface HeroSlot {
 }
 
 let slot: HeroSlot | null = null;
+// The slot survives a scene, and its variantKey encodes the probe INDEX rather
+// than the probe itself — so a new generation at the same index would never
+// trigger a rebuild, and the inspected front would keep sampling a disposed
+// cube map and render unlit (see case-env-probes.ts).
+onProbesReplaced((repoint) => repoint(slot?.mat));
 // In-flight decode target. Compared against on completion so a fast browse
 // through several titles lands only the one still selected.
 let pending: string | null = null;

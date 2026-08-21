@@ -49,6 +49,12 @@ export type SetupScreen =
   // store has to phoning the distributor and quoting an account number.
   | { kind: 'plex-link'; code: string; step: string; error?: string }
   | { kind: 'libraries'; rows: SetupLibraryRow[]; row: number; error?: string }
+  // GH #86 zero-setup follow-up (owner ruling 2026-08-21): which streaming
+  // apps the player has, right after the library checkboxes and before the
+  // catalog sync. Same checkbox-list shape as 'libraries' (reuses
+  // SetupLibraryRow), but zero chosen is a legitimate answer -- unlike an
+  // empty library list, it never blocks OPEN THE STORE.
+  | { kind: 'streaming'; rows: SetupLibraryRow[]; row: number }
   | { kind: 'sync'; stage: string; pages: number }
   | { kind: 'arriving' }
   | { kind: 'notice'; address: string; detail: string; row: number };
@@ -63,8 +69,9 @@ const HOME_ROWS = 4;
 const AUTH_ROWS = 4;
 // Notice rows: 0 RETRY NOW / 1 CHANGE SERVER / 2 TRY A DEMO STORE
 const NOTICE_ROWS = 3;
-// The libraries screen windows its checkbox rows into this many visible lines.
-const LIB_WINDOW = 6;
+// The libraries/streaming checkbox screens window their rows into this many
+// visible lines (header + this + the confirm row budgets to ~10 total).
+const CHECKLIST_WINDOW = 6;
 
 /** A typed printable character lands in whichever field the cursor is on. */
 export function setupScreenChar(s: SetupScreen, ch: string): SetupScreen {
@@ -150,6 +157,23 @@ export function setupScreenKey(s: SetupScreen, key: SetupKey): { state: SetupScr
         if (!s.rows.some((r) => r.carried)) {
           return { state: { ...s, error: 'CARRY AT LEAST ONE LIBRARY.' } };
         }
+        return { state: s, action: 'open-store' };
+      }
+      return { state: s };
+    }
+    case 'streaming': {
+      const total = s.rows.length + 1; // + OPEN THE STORE
+      if (key === 'up' || key === 'down') {
+        const row = (s.row + (key === 'up' ? -1 : 1) + total) % total;
+        return { state: { ...s, row } };
+      }
+      if (key === 'ok') {
+        if (s.row < s.rows.length) {
+          const rows = s.rows.map((r, i) => (i === s.row ? { ...r, carried: !r.carried } : r));
+          return { state: { ...s, rows } };
+        }
+        // Zero chosen is a legitimate answer here -- unlike 'libraries',
+        // never blocks on an empty selection.
         return { state: s, action: 'open-store' };
       }
       return { state: s };
@@ -256,14 +280,14 @@ export function setupScreenLines(s: SetupScreen): { lines: string[]; cursorLine:
       return { lines, cursorLine: 5 + s.row };
     }
     case 'libraries': {
-      // Window the checkbox rows around the cursor; OPEN THE STORE stays last.
+      // Window the checkbox rows around the cursor; CONTINUE stays last.
       const onOpen = s.row >= s.rows.length;
       const cursorRow = onOpen ? Math.max(0, s.rows.length - 1) : s.row;
-      let start = Math.max(0, Math.min(cursorRow - (LIB_WINDOW - 1), s.rows.length - LIB_WINDOW));
-      if (s.rows.length <= LIB_WINDOW) start = 0;
+      let start = Math.max(0, Math.min(cursorRow - (CHECKLIST_WINDOW - 1), s.rows.length - CHECKLIST_WINDOW));
+      if (s.rows.length <= CHECKLIST_WINDOW) start = 0;
       // Keep the cursor inside the window when it walks upward too.
       if (cursorRow < start) start = cursorRow;
-      const visible = s.rows.slice(start, start + LIB_WINDOW);
+      const visible = s.rows.slice(start, start + CHECKLIST_WINDOW);
       const carriedCount = s.rows.filter((r) => r.carried).length;
       const lines = [
         "CHOOSE THIS STORE'S LIBRARIES",
@@ -275,7 +299,31 @@ export function setupScreenLines(s: SetupScreen): { lines: string[]; cursorLine:
         lines.push(sel(!onOpen && idx === s.row, `[${r.carried ? 'X' : ' '}] ${r.name.toUpperCase().slice(0, 32)}`));
       });
       const openLineIdx = lines.length;
-      lines.push(sel(onOpen, s.error ? s.error : 'OPEN THE STORE'));
+      lines.push(sel(onOpen, s.error ? s.error : 'CONTINUE'));
+      const cursorLine = onOpen ? openLineIdx : 3 + (s.row - start);
+      return { lines, cursorLine };
+    }
+    case 'streaming': {
+      // Same windowed-checkbox idiom as 'libraries' -- see there. Zero chosen
+      // never errors, so there is no error line to budget for.
+      const onOpen = s.row >= s.rows.length;
+      const cursorRow = onOpen ? Math.max(0, s.rows.length - 1) : s.row;
+      let start = Math.max(0, Math.min(cursorRow - (CHECKLIST_WINDOW - 1), s.rows.length - CHECKLIST_WINDOW));
+      if (s.rows.length <= CHECKLIST_WINDOW) start = 0;
+      if (cursorRow < start) start = cursorRow;
+      const visible = s.rows.slice(start, start + CHECKLIST_WINDOW);
+      const carriedCount = s.rows.filter((r) => r.carried).length;
+      const lines = [
+        'STREAMING SERVICES YOU HAVE',
+        'OK TICKS A BOX. AISLES STOCK FOR',
+        `EVERY SERVICE CHOSEN. (${carriedCount} OF ${s.rows.length})`,
+      ];
+      visible.forEach((r, i) => {
+        const idx = start + i;
+        lines.push(sel(!onOpen && idx === s.row, `[${r.carried ? 'X' : ' '}] ${r.name.toUpperCase().slice(0, 32)}`));
+      });
+      const openLineIdx = lines.length;
+      lines.push(sel(onOpen, 'OPEN THE STORE'));
       const cursorLine = onOpen ? openLineIdx : 3 + (s.row - start);
       return { lines, cursorLine };
     }
