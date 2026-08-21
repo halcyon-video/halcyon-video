@@ -321,6 +321,26 @@ function signalSend(to: string, type: string, payload?: unknown): void {
   }).catch(() => { /* mailbox hiccup — viewer side retries */ });
 }
 
+// The engine's default send budget (~2.5 Mbps) plus the 'detail' content hint
+// (degrade by DROPPING FRAMES, never resolution) reads as a blocky slideshow
+// on a TV panel: the store is a full-screen 3D scene and a LAN carries far
+// more than the default. Ask for a real budget and balanced degradation so
+// the encoder scales a little of both axes before sacrificing either one
+// wholesale. Parameters live on the sender, so they survive the
+// replaceTrack() swaps playback does.
+const VIDEO_MAX_BITRATE = 12_000_000;
+const VIDEO_MAX_FRAMERATE = 60;
+function tuneVideoSender(sender: RTCRtpSender): void {
+  try {
+    const p = sender.getParameters();
+    p.degradationPreference = 'balanced';
+    if (!p.encodings || !p.encodings.length) p.encodings = [{}];
+    p.encodings[0].maxBitrate = VIDEO_MAX_BITRATE;
+    p.encodings[0].maxFramerate = VIDEO_MAX_FRAMERATE;
+    void sender.setParameters(p).catch(() => { /* advisory — defaults stand */ });
+  } catch { /* an engine without setParameters keeps its defaults */ }
+}
+
 /**
  * Capture the current scene's canvas (no frame-rate argument: frames are
  * produced exactly when the on-demand loop paints). A settings rebuild swaps
@@ -515,7 +535,10 @@ async function createViewer(id: string): Promise<void> {
 
   // Joining mid-film gets the film, not a frozen store.
   const videoTrack = playbackVideoTrack() ?? stream.getVideoTracks()[0];
-  if (videoTrack) v.videoSender = pc.addTrack(videoTrack, stream);
+  if (videoTrack) {
+    v.videoSender = pc.addTrack(videoTrack, stream);
+    tuneVideoSender(v.videoSender);
+  }
   if (!audioTrack) audioTrack = retailAudio.captureRemoteTrack();
   // Same stream handle for both tracks so the viewer's ontrack sees one
   // MediaStream carrying video + audio.

@@ -629,6 +629,29 @@ if (!tvControls && isTouchPrimary()) {
       .map((el) => (el.textContent ?? '').replace(/\s+/g, ' ').trim());
     return { visible: hintShown, playing: document.body.classList.contains('playing'), text: shown.join(' | ') };
   },
+  // Inbound video numbers for the stream-quality probe: fps/resolution as the
+  // decoder sees them, plus cumulative counters the caller can delta.
+  stats: async () => {
+    if (!pc) return null;
+    const report = await pc.getStats();
+    let video: any = null;
+    const codecs = new Map<string, string>();
+    report.forEach((s: any) => {
+      if (s.type === 'codec') codecs.set(s.id, s.mimeType);
+      if (s.type === 'inbound-rtp' && s.kind === 'video') video = s;
+    });
+    if (!video) return null;
+    return {
+      fps: video.framesPerSecond ?? null,
+      width: video.frameWidth ?? null,
+      height: video.frameHeight ?? null,
+      framesDecoded: video.framesDecoded ?? 0,
+      framesDropped: video.framesDropped ?? 0,
+      bytesReceived: video.bytesReceived ?? 0,
+      codec: codecs.get(video.codecId) ?? null,
+      timestamp: video.timestamp,
+    };
+  },
   // TV mode: the active flag plus the pure key mapping, so the rig can assert
   // both without a WebRTC session on the wire.
   get tv() {
