@@ -40,6 +40,7 @@ import type { StoreTheme } from './themes';
 import { assetUrl } from './asset-url';
 import { registerRuntimeFace } from './bundled-fonts';
 import { BRAND_DROP_DIR, detectBrandDrop } from './brand-drop';
+import { setBrandStringResolver } from './counter-terminal';
 
 /** One face the pack ships, registered under a collision-proof runtime family. */
 export interface BrandPackFontSpec {
@@ -198,6 +199,9 @@ export function brandString(key: string, fallback: string): string {
   const v = s && typeof s[key] === 'string' ? s[key] : null;
   return v !== null ? v : fallback;
 }
+// counter-terminal.ts keeps its imports empty for node-testability (#77), so
+// its one branded label reads through a seam we fill in here.
+setBrandStringResolver(brandString);
 
 /**
  * The runtime family a pack-declared font name was registered under, or null.
