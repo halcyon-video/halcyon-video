@@ -210,6 +210,89 @@ let videoPlayer: VideoPlayer | null = null;
 // WebGL context died during playback; reload when the player closes (issue #70).
 let pendingContextLostReload = false;
 
+// Bounded-retry bookkeeping for a context loss that hits DURING boot/rebuild
+// (storeScene is null the whole time the store is being built — see
+// installContextLossRecovery below). sessionStorage, not a module variable,
+// because the recovery for a boot-time loss IS a reload — the counter has to
+// survive that reload to ever notice a repeating cause. Cleared once a boot
+// actually finishes so an old, fully-recovered loss never eats into a later,
+// unrelated one's budget.
+const BOOT_CONTEXT_LOSS_KEY = 'bb_boot_context_loss_attempts';
+const BOOT_CONTEXT_LOSS_MAX_ATTEMPTS = 3;
+// Set once a boot-time loss exceeds the bound above and this run stops
+// retrying. texturesReadyPromise tracks DECODE, not GPU upload (see its
+// resolution in initializeStoreScene) — image decode keeps running on the CPU
+// even with the GPU context dead and preventDefault()ed, and on the demo's
+// small, browser-cached poster set it can still finish and resolve that
+// promise seconds later. Without this flag that resolution would go on to
+// call hideBootOverlay() anyway, silently swapping the give-up message for a
+// "ready" store that can't actually render anything — the exact blank-canvas
+// failure this fix exists to prevent, just delayed instead of immediate.
+let contextLossGaveUp = false;
+
+/**
+ * WebGL context-loss recovery for the store canvas, wired ONCE per canvas
+ * (a fresh canvas is born with every `new StoreScene(...)` — cold boot and
+ * every settings rebuild alike, see initializeStoreScene). On a 24/7 kiosk
+ * the GPU context can be lost (driver reset, GPU hang, VRAM pressure) at any
+ * point in the store's life, including the heaviest GPU window there is: the
+ * boot/rebuild texture load itself. That window used to have NO listener at
+ * all (it was installed only after texturesReadyPromise resolved), so a loss
+ * there left a permanently blank, dead canvas with nothing watching it and
+ * nothing on screen to explain why (issue #78). Registering here, right
+ * after the canvas exists, closes that gap; everything after boot keeps the
+ * behaviour issue #70 already established (defer the reload past an active
+ * movie), unified into this one handler instead of a second competing one.
+ */
+function installContextLossRecovery(canvas: HTMLCanvasElement) {
+  canvas.addEventListener('webglcontextlost', (event) => {
+    // Without this, the browser treats the loss as permanent and never fires
+    // webglcontextrestored — reload is the only escape either way, but a
+    // future GPU-side recovery (or three.js's own restore path) needs this
+    // call to even be possible.
+    event.preventDefault();
+
+    if (!storeScene) {
+      // Still booting or rebuilding: texturesReadyPromise hasn't resolved
+      // (storeScene is set only once it has — see initializeStoreScene), so
+      // there is no scene to fall back on and no movie that could be
+      // playing. A transient loss here is worth a couple of automatic
+      // retries, but a DETERMINISTIC cause (a broken video decoder, a GPU
+      // that can't actually run this app) must not turn into an endless
+      // reload loop — bound it and say so on screen instead.
+      const attempts = Number(sessionStorage.getItem(BOOT_CONTEXT_LOSS_KEY) || '0') + 1;
+      sessionStorage.setItem(BOOT_CONTEXT_LOSS_KEY, String(attempts));
+      if (attempts > BOOT_CONTEXT_LOSS_MAX_ATTEMPTS) {
+        contextLossGaveUp = true;
+        logToConsole(
+          `[System] WebGL context lost during startup (attempt ${attempts}) — giving up after ${BOOT_CONTEXT_LOSS_MAX_ATTEMPTS} retries. `
+          + 'Close and reopen Halcyon, or restart this device, to try again.',
+          'system'
+        );
+        return;
+      }
+      logToConsole(`[System] WebGL context lost during startup (attempt ${attempts}/${BOOT_CONTEXT_LOSS_MAX_ATTEMPTS}) — restarting...`, 'system');
+      setTimeout(() => location.reload(), 1000);
+      return;
+    }
+
+    if (ui.isPlaybackActive) {
+      // Don't interrupt the movie — but re-arm the reload so the store
+      // doesn't come back as a permanently dead context when playback
+      // ends (the player's onClose checks this flag). Issue #70.
+      pendingContextLostReload = true;
+      logToConsole('[System] WebGL context lost during playback — reload deferred to playback end.', 'system');
+      return;
+    }
+    logToConsole('[System] WebGL context lost — restarting front-end...', 'system');
+    setTimeout(() => location.reload(), 1000);
+  });
+
+  canvas.addEventListener('webglcontextrestored', () => {
+    logToConsole('[System] WebGL context restored.', 'system');
+  });
+}
+
 /**
  * Fetch Jellyseerr's coming-soon titles without ever letting a failure there
  * block Jellyfin login/sync -- the feature is purely additive.
@@ -2537,6 +2620,18 @@ async function initializeStoreScene(preservePosterCache = false) {
     logToConsole(`[System] Planning the store floor for ${plannedTitles} title(s)...`, 'system');
     const scene = new StoreScene(canvasContainer, storeLibraries, logToConsole, jfUrl, jfToken, storeComingSoon, storeDiscovery, storeGameMovies, staffPicks);
     armQualityBackstop();
+    // A fresh attempt is underway — any earlier give-up no longer applies (it
+    // could only be reached again via a brand-new page load, which is a fresh
+    // JS environment anyway, or a rebuild the user triggered by hand).
+    contextLossGaveUp = false;
+    // Wire context-loss recovery the moment the canvas exists — long before
+    // the texture load below even starts, let alone finishes. See
+    // installContextLossRecovery for why this can't wait for
+    // texturesReadyPromise. The scene constructor above always builds a
+    // fresh canvas (three-scene.ts appends it in its own constructor), so
+    // this fires on every boot AND every rebuild.
+    const glCanvas = canvasContainer.querySelector('canvas');
+    if (glCanvas) installContextLossRecovery(glCanvas);
 
     let lastLoggedPct = -1;
     scene.onTextureLoadProgress = (loaded, total) => {
@@ -2723,7 +2818,20 @@ async function initializeStoreScene(preservePosterCache = false) {
     logToConsole('[System] Loading store textures...', 'system');
 
     scene.texturesReadyPromise.then(() => {
+      if (contextLossGaveUp) {
+        // A boot-time context loss already exhausted its retries and put the
+        // give-up message on screen (see installContextLossRecovery) — decode
+        // finishing later doesn't change that the GPU context is still dead,
+        // so don't swap that message for a "ready" reveal nothing can render.
+        logToConsole('[System] Textures finished decoding after the context-loss give-up — staying on the error message rather than revealing an unrenderable store.', 'system');
+        return;
+      }
       storeScene = scene;
+      // The boot/rebuild that just finished got past every texture upload
+      // without a context loss (or recovered from one) — a fully separate,
+      // later loss shouldn't inherit whatever was left of this run's retry
+      // budget. See installContextLossRecovery.
+      sessionStorage.removeItem(BOOT_CONTEXT_LOSS_KEY);
       // There is a canvas to capture again, so any "can never host" this store
       // reported earlier (2.5D, a renderer that threw) has stopped being true —
       // without this, switching a kiosk to 2D and back would leave Remote Play
@@ -2769,27 +2877,6 @@ async function initializeStoreScene(preservePosterCache = false) {
       // You've just come in through the doors — ring the entry chime. (May stay
       // silent if the browser hasn't seen a user gesture yet; that's fine.)
       scene.playDoorChime();
-
-      // WebGL context-loss recovery. On a 24/7 kiosk the GPU context can be
-      // lost (driver reset, GPU hang, VRAM pressure). Without handling this the
-      // scene silently freezes/blanks forever. We can't cheaply restore all GPU
-      // resources, so the simplest robust recovery is a full front-end reload.
-      // Skip the auto-reload during active playback so we don't interrupt a
-      // movie for a transient loss the player itself may survive.
-      const glCanvas = canvasContainer.querySelector('canvas');
-      glCanvas?.addEventListener('webglcontextlost', (event) => {
-        event.preventDefault();
-        if (ui.isPlaybackActive) {
-          // Don't interrupt the movie — but re-arm the reload so the store
-          // doesn't come back as a permanently dead context when playback
-          // ends (the player's onClose checks this flag). Issue #70.
-          pendingContextLostReload = true;
-          logToConsole('[System] WebGL context lost during playback — reload deferred to playback end.', 'system');
-          return;
-        }
-        logToConsole('[System] WebGL context lost — restarting front-end...', 'system');
-        setTimeout(() => location.reload(), 1000);
-      });
     });
 
   } catch (err: any) {
