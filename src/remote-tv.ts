@@ -25,14 +25,17 @@ export interface TvControlOpts {
 /**
  * A ten-foot browser, detected by user agent; `?tv=1` / `?tv=0` overrides for
  * a TV the sniff misses (or a desktop pretending, as the verify rig does).
- * AFT* is the Fire TV hardware family; CrKey is Chromecast/Google TV; the
- * Tizen/webOS/Roku marks are other TVs whose remotes have the same shape.
+ * AFT* is the Fire TV hardware family; Google TV devices carry their model
+ * name ("Google TV Streamer", "Chromecast") rather than any generic TV mark —
+ * measured off a real Streamer's WebView UA on 2026-08-20; CrKey is the cast
+ * receiver; the Tizen/webOS/Roku marks are other TVs whose remotes have the
+ * same shape.
  */
 export function isTvViewer(): boolean {
   const forced = new URLSearchParams(location.search).get('tv');
   if (forced === '1') return true;
   if (forced === '0') return false;
-  return /\bAFT[A-Za-z0-9]|Fire ?TV|Android ?TV|GoogleTV|CrKey|SMART-TV|SmartTV|BRAVIA|Tizen|Web[0O]S|Roku\b/i
+  return /\bAFT[A-Za-z0-9]|Fire ?TV|Android ?TV|Google ?TV|Chromecast|CrKey|SMART-TV|SmartTV|BRAVIA|Tizen|Web[0O]S|Roku\b/i
     .test(navigator.userAgent);
 }
 
