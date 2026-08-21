@@ -545,6 +545,7 @@ This app's steady state is *days on a shelf*, and it's engineered like it:
 | **Jellyseerr / Overseerr** (optional) | Recommendation clasps, REQUEST / COMING SOON cases, collection gaps, discovery shelving, staff picks, FOR YOU endcaps, "order it for me" |
 | **RomM** (optional) | The video-game department: per-platform bays, real carton proportions, your cover scans |
 | **The server on the same machine as the TV** | mpv playback — real HDR and original lossless audio, no transcode |
+| A streaming subscription (Netflix, Prime Video, Disney+, etc.) | A shelved, browsable aisle that hands you off to the service instead of playing — stocked from a direct TMDB key, Jellyseerr, or (with neither) the bundled snapshot below, so a chosen service always stocks |
 | Nothing at all | `?demo=1` — the full store on a synthetic library, no server, playback disabled |
 
 Every integration degrades by *absence*, not error: unconfigured features are
@@ -565,6 +566,7 @@ Two optional features are the exceptions, and only while you use them:
 | Feature | Reaches | What for |
 |---|---|---|
 | **Jellyseerr discovery** | `image.tmdb.org` | Cover art for titles you *don't* own |
+| **Streaming-service aisles** | `image.tmdb.org` (posters) + TMDB/Jellyseerr's API when configured | Cover art and title data for your streaming subscriptions — see below |
 | **Remote Play** | `stun.l.google.com` | Finding your public address so a viewer outside your network can connect |
 
 Jellyseerr returns a TMDB *path* rather than the image itself — its own web UI
@@ -786,3 +788,9 @@ shots are library metadata from the author's personal RomM server. This project
 is not affiliated with, endorsed by, or connected to any
 video-rental company, past or present — it is a love letter to Friday nights
 at all of them.*
+
+*The streaming-service aisles' bundled offline snapshot
+(`src/data/streaming-snapshot.json`, refreshed with
+`tools/refresh-streaming-snapshot.mjs`) and any live TMDB/Jellyseerr lookup are
+title data and poster art only — no service logos or marks. This product uses
+the TMDB API but is not endorsed or certified by TMDB.*

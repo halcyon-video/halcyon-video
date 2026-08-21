@@ -463,7 +463,7 @@ function abortBootToLogin(reason?: string) {
  * fetch, no login overlay ever — stock the store from the synthetic demo
  * library and hand off to the normal texture-gated reveal.
  */
-export function startDemoAndLoad() {
+export async function startDemoAndLoad() {
   if (!deps) return;
   // First visit defaults to daytime out the windows (the scene otherwise
   // rolls day/night 50/50 per boot); user-changeable in Store Look after.
@@ -479,6 +479,15 @@ export function startDemoAndLoad() {
   deps.log('[System] Demo mode: stocking the store with a placeholder library (no media server).', 'system');
   deps.setLibraries(buildDemoLibraries(900));
   deps.setGames(buildDemoGames(60));
+  // GH #86 zero-setup follow-up (owner ruling 2026-08-21): the demo's own
+  // bb_streaming_services setting default is the full eight (settings.ts),
+  // and this is the ONE loader that was never wired into the demo boot at
+  // all — every other credential path races it alongside the sync, but the
+  // demo has no sync to race it into. Awaited (not raced against a timeout
+  // here) because loadStreamingMovies() already races its own network calls
+  // against a 15s cap internally, and the bundled-snapshot path it lands on
+  // with no config makes no network call to begin with.
+  await deps.loadStreaming();
   deps.launchStore();
 }
 

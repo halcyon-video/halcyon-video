@@ -36,6 +36,7 @@ import { loadMediaReleasePin, saveMediaReleasePin } from './media-release-date';
 import { formatUnlockLabel, makeRentalRecord, rentalCapacityAt } from './rental-clock';
 import { activeProviderKind } from './providers/provider-registry';
 import { topStudiosInLibrary } from './promo-campaigns';
+import { ALL_DEFAULT_STREAMING_SERVICES_CSV } from './streaming-catalog';
 import type { StoreScene } from './three-scene';
 import type { JellyfinLibrary } from './jellyfin';
 
@@ -1054,14 +1055,24 @@ export function registerCoreSettings(): void {
     hint: 'YYYY or YYYY-MM-DD. Never suggest titles released later. The Media Release Date pin still applies if tighter.',
   });
 
-  // Streaming-service sections (GH #86): movies on the owner's subscriptions,
-  // sourced from TMDB watch-provider data — directly (src/tmdb.ts) when
-  // tmdb_apikey is set, else via Jellyseerr (jellyseerr.ts's
-  // fetchStreamingMovies) as a fallback; see streaming-catalog.ts's
-  // resolveStreamingSource for the ladder. Hidden (no drawer UI yet — GH #86
-  // follow-up): both rows still register so getSetting parses
-  // bb_streaming_enabled as a real boolean and both are reachable from
-  // SERVICE MODE / a direct localStorage or harness --set in the meantime.
+  // Streaming-service sections (GH #86): movies on subscriptions the owner
+  // actually has, sourced from TMDB watch-provider data — directly
+  // (src/tmdb.ts) when tmdb_apikey is set, via Jellyseerr
+  // (jellyseerr.ts's fetchStreamingMovies) as a fallback, or the bundled
+  // snapshot (streaming-snapshot.ts) with neither configured; see
+  // streaming-catalog.ts's resolveStreamingSource for the ladder.
+  //
+  // bb_streaming_services is the CHOICE itself (owner ruling 2026-08-21):
+  // blank means none chosen, which is a fresh LOCAL install's default — no
+  // streaming aisles, the opening-day empty store (#41) stands as-is until
+  // the setup terminal's STREAMING SERVICES step (store-setup-screens.ts)
+  // picks some. The HOSTED DEMO build (isDemoMode) defaults to the full
+  // eight instead, so a visitor's very first boot is already stocked — "a
+  // user should be able to click into a hosted site and it just works".
+  // Hidden (no drawer UI yet beyond the opening-day terminal): both rows
+  // still register so getSetting parses bb_streaming_enabled as a real
+  // boolean and both are reachable from SERVICE MODE / a direct localStorage
+  // or harness --set in the meantime.
   registerSetting({
     key: 'bb_streaming_enabled',
     label: 'Streaming-service sections',
@@ -1077,9 +1088,9 @@ export function registerCoreSettings(): void {
     label: 'Streaming services',
     kind: 'text',
     group: 'Connection',
-    default: '',
+    default: isDemoMode ? ALL_DEFAULT_STREAMING_SERVICES_CSV : '',
     applyMode: 'rebuild-scene',
-    hint: 'Comma list overriding the default eight (Netflix, Prime Video, Disney+, Hulu, Max, Apple TV+, Paramount+, Peacock). Blank = the default set.',
+    hint: 'Comma list of CHOSEN streaming services (Netflix, Prime Video, Disney+, Hulu, Max, Apple TV+, Paramount+, Peacock). Blank = none.',
     hidden: true,
     visibleWhen: () => getSetting<boolean>('bb_streaming_enabled'),
   });

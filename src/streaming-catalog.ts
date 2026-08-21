@@ -71,11 +71,23 @@ export const DEFAULT_STREAMING_SERVICES: StreamingServiceDef[] = [
   {
     id: 'max', name: 'MAX', aliases: ['Max', 'HBO Max'],
   },
+  // Verified live against Jellyseerr/TMDB 2026-08-21 (GH #86 bundled-snapshot
+  // follow-up): both of these renamed since the aliases above were first
+  // written, which is exactly why they were silently missing from the
+  // snapshot -- matchProviderId is an EXACT match, so a stale alias just
+  // finds nothing rather than erroring. Apple TV's subscription tier is now
+  // plain "Apple TV" (id 350 in the US region list) -- the transactional
+  // rent/buy store picked up the "Store" suffix instead ("Apple TV Store",
+  // id 2), so adding the bare name back is safe: it can no longer collide
+  // with the transactional one the way it could under the old naming.
+  // Paramount+ no longer has a plain "Paramount Plus" entry at all -- TMDB
+  // splits it into ad-tier SKUs; both are listed so either resolves.
   {
-    id: 'appletv', name: 'APPLE TV+', aliases: ['Apple TV Plus', 'Apple TV+'],
+    id: 'appletv', name: 'APPLE TV+', aliases: ['Apple TV Plus', 'Apple TV+', 'Apple TV'],
   },
   {
-    id: 'paramount', name: 'PARAMOUNT+', aliases: ['Paramount Plus', 'Paramount+'],
+    id: 'paramount', name: 'PARAMOUNT+',
+    aliases: ['Paramount Plus', 'Paramount+', 'Paramount Plus Premium', 'Paramount Plus Essential'],
   },
   {
     id: 'peacock', name: 'PEACOCK',
@@ -91,24 +103,31 @@ function slugify(name: string): string {
 }
 
 /**
- * The service set to build sections for: the default eight, or -- when
- * `overrideCsv` (bb_streaming_services) is a non-blank comma list -- exactly
- * the named services, matched against the defaults by id or alias first and
- * synthesized as a custom (template-less) def otherwise. A blank/undefined
- * override, or one that resolves to nothing, keeps the default eight rather
- * than building an empty store.
+ * The CHOSEN service set to build sections for -- exactly the services named
+ * in `overrideCsv` (bb_streaming_services), matched against the defaults by
+ * id or alias first and synthesized as a custom (template-less) def
+ * otherwise. Blank/undefined/whitespace-only means NONE chosen (owner ruling
+ * 2026-08-21: a fresh local install boots with no streaming aisles at all --
+ * the opening-day setup terminal is where a normie picks which services they
+ * actually have). The hosted demo build supplies ALL_DEFAULT_STREAMING_SERVICES_CSV
+ * below as its OWN setting default (see settings.ts) rather than leaning on
+ * this function ever treating blank as "everything".
  */
 export function resolveEnabledServices(overrideCsv: string | undefined | null): StreamingServiceDef[] {
   const names = (overrideCsv ?? '').split(',').map((s) => s.trim()).filter(Boolean);
-  if (names.length === 0) return DEFAULT_STREAMING_SERVICES;
-  const resolved = names.map((name): StreamingServiceDef => {
+  if (names.length === 0) return [];
+  return names.map((name): StreamingServiceDef => {
     const lower = name.toLowerCase();
     const known = DEFAULT_STREAMING_SERVICES.find((d) =>
       d.id === lower || d.aliases.some((a) => a.toLowerCase() === lower));
     return known ?? { id: slugify(name), name: name.toUpperCase(), aliases: [name] };
   });
-  return resolved.length > 0 ? resolved : DEFAULT_STREAMING_SERVICES;
 }
+
+/** CSV of every default service's id, in order -- a concrete, non-blank
+ *  spelling of "all eight chosen" for the demo build's bb_streaming_services
+ *  default (settings.ts), now that a blank CSV means "none" instead. */
+export const ALL_DEFAULT_STREAMING_SERVICES_CSV = DEFAULT_STREAMING_SERVICES.map((d) => d.id).join(',');
 
 /**
  * Which network source stocks the streaming sections (owner correction
@@ -119,15 +138,17 @@ export function resolveEnabledServices(overrideCsv: string | undefined | null): 
  * `/discover/movie` call can filter to subscription (flatrate) titles via
  * `with_watch_monetization_types` -- Jellyseerr's proxied discover endpoint
  * has no equivalent param, so its results mix in rent/buy titles the owner
- * doesn't actually subscribe to. Neither configured keeps today's behavior:
- * the feature builds nothing.
+ * doesn't actually subscribe to. Neither configured falls back to the
+ * bundled snapshot (src/streaming-snapshot.ts, GH #86 zero-setup follow-up,
+ * owner ruling 2026-08-21) -- the floor of the ladder, so a CHOSEN service
+ * always stocks even with nothing configured at all.
  */
-export type StreamingSource = 'tmdb' | 'jellyseerr' | 'none';
+export type StreamingSource = 'tmdb' | 'jellyseerr' | 'snapshot';
 
 export function resolveStreamingSource(hasTmdbKey: boolean, hasJellyseerr: boolean): StreamingSource {
   if (hasTmdbKey) return 'tmdb';
   if (hasJellyseerr) return 'jellyseerr';
-  return 'none';
+  return 'snapshot';
 }
 
 /** Match a service def against Jellyseerr's watch-provider list by exact

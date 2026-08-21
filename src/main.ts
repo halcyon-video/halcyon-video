@@ -58,6 +58,7 @@ import { fetchGames, launchGame } from './romm';
 import { isGamesOnly, storeCatalog } from './games-only';
 import { buildStreamingLibraries, resolveEnabledServices, resolveStreamingSource } from './streaming-catalog';
 import { fetchStreamingMoviesFromTmdb, getTmdbConfig } from './tmdb';
+import { fetchStreamingMoviesFromSnapshot } from './streaming-snapshot';
 import { isMembershipPickerOpen } from './membership-cards';
 import {
   initBootFlow,
@@ -359,29 +360,36 @@ async function loadDiscoveryMovies(): Promise<void> {
 }
 
 /**
- * GH #86: fetch the enabled streaming services' watch-provider stock, same
+ * GH #86: fetch the CHOSEN streaming services' watch-provider stock, same
  * never-block-boot treatment as the other Jellyseerr loaders. A no-op — []
- * without a single request — while the master switch is off, so an owner who
- * doesn't want streaming sections costs neither source anything extra.
+ * without a single request — while the master switch is off, or while
+ * nothing is chosen (bb_streaming_services blank -- a fresh local install's
+ * default, owner ruling 2026-08-21), so neither costs anything extra.
  *
- * Source ladder (owner correction 2026-08-21): a direct TMDB key
- * (tmdb_apikey) is a full replacement source, not icing on Jellyseerr — it
- * wins when both are configured (see streaming-catalog.ts's
- * resolveStreamingSource for why), Jellyseerr is the fallback, and neither
- * configured builds nothing, exactly as before this change.
+ * Source ladder: a direct TMDB key (tmdb_apikey) is a full replacement
+ * source, not icing on Jellyseerr — it wins when both are configured (see
+ * streaming-catalog.ts's resolveStreamingSource for why), Jellyseerr is the
+ * fallback, and neither configured falls back to the bundled snapshot
+ * (streaming-snapshot.ts) — the floor of the ladder, so a chosen service
+ * ALWAYS stocks, including the hosted demo and a bare local install with
+ * nothing set up at all.
  */
 async function loadStreamingMovies(): Promise<void> {
   if (!streamingEnabled()) {
     streamingMovies = [];
     return;
   }
+  const servicesOverride = getSetting<string>('bb_streaming_services');
+  if (resolveEnabledServices(servicesOverride).length === 0) {
+    streamingMovies = []; // nothing chosen -- no network round trip needed
+    return;
+  }
   const TIMEOUT_MS = 15_000;
   const timeoutPromise = new Promise<Movie[]>((resolve) => setTimeout(() => resolve([]), TIMEOUT_MS));
-  const servicesOverride = getSetting<string>('bb_streaming_services');
   const source = resolveStreamingSource(!!getTmdbConfig(), !!getJellyseerrConfig());
   const fetchPromise = source === 'tmdb' ? fetchStreamingMoviesFromTmdb(servicesOverride)
     : source === 'jellyseerr' ? fetchStreamingMovies(servicesOverride)
-    : Promise.resolve<Movie[]>([]);
+    : fetchStreamingMoviesFromSnapshot(servicesOverride);
   try {
     streamingMovies = await Promise.race([fetchPromise, timeoutPromise]);
   } catch (e) {

@@ -1,0 +1,1014 @@
+{
+  "generatedAt": "2026-08-21T05:57:17.064Z",
+  "watchRegion": "US",
+  "services": [
+    {
+      "id": "netflix",
+      "name": "NETFLIX",
+      "titles": [
+        {
+          "tmdbId": 1284041,
+          "title": "The Last House",
+          "year": 2026,
+          "posterPath": "/6JU7E8Vv2M11egkctWVOScxWR75.jpg"
+        },
+        {
+          "tmdbId": 315635,
+          "title": "Spider-Man: Homecoming",
+          "year": 2017,
+          "posterPath": "/c24sv2weTHPsmDa7jEMN0m2P3RT.jpg"
+        },
+        {
+          "tmdbId": 1504358,
+          "title": "Don't Say Good Luck",
+          "year": 2026,
+          "posterPath": "/dgTKahWonzVLeN8Lm22WR2S7D0A.jpg"
+        },
+        {
+          "tmdbId": 324857,
+          "title": "Spider-Man: Into the Spider-Verse",
+          "year": 2018,
+          "posterPath": "/iiZZdoQBEYBv6id8su7ImL0oCbD.jpg"
+        },
+        {
+          "tmdbId": 1007757,
+          "title": "Swapped",
+          "year": 2026,
+          "posterPath": "/tHhxWxge06goXU6ZQH1hj7vK8Hd.jpg"
+        },
+        {
+          "tmdbId": 803796,
+          "title": "KPop Demon Hunters",
+          "year": 2025,
+          "posterPath": "/zT7Lhw3BhJbMkRqm9Zlx2YGMsY0.jpg"
+        },
+        {
+          "tmdbId": 1625901,
+          "title": "The Dating App Killer: The Monica White Story",
+          "year": 2026,
+          "posterPath": "/wyu5CdFptyz7ZxmgwcHMMhR5tt0.jpg"
+        },
+        {
+          "tmdbId": 1234821,
+          "title": "Jurassic World Rebirth",
+          "year": 2025,
+          "posterPath": "/1RICxzeoNCAO5NpcRMIgg1XT6fm.jpg"
+        },
+        {
+          "tmdbId": 967941,
+          "title": "Wicked: For Good",
+          "year": 2025,
+          "posterPath": "/si9tolnefLSUKaqQEGz1bWArOaL.jpg"
+        },
+        {
+          "tmdbId": 1265609,
+          "title": "War Machine",
+          "year": 2026,
+          "posterPath": "/rFhKkXhk7ClU03jQ5rHIApJDwev.jpg"
+        },
+        {
+          "tmdbId": 949838,
+          "title": "72 HOURS",
+          "year": 2026,
+          "posterPath": "/9Bu1PW2R1XayqRqnl0aDOgMcrdS.jpg"
+        },
+        {
+          "tmdbId": 1318447,
+          "title": "Apex",
+          "year": 2026,
+          "posterPath": "/eTp7gSPkSF3Aw79mNx1NkBP1PZT.jpg"
+        },
+        {
+          "tmdbId": 424,
+          "title": "Schindler's List",
+          "year": 1993,
+          "posterPath": "/sF1U4EUQS8YHUYjNl3pMGNIQyr0.jpg"
+        },
+        {
+          "tmdbId": 1272837,
+          "title": "28 Years Later: The Bone Temple",
+          "year": 2026,
+          "posterPath": "/kK1BGkG3KAvWB0WMV1DfOx9yTMZ.jpg"
+        },
+        {
+          "tmdbId": 1297842,
+          "title": "GOAT",
+          "year": 2026,
+          "posterPath": "/wfuqMlaExcoYiUEvKfVpUTt1v4u.jpg"
+        },
+        {
+          "tmdbId": 539972,
+          "title": "Kraven the Hunter",
+          "year": 2024,
+          "posterPath": "/1GvBhRxY6MELDfxFrete6BNhBB5.jpg"
+        },
+        {
+          "tmdbId": 1100988,
+          "title": "28 Years Later",
+          "year": 2025,
+          "posterPath": "/n5FygjEppOvac6yEaowi26nTyw3.jpg"
+        },
+        {
+          "tmdbId": 912649,
+          "title": "Venom: The Last Dance",
+          "year": 2024,
+          "posterPath": "/vGXptEdgZIhPg3cGlc7e8sNPC2e.jpg"
+        },
+        {
+          "tmdbId": 1740877,
+          "title": "Storm on Sesame Street",
+          "year": 2026,
+          "posterPath": "/w4GrHRGgRQOYG95f2oVLYzGJ4Md.jpg"
+        },
+        {
+          "tmdbId": 436270,
+          "title": "Black Adam",
+          "year": 2022,
+          "posterPath": "/rCtreCr4xiYEWDQTebybolIh6Xe.jpg"
+        }
+      ]
+    },
+    {
+      "id": "prime",
+      "name": "AMAZON PRIME VIDEO",
+      "titles": [
+        {
+          "tmdbId": 687163,
+          "title": "Project Hail Mary",
+          "year": 2026,
+          "posterPath": "/yihdXomYb5kTeSivtFndMy5iDmf.jpg"
+        },
+        {
+          "tmdbId": 454639,
+          "title": "Masters of the Universe",
+          "year": 2026,
+          "posterPath": "/oRuyGUHdoaQxWP3SDfafGkStxTC.jpg"
+        },
+        {
+          "tmdbId": 1481343,
+          "title": "The Devil's Mouth",
+          "year": 2026,
+          "posterPath": "/lH8k9uCWYn2b2gsYleqYBDPbWa8.jpg"
+        },
+        {
+          "tmdbId": 755898,
+          "title": "War of the Worlds",
+          "year": 2025,
+          "posterPath": "/yvirUYrva23IudARHn3mMGVxWqM.jpg"
+        },
+        {
+          "tmdbId": 157336,
+          "title": "Interstellar",
+          "year": 2014,
+          "posterPath": "/yQvGrMoipbRoddT0ZR8tPoR7NfX.jpg"
+        },
+        {
+          "tmdbId": 1184918,
+          "title": "The Wild Robot",
+          "year": 2024,
+          "posterPath": "/wTnV3PCVW5O92JMrFvvrRcV39RU.jpg"
+        },
+        {
+          "tmdbId": 680,
+          "title": "Pulp Fiction",
+          "year": 1994,
+          "posterPath": "/vQWk5YBFWF4bZaofAbv0tShwBvQ.jpg"
+        },
+        {
+          "tmdbId": 1301421,
+          "title": "The Sheep Detectives",
+          "year": 2026,
+          "posterPath": "/mGWOmj2jHFol3kOGNv1EhbSDDE1.jpg"
+        },
+        {
+          "tmdbId": 798645,
+          "title": "The Running Man",
+          "year": 2025,
+          "posterPath": "/dKL78O9zxczVgjtNcQ9UkbYLzqX.jpg"
+        },
+        {
+          "tmdbId": 1061474,
+          "title": "Superman",
+          "year": 2025,
+          "posterPath": "/ldyfo0BKmz5rWtJJKCvwaNS4cJT.jpg"
+        },
+        {
+          "tmdbId": 1168190,
+          "title": "The Wrecking Crew",
+          "year": 2026,
+          "posterPath": "/gbVwHl4YPSq6BcC92TQpe7qUTh6.jpg"
+        },
+        {
+          "tmdbId": 390062,
+          "title": "Jungle",
+          "year": 2017,
+          "posterPath": "/tDgxknTVwrScxpCYyGUjXSn5NRk.jpg"
+        },
+        {
+          "tmdbId": 106646,
+          "title": "The Wolf of Wall Street",
+          "year": 2013,
+          "posterPath": "/kW9LmvYHAaS9iA0tHmZVq8hQYoq.jpg"
+        },
+        {
+          "tmdbId": 1171145,
+          "title": "Crime 101",
+          "year": 2026,
+          "posterPath": "/tVvpFIoteRHNnoZMhdnwIVwJpCA.jpg"
+        },
+        {
+          "tmdbId": 1380291,
+          "title": "Tom Clancy's Jack Ryan: Ghost War",
+          "year": 2026,
+          "posterPath": "/8ehYxUh5MWE41AeE9gkHE8DKzvB.jpg"
+        },
+        {
+          "tmdbId": 939243,
+          "title": "Sonic the Hedgehog 3",
+          "year": 2024,
+          "posterPath": "/d8Ryb8AunYAuycVKDp5HpdWPKgC.jpg"
+        },
+        {
+          "tmdbId": 1054867,
+          "title": "One Battle After Another",
+          "year": 2025,
+          "posterPath": "/lbBWwxBht4JFP5PsuJ5onpMqugW.jpg"
+        },
+        {
+          "tmdbId": 575265,
+          "title": "Mission: Impossible - The Final Reckoning",
+          "year": 2025,
+          "posterPath": "/iKPsC9EFUafRP9SrUznI61getVP.jpg"
+        },
+        {
+          "tmdbId": 11036,
+          "title": "The Notebook",
+          "year": 2004,
+          "posterPath": "/rNzQyW4f8B8cQeg7Dgj3n6eT5k9.jpg"
+        },
+        {
+          "tmdbId": 189,
+          "title": "Sin City: A Dame to Kill For",
+          "year": 2014,
+          "posterPath": "/50kALxDX4mmzIRljbNbPY0u4cie.jpg"
+        }
+      ]
+    },
+    {
+      "id": "disney",
+      "name": "DISNEY+",
+      "titles": [
+        {
+          "tmdbId": 634649,
+          "title": "Spider-Man: No Way Home",
+          "year": 2021,
+          "posterPath": "/1g0dhYtq4irTY1GPXvft6k4YLjm.jpg"
+        },
+        {
+          "tmdbId": 315635,
+          "title": "Spider-Man: Homecoming",
+          "year": 2017,
+          "posterPath": "/c24sv2weTHPsmDa7jEMN0m2P3RT.jpg"
+        },
+        {
+          "tmdbId": 557,
+          "title": "Spider-Man",
+          "year": 2002,
+          "posterPath": "/nXdAh5vUwERL4WGVMaee8RoDEAS.jpg"
+        },
+        {
+          "tmdbId": 299536,
+          "title": "Avengers: Infinity War",
+          "year": 2018,
+          "posterPath": "/7WsyChQLEftFiDOVTGkv3hFpyyt.jpg"
+        },
+        {
+          "tmdbId": 83533,
+          "title": "Avatar: Fire and Ash",
+          "year": 2025,
+          "posterPath": "/bRBeSHfGHwkEpImlhxPmOcUsaeg.jpg"
+        },
+        {
+          "tmdbId": 1493400,
+          "title": "Camp Rock 3",
+          "year": 2026,
+          "posterPath": "/rS7byWK9cfPfdLeFNlRIaJxH9mN.jpg"
+        },
+        {
+          "tmdbId": 24428,
+          "title": "The Avengers",
+          "year": 2012,
+          "posterPath": "/RYMX2wcKCBAr24UyPD7xwmjaTn.jpg"
+        },
+        {
+          "tmdbId": 1314481,
+          "title": "The Devil Wears Prada 2",
+          "year": 2026,
+          "posterPath": "/xTI42pmsP5EDnvsNJPEDubwWBQO.jpg"
+        },
+        {
+          "tmdbId": 1930,
+          "title": "The Amazing Spider-Man",
+          "year": 2012,
+          "posterPath": "/jexoNYnPd6vVrmygwF6QZmWPFdu.jpg"
+        },
+        {
+          "tmdbId": 1439930,
+          "title": "The Punisher: One Last Kill",
+          "year": 2026,
+          "posterPath": "/qQclTgLMDvGBuUBFGHRipxkEwWR.jpg"
+        },
+        {
+          "tmdbId": 1084242,
+          "title": "Zootopia 2",
+          "year": 2025,
+          "posterPath": "/oJ7g2CifqpStmoYQyaLQgEU32qO.jpg"
+        },
+        {
+          "tmdbId": 429617,
+          "title": "Spider-Man: Far From Home",
+          "year": 2019,
+          "posterPath": "/4q2NNj4S5dG2RLF9CpXsej7yXl.jpg"
+        },
+        {
+          "tmdbId": 299534,
+          "title": "Avengers: Endgame",
+          "year": 2019,
+          "posterPath": "/ulzhLuWrPK07P1YkdWQLZnQh1JL.jpg"
+        },
+        {
+          "tmdbId": 559,
+          "title": "Spider-Man 3",
+          "year": 2007,
+          "posterPath": "/sJMTTGjtjvrMZ7G0oP9D13wNUum.jpg"
+        },
+        {
+          "tmdbId": 569094,
+          "title": "Spider-Man: Across the Spider-Verse",
+          "year": 2023,
+          "posterPath": "/8Vt6mWEReuy4Of61Lnj5Xj704m8.jpg"
+        },
+        {
+          "tmdbId": 822119,
+          "title": "Captain America: Brave New World",
+          "year": 2025,
+          "posterPath": "/pzIddUEMWhWzfvLI3TwxUG2wGoi.jpg"
+        },
+        {
+          "tmdbId": 533535,
+          "title": "Deadpool & Wolverine",
+          "year": 2024,
+          "posterPath": "/8cdWjvZQUExUUTzyp4t6EDMubfO.jpg"
+        },
+        {
+          "tmdbId": 102382,
+          "title": "The Amazing Spider-Man 2",
+          "year": 2014,
+          "posterPath": "/dGjoPttcbKR5VWg1jQuNFB247KL.jpg"
+        },
+        {
+          "tmdbId": 1327819,
+          "title": "Hoppers",
+          "year": 2026,
+          "posterPath": "/xjtWQ2CL1mpmMNwuU5HeS4Iuwuu.jpg"
+        },
+        {
+          "tmdbId": 271110,
+          "title": "Captain America: Civil War",
+          "year": 2016,
+          "posterPath": "/rAGiXaUfPzY7CDEyNKUofk3Kw2e.jpg"
+        }
+      ]
+    },
+    {
+      "id": "hulu",
+      "name": "HULU",
+      "titles": [
+        {
+          "tmdbId": 557,
+          "title": "Spider-Man",
+          "year": 2002,
+          "posterPath": "/nXdAh5vUwERL4WGVMaee8RoDEAS.jpg"
+        },
+        {
+          "tmdbId": 24428,
+          "title": "The Avengers",
+          "year": 2012,
+          "posterPath": "/RYMX2wcKCBAr24UyPD7xwmjaTn.jpg"
+        },
+        {
+          "tmdbId": 1314481,
+          "title": "The Devil Wears Prada 2",
+          "year": 2026,
+          "posterPath": "/xTI42pmsP5EDnvsNJPEDubwWBQO.jpg"
+        },
+        {
+          "tmdbId": 157336,
+          "title": "Interstellar",
+          "year": 2014,
+          "posterPath": "/yQvGrMoipbRoddT0ZR8tPoR7NfX.jpg"
+        },
+        {
+          "tmdbId": 559,
+          "title": "Spider-Man 3",
+          "year": 2007,
+          "posterPath": "/sJMTTGjtjvrMZ7G0oP9D13wNUum.jpg"
+        },
+        {
+          "tmdbId": 1242898,
+          "title": "Predator: Badlands",
+          "year": 2025,
+          "posterPath": "/pHpq9yNUIo6aDoCXEBzjSolywgz.jpg"
+        },
+        {
+          "tmdbId": 1726,
+          "title": "Iron Man",
+          "year": 2008,
+          "posterPath": "/78lPtwv72eTNqFW9COBYI0dWDJa.jpg"
+        },
+        {
+          "tmdbId": 1724,
+          "title": "The Incredible Hulk",
+          "year": 2008,
+          "posterPath": "/gKzYx79y0AQTL4UAk1cBQJ3nvrm.jpg"
+        },
+        {
+          "tmdbId": 350,
+          "title": "The Devil Wears Prada",
+          "year": 2006,
+          "posterPath": "/8912AsVuS7Sj915apArUFbv6F9L.jpg"
+        },
+        {
+          "tmdbId": 862,
+          "title": "Toy Story",
+          "year": 1995,
+          "posterPath": "/uXDfjJbdP4ijW5hWSBrPrlKpxab.jpg"
+        },
+        {
+          "tmdbId": 10138,
+          "title": "Iron Man 2",
+          "year": 2010,
+          "posterPath": "/6WBeq4fCfn7AN0o21W9qNcRF2l9.jpg"
+        },
+        {
+          "tmdbId": 106646,
+          "title": "The Wolf of Wall Street",
+          "year": 2013,
+          "posterPath": "/kW9LmvYHAaS9iA0tHmZVq8hQYoq.jpg"
+        },
+        {
+          "tmdbId": 19995,
+          "title": "Avatar",
+          "year": 2009,
+          "posterPath": "/gKY6q7SjCkAU6FqvqWybDYgUKIF.jpg"
+        },
+        {
+          "tmdbId": 10195,
+          "title": "Thor",
+          "year": 2011,
+          "posterPath": "/prSfAi1xGrhLQNxVSUFh61xQ4Qy.jpg"
+        },
+        {
+          "tmdbId": 284054,
+          "title": "Black Panther",
+          "year": 2018,
+          "posterPath": "/uxzzxijgPIY7slzFvMotPv8wjKA.jpg"
+        },
+        {
+          "tmdbId": 2062,
+          "title": "Ratatouille",
+          "year": 2007,
+          "posterPath": "/t3vaWRPSf6WjDSamIkKDs1iQWna.jpg"
+        },
+        {
+          "tmdbId": 1266127,
+          "title": "Ready or Not: Here I Come",
+          "year": 2026,
+          "posterPath": "/13ZcJzSGEqVgDSqsS9U5EkQwPkV.jpg"
+        },
+        {
+          "tmdbId": 12,
+          "title": "Finding Nemo",
+          "year": 2003,
+          "posterPath": "/eHuGQ10FUzK1mdOY69wF5pGgEf5.jpg"
+        },
+        {
+          "tmdbId": 1198994,
+          "title": "Send Help",
+          "year": 2026,
+          "posterPath": "/zbJWVHOtj3ljBzWgL1P8pxP03Up.jpg"
+        },
+        {
+          "tmdbId": 558,
+          "title": "Spider-Man 2",
+          "year": 2004,
+          "posterPath": "/aGuvNAaaZuWXYQQ6N2v7DeuP6mB.jpg"
+        }
+      ]
+    },
+    {
+      "id": "max",
+      "name": "MAX",
+      "titles": [
+        {
+          "tmdbId": 569094,
+          "title": "Spider-Man: Across the Spider-Verse",
+          "year": 2023,
+          "posterPath": "/8Vt6mWEReuy4Of61Lnj5Xj704m8.jpg"
+        },
+        {
+          "tmdbId": 155,
+          "title": "The Dark Knight",
+          "year": 2008,
+          "posterPath": "/qJ2tW6WMUDux911r6m7haRef0WH.jpg"
+        },
+        {
+          "tmdbId": 931285,
+          "title": "Mortal Kombat II",
+          "year": 2026,
+          "posterPath": "/hwRdDFIhaEmpRgoki805YvyyjZf.jpg"
+        },
+        {
+          "tmdbId": 122,
+          "title": "The Lord of the Rings: The Return of the King",
+          "year": 2003,
+          "posterPath": "/rCzpDGLbOoPwLjy3OAm5NUPOTrC.jpg"
+        },
+        {
+          "tmdbId": 1304313,
+          "title": "Lee Cronin's The Mummy",
+          "year": 2026,
+          "posterPath": "/1q308iixueCU4pFtSYugNOevtNx.jpg"
+        },
+        {
+          "tmdbId": 671,
+          "title": "Harry Potter and the Philosopher's Stone",
+          "year": 2001,
+          "posterPath": "/wuMc08IPKEatf9rnMNXvIDxqP4W.jpg"
+        },
+        {
+          "tmdbId": 840464,
+          "title": "Greenland 2: Migration",
+          "year": 2026,
+          "posterPath": "/z2tqCJLsw6uEJ8nJV8BsQXGa3dr.jpg"
+        },
+        {
+          "tmdbId": 693134,
+          "title": "Dune: Part Two",
+          "year": 2024,
+          "posterPath": "/6izwz7rsy95ARzTR3poZ8H6c5pp.jpg"
+        },
+        {
+          "tmdbId": 120,
+          "title": "The Lord of the Rings: The Fellowship of the Ring",
+          "year": 2001,
+          "posterPath": "/6oom5QYQ2yQTMJIbnvbkBL9cHo6.jpg"
+        },
+        {
+          "tmdbId": 436969,
+          "title": "The Suicide Squad",
+          "year": 2021,
+          "posterPath": "/q61qEyssk2ku3okWICKArlAdhBn.jpg"
+        },
+        {
+          "tmdbId": 1325734,
+          "title": "The Drama",
+          "year": 2026,
+          "posterPath": "/rnIOUhzwJDfgQakx8EjoNyItKgs.jpg"
+        },
+        {
+          "tmdbId": 121,
+          "title": "The Lord of the Rings: The Two Towers",
+          "year": 2002,
+          "posterPath": "/5VTN0pR8gcqV3EPUHHfMGnJYN9L.jpg"
+        },
+        {
+          "tmdbId": 1061474,
+          "title": "Superman",
+          "year": 2025,
+          "posterPath": "/ldyfo0BKmz5rWtJJKCvwaNS4cJT.jpg"
+        },
+        {
+          "tmdbId": 12444,
+          "title": "Harry Potter and the Deathly Hallows: Part 1",
+          "year": 2010,
+          "posterPath": "/iGoXIpQb7Pot00EEdwpwPajheZ5.jpg"
+        },
+        {
+          "tmdbId": 672,
+          "title": "Harry Potter and the Chamber of Secrets",
+          "year": 2002,
+          "posterPath": "/sdEOH0992YZ0QSxgXNIGLq1ToUi.jpg"
+        },
+        {
+          "tmdbId": 129,
+          "title": "Spirited Away",
+          "year": 2001,
+          "posterPath": "/39wmItIWsg5sZMyRUHLkWBcuVCM.jpg"
+        },
+        {
+          "tmdbId": 674,
+          "title": "Harry Potter and the Goblet of Fire",
+          "year": 2005,
+          "posterPath": "/fECBtHlr0RB3foNHDiCBXeg9Bv9.jpg"
+        },
+        {
+          "tmdbId": 438631,
+          "title": "Dune",
+          "year": 2021,
+          "posterPath": "/v1tRXZ4JtD2Iv6fjkPvT4GiwslV.jpg"
+        },
+        {
+          "tmdbId": 950387,
+          "title": "A Minecraft Movie",
+          "year": 2025,
+          "posterPath": "/yFHHfHcUgGAxziP1C3lLt0q2T4s.jpg"
+        },
+        {
+          "tmdbId": 673,
+          "title": "Harry Potter and the Prisoner of Azkaban",
+          "year": 2004,
+          "posterPath": "/aWxwnYoe8p2d2fcxOqtvAtJ72Rw.jpg"
+        }
+      ]
+    },
+    {
+      "id": "appletv",
+      "name": "APPLE TV+",
+      "titles": [
+        {
+          "tmdbId": 597,
+          "title": "Titanic",
+          "year": 1997,
+          "posterPath": "/9xjZS2rlVxm8SFx8kPC3aIGCOYQ.jpg"
+        },
+        {
+          "tmdbId": 911430,
+          "title": "F1",
+          "year": 2025,
+          "posterPath": "/9PXZIUsSDh4alB80jheWX4fhZmy.jpg"
+        },
+        {
+          "tmdbId": 950396,
+          "title": "The Gorge",
+          "year": 2025,
+          "posterPath": "/7iMBZzVZtG0oBug4TfqDb9ZxAOa.jpg"
+        },
+        {
+          "tmdbId": 286217,
+          "title": "The Martian",
+          "year": 2015,
+          "posterPath": "/fASz8A0yFE3QB6LgGoOfwvFSseV.jpg"
+        },
+        {
+          "tmdbId": 329865,
+          "title": "Arrival",
+          "year": 2016,
+          "posterPath": "/pEzNVQfdzYDzVK0XqxERIw2x2se.jpg"
+        },
+        {
+          "tmdbId": 1363123,
+          "title": "The Family Plan 2",
+          "year": 2025,
+          "posterPath": "/semFxuYx6HcrkZzslgAkBqfJvZk.jpg"
+        },
+        {
+          "tmdbId": 210577,
+          "title": "Gone Girl",
+          "year": 2014,
+          "posterPath": "/ts996lKsxvjkO2yiYG0ht4qAicO.jpg"
+        },
+        {
+          "tmdbId": 2501,
+          "title": "The Bourne Identity",
+          "year": 2002,
+          "posterPath": "/aP8swke3gmowbkfZ6lmNidu0y9p.jpg"
+        },
+        {
+          "tmdbId": 1029575,
+          "title": "The Family Plan",
+          "year": 2023,
+          "posterPath": "/jLLtx3nTRSLGPAKl4RoIv1FbEBr.jpg"
+        },
+        {
+          "tmdbId": 1098006,
+          "title": "Fountain of Youth",
+          "year": 2025,
+          "posterPath": "/4iWjGghUj2uyHo2Hyw8NFBvsNGm.jpg"
+        },
+        {
+          "tmdbId": 1698575,
+          "title": "Snoopy Presents: There's No Place Like Home, Snoopy",
+          "year": 2026,
+          "posterPath": "/YbC4SlzE030BgxWdKDdlatMh5W.jpg"
+        },
+        {
+          "tmdbId": 601,
+          "title": "E.T. the Extra-Terrestrial",
+          "year": 1982,
+          "posterPath": "/an0nD6uq6byfxXCfk6lQBzdL2J1.jpg"
+        },
+        {
+          "tmdbId": 1259102,
+          "title": "Eternity",
+          "year": 2025,
+          "posterPath": "/yiwGcjfDKXD5PqQnyKUU9kspWQQ.jpg"
+        },
+        {
+          "tmdbId": 466420,
+          "title": "Killers of the Flower Moon",
+          "year": 2023,
+          "posterPath": "/dB6Krk806zeqd0YNp2ngQ9zXteH.jpg"
+        },
+        {
+          "tmdbId": 745,
+          "title": "The Sixth Sense",
+          "year": 1999,
+          "posterPath": "/vOyfUXNFSnaTk7Vk5AjpsKTUWsu.jpg"
+        },
+        {
+          "tmdbId": 18240,
+          "title": "The Proposal",
+          "year": 2009,
+          "posterPath": "/6stnAm1wSek8ZrislwK4xGTyCnt.jpg"
+        },
+        {
+          "tmdbId": 1949,
+          "title": "Zodiac",
+          "year": 2007,
+          "posterPath": "/6YmeO4pB7XTh8P8F960O1uA14JO.jpg"
+        },
+        {
+          "tmdbId": 753342,
+          "title": "Napoleon",
+          "year": 2023,
+          "posterPath": "/ytFOXyghxLzAM4KZyazDdEkM66q.jpg"
+        },
+        {
+          "tmdbId": 4327,
+          "title": "Charlie's Angels",
+          "year": 2000,
+          "posterPath": "/paDTaHGLxhacythNZCT86VPanm6.jpg"
+        },
+        {
+          "tmdbId": 453,
+          "title": "A Beautiful Mind",
+          "year": 2001,
+          "posterPath": "/rEIg5yJdNOt9fmX4P8gU9LeNoTQ.jpg"
+        }
+      ]
+    },
+    {
+      "id": "paramount",
+      "name": "PARAMOUNT+",
+      "titles": [
+        {
+          "tmdbId": 980431,
+          "title": "Avatar Aang: The Last Airbender",
+          "year": 2026,
+          "posterPath": "/3sgnSfNT27Bx5O5ukr7B26mhEQq.jpg"
+        },
+        {
+          "tmdbId": 157336,
+          "title": "Interstellar",
+          "year": 2014,
+          "posterPath": "/yQvGrMoipbRoddT0ZR8tPoR7NfX.jpg"
+        },
+        {
+          "tmdbId": 238,
+          "title": "The Godfather",
+          "year": 1972,
+          "posterPath": "/3bhkrj58Vtu7enYsRolD1fZdja1.jpg"
+        },
+        {
+          "tmdbId": 680,
+          "title": "Pulp Fiction",
+          "year": 1994,
+          "posterPath": "/vQWk5YBFWF4bZaofAbv0tShwBvQ.jpg"
+        },
+        {
+          "tmdbId": 361743,
+          "title": "Top Gun: Maverick",
+          "year": 2022,
+          "posterPath": "/n0YuM4f5lvGAP6MAW2kBIzugXnc.jpg"
+        },
+        {
+          "tmdbId": 98,
+          "title": "Gladiator",
+          "year": 2000,
+          "posterPath": "/wN2xWp1eIwCKOD0BHTcErTBv1Uq.jpg"
+        },
+        {
+          "tmdbId": 13,
+          "title": "Forrest Gump",
+          "year": 1994,
+          "posterPath": "/Cw4hIUIAmSYfK9QfaUW5igp9La.jpg"
+        },
+        {
+          "tmdbId": 798645,
+          "title": "The Running Man",
+          "year": 2025,
+          "posterPath": "/dKL78O9zxczVgjtNcQ9UkbYLzqX.jpg"
+        },
+        {
+          "tmdbId": 597,
+          "title": "Titanic",
+          "year": 1997,
+          "posterPath": "/9xjZS2rlVxm8SFx8kPC3aIGCOYQ.jpg"
+        },
+        {
+          "tmdbId": 857,
+          "title": "Saving Private Ryan",
+          "year": 1998,
+          "posterPath": "/uqx37cS8cpHg8U35f9U5IBlrCV3.jpg"
+        },
+        {
+          "tmdbId": 106646,
+          "title": "The Wolf of Wall Street",
+          "year": 2013,
+          "posterPath": "/kW9LmvYHAaS9iA0tHmZVq8hQYoq.jpg"
+        },
+        {
+          "tmdbId": 335984,
+          "title": "Blade Runner 2049",
+          "year": 2017,
+          "posterPath": "/gajva2L0rPYkEWjzgFlBXCAVBE5.jpg"
+        },
+        {
+          "tmdbId": 240,
+          "title": "The Godfather Part II",
+          "year": 1974,
+          "posterPath": "/sSuQTCZwqKrNBNIsksO9IAUoWP9.jpg"
+        },
+        {
+          "tmdbId": 489,
+          "title": "Good Will Hunting",
+          "year": 1997,
+          "posterPath": "/z2FnLKpFi1HPO7BEJxdkv6hpJSU.jpg"
+        },
+        {
+          "tmdbId": 939243,
+          "title": "Sonic the Hedgehog 3",
+          "year": 2024,
+          "posterPath": "/d8Ryb8AunYAuycVKDp5HpdWPKgC.jpg"
+        },
+        {
+          "tmdbId": 575265,
+          "title": "Mission: Impossible - The Final Reckoning",
+          "year": 2025,
+          "posterPath": "/iKPsC9EFUafRP9SrUznI61getVP.jpg"
+        },
+        {
+          "tmdbId": 1159559,
+          "title": "Scream 7",
+          "year": 2026,
+          "posterPath": "/jjyuk0edLiW8vOSnlfwWCCLpbh5.jpg"
+        },
+        {
+          "tmdbId": 189,
+          "title": "Sin City: A Dame to Kill For",
+          "year": 2014,
+          "posterPath": "/50kALxDX4mmzIRljbNbPY0u4cie.jpg"
+        },
+        {
+          "tmdbId": 280,
+          "title": "Terminator 2: Judgment Day",
+          "year": 1991,
+          "posterPath": "/jFTVD4XoWQTcg7wdyJKa8PEds5q.jpg"
+        },
+        {
+          "tmdbId": 18785,
+          "title": "The Hangover",
+          "year": 2009,
+          "posterPath": "/A0uS9rHR56FeBtpjVki16M5xxSW.jpg"
+        }
+      ]
+    },
+    {
+      "id": "peacock",
+      "name": "PEACOCK",
+      "titles": [
+        {
+          "tmdbId": 1339713,
+          "title": "Obsession",
+          "year": 2026,
+          "posterPath": "/bRwnj8WEKBCvmfeUNOukJPwB43K.jpg"
+        },
+        {
+          "tmdbId": 1226863,
+          "title": "The Super Mario Galaxy Movie",
+          "year": 2026,
+          "posterPath": "/eJGWx219ZcEMVQJhAgMiqo8tYY.jpg"
+        },
+        {
+          "tmdbId": 603,
+          "title": "The Matrix",
+          "year": 1999,
+          "posterPath": "/dXNAPwY7VrqMAo51EKhhCJfaGb5.jpg"
+        },
+        {
+          "tmdbId": 652,
+          "title": "Troy",
+          "year": 2004,
+          "posterPath": "/a07wLy4ONfpsjnBqMwhlWTJTcm.jpg"
+        },
+        {
+          "tmdbId": 671,
+          "title": "Harry Potter and the Philosopher's Stone",
+          "year": 2001,
+          "posterPath": "/wuMc08IPKEatf9rnMNXvIDxqP4W.jpg"
+        },
+        {
+          "tmdbId": 872585,
+          "title": "Oppenheimer",
+          "year": 2023,
+          "posterPath": "/8Gxv8gSFCU0XGDykEGv7zR1n2ua.jpg"
+        },
+        {
+          "tmdbId": 12444,
+          "title": "Harry Potter and the Deathly Hallows: Part 1",
+          "year": 2010,
+          "posterPath": "/iGoXIpQb7Pot00EEdwpwPajheZ5.jpg"
+        },
+        {
+          "tmdbId": 672,
+          "title": "Harry Potter and the Chamber of Secrets",
+          "year": 2002,
+          "posterPath": "/sdEOH0992YZ0QSxgXNIGLq1ToUi.jpg"
+        },
+        {
+          "tmdbId": 674,
+          "title": "Harry Potter and the Goblet of Fire",
+          "year": 2005,
+          "posterPath": "/fECBtHlr0RB3foNHDiCBXeg9Bv9.jpg"
+        },
+        {
+          "tmdbId": 673,
+          "title": "Harry Potter and the Prisoner of Azkaban",
+          "year": 2004,
+          "posterPath": "/aWxwnYoe8p2d2fcxOqtvAtJ72Rw.jpg"
+        },
+        {
+          "tmdbId": 12445,
+          "title": "Harry Potter and the Deathly Hallows: Part 2",
+          "year": 2011,
+          "posterPath": "/c54HpQmuwXjHq2C9wmoACjxoom3.jpg"
+        },
+        {
+          "tmdbId": 385687,
+          "title": "Fast X",
+          "year": 2023,
+          "posterPath": "/fiVW06jE7z9YnO4trhaMEdclSiC.jpg"
+        },
+        {
+          "tmdbId": 49018,
+          "title": "Insidious",
+          "year": 2011,
+          "posterPath": "/1egpmVXuXed58TH2UOnX1nATTrf.jpg"
+        },
+        {
+          "tmdbId": 675,
+          "title": "Harry Potter and the Order of the Phoenix",
+          "year": 2007,
+          "posterPath": "/5aOyriWkPec0zUDxmHFP9qMmBaj.jpg"
+        },
+        {
+          "tmdbId": 767,
+          "title": "Harry Potter and the Half-Blood Prince",
+          "year": 2009,
+          "posterPath": "/z7uo9zmQdQwU5ZJHFpv2Upl30i1.jpg"
+        },
+        {
+          "tmdbId": 489,
+          "title": "Good Will Hunting",
+          "year": 1997,
+          "posterPath": "/z2FnLKpFi1HPO7BEJxdkv6hpJSU.jpg"
+        },
+        {
+          "tmdbId": 808,
+          "title": "Shrek",
+          "year": 2001,
+          "posterPath": "/iB64vpL3dIObOtMZgX3RqdVdQDc.jpg"
+        },
+        {
+          "tmdbId": 502356,
+          "title": "The Super Mario Bros. Movie",
+          "year": 2023,
+          "posterPath": "/qNBAXBIQlnOThrVvA6mA2B5ggV6.jpg"
+        },
+        {
+          "tmdbId": 216015,
+          "title": "Fifty Shades of Grey",
+          "year": 2015,
+          "posterPath": "/63kGofUkt1Mx0SIL4XI4Z5AoSgt.jpg"
+        },
+        {
+          "tmdbId": 337167,
+          "title": "Fifty Shades Freed",
+          "year": 2018,
+          "posterPath": "/jjPJ4s3DWZZvI4vw8Xfi4Vqa1Q8.jpg"
+        }
+      ]
+    }
+  ]
+}

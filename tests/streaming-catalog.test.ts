@@ -7,6 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   DEFAULT_STREAMING_SERVICES,
+  ALL_DEFAULT_STREAMING_SERVICES_CSV,
   resolveEnabledServices,
   resolveStreamingSource,
   matchProviderId,
@@ -17,11 +18,11 @@ import {
   buildStreamingLibraries,
 } from '../src/streaming-catalog.ts';
 
-test('resolveStreamingSource: TMDB wins when both are configured; Jellyseerr is the fallback; neither builds nothing', () => {
+test('resolveStreamingSource: TMDB wins when both are configured; Jellyseerr is the fallback; neither falls back to the bundled snapshot', () => {
   assert.equal(resolveStreamingSource(true, true), 'tmdb');
   assert.equal(resolveStreamingSource(true, false), 'tmdb');
   assert.equal(resolveStreamingSource(false, true), 'jellyseerr');
-  assert.equal(resolveStreamingSource(false, false), 'none');
+  assert.equal(resolveStreamingSource(false, false), 'snapshot');
 });
 
 test('the default eight services have unique, non-blank ids and names', () => {
@@ -35,11 +36,15 @@ test('the default eight services have unique, non-blank ids and names', () => {
   }
 });
 
-test('resolveEnabledServices: blank/undefined/whitespace-only keeps the default eight', () => {
-  assert.equal(resolveEnabledServices(undefined), DEFAULT_STREAMING_SERVICES);
-  assert.equal(resolveEnabledServices(null), DEFAULT_STREAMING_SERVICES);
-  assert.equal(resolveEnabledServices(''), DEFAULT_STREAMING_SERVICES);
-  assert.equal(resolveEnabledServices('   , , '), DEFAULT_STREAMING_SERVICES);
+test('resolveEnabledServices: blank/undefined/whitespace-only means NONE chosen (owner ruling 2026-08-21 -- a fresh local install has no streaming aisles until the opening-day terminal picks some)', () => {
+  assert.deepEqual(resolveEnabledServices(undefined), []);
+  assert.deepEqual(resolveEnabledServices(null), []);
+  assert.deepEqual(resolveEnabledServices(''), []);
+  assert.deepEqual(resolveEnabledServices('   , , '), []);
+});
+
+test('ALL_DEFAULT_STREAMING_SERVICES_CSV resolves back to the full default eight, in order -- the demo build\'s own setting default', () => {
+  assert.deepEqual(resolveEnabledServices(ALL_DEFAULT_STREAMING_SERVICES_CSV), DEFAULT_STREAMING_SERVICES);
 });
 
 test('resolveEnabledServices: matches defaults by id or alias, case-insensitively', () => {
@@ -70,11 +75,14 @@ test('matchProviderId: exact case-insensitive alias match, and null when absent'
   );
   assert.equal(matchProviderId(netflix, [{ id: 9, name: 'Amazon Video' }]), null);
 
-  // A substring must NOT match -- "Apple TV" (transactional rent/buy) is a
-  // real, DIFFERENT TMDB provider from "Apple TV Plus" (the subscription).
+  // TMDB renamed both sides of this pair since the aliases were first
+  // written (verified live against Jellyseerr 2026-08-21, GH #86 bundled-
+  // snapshot follow-up): the subscription is now plain "Apple TV" (id 350)
+  // and the transactional rent/buy store picked up "Apple TV Store" (id 2).
+  // A substring still must not cross-match the two.
   const appletv = DEFAULT_STREAMING_SERVICES.find((d) => d.id === 'appletv')!;
-  assert.equal(matchProviderId(appletv, [{ id: 2, name: 'Apple TV' }]), null);
-  assert.equal(matchProviderId(appletv, [{ id: 350, name: 'Apple TV Plus' }]), 350);
+  assert.equal(matchProviderId(appletv, [{ id: 2, name: 'Apple TV Store' }]), null);
+  assert.equal(matchProviderId(appletv, [{ id: 350, name: 'Apple TV' }]), 350);
 });
 
 test('buildStreamingUrl: a service with a template uses it; one without falls back to the TMDB watch page', () => {
