@@ -62,6 +62,8 @@ export interface BootFlowDeps {
   loadComingSoon: () => Promise<void>;
   loadDiscovery: () => Promise<void>;
   loadGames: () => Promise<void>;
+  /** GH #86: streaming-service sections (Jellyseerr watch-provider data). */
+  loadStreaming: () => Promise<void>;
   mergeCollectionGaps: (libs: JellyfinLibrary[]) => Promise<number>;
   logJellyseerrStatus: (gapCount: number) => Promise<void>;
   gameCount: () => number;
@@ -207,6 +209,7 @@ async function syncForSetup(
       d.loadComingSoon(),
       d.loadDiscovery(),
       d.loadGames(),
+      d.loadStreaming(),
     ]);
   } finally {
     if (stallTimer) clearTimeout(stallTimer);
@@ -369,7 +372,8 @@ async function finishLoginAndLaunch(urlInput: string, session: MembershipLoginSe
       ]),
       deps.loadComingSoon(),
       deps.loadDiscovery(),
-      deps.loadGames()
+      deps.loadGames(),
+      deps.loadStreaming()
     ]);
   } finally {
     if (loginStallTimer) clearTimeout(loginStallTimer);
@@ -603,7 +607,8 @@ export async function checkCredentialsAndLoad() {
           ]),
           d.loadComingSoon(),
           d.loadDiscovery(),
-          d.loadGames()
+          d.loadGames(),
+          d.loadStreaming()
         ]);
         if (stallTimer) { clearTimeout(stallTimer); stallTimer = null; }
 

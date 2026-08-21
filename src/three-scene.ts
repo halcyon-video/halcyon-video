@@ -3600,7 +3600,7 @@ export class StoreScene {
   public candyBoxMats: THREE.MeshStandardMaterial[] | null = null;
   public dropCandyIntoBag(count: number): void { return checkout.dropCandyIntoBag(this, count); }
 
-  public selectAction(): 'inspect' | 'play' | 'request' | 'launch' | 'genre-menu' | 'start-browsing' | 'take' | 'checkout' | null { if (this.navOverlaySelect()) return null; return inspect.selectAction(this); }
+  public selectAction(): 'inspect' | 'play' | 'request' | 'launch' | 'streaming' | 'genre-menu' | 'start-browsing' | 'take' | 'checkout' | null { if (this.navOverlaySelect()) return null; return inspect.selectAction(this); }
 
   // Play the "launch" flourish on the currently-inspected case, then invoke
   // onComplete (typically to start video playback). The rental copy (the

@@ -51,10 +51,12 @@ import {
   requestMovie,
   isDiscoveryRequested,
   getJellyseerrConfig,
-  pingJellyseerr
+  pingJellyseerr,
+  fetchStreamingMovies,
 } from './jellyseerr';
 import { fetchGames, launchGame } from './romm';
 import { isGamesOnly, storeCatalog } from './games-only';
+import { buildStreamingLibraries, resolveEnabledServices } from './streaming-catalog';
 import { isMembershipPickerOpen } from './membership-cards';
 import {
   initBootFlow,
@@ -152,6 +154,15 @@ let discoveryMovies: Movie[] = [];
 // section -- see romm.ts. Stays [] if Romm isn't configured/reachable, same
 // never-block-boot treatment as the Jellyseerr lists above.
 let gameMovies: Movie[] = [];
+// GH #86: streaming-service titles from Jellyseerr's TMDB watch-provider data
+// (see streaming-catalog.ts + jellyseerr.ts's fetchStreamingMovies). Stays []
+// if Jellyseerr isn't configured/reachable or the master switch is off, same
+// never-block-boot treatment as the other Jellyseerr lists above.
+let streamingMovies: Movie[] = [];
+/** `true` unless the owner switched streaming sections off (default ON). */
+function streamingEnabled(): boolean {
+  return getSetting<boolean>('bb_streaming_enabled') !== false;
+}
 // What the STORE is built from, as opposed to what was fetched. Normally these
 // alias librariesList/gameMovies exactly; with GAMES ONLY on (games-only.ts)
 // the Romm platforms stand in as the libraries and the game department empties,
@@ -167,16 +178,26 @@ let storeComingSoon: Movie[] = [];
 let storeDiscovery: Movie[] = [];
 function refreshStoreCatalog() {
   const catalog = storeCatalog(librariesList, gameMovies);
+  // GH #86: one synthetic library per streaming service with surviving stock,
+  // appended after games-only's own library swap so a streaming aisle can
+  // stand alongside either the real libraries or (unusually) a games-only
+  // floor plan. Built fresh every call (cheap — capped at ~24 titles/service)
+  // rather than cached, so toggling the master switch off and back on without
+  // a re-fetch still reflects the current setting immediately.
+  const streamingLibs = streamingEnabled()
+    ? buildStreamingLibraries(streamingMovies, resolveEnabledServices(getSetting<string>('bb_streaming_services')))
+    : [];
+  const mergedLibraries = [...catalog.libraries, ...streamingLibs];
   // Per-library toggles (#41 Store Libraries / #39 Overhead TVs) register
   // here — the one funnel that sees every catalog, login, demo and rebuild
   // alike. The drawer builds its pages at open time, so late registration is
-  // enough. Synthetic games-only "libraries" are platforms, not libraries.
-  registerLibraryToggles(catalog.libraries.filter((l) => !l.games).map((l) => ({ id: l.id, name: l.name })));
+  // enough. Synthetic games-only/streaming "libraries" aren't real libraries.
+  registerLibraryToggles(mergedLibraries.filter((l) => !l.games && !l.streaming).map((l) => ({ id: l.id, name: l.name })));
   // Media Release Date pin (#42): everything premiering after the rolling
   // cutoff is absent from the store entirely. Filtered COPIES of the fetched
   // lists — clearing the pin is a rebuild, never a re-sync.
   const cutoff = activeMediaCutoff();
-  storeLibraries = cutoff ? filterLibrariesByCutoff(catalog.libraries, cutoff) : catalog.libraries;
+  storeLibraries = cutoff ? filterLibrariesByCutoff(mergedLibraries, cutoff) : mergedLibraries;
   storeGameMovies = cutoff ? filterMoviesByCutoff(catalog.games, cutoff) : catalog.games;
   storeComingSoon = cutoff ? filterMoviesByCutoff(comingSoonMovies, cutoff) : comingSoonMovies;
   storeDiscovery = cutoff ? filterMoviesByCutoff(discoveryMovies, cutoff) : discoveryMovies;
@@ -332,6 +353,30 @@ async function loadDiscoveryMovies(): Promise<void> {
   } catch (e) {
     console.warn('[Jellyseerr] Failed to load discovery titles:', e);
     discoveryMovies = [];
+  }
+}
+
+/**
+ * GH #86: fetch the enabled streaming services' watch-provider stock, same
+ * never-block-boot treatment as the other Jellyseerr loaders. A no-op — []
+ * without a single request — while the master switch is off, so an owner who
+ * doesn't want streaming sections costs Jellyseerr nothing extra.
+ */
+async function loadStreamingMovies(): Promise<void> {
+  if (!streamingEnabled()) {
+    streamingMovies = [];
+    return;
+  }
+  const TIMEOUT_MS = 15_000;
+  const timeoutPromise = new Promise<Movie[]>((resolve) => setTimeout(() => resolve([]), TIMEOUT_MS));
+  try {
+    streamingMovies = await Promise.race([
+      fetchStreamingMovies(getSetting<string>('bb_streaming_services')),
+      timeoutPromise,
+    ]);
+  } catch (e) {
+    console.warn('[Jellyseerr] Failed to load streaming-service titles:', e);
+    streamingMovies = [];
   }
 }
 
@@ -2694,6 +2739,8 @@ async function initializeStoreScene(preservePosterCache = false) {
         else if (choice === 'dismiss') handleGapDismiss();
       } else if (action === 'launch' && movie) {
         await handleGameLaunch(movie);
+      } else if (action === 'streaming' && movie) {
+        handleStreamingLaunch(movie);
       }
     };
 
@@ -3115,6 +3162,27 @@ async function handleGameLaunch(movie: Movie) {
     logToConsole(`[System] "${movie.title}" is ready — take it to the counter to play (emulator launch is only available in the desktop app).`, 'system');
   } else {
     logToConsole(`[System] Couldn't launch "${movie.title}" — check the Romm launch command in settings.`, 'system');
+  }
+}
+
+// ─── GH #86: streaming-service titles -> hand off to the service ───────────
+/**
+ * The streaming-section equivalent of "play": there is no local copy to
+ * stream, so selecting the case opens the service's own page for the title in
+ * a new tab/window instead — never checkout, never a bag, never the player.
+ * Never throws; a title synthesized without a link (shouldn't happen —
+ * synthesizeStreamingMovie always sets one) just logs and does nothing.
+ */
+function handleStreamingLaunch(movie: Movie) {
+  if (!movie.streamingUrl) {
+    logToConsole(`[System] "${movie.title}" has no streaming link.`, 'system');
+    return;
+  }
+  logToConsole(`[System] Opening ${movie.streamingServiceName || 'the streaming service'} for "${movie.title}"...`, 'system');
+  try {
+    window.open(movie.streamingUrl, '_blank', 'noopener');
+  } catch {
+    logToConsole(`[System] Couldn't open the link for "${movie.title}" (popup blocked?).`, 'system');
   }
 }
 
@@ -3764,6 +3832,7 @@ async function main() {
     loadComingSoon: loadComingSoonMovies,
     loadDiscovery: loadDiscoveryMovies,
     loadGames: loadGameMovies,
+    loadStreaming: loadStreamingMovies,
     mergeCollectionGaps,
     logJellyseerrStatus,
     gameCount: () => gameMovies.length,
@@ -4026,6 +4095,8 @@ async function main() {
         else if (choice === 'dismiss') handleGapDismiss();
       } else if (action === 'launch' && movie) {
         await handleGameLaunch(movie);
+      } else if (action === 'streaming' && movie) {
+        handleStreamingLaunch(movie);
       }
     },
     onBack: () => {

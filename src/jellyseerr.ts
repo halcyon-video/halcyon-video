@@ -12,6 +12,10 @@ import { Movie } from './jellyfin';
 import { isDemoMode } from './demo-mode';
 import { resolveSeerrConfig as resolveSeerr, type SeerrConfig } from './seerr-config';
 import { activeSuggestionWindow, titleInWindow, windowGteParam, windowLteParam } from './media-release-date';
+import {
+  type StreamingServiceDef, type RawDiscoverItem,
+  resolveEnabledServices, matchProviderId, ingestStreamingResults, STREAMING_CAP_PER_SERVICE,
+} from './streaming-catalog';
 
 // Re-exported under the historical name so existing importers are untouched.
 export type JellyseerrConfig = SeerrConfig;
@@ -773,4 +777,86 @@ export async function requestMovie(tmdbId: number): Promise<boolean> {
     console.warn(`[Jellyseerr] Failed to request tmdbId ${tmdbId}:`, e);
     return false;
   }
+}
+
+// ─── Streaming-service sections (GH #86) ───────────────────────────────────
+// Movies on the owner's streaming subscriptions, sourced from TMDB
+// watch-provider data (Jellyseerr proxies both endpoints -- see
+// streaming-catalog.ts's header comment for the verified shapes). The
+// selection/synthesis logic lives in streaming-catalog.ts, kept import-free
+// of this module's Tauri/DOM transport so it stays node-test-safe; this
+// function is just the network round trip.
+
+// TMDB's watch-provider data is region-keyed; a hardcoded US default until a
+// settings UI exists to pick one (GH #86 follow-up).
+const STREAMING_WATCH_REGION = 'US';
+// Round-trip fan-out for the per-service discover calls, matching the
+// collection-gap loader's GAP_FETCH_CONCURRENCY -- Jellyseerr proxies TMDB
+// behind its own rate limiter.
+const STREAMING_FETCH_CONCURRENCY = 8;
+
+/**
+ * Fetch every enabled streaming service's watch-provider stock: resolve the
+ * region's provider list, match the enabled service defs against it by name,
+ * then fetch one page of /discover/movies per matched service concurrently.
+ *
+ * Never throws: unconfigured, unreachable, a rejected watch-provider list, or
+ * a single service's discover call failing all resolve to fewer (or zero)
+ * streaming titles, never a broken boot. A service whose name doesn't match
+ * anything in the region's provider list is logged once (not per-title) so a
+ * TMDB rename shows up on the boot console instead of a silently empty aisle.
+ */
+export async function fetchStreamingMovies(servicesOverrideCsv?: string | null): Promise<Movie[]> {
+  const config = getJellyseerrConfig();
+  if (!config) return [];
+
+  const wanted = resolveEnabledServices(servicesOverrideCsv);
+  let providers: { id: number; name: string }[] = [];
+  try {
+    const list = await jellyseerrRequest(
+      config, `/api/v1/watchproviders/movies?watchRegion=${STREAMING_WATCH_REGION}`
+    );
+    providers = Array.isArray(list) ? list : [];
+  } catch (e) {
+    console.warn('[Jellyseerr] Streaming: failed to load the watch-provider list -- no streaming sections built:', e);
+    return [];
+  }
+
+  const matched: { def: StreamingServiceDef; providerId: number }[] = [];
+  const unmatched: string[] = [];
+  for (const def of wanted) {
+    const providerId = matchProviderId(def, providers);
+    if (providerId !== null) matched.push({ def, providerId });
+    else unmatched.push(def.name);
+  }
+  if (unmatched.length > 0) {
+    console.warn(
+      `[Jellyseerr] Streaming: no provider match in region ${STREAMING_WATCH_REGION} for: ${unmatched.join(', ')}` +
+      ' -- check the name against Jellyseerr\'s own watch-provider list (a rename on TMDB\'s side, most likely).'
+    );
+  }
+  if (matched.length === 0) return [];
+
+  const dismissed = getDismissedTitleIds();
+  const movies: Movie[] = [];
+  for (let i = 0; i < matched.length; i += STREAMING_FETCH_CONCURRENCY) {
+    const batch = matched.slice(i, i + STREAMING_FETCH_CONCURRENCY);
+    const results = await Promise.all(batch.map(async ({ def, providerId }): Promise<Movie[]> => {
+      try {
+        const data = await jellyseerrRequest(
+          config,
+          `/api/v1/discover/movies?watchProviders=${providerId}&watchRegion=${STREAMING_WATCH_REGION}&page=1`
+        );
+        const items: RawDiscoverItem[] = Array.isArray(data?.results) ? data.results : [];
+        return ingestStreamingResults(items, def, { dismissed, cap: STREAMING_CAP_PER_SERVICE });
+      } catch (e) {
+        console.warn(`[Jellyseerr] Streaming: discover fetch failed for ${def.name}:`, e);
+        return [];
+      }
+    }));
+    for (const r of results) movies.push(...r);
+  }
+
+  console.log(`[Jellyseerr] Streaming: ${movies.length} title(s) across ${matched.length} service(s).`);
+  return movies;
 }

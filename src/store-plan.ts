@@ -256,13 +256,13 @@ export class StorePlan {
         .sort(shelfTitleCompare);
       const hasTvShows = movies.some((m) => m.isSeries);
       const fitsOnThreeUnits = movies.length <= 3 * UNIT_CAPACITY;
-      // A games-only platform library (games-only.ts) never sections: its
-      // titles carry no genres, so every one of them would file under GENERAL
-      // and a 1000-game platform would sign a dozen aisles GENERAL. Left
-      // uncategorized, each signboard falls back to the library name — i.e.
-      // the platform (shelving.ts) — which is the wayfinding that department
-      // actually wants.
-      if (lib.games || hasTvShows || fitsOnThreeUnits || movies.length < TINY_LIBRARY_MOVIES) {
+      // A games-only platform library (games-only.ts) or a streaming-service
+      // library (streaming-catalog.ts, GH #86) never sections: their titles
+      // carry no genres worth splitting a ~24-title aisle over, so every one
+      // of them would file under GENERAL. Left uncategorized, each signboard
+      // falls back to the library name — the platform, or the service
+      // (shelving.ts) — which is the wayfinding each of those wants.
+      if (lib.games || lib.streaming || hasTvShows || fitsOnThreeUnits || movies.length < TINY_LIBRARY_MOVIES) {
         // An un-sectioned run still lands row-major through sideEntrySlot, so a
         // title count that isn't a whole number of shelf columns leaves the
         // bottom tiers of the trailing columns as bare board. Top it up with

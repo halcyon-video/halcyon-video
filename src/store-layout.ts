@@ -367,7 +367,8 @@ export const NR_LEFT_UNIT_STANDOFF = 0.1; // left-wall unit group origin off the
 // the bare slot is the whole point: scanning a shelf, the not-in-stock cases
 // are the ones with nothing stacked behind them.
 export function isUnstockedTitle(movie: Movie): boolean {
-  return movie.comingSoon === true || movie.collectionGap === true || movie.discovery === true;
+  return movie.comingSoon === true || movie.collectionGap === true || movie.discovery === true
+    || movie.streaming === true;
 }
 
 // Returns the number of extra static rental copies to place behind this movie's slot.

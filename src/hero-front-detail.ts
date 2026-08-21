@@ -45,13 +45,13 @@ import {
   hasRealGameBox,
   gameFaceAspect,
   getMovieOffsets,
-  stampCollectionGapSticker,
   stampStaffPickSticker,
   makePlasticMaterial,
   cropFrontTextureForMedium,
   applyWhiteBorderShader,
   type CaseFinish,
 } from './video-case';
+import { stampCollectionGapSticker, stampStreamingSticker } from './case-corner-stickers';
 import { isDiscoveryRequested } from './jellyseerr';
 import { onProbesReplaced } from './case-env-probes';
 import { uploadTextureNow } from './poster-textures';
@@ -151,6 +151,13 @@ export function stampPosterBadges(data: Uint8Array, w: number, h: number, movie:
   if (movie.collectionGap || movie.discovery) {
     const requested = !!movie.discoveryRequested || isDiscoveryRequested(movie.tmdbId);
     out = stampCollectionGapSticker(out, w, h, movie.id, requested);
+  }
+  // GH #86: a streaming-service title -- "WATCH ON <SERVICE>", never REQUEST/
+  // COMING SOON (it isn't orderable). Mutually exclusive with the block above
+  // (streaming-catalog.ts never sets collectionGap/discovery) and with is4k
+  // (a streaming title has no local file to have a resolution at all).
+  if (movie.streaming) {
+    out = stampStreamingSticker(out, w, h, movie.id, movie.streamingServiceName || 'STREAMING');
   }
   // Watch-history staff pick (staff-picks.ts): endcap order candidates only.
   if (movie.staffPick) out = stampStaffPickSticker(out, w, h, movie.id);

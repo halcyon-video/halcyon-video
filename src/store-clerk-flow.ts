@@ -44,12 +44,14 @@ export function markDiscoveryRequested(scene: StoreScene, movieId: string): void
 /**
  * Is this case one the player can cross off ("not interested")? An un-ordered
  * not-in-stock case qualifies wherever it stands: a shelved collection gap /
- * inline discovery suggestion (a library entry), or a FOR YOU order candidate
- * on a staff-picks endcap (fixture stock, not a library entry — the endcap
- * keeps an honest empty spot afterwards, exactly like the shelf does).
+ * inline discovery suggestion (a library entry), a streaming-service title
+ * (GH #86 — same shared jellyseerr_dismissed_ids pool, so "not interested"
+ * works there too), or a FOR YOU order candidate on a staff-picks endcap
+ * (fixture stock, not a library entry — the endcap keeps an honest empty spot
+ * afterwards, exactly like the shelf does).
  */
 function isDismissable(scene: StoreScene, movie: Movie): boolean {
-  if (!(movie.collectionGap || movie.discovery) || typeof movie.tmdbId !== 'number') return false;
+  if (!(movie.collectionGap || movie.discovery || movie.streaming) || typeof movie.tmdbId !== 'number') return false;
   if (movie.discoveryRequested || isDiscoveryRequested(movie.tmdbId)) return false;
   if (scene.libraries.some((l) => l.movies.some((mm) => mm.id === movie.id))) return true;
   // Fixture stock: only while a case is actually standing there to remove.
@@ -357,7 +359,7 @@ export function claspPool(scene: StoreScene, target: ClaspTarget): Movie[] {
   const lib = scene.libraries[target.libraryIdx];
   if (!lib) return [];
   const rentable = (m: Movie) =>
-    !m.comingSoon && !m.discovery && !m.collectionGap && !m.game;
+    !m.comingSoon && !m.discovery && !m.collectionGap && !m.game && !m.streaming;
   if (target.category) {
     const layout = scene.plan.layoutFor(target.libraryIdx);
     const pool: Movie[] = [];

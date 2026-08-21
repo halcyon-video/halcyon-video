@@ -1043,6 +1043,34 @@ export function registerCoreSettings(): void {
     hint: 'YYYY or YYYY-MM-DD. Never suggest titles released later. The Media Release Date pin still applies if tighter.',
   });
 
+  // Streaming-service sections (GH #86): movies on the owner's subscriptions,
+  // sourced from TMDB watch-provider data via Jellyseerr — see
+  // streaming-catalog.ts + jellyseerr.ts's fetchStreamingMovies. Hidden (no
+  // drawer UI yet — GH #86 follow-up): both rows still register so getSetting
+  // parses bb_streaming_enabled as a real boolean and both are reachable from
+  // SERVICE MODE / a direct localStorage or harness --set in the meantime.
+  registerSetting({
+    key: 'bb_streaming_enabled',
+    label: 'Streaming-service sections',
+    kind: 'toggle',
+    group: 'Connection',
+    default: true,
+    applyMode: 'rebuild-scene',
+    hint: 'Shelve Jellyseerr watch-provider titles per streaming service. Off = no streaming aisles built.',
+    hidden: true,
+  });
+  registerSetting({
+    key: 'bb_streaming_services',
+    label: 'Streaming services',
+    kind: 'text',
+    group: 'Connection',
+    default: '',
+    applyMode: 'rebuild-scene',
+    hint: 'Comma list overriding the default eight (Netflix, Prime Video, Disney+, Hulu, Max, Apple TV+, Paramount+, Peacock). Blank = the default set.',
+    hidden: true,
+    visibleWhen: () => getSetting<boolean>('bb_streaming_enabled'),
+  });
+
   // Remote Play: stream this running store, peer-to-peer, to any browser on
   // the network (see src/remote-play.ts). Live toggle — starts/stops hosting
   // without a rebuild.
