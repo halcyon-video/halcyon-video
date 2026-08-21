@@ -88,6 +88,8 @@ The short answers, so you don't have to go looking for them.
 | **Work with Plex?** | Yes — sign in with a plex.tv code and your servers show up. Emby is the next one ([#32](https://github.com/halcyon-video/halcyon-video/issues/32)). [More ↓](#plex) |
 | **Run on a Raspberry Pi?** | Yes — **2.5D mode** runs the same store as plain HTML/CSS. [More ↓](#25d-mode--the-same-store-for-a-raspberry-pi) |
 | **Work away from home?** | Yes — **Remote Play** streams the live store to any browser, with its own TURN relay for off-LAN viewers. [More ↓](#remote-play--the-store-in-your-pocket) |
+| **Work in VR?** | Yes — **WebXR walk mode**: plug in a headset and first-person walk grows an **Enter VR** button. Stick to walk the aisles, trigger to pull a case off the shelf. |
+| **Shelve my streaming services?** | Yes — pick your services (Netflix, Prime Video, Disney+, …) at the setup terminal and each becomes a browsable aisle that hands you off to the service to watch. No API key needed — a bundled snapshot stocks them out of the box. [More ↓](#integrations-at-a-glance) |
 | **Look like *my* video store?** | Yes — brand, logo, colors, themes, fixtures and sign art are all data you drop in a folder, not code. [See it ↑](#it-doesnt-have-to-be-my-store) · [More ↓](#make-it-yours) |
 | **Show me my library as it was in 1996?** | Yes — pin a **Media Release Date** and everything released after it leaves the store entirely. The pin rolls forward a day per day. [More ↓](#media-release-date--the-store-as-it-stood-on-a-date) |
 | **Work with no media server at all?** | The demo does — it ships its own synthetic catalog, which is the link above. Shelving *your* files needs Jellyfin or Plex; there's no built-in folder scanner. |
@@ -151,6 +153,11 @@ TVs). Everywhere else — the demo, a first boot, a Plex install — they play a
 bundled 30-second loop, because a dark tube reads as broken hardware.
 
 ![First-person walk mode](docs/screenshots/walk-mode.jpg)
+
+**And if a headset is plugged in, you can stand in it.** First-person walk mode
+offers an **Enter VR** button on WebXR hardware: left stick walks, right stick
+snap-turns, the trigger pulls whatever case you're pointing at, squeeze backs
+out. Same store, same shelves, at eye height.
 
 ### The New Releases wall
 
@@ -748,7 +755,6 @@ night, new releases, a full bag. That's the register the whole app aims for.
   released yet; it's what unlocks HDMI-CEC display control, system suspend,
   and launching a game in a native emulator
 - More period fixtures and eras
-- VR walk mode experiments
 - More clerk conversations, more rituals
 
 ---
