@@ -74,6 +74,29 @@ export function installTvControls(opts: TvControlOpts): TvControls {
   // Swaps the legend to the TV wording (remote.html carries all three).
   document.body.classList.add('tv');
 
+  // An on-screen BACK the TV browser's own pointer can click. Some TV
+  // browsers never give a page the remote's BACK at all — TV Bro's direct
+  // d-pad mode spends it on exiting that mode, and Silk's spends it on
+  // history — but every one of them has a d-pad-driven virtual cursor that
+  // can click. This is the guaranteed back-out path on a five-key remote.
+  const backBtn = document.createElement('div');
+  backBtn.id = 'tvbackbtn';
+  backBtn.textContent = '⟵ BACK';
+  backBtn.style.cssText = [
+    'position:absolute', 'bottom:14px', 'left:14px', 'z-index:41', 'cursor:pointer',
+    'font:700 16px/1 system-ui,sans-serif', 'letter-spacing:0.08em',
+    'color:#0a1944', 'background:rgba(255,210,63,0.72)', 'border-radius:999px',
+    'padding:12px 18px', 'user-select:none', 'opacity:0.55',
+  ].join(';');
+  backBtn.onmouseenter = () => { backBtn.style.opacity = '1'; };
+  backBtn.onmouseleave = () => { backBtn.style.opacity = '0.55'; };
+  backBtn.onclick = (e) => {
+    e.stopPropagation(); // not a stage click — never forward it as a pick
+    opts.sendKey('Escape', 'Escape', true, false);
+    opts.sendKey('Escape', 'Escape', false, false);
+  };
+  document.body.appendChild(backBtn);
+
   // The BACK trap. TV browsers spend the remote's BACK key on history — one
   // press on a freshly opened page exits to the launcher. Park a sentinel
   // entry under us so BACK becomes a popstate we can turn into the store's
