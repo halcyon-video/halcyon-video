@@ -2907,6 +2907,35 @@ html, body {
   to { opacity: 1; }
 }
 
+.walk-hud-vr-row {
+  justify-content: center;
+  margin-top: 4px;
+}
+
+.walk-hud-vr-btn {
+  background: rgba(255, 169, 3, 0.15);
+  border: 1px solid rgba(255, 169, 3, 0.6);
+  border-radius: 6px;
+  padding: 6px 16px;
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #ffa903;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.walk-hud-vr-btn:hover {
+  background: rgba(255, 169, 3, 0.3);
+}
+
+.walk-hud-vr-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 
 /* ─── Exit-door whiteout (playback transition) ─────────────────────────────── */
 #whiteout-overlay {

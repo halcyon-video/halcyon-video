@@ -103,6 +103,7 @@ import type * as subnav from './store-subnav';
 import * as inspect from './store-inspect';
 import * as clerkFlow from './store-clerk-flow';
 import * as walk from './store-walk';
+import * as vr from './store-vr';
 import * as overview from './store-overview';
 import * as cam from './store-camera';
 import * as grade from './store-grade';
@@ -2537,6 +2538,10 @@ export class StoreScene {
 
     // Handle resizing
     window.addEventListener('resize', this.onWindowResize);
+
+    // WebXR VR walk mode (issue #79) — feature-detects and wires its own
+    // Enter VR button; everything else lives in store-vr.ts.
+    vr.setupVRAffordance(this);
   }
 
   // Single code path for sizing the renderer/composer/passes, driven by the

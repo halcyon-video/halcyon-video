@@ -35,7 +35,16 @@ export function handleWalkClick(scene: StoreScene) {
     );
   }
   scene._raycaster.setFromCamera(scene._mouse, scene.camera);
-  const intersects = scene._raycaster.intersectObjects(scene.scene.children, true);
+  resolveWalkRaycastHit(scene, scene._raycaster.intersectObjects(scene.scene.children, true));
+}
+
+// Shared tail of a walk-mode raycast pick, regardless of where the ray came
+// from: the mouse-look reticle above, or (src/store-vr.ts) a VR headset's
+// gaze ray fired from the trigger button. Do not fork this — a new input
+// source should build its own THREE.Raycaster and hand the sorted
+// intersections here rather than re-implementing the clasp/tip-jar/slot
+// resolution order.
+export function resolveWalkRaycastHit(scene: StoreScene, intersects: THREE.Intersection[]) {
   for (const hit of intersects) {
     if (hit.distance > WALK_INTERACT_RANGE) break; // sorted by distance — nothing reachable left
     // Recommendation clasps are plain meshes, so they'd be skipped by the
