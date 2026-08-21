@@ -15,6 +15,7 @@
 import {
   buildPlexDirectStreamUrl,
   buildPlexHlsStreamUrl,
+  preflightPlexTranscodeDecision,
   buildPlexImageUrl,
   fetchPlexItemPlaybackInfo,
   fetchPlexLibrariesAndMovies,
@@ -214,11 +215,19 @@ export class PlexProvider implements MediaSourceProvider {
         };
       }
     }
-    const { url, sessionId } = buildPlexHlsStreamUrl(server, session.accessToken, itemId, {
+    const sessionId = `halcyon-${Date.now().toString(36)}`;
+    const plexOpts = {
       maxBitrate: opts?.maxBitrate,
       startPositionTicks: opts?.startPositionTicks,
       mediaSourceId: opts?.mediaSourceId,
-    });
+      sessionId,
+    };
+    // Awaited: this call is only ever made off a user-gesture chain (scene
+    // build / ambient-tvs.ts), unlike the full-screen player's mid-playback
+    // track switch — see preflightPlexTranscodeDecision (#76). A rejection
+    // here propagates to ambient-tvs.ts's own try/catch around this call.
+    await preflightPlexTranscodeDecision(server, session.accessToken, itemId, sessionId, plexOpts);
+    const { url } = buildPlexHlsStreamUrl(server, session.accessToken, itemId, plexOpts);
     return { kind: 'transcode', url, sessionId };
   }
 

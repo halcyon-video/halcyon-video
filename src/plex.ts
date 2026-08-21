@@ -596,25 +596,16 @@ export function buildPlexDirectStreamUrl(
   return `${normalizePlexUrl(server)}${partKey}?X-Plex-Token=${encodeURIComponent(token)}`;
 }
 
-/**
- * The HLS ladder. Plex's transcoder is addressed by the item's metadata PATH
- * rather than by id, and wants a caller-invented `session` — that session id is
- * also the handle used to tear the encode down again, which is why it is
- * returned to the caller rather than kept here.
- */
-export function buildPlexHlsStreamUrl(
-  server: string,
-  token: string,
-  itemId: string,
-  opts?: {
-    maxBitrate?: number;
-    startPositionTicks?: number;
-    mediaSourceId?: string;
-    sessionId?: string;
-  }
-): { url: string; sessionId: string } {
-  const base = normalizePlexUrl(server);
-  const sessionId = opts?.sessionId ?? `halcyon-${Date.now().toString(36)}`;
+export interface PlexHlsOpts {
+  maxBitrate?: number;
+  startPositionTicks?: number;
+  mediaSourceId?: string;
+  sessionId?: string;
+}
+
+/** Shared by buildPlexHlsStreamUrl and preflightPlexTranscodeDecision so the
+ *  two requests can never drift apart — see the pre-flight's doc comment. */
+function plexTranscodeParams(token: string, itemId: string, sessionId: string, opts?: PlexHlsOpts): URLSearchParams {
   const params = new URLSearchParams({
     path: `/library/metadata/${itemId}`,
     mediaIndex: '0',
@@ -634,7 +625,62 @@ export function buildPlexHlsStreamUrl(
   if (opts?.startPositionTicks) {
     params.set('offset', String(Math.round(opts.startPositionTicks / TICKS_PER_MS / 1000)));
   }
+  return params;
+}
+
+/**
+ * The HLS ladder. Plex's transcoder is addressed by the item's metadata PATH
+ * rather than by id, and wants a caller-invented `session` — that session id is
+ * also the handle used to tear the encode down again, which is why it is
+ * returned to the caller rather than kept here.
+ *
+ * Pure string-building, no network call — safe to call for a URL that may
+ * never actually be read (playback-routing.ts's directStreamUrl keeps a
+ * defensive Plex fallback that's unreachable while playbackIsDirectSafe()
+ * always returns false for Plex). Real consumers of the returned URL must
+ * precede it with preflightPlexTranscodeDecision — see that function and
+ * issue #76.
+ */
+export function buildPlexHlsStreamUrl(
+  server: string,
+  token: string,
+  itemId: string,
+  opts?: PlexHlsOpts
+): { url: string; sessionId: string } {
+  const base = normalizePlexUrl(server);
+  const sessionId = opts?.sessionId ?? `halcyon-${Date.now().toString(36)}`;
+  const params = plexTranscodeParams(token, itemId, sessionId, opts);
   return { url: `${base}/video/:/transcode/universal/start.m3u8?${params}`, sessionId };
+}
+
+/**
+ * PMS 1.43 (verified against 1.43.3) answers start.m3u8 with a bare 400 when
+ * nothing has asked it to decide the transcode first — steady-state, every
+ * time, not just on a cold boot. Asking `/decision` with the IDENTICAL
+ * params (same path, same session id, `decision` in place of `start.m3u8`)
+ * immediately before is what every official Plex client does, and it makes
+ * PMS answer start.m3u8 with 200 every time instead. A non-200 here is the
+ * real playback error a bare hls.js 400 would otherwise stand in for
+ * (issue #76) — callers on a path that can await MUST call this before
+ * using a URL from buildPlexHlsStreamUrl; callers that can't (the player's
+ * mid-playback track/quality switch runs inside a user-gesture chain — see
+ * playback-routing.ts) fire it without waiting, best-effort.
+ */
+export async function preflightPlexTranscodeDecision(
+  server: string,
+  token: string,
+  itemId: string,
+  sessionId: string,
+  opts?: PlexHlsOpts
+): Promise<void> {
+  const base = normalizePlexUrl(server);
+  const params = plexTranscodeParams(token, itemId, sessionId, opts);
+  const res = await fetch(`${base}/video/:/transcode/universal/decision?${params}`, {
+    headers: plexHeaders(token),
+  });
+  if (!res.ok) {
+    throw new Error(`Plex transcode decision failed: HTTP ${res.status} ${res.statusText}`);
+  }
 }
 
 /** Tear down an abandoned encode — it pins server CPU until it times out. */

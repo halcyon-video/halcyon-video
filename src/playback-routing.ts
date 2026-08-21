@@ -7,12 +7,16 @@
 // `/Videos/<id>/stream` URLs against a server that has no such route, so
 // pressing play did nothing and no resume point was ever written.
 //
-// This module is the seam, deliberately SYNCHRONOUS for the URL builders: the
+// This module is the seam, and its URL builders come in two shapes: the
 // player rebuilds its stream URL inside a user-gesture chain (`buildStream`)
-// and inside track-switch callbacks, and awaiting there would sever the gesture
-// and trip autoplay policy. MediaSourceProvider.resolvePlaybackSource is async
-// because a backend may have to probe, so it is the wrong shape for those call
-// sites; the per-backend sync builders are what this routes to.
+// and inside track-switch callbacks, and awaiting there would sever the
+// gesture and trip autoplay policy — that path uses the SYNCHRONOUS builders
+// (transcodeStreamUrlSync, directStreamUrl). Everywhere else (the player's
+// INITIAL stream build, which already awaits several things before it;
+// MediaSourceProvider.resolvePlaybackSource, async because a backend may have
+// to probe) can afford to await, which transcodeStreamUrl does on Plex to
+// run the /decision pre-flight PMS 1.43 requires before start.m3u8 (#76) —
+// see plex.ts's preflightPlexTranscodeDecision.
 //
 // Jellyfin's path is byte-identical to what it was — same functions, same
 // arguments, same order.
@@ -27,6 +31,7 @@ import {
 } from './jellyfin.ts';
 import {
   buildPlexHlsStreamUrl,
+  preflightPlexTranscodeDecision,
   fetchPlexItemPlaybackInfo,
   reportPlexPlaybackProgress,
   reportPlexPlaybackStopped,
@@ -78,22 +83,68 @@ export function directStreamUrl(
   return buildStaticStreamUrl(server, token, itemId, mediaSourceId);
 }
 
-/** The transcode/HLS URL. */
-export function transcodeStreamUrl(
+/**
+ * The transcode/HLS URL, fully resolved: on Plex this AWAITS the /decision
+ * pre-flight PMS 1.43 needs before it will answer start.m3u8 with 200
+ * instead of a bare 400 (issue #76) — see preflightPlexTranscodeDecision.
+ * Safe anywhere the caller isn't inside a user-gesture chain, i.e. the
+ * player's INITIAL stream build (main.ts already awaits several things
+ * before that point). For the mid-playback track/quality switch, which
+ * can't await (see this module's header comment), use
+ * transcodeStreamUrlSync below instead.
+ */
+export async function transcodeStreamUrl(
+  server: string,
+  token: string,
+  itemId: string,
+  opts: StreamUrlOptions
+): Promise<string> {
+  if (isPlex()) {
+    // Plex selects audio/subtitle tracks through its own transcode-decision
+    // parameters rather than the stream indices Jellyfin takes; the picker's
+    // per-track switching is Jellyfin-only for now (see the README note).
+    const sessionId = `halcyon-${Date.now().toString(36)}`;
+    const plexOpts = {
+      maxBitrate: opts.maxBitrate,
+      startPositionTicks: opts.startPositionTicks,
+      mediaSourceId: opts.mediaSourceId,
+      sessionId,
+    };
+    await preflightPlexTranscodeDecision(server, token, itemId, sessionId, plexOpts);
+    return buildPlexHlsStreamUrl(server, token, itemId, plexOpts).url;
+  }
+  return buildHlsStreamUrl(server, token, itemId, opts);
+}
+
+/**
+ * Same URL transcodeStreamUrl would build, but SYNCHRONOUS — for the two
+ * call sites that can't await: the player's buildStream callback and
+ * track-switch handlers (see this module's header comment; video-player.ts's
+ * applyStreamSelection calls this inside a click/key handler and immediately
+ * calls video.play()). On Plex the /decision pre-flight is fired with the
+ * identical params and session id but NOT awaited — best-effort. A lost race
+ * falls through to hls.js's own fatal-error recovery ladder in
+ * video-player.ts (the same ladder any other transient HLS hiccup hits),
+ * rather than leaving the switch with no pre-flight at all.
+ */
+export function transcodeStreamUrlSync(
   server: string,
   token: string,
   itemId: string,
   opts: StreamUrlOptions
 ): string {
   if (isPlex()) {
-    // Plex selects audio/subtitle tracks through its own transcode-decision
-    // parameters rather than the stream indices Jellyfin takes; the picker's
-    // per-track switching is Jellyfin-only for now (see the README note).
-    return buildPlexHlsStreamUrl(server, token, itemId, {
+    const sessionId = `halcyon-${Date.now().toString(36)}`;
+    const plexOpts = {
       maxBitrate: opts.maxBitrate,
       startPositionTicks: opts.startPositionTicks,
       mediaSourceId: opts.mediaSourceId,
-    }).url;
+      sessionId,
+    };
+    void preflightPlexTranscodeDecision(server, token, itemId, sessionId, plexOpts).catch((e) => {
+      console.warn('[Plex] transcode decision pre-flight failed (mid-playback switch):', e);
+    });
+    return buildPlexHlsStreamUrl(server, token, itemId, plexOpts).url;
   }
   return buildHlsStreamUrl(server, token, itemId, opts);
 }

@@ -34,6 +34,7 @@ import {
 import {
   directStreamUrl,
   transcodeStreamUrl,
+  transcodeStreamUrlSync,
   probeItemPlaybackInfo,
   playbackIsDirectSafe,
   playbackStarted,
@@ -3499,13 +3500,23 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
   // server-side — either forces the HLS transcode path. Text subtitles no
   // longer do.
   const directPlayable = playbackIsDirectSafe(mediaInfo) && initialAudioIndex === undefined && burnInSubtitleIndex === undefined;
-  const hlsSrc = transcodeStreamUrl(jellyfinUrl, token, playbackId, {
-    sourceVideoCodec,
-    mediaSourceId,
-    audioStreamIndex: initialAudioIndex,
-    subtitleStreamIndex: burnInSubtitleIndex,
-    startPositionTicks: resumeTicks || undefined,
-  });
+  let hlsSrc: string;
+  try {
+    hlsSrc = await transcodeStreamUrl(jellyfinUrl, token, playbackId, {
+      sourceVideoCodec,
+      mediaSourceId,
+      audioStreamIndex: initialAudioIndex,
+      subtitleStreamIndex: burnInSubtitleIndex,
+      startPositionTicks: resumeTicks || undefined,
+    });
+  } catch (e: any) {
+    // On Plex this is where a failed /decision pre-flight surfaces (#76) —
+    // the real playback error, not a bare hls.js 400 the player would
+    // otherwise have to guess the cause of.
+    logToConsole(`[Video] Could not start "${movie.title}": ${e?.message ?? e}`, 'video');
+    ui.isPlaybackActive = false;
+    return;
+  }
   const hevcCopy = isHevcPassThroughEnabled() && (sourceVideoCodec === 'hevc' || sourceVideoCodec === 'h265');
   const mediaInfoSummary =
     `container=${mediaInfo?.container ?? 'unknown'} video=${mediaInfo?.videoCodec ?? 'unknown'} ` +
@@ -3515,8 +3526,9 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
     `[Video] Streaming "${movie.title}"${version ? ` [${version.label}]` : ''} in-app (${directPlayable ? 'direct play' : `HLS, hevc pass-through ${hevcCopy ? 'on' : 'off'}`}): ${mediaInfoSummary}.`,
     'video',
   );
-  // Last gate before the player exists: the media-info fetch above is another
-  // await the background token check can land inside.
+  // Last gate before the player exists: the media-info fetch and the stream
+  // URL build above are more awaits the background token check can land
+  // inside.
   if (sessionLost()) { ui.isPlaybackActive = false; return; }
 
   // Fire-and-forget: awaiting here would sever the user-gesture chain before
@@ -3561,7 +3573,7 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
     // dismiss the controls doesn't dump the viewer at the storefront. Couch
     // playback just drops back onto the couch, so no confirm is needed.
     confirmExit: !fromCouch,
-    buildStream: (sel) => transcodeStreamUrl(jellyfinUrl, token, playbackId, { ...sel, sourceVideoCodec, mediaSourceId }),
+    buildStream: (sel) => transcodeStreamUrlSync(jellyfinUrl, token, playbackId, { ...sel, sourceVideoCodec, mediaSourceId }),
     log: (msg) => logToConsole(msg, 'video'),
     onProgress: (positionTicks, isPaused) => {
       playbackProgressed(jellyfinUrl, token, playbackId, positionTicks, isPaused);
