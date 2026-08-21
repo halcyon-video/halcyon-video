@@ -9,6 +9,7 @@
 // old laptop — the whole point of server-side rendering the store.
 
 import { installTouchControls, isTouchPrimary } from './remote-touch';
+import { installTvControls, isTvViewer } from './remote-tv';
 
 const video = document.getElementById('screen') as HTMLVideoElement;
 const stage = document.getElementById('stage') as HTMLDivElement;
@@ -479,12 +480,35 @@ function unmute() {
   }
 }
 
+// A TV browser drives with the remote: BACK becomes the store's back action,
+// the media keys join the store's vocabulary, MENU recalls the legend
+// (src/remote-tv.ts). Everything it sends is an ordinary key message.
+const tvControls = isTvViewer()
+  ? installTvControls({
+      sendKey: (key, code, down, repeat) => {
+        unmute();
+        sendInput({ t: 'key', et: down ? 'down' : 'up', key, code, repeat });
+      },
+      toggleHint,
+    })
+  : null;
+
 // Keys whose page default (scrolling, find-as-you-type, back-nav) must not
 // fire under the store's controls.
 const PREVENT = new Set(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' ', 'Backspace', '/']);
 
 window.addEventListener('keydown', (e) => {
   if (e.ctrlKey || e.metaKey || e.altKey) return; // leave browser chords alone
+  if (tvControls) {
+    const m = tvControls.mapKey(e);
+    if (m === 'hint') { e.preventDefault(); toggleHint(); return; } // viewer-local
+    if (m) {
+      e.preventDefault();
+      unmute();
+      sendInput({ t: 'key', et: 'down', key: m.key, code: m.code, repeat: e.repeat });
+      return;
+    }
+  }
   if (e.key === 'l' || e.key === 'L') { toggleMouseLook(); return; } // viewer-local
   // Also viewer-local, and unclaimed by the store's key vocabulary
   // (a d w s e q f c r x p / + arrows/Enter/Space/Esc/Backspace).
@@ -495,6 +519,14 @@ window.addEventListener('keydown', (e) => {
 });
 window.addEventListener('keyup', (e) => {
   if (e.ctrlKey || e.metaKey || e.altKey) return;
+  if (tvControls) {
+    const m = tvControls.mapKey(e);
+    if (m === 'hint') return;
+    if (m) {
+      sendInput({ t: 'key', et: 'up', key: m.key, code: m.code });
+      return;
+    }
+  }
   if (e.key === 'l' || e.key === 'L') return;
   if (e.key === 'h' || e.key === 'H' || e.key === '?') return;
   sendInput({ t: 'key', et: 'up', key: e.key, code: e.code });
@@ -563,7 +595,7 @@ stage.addEventListener('click', (e) => {
 // don't have and a pointer lock iOS Safari won't grant (src/remote-touch.ts).
 // Everything it sends is an ordinary key/look message, so the host is unaware
 // there's a phone on the other end.
-if (isTouchPrimary()) {
+if (!tvControls && isTouchPrimary()) {
   installTouchControls({
     stage,
     sendKey: (key, code, down, repeat) =>
@@ -592,10 +624,22 @@ if (isTouchPrimary()) {
     // display:none parent still computes 'inline', and the legend's own
     // hidden state is opacity, which keeps its rects — so this reports the
     // one variant actually laid out, in either state.
-    const shown = [...hintEl.querySelectorAll('.kb, .tt')]
+    const shown = [...hintEl.querySelectorAll('.kb, .tt, .tvl')]
       .filter((el) => el.getClientRects().length > 0)
       .map((el) => (el.textContent ?? '').replace(/\s+/g, ' ').trim());
     return { visible: hintShown, playing: document.body.classList.contains('playing'), text: shown.join(' | ') };
+  },
+  // TV mode: the active flag plus the pure key mapping, so the rig can assert
+  // both without a WebRTC session on the wire.
+  get tv() {
+    return {
+      active: !!tvControls,
+      map: (key: string): string | null => {
+        if (!tvControls) return null;
+        const m = tvControls.mapKey(new KeyboardEvent('keydown', { key }));
+        return m === 'hint' ? 'hint' : (m ? m.key : null);
+      },
+    };
   },
   // Connection diagnostics: candidate flavours each side offered, live ICE
   // state, and the best-guess cause when a connection stalls.

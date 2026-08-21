@@ -21,14 +21,17 @@
       transition: opacity 1.2s; opacity: 0;
     }
     #hint b { color: #ffd23f; font-weight: 700; }
-    /* Four legends, one shown: store vs. playback (the host tells us which, over
-       the input channel) crossed with keyboard vs. touch. Static text rather
-       than an import — remote-viewer.ts stays free of app modules on purpose. */
-    #hint .play, #hint .tt { display: none; }
+    /* Six legends, one shown: store vs. playback (the host tells us which, over
+       the input channel) crossed with keyboard vs. touch vs. TV remote. Static
+       text rather than an import — remote-viewer.ts stays free of app modules
+       on purpose. */
+    #hint .play, #hint .tt, #hint .tvl { display: none; }
     body.playing #hint .store { display: none; }
     body.playing #hint .play { display: inline; }
     body.touch #hint .kb { display: none; }
     body.touch #hint .tt { display: inline; }
+    body.tv #hint .kb, body.tv #hint .tt { display: none; }
+    body.tv #hint .tvl { display: inline; }
     #helpbtn {
       position: absolute; top: 14px; left: 14px; display: none; cursor: pointer;
       font: 700 15px/1 system-ui, sans-serif; color: #0a1944; background: #ffd23f;
@@ -50,7 +53,7 @@
   <div id="status">Looking for the store…</div>
   <div id="modebtn"></div>
   <div id="helpbtn" title="Show the controls">?</div>
-  <div id="hint"><span class="store"><span class="kb">WASD / arrows browse &nbsp;·&nbsp; Enter select &nbsp;·&nbsp; Q back &nbsp;·&nbsp; F walk &nbsp;·&nbsp; L mouse look &nbsp;·&nbsp; click to pick &nbsp;·&nbsp; <b>H</b> shows this again</span><span class="tt">D-pad browses &nbsp;·&nbsp; OK selects &nbsp;·&nbsp; drag to look around &nbsp;·&nbsp; tap a case to pick it &nbsp;·&nbsp; <b>?</b> shows this again</span></span><span class="play"><span class="kb">Now playing &nbsp;·&nbsp; Enter pause / resume &nbsp;·&nbsp; Q stop &nbsp;·&nbsp; F fullscreen &nbsp;·&nbsp; M mute &nbsp;·&nbsp; <b>H</b> shows this again</span><span class="tt">Now playing &nbsp;·&nbsp; OK pauses / resumes &nbsp;·&nbsp; BACK stops &nbsp;·&nbsp; <b>?</b> shows this again</span></span></div>
+  <div id="hint"><span class="store"><span class="kb">WASD / arrows browse &nbsp;·&nbsp; Enter select &nbsp;·&nbsp; Q back &nbsp;·&nbsp; F walk &nbsp;·&nbsp; L mouse look &nbsp;·&nbsp; click to pick &nbsp;·&nbsp; <b>H</b> shows this again</span><span class="tt">D-pad browses &nbsp;·&nbsp; OK selects &nbsp;·&nbsp; drag to look around &nbsp;·&nbsp; tap a case to pick it &nbsp;·&nbsp; <b>?</b> shows this again</span><span class="tvl">D-pad browses &nbsp;·&nbsp; OK selects &nbsp;·&nbsp; BACK backs out &nbsp;·&nbsp; <b>MENU</b> shows this again</span></span><span class="play"><span class="kb">Now playing &nbsp;·&nbsp; Enter pause / resume &nbsp;·&nbsp; Q stop &nbsp;·&nbsp; F fullscreen &nbsp;·&nbsp; M mute &nbsp;·&nbsp; <b>H</b> shows this again</span><span class="tt">Now playing &nbsp;·&nbsp; OK pauses / resumes &nbsp;·&nbsp; BACK stops &nbsp;·&nbsp; <b>?</b> shows this again</span><span class="tvl">Now playing &nbsp;·&nbsp; Play/Pause &nbsp;·&nbsp; RW / FF seek &nbsp;·&nbsp; BACK stops &nbsp;·&nbsp; <b>MENU</b> shows this again</span></span></div>
   <script type="module" src="/src/remote-viewer.ts"></script>
 </body>
 </html>

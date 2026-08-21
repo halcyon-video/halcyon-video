@@ -461,7 +461,11 @@ It runs fully headless, too: a Docker or server deployment with no TV
 attached serves private instances only — that's the set-top-box setup. Point
 any device's browser at `/remote.html` and the server does the rendering;
 the box just decodes a video stream, so even the weakest smart-TV browser
-walks the aisles at full fidelity. Until someone donates a login
+walks the aisles at full fidelity. TV browsers (Fire TV, Android TV, and
+friends) get the ten-foot treatment automatically: the remote's D-pad and OK
+drive the store, BACK backs out instead of leaving the page, play/pause and
+rewind/fast-forward do what they say during a film, and MENU recalls the
+controls — add `?tv=1` if your TV's browser isn't recognized. Until someone donates a login
 (**Settings → Connection → Remote Play**, from any logged-in browser), the
 instances boot the demo library. Instances are capped
 (`REMOTE_PLAY_MAX_INSTANCES`, default 2) and viewers past the cap are turned
