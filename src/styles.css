@@ -2907,9 +2907,17 @@ html, body {
   to { opacity: 1; }
 }
 
-.walk-hud-vr-row {
-  justify-content: center;
-  margin-top: 4px;
+/* Standalone VR entry (#walk-vr-enter in index.html): outside the walk HUD
+   because headset browsers have no F key to reach walk mode — the button is
+   the only VR entry and must be reachable from any flat view. Sits above
+   walk-hud's top edge (top: 100px); the hidden <button> collapses the box,
+   so a non-XR browser renders nothing here. */
+.vr-entry-overlay {
+  position: absolute;
+  top: 60px;
+  right: 25px;
+  z-index: 1000;
+  pointer-events: none;
 }
 
 .walk-hud-vr-btn {
