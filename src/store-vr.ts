@@ -1,9 +1,12 @@
 // WebXR VR walk mode (issue #79, v1) — everything VR lives here; three-scene.ts
 // only calls setupVRAffordance() once from initThree(). Feature-detects
-// navigator.xr and, if immersive-vr is supported, unhides the "Enter VR"
-// button already sitting (hidden) inside walk-hud (index.html). Every
-// function here takes the StoreScene as its first parameter, matching the
-// store-*.ts extraction pattern; nothing is ever bolted onto the class.
+// navigator.xr and, if immersive-vr is supported, unhides the standalone
+// "Enter VR" button (the vr-entry-overlay in index.html — outside the walk
+// HUD, because a headset browser has no F key to reach walk mode, so the
+// button must be clickable from any flat view; enterVR() enters walk mode
+// itself first). Every function here takes the StoreScene as its first
+// parameter, matching the store-*.ts extraction pattern; nothing is ever
+// bolted onto the class.
 //
 // Design invariant: a VR session never outlives walk-around mode. Every
 // other screen (inspect, browse, playback, checkout, the CRT terminals...) is
@@ -109,8 +112,8 @@ function getOrCreateState(scene: StoreScene): VRState {
 }
 
 // Called once from StoreScene.initThree(). Feature-detects navigator.xr +
-// immersive-vr support and, if present, unhides the Enter VR button that
-// already sits in walk-hud (index.html) — no-ops cleanly on Tauri desktop or
+// immersive-vr support and, if present, unhides the standalone Enter VR
+// button (vr-entry-overlay, index.html) — no-ops cleanly on Tauri desktop or
 // any non-XR browser, where navigator.xr is undefined.
 export function setupVRAffordance(scene: StoreScene): void {
   const btn = document.getElementById('walk-vr-enter') as HTMLButtonElement | null;
@@ -127,11 +130,24 @@ export function setupVRAffordance(scene: StoreScene): void {
 }
 
 export async function enterVR(scene: StoreScene): Promise<void> {
-  if (!scene.isWalkAroundMode) return; // v1 only offers VR from first-person walk mode
   if (!navigator.xr) return;
 
   const state = getOrCreateState(scene);
   if (state.session || state.pending) return; // already presenting or mid-request
+
+  // VR only runs over walk mode (see the module header invariant), but the
+  // player can't be required to already BE there: a headset browser has no F
+  // key, so from any flat view entering VR enters walk mode itself first.
+  // toggleWalkAround() can refuse (backroom lockout) — bail rather than start
+  // a session over a view the rig can't drive. Track whether WE walked, so a
+  // failed session request can toggle back out instead of stranding a
+  // keyboardless player in walk mode with no way to leave it.
+  let walkedForVR = false;
+  if (!scene.isWalkAroundMode) {
+    scene.toggleWalkAround();
+    if (!scene.isWalkAroundMode) { setVRButtonEnabled(true); return; }
+    walkedForVR = true;
+  }
   state.pending = true;
 
   let session: XRSession;
@@ -140,6 +156,7 @@ export async function enterVR(scene: StoreScene): Promise<void> {
   } catch {
     state.pending = false;
     setVRButtonEnabled(true);
+    if (walkedForVR && scene.isWalkAroundMode) scene.toggleWalkAround();
     scene.onConsoleLog('[System] VR session request was denied or failed.', 'system');
     return;
   }
@@ -163,6 +180,7 @@ export async function enterVR(scene: StoreScene): Promise<void> {
       state.pending = false;
       setVRButtonEnabled(true);
       scene.renderer.xr.enabled = false;
+      if (walkedForVR && scene.isWalkAroundMode) scene.toggleWalkAround();
       scene.onConsoleLog('[System] VR session failed to start.', 'system');
       await session.end().catch(() => { /* already dead — nothing to clean up */ });
       return;

@@ -517,14 +517,18 @@
             <span class="walk-hud-key">F</span>
             <span class="walk-hud-desc">Exit Walk Mode</span>
           </div>
-          <!-- Hidden until store-vr.ts confirms navigator.xr + immersive-vr
-               support (Enter VR is a no-op affordance everywhere else, e.g.
-               the Tauri desktop build, so it stays out of the DOM flow
-               entirely rather than showing disabled). -->
-          <div class="walk-hud-row walk-hud-vr-row">
-            <button type="button" id="walk-vr-enter" class="walk-hud-vr-btn" hidden>Enter VR</button>
-          </div>
         </div>
+      </div>
+
+      <!-- VR entry — deliberately OUTSIDE the walk HUD: a headset browser has
+           no F key to reach walk mode, so this must be clickable from any
+           flat view (enterVR() enters walk mode itself first). Hidden until
+           store-vr.ts confirms navigator.xr + immersive-vr support (Enter VR
+           is a no-op affordance everywhere else, e.g. the Tauri desktop
+           build, so it stays out of the DOM flow entirely rather than
+           showing disabled). -->
+      <div class="vr-entry-overlay">
+        <button type="button" id="walk-vr-enter" class="walk-hud-vr-btn" hidden>Enter VR</button>
       </div>
 
       <!-- Walk-mode aim dot: under pointer lock the OS cursor is captured, so
