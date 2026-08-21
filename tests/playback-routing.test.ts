@@ -20,9 +20,18 @@ const store = new Map<string, string>();
   clear: () => store.clear(),
 };
 
+// Mock fetch for Plex /decision pre-flight requests.
+(globalThis as any).fetch = async () => ({
+  ok: true,
+  status: 200,
+  statusText: 'OK',
+  json: async () => ({}),
+});
+
 const {
   directStreamUrl,
   transcodeStreamUrl,
+  transcodeStreamUrlSync,
   playbackIsDirectSafe,
 } = await import('../src/playback-routing.ts');
 
@@ -32,24 +41,31 @@ const MP4 = { container: 'mp4', videoCodec: 'h264', audioCodecs: ['aac'] };
 beforeEach(() => store.clear());
 const useBackend = (kind: string) => store.set('provider_kind', kind);
 
-test('an install with no provider_kind still behaves as Jellyfin', () => {
-  const url = transcodeStreamUrl(SERVER, 'tok', '42', {});
+test('an install with no provider_kind still behaves as Jellyfin', async () => {
+  const url = await transcodeStreamUrl(SERVER, 'tok', '42', {});
   assert.match(url, /\/Videos\/42\//, 'installs predating the boundary must not change');
+  assert.match(transcodeStreamUrlSync(SERVER, 'tok', '42', {}), /\/Videos\/42\//);
 });
 
-test('Jellyfin routes to Jellyfin endpoints', () => {
+test('Jellyfin routes to Jellyfin endpoints', async () => {
   useBackend('jellyfin');
   assert.match(directStreamUrl(SERVER, 'tok', '42'), /\/Videos\/42\//);
-  assert.match(transcodeStreamUrl(SERVER, 'tok', '42', {}), /\/Videos\/42\//);
+  assert.match(await transcodeStreamUrl(SERVER, 'tok', '42', {}), /\/Videos\/42\//);
+  assert.match(transcodeStreamUrlSync(SERVER, 'tok', '42', {}), /\/Videos\/42\//);
   assert.equal(playbackIsDirectSafe(MP4), true, 'a plain mp4/h264/aac is direct-playable');
 });
 
-test('Plex routes to Plex endpoints, and never to a Jellyfin route', () => {
+test('Plex routes to Plex endpoints, and never to a Jellyfin route', async () => {
   useBackend('plex');
-  const hls = transcodeStreamUrl(SERVER, 'tok', '42', {});
+  const hls = await transcodeStreamUrl(SERVER, 'tok', '42', {});
   assert.match(hls, /\/video\/:\/transcode\/universal\/start\.m3u8/);
   assert.match(hls, /X-Plex-Token=tok/);
   assert.doesNotMatch(hls, /\/Videos\//, 'the bug this file exists for');
+
+  const hlsSync = transcodeStreamUrlSync(SERVER, 'tok', '42', {});
+  assert.match(hlsSync, /\/video\/:\/transcode\/universal\/start\.m3u8/);
+  assert.match(hlsSync, /X-Plex-Token=tok/);
+  assert.doesNotMatch(hlsSync, /\/Videos\//);
 
   // Even the direct builder — unreachable today, see playbackIsDirectSafe —
   // must not fabricate a Jellyfin URL if a future direct path calls it.
@@ -66,23 +82,23 @@ test('Plex declines synchronous direct play regardless of codecs', () => {
   );
 });
 
-test('switching backend switches the playback path with no reload', () => {
+test('switching backend switches the playback path with no reload', async () => {
   useBackend('jellyfin');
-  assert.match(transcodeStreamUrl(SERVER, 'tok', '7', {}), /\/Videos\/7\//);
+  assert.match(await transcodeStreamUrl(SERVER, 'tok', '7', {}), /\/Videos\/7\//);
   useBackend('plex');
-  assert.match(transcodeStreamUrl(SERVER, 'tok', '7', {}), /transcode\/universal/);
+  assert.match(await transcodeStreamUrl(SERVER, 'tok', '7', {}), /transcode\/universal/);
 });
 
-test('a resume position survives into the stream URL on both backends', () => {
+test('a resume position survives into the stream URL on both backends', async () => {
   const oneMinute = 60 * 10_000_000; // ticks
   useBackend('jellyfin');
   assert.match(
-    transcodeStreamUrl(SERVER, 'tok', '7', { startPositionTicks: oneMinute }),
+    await transcodeStreamUrl(SERVER, 'tok', '7', { startPositionTicks: oneMinute }),
     /StartTimeTicks=600000000/
   );
   useBackend('plex');
   assert.match(
-    transcodeStreamUrl(SERVER, 'tok', '7', { startPositionTicks: oneMinute }),
+    await transcodeStreamUrl(SERVER, 'tok', '7', { startPositionTicks: oneMinute }),
     /offset=60/,
     'Plex takes seconds where Jellyfin takes ticks'
   );
