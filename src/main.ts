@@ -56,7 +56,8 @@ import {
 } from './jellyseerr';
 import { fetchGames, launchGame } from './romm';
 import { isGamesOnly, storeCatalog } from './games-only';
-import { buildStreamingLibraries, resolveEnabledServices } from './streaming-catalog';
+import { buildStreamingLibraries, resolveEnabledServices, resolveStreamingSource } from './streaming-catalog';
+import { fetchStreamingMoviesFromTmdb, getTmdbConfig } from './tmdb';
 import { isMembershipPickerOpen } from './membership-cards';
 import {
   initBootFlow,
@@ -154,10 +155,11 @@ let discoveryMovies: Movie[] = [];
 // section -- see romm.ts. Stays [] if Romm isn't configured/reachable, same
 // never-block-boot treatment as the Jellyseerr lists above.
 let gameMovies: Movie[] = [];
-// GH #86: streaming-service titles from Jellyseerr's TMDB watch-provider data
-// (see streaming-catalog.ts + jellyseerr.ts's fetchStreamingMovies). Stays []
-// if Jellyseerr isn't configured/reachable or the master switch is off, same
-// never-block-boot treatment as the other Jellyseerr lists above.
+// GH #86: streaming-service titles from TMDB watch-provider data, straight
+// from TMDB (tmdb.ts) or via Jellyseerr as a fallback (see
+// streaming-catalog.ts's resolveStreamingSource). Stays [] if neither source
+// is configured/reachable or the master switch is off, same never-block-boot
+// treatment as the other Jellyseerr-adjacent lists above.
 let streamingMovies: Movie[] = [];
 /** `true` unless the owner switched streaming sections off (default ON). */
 function streamingEnabled(): boolean {
@@ -360,7 +362,13 @@ async function loadDiscoveryMovies(): Promise<void> {
  * GH #86: fetch the enabled streaming services' watch-provider stock, same
  * never-block-boot treatment as the other Jellyseerr loaders. A no-op — []
  * without a single request — while the master switch is off, so an owner who
- * doesn't want streaming sections costs Jellyseerr nothing extra.
+ * doesn't want streaming sections costs neither source anything extra.
+ *
+ * Source ladder (owner correction 2026-08-21): a direct TMDB key
+ * (tmdb_apikey) is a full replacement source, not icing on Jellyseerr — it
+ * wins when both are configured (see streaming-catalog.ts's
+ * resolveStreamingSource for why), Jellyseerr is the fallback, and neither
+ * configured builds nothing, exactly as before this change.
  */
 async function loadStreamingMovies(): Promise<void> {
   if (!streamingEnabled()) {
@@ -369,13 +377,15 @@ async function loadStreamingMovies(): Promise<void> {
   }
   const TIMEOUT_MS = 15_000;
   const timeoutPromise = new Promise<Movie[]>((resolve) => setTimeout(() => resolve([]), TIMEOUT_MS));
+  const servicesOverride = getSetting<string>('bb_streaming_services');
+  const source = resolveStreamingSource(!!getTmdbConfig(), !!getJellyseerrConfig());
+  const fetchPromise = source === 'tmdb' ? fetchStreamingMoviesFromTmdb(servicesOverride)
+    : source === 'jellyseerr' ? fetchStreamingMovies(servicesOverride)
+    : Promise.resolve<Movie[]>([]);
   try {
-    streamingMovies = await Promise.race([
-      fetchStreamingMovies(getSetting<string>('bb_streaming_services')),
-      timeoutPromise,
-    ]);
+    streamingMovies = await Promise.race([fetchPromise, timeoutPromise]);
   } catch (e) {
-    console.warn('[Jellyseerr] Failed to load streaming-service titles:', e);
+    console.warn('[Streaming] Failed to load streaming-service titles:', e);
     streamingMovies = [];
   }
 }

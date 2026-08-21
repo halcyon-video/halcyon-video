@@ -1029,6 +1029,17 @@ export function registerCoreSettings(): void {
   cred('jellyseerr_url', 'Jellyseerr / Overseerr URL', 'text');
   cred('jellyseerr_apikey', 'Jellyseerr / Overseerr API Key', 'secret');
 
+  // Streaming-service sections' primary source (GH #86 follow-up, owner
+  // correction 2026-08-21): a direct TMDB key works with no Jellyseerr
+  // install at all -- see src/tmdb.ts + streaming-catalog.ts's
+  // resolveStreamingSource. Accepts either TMDB credential shape (a v3 key or
+  // a v4 read-access token; src/tmdb.ts tells them apart). Hidden alongside
+  // the bb_streaming_* rows below (no drawer UI yet -- same follow-up).
+  cred('tmdb_apikey', 'TMDB API Key', 'secret', {
+    hint: 'A v3 API key or v4 Read Access Token. Powers streaming-service sections directly, no Jellyseerr required.',
+    hidden: true,
+  });
+
   // Permanent release-date bounds on everything Jellyseerr SUGGESTS (discovery
   // shelves, staff-pick seeds, un-ordered collection gaps) — a static window
   // that does NOT move with the clock, unlike the terminal's rolling Media
@@ -1044,10 +1055,12 @@ export function registerCoreSettings(): void {
   });
 
   // Streaming-service sections (GH #86): movies on the owner's subscriptions,
-  // sourced from TMDB watch-provider data via Jellyseerr — see
-  // streaming-catalog.ts + jellyseerr.ts's fetchStreamingMovies. Hidden (no
-  // drawer UI yet — GH #86 follow-up): both rows still register so getSetting
-  // parses bb_streaming_enabled as a real boolean and both are reachable from
+  // sourced from TMDB watch-provider data — directly (src/tmdb.ts) when
+  // tmdb_apikey is set, else via Jellyseerr (jellyseerr.ts's
+  // fetchStreamingMovies) as a fallback; see streaming-catalog.ts's
+  // resolveStreamingSource for the ladder. Hidden (no drawer UI yet — GH #86
+  // follow-up): both rows still register so getSetting parses
+  // bb_streaming_enabled as a real boolean and both are reachable from
   // SERVICE MODE / a direct localStorage or harness --set in the meantime.
   registerSetting({
     key: 'bb_streaming_enabled',
@@ -1056,7 +1069,7 @@ export function registerCoreSettings(): void {
     group: 'Connection',
     default: true,
     applyMode: 'rebuild-scene',
-    hint: 'Shelve Jellyseerr watch-provider titles per streaming service. Off = no streaming aisles built.',
+    hint: 'Shelve watch-provider titles per streaming service. Off = no streaming aisles built.',
     hidden: true,
   });
   registerSetting({

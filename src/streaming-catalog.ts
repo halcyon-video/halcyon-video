@@ -110,6 +110,26 @@ export function resolveEnabledServices(overrideCsv: string | undefined | null): 
   return resolved.length > 0 ? resolved : DEFAULT_STREAMING_SERVICES;
 }
 
+/**
+ * Which network source stocks the streaming sections (owner correction
+ * 2026-08-21, GH #86 follow-up): a direct TMDB key is no longer optional
+ * icing on top of Jellyseerr -- it is a full replacement source, so the
+ * feature works with NEITHER Jellyseerr NOR a request server installed.
+ * TMDB wins when both are configured, because only the direct
+ * `/discover/movie` call can filter to subscription (flatrate) titles via
+ * `with_watch_monetization_types` -- Jellyseerr's proxied discover endpoint
+ * has no equivalent param, so its results mix in rent/buy titles the owner
+ * doesn't actually subscribe to. Neither configured keeps today's behavior:
+ * the feature builds nothing.
+ */
+export type StreamingSource = 'tmdb' | 'jellyseerr' | 'none';
+
+export function resolveStreamingSource(hasTmdbKey: boolean, hasJellyseerr: boolean): StreamingSource {
+  if (hasTmdbKey) return 'tmdb';
+  if (hasJellyseerr) return 'jellyseerr';
+  return 'none';
+}
+
 /** Match a service def against Jellyseerr's watch-provider list by exact
  *  (case-insensitive) name. `null` when none of its aliases appear -- logged
  *  once by the caller so a naming drift shows up on the boot console instead

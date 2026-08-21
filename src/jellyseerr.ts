@@ -786,6 +786,12 @@ export async function requestMovie(tmdbId: number): Promise<boolean> {
 // selection/synthesis logic lives in streaming-catalog.ts, kept import-free
 // of this module's Tauri/DOM transport so it stays node-test-safe; this
 // function is just the network round trip.
+//
+// Owner correction 2026-08-21: this is now the FALLBACK source. A direct
+// tmdb_apikey (src/tmdb.ts) wins when configured, because only the direct
+// TMDB call can filter to subscription-only titles
+// (with_watch_monetization_types=flatrate) -- this proxy has no equivalent
+// param. See streaming-catalog.ts's resolveStreamingSource for the ladder.
 
 // TMDB's watch-provider data is region-keyed; a hardcoded US default until a
 // settings UI exists to pick one (GH #86 follow-up).

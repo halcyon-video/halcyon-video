@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 import {
   DEFAULT_STREAMING_SERVICES,
   resolveEnabledServices,
+  resolveStreamingSource,
   matchProviderId,
   buildStreamingUrl,
   tmdbWatchFallbackUrl,
@@ -15,6 +16,13 @@ import {
   ingestStreamingResults,
   buildStreamingLibraries,
 } from '../src/streaming-catalog.ts';
+
+test('resolveStreamingSource: TMDB wins when both are configured; Jellyseerr is the fallback; neither builds nothing', () => {
+  assert.equal(resolveStreamingSource(true, true), 'tmdb');
+  assert.equal(resolveStreamingSource(true, false), 'tmdb');
+  assert.equal(resolveStreamingSource(false, true), 'jellyseerr');
+  assert.equal(resolveStreamingSource(false, false), 'none');
+});
 
 test('the default eight services have unique, non-blank ids and names', () => {
   assert.equal(DEFAULT_STREAMING_SERVICES.length, 8);
