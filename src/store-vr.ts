@@ -111,6 +111,8 @@ function getOrCreateState(scene: StoreScene): VRState {
   return state;
 }
 
+const disposedScenes = new WeakSet<StoreScene>();
+
 // Called once from StoreScene.initThree(). Feature-detects navigator.xr +
 // immersive-vr support and, if present, unhides the standalone Enter VR
 // button (vr-entry-overlay, index.html) — no-ops cleanly on Tauri desktop or
@@ -120,12 +122,12 @@ export function setupVRAffordance(scene: StoreScene): void {
   if (!btn || !navigator.xr) return;
 
   navigator.xr.isSessionSupported('immersive-vr').then((supported) => {
-    if (!supported) return;
+    if (!supported || disposedScenes.has(scene)) return;
     btn.hidden = false;
-    btn.addEventListener('click', () => {
+    btn.onclick = () => {
       btn.disabled = true;
       void enterVR(scene);
-    });
+    };
   }).catch(() => { /* isSessionSupported itself can reject on some UAs — stay hidden */ });
 }
 
@@ -346,4 +348,33 @@ function cleanupAfterSession(scene: StoreScene, state: VRState): void {
   scene.resumeRendering();
   setVRButtonEnabled(true);
   scene.onConsoleLog('[System] Exited VR.', 'system');
+}
+
+/**
+ * Tear down any active VR session and release DOM affordances on StoreScene disposal.
+ * Called from StoreScene.destroy().
+ */
+export function disposeVR(scene: StoreScene): void {
+  disposedScenes.add(scene);
+  const state = vrStates.get(scene);
+  if (state) {
+    if (state.session) {
+      void state.session.end().catch(() => { /* already dead — nothing to clean up */ });
+      state.session = null;
+    }
+    vrStates.delete(scene);
+  }
+  try {
+    if (scene.renderer?.xr) {
+      scene.renderer.setAnimationLoop(null);
+      scene.renderer.xr.enabled = false;
+    }
+  } catch {
+    /* ignore renderer disposal errors */
+  }
+  const btn = document.getElementById('walk-vr-enter') as HTMLButtonElement | null;
+  if (btn && btn.onclick) {
+    btn.onclick = null;
+  }
+  setVRButtonEnabled(true);
 }
