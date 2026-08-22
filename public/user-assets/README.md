@@ -60,6 +60,44 @@ extruded wall lettering (transparent pixels cut away).
 Data maps (normal, roughness, …) must load linear, not sRGB — pass
 `{ srgb: false }` to `tryLoadUserAssetTexture` for those.
 
+## clerk/ — a custom sprite sheet for the store clerk
+
+The clerk is a Doom-style directional billboard whose sprite sheet is painted
+procedurally at boot (`src/clerk-art.ts`). Drop a finished sheet here and it
+replaces her art wholesale — the rig, roaming, and animation timing all stay:
+
+```
+user-assets/
+  clerk/
+    default.png      # your sheet, any theme
+    <theme-id>.png   # optional per-theme variant (bb-1990, bb-1993, bb-2000,
+                     # bb-2010, owl-90s) — beats default.png while that theme
+                     # is active
+```
+
+**Getting a template:** open the store with `?clerk_template=1` on the URL
+(any mode, the hosted demo included) and the current procedural sheet
+downloads as `clerk-sprite-template.png` — edit that. It wears the active
+theme's livery, so grab it under the theme you're customizing for.
+
+The grid is the contract (the runtime pages cells by fraction, so any
+resolution works as long as the layout matches):
+
+- **5 rows** = directions, top to bottom: front, front-side, side, back-side,
+  back — all drawn heading screen-RIGHT; the runtime mirrors them for the
+  other three octants.
+- **16 columns** = animation frames, left to right: idle 2, walk 4,
+  stock-high 2, stock-mid 2, stock-low 2, talk 2, type 2.
+- Cells must stay **2:3** (the template's are 256x384) — the in-store
+  billboard is 5.7 ft tall at that aspect, so a different cell shape
+  stretches the character.
+- **Transparent background required** — the sprite renders with
+  `alphaTest: 0.5`, so pixels below 50% alpha are cut (no soft glows).
+
+An installed brand pack can carry the same files
+(`brands/<pack-id>/clerk/…`), which beat this flat tree per file, like every
+other asset kind.
+
 ## brand/ — drop your logo in a folder (the two-step rebrand)
 
 The short way to make this store yours. **No setting, no manifest, no JSON.**
