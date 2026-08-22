@@ -1034,11 +1034,9 @@ export function registerCoreSettings(): void {
   // correction 2026-08-21): a direct TMDB key works with no Jellyseerr
   // install at all -- see src/tmdb.ts + streaming-catalog.ts's
   // resolveStreamingSource. Accepts either TMDB credential shape (a v3 key or
-  // a v4 read-access token; src/tmdb.ts tells them apart). Hidden alongside
-  // the bb_streaming_* rows below (no drawer UI yet -- same follow-up).
+  // a v4 read-access token; src/tmdb.ts tells them apart).
   cred('tmdb_apikey', 'TMDB API Key', 'secret', {
     hint: 'A v3 API key or v4 Read Access Token. Powers streaming-service sections directly, no Jellyseerr required.',
-    hidden: true,
   });
 
   // Permanent release-date bounds on everything Jellyseerr SUGGESTS (discovery
@@ -1069,10 +1067,6 @@ export function registerCoreSettings(): void {
   // picks some. The HOSTED DEMO build (isDemoMode) defaults to the full
   // eight instead, so a visitor's very first boot is already stocked — "a
   // user should be able to click into a hosted site and it just works".
-  // Hidden (no drawer UI yet beyond the opening-day terminal): both rows
-  // still register so getSetting parses bb_streaming_enabled as a real
-  // boolean and both are reachable from SERVICE MODE / a direct localStorage
-  // or harness --set in the meantime.
   registerSetting({
     key: 'bb_streaming_enabled',
     label: 'Streaming-service sections',
@@ -1080,8 +1074,7 @@ export function registerCoreSettings(): void {
     group: 'Connection',
     default: true,
     applyMode: 'rebuild-scene',
-    hint: 'Shelve watch-provider titles per streaming service. Off = no streaming aisles built.',
-    hidden: true,
+    hint: 'Shelve watch-provider titles per streaming service. Movies only. Off = no streaming aisles built.',
   });
   registerSetting({
     key: 'bb_streaming_services',
@@ -1090,8 +1083,7 @@ export function registerCoreSettings(): void {
     group: 'Connection',
     default: isDemoMode ? ALL_DEFAULT_STREAMING_SERVICES_CSV : '',
     applyMode: 'rebuild-scene',
-    hint: 'Comma list of CHOSEN streaming services (Netflix, Prime Video, Disney+, Hulu, Max, Apple TV+, Paramount+, Peacock). Blank = none.',
-    hidden: true,
+    hint: 'Comma list of CHOSEN streaming services (Netflix, Prime Video, Disney+, Hulu, Max, Apple TV+, Paramount+, Peacock). Movies only. Blank = none.',
     visibleWhen: () => getSetting<boolean>('bb_streaming_enabled'),
   });
 
