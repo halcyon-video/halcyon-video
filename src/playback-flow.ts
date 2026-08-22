@@ -12,7 +12,7 @@
 // under `node --test`'s type-stripping loader, which can't resolve a bare
 // sibling specifier (same note as jellyfin.ts's own media-release-date.ts import).
 import type { Movie, Episode } from './jellyfin.ts';
-import { reportPlaybackStart, reportPlaybackProgress, reportPlaybackStopped } from './jellyfin.ts';
+import { playbackStarted, playbackProgressed, playbackStopped } from './playback-routing.ts';
 
 const TICKS_PER_SECOND = 10_000_000;
 
@@ -153,8 +153,8 @@ export async function playLocalWithMpv(
   onExit: (positionTicks: number, endedNaturally: boolean) => void,
   log: (msg: string) => void
 ): Promise<boolean> {
-  const jellyfinUrl = localStorage.getItem('jellyfin_url');
-  const token = localStorage.getItem('jellyfin_token');
+  const jellyfinUrl = typeof localStorage !== 'undefined' ? localStorage.getItem('jellyfin_url') : null;
+  const token = typeof localStorage !== 'undefined' ? localStorage.getItem('jellyfin_token') : null;
   const startSeconds = Math.max(0, Math.floor(startPositionTicks / TICKS_PER_SECOND));
 
   let id: string;
@@ -175,29 +175,29 @@ export async function playLocalWithMpv(
   }
 
   log(`[Video] Playing off disk in mpv (from ${startSeconds}s).`);
-  if (jellyfinUrl && token) reportPlaybackStart(jellyfinUrl, token, itemId);
+  if (jellyfinUrl && token) playbackStarted(jellyfinUrl, token, itemId);
 
   // Poll for position so Continue Watching still tracks, and so closing mpv
   // returns to the store the same way the in-app player's Back does.
   let lastTicks = startPositionTicks;
-  const poll = window.setInterval(async () => {
+  const poll = setInterval(async () => {
     try {
       const res = await fetch(`/__play?id=${encodeURIComponent(id)}`);
       if (!res.ok) throw new Error(String(res.status));
       const s = await res.json();
       lastTicks = Math.round((s.position ?? 0) * TICKS_PER_SECOND);
       if (!s.exited) {
-        if (jellyfinUrl && token) reportPlaybackProgress(jellyfinUrl, token, itemId, lastTicks, false);
+        if (jellyfinUrl && token) playbackProgressed(jellyfinUrl, token, itemId, lastTicks, false);
         return;
       }
-      window.clearInterval(poll);
+      clearInterval(poll);
       if (s.error) log(`[Video] mpv error: ${s.error}`);
-      if (jellyfinUrl && token) reportPlaybackStopped(jellyfinUrl, token, itemId, lastTicks);
+      if (jellyfinUrl && token) playbackStopped(jellyfinUrl, token, itemId, lastTicks, durationTicks);
       onExit(lastTicks, isMpvNaturalFinish(lastTicks, durationTicks));
     } catch {
       // Endpoint vanished (server restarted) — stop polling rather than spin.
       // Ambiguous exit: never autoplay on a guess.
-      window.clearInterval(poll);
+      clearInterval(poll);
       onExit(lastTicks, false);
     }
   }, 5000);
