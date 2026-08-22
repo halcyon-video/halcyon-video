@@ -24,10 +24,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer, type Server } from 'node:http';
-import type { Episode } from '../src/jellyfin.ts';
+import type { Episode, Movie } from '../src/jellyfin.ts';
 import { fetchFirstEpisodeOfSeries } from '../src/jellyfin.ts';
 import { fetchPlexFirstEpisodeOfSeries } from '../src/plex.ts';
-import { resolveEpisodePlaybackArgs } from '../src/flat/flat-playback.ts';
+import { resolveEpisodePlaybackArgs, resolveDetailButtonState } from '../src/flat/flat-playback.ts';
 
 function mkEpisode(extra: Partial<Episode> = {}): Episode {
   return {
@@ -114,3 +114,98 @@ test('Plex: asking for an episode-as-series (the GH #71 trap) resolves null, exa
     assert.equal(result, null);
   });
 });
+
+// ── Layer 3: detail action button state resolution ───────────────────────────
+
+test('resolveDetailButtonState: standard library movie resolves to Play (enabled)', () => {
+  const movie: Partial<Movie> = { id: 'm-1', title: 'Twin Peaks: Fire Walk With Me' };
+  assert.deepEqual(resolveDetailButtonState(movie), {
+    text: 'Play',
+    icon: '▶',
+    disabled: false,
+  });
+});
+
+test('resolveDetailButtonState: game title resolves to Rent (enabled)', () => {
+  const game: Partial<Movie> = { id: 'g-1', title: 'Chrono Trigger', game: true, platform: 'SNES' };
+  assert.deepEqual(resolveDetailButtonState(game), {
+    text: 'Rent',
+    icon: '🎮',
+    disabled: false,
+  });
+});
+
+test('resolveDetailButtonState: unrequested discovery title resolves to Request (enabled)', () => {
+  const discovery: Partial<Movie> = { id: 'd-1', title: 'Dune: Part Two', discovery: true, tmdbId: 693134 };
+  assert.deepEqual(resolveDetailButtonState(discovery, false), {
+    text: 'Request',
+    icon: '✦',
+    disabled: false,
+  });
+});
+
+test('resolveDetailButtonState: requested discovery title resolves to Requested (disabled)', () => {
+  const discovery: Partial<Movie> = { id: 'd-1', title: 'Dune: Part Two', discovery: true, tmdbId: 693134 };
+  assert.deepEqual(resolveDetailButtonState(discovery, true), {
+    text: 'Requested',
+    icon: '✓',
+    disabled: true,
+  });
+});
+
+test('resolveDetailButtonState: unrequested collection gap resolves to Request (enabled)', () => {
+  const gap: Partial<Movie> = { id: 'c-1', title: 'The Empire Strikes Back', collectionGap: true, tmdbId: 1891 };
+  assert.deepEqual(resolveDetailButtonState(gap, false), {
+    text: 'Request',
+    icon: '✦',
+    disabled: false,
+  });
+});
+
+test('resolveDetailButtonState: requested collection gap resolves to Coming Soon (disabled)', () => {
+  const gap: Partial<Movie> = { id: 'c-1', title: 'The Empire Strikes Back', collectionGap: true, tmdbId: 1891 };
+  assert.deepEqual(resolveDetailButtonState(gap, true), {
+    text: 'Coming Soon',
+    icon: '✓',
+    disabled: true,
+  });
+});
+
+test('resolveDetailButtonState: streaming title resolves to Watch on <SERVICE> (enabled)', () => {
+  const streaming: Partial<Movie> = {
+    id: 'streaming_netflix_12345',
+    title: 'Glass Onion',
+    streaming: true,
+    streamingServiceId: 'netflix',
+    streamingServiceName: 'NETFLIX',
+    streamingUrl: 'https://www.netflix.com/search?q=Glass%20Onion',
+  };
+  assert.deepEqual(resolveDetailButtonState(streaming), {
+    text: 'Watch on NETFLIX',
+    icon: '↗',
+    disabled: false,
+  });
+});
+
+test('resolveDetailButtonState: streaming title without explicit service name falls back to Streaming', () => {
+  const streaming: Partial<Movie> = {
+    id: 'streaming_custom_99999',
+    title: 'Indie Film',
+    streaming: true,
+  };
+  assert.deepEqual(resolveDetailButtonState(streaming), {
+    text: 'Watch on Streaming',
+    icon: '↗',
+    disabled: false,
+  });
+});
+
+test('resolveDetailButtonState: coming soon movie resolves to Coming Soon (disabled)', () => {
+  const comingSoon: Partial<Movie> = { id: 'cs-1', title: 'Upcoming Film', comingSoon: true };
+  assert.deepEqual(resolveDetailButtonState(comingSoon), {
+    text: 'Coming Soon',
+    icon: '⏱',
+    disabled: true,
+  });
+});
+
