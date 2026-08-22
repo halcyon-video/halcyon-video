@@ -6039,6 +6039,8 @@ export class StoreScene {
     this.floorAOTex = null;
     this.floorMat = null;
 
+    vr.disposeVR(this);
+
     window.removeEventListener('keydown', this.handleWalkKeyDown);
     window.removeEventListener('keydown', this.onClaspKey, true);
     this.renderer.domElement.removeEventListener('pointermove', this.onClaspPointerMove);

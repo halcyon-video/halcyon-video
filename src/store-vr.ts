@@ -122,10 +122,10 @@ export function setupVRAffordance(scene: StoreScene): void {
   navigator.xr.isSessionSupported('immersive-vr').then((supported) => {
     if (!supported) return;
     btn.hidden = false;
-    btn.addEventListener('click', () => {
+    btn.onclick = () => {
       btn.disabled = true;
       void enterVR(scene);
-    });
+    };
   }).catch(() => { /* isSessionSupported itself can reject on some UAs — stay hidden */ });
 }
 
@@ -346,4 +346,23 @@ function cleanupAfterSession(scene: StoreScene, state: VRState): void {
   scene.resumeRendering();
   setVRButtonEnabled(true);
   scene.onConsoleLog('[System] Exited VR.', 'system');
+}
+
+/**
+ * Tear down any active VR session and release DOM affordances on StoreScene disposal.
+ * Called from StoreScene.destroy().
+ */
+export function disposeVR(scene: StoreScene): void {
+  const state = vrStates.get(scene);
+  if (state) {
+    if (state.session) {
+      void state.session.end().catch(() => { /* already dead — nothing to clean up */ });
+      state.session = null;
+    }
+    vrStates.delete(scene);
+  }
+  const btn = document.getElementById('walk-vr-enter') as HTMLButtonElement | null;
+  if (btn && btn.onclick) {
+    btn.onclick = null;
+  }
 }
