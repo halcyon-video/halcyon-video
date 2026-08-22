@@ -63,10 +63,6 @@ const ALLOWED = {
     names: ['authenticateUser', 'buildUserAvatarUrl'],
     why: 'the picker is on the old path deliberately — it wants a reshape behind multiUserPicker',
   },
-  'src/playback-flow.ts': {
-    names: ['reportPlaybackStart', 'reportPlaybackProgress', 'reportPlaybackStopped'],
-    why: 'playback reporting, called through playback-routing.ts on the Plex side',
-  },
   'src/playback-routing.ts': {
     names: [
       'buildStaticStreamUrl',
