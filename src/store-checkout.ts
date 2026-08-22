@@ -24,8 +24,13 @@ import type { StoreScene } from './three-scene';
 export function ensureCarried(scene: StoreScene): CarriedTapes {
   if (!scene.carried) {
     // The held stack is parented to the camera (FPS viewmodel), so the
-    // camera must be in the scene graph for its children to render.
-    if (scene.camera.parent !== scene.scene) scene.scene.add(scene.camera);
+    // camera must be in the scene graph for its children to render. A flat
+    // boot never adds the free-floating camera anywhere until now; a VR
+    // session (store-vr.ts) parents it under the head-tracking rig instead,
+    // which is ALREADY a scene descendant — reparenting it here would rip it
+    // out from under the rig and snap the headset to world origin, so only
+    // the never-added case (parent === null) gets fixed up.
+    if (scene.camera.parent === null) scene.scene.add(scene.camera);
     // T23: with rental mode on, the carry limit is the weekday/weekend rule
     // evaluated at first take (and revalidated at the register).
     const capacity = scene.rentalMode ? rentalCapacityAt(new Date()) : DEFAULT_CARRY_CAPACITY;
@@ -134,9 +139,12 @@ export function slotBackBoxPose(_scene: StoreScene, slot: MovieSlot): CarryPose 
   };
 }
 
-export function takeSelectedTape(scene: StoreScene): boolean {
-  const movie = scene.getSelectedMovie();
-  if (!movie) return false;
+// Shared tail of "add this title to the carried stack", regardless of where
+// the movie/slot came from: the 2D inspect-view confirm below, or (VR carry,
+// store-vr.ts via store-walk.ts's walkTakeSlot) a headset trigger pull on a
+// shelf case raycast hit directly out of walk mode. Does not touch scene.mode
+// or the camera — callers decide what happens to the view afterward.
+export function takeTapeIntoCarry(scene: StoreScene, movie: Movie, slot: MovieSlot | null): boolean {
   const carried = scene.ensureCarried();
   const verdict = carried.canTake(movie.id);
   if (verdict === 'full') {
@@ -154,11 +162,19 @@ export function takeSelectedTape(scene: StoreScene): boolean {
     showClerkToast(`You've already got "${movie.title}" right there in your hands.`);
     return false;
   }
-  const slot = scene.slotsByPosition.get(scene.getActiveSlotKey());
   const startPose = slot ? scene.slotBackBoxPose(slot) : null;
   carried.take(movie, slot?.key ?? null, startPose, performance.now());
   retailAudio.playBoxPickup();
   scene.rebuildSSAOExclusionList();
+  return true;
+}
+
+export function takeSelectedTape(scene: StoreScene): boolean {
+  const movie = scene.getSelectedMovie();
+  if (!movie) return false;
+  const slot = scene.slotsByPosition.get(scene.getActiveSlotKey()) ?? null;
+  if (!takeTapeIntoCarry(scene, movie, slot)) return false;
+  const carried = scene.carried!;
   scene.onConsoleLog(`[System] Took "${movie.title}" (${carried.count}/${carried.capacity}). C to check out.`, 'system');
   // Step back to the shelf — the case visibly flies from the slot to your hands.
   if (scene.mode === 'inspect') scene.backAction();
@@ -335,6 +351,51 @@ export function confirmCheckout(scene: StoreScene): boolean {
     scene.requestRender();
   }
   return started;
+}
+
+// Pure predicate mirroring confirmCheckout's guard clauses, with no side
+// effects — store-vr.ts (issue #97) checks this BEFORE deciding to end a VR
+// session, so a deny (empty-handed, over the rental cap) never tears down
+// the headset view for nothing.
+export function canConfirmCheckout(scene: StoreScene): boolean {
+  const carried = scene.carried;
+  if (!carried || carried.count === 0) return false;
+  if (scene.rentalMode && carried.count > rentalCapacityAt(new Date())) return false;
+  return true;
+}
+
+// VR counter confirm (issue #97): carrying a case to the counter and
+// confirming there must never fly the camera through the flat wrap/slide/
+// walk-out choreography confirmCheckout()'s flourish drives — that ritual is
+// timed off the ACTIVE-tier flat animate() loop, which never runs while a
+// WebXR session owns the frame loop (see store-vr.ts's onXRFrame), and a
+// scripted camera flight is exactly the "no fly-to-checkout shortcut" the
+// issue rules out anyway. This mirrors confirmCheckout's guard clauses but
+// then completes the sale immediately: no bag, no exit walk, just the same
+// finishCheckout() every other checkout path ends at (which is what starts
+// playback). store-vr.ts calls this only after ending the session, so the
+// hand-off from "still in the headset" to "watching the movie" has no flat
+// warp in between it either.
+export function confirmCheckoutVR(scene: StoreScene): boolean {
+  const carried = scene.carried;
+  if (!carried || carried.count === 0) {
+    retailAudio.playDenyBuzz();
+    showClerkToast('Nothing to ring up yet — grab a movie or two off the shelves first!');
+    return false;
+  }
+  if (scene.rentalMode) {
+    const cap = rentalCapacityAt(new Date());
+    carried.setCapacity(cap);
+    if (carried.count > cap) {
+      retailAudio.playDenyBuzz();
+      showClerkToast(`It's a ${cap}-tape night now, hon — put ${carried.count - cap} back first. (R returns the top one.)`);
+      return false;
+    }
+  }
+  retailAudio.playCheckoutChime();
+  showClerkToast('All set — great picks! Enjoy your movies tonight.');
+  scene.finishCheckout(carried.ids());
+  return true;
 }
 
 export function finishCheckout(scene: StoreScene, ids: string[]): void {

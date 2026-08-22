@@ -8,6 +8,7 @@ import * as THREE from 'three';
 import { MovieSlot } from './store-layout';
 import { recordInspect } from './clerk-recommend';
 import { retailAudio } from './audio';
+import { takeTapeIntoCarry } from './store-checkout';
 import type { StoreScene } from './three-scene';
 
 // Max reach (ft) for walk-mode click interactions — beyond this a raycast
@@ -43,8 +44,20 @@ export function handleWalkClick(scene: StoreScene) {
 // gaze ray fired from the trigger button. Do not fork this — a new input
 // source should build its own THREE.Raycaster and hand the sorted
 // intersections here rather than re-implementing the clasp/tip-jar/slot
-// resolution order.
-export function resolveWalkRaycastHit(scene: StoreScene, intersects: THREE.Intersection[]) {
+// resolution order. Returns whether anything was actually resolved, so a
+// caller can fall back to some OTHER action (store-vr.ts's counter-proximity
+// checkout confirm) only when the ray hit nothing.
+//
+// onSlotHit defaults to the flat mouse-look click's walkInspectSlot (drop
+// into the 2D inspect view); store-vr.ts passes walkTakeSlot instead, so a
+// VR trigger pull puts the case straight into the carried stack and never
+// leaves walk mode (issue #97 — picking up a movie in VR must not warp the
+// camera to a flat view).
+export function resolveWalkRaycastHit(
+  scene: StoreScene,
+  intersects: THREE.Intersection[],
+  onSlotHit: (scene: StoreScene, slot: MovieSlot) => void = (s, slot) => s.walkInspectSlot(slot),
+): boolean {
   for (const hit of intersects) {
     if (hit.distance > WALK_INTERACT_RANGE) break; // sorted by distance — nothing reachable left
     // Recommendation clasps are plain meshes, so they'd be skipped by the
@@ -53,22 +66,23 @@ export function resolveWalkRaycastHit(scene: StoreScene, intersects: THREE.Inter
     const claspTarget = scene.shelfClasps.targetFor(hit.object);
     if (claspTarget) {
       scene.callClerkToClasp(claspTarget);
-      return;
+      return true;
     }
     // The tip card and its cup are plain meshes too — same reason as the
     // clasps, they'd be skipped by the instanceId guard below. Clicking either
     // opens the overlay (src/tip-jar.ts); walking on ignores it entirely.
     if (scene.tipJars.some((jar) => jar.hitTest(hit.object))) {
       scene.openTipJar();
-      return;
+      return true;
     }
     if (hit.instanceId === undefined) continue;
     const slot = scene.getSlotFromIntersection(hit.object, hit.instanceId);
     if (slot && !slot.hidden) {
-      scene.walkInspectSlot(slot);
-      return;
+      onSlotHit(scene, slot);
+      return true;
     }
   }
+  return false;
 }
 
 export function walkInspectSlot(scene: StoreScene, slot: MovieSlot) {
@@ -106,6 +120,17 @@ export function walkInspectSlot(scene: StoreScene, slot: MovieSlot) {
   recordInspect(slot.movie);
   if (scene.onSelectionChange) scene.onSelectionChange(slot.movie);
   scene.onConsoleLog(`[System] Picked up "${slot.movie.title}" — Back returns to where you stood.`, "system");
+}
+
+// VR carry pickup (issue #97): a headset trigger pull on a shelf case goes
+// straight into the carried stack instead of walkInspectSlot's flat inspect
+// view — no mode change, so walk-around (and the VR session running over it,
+// see store-vr.ts) never ends here. The player physically carries the case
+// to the checkout counter and confirms there.
+export function walkTakeSlot(scene: StoreScene, slot: MovieSlot): void {
+  if (!takeTapeIntoCarry(scene, slot.movie, slot)) return;
+  recordInspect(slot.movie);
+  scene.onConsoleLog(`[System] Took "${slot.movie.title}" — carry it to the counter to check out.`, "system");
 }
 
 export function getSlotFromIntersection(scene: StoreScene, object: THREE.Object3D, instanceId: number): MovieSlot | null {

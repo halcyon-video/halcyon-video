@@ -3113,6 +3113,11 @@ export class StoreScene {
   // so no slot state changes — matching how the launch flourish reads.
   public takeSelectedTape(): boolean { return checkout.takeSelectedTape(this); }
 
+  // Shared take-into-carry mechanics for a caller that already has the
+  // movie/slot in hand (2D selection OR a VR raycast hit) — see
+  // checkout.takeTapeIntoCarry's header.
+  public takeTapeIntoCarry(movie: Movie, slot: MovieSlot | null): boolean { return checkout.takeTapeIntoCarry(this, movie, slot); }
+
   /** Put the top carried tape back on its shelf (R / LB). */
   public returnCarriedTape(): void { return checkout.returnCarriedTape(this); }
 
@@ -3139,6 +3144,15 @@ export class StoreScene {
   // Enter at the counter: with tapes, run the checkout flourish; empty-handed,
   // the clerk nudges you back to the shelves.
   public confirmCheckout(): boolean { return checkout.confirmCheckout(this); }
+
+  // Whether confirmCheckoutVR would succeed right now, with no side effects
+  // (see checkout.canConfirmCheckout's header) — store-vr.ts checks this
+  // before tearing down a VR session for a checkout confirm.
+  public canConfirmCheckout(): boolean { return checkout.canConfirmCheckout(this); }
+
+  // The VR counter confirm: same guards as confirmCheckout, no flourish —
+  // see checkout.confirmCheckoutVR's header.
+  public confirmCheckoutVR(): boolean { return checkout.confirmCheckoutVR(this); }
 
   // Checkout flourish done: emit the event, clear the stack (dispose + wipe
   // bb_carried), release the clerk, and return to the overview. What happens
