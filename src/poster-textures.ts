@@ -410,6 +410,128 @@ function updateTextureArrayLayerImpl(
   renderer.resetState();
 }
 
+// ── Low-res atlas tile writer ───────────────────────────────────────────────
+// Same raw-GL contract as updateTextureArrayLayer above (mirror the CPU copy
+// first, lazily initialize the GPU texture, reset three's state cache after)
+// but writes a LOW_RES_TILE_W x LOW_RES_TILE_H sub-rectangle of one atlas
+// layer instead of the whole layer — see the atlas note in the "Layer
+// banking" section below. No mip chain to maintain: the atlas array is
+// allocated with generateMipmaps=false, so there is nothing to box-filter
+// after the base-level texSubImage3D.
+export function updateAtlasTile(
+  renderer: THREE.WebGLRenderer,
+  arrayTexture: THREE.DataArrayTexture,
+  layerIndex: number,
+  tileX: number,
+  tileY: number,
+  pixelData: Uint8Array
+) {
+  perfTrace.count(CT_ARRAYUP);
+  perfTrace.begin(SP_ARRAYUP);
+  try {
+    updateAtlasTileImpl(renderer, arrayTexture, layerIndex, tileX, tileY, pixelData);
+  } finally {
+    perfTrace.end(SP_ARRAYUP);
+  }
+}
+
+function updateAtlasTileImpl(
+  renderer: THREE.WebGLRenderer,
+  arrayTexture: THREE.DataArrayTexture,
+  layerIndex: number,
+  tileX: number,
+  tileY: number,
+  pixelData: Uint8Array
+) {
+  const atlasW = arrayTexture.image.width;
+  const tileW = LOW_RES_TILE_W;
+  const tileH = LOW_RES_TILE_H;
+  const xOffset = tileX * tileW;
+  const yOffset = tileY * tileH;
+
+  // Mirror into the CPU backing array first (same contract as
+  // updateTextureArrayLayerImpl — see its opening comment): a tile is a
+  // sub-rectangle of the layer rather than a contiguous run, so this copies
+  // row by row instead of one flat .set().
+  if (arrayTexture.image.data) {
+    const dst = arrayTexture.image.data as Uint8Array;
+    const layerByteOffset = layerIndex * atlasW * arrayTexture.image.height * 4;
+    for (let row = 0; row < tileH; row++) {
+      const dstOffset = layerByteOffset + ((yOffset + row) * atlasW + xOffset) * 4;
+      const srcOffset = row * tileW * 4;
+      dst.set(pixelData.subarray(srcOffset, srcOffset + tileW * 4), dstOffset);
+    }
+  }
+
+  if (arrayTexture.version === 0) {
+    arrayTexture.version = 1;
+  }
+
+  const properties = renderer.properties.get(arrayTexture) as any;
+  let webglTexture = properties ? properties.__webglTexture : null;
+  if (!webglTexture) {
+    renderer.initTexture(arrayTexture);
+    webglTexture = properties ? properties.__webglTexture : null;
+    if (properties) {
+      properties.__storageAllocated = true;
+      properties.__version = arrayTexture.version;
+    }
+  }
+  if (!webglTexture) {
+    console.warn("Failed to retrieve __webglTexture from renderer properties (atlas tile).");
+    return;
+  }
+
+  const gl = renderer.getContext() as WebGL2RenderingContext;
+
+  const oldFlipY = gl.getParameter(gl.UNPACK_FLIP_Y_WEBGL);
+  const oldPremultiply = gl.getParameter(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL);
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+  gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+  gl.bindTexture(gl.TEXTURE_2D_ARRAY, webglTexture);
+
+  try {
+    gl.texSubImage3D(
+      gl.TEXTURE_2D_ARRAY,
+      0, // lod level — the atlas array has exactly one
+      xOffset, yOffset, layerIndex,
+      tileW, tileH, 1,
+      gl.RGBA,
+      gl.UNSIGNED_BYTE,
+      pixelData
+    );
+  } catch (err) {
+    console.warn("WebGL atlas tile upload deferred until Three.js allocation.", err);
+  }
+
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, oldFlipY);
+  gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, oldPremultiply);
+  renderer.resetState();
+}
+
+// Extracts one atlas tile's pixels back out of a layer's CPU mirror — the
+// inverse of the row-copy in updateAtlasTileImpl. Used by getFallbackPixels,
+// which needs a compact, standalone Uint8Array (not a view into the shared,
+// multi-hundred-KB atlas layer buffer) to hand a soft-cover material.
+function extractAtlasTile(
+  atlasData: Uint8Array,
+  atlasW: number,
+  layerByteOffset: number,
+  tileX: number,
+  tileY: number,
+  tileW: number,
+  tileH: number
+): Uint8Array {
+  const out = new Uint8Array(tileW * tileH * 4);
+  const xOffset = tileX * tileW;
+  const yOffset = tileY * tileH;
+  for (let row = 0; row < tileH; row++) {
+    const srcOffset = layerByteOffset + ((yOffset + row) * atlasW + xOffset) * 4;
+    out.set(atlasData.subarray(srcOffset, srcOffset + tileW * 4), row * tileW * 4);
+  }
+  return out;
+}
+
 // Scratch reuse: the result is consumed synchronously by texSubImage3D (GL
 // copies the pixels during the call), and upload waves used to allocate a
 // fresh 150KB buffer per layer — 70-layer waves showed up as multi-MB
@@ -433,9 +555,41 @@ function downsample320To160(src: Uint8Array): Uint8Array {
 }
 
 // Spare layers allocated beyond the current catalog so TextureArrayManager's
-// rebuild fast path survives small catalog churn between rebuilds. Costs
-// ~178KB of array-texture backing per layer (64x96 + 160x240, RGBA).
+// rebuild fast path survives small catalog churn between rebuilds. Bounded
+// cost even post-atlas: worst case (all headroom lands in the high-res bank
+// or opens a fresh atlas layer) is ~178KB of array-texture backing per title
+// (64x96 + 160x240, RGBA); in the common case the headroom's low-res share
+// lands inside an atlas layer's existing rounding slack and costs nothing.
 const LAYER_CHURN_HEADROOM = 64;
+
+// Low-res ATLAS (issue #60): each GPU layer of the low-res bank packs an
+// 8x8 grid of 64x96 tiles instead of one poster per layer, so the low-res
+// bank's TITLE capacity is TILES_PER_ATLAS_LAYER (64x) its GPU layer count —
+// for the same GL_MAX_ARRAY_TEXTURE_LAYERS ceiling and the same total byte
+// footprint (one 512x768 layer is exactly 64 64x96 layers' worth of pixels).
+// A poster's low-res "slot" (see lowResBase below) was always a bare layer
+// index before; decomposing it into (layer, tileX, tileY) is confined to the
+// write/read paths here plus samplePosterBank's low-res branch (video-case.ts)
+// — getIndex() and every public method still hand out/accept a flat slot
+// number, so no caller outside this file knows the atlas exists.
+//
+// The atlas array has NO mip chain (generateMipmaps: false) — mipmapping a
+// shared atlas layer bleeds neighbor tiles into each other at every level
+// past 0, and there is no per-tile mipmap in WebGL. The high-res bank keeps
+// its full mip chain unchanged. Trading the low-res tier's distance-LOD
+// filtering for correct colors is the right side of that trade: this bank
+// only ever paints a title that would otherwise render with NO cover art at
+// all (the progressive-preview use is on screen for a frame or two, and the
+// overflow-bank use is titles past the old hard ceiling). samplePosterBank
+// also clamps its UV a half-texel inside the tile so bilinear filtering can
+// never sample across a tile boundary either.
+const LOW_RES_TILE_W = 64;
+const LOW_RES_TILE_H = 96;
+const ATLAS_TILE_COLS = 8;
+const ATLAS_TILE_ROWS = 8;
+const TILES_PER_ATLAS_LAYER = ATLAS_TILE_COLS * ATLAS_TILE_ROWS; // 64
+const ATLAS_LAYER_W = LOW_RES_TILE_W * ATLAS_TILE_COLS; // 512
+const ATLAS_LAYER_H = LOW_RES_TILE_H * ATLAS_TILE_ROWS; // 768
 
 // ── Layer banking ───────────────────────────────────────────────────────────
 // GL_MAX_ARRAY_TEXTURE_LAYERS is a HARD driver ceiling on one array texture —
@@ -459,28 +613,33 @@ const LAYER_CHURN_HEADROOM = 64;
 // spends changes with the catalog's size:
 //
 //   catalog <= bankSize  — unchanged from before. Every title owns one layer in
-//                          BOTH arrays: the 64x96 one paints first while the
-//                          160x240 one streams (the progressive tier).
+//                          the high-res array and one ATLAS TILE in the
+//                          low-res array: the 64x96 tile paints first while
+//                          the 160x240 layer streams (the progressive tier).
 //   catalog >  bankSize  — the tiers split into a flat address space. Titles
 //                          below bankSize live in the high-res array, titles
-//                          above it in the low-res array (offset by
+//                          above it in the low-res atlas (offset by
 //                          `lowResBase`). Every title still gets a painted
-//                          cover; what's traded away is the progressive tier —
-//                          a case simply appears when its art lands — and the
-//                          overflow titles' shelf art is 64x96. The INSPECT and
-//                          hero views are unaffected either way: those paint
-//                          from posterPixelCache at full 320x480, not from
-//                          these arrays.
+//                          cover up to the new, much higher ceiling below;
+//                          what's traded away past bankSize is the
+//                          progressive tier — a case simply appears when its
+//                          art lands — and the overflow titles' shelf art is
+//                          64x96. The INSPECT and hero views are unaffected
+//                          either way: those paint from posterPixelCache at
+//                          full 320x480, not from these arrays.
 //
-// Distance LOD never depended on the tier split — that comes from each array's
-// own mip chain. The loaded-flags LUT stays single and globally indexed (a
-// plain 2D texture bounded by MAX_TEXTURE_SIZE = 32768, nowhere near binding),
-// and its existing 255/128 values are exactly the "which array" signal the
-// shader needs.
+// Distance LOD comes from the high-res array's mip chain; the low-res atlas
+// has none (see the atlas note above the tile constants) — a deliberate,
+// disclosed trade, not an oversight. The loaded-flags LUT stays single and
+// globally indexed (a plain 2D texture bounded by MAX_TEXTURE_SIZE = 32768,
+// nowhere near binding), and its existing 255/128 values are exactly the
+// "which array" signal the shader needs.
 //
-// Ceiling: 2 x bankSize titles (8192 here). Past that a title gets no layer and
-// shelves unpainted — see getIndex.
-const POSTER_BANKS = 2;
+// Ceiling: bankSize (high-res) + bankSize x TILES_PER_ATLAS_LAYER (low-res
+// atlas) titles — e.g. 4096 + 4096*64 = 266240 on a 4096-layer driver, vs the
+// old 8192. Past that a title gets no layer and shelves unpainted — see
+// getIndex. This is also the number the counter-terminal shortfall notice
+// reports against (see counter-terminal.ts's #60 note).
 // Fallback bank size when no renderer is on hand to ask (headless/asset-viewer
 // paths that allocate before a context exists). 2048 is the smallest layer
 // count in real-world WebGL2 use.
@@ -558,6 +717,19 @@ class TextureArrayManager {
     return this.lowResBase === 0 || idx < this.bankSize;
   }
 
+  /**
+   * Decomposes a low-res SLOT number (idx - lowResBase, always >= 0 for any
+   * title that reaches this — see isHighBank/setFlag) into its physical atlas
+   * address. Shared by the write path (updateLowRes) and the read path
+   * (getFallbackPixels) so the two can never disagree about where a title's
+   * tile lives.
+   */
+  private atlasTileFor(slot: number): { layer: number; tileX: number; tileY: number } {
+    const layer = Math.floor(slot / TILES_PER_ATLAS_LAYER);
+    const tile = slot % TILES_PER_ATLAS_LAYER;
+    return { layer, tileX: tile % ATLAS_TILE_COLS, tileY: Math.floor(tile / ATLAS_TILE_COLS) };
+  }
+
   public init(totalMovies: number, renderer?: THREE.WebGLRenderer) {
     // ── Rebuild fast path ────────────────────────────────────────────────
     // A no-reload rebuild (quality/AO/theme/arrangement/render-mode change)
@@ -585,11 +757,13 @@ class TextureArrayManager {
       // fixed by the last full allocation, so this stays cheap and settled.
       this.shortfall = Math.max(0, totalMovies - this.layerBudget);
       // Re-upload the mirrored pixels into the new GL context on first use.
+      // Anisotropy only re-applies to the high-res array: the low-res atlas
+      // has no mip chain (see the atlas note above) and anisotropic filtering
+      // needs one.
       const maxAniso = renderer ? Math.min(8, renderer.capabilities.getMaxAnisotropy()) : 0;
-      for (const tex of [this.lowResArray!, this.highResArray!]) {
-        tex.needsUpdate = true;
-        if (maxAniso) tex.anisotropy = maxAniso;
-      }
+      this.lowResArray!.needsUpdate = true;
+      this.highResArray!.needsUpdate = true;
+      if (maxAniso) this.highResArray!.anisotropy = maxAniso;
       this.loadedFlagsTexture!.needsUpdate = true;
       this.bindUniforms();
       return;
@@ -610,12 +784,15 @@ class TextureArrayManager {
     // Without headroom the very first rebuild would find nextIndex == maxMovies
     // and reallocate anyway, and the fast path would never engage.
     this.bankSize = maxArrayLayers(renderer);
-    const layerBudget = this.bankSize * POSTER_BANKS;
+    // High-res bank: bankSize titles, one layer each (unchanged). Low-res
+    // bank: ATLASED (see the note above the tile constants) — bankSize GPU
+    // layers, each holding TILES_PER_ATLAS_LAYER titles.
+    const layerBudget = this.bankSize + this.bankSize * TILES_PER_ATLAS_LAYER;
     this.layerBudget = layerBudget;
     this.shortfall = Math.max(0, totalMovies - layerBudget);
     this.maxMovies = Math.max(1, Math.min(totalMovies + LAYER_CHURN_HEADROOM, layerBudget));
     // Overflow: the low-res array stops being every title's preview and becomes
-    // the second bank (see the POSTER_BANKS note).
+    // the second bank (see the "Layer banking" note above).
     this.lowResBase = this.maxMovies > this.bankSize ? this.bankSize : 0;
     if (totalMovies > layerBudget) {
       // Past the banked budget a title simply gets no layer (see getIndex) and
@@ -623,8 +800,9 @@ class TextureArrayManager {
       // never arrived. Say so loudly; silently blank shelves read as a bug.
       console.warn(
         `[posters] Catalog of ${totalMovies} exceeds the poster layer budget ` +
-        `(${POSTER_BANKS} banks x ${this.bankSize} = ${layerBudget}); ` +
-        `${totalMovies - layerBudget} title(s) will shelve without cover art.`
+        `(${this.bankSize} high-res + ${this.bankSize}x${TILES_PER_ATLAS_LAYER} ` +
+        `low-res atlas = ${layerBudget}); ${totalMovies - layerBudget} title(s) ` +
+        `will shelve without cover art.`
       );
     }
     // Fresh arrays hold no pixels yet, so every layer must upload again.
@@ -632,9 +810,9 @@ class TextureArrayManager {
     this.highResQueued.clear();
     posterLayersInvalid = false;
 
-    // Both arrays are mip-mapped for distance LOD (perf #28): distant shelves
-    // sampled without mips alias/shimmer and thrash the GPU texture cache.
-    // Layers stream in one at a time via raw texSubImage3D (see
+    // The high-res array is mip-mapped for distance LOD (perf #28): distant
+    // shelves sampled without mips alias/shimmer and thrash the GPU texture
+    // cache. Layers stream in one at a time via raw texSubImage3D (see
     // updateTextureArrayLayer), which uploads every mip level explicitly from
     // CPU-box-filtered pixels — gl.generateMipmap is never called after the
     // first allocation (whole-array regen is a frame-tanking stall). Keep
@@ -642,37 +820,42 @@ class TextureArrayManager {
     // from `generateMipmaps` + `minFilter` at allocation time, so flipping it
     // (or setting the mip-capable minFilter after the array is on the GPU)
     // would leave the wrong number of mip levels allocated and posters would
-    // render black.
-
-    // Allocate the low-res (64x96) and high-res (160x240) banks. Only as many
-    // banks as the catalog needs are built, and the last one is sized to the
-    // remainder — a 5k catalog on a 4096-layer driver costs 4096 + 904 layers,
-    // not two full banks.
-    //
-    // Anisotropy on BOTH: the low-res array is bound for the DISTANT shelves —
-    // precisely where grazing-angle shimmer is worst — and used to sit at 1
-    // while its high-res twin got 8, which made the far cases crawl. Shelf
-    // posters are viewed down the aisles, where isotropic mip sampling
-    // over-blurs; cap at the driver's max (some report less than 4).
+    // render black. The low-res ATLAS array deliberately has NO mip chain —
+    // see the note above the tile constants — so it skips all of this.
     const aniso = renderer ? Math.min(8, renderer.capabilities.getMaxAnisotropy()) : 0;
-    const allocBank = (w: number, h: number, layers: number): THREE.DataArrayTexture => {
+    const allocBank = (w: number, h: number, layers: number, mipmapped: boolean): THREE.DataArrayTexture => {
       const tex = new THREE.DataArrayTexture(new Uint8Array(w * h * layers * 4), w, h, layers);
       tex.format = THREE.RGBAFormat;
       tex.type = THREE.UnsignedByteType;
       tex.colorSpace = THREE.SRGBColorSpace;
-      tex.minFilter = THREE.LinearMipmapLinearFilter;
       tex.magFilter = THREE.LinearFilter;
-      tex.generateMipmaps = true;
-      if (aniso) tex.anisotropy = aniso;
+      if (mipmapped) {
+        // Bound for the DISTANT shelves — precisely where grazing-angle
+        // shimmer is worst — so anisotropy matters here even though it used
+        // to sit at 1 while its high-res twin got 8 (which made the far
+        // cases crawl). Cap at the driver's max (some report less than 4).
+        tex.minFilter = THREE.LinearMipmapLinearFilter;
+        tex.generateMipmaps = true;
+        if (aniso) tex.anisotropy = aniso;
+      } else {
+        tex.minFilter = THREE.LinearFilter;
+        tex.generateMipmaps = false;
+      }
       tex.version = 1;
       return tex;
     };
-    // High-res covers indices [0, bankSize); low-res covers either the same
-    // range (progressive tier) or [bankSize, maxMovies) (second bank).
-    this.highResArray = allocBank(160, 240, Math.min(this.bankSize, this.maxMovies));
-    this.lowResArray = allocBank(64, 96, this.lowResBase === 0
-      ? this.maxMovies
-      : this.maxMovies - this.bankSize);
+    // High-res covers indices [0, bankSize), one layer per title. Only as
+    // many layers as the catalog needs are built — a 5k catalog on a
+    // 4096-layer driver costs 4096 high-res layers, not a full extra bank.
+    this.highResArray = allocBank(160, 240, Math.min(this.bankSize, this.maxMovies), true);
+
+    // Low-res ATLAS: covers either the same range as high-res (progressive
+    // tier, lowResBase === 0) or [bankSize, maxMovies) (second bank) — either
+    // way, `lowResSlotsNeeded` title-slots pack TILES_PER_ATLAS_LAYER to a
+    // GPU layer, so the array only needs ceil(slots / 64) layers.
+    const lowResSlotsNeeded = this.lowResBase === 0 ? this.maxMovies : this.maxMovies - this.bankSize;
+    const lowResLayers = Math.max(1, Math.min(this.bankSize, Math.ceil(lowResSlotsNeeded / TILES_PER_ATLAS_LAYER)));
+    this.lowResArray = allocBank(ATLAS_LAYER_W, ATLAS_LAYER_H, lowResLayers, false);
 
     // Allocate loaded flags LUT (1D texture). Sized for one entry BEYOND the
     // last mintable layer: getIndex() only ever hands out [0, maxMovies), so
@@ -790,7 +973,8 @@ class TextureArrayManager {
     const idx = this.getIndex(movieId);
     if (!this.hasLayer(movieId)) return; // past the layer budget — no art for this one
     // In overflow mode the low-res array is the SECOND BANK, not a preview
-    // tier: a high-bank title has no low-res layer to write (see POSTER_BANKS).
+    // tier: a high-bank title has no low-res tile to write (see "Layer
+    // banking" above).
     if (this.isHighBank(idx) && this.lowResBase !== 0) return;
     if (this.lowResUploaded.has(idx)) return;
     this.lowResUploaded.add(idx);
@@ -823,7 +1007,8 @@ class TextureArrayManager {
     if (!this.hasLayer(movieId)) return;
     if (this.isHighBank(idx) && this.lowResBase !== 0) return;
     if (this.lowResArray) {
-      updateTextureArrayLayer(renderer, this.lowResArray, idx - this.lowResBase, pixelData);
+      const { layer, tileX, tileY } = this.atlasTileFor(idx - this.lowResBase);
+      updateAtlasTile(renderer, this.lowResArray, layer, tileX, tileY, pixelData);
       this.lowResUploaded.add(idx);
     }
   }
@@ -933,24 +1118,29 @@ class TextureArrayManager {
    * outruns both CPU caches on nearly every step.
    * Falls back to high-res only when there's no low-res layer for this title
    * at all — a high-bank title once the catalog overflows into two banks
-   * (POSTER_BANKS/isHighBank), where the low-res array becomes a SECOND BANK
-   * holding different titles entirely, not a preview tier for this one.
+   * (isHighBank), where the low-res array becomes a SECOND BANK holding
+   * different titles entirely, not a preview tier for this one.
    *
-   * A `.slice()` copy, not a `.subarray()` view: a view would keep the ENTIRE
-   * multi-hundred-MB array-texture backing buffer alive for as long as one
-   * caller holds a texture built from a tiny slice of it.
+   * A copy, not a view: a view would keep the ENTIRE multi-hundred-KB
+   * array-texture backing buffer (or, for the low-res atlas, layer) alive
+   * for as long as one caller holds a texture built from a tiny slice of it.
    */
   public getFallbackPixels(movieId: string): { data: Uint8Array; w: number; h: number } | null {
     const idx = this.movieToIndex.get(movieId);
     if (idx === undefined || !this.loadedFlags || this.loadedFlags[idx] === 0) return null;
     if (this.lowResArray) {
-      const lowIdx = idx - this.lowResBase;
-      if (lowIdx >= 0) {
-        const { width: w, height: h, data } = this.lowResArray.image;
-        const layerSize = w * h * 4;
-        const start = lowIdx * layerSize;
-        if (start + layerSize <= (data as Uint8Array).length) {
-          return { data: (data as Uint8Array).slice(start, start + layerSize), w, h };
+      const lowSlot = idx - this.lowResBase;
+      if (lowSlot >= 0) {
+        const { width: atlasW, height: atlasH, data } = this.lowResArray.image;
+        const { layer, tileX, tileY } = this.atlasTileFor(lowSlot);
+        const layerSize = atlasW * atlasH * 4;
+        const layerByteOffset = layer * layerSize;
+        if (layerByteOffset + layerSize <= (data as Uint8Array).length) {
+          return {
+            data: extractAtlasTile(data as Uint8Array, atlasW, layerByteOffset, tileX, tileY, LOW_RES_TILE_W, LOW_RES_TILE_H),
+            w: LOW_RES_TILE_W,
+            h: LOW_RES_TILE_H,
+          };
         }
       }
     }

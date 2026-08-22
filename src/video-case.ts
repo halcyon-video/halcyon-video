@@ -4659,29 +4659,49 @@ export function isGlobalMaterial(m: THREE.Material): boolean {
 
 // ── Banked poster sampling ──────────────────────────────────────────────────
 // The poster store spans more layers than one array texture may legally hold
-// (GL_MAX_ARRAY_TEXTURE_LAYERS — see poster-textures.ts POSTER_BANKS), so a
-// global poster index splits into a BANK and a layer within it — served by the
-// two samplers already bound, because this shader has no spare texture unit.
-// Shared by both front materials so the two poster sampling sites can never
-// drift apart.
+// (GL_MAX_ARRAY_TEXTURE_LAYERS — see poster-textures.ts's "Layer banking"
+// note), so a global poster index splits into a BANK and a layer within it —
+// served by the two samplers already bound, because this shader has no spare
+// texture unit. Shared by both front materials so the two poster sampling
+// sites can never drift apart.
 const POSTER_ARRAY_UNIFORMS = `
       precision highp sampler2DArray;
       uniform sampler2DArray lowResMapArray;
       uniform sampler2DArray highResMapArray;
       uniform float posterLowResBase;
       // The SAME two samplers serve both banks — the case shader has no spare
-      // texture unit for a third (see poster-textures.ts POSTER_BANKS). Which
-      // array a title lives in is already encoded in its loaded flag, so the
+      // texture unit for a third (see poster-textures.ts). Which array a
+      // title lives in is already encoded in its loaded flag, so the
       // caller's hi flag picks the array and posterLowResBase rebases the
-      // layer: 0 while the low-res array is every title's preview tier,
+      // slot: 0 while the low-res array is every title's preview tier,
       // bankSize once it becomes the second bank.
+      //
+      // The low-res array is a TILE ATLAS (issue #60): each GPU layer packs
+      // an 8x8 grid of 64x96 tiles (TILES_PER_ATLAS_LAYER in
+      // poster-textures.ts — kept in sync here as a literal, since GLSL has
+      // no cross-file constants), so a low-res "slot" decomposes into a
+      // layer and a tile within it. uv is clamped a half-texel inside the
+      // tile first so bilinear filtering never samples across into the
+      // neighbor tile — the atlas array has no mip chain (see
+      // poster-textures.ts), so this is the only bleed risk left.
       //
       // Explicit gradients (never implicit texture()): adjacent instanced quads
       // are different posters and take different branches, and implicit-LOD
       // sampling inside non-uniform control flow is undefined per GLSL ES 3.00.
+      const float ATLAS_COLS = 8.0;
+      const float ATLAS_ROWS = 8.0;
+      const float ATLAS_TILES_PER_LAYER = ATLAS_COLS * ATLAS_ROWS;
+      const vec2 ATLAS_TILE_HALF_TEXEL = vec2(0.5 / 64.0, 0.5 / 96.0);
       vec4 samplePosterBank(bool hi, vec2 uv, float idx, vec2 ddx, vec2 ddy) {
         if (hi) return textureGrad(highResMapArray, vec3(uv, idx), ddx, ddy);
-        return textureGrad(lowResMapArray, vec3(uv, idx - posterLowResBase), ddx, ddy);
+        float slot = idx - posterLowResBase;
+        float layer = floor(slot / ATLAS_TILES_PER_LAYER);
+        float tile = mod(slot, ATLAS_TILES_PER_LAYER);
+        float tileX = mod(tile, ATLAS_COLS);
+        float tileY = floor(tile / ATLAS_COLS);
+        vec2 uvClamped = clamp(uv, ATLAS_TILE_HALF_TEXEL, vec2(1.0) - ATLAS_TILE_HALF_TEXEL);
+        vec2 atlasUv = (vec2(tileX, tileY) + uvClamped) / vec2(ATLAS_COLS, ATLAS_ROWS);
+        return textureGrad(lowResMapArray, vec3(atlasUv, layer), ddx / ATLAS_COLS, ddy / ATLAS_ROWS);
       }
 `;
 
