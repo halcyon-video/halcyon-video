@@ -57,7 +57,7 @@ import {
   StoreShellSpec,
   getStoreShellSpec,
   StorefrontSpec,
-  FixturePlacement,
+  FixturePlacement, newReleasesWallSpan, newReleasesLeftWallCols,
 } from './store-layout';
 import { activeMediaCutoff } from './media-release-date';
 import { titleMatchKeys } from './staff-picks';
@@ -1182,8 +1182,8 @@ export class StoreScene {
       const sw = this.getStoreWidth();
       const leftEdge = 11.0 - sw / 2;
       const rightEdge = 11.0 + sw / 2;
-      this.nrBackLeftX = leftEdge + this.LEFT_SLIVER;
-      this.nrBackRightEdgeX = rightEdge - 0.2;
+      // How much back wall New Releases gets is the FORMAT's call (GH #33).
+      [this.nrBackLeftX, this.nrBackRightEdgeX] = newReleasesWallSpan(leftEdge + this.LEFT_SLIVER, rightEdge - 0.2);
       // Stepped-corner footprint comes from the shell spec (T07). Width sets how
       // far left the step begins; depth is clamped to the section width so the
       // NR connector run is never longer than the section it wraps, and stays
@@ -1256,8 +1256,7 @@ export class StoreScene {
       // glass). The whole point of this calc is described right above it as
       // ADAPTIVE — sized to whatever the ribbon leaves behind it — so let it
       // actually use the space it computed instead of throwing some away.
-      this.nrLeftWallCols = Math.max(0, Math.floor((unitSpace - 1.0) / BOX_SPACING));
-      if (this.nrLeftWallCols < SECTION_COLS) this.nrLeftWallCols = 0; // below one section, drop the run
+      this.nrLeftWallCols = newReleasesLeftWallCols(unitSpace);
 
       this.nrTotalCols = this.nrLeftWallCols + this.nrBackWallCols;
     }

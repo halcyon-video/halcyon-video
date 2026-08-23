@@ -4,7 +4,7 @@
 // use only — every consumer fully writes a temp before reading it back.
 import * as THREE from 'three';
 import { Movie } from './jellyfin';
-import { SECTION_COLS } from './store-layout';
+import { SECTION_COLS, STORE_CENTER_X } from './store-layout';
 import { perfSlot } from './perf-trace';
 
 // Euler order for every movie-case transform (slot instances, hero cases, the
@@ -149,7 +149,36 @@ export const updatedMeshes = new Set<THREE.InstancedMesh>();
 export const CLERK_SLEEP_INPUT_MS = 300_000;
 
 // Overview ("security cam") camera pose and free-look limits.
+//
+// The vantage is AUTHORED for the corporate box — high in the front-right
+// corner, looking back down the floor. x = 24 sits comfortably inside that
+// store's right wall (a baseline chain store is ~78 ft wide, so the wall is out
+// at x = 50), but it is an absolute world coordinate, and a mom-and-pop store
+// is 23.5 ft wide with its right wall at x = 22.75. Left alone, the store's own
+// boot view — and the jump index that shares it — stood in the car park looking
+// in through the glass.
+//
+// So the authored x is a CEILING, not a fixed position: resolveOverviewVantage()
+// pulls it inside whatever store actually got built. Mutating the vector in
+// place (rather than handing out a resolved copy) is deliberate — five call
+// sites read this, including two that never see a store width
+// (sortByScreenOrder in store-subnav.ts, aimOverviewAt in store-camera.ts), and
+// all five read it without mutating. See buildStore, which resolves it before
+// anything reads it.
 export const OVERVIEW_POS = new THREE.Vector3(24.0, 5.5, 9.5);
+const OVERVIEW_AUTHORED_X = OVERVIEW_POS.x;
+/** Clear floor (ft) kept between the overview vantage and the right wall. */
+const OVERVIEW_WALL_CLEAR = 2.4;
+
+/**
+ * Pin the overview vantage inside THIS store's right wall. Idempotent, and a
+ * no-op on any store wide enough for the authored position — which is every
+ * corporate one.
+ */
+export function resolveOverviewVantage(storeWidth: number): void {
+  const rightWall = STORE_CENTER_X + storeWidth / 2;
+  OVERVIEW_POS.x = Math.min(OVERVIEW_AUTHORED_X, rightWall - OVERVIEW_WALL_CLEAR);
+}
 export const OVERVIEW_LOOK_STEP = 0.085; // rad per arrow press/repeat
 export const OVERVIEW_YAW_CLAMP = 1.95;  // ±112°: the store, not the doors
 export const OVERVIEW_PITCH_MIN = -0.55; // can't stare at the floor…

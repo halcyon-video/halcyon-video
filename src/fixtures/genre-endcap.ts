@@ -22,6 +22,7 @@ import { createCategorySignTexture } from '../canvas-textures';
 import { CASE_HEIGHT, CASE_DEPTH } from '../video-case';
 import { isDiscoveryRequested } from '../jellyseerr';
 import { getActiveTheme } from '../themes';
+import { formatShelfWood } from '../format-surfaces';
 import { BB_ARCHIVO_BLACK } from '../bundled-fonts';
 
 const COLS = 3;
@@ -327,10 +328,14 @@ export class GenreEndcap implements SlottedFixture {
 
     // Three shallow display shelves off the front face, cases tilted back the
     // same way the discovery rack presents its stock.
+    // Display boards: bright melamine on a chain endcap, the run's own timber
+    // where the format's shelving is wood (see coreMaterial).
+    const endcapWood = formatShelfWood();
     const shelfMat = new THREE.MeshStandardMaterial({
-      color: 0xf4f6fa,
-      roughness: 0.35,
-      metalness: 0.15,
+      color: new THREE.Color(endcapWood ? endcapWood.hex : 0xf4f6fa),
+      map: endcapWood ? endcapWood.textures.map : null,
+      roughness: endcapWood ? 0.62 : 0.35,
+      metalness: endcapWood ? 0.0 : 0.15,
     });
     // One board per tier, each cut to the carcass's width AT ITS OWN HEIGHT so
     // the shelves narrow with the panel instead of flying past its tapered
@@ -366,10 +371,16 @@ export class GenreEndcap implements SlottedFixture {
    * the shelving palette.
    */
   protected coreMaterial(primary: string | number): THREE.Material {
+    // "It reads as gondola: opaque, matte, in the shelving palette" — so when
+    // the FORMAT's shelving is timber rather than painted steel, the endcap is
+    // timber too. Following the house colour there would leave a chain-blue
+    // slab standing at the end of a wooden run, which is what it looked like.
+    const wood = formatShelfWood();
     return new THREE.MeshStandardMaterial({
-      color: new THREE.Color(primary as any),
-      roughness: 0.75,
-      metalness: 0.05,
+      color: new THREE.Color((wood ? wood.endPanelHex : primary) as any),
+      map: wood ? wood.textures.map : null,
+      roughness: wood ? 0.62 : 0.75,
+      metalness: wood ? 0.0 : 0.05,
     });
   }
 

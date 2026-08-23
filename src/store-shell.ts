@@ -20,12 +20,15 @@ import { EntranceCheckout } from './entrance';
 import { buildWindowBays } from './entrance/windows';
 import { addGlassReflectionPane } from './glass-reflection';
 import { buildExteriorEnvironment, PARKING_STALLS } from './exterior-environment';
-import { NR_WALL_SHELF_DEPTH, NR_WALL_CLEARANCE, NR_LEFT_UNIT_STANDOFF, WALL_SHELF_HEIGHTS, BOX_SPACING, SECTION_COLS, seededRandom01, getStorefrontSpec, vestibuleHalfWidth, posterBayIndices, entranceOpeningHalfWidth, mapWallSegmentUV, STORE_CENTER_X, FRONT_GLASS_Z } from './store-layout';
+import { NR_WALL_SHELF_DEPTH, NR_WALL_CLEARANCE, NR_LEFT_UNIT_STANDOFF, WALL_SHELF_HEIGHTS, BOX_SPACING, SECTION_COLS, UNIT_SECTIONS, seededRandom01, getStorefrontSpec, vestibuleHalfWidth, posterBayIndices, entranceOpeningHalfWidth, mapWallSegmentUV, STORE_CENTER_X, FRONT_GLASS_Z } from './store-layout';
 import { buildFrontSoffit, frontSoffitLidPolygon, frontSoffitPolygon, frontSoffitY, pointInSoffit, soffitConnectHalf, soffitMirroredEdges, soffitTrofferCenters, tileOverlapsSoffit } from './ceiling-soffit';
 import { createFixture } from './fixture-registry';
 import { CandyDisplay } from './fixtures/period-fixtures';
 import { TipJar } from './fixtures/tip-jar';
-import { DEFAULT_FIXTURE_PLACEMENTS, gameSectionPlacements, counterAnchoredPlacements, promoStandPlacements } from './store-fixtures-config';
+import { DEFAULT_FIXTURE_PLACEMENTS, gameSectionPlacements, counterAnchoredPlacements, promoStandPlacements, admitFixturePlacements, curtainedAlcovePlacements } from './store-fixtures-config';
+import { activeStoreFormat } from './store-format';
+import { resolveOverviewVantage } from './scene-shared';
+import { formatCarpetTextures, formatWallTextures, formatWallIsPrefinished, formatShelfWood } from './format-surfaces';
 import { validateLayout, Footprint } from './layout-validator';
 import { buildAisleShelving } from './shelving';
 import { buildCounterProps93 } from './fixtures/counter-props-93';
@@ -42,7 +45,7 @@ import { buildPreownedPreorderGamesSigns } from './fixtures/preowned-preorder-ga
 import { buildNewReleaseToppers, type NrTopperRun } from './fixtures/new-release-toppers';
 import { StoreClerk, ClerkDest } from './clerk';
 import { ClerkNavGrid, NavRect } from './clerk-nav';
-import { neutralizeScanTexture, createBrandLogoBodyTexture, createBrandLogoTextTexture, createNewReleasesSignTexture, createPromoSignTexture, createCeilingTileTexture, createCarpetTextures, createWallTextures, createBrickTexture, createStorefrontLogoYellowTexture, createAsphaltTexture, createParkingStainsTexture, createShelfTextures, createShelfBayShadeTexture, createWireMeshTexture, useCheapMaterials, createGlassSurfaceNormalMap, createAcousticPanelTexture, createTrofferLensTexture, createHvacVentTexture } from './canvas-textures';
+import { neutralizeScanTexture, createBrandLogoBodyTexture, createBrandLogoTextTexture, createNewReleasesSignTexture, createPromoSignTexture, createCeilingTileTexture, createBrickTexture, createStorefrontLogoYellowTexture, createAsphaltTexture, createParkingStainsTexture, createShelfTextures, createShelfBayShadeTexture, createWireMeshTexture, useCheapMaterials, createGlassSurfaceNormalMap, createAcousticPanelTexture, createTrofferLensTexture, createHvacVentTexture } from './canvas-textures';
 import { getActiveTheme, themeTrimDarkHex, themeKneeGoldHex, WALL_PAINT_OPTIONS } from './themes';
 import { getSetting } from './settings';
 import { tryLoadUserAssetTexture, loadUserAssetSurface } from './user-assets';
@@ -249,6 +252,10 @@ scene: StoreScene,
 
 export function buildStore(scene: StoreScene) {
   const storeWidth = scene.getStoreWidth();
+  // Pin the overview ("security cam") vantage inside THIS store's walls before
+  // anything reads it — the authored position is sized for the corporate box
+  // and would stand outside a small-format store. See resolveOverviewVantage.
+  resolveOverviewVantage(storeWidth);
   // T05 storefront options (doors/windows/counter) — computed once storeWidth
   // is known (window bay widths are sized in feet) and read by both the
   // storefront window build below and the EntranceCheckout fixture (via
@@ -1066,7 +1073,9 @@ export function buildStore(scene: StoreScene) {
     // left the carpet between them receiving ~2% of pool centre: dark gutters
     // covering most of the floor. 0.9 puts them ~22ft apart, so the midpoint
     // between neighbours keeps roughly half its light from each.
-    const spacing = keyY * Math.tan(halfAngle) * 0.9;
+    // ...and then by the FORMAT, whose shelving may not let a cone spread the
+    // way this derivation assumes (see StoreFormatSpec.keyLightSpacingScale).
+    const spacing = keyY * Math.tan(halfAngle) * 0.9 * activeStoreFormat().keyLightSpacingScale;
     const cols = Math.max(1, Math.ceil(storeWidth / spacing));
     const rows = Math.max(1, Math.ceil(floorCeilLen / spacing));
     // Which spots get to cast, within the sampler budget above. Spread the
@@ -1111,7 +1120,8 @@ export function buildStore(scene: StoreScene) {
         // the small disc that did land. Unbounded range + pure inverse-square
         // lets the cones reach the floor and overlap into even coverage; the
         // shadow camera's far plane still clips the depth pass at the floor.
-        const key = new THREE.SpotLight(0xf3f6ff, 110, 0, halfAngle, 0.85, 2);
+        const key = new THREE.SpotLight(
+          0xf3f6ff, 110 * activeStoreFormat().keyLightIntensityScale, 0, halfAngle, 0.85, 2);
         key.position.set(kx, ky, kz);
         // A hair off vertical: a perfectly straight-down lookAt runs
         // parallel to the shadow camera's up vector. Same offset on every
@@ -1200,9 +1210,12 @@ export function buildStore(scene: StoreScene) {
     scene.troffers.push(...soffit.troffers);
   }
 
-  // 2. Photoreal loop-pile carpet in the theme's own color (albedo mottle +
-  //    pile normal + wear roughness).
-  const { map: carpetTex, normalMap: carpetNormTex, roughnessMap: carpetRoughTex } = createCarpetTextures();
+  // 2. The floor covering the active FORMAT is laid with: photoreal loop pile
+  //    in the theme's own color on the corporate box, deep brown shag in a
+  //    mom-and-pop (albedo mottle + pile normal + wear roughness either way).
+  //    See format-surfaces.ts — the format decides what the floor IS, the theme
+  //    only ever decided what colour it was dyed.
+  const { map: carpetTex, normalMap: carpetNormTex, roughnessMap: carpetRoughTex } = formatCarpetTextures();
 
   const carpetFeetPerTile = 6.0;
   [carpetTex, carpetNormTex, carpetRoughTex].forEach(t =>
@@ -1231,7 +1244,10 @@ export function buildStore(scene: StoreScene) {
   // the git-ignored user-assets tree wins, else the 1K default shipped at
   // public/textures/surfaces/ (the tryLoadUserAssetTexture fallback chain).
   // Only a build missing both keeps the procedural maps above.
-  {
+  // ...but only where the format's floor IS commercial carpet. The scan is a
+  // photo of one particular loop pile; dropping it over shag would replace the
+  // pile the format just built with a picture of the chain's floor.
+  if (activeStoreFormat().carpet === 'loop-pile') {
     const maxAniso = scene.renderer.capabilities.getMaxAnisotropy();
     const configureCarpetMap = (tex: THREE.Texture) => {
       tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
@@ -1275,8 +1291,11 @@ export function buildStore(scene: StoreScene) {
     }, { srgb: false });
   }
 
-  // 2.5 Store walls: amber-gold drywall with painted orange-peel relief.
-  const { map: wallTex, normalMap: wallNormTex, roughnessMap: wallRoughTex } = createWallTextures();
+  // 2.5 Store walls, per FORMAT: amber-gold drywall with painted orange-peel
+  //     relief on the corporate box; tongue-and-groove wood panelling in a
+  //     mom-and-pop (format-surfaces.ts).
+  const wallPrefinished = formatWallIsPrefinished();
+  const { map: wallTex, normalMap: wallNormTex, roughnessMap: wallRoughTex } = formatWallTextures();
 
   const wallFeetPerTile = 9.0;
   [wallTex, wallNormTex, wallRoughTex].forEach(t =>
@@ -1285,9 +1304,14 @@ export function buildStore(scene: StoreScene) {
   const wallMat = new THREE.MeshStandardMaterial({
     map: wallTex,
     normalMap: wallNormTex,
-    normalScale: new THREE.Vector2(0.25, 0.25),
+    // Panelling is RELIEF, not paint texture: the V-grooves between boards and
+    // the shallow dome of each board are the whole point, so they are driven
+    // several times harder than drywall's orange peel. Roughness likewise comes
+    // straight off the map (varnished timber, ~0.66 with duller grooves) rather
+    // than being scaled down toward matte plaster.
+    normalScale: wallPrefinished ? new THREE.Vector2(0.9, 0.9) : new THREE.Vector2(0.25, 0.25),
     roughnessMap: wallRoughTex, // sheen drift — see createWallTextures
-    roughness: 0.92, // scales the sheen-drift map so raked paint shows its satin
+    roughness: wallPrefinished ? 1.0 : 0.92, // scales the map so raked paint shows its satin
     metalness: 0.0,
     // Baked wall-contact shading (docs/lightmap-pipeline.md Phase 1):
     // occlusion pools at the floor line and, faintly, under the ceiling
@@ -1305,15 +1329,21 @@ export function buildStore(scene: StoreScene) {
   // pin a fixed swatch (amber/white/blue/lime) regardless of theme. A 404
   // leaves the procedural amber map (tinted to palette.wall) untouched, and
   // the 0..1 aoMap is never replaced.
-  const wallColorChoice = getSetting<string>('bb_wall_color');
-  const wallTintHex = WALL_PAINT_OPTIONS[wallColorChoice]?.hex ?? theme.palette.wall;
-  loadUserAssetSurface('surfaces/store-wall', (slot, tex) => {
-    if (slot === 'map') wallMat.color.set(wallTintHex);
-    if (slot === 'normalMap') wallMat.normalScale.set(0.35, 0.35);
-    wallMat[slot] = tex;
-    wallMat.needsUpdate = true;
-    scene.requestRender();
-  }, { repeat: [storeWidth / wallFeetPerTile, roomHeight / wallFeetPerTile], anisotropy: 8 });
+  // Skipped entirely on a PREFINISHED wall (wood panelling): the scan is
+  // painted plaster and the "Wall Paint" tint multiplies over it, so applying
+  // either to timber would swap the boards for a wall and then dye the grain.
+  // See formatWallIsPrefinished().
+  if (!wallPrefinished) {
+    const wallColorChoice = getSetting<string>('bb_wall_color');
+    const wallTintHex = WALL_PAINT_OPTIONS[wallColorChoice]?.hex ?? theme.palette.wall;
+    loadUserAssetSurface('surfaces/store-wall', (slot, tex) => {
+      if (slot === 'map') wallMat.color.set(wallTintHex);
+      if (slot === 'normalMap') wallMat.normalScale.set(0.35, 0.35);
+      wallMat[slot] = tex;
+      wallMat.needsUpdate = true;
+      scene.requestRender();
+    }, { repeat: [storeWidth / wallFeetPerTile, roomHeight / wallFeetPerTile], anisotropy: 8 });
+  }
 
   // Back wall (full-width outer shell at backWallZ)
   const backWallGeo = new THREE.PlaneGeometry(storeWidth, roomHeight);
@@ -1753,8 +1783,13 @@ export function buildStore(scene: StoreScene) {
   // section dividers stick out as a real ledge boxes rest on, not a thin lip.
   const backWallShelfDepth = NR_WALL_SHELF_DEPTH; // Single sided depth in feet
 
-  // Frosted shelf textures (laminate albedo + roughness map + micro-stipple normal map)
-  const { map: shelfAlbedoTex, roughnessMap: shelfRoughnessTex, normalMap: shelfNormalTex } = createShelfTextures();
+  // Shelf textures for the active FORMAT: frosted laminate (albedo + roughness
+  // map + micro-stipple normal) on the corporate box, stained timber veneer in
+  // a format whose shelving is wood. Null here means laminate, and every
+  // material below then keeps exactly the values it always had.
+  const shelfWood = formatShelfWood();
+  const { map: shelfAlbedoTex, roughnessMap: shelfRoughnessTex, normalMap: shelfNormalTex } =
+    shelfWood ? shelfWood.textures : createShelfTextures();
   // Tile the texture across shelf dimensions
   shelfAlbedoTex.repeat.set(6, 2);
   shelfRoughnessTex.repeat.set(6, 2);
@@ -1767,10 +1802,15 @@ export function buildStore(scene: StoreScene) {
   // whisper on top of the 0.65-rough base) was a store-wide per-pixel cost
   // for nearly nothing. The maps carry the laminate read.
   const sharedShelfMat = new THREE.MeshStandardMaterial({
-    color: 0xf8f2e8, // warm off-white melamine (reference-photo lit shelf reads ~#f2e8da)
+    // Timber carries its colour in its own albedo (grain, figure and knots are
+    // all painted in the format's stain), so it takes a white tint and lets the
+    // map speak; melamine keeps its warm off-white cast over a neutral scan.
+    color: shelfWood ? 0xffffff : 0xf8f2e8, // lit shelf in the reference photo reads ~#f2e8da
     map: shelfAlbedoTex, // laminate blotch/streak/scuff — kills the flat-plastic read
-    roughness: 0.55, // satin melamine: enough env sheen to shift with the view angle
-    metalness: 0.1,
+    // Sealed veneer is a shade duller than satin melamine and not remotely
+    // metallic; melamine keeps the env sheen that shifts with the view angle.
+    roughness: shelfWood ? 0.62 : 0.55,
+    metalness: shelfWood ? 0.0 : 0.1,
     roughnessMap: shelfRoughnessTex,
     normalMap: shelfNormalTex,
     normalScale: new THREE.Vector2(0.3, 0.3),
@@ -1862,8 +1902,14 @@ export function buildStore(scene: StoreScene) {
   // Shared materials for aisle shelving units
   const sharedAisleSignSideMat = new THREE.MeshStandardMaterial({
     // 0.05 roughness made every signboard edge a near-mirror — big flat
-    // plastic panels should have a satin sheen, not specular glare.
-    color: new THREE.Color(theme.palette.primary), roughness: 0.35, metalness: 0.05
+    // plastic panels should have a satin sheen, not specular glare. A WOOD
+    // format has no painted panel to carry the house colour, so it names its
+    // own darker stain in its preset (shelfEndPanelHex) and gets timber sheen
+    // instead of plastic.
+    color: new THREE.Color(shelfWood ? shelfWood.endPanelHex : theme.palette.primary),
+    map: shelfWood ? shelfAlbedoTex : null,
+    roughness: shelfWood ? 0.6 : 0.35,
+    metalness: shelfWood ? 0.0 : 0.05,
   });
 
   const wireShelfMat = new THREE.MeshStandardMaterial({
@@ -1888,7 +1934,10 @@ export function buildStore(scene: StoreScene) {
   // spans the entire New Releases wall — a huge screen area — and the baked
   // bay-shade map does the visual work, not the clearcoat lobe.
   const nrBackingMat = new THREE.MeshStandardMaterial({
-    color: 0xf8f2e8, // matches sharedShelfMat's warm off-white
+    // The map here is the baked per-bay SHADE, not an albedo, so the panel's
+    // colour has to come from the material: timber tone on a wood format, the
+    // melamine off-white otherwise.
+    color: shelfWood ? new THREE.Color(shelfWood.hex) : new THREE.Color(0xf8f2e8),
     map: createShelfBayShadeTexture([...WALL_SHELF_HEIGHTS], 0, NR_PANEL_H),
     roughness: 0.65,
     metalness: 0.1,
@@ -1902,15 +1951,20 @@ export function buildStore(scene: StoreScene) {
   // neutral scan reads as satin melamine. The New Releases backing panel shares
   // the shelf normal/roughness objects, so it takes the real normal + roughness
   // too (keeping its own baked bay-shade albedo). A 404 leaves both procedural.
-  loadUserAssetSurface('surfaces/store-shelf', (slot, tex) => {
-    sharedShelfMat[slot] = tex;
-    sharedShelfMat.needsUpdate = true;
-    if (slot === 'normalMap' || slot === 'roughnessMap') {
-      nrBackingMat[slot] = tex;
-      nrBackingMat.needsUpdate = true;
-    }
-    scene.requestRender();
-  }, { repeat: [6, 2], anisotropy: 8 });
+  // ...but never over TIMBER: the scan is white melamine, and dropping it on a
+  // wood format's shelving would put the chain's fixtures back in the room the
+  // format just rebuilt.
+  if (!shelfWood) {
+    loadUserAssetSurface('surfaces/store-shelf', (slot, tex) => {
+      sharedShelfMat[slot] = tex;
+      sharedShelfMat.needsUpdate = true;
+      if (slot === 'normalMap' || slot === 'roughnessMap') {
+        nrBackingMat[slot] = tex;
+        nrBackingMat.needsUpdate = true;
+      }
+      scene.requestRender();
+    }, { repeat: [6, 2], anisotropy: 8 });
+  }
 
   // New Releases wall clasp/strip hardware — the wall fixture's OWN material,
   // not the shared gondola strip: the shared strip's untextured metalness
@@ -2114,9 +2168,13 @@ export function buildStore(scene: StoreScene) {
     registerEndCap: (mesh) => scene.libraryEndCaps.push(mesh),
     // The clasp is a promise that asking gets you somewhere — only built
     // when the Jellyseerr integration is there to back it (demo/harness
-    // count as synthetic). No clasps also empties the whole call-button
-    // flow (hover/E/cursor selection, localRecommendPool) in one place.
-    registerClasp: isJellyseerrAvailable()
+    // count as synthetic)...
+    // ...and only where there is someone to answer it. A format with no clerk
+    // (mom-and-pop, GH #33) builds no clasps either: an "ASK FOR
+    // RECOMMENDATIONS!" call button on an empty floor is a promise nobody can
+    // keep. No clasps also empties the whole call-button flow (hover/E/cursor
+    // selection, localRecommendPool) in one place.
+    registerClasp: isJellyseerrAvailable() && activeStoreFormat().clerk
       ? (placement) => scene.shelfClasps.add(placement)
       : undefined,
     suppressFrontCapLineIds: endcapHostLineIds,
@@ -2129,7 +2187,10 @@ export function buildStore(scene: StoreScene) {
   // returned stock -- unconfigured/unreachable => scene.gameMovies is [], no
   // fixture. (Discovery suggestions used to add a rack here too; they now
   // shelve inline with the regular stock — see the constructor's merge.)
-  const fixturePlacements = [
+  // ...then filtered by what THIS STORE FORMAT admits: a mom-and-pop has no
+  // open floor for floor displays and no counter band to mount a letterboard
+  // on, so those never reach the build loop at all (see admitFixturePlacements).
+  const fixturePlacements = admitFixturePlacements([
     ...DEFAULT_FIXTURE_PLACEMENTS,
     // Promo floor stands: the third one exists only in a store deep enough for
     // it (see promoStandPlacements), and any stand whose campaign chain comes
@@ -2145,7 +2206,12 @@ export function buildStore(scene: StoreScene) {
     ...endcapPlacements,
     // ...and the franchise-collection ends, on whatever run ends were left.
     ...collectionEndcaps,
-  ];
+    // The back room, on the formats that have one (GH #33).
+    ...(activeStoreFormat().curtainedSection ? curtainedAlcovePlacements() : []),
+  ], {
+    floorDisplays: activeStoreFormat().floorDisplays,
+    counterShape: scene.storefrontSpec.counterShape,
+  });
   scene.slottedFixtures = [];
   scene.candyDisplays = [];
   // Collected here (not read back off scene.slottedFixtures/candyDisplays
@@ -2266,8 +2332,13 @@ export function buildStore(scene: StoreScene) {
   }
 
   // --- Ceiling-hung CRT TVs playing a family movie ---
-  scene.ambientTvs = new AmbientTvs(scene.fixtureContext());
-  scene.ambientTvs.build();
+  // ...on the formats with the headroom for them (StoreFormatSpec.ceilingTvs).
+  // Everything downstream already handles their absence: `scene.ambientTvs?`
+  // everywhere, and ▲ at the entrance falls back to the shelf wrap.
+  if (activeStoreFormat().ceilingTvs) {
+    scene.ambientTvs = new AmbientTvs(scene.fixtureContext());
+    scene.ambientTvs.build();
+  }
 
   // --- Store Clerk (billboard sprite) ---
   // Her nav grid is built from the same ground-plan rectangles the layout
@@ -2343,7 +2414,12 @@ export function buildStore(scene: StoreScene) {
   // scene build, since a stocked store rebuilds this whole function.
   const storeHasStock = scene.libraries.some((lib) => lib.movies.length > 0)
     || scene.gameMovies.length > 0;
-  if (storeHasStock) {
+  // ...and some formats simply have no staff. The owner's mom-and-pop spec is
+  // "No clerk for now" (GH #33) — a one-person shop where the owner is out the
+  // back, not a floor with a roaming employee on it. Everything that reaches
+  // for her already does so optionally (`scene.clerk?.`), and the shelf clasps
+  // that summon her are gated on the same format below.
+  if (storeHasStock && activeStoreFormat().clerk) {
     const clerk = new StoreClerk(scene.plan, clerkFloorDests, scene.shelvingUnits, {
       // Only offer to chat while the player is free-roaming the floor.
       isAvailable: () => scene.mode === 'walk-around',
@@ -2397,11 +2473,11 @@ export function buildStore(scene: StoreScene) {
     const labels: string[] = [];
     lineUnits.forEach(u => {
       (['front', 'back'] as const).forEach(side => {
-        // Labels are keyed by GLOBAL section index; each unit face holds
-        // one entry block = two sections (see StorePlan.blockIndexOf).
+        // Labels are keyed by GLOBAL section index; each unit face holds one
+        // entry block = UNIT_SECTIONS sections (see StorePlan.blockIndexOf).
         const block = scene.plan.blockIndexOf(u.libraryIdx, u.unitIdxInLibrary, side);
-        for (let s = 0; s < 2; s++) {
-          const label = layout.sectionLabels.get(String(block * 2 + s));
+        for (let s = 0; s < UNIT_SECTIONS; s++) {
+          const label = layout.sectionLabels.get(String(block * UNIT_SECTIONS + s));
           if (label) labels.push(label);
         }
       });

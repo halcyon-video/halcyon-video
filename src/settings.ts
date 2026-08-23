@@ -33,6 +33,7 @@ import { brandDropReport } from './brand-drop';
 import type { LogoShape, LogoSpec } from './logo-spec';
 import { drawLogo, getLogoFontString } from './logo-renderer';
 import { activatePanelRow, SettingsRowKit } from './settings-rows';
+import { registerStoreFormatSetting } from './store-format-setting';
 import { loadMediaReleasePin, saveMediaReleasePin } from './media-release-date';
 import { formatUnlockLabel, makeRentalRecord, rentalCapacityAt } from './rental-clock';
 import { activeProviderKind } from './providers/provider-registry';
@@ -593,6 +594,11 @@ export function registerCoreSettings(): void {
   // (DVD ships with one today — drop a second scan into COVER_VARIANTS.dvd
   // and its row lights up here with no further wiring).
   registerCoverVariantSettings();
+
+  // The store FORMAT comes first on the Store Look page: it decides the shape of
+  // the room, and several rows below it (Shelf Arrangement, Corner Step) are
+  // things a given format may not offer at all. See store-format-setting.ts.
+  registerStoreFormatSetting();
 
   registerSetting({
     key: 'bb_arrangement',

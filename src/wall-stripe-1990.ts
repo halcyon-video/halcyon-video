@@ -43,6 +43,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { getActiveTheme, type StoreTheme } from './themes';
+import { formatWallIsPrefinished } from './format-surfaces';
 import { tryLoadUserAssetTexture } from './user-assets';
 import { markSignMesh } from './sign-builders';
 import { CORNICE_DROP } from './store-shell';
@@ -73,6 +74,13 @@ const USER_ASSET = 'fixtures/wall-stripe-1990/front.png';
 
 /** Single source of truth for the gate: the 1990 store paints this stripe. */
 export function wallStripe1990Active(theme: StoreTheme = getActiveTheme()): boolean {
+  // Never on a PREFINISHED wall. This band is house livery PAINTED onto flat
+  // drywall — that is the whole reason the 1990 store has it instead of a
+  // soffit. A format whose walls are tongue-and-groove timber (mom-and-pop,
+  // GH #33) has nothing to paint it on: a chain stripe ruled across wood
+  // panelling reads as a decal stuck to someone else's wall, which is exactly
+  // what it would be.
+  if (formatWallIsPrefinished()) return false;
   return theme.id === 'bb-1990';
 }
 

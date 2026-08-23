@@ -11,6 +11,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { JellyfinLibrary } from './jellyfin';
 import {
   FIELD_Z_FRONT, AISLE_SHELF_HEIGHTS, BOX_SPACING, SECTION_COLS,
+  UNIT_SECTIONS,
   UNIT_DEPTH, UNIT_SIDE_CAPACITY, UNIT_FRAME_HEIGHT, unitDepthAtHeight,
 } from './store-layout';
 import { StorePlan } from './store-plan';
@@ -481,7 +482,8 @@ export function buildAisleShelving(deps: AisleShelvingDeps): void {
     // column order is mirrored (see aisleColZ: -X-browsed fronts, and the
     // reverse of that on backs) have logical section 0 at the far end, so
     // reflect over the unit's full section count. Labels are keyed by GLOBAL
-    // section index: one block = two sections.
+    // section index: one block = UNIT_SECTIONS sections (two on the corporate
+    // box, one on a format whose units are a single signboard bay wide).
     const sectionLabelFor = (side: 'front' | 'back', p: number): string => {
       const cnt = sideEntryCount(side);
       if (cnt <= 0) return lib.name;
@@ -489,7 +491,7 @@ export function buildAisleShelving(deps: AisleShelvingDeps): void {
       const mirrored = (unit.browseSign < 0) !== (side === 'back');
       const s = mirrored ? (totalSecs - 1 - p) : p;
       const block = plan.blockIndexOf(unit.libraryIdx, unit.unitIdxInLibrary, side);
-      return layout.sectionLabels.get(String(block * 2 + s)) ?? lib.name;
+      return layout.sectionLabels.get(String(block * UNIT_SECTIONS + s)) ?? lib.name;
     };
 
     // Create signboards running long ways above each shelf section at the top

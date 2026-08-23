@@ -44,7 +44,7 @@ import { makeCrtGlassMaterial, addGlassReflectionPane } from '../glass-reflectio
 import { assetUrl } from '../asset-url';
 import { FixtureContext, StoreFixture } from '../fixtures';
 import { getActiveTheme, themeKneeGoldHex } from '../themes';
-import { ENTRANCE_SIDELIGHT_WIDTH, CEILING_Y, mapWallSegmentUV } from '../store-layout';
+import { ENTRANCE_SIDELIGHT_WIDTH, CEILING_Y, mapWallSegmentUV, vestibuleHalfWidth } from '../store-layout';
 import { vestibuleCeilingY } from '../ceiling-soffit';
 import { WINDOW_HEAD_Y } from '../storefront-facade';
 import { buildVestibuleDoor, updateVestibuleDoors, VestibuleDoor } from './doors';
@@ -197,7 +197,14 @@ export class EntranceCheckout implements StoreFixture {
     const cx = 11.0;             // centred on the store
     const doorH = 7.0;
     const doorW = spec.doorWidth;
-    const boxW = 9.0 + 2 * doorW; // widened by two door-widths
+    // Vestibule chamber width. DERIVED from vestibuleHalfWidth() rather than
+    // re-stating the "9.0 + two door-widths" formula, because that function is
+    // what the facade's entry opening, the storefront knee-wall gap and the
+    // baseline store width are all sized from — and it is FORMAT-DRIVEN now
+    // (a mom-and-pop's chamber is a 4.6 ft lobby with one leaf, not a 9 ft
+    // airlock with two). A second copy of the formula here is exactly how the
+    // facade and the chamber would drift apart on a new format.
+    const boxW = 2 * vestibuleHalfWidth(spec) - 0.4;
     const boxDepth = doorW * 2;  // depth = two door-widths (~6.4 ft)
     const frontZ = 15.0;         // street side (front glass wall)
     const backZ = frontZ - boxDepth; // store side (= counter back)
@@ -491,18 +498,26 @@ export class EntranceCheckout implements StoreFixture {
         },
       ],
       register: counterResult.registerStanding,
-      terminals: [
-        counterResult.getTerminalStanding(cx - 4.0),
-        counterResult.getTerminalStanding(cx + 4.0),
-      ],
+      // Same anchors the terminal props are built at, below.
+      terminals: spec.counterShape === 'desk'
+        ? [counterResult.getTerminalStanding(cx + 1.3)]
+        : [
+            counterResult.getTerminalStanding(cx - 4.0),
+            counterResult.getTerminalStanding(cx + 4.0),
+          ],
     };
 
     // Anchor X offsets along the inner island. The usquare counter's island
     // is shorter (±5.0 vs the shield's ±6.0 — see counter.ts islandHalf), so
     // everything that parks ON it pulls proportionally toward the centre.
+    // 'desk' (the mom-and-pop format's standalone 6 ft counter, islandHalf 3.0)
+    // is the tight one: the owner's spec is a counter "that fits a single
+    // computer", so the terminal sits just right of centre and the bag waits
+    // just left of it, both well inside the desk's own ends.
     const sq = spec.counterShape === 'usquare';
-    const termOff = sq ? 3.5 : 4.0;
-    const bagOff = sq ? 4.6 : 5.4;
+    const isDesk = spec.counterShape === 'desk';
+    const termOff = isDesk ? 1.3 : (sq ? 3.5 : 4.0);
+    const bagOff = isDesk ? 1.9 : (sq ? 4.6 : 5.4);
     const term1 = getInnerCounterSpine(cx - termOff);
     const term2 = getInnerCounterSpine(cx + termOff);
     const bagSpine = getInnerCounterSpine(cx - bagOff);
@@ -510,10 +525,13 @@ export class EntranceCheckout implements StoreFixture {
     // Rental terminals on the inner counter, screens facing the clerk side
     // (away from the store) like a real register — the gold-on-black rental
     // system reads to whoever is working the register, not the customer.
-    this.buildDeskTerminals(group, [
-      { x: cx - termOff, y: innerH + 0.12, z: term1.z, rotY: term1.rotY },
-      { x: cx + termOff, y: innerH + 0.12, z: term2.z, rotY: term2.rotY },
-    ]);
+    // A single computer on the desk format, the classic pair otherwise.
+    this.buildDeskTerminals(group, isDesk
+      ? [{ x: cx + termOff, y: innerH + 0.12, z: term2.z, rotY: term2.rotY }]
+      : [
+          { x: cx - termOff, y: innerH + 0.12, z: term1.z, rotY: term1.rotY },
+          { x: cx + termOff, y: innerH + 0.12, z: term2.z, rotY: term2.rotY },
+        ]);
 
     // Glossy white plastic rental bag waiting at the end of the counter
     // nearest the exit door (-X side) — the launch flourish drops your movie
@@ -541,9 +559,28 @@ export class EntranceCheckout implements StoreFixture {
     const chuteTheme = getActiveTheme();
     if (chuteTheme.defaultMedium === 'vhs') {
       const zBackC = backZ - 0.1; // counter.ts's band outline datum
+      // Mirrored from return-slot.ts's CHUTE_BACK, the same way BAND_H is
+      // mirrored from counter.ts below — those files stay layout-agnostic.
+      const RETURN_CHUTE_BACK = 1.5;
       let anchor: { x: number; z: number };
       let faceYaw: number;
-      if (sq) {
+      if (isDesk) {
+        // Standalone desk (mom-and-pop): there is no band to grow the chute
+        // OUT OF, so it stands as its own drop box at the desk's +X end, slot
+        // facing +X — still the first thing on your left as you come through
+        // the door, still clear of the vestibule glazing and the door swing.
+        //
+        // The anchor is the SLOT FACE, and the body runs CHUTE_BACK (1.5 ft)
+        // behind it — that depth exists to tuck the chute's rear wall inside
+        // the counter band it normally bumps out of. Anchoring it at the desk's
+        // own end face therefore buried 1.5 ft of chute IN the desk, on top of
+        // the terminal: from the manager terminal the blue shell covered a
+        // third of the screen. Offsetting by that same depth stands its rear
+        // wall flush with the desk end instead. Desk rect: x = cx ± 3.0,
+        // z = zBackC-4.6 .. zBackC-3.0 (see counter.ts's `desk` branch).
+        anchor = { x: cx + 3.0 + RETURN_CHUTE_BACK, z: zBackC - 3.8 };
+        faceYaw = Math.PI / 2;
+      } else if (sq) {
         // Flat right side, facing +X; biased toward the back (door) end but
         // clear of the back corner's square cut.
         anchor = { x: cx + 6.8, z: zBackC - 3.2 };

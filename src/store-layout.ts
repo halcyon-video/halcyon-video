@@ -6,6 +6,13 @@
 // stripping (see tests/shelf-order.test.ts).
 import type * as THREE from 'three';
 import type { Movie } from './jellyfin';
+// The active STORE FORMAT preset (src/store-format.ts). Resolved once, at
+// module evaluation, from localStorage — which is why every constant below can
+// derive from it and still be a plain `const`. See that module's header for
+// why switching format is a reload rather than a scene rebuild.
+import { activeStoreFormat, type CounterShape } from './store-format.ts';
+
+const FORMAT = activeStoreFormat();
 
 // Layout settings (standardized to feet: 1 unit = 1 foot)
 // THE canonical store-geometry facts (CLAUDE.md documents both for the shot
@@ -16,21 +23,48 @@ import type { Movie } from './jellyfin';
 // what unified PARKING_STALLS in exterior-environment.ts.
 export const STORE_CENTER_X = 11.0;
 export const FRONT_GLASS_Z = 15.0;
-export const LIBRARY_X_SPACING = 11.0; // Centre-to-centre of adjacent islands WITHIN one side, in feet (narrowed from 13.0). Numerically the same as STORE_CENTER_X but a DIFFERENT fact — don't conflate the two.
-export const FIELD_Z_FRONT = -14.4; // Layout-space Z of the front edge of the island field. LAYOUT z is compressed 0.75x toward the glass (StorePlan.scaleZ), so the world front edge is scaleZ(-14.4) = -7.05 and each layout-foot here only moves the world edge 0.75 ft. Chosen so the game department's field-side walkway measures >=6 ft in the WORST arrangement (herringbone island corners poke ~0.8 ft past the world edge; straight gets ~6.9) — measured, not estimated: the gamedump harness state logs it on window.__gameDeptClear. backWallZ derives from here, so the store just deepens to fit.
+// Centre-to-centre of adjacent shelf runs WITHIN one field, in feet — the
+// hatching pitch fillField() steps by (narrowed from 13.0). FORMAT-DRIVEN:
+// 11.0 on the corporate box, 6.2 in a mom-and-pop, where the whole point is
+// that the aisles are tight. On the corporate store this is numerically the
+// same as STORE_CENTER_X but a DIFFERENT fact — don't conflate the two.
+export const LIBRARY_X_SPACING = FORMAT.runSpacing;
+// Layout-space Z of the front edge of the island field. LAYOUT z is compressed
+// 0.75x toward the glass (StorePlan.scaleZ), so the world front edge is
+// scaleZ(FIELD_Z_FRONT) and each layout-foot here only moves the world edge
+// 0.75 ft. backWallZ derives from here, so the store just deepens to fit.
+// FORMAT-DRIVEN: the corporate -14.4 (world -7.05) was chosen so the game
+// department's field-side walkway measures >=6 ft in the WORST arrangement
+// (herringbone island corners poke ~0.8 ft past the world edge; straight gets
+// ~6.9) — measured, not estimated: the gamedump harness state logs it on
+// window.__gameDeptClear. A mom-and-pop store is only ~20 ft deep in total and
+// has no game department, so it starts its shelves at world -3.0 instead,
+// right behind its little desk.
+export const FIELD_Z_FRONT = FORMAT.fieldZFront;
 // A 12-col island is ~7.4ft long; tilted ~40deg its X-footprint is ~6ft, so islands on
 // the same side need ~11ft of centre spacing to leave a real gap and not overlap.
 // Clear central aisle straddling the store centreline (X=11). Columns left of centre
 // are pushed left and columns right of centre (including a dead-centre column) are
 // pushed right by half this, opening a walkway between the left and right fields.
-export const CENTER_WALKWAY = 16.0; // Widened again (12.0 -> 16.0): a real open floor area down the store centre
+// Clear central aisle straddling the store centreline. FORMAT-DRIVEN: the
+// corporate box widened this twice (12.0 -> 16.0) for a real open floor area
+// down the store centre; a mom-and-pop has no central walkway at all (its
+// format hatches ONE field across the whole floor — see StoreFormatSpec.singleField),
+// so it reads 0 and nothing straddles anything.
+export const CENTER_WALKWAY = FORMAT.centerWalkway;
 // Deepest (largest) Z a back-wall-relative floor fixture may reach: keeps
 // displays/bins/racks behind the checkout zone (shield apex z=-5.5 plus a
 // floor-display clearance + half-footprint margin) even when a tiny store's
 // back wall sits shallow and `backWallZ + zOffset` would land them inside
 // the counter. Fixtures with relativeToBackWall clamp against this.
 export const FLOOR_FIXTURE_MAX_Z = -10.0;
-export const CEILING_Y = 13.5; // Ceiling height in feet (raised from 12.0)
+// Ceiling height in feet — this FORMAT's standard ceiling (the corporate box
+// raised it from 12.0 to 13.5; a mom-and-pop sits at 9.0, everything a bit
+// compressed). Read as "the height this store normally has" by the handful of
+// modules that scale against it (outdoor-lighting's window-pool height, the
+// vestibule wall cap, the asset viewer's stub context); the LIVE height, after
+// the bb_ceiling override, is StoreShellSpec.ceilingY / scene.ceilingY.
+export const CEILING_Y = FORMAT.ceilingY;
 export const HIGH_CEILING_Y = 18.0; // Optional raised-ceiling variant (T07)
 
 // ─── Store shell options (T07) ──────────────────────────────────────────────
@@ -60,17 +94,28 @@ export interface StoreShellSpec {
 export function getStoreShellSpec(): StoreShellSpec {
   const ls = typeof localStorage !== 'undefined' ? localStorage : null;
 
+  // The format sets the room's normal height (CEILING_Y); 'high' is still a
+  // user override on top of it, so a mom-and-pop can be given a raised ceiling
+  // deliberately even though its own default is a low one.
   const ceilingY = ls?.getItem('bb_ceiling') === 'high' ? HIGH_CEILING_Y : CEILING_Y;
 
   // Stepped back-right corner. The store has always had this forward step; the
   // option only varies its footprint. Depth is kept below the 8 ft back-wall
   // shelf margin (see StorePlan.plan) so no freestanding island can reach into
   // the notch — shelves never intersect it by construction.
-  let steppedCorner: StoreShellSpec['steppedCorner'] = { corner: 'back-right', w: 7.2, d: 7.0 };
-  switch (ls?.getItem('bb_corner')) {
-    case 'wide': steppedCorner = { corner: 'back-right', w: 11.0, d: 7.0 }; break;
-    case 'shallow': steppedCorner = { corner: 'back-right', w: 5.0, d: 4.0 }; break;
-    case 'none': steppedCorner = null; break;
+  // A format without the step has a flat back wall, full stop: the step exists
+  // to carry the New Releases wall, and a format with no New Releases wall
+  // (mom-and-pop) would just be notching its back corner for nothing — in a
+  // room this small the notch is a meaningful bite out of the sales floor.
+  let steppedCorner: StoreShellSpec['steppedCorner'] = FORMAT.steppedCorner
+    ? { corner: 'back-right', w: 7.2, d: 7.0 }
+    : null;
+  if (FORMAT.steppedCorner) {
+    switch (ls?.getItem('bb_corner')) {
+      case 'wide': steppedCorner = { corner: 'back-right', w: 11.0, d: 7.0 }; break;
+      case 'shallow': steppedCorner = { corner: 'back-right', w: 5.0, d: 4.0 }; break;
+      case 'none': steppedCorner = null; break;
+    }
   }
 
   // Wall displays default OFF so the default store is identical to today.
@@ -100,10 +145,12 @@ export interface StorefrontSpec {
   // counterStyle/counterTop (materials/bevels only), this changes the
   // FOOTPRINT, so counterStructureFootprints() in store-fixtures-config.ts
   // must stay in sync with counter.ts for both shapes.
-  counterShape: 'shield' | 'usquare';
+  counterShape: CounterShape;
 }
 
-const DEFAULT_DOOR_WIDTH = 3.2;
+// Width of one entrance door leaf (ft). FORMAT-DRIVEN — a mom-and-pop hangs a
+// single 3.0 ft leaf where the chain hangs a 3.2 ft pair.
+const DEFAULT_DOOR_WIDTH = FORMAT.doorWidth;
 // EXACT pane width of every storefront pane, front and side walls alike (ft).
 // User direction: every pane is 4.0 ft wide, PERIOD — a bigger store never
 // stretches its panes, it adds WHOLE panes and leaves any leftover run as
@@ -117,8 +164,8 @@ export const WINDOW_BAY_TARGET_WIDTH = 4.0;
 // SIX 4-ft panes in each side wall's window ribbon. Bigger stores add whole
 // panes; these counts size the baseline shell (see baselineStorefrontWidth /
 // baselineStoreDepth below).
-export const FRONT_PANES_BASELINE = 16;
-export const SIDE_PANES_BASELINE = 6;
+export const FRONT_PANES_BASELINE = FORMAT.frontPanesBaseline;
+export const SIDE_PANES_BASELINE = FORMAT.sidePanesBaseline;
 
 // Solid wall margin (ft) between each end of the front window row and the
 // store corner — the glazing must NOT run wall-to-wall (user direction: ~2 ft
@@ -241,14 +288,19 @@ export function getStorefrontSpec(storeWidth: number): StorefrontSpec {
       counterShape: 'usquare',
     };
   }
+  // The unnamed 'standard' storefront IS the active format's own storefront:
+  // door count, counter ground-plan and counter top all come from the preset,
+  // so a mom-and-pop boots with a single leaf and a little wooden desk without
+  // the user having to pick a matching bb_storefront value. The named presets
+  // above stay exactly as authored — choosing one is choosing that storefront.
   return {
-    doorStyle: 'double-swing',
+    doorStyle: FORMAT.doorStyle,
     doorWidth: DEFAULT_DOOR_WIDTH,
     windowBays: defaultWindowBays(storeWidth, DEFAULT_DOOR_WIDTH),
     frameColor: '#111111',
     counterStyle: 'laminate-90s',
-    counterTop: 'white',
-    counterShape: 'shield',
+    counterTop: FORMAT.counterShape === 'desk' ? 'woodgrain' : 'white',
+    counterShape: FORMAT.counterShape,
   };
 }
 
@@ -258,7 +310,7 @@ export function getStorefrontSpec(storeWidth: number): StorefrontSpec {
 // module's own footprint both call this instead of each hardcoding
 // `(9.0 + 2 * 3.2) / 2 + 0.2`.
 export function vestibuleHalfWidth(spec: Pick<StorefrontSpec, 'doorWidth'>): number {
-  return (9.0 + 2 * spec.doorWidth) / 2 + 0.2;
+  return (FORMAT.vestibuleInnerWidth + 2 * spec.doorWidth) / 2 + 0.2;
 }
 
 export const BROWSE_WINDOW_SIZE = 8; // Number of columns visible at once in browse mode
@@ -267,7 +319,14 @@ export const BROWSE_WINDOW_SIZE = 8; // Number of columns visible at once in bro
 // height — the old 14.4 in pitch (1.8x) read airy and fake. Owner approved
 // the tightening 2026-07-30. Aisle: 5 @ 10 in, first deck 6 in. Wall: 8 @
 // 10.5 in, bottom deck ~5 in off the carpet like the footage shows.
-export const AISLE_SHELF_HEIGHTS = [0.5, 1.333, 2.167, 3.0, 3.833]; // Y coordinates for freestanding shelves
+// Y coordinates of each shelf tier on a freestanding unit. FORMAT-DRIVEN, and
+// the TIER COUNT is load-bearing: UNIT_SIDE_CAPACITY, UNIT_CAPACITY,
+// SECTION_CAPACITY, TINY_LIBRARY_MOVIES and sideEntrySlot() all derive from
+// `.length`, which is exactly why the format is resolved before this module
+// evaluates and can never change afterwards (see store-format.ts's header).
+// Corporate: 5 tiers @ 10 in, first deck 6 in. Mom-and-pop: 9 tiers @ 10.5 in
+// reaching 7.42 ft — floor-to-ceiling under its 9 ft lid.
+export const AISLE_SHELF_HEIGHTS = FORMAT.aisleShelfHeights;
 export const WALL_SHELF_HEIGHTS = [0.42, 1.295, 2.17, 3.045, 3.92, 4.795, 5.67, 6.545]; // Y coordinates for New Releases wall shelves (floor-to-high coverage)
 export const BOX_SPACING = 0.58; // Space between boxes on a shelf in feet
 export const LEAN_ANGLE = -10 * Math.PI / 180; // 10 degrees in radians (0.1745) leaning backward
@@ -276,8 +335,14 @@ export const STAGGER_OFFSET = -0.04; // Offset in feet — the rental copy peeks
 // are a fixed two sections wide so every island reads the same regardless of how
 // many movies its library holds (short libraries just leave the tail slots empty).
 export const SECTION_COLS = 6;
-export const UNIT_SECTIONS = 2;
-export const MAX_SHELF_COLS = SECTION_COLS * UNIT_SECTIONS; // 12 — fixed two-section width
+// FORMAT-DRIVEN (see StoreFormatSpec.unitSections): the chain's unit is two
+// signboard sections wide, a mom-and-pop's is one. This is the granularity the
+// floor planner allocates shelving in, so it is read together with the tier
+// count — the two together decide the smallest amount of shelf a library can be
+// given, and a unit that holds far more than a small library has is a unit with
+// a bare face on it.
+export const UNIT_SECTIONS = FORMAT.unitSections;
+export const MAX_SHELF_COLS = SECTION_COLS * UNIT_SECTIONS; // 12 on the corporate box
 export const UNIT_DEPTH = 2.16; // Double-sided freestanding depth (X extent when axis-aligned), in feet.
 export const UNIT_TOP_DEPTH = 1.26; // Double-sided freestanding depth at the taper reference height, in feet.
 
@@ -299,7 +364,7 @@ export const UNIT_TAPER_HEIGHT = 5.1;
 // trying to fit another row?"). It also now matches ENDCAP_CORE_HEIGHT, so a
 // run terminating in an endcap fixture crowns at exactly the same height as
 // one terminating in its own cap.
-export const UNIT_FRAME_HEIGHT = 4.6;
+export const UNIT_FRAME_HEIGHT = FORMAT.unitFrameHeight;
 
 /**
  * Front-to-back depth (ft) of a freestanding unit at height `y` — the single
@@ -308,6 +373,11 @@ export const UNIT_FRAME_HEIGHT = 4.6;
  * solve their width/depth through this.
  */
 export function unitDepthAtHeight(y: number): number {
+  // A format whose shelving does NOT taper is full depth all the way up: a
+  // mom-and-pop's wooden case is a plain box, and carrying the chain gondola's
+  // taper to a 7.4 ft top tier would leave that tier 0.9 ft deep — too shallow
+  // to stand a tape on, and negative before the ceiling.
+  if (!FORMAT.unitTaper) return UNIT_DEPTH;
   return UNIT_DEPTH - (UNIT_DEPTH - UNIT_TOP_DEPTH) * (y / UNIT_TAPER_HEIGHT);
 }
 
@@ -338,9 +408,51 @@ export const HERRINGBONE_AISLE_ANGLE = AISLE_ANGLE + 10 * Math.PI / 180;
 // tier of every freestanding unit bare.
 export const UNIT_SIDE_CAPACITY = MAX_SHELF_COLS * AISLE_SHELF_HEIGHTS.length; // 60 (12 cols x 5 shelves)
 export const UNIT_CAPACITY = UNIT_SIDE_CAPACITY * 2; // 120 (double-sided)
-export const MAX_RUN_UNITS = 4;        // longest continuous shelf run (line), in units
-export const RUN_BREAK_GAP = 3.0;      // cross-aisle gap (ft) between consecutive runs in a line
+// Longest continuous shelf run (line), in units, in the SMALLEST store of this
+// format — StorePlan.computeDimensions grows it from here with the library.
+export const MAX_RUN_UNITS = FORMAT.baseRunUnits;
+// Cross-aisle gap (ft) between consecutive runs in one hatched line.
+export const RUN_BREAK_GAP = FORMAT.runBreakGap;
 export const BACK_WALL_UNIT_IDX = 999;
+
+/**
+ * The span of BACK WALL this format hands to New Releases, given the span the
+ * shell would otherwise offer (wall edges, minus the left sliver and the
+ * right-wall clearance).
+ *
+ * A format with a New Releases WALL takes all of it — that ribbon is the whole
+ * back of a chain store. A format without one gets, at most, a single dedicated
+ * run centred on the wall, and the rest of that wall stays the room's own
+ * finish: the owner's mom-and-pop spec is "no NEW RELEASES walls — the walls
+ * belong to the regular library; at most one dedicated new-releases shelf"
+ * (GH #33). `newReleasesRuns: 0` yields an empty span and no runs at all.
+ *
+ * Lives here, with the format-derived constants it is made of, rather than in
+ * three-scene.ts's shell derivation — that file is at its line budget and this
+ * is exactly the kind of feature logic the budget exists to keep out of it.
+ */
+export function newReleasesWallSpan(leftX: number, rightX: number): [left: number, right: number] {
+  if (FORMAT.newReleasesWall) return [leftX, rightX];
+  const unitLen = (MAX_SHELF_COLS - 1) * BOX_SPACING + 1.0;
+  const runW = Math.min(Math.max(0, FORMAT.newReleasesRuns) * unitLen, rightX - leftX);
+  const midX = (leftX + rightX) / 2;
+  return [midX - runW / 2, midX + runW / 2];
+}
+
+/**
+ * Columns for the LEFT-WALL New Releases unit — the start of the ribbon — given
+ * the run of wall the side-window ribbon left behind it.
+ *
+ * Windows take priority (user direction), so this is adaptive: it uses whatever
+ * wall remains, and drops the run entirely below one signboard section rather
+ * than building a stub. A format with no New Releases wall has no ribbon to
+ * start, and that side wall belongs to the room.
+ */
+export function newReleasesLeftWallCols(unitSpace: number): number {
+  if (!FORMAT.newReleasesWall) return 0;
+  const cols = Math.max(0, Math.floor((unitSpace - 1.0) / BOX_SPACING));
+  return cols < SECTION_COLS ? 0 : cols;
+}
 
 // New Releases wall-run construction depths — the SINGLE SOURCE shared by the
 // layout calc (buildStore in store-shell.ts), buildShelfRun's geometry, and
