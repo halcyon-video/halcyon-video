@@ -164,6 +164,13 @@
         </div>
       </div>
 
+      <!-- Emblem Studio (#111) — the logo composer's own wide surface, opened
+           from the Store Brand page's Emblem Editor row. It is NOT here: unlike
+           every overlay above, it builds its whole surface in JS
+           (src/emblem-editor.ts). One reason — the screenshot harness has no
+           app DOM, and an editor whose markup lives only in index.html is an
+           editor no harness state can shoot. -->
+
       <!-- Exit Confirmation — small CRT panel (same POS tokens as the drawer) -->
       <div id="exit-confirm-overlay">
         <div class="exit-card crt-panel">

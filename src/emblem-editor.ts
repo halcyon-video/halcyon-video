@@ -1,12 +1,24 @@
-// The EMBLEM EDITOR — build the store's logo out of layered primitive shapes.
+// THE EMBLEM STUDIO — build the store's logo out of layered primitive shapes.
 //
-// A sub-page of the Store Brand drawer page, in the spirit of the emblem
-// editors mid-2000s shooters shipped: stack rectangles, ovals, wedges, stars,
-// rings and type; give each one a colour, a place and an angle; and the pile
-// flattens into the store's brand. It is deliberately NOT a canvas you drag
-// things around on — the store is driven from a couch with five buttons, so
-// every property is a drawer row that Left/Right adjusts, and the preview at
-// the top shows what the pile currently is.
+// In the spirit of the emblem editors mid-2000s shooters shipped: stack
+// rectangles, ovals, wedges, stars, rings and type; give each one a colour, a
+// place and an angle; and the pile flattens into the store's brand.
+//
+// It used to be a SUB-PAGE OF THE SETTINGS DRAWER — one narrow CRT column of
+// rows, eight at a time, so shaping a logo meant paging up and down hunting for
+// the control you wanted (#111). It is now its own wide surface: the design
+// canvas on the left, the layer stack next to it, the selected layer's WHOLE
+// property set beside that, and the emblem-wide settings and actions last. At
+// 1080p none of it pages.
+//
+// TWO INPUT PATHS, NEITHER OF THEM SECOND-CLASS.
+//   - MOUSE: click a layer in the stack or a shape on the canvas to select it,
+//     drag it to move, pull a handle to scale, turn the stem to rotate; every
+//     slider, swatch and dropdown is a real control (src/emblem-canvas.ts).
+//   - REMOTE: ▲▼ walk the focus ring, ◄► adjust the focused control, OK
+//     activates, Back closes. Every mouse gesture above has a labelled row
+//     (src/emblem-controls.ts) — the store still boots on a television.
+// This module owns the surface, the session and the focus ring the two share.
 //
 // WHAT MAKES IT A BRAND RATHER THAN A PICTURE. Two things:
 //   - Layers take their colour from the brand's own ink slots (body / text /
@@ -21,538 +33,617 @@
 // The document is the only thing saved (localStorage `bb_emblem`); everything
 // on screen is derived from it. Edits repaint the store's 2D brand surfaces
 // live through refreshBrand(); the SHAPE of the sign is geometry rather than a
-// texture, so that lands on the drawer-close rebuild, the same way a theme
-// change does.
+// texture, so that lands on the close rebuild, the same way a theme change does.
 import {
-  cloneEmblemDoc, defaultEmblemLayer, emblemDocActive, emptyEmblemDoc,
-  EMBLEM_KIND_SPECS, EMBLEM_KINDS, EMBLEM_STARTERS, moveEmblemLayer, newLayerId,
+  cloneEmblemDoc, emptyEmblemDoc, EMBLEM_KIND_SPECS, moveEmblemLayer,
 } from './emblem-doc';
-import type { EmblemDoc, EmblemInk, EmblemLayer, EmblemLayerKind, EmblemRole } from './emblem-doc';
+import type { EmblemDoc, EmblemLayer } from './emblem-doc';
 import {
-  applyEmblemToSpec, emblemArtCanvas, emblemColorsFromSpec, emblemPngBlob,
-  emblemSilhouette, loadEmblemDoc, saveEmblemDoc,
+  applyEmblemToSpec, emblemColorsFromSpec, loadEmblemDoc, saveEmblemDoc,
 } from './emblem-render';
 import { getActiveLogoSpec } from './logo-spec';
 import { drawLogo } from './logo-renderer';
 import { refreshBrand } from './brand-live';
+import { brandString } from './brand-pack';
 import { applyThemeCssVars, getActiveTheme } from './themes';
-import { SettingsRowKit, setRowEnabled, setRowLabel } from './settings-rows';
-import type { RangeSpec, RowKitHooks } from './settings-rows';
-import { brandFontChoices } from './settings';
+import { SettingsRowKit } from './settings-rows';
+import { createEmblemCanvas } from './emblem-canvas';
+import type { EmblemCanvasHandle } from './emblem-canvas';
+import { buildEmblemControls } from './emblem-controls';
+import type { EmblemControls } from './emblem-controls';
+import type { EmblemSession } from './emblem-session';
 
 /**
- * Row-key namespace. It nests under the Store Brand prefix on purpose: main.ts
- * already routes that prefix back through activateBrandRow, so the editor
- * joins the drawer's remote navigation without a second routing branch.
+ * Row-key namespace. It nests under the Store Brand prefix for continuity with
+ * the drawer page this grew out of; the studio dispatches its own rows, so the
+ * prefix is now just a namespace rather than a routing decision.
  */
 export const EMBLEM_ROW_PREFIX = '__brand__:emblem/';
 
-export interface EmblemPanelHooks extends RowKitHooks {
+/** The stack list and the Done button aren't kit rows — they register by hand. */
+const STACK_KEY = `${EMBLEM_ROW_PREFIX}layers`;
+const DONE_KEY = `${EMBLEM_ROW_PREFIX}done`;
+
+/** The Store Brand page's door into the studio (see buildEmblemEditorRow). */
+export const EMBLEM_OPEN_ROW_KEY = '__brand__:emblem';
+
+export interface EmblemStudioHooks {
   /** The emblem changed in a way the 3D sign geometry must be rebuilt for. */
   onDirty?: () => void;
+  /** The studio closed — the caller puts back whatever it opened over. */
+  onClose?: () => void;
 }
 
-const PREVIEW_W = 960;
-const PREVIEW_H = 420;
-// Where the checkerboard "what you built" pane ends and the "on the store's
-// sign" pane begins. Two panes, because the two questions a person actually
-// has here are "is the empty space empty?" and "what will the sign look like?".
-const PREVIEW_SPLIT = 0.55;
-const CHECKER = 16;
+/**
+ * The Store Brand page's "Emblem Editor" row — the one door into the studio.
+ *
+ * Built HERE rather than in settings.ts, and as an ordinary kit action row
+ * rather than by hand, because the studio is no longer a drawer sub-page: there
+ * is no sub-page key for main.ts to route, so the row has to carry the open
+ * itself. Doing it through the kit is also what gives it the click handler and
+ * the remote dispatch for free — the hand-built version it replaced had a
+ * pointerenter listener and nothing else, so a mouse could highlight it and not
+ * open it.
+ */
+export function buildEmblemEditorRow(
+  kit: SettingsRowKit,
+  hooks: { onDirty?: () => void; onRefreshPage?: () => void } = {},
+): HTMLElement {
+  const doc = getActiveLogoSpec().emblem;
+  const active = doc && doc.enabled && doc.layers.length > 0;
+  return kit.action(
+    'emblem', 'Emblem Editor',
+    'Build a logo out of layered shapes, ovals, stars and type, on its own wide surface. The shape you make becomes the shape of the store’s signs.',
+    active ? `${doc!.layers.length} layers ›` : 'Open ›',
+    () => openEmblemStudio({ onDirty: hooks.onDirty, onClose: hooks.onRefreshPage }),
+  );
+}
 
-const ROLE_OPTIONS = [
-  { id: 'solid', label: 'Solid part' },
-  { id: 'hole', label: 'Cut-out hole' },
-  { id: 'ink', label: 'Printed on it' },
-];
+const SIGN_PREVIEW_W = 900;
+const SIGN_PREVIEW_H = 260;
 
-const INK_OPTIONS = [
-  { id: 'body', label: 'Brand Body' },
-  { id: 'text', label: 'Brand Text' },
-  { id: 'border', label: 'Brand Trim' },
-  { id: 'custom', label: 'Custom…' },
-];
+/**
+ * The studio's surface, built on first open rather than parked in index.html
+ * with the other overlays.
+ *
+ * Two reasons it lives here. The screenshot harness (harness.html) has no app
+ * DOM at all, so an editor whose markup is only in index.html is an editor no
+ * harness state can shoot — and this one has a lot of layout worth shooting.
+ * And unlike the drawer, nothing outside this module ever fills these panels,
+ * so index.html would be carrying a shell only one file uses.
+ *
+ * Built once and kept: closing hides it, the way every other CRT surface here
+ * behaves, and the `:not(.visible) *` pointer-events guard in styles.css is
+ * what makes a hidden one cost nothing.
+ */
+const STUDIO_MARKUP = `
+  <div class="emblem-studio crt-page">
+    <header class="crt-titlebar">
+      <h2 class="settings-title">Emblem Editor</h2>
+      <span class="crt-titlebar-right" id="emblem-studio-brand"></span>
+    </header>
+    <div class="emblem-studio-body">
+      <div class="emblem-studio-grid">
+        <section class="emblem-col emblem-col-stage">
+          <div class="emblem-panel-title">Design — drag to move, handles to size, stem to rotate</div>
+          <div class="emblem-stage" id="emblem-studio-stage"></div>
+          <div class="emblem-panel-title">On the store's sign</div>
+          <canvas class="emblem-sign-canvas" id="emblem-studio-sign"></canvas>
+        </section>
+        <section class="emblem-col emblem-col-layers">
+          <div class="emblem-panel-title">Layers — top first</div>
+          <div class="settings-row emblem-stack-row">
+            <span class="settings-row-hint">Which layer the properties edit. Left/Right steps the pile; or click an entry, or click the shape itself.</span>
+            <div class="emblem-stack" id="emblem-studio-stack"></div>
+          </div>
+          <div class="emblem-rows" id="emblem-studio-layer-ops"></div>
+        </section>
+        <section class="emblem-col emblem-col-props">
+          <div class="emblem-panel-title">Selected shape</div>
+          <div class="emblem-rows" id="emblem-studio-props"></div>
+        </section>
+        <section class="emblem-col emblem-col-meta">
+          <div class="emblem-panel-title">The emblem</div>
+          <div class="emblem-rows" id="emblem-studio-doc"></div>
+          <div class="emblem-panel-title">Whole composition</div>
+          <div class="emblem-rows" id="emblem-studio-actions"></div>
+        </section>
+      </div>
+      <p class="crt-status emblem-studio-status" id="emblem-studio-status"></p>
+    </div>
+    <footer class="crt-footer">
+      <span class="crt-footer-hint" id="emblem-studio-hint"></span>
+      <span class="crt-footer-page">&#9650;&#9660; Focus &nbsp;&#8226;&nbsp; &#9668;&#9658; Adjust &nbsp;&#8226;&nbsp; Back closes</span>
+    </footer>
+  </div>`;
 
-/** Build the emblem editor into `container` (after main.ts's Back row). */
-export function buildEmblemEditorPanel(container: HTMLElement, hooks: EmblemPanelHooks = {}): void {
+/** The overlay element, created on first use. */
+function studioOverlay(): HTMLElement {
+  let overlay = document.getElementById('emblem-studio-overlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'emblem-studio-overlay';
+    overlay.innerHTML = STUDIO_MARKUP;
+    document.body.appendChild(overlay);
+    // Never a hardcoded house name: an installed brand pack renames every CRT
+    // title bar in the app, and this one is not the exception.
+    const brand = overlay.querySelector('#emblem-studio-brand');
+    if (brand) brand.textContent = brandString('app-titlebar-brand', 'HALCYON VIDEO');
+  }
+  return overlay;
+}
+
+interface StudioState {
+  hooks: EmblemStudioHooks;
+  overlay: HTMLElement;
+  session: EmblemSession;
+  kit: SettingsRowKit;
+  controls: EmblemControls;
+  design: EmblemCanvasHandle;
+  signCanvas: HTMLCanvasElement;
+  stackEl: HTMLElement;
+  stackRow: HTMLElement;
+  statusEl: HTMLElement | null;
+  hintEl: HTMLElement | null;
+  rowKeys: string[];
+  index: number;
+  lastSaved: string;
+  resizeObserver: ResizeObserver | null;
+  redrawPending: number;
+}
+
+let studio: StudioState | null = null;
+
+export function isEmblemStudioOpen(): boolean {
+  return studio !== null;
+}
+
+// ─── Opening ─────────────────────────────────────────────────────────────────
+
+/**
+ * Open the studio over whatever is on screen. The caller owns the key routing
+ * (main.ts's input ladder) and gets `onClose` when Back or Done lands.
+ */
+export function openEmblemStudio(hooks: EmblemStudioHooks = {}): void {
+  if (studio) return;
+  const overlay = studioOverlay();
+
   // Cloned: loadEmblemDoc memoizes and hands every caller the same object, and
-  // this one gets mutated on every keystroke.
+  // this one gets mutated on every keystroke and every pointer sample.
   const saved = loadEmblemDoc();
-  let working: EmblemDoc = saved ? cloneEmblemDoc(saved) : emptyEmblemDoc();
-  let selected = Math.max(0, working.layers.length - 1);
-  // The last composition something threw away — Clear Emblem, or a Start From
-  // that replaced it — so Left on the Clear row can put it back for as long as
-  // the page is open. Losing a logo you spent an hour on to one press of OK,
-  // with no way back, is not a thing this store should do.
-  let replaced: EmblemDoc | null = null;
-  let lastSaved = JSON.stringify(loadEmblemDoc());
+  const working: EmblemDoc = saved ? cloneEmblemDoc(saved) : emptyEmblemDoc();
 
-  const layer = (): EmblemLayer | null => working.layers[selected] ?? null;
-  const kindSpec = () => EMBLEM_KIND_SPECS[layer()?.kind ?? 'rect'];
+  const stageEl = requireEl('emblem-studio-stage');
+  const stackEl = requireEl('emblem-studio-stack');
+  // By CLASS, not by id: buildStackRow renames this element to its row key so
+  // the focus ring can find it like any other row, which means a lookup by the
+  // markup's id works exactly once and every REOPEN bails out silently.
+  const stackRow = overlay.querySelector<HTMLElement>('.emblem-stack-row');
+  const layerOpsEl = requireEl('emblem-studio-layer-ops');
+  const propsEl = requireEl('emblem-studio-props');
+  const docEl = requireEl('emblem-studio-doc');
+  const actionsEl = requireEl('emblem-studio-actions');
+  const signCanvas = document.getElementById('emblem-studio-sign') as HTMLCanvasElement | null;
+  if (!stageEl || !stackEl || !stackRow || !layerOpsEl || !propsEl || !docEl || !actionsEl || !signCanvas) return;
 
-  /** The honest one-liner: what the store is actually wearing right now. */
-  const statusText = (): string => {
-    const n = working.layers.length;
-    if (!n) return 'Empty';
-    if (!working.enabled) return `${n} layers — not in use`;
-    if (!emblemDocActive(working)) return `${n} layers — no solid part`;
-    const sil = emblemSilhouette(working);
-    return sil ? `${n} layers — ${sil.aspect.toFixed(2)}:1 outline` : `${n} layers`;
-  };
+  // Fresh DOM on every open: the studio is built, not refreshed, so nothing
+  // from a previous session's document can survive in a control.
+  for (const el of [stackEl, layerOpsEl, propsEl, docEl, actionsEl]) el.innerHTML = '';
+  stageEl.querySelector('.emblem-design-canvas')?.remove();
 
-  // ── Preview ───────────────────────────────────────────────────────────────
-  const previewRow = document.createElement('div');
-  previewRow.className = 'settings-row settings-brand-preview';
-  const canvas = document.createElement('canvas');
-  canvas.width = PREVIEW_W;
-  canvas.height = PREVIEW_H;
-  canvas.className = 'brand-preview-canvas';
-  previewRow.appendChild(canvas);
-  container.appendChild(previewRow);
-
-  /**
-   * Pane 1 — the design canvas on a transparency checkerboard, with the
-   * selected layer ringed. This is the pane that answers "does empty space
-   * stay empty", which is the whole point of flattening with real alpha.
-   */
-  const drawCanvasPane = (ctx: CanvasRenderingContext2D, px: number, py: number, pw: number, ph: number) => {
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(px, py, pw, ph);
-    ctx.clip();
-    ctx.fillStyle = '#0c0f14';
-    ctx.fillRect(px, py, pw, ph);
-
-    // The design box, contain-fitted with a margin.
-    const pad = 22;
-    const availW = pw - pad * 2;
-    const availH = ph - pad * 2;
-    const aspect = Math.max(0.05, working.aspect);
-    const wide = availW / availH > aspect;
-    const dw = wide ? availH * aspect : availW;
-    const dh = wide ? availH : availW / aspect;
-    const dx = px + (pw - dw) / 2;
-    const dy = py + (ph - dh) / 2;
-
-    // Checkerboard: the universal "this is transparent" cue.
-    for (let y = 0; y < dh; y += CHECKER) {
-      for (let x = 0; x < dw; x += CHECKER) {
-        ctx.fillStyle = ((x / CHECKER + y / CHECKER) & 1) ? '#2a3038' : '#20252c';
-        ctx.fillRect(dx + x, dy + y, Math.min(CHECKER, dw - x), Math.min(CHECKER, dh - y));
-      }
-    }
-
-    const sil = emblemSilhouette(working);
-    if (sil) {
-      const art = emblemArtCanvas(
-        working, emblemColorsFromSpec(getActiveLogoSpec()),
-        Math.round(sil.bbox.w * dw), Math.round(sil.bbox.h * dh),
-      );
-      if (art) ctx.drawImage(art, dx + sil.bbox.x * dw, dy + sil.bbox.y * dh, sil.bbox.w * dw, sil.bbox.h * dh);
-    } else {
-      ctx.fillStyle = 'rgba(255,255,255,0.45)';
-      ctx.font = '20px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText('Add a shape to begin', dx + dw / 2, dy + dh / 2);
-    }
-
-    // Canvas edge, then the selected layer's box.
-    ctx.strokeStyle = 'rgba(255,255,255,0.28)';
-    ctx.lineWidth = 1;
-    ctx.setLineDash([]);
-    ctx.strokeRect(dx + 0.5, dy + 0.5, dw - 1, dh - 1);
-    const sel = layer();
-    if (sel) {
-      ctx.save();
-      ctx.translate(dx + sel.cx * dw, dy + sel.cy * dh);
-      ctx.rotate((sel.rot * Math.PI) / 180);
-      ctx.strokeStyle = getActiveLogoSpec().textColor;
-      ctx.lineWidth = 2;
-      ctx.setLineDash([6, 5]);
-      ctx.strokeRect(-(sel.w * dw) / 2, -(sel.h * dh) / 2, sel.w * dw, sel.h * dh);
-      ctx.restore();
-    }
-    ctx.restore();
-  };
-
-  /** The active brand with the WORKING doc folded in, outline fields and all. */
-  const previewSpec = () => applyEmblemToSpec({ ...getActiveLogoSpec(), emblem: working });
-
-  /**
-   * Pane 2 — the emblem the way a brand surface paints it, through the REAL
-   * painter (drawLogo on a spec with this doc folded in). Not a mock-up: this
-   * is the same call the storefront board makes.
-   */
-  const drawSignPane = (ctx: CanvasRenderingContext2D, px: number, py: number, pw: number, ph: number) => {
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(px, py, pw, ph);
-    ctx.clip();
-    const grad = ctx.createLinearGradient(px, py, px, py + ph);
-    grad.addColorStop(0, '#1a2029');
-    grad.addColorStop(1, '#0c0f14');
-    ctx.fillStyle = grad;
-    ctx.fillRect(px, py, pw, ph);
-    drawLogo(ctx, previewSpec(), { x: px + pw * 0.04, y: py + ph * 0.06, w: pw * 0.92, h: ph * 0.88 });
-    ctx.restore();
-  };
-
-  // Coalesced to one repaint per frame. A redraw re-flattens the composition
-  // (a 640-pixel mask trace) and re-renders the art, which is cheap but not
-  // free — and a slider drag fires input events faster than that. This is NOT
-  // a render loop: nothing is scheduled unless an edit asked for a repaint.
-  let redrawPending = 0;
-  const requestRedraw = () => {
-    if (redrawPending) return;
-    redrawPending = requestAnimationFrame(() => {
-      redrawPending = 0;
-      redraw();
-    });
-  };
-
-  const redraw = () => {
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.clearRect(0, 0, PREVIEW_W, PREVIEW_H);
-    const splitX = Math.round(PREVIEW_W * PREVIEW_SPLIT);
-    drawCanvasPane(ctx, 0, 0, splitX, PREVIEW_H);
-    drawSignPane(ctx, splitX, 0, PREVIEW_W - splitX, PREVIEW_H);
-    syncStatus();
-  };
-
-  // ── Persist ───────────────────────────────────────────────────────────────
-  const commit = () => {
-    requestRedraw();
-    const next = JSON.stringify(working);
-    if (next === lastSaved) return;
-    // An emblem with no layers is not an emblem: clear the key rather than
-    // leave an empty document behind for the brand chain to resolve.
-    saveEmblemDoc(working.layers.length ? working : null);
-    lastSaved = next;
-    // --bb-knockout and friends derive from the emblem's ink, so the DOM chrome
-    // has to be re-published alongside the 3D surfaces.
-    applyThemeCssVars(getActiveTheme());
-    refreshBrand();
-    // The SIGN's silhouette is geometry, not a texture — an extruded storefront
-    // emblem is rebuilt, not repainted. Same drawer-close rebuild the theme row
-    // asks for.
-    hooks.onDirty?.();
-  };
-
-  const kit = new SettingsRowKit({
-    container,
-    prefix: EMBLEM_ROW_PREFIX,
-    hooks,
-    preview: requestRedraw,
-    commit,
-  });
-
-  /** A structural change (add/delete/reorder/preset): re-read every control. */
-  const restructure = () => {
-    selected = Math.min(Math.max(0, selected), Math.max(0, working.layers.length - 1));
-    kit.syncAll();
-    syncEnablement();
-    commit();
-  };
-
-  // ── Starters ──────────────────────────────────────────────────────────────
-  // Stepping this row replaces the whole composition, so it stashes what it
-  // replaced — Clear Emblem's Left is the one undo on this page and it covers
-  // both ways of losing your work.
-  kit.strip(
-    'starters', 'Start From',
-    'A few layers to take apart. REPLACES what you have (Clear Emblem’s Left undoes it). Left/Right cycles.',
-    EMBLEM_STARTERS.map((s) => s.label),
-    (i) => {
-      if (working.layers.length) replaced = cloneEmblemDoc(working);
-      working = EMBLEM_STARTERS[i].doc();
-      selected = Math.max(0, working.layers.length - 1);
-      restructure();
-    },
-  );
-
-  // ── Add ───────────────────────────────────────────────────────────────────
-  // Deliberately TWO rows rather than one palette of buttons. The drawer hands
-  // a row the same direction for Right and for OK, so a palette that added on
-  // every step would drop four unwanted layers on the way to picking the fifth.
-  // Choosing and committing are separate presses instead.
-  let pendingKind: EmblemLayerKind = 'rect';
-  kit.select(
-    'newkind', 'New Shape', 'What the Add Shape row below will drop on the pile.',
-    EMBLEM_KINDS.map((k) => ({ id: k, label: EMBLEM_KIND_SPECS[k].label })),
-    () => pendingKind,
-    (v) => { pendingKind = v as EmblemLayerKind; },
-  );
-  kit.action(
-    'add', 'Add Shape',
-    'Drops a new layer of the chosen shape on top of the pile and selects it.',
-    'Enter',
-    () => {
-      const fresh = defaultEmblemLayer(pendingKind);
-      // A first shape fills the canvas; anything after it lands smaller and
-      // centred, so it reads as an addition rather than as covering the pile.
-      const first = working.layers.length === 0;
-      if (fresh.kind !== 'text') {
-        fresh.w = first ? 1 : 0.4;
-        fresh.h = first ? 1 : 0.4;
-      }
-      working.layers.push(fresh);
-      selected = working.layers.length - 1;
-      restructure();
-    },
-  );
-
-  // ── Layer selection and stack order ───────────────────────────────────────
-  kit.readout(
-    'layer', 'Layer',
-    'Which layer the rows below edit. Left/Right steps through the pile, bottom to top.',
-    () => (working.layers.length
-      ? `${selected + 1} / ${working.layers.length} — ${EMBLEM_KIND_SPECS[working.layers[selected].kind].label}`
-      : '(empty)'),
-    (dir) => {
-      if (!working.layers.length) return;
-      selected = (selected + dir + working.layers.length) % working.layers.length;
-      kit.syncAll();
-      syncEnablement();
+  const session: EmblemSession = {
+    doc: working,
+    selected: Math.max(0, working.layers.length - 1),
+    layer(): EmblemLayer | null { return this.doc.layers[this.selected] ?? null; },
+    select(index: number) {
+      const s = studio;
+      if (!s) return;
+      s.session.selected = Math.min(Math.max(0, index), Math.max(0, s.session.doc.layers.length - 1));
+      s.kit.syncAll();
+      s.controls.syncEnablement();
+      renderStack();
       requestRedraw();
     },
-  );
-
-  kit.action(
-    'order', 'Move In Stack',
-    'Right brings the selected layer forward, Left sends it back. Later layers print over earlier ones.',
-    '‹ back · fwd ›',
-    () => { selected = moveEmblemLayer(working, selected, 1); restructure(); },
-    () => { selected = moveEmblemLayer(working, selected, -1); restructure(); },
-  );
-
-  kit.action(
-    'dup', 'Duplicate / Delete',
-    'Enter copies the selected layer, Left deletes it.',
-    'Enter · ‹ delete',
-    () => {
-      const sel = layer();
-      if (!sel) return;
-      working.layers.splice(selected + 1, 0, {
-        ...sel, id: newLayerId(), cx: sel.cx + 0.04, cy: sel.cy + 0.04,
-      });
-      selected += 1;
-      restructure();
+    preview() { requestRedraw(); },
+    commit() { commit(); },
+    restructure() {
+      const s = studio;
+      if (!s) return;
+      s.session.selected = Math.min(
+        Math.max(0, s.session.selected), Math.max(0, s.session.doc.layers.length - 1),
+      );
+      s.kit.syncAll();
+      s.controls.syncEnablement();
+      renderStack();
+      commit();
     },
-    () => {
-      if (!working.layers.length) return;
-      working.layers.splice(selected, 1);
-      selected = Math.max(0, selected - 1);
-      restructure();
-    },
-  );
-
-  // ── The selected layer ────────────────────────────────────────────────────
-  const shapeRow = kit.select(
-    'kind', 'Shape', 'What the selected layer is.',
-    EMBLEM_KINDS.map((k) => ({ id: k, label: EMBLEM_KIND_SPECS[k].label })),
-    () => layer()?.kind ?? 'rect',
-    (v) => {
-      const sel = layer();
-      if (!sel) return;
-      sel.kind = v as EmblemLayerKind;
-      // The two detail knobs mean something different per kind, so a change of
-      // kind resets them rather than reinterpreting a star's point count as a
-      // wedge's sweep angle.
-      const spec = EMBLEM_KIND_SPECS[sel.kind];
-      sel.detail = spec.defaults.detail;
-      sel.detail2 = spec.defaults.detail2;
-      if (sel.kind === 'text' && !sel.text) {
-        sel.text = 'VIDEO';
-        sel.fontFamily ??= 'Archivo Black';
-      }
-      kit.syncAll();
-      syncEnablement();
-    },
-  );
-
-  const roleRow = kit.select(
-    'role', 'Outline Role',
-    'Solid parts and holes shape the SIGN itself; "printed on it" only paints.',
-    ROLE_OPTIONS,
-    () => layer()?.role ?? 'solid',
-    (v) => { const sel = layer(); if (sel) sel.role = v as EmblemRole; },
-  );
-
-  const inkRow = kit.select(
-    'ink', 'Ink',
-    'Brand inks follow the store’s colours when the brand changes; Custom pins one.',
-    INK_OPTIONS,
-    () => layer()?.ink ?? 'body',
-    (v) => {
-      const sel = layer();
-      if (sel) sel.ink = v as EmblemInk;
-      syncEnablement();
-    },
-  );
-
-  const colorRow = kit.color(
-    'color', 'Custom Colour', 'Used when Ink is set to Custom.',
-    () => layer()?.color ?? '#ffffff',
-    (v) => { const sel = layer(); if (sel) sel.color = v; },
-  );
-
-  const textRow = kit.text(
-    'text', 'Text', 'The words on a text layer.',
-    () => layer()?.text ?? '',
-    (v) => { const sel = layer(); if (sel) sel.text = v; },
-  );
-
-  const fontRow = kit.select(
-    'font', 'Font', 'Typeface for a text layer.',
-    () => brandFontChoices().map((f) => ({ id: f, label: f })),
-    () => layer()?.fontFamily ?? 'Archivo Black',
-    (v) => { const sel = layer(); if (sel) sel.fontFamily = v; },
-  );
-
-  const pct = (v: number) => `${Math.round(v * 100)}%`;
-  // Positions run past the canvas edge on purpose: a shape that hangs off and
-  // gets cropped by the design box is a legitimate move, not a mistake.
-  const POS: RangeSpec = { min: -0.5, max: 1.5, step: 0.005, navStep: 0.02 };
-  const SIZE: RangeSpec = { min: 0.02, max: 2, step: 0.005, navStep: 0.02 };
-
-  kit.slider('x', 'Across', 'Left/right position of the layer’s centre.',
-    POS, pct, () => layer()?.cx ?? 0.5, (v) => { const s = layer(); if (s) s.cx = v; });
-  kit.slider('y', 'Down', 'Up/down position of the layer’s centre.',
-    POS, pct, () => layer()?.cy ?? 0.5, (v) => { const s = layer(); if (s) s.cy = v; });
-  const widthRow = kit.slider('w', 'Width', 'Layer width, as a share of the canvas.',
-    SIZE, pct, () => layer()?.w ?? 0.5, (v) => { const s = layer(); if (s) s.w = v; });
-  const heightRow = kit.slider('h', 'Height', 'Layer height, as a share of the canvas.',
-    SIZE, pct, () => layer()?.h ?? 0.5, (v) => { const s = layer(); if (s) s.h = v; });
-  kit.slider('rot', 'Rotation', 'Turn the layer about its own centre.',
-    { min: -180, max: 180, step: 1, navStep: 5 }, (v) => `${Math.round(v)}°`,
-    () => layer()?.rot ?? 0, (v) => { const s = layer(); if (s) s.rot = v; });
-  kit.slider('alpha', 'Opacity', 'How much of what is underneath shows through.',
-    { min: 0, max: 1, step: 0.02, navStep: 0.1 }, pct,
-    () => layer()?.alpha ?? 1, (v) => { const s = layer(); if (s) s.alpha = v; });
-
-  // The two kind-specific knobs. Label, range and meaning all follow the
-  // selected layer — see EMBLEM_KIND_SPECS, which is the single place a new
-  // primitive declares them, so adding one needs no UI code at all.
-  const detailRange = (which: 1 | 2): RangeSpec => {
-    const d = which === 1 ? kindSpec().detail : kindSpec().detail2;
-    return d
-      ? { min: d.min, max: d.max, step: d.step, navStep: d.navStep }
-      : { min: 0, max: 1, step: 0.01, navStep: 0.1 };
-  };
-  const detailFormat = (which: 1 | 2) => (v: number) => {
-    const d = which === 1 ? kindSpec().detail : kindSpec().detail2;
-    if (!d) return '—';
-    const rounded = d.step >= 1 ? Math.round(v) : Math.round(v * 100) / 100;
-    return `${rounded}${d.unit ?? ''}`;
-  };
-  const detailRow = kit.slider('detail', 'Detail', 'Extra control for the selected shape.',
-    () => detailRange(1), detailFormat(1),
-    () => layer()?.detail ?? 0, (v) => { const s = layer(); if (s) s.detail = v; });
-  const detail2Row = kit.slider('detail2', 'Detail 2', 'Second control for the selected shape.',
-    () => detailRange(2), detailFormat(2),
-    () => layer()?.detail2 ?? 0, (v) => { const s = layer(); if (s) s.detail2 = v; });
-
-  // ── The emblem as a whole ─────────────────────────────────────────────────
-  kit.slider('aspect', 'Canvas Shape', 'Width against height of the design canvas.',
-    { min: 0.4, max: 4, step: 0.05, navStep: 0.1 }, (v) => `${v.toFixed(2)} : 1`,
-    () => working.aspect, (v) => { working.aspect = v; });
-  kit.slider('tilt', 'Lean', 'Rake the whole emblem, the classic video-store lean.',
-    { min: -20, max: 20, step: 0.5, navStep: 1 }, (v) => `${(Math.round(v * 10) / 10)}°`,
-    () => working.tilt, (v) => { working.tilt = v; });
-  kit.toggle('wordmark', 'Store Name On It',
-    'Print the store name over the emblem, fitted to the largest rectangle that sits inside your shape. Turn it off if your own text layers carry the name.',
-    () => working.wordmark, (v) => { working.wordmark = v; });
-  kit.toggle('enabled', 'Use This Emblem',
-    'Off keeps everything you built but puts the store back on its normal brand.',
-    () => working.enabled, (v) => { working.enabled = v; });
-
-  const statusRow = kit.readout(
-    'status', 'Emblem Status',
-    'What the store is actually wearing, and the shape it cuts its signs to.',
-    () => statusText(),
-  );
-  const statusValue = statusRow.querySelector('.settings-row-value');
-  const syncStatus = () => {
-    if (statusValue) statusValue.textContent = statusText();
   };
 
-  // The previous export's object URL, revoked when the next one replaces it —
-  // revoking immediately after the click can pull the file out from under the
-  // download, and never revoking leaks the blob for the session.
-  let lastExportUrl: string | null = null;
-  const exportRow = kit.action(
-    'export', 'Export PNG',
-    'Save the flattened emblem as a transparent PNG — the same art the store wears.',
-    'Enter to save',
-    () => {
-      const value = exportRow.querySelector('.settings-row-value');
-      void emblemPngBlob(working, emblemColorsFromSpec(getActiveLogoSpec()), 1024).then((blob) => {
-        if (!blob) {
-          if (value) value.textContent = 'Nothing to export';
-          return;
-        }
-        if (lastExportUrl) URL.revokeObjectURL(lastExportUrl);
-        lastExportUrl = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = lastExportUrl;
-        a.download = 'emblem.png';
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        if (value) value.textContent = `Saved emblem.png (${Math.round(blob.size / 1024)} KB)`;
-      });
+  const rowKeys: string[] = [];
+  const kit = new SettingsRowKit({
+    container: layerOpsEl,
+    prefix: EMBLEM_ROW_PREFIX,
+    hooks: {
+      registerRow: (key) => { rowKeys.push(key); return rowKeys.length - 1; },
+      selectRow: (idx) => setStudioSelection(idx),
     },
+    preview: () => requestRedraw(),
+    commit: () => commit(),
+  });
+
+  const design = createEmblemCanvas(session, stageEl);
+
+  studio = {
+    hooks,
+    overlay,
+    session,
+    kit,
+    // Filled in immediately below — the controls need the studio to exist first,
+    // because their callbacks reach back through it.
+    controls: null as unknown as EmblemControls,
+    design,
+    signCanvas,
+    stackEl,
+    stackRow,
+    statusEl: document.getElementById('emblem-studio-status'),
+    hintEl: document.getElementById('emblem-studio-hint'),
+    rowKeys,
+    index: 0,
+    lastSaved: JSON.stringify(loadEmblemDoc()),
+    resizeObserver: null,
+    redrawPending: 0,
+  };
+
+  // THE FOCUS RING IS BUILD ORDER, and build order is the surface's reading
+  // order: the stack, then what you do to the stack, then the selected layer's
+  // properties, then the emblem as a whole, then the actions. Registering out
+  // of order would make ▼ jump around a screen where everything is visible.
+  buildStackRow();
+  studio.controls = buildEmblemControls(
+    kit, session,
+    { layerOps: layerOpsEl, props: propsEl, doc: docEl, actions: actionsEl },
+    () => renderStack(),
   );
+  buildDoneRow(actionsEl);
 
-  kit.action(
-    'clear', 'Clear Emblem',
-    'Throws the whole composition away and puts the store back on its normal brand. Left puts back whatever was last replaced or cleared, while this page is open.',
-    'Enter · ‹ undo',
-    () => {
-      if (!working.layers.length) return;
-      replaced = cloneEmblemDoc(working);
-      working = emptyEmblemDoc();
-      selected = 0;
-      restructure();
-    },
-    () => {
-      if (!replaced) return;
-      working = replaced;
-      replaced = null;
-      selected = Math.max(0, working.layers.length - 1);
-      restructure();
-    },
-  );
-
-  /**
-   * Rows that only mean something for certain layers go INERT rather than
-   * disappearing — a row that vanishes takes its slot in the drawer's flat nav
-   * list with it, and the page is measured and paginated once per build.
-   */
-  function syncEnablement(): void {
-    const sel = layer();
-    const isText = sel?.kind === 'text';
-    for (const row of [shapeRow, roleRow, inkRow, widthRow, heightRow]) setRowEnabled(row, !!sel);
-    setRowEnabled(colorRow, !!sel && sel.ink === 'custom');
-    setRowEnabled(textRow, isText);
-    setRowEnabled(fontRow, isText);
-    // A text layer's box is a type size and a wrap ceiling, not a rectangle.
-    setRowLabel(widthRow, isText ? 'Max Width' : 'Width');
-    setRowLabel(heightRow, isText ? 'Text Size' : 'Height');
-    const d1 = kindSpec().detail;
-    const d2 = kindSpec().detail2;
-    setRowLabel(detailRow, d1?.label ?? 'Detail');
-    setRowLabel(detail2Row, d2?.label ?? 'Detail 2');
-    setRowEnabled(detailRow, !!sel && !!d1);
-    setRowEnabled(detail2Row, !!sel && !!d2);
-  }
-
-  syncEnablement();
+  studio.controls.syncEnablement();
+  renderStack();
   redraw();
-  // A face picked for a text layer may still be decoding on a cold drawer;
+
+  overlay.classList.add('visible');
+  overlay.addEventListener('keydown', onStudioKeydown, true);
+  // The design canvas has no size until the overlay is laid out, and a canvas
+  // measured at zero draws nothing. Redraw once the browser has done the layout,
+  // and on every later resize.
+  requestAnimationFrame(() => redraw());
+  if (typeof ResizeObserver !== 'undefined') {
+    studio.resizeObserver = new ResizeObserver(() => {
+      // A resize mid-drag would move the geometry under the pointer.
+      if (!studio?.design.isDragging()) requestRedraw();
+    });
+    studio.resizeObserver.observe(stageEl);
+  }
+  // A face picked for a text layer may still be decoding on a cold open;
   // repaint once when the app's fonts settle (one-shot, no polling).
-  document.fonts?.ready?.then(() => redraw()).catch(() => {});
+  document.fonts?.ready?.then(() => requestRedraw()).catch(() => {});
+
+  // Land on the stack, never on Start From: Right on that row replaces the whole
+  // composition, and an editor that opens with its destructive control armed is
+  // an editor people lose work in.
+  setStudioSelection(0);
+
+  // Verification hook, in the house style of window.__gameDept / __promoStands:
+  // the document under edit, the focus ring, and where a pointer has to aim to
+  // grab the selected layer's handles (tools/verify_emblem_studio.mjs).
+  (window as unknown as Record<string, unknown>).__emblemStudio = {
+    doc: () => studio?.session.doc ?? null,
+    selected: () => studio?.session.selected ?? -1,
+    rows: () => studio?.rowKeys.slice() ?? [],
+    focused: () => studio?.rowKeys[studio.index] ?? null,
+    probe: () => studio?.design.probe() ?? null,
+  };
+}
+
+function requireEl(id: string): HTMLElement {
+  return document.getElementById(id) as HTMLElement;
+}
+
+export function closeEmblemStudio(): void {
+  const s = studio;
+  if (!s) return;
+  if (s.redrawPending) cancelAnimationFrame(s.redrawPending);
+  s.resizeObserver?.disconnect();
+  s.design.dispose();
+  s.overlay.removeEventListener('keydown', onStudioKeydown, true);
+  delete (window as unknown as Record<string, unknown>).__emblemStudio;
+  s.overlay.classList.remove('visible');
+  studio = null;
+  s.hooks.onClose?.();
+}
+
+// ─── Persist and repaint ─────────────────────────────────────────────────────
+
+// Coalesced to one repaint per frame. A redraw re-flattens the composition (a
+// 640-pixel mask trace) and re-renders the art, which is cheap but not free —
+// and a slider drag or a pointer drag fires faster than that. This is NOT a
+// render loop: nothing is scheduled unless an edit asked for a repaint.
+function requestRedraw(): void {
+  const s = studio;
+  if (!s || s.redrawPending) return;
+  s.redrawPending = requestAnimationFrame(() => {
+    if (studio) studio.redrawPending = 0;
+    redraw();
+  });
+}
+
+function redraw(): void {
+  const s = studio;
+  if (!s) return;
+  s.design.redraw();
+  drawSignPreview(s);
+  if (s.statusEl) s.statusEl.textContent = s.controls.statusText();
+}
+
+/** The active brand with the WORKING doc folded in, outline fields and all. */
+function previewSpec(s: StudioState) {
+  return applyEmblemToSpec({ ...getActiveLogoSpec(), emblem: s.session.doc });
+}
+
+/**
+ * The emblem the way a brand surface paints it, through the REAL painter
+ * (drawLogo on a spec with this document folded in). Not a mock-up: this is the
+ * same call the storefront board makes, which is what makes it worth the space.
+ */
+function drawSignPreview(s: StudioState): void {
+  const canvas = s.signCanvas;
+  if (canvas.width !== SIGN_PREVIEW_W) canvas.width = SIGN_PREVIEW_W;
+  if (canvas.height !== SIGN_PREVIEW_H) canvas.height = SIGN_PREVIEW_H;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, SIGN_PREVIEW_W, SIGN_PREVIEW_H);
+  const grad = ctx.createLinearGradient(0, 0, 0, SIGN_PREVIEW_H);
+  grad.addColorStop(0, '#1a2029');
+  grad.addColorStop(1, '#0c0f14');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, SIGN_PREVIEW_W, SIGN_PREVIEW_H);
+  drawLogo(ctx, previewSpec(s), {
+    x: SIGN_PREVIEW_W * 0.04, y: SIGN_PREVIEW_H * 0.07,
+    w: SIGN_PREVIEW_W * 0.92, h: SIGN_PREVIEW_H * 0.86,
+  });
+}
+
+function commit(): void {
+  const s = studio;
+  if (!s) return;
+  requestRedraw();
+  const next = JSON.stringify(s.session.doc);
+  if (next === s.lastSaved) return;
+  // An emblem with no layers is not an emblem: clear the key rather than leave
+  // an empty document behind for the brand chain to resolve.
+  saveEmblemDoc(s.session.doc.layers.length ? s.session.doc : null);
+  s.lastSaved = next;
+  // --bb-knockout and friends derive from the emblem's ink, so the DOM chrome
+  // has to be re-published alongside the 3D surfaces.
+  applyThemeCssVars(getActiveTheme());
+  refreshBrand();
+  // The SIGN's silhouette is geometry, not a texture — an extruded storefront
+  // emblem is rebuilt, not repainted. Same close-time rebuild the theme row asks
+  // for.
+  s.hooks.onDirty?.();
+}
+
+// ─── The layer stack ─────────────────────────────────────────────────────────
+
+/**
+ * The stack is ONE focus stop, not one per layer. ◄► step it (which is the
+ * remote's layer picker), and every entry is separately clickable for a mouse —
+ * so both paths reach every layer without the ring growing with the document.
+ */
+function buildStackRow(): void {
+  const s = studio;
+  if (!s) return;
+  s.stackRow.id = `setting-row-${STACK_KEY}`;
+  s.stackRow.tabIndex = -1;
+  s.rowKeys.push(STACK_KEY);
+  const index = s.rowKeys.length - 1;
+  s.stackRow.addEventListener('pointerenter', () => setStudioSelection(index));
+}
+
+/** Step the selection through the stack — the stack row's ◄► behaviour. */
+function stepStack(dir: number): void {
+  const s = studio;
+  if (!s || !s.session.doc.layers.length) return;
+  const n = s.session.doc.layers.length;
+  // The list reads TOP LAYER FIRST, so ▲-ish directions have to agree with it:
+  // Right steps DOWN the printed list, which is DOWN the stack.
+  s.session.select((s.session.selected - dir + n) % n);
+}
+
+function renderStack(): void {
+  const s = studio;
+  if (!s) return;
+  const { layers } = s.session.doc;
+  s.stackEl.innerHTML = '';
+  if (!layers.length) {
+    const empty = document.createElement('p');
+    empty.className = 'emblem-stack-empty';
+    empty.textContent = 'No layers yet — Add Shape below, or pick a Start From.';
+    s.stackEl.appendChild(empty);
+    return;
+  }
+  const colors = emblemColorsFromSpec(getActiveLogoSpec());
+  // Printed top-of-the-pile first, the way every layer stack a person has ever
+  // used reads. The array itself is bottom-first (paint order), so this walks
+  // it backwards rather than reversing it — the indices below are real ones.
+  for (let i = layers.length - 1; i >= 0; i--) {
+    const layer = layers[i];
+    const item = document.createElement('div');
+    item.className = 'emblem-stack-item';
+    if (i === s.session.selected) item.classList.add('active');
+
+    const swatch = document.createElement('span');
+    swatch.className = 'emblem-stack-swatch';
+    swatch.style.background = layer.ink === 'custom' ? layer.color
+      : layer.ink === 'text' ? colors.text
+        : layer.ink === 'border' ? colors.border : colors.body;
+    if (layer.role === 'hole') swatch.classList.add('is-hole');
+    item.appendChild(swatch);
+
+    const name = document.createElement('span');
+    name.className = 'emblem-stack-name';
+    const label = EMBLEM_KIND_SPECS[layer.kind].label;
+    name.textContent = layer.kind === 'text' && layer.text ? `${label} “${layer.text}”` : label;
+    item.appendChild(name);
+
+    const role = document.createElement('span');
+    role.className = 'emblem-stack-role';
+    role.textContent = layer.role === 'solid' ? 'SHAPE' : layer.role === 'hole' ? 'HOLE' : 'INK';
+    item.appendChild(role);
+
+    // Reorder and delete, for the pointer. The remote reaches all three through
+    // the Move In Stack / Duplicate-Delete rows below the list.
+    const ops = document.createElement('span');
+    ops.className = 'emblem-stack-ops';
+    ops.appendChild(stackOpButton('▲', 'Bring forward', i, 'up'));
+    ops.appendChild(stackOpButton('▼', 'Send back', i, 'down'));
+    ops.appendChild(stackOpButton('✕', 'Delete layer', i, 'delete'));
+    item.appendChild(ops);
+
+    item.addEventListener('click', () => {
+      s.session.select(i);
+      setStudioSelection(s.rowKeys.indexOf(STACK_KEY));
+    });
+    s.stackEl.appendChild(item);
+  }
+  // Keep the selected entry in view on a long stack — the list scrolls, the
+  // studio does not page.
+  s.stackEl.querySelector('.emblem-stack-item.active')?.scrollIntoView({ block: 'nearest' });
+}
+
+function stackOpButton(glyph: string, title: string, index: number, op: 'up' | 'down' | 'delete'): HTMLButtonElement {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'emblem-stack-op';
+  btn.textContent = glyph;
+  btn.title = title;
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const s = studio;
+    if (!s) return;
+    const doc = s.session.doc;
+    if (op === 'delete') {
+      doc.layers.splice(index, 1);
+      s.session.selected = Math.max(0, Math.min(s.session.selected, doc.layers.length - 1));
+    } else {
+      // Reordering a layer that isn't selected must not steal the selection —
+      // the property column would silently start editing something else.
+      const wasSelected = s.session.selected === index;
+      const moved = moveEmblemLayer(doc, index, op === 'up' ? 1 : -1);
+      if (wasSelected) s.session.selected = moved;
+    }
+    s.session.restructure();
+  });
+  return btn;
+}
+
+// ─── Done ────────────────────────────────────────────────────────────────────
+
+function buildDoneRow(container: HTMLElement): void {
+  const s = studio;
+  if (!s) return;
+  const row = document.createElement('button');
+  row.type = 'button';
+  row.className = 'settings-row settings-brand-row';
+  row.id = `setting-row-${DONE_KEY}`;
+  row.innerHTML = `
+    <span class="settings-row-main">
+      <span class="settings-row-label">Done</span>
+      <span class="settings-row-hint">Close the editor. Everything here saves as you go.</span>
+    </span>
+    <span class="settings-row-leader" aria-hidden="true"></span>
+    <span class="settings-row-value">Enter</span>
+  `;
+  s.rowKeys.push(DONE_KEY);
+  const index = s.rowKeys.length - 1;
+  row.addEventListener('pointerenter', () => setStudioSelection(index));
+  row.addEventListener('click', () => closeEmblemStudio());
+  container.appendChild(row);
+}
+
+// ─── The focus ring ──────────────────────────────────────────────────────────
+
+function studioRowEl(key: string): HTMLElement | null {
+  return document.getElementById(`setting-row-${key}`);
+}
+
+function setStudioSelection(index: number): void {
+  const s = studio;
+  if (!s || !s.rowKeys.length) return;
+  s.index = ((index % s.rowKeys.length) + s.rowKeys.length) % s.rowKeys.length;
+  s.rowKeys.forEach((key, i) => {
+    const el = studioRowEl(key);
+    if (!el) return;
+    if (i === s.index) {
+      el.classList.add('selected');
+      el.focus({ preventScroll: true });
+      el.scrollIntoView({ block: 'nearest' });
+    } else {
+      el.classList.remove('selected');
+    }
+  });
+  if (s.hintEl) {
+    const el = studioRowEl(s.rowKeys[s.index]);
+    s.hintEl.textContent = el?.querySelector('.settings-row-hint')?.textContent?.trim() ?? '';
+  }
+}
+
+/**
+ * Escape hands the keyboard back from an embedded control to the focus ring.
+ *
+ * This surface is the one place the two input paths really do mix: you click a
+ * slider or open a dropdown with a mouse, and from that moment the control owns
+ * the keyboard (InputManager stands down for any focused field, by design —
+ * see text-entry-focus.ts), so the arrows adjust it and Back cannot close the
+ * studio. Moving the pointer to another row already frees it, but that is not a
+ * way OUT that anyone would find. Escape is.
+ *
+ * Capture phase, and only for a control inside this overlay: the keypress that
+ * discovers the problem is the one that fixes it, and it never reaches
+ * InputManager as a second Back.
+ */
+function onStudioKeydown(e: KeyboardEvent): void {
+  const s = studio;
+  if (!s || (e.key !== 'Escape' && e.key !== 'Backspace')) return;
+  const el = document.activeElement as HTMLElement | null;
+  if (!el || el === document.body || !s.overlay.contains(el)) return;
+  if (!/^(INPUT|SELECT|TEXTAREA)$/.test(el.tagName)) return;
+  e.preventDefault();
+  e.stopPropagation();
+  el.blur();
+  setStudioSelection(s.index);
+}
+
+/** ▲▼ — walk the ring. */
+export function emblemStudioMove(delta: number): void {
+  if (!studio) return;
+  setStudioSelection(studio.index + delta);
+}
+
+/** ◄ ► OK — adjust or run the focused control. `dir` is +1 or -1. */
+export function emblemStudioActivate(dir: number): void {
+  const s = studio;
+  if (!s) return;
+  const key = s.rowKeys[s.index];
+  if (key === STACK_KEY) { stepStack(dir); return; }
+  if (key === DONE_KEY) {
+    if (dir > 0) closeEmblemStudio();
+    return;
+  }
+  s.kit.dispatch(key, dir);
+}
+
+/** Back — the studio is one level, so Back always closes it. */
+export function emblemStudioBack(): void {
+  closeEmblemStudio();
 }

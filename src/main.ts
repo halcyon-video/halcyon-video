@@ -125,12 +125,14 @@ import {
   activateBrandRow,
   BRAND_ROW_PREFIX,
   SETTINGS_SUBPAGE_PREFIX,
-  EMBLEM_SUBPAGE,
   createSettingThumb,
   refreshSettingThumb,
 } from './settings';
 import type { SettingDef, SettingGroup } from './settings';
-import { buildEmblemEditorPanel } from './emblem-editor';
+import {
+  closeEmblemStudio, emblemStudioActivate, emblemStudioBack, emblemStudioMove,
+  EMBLEM_OPEN_ROW_KEY, isEmblemStudioOpen,
+} from './emblem-editor';
 import {
   MEDIA_DATE_BUTTON_ID,
   STREAMING_BUTTON_ID,
@@ -665,11 +667,22 @@ const ui = {
   // owns-the-keys treatment as the manager terminal above.
   isSetupOpen: false,
 
+  /**
+   * The emblem studio (#111) — the logo composer's own wide surface, opened
+   * over the Store Brand drawer page. A GETTER rather than a flag: the studio
+   * module already knows whether it is built, and a second copy of that
+   * answer here is one more thing that can disagree with the DOM.
+   */
+  get isEmblemStudioOpen(): boolean {
+    return isEmblemStudioOpen();
+  },
+
   /** True if any overlay is blocking main navigation */
   get isAnyOverlayOpen(): boolean {
     return this.isPowerMenuOpen || this.isSettingsDrawerOpen || this.isLoginOpen || this.isExitConfirmOpen
       || this.isVersionPickerOpen || this.isSearchOpen || this.isCandyCheckoutOpen
-      || this.isFeedbackOpen || this.isCounterTerminalOpen || this.isSetupOpen || isMembershipPickerOpen();
+      || this.isFeedbackOpen || this.isCounterTerminalOpen || this.isSetupOpen
+      || this.isEmblemStudioOpen || isMembershipPickerOpen();
   }
 };
 
@@ -1289,24 +1302,7 @@ function generateSettingsDrawer() {
         groupEl.appendChild(makeRow(def.key, def.label, resolveHint(def), '', `setting-value-${def.key}`));
       }
     };
-    if (settingsPage === 'Store Brand' && settingsSubpage === EMBLEM_SUBPAGE) {
-      // The build-your-own emblem composer (src/emblem-editor.ts). Same deal as
-      // the brand panel below — its rows share BRAND_ROW_PREFIX, so
-      // activateSetting()'s existing delegation covers it.
-      buildEmblemEditorPanel(groupEl, {
-        onDirty: () => {
-          // An emblem edit repaints the 2D brand surfaces live, but the
-          // storefront sign's SILHOUETTE is geometry: it needs the rebuild.
-          settingsPendingRebuild = true;
-          updateSettingsStatus();
-        },
-        registerRow: (key) => {
-          settingsRowKeys.push(key);
-          return settingsRowKeys.length - 1;
-        },
-        selectRow: (idx) => setSettingsSelection(idx),
-      });
-    } else if (settingsPage === 'Store Brand') {
+    if (settingsPage === 'Store Brand') {
       // Custom LogoSpec editor page (live preview, presets, pickers/sliders) —
       // built by settings.ts; its rows join settingsRowKeys / the selection
       // flow here, and activateSetting() delegates back via activateBrandRow.
@@ -1314,6 +1310,16 @@ function generateSettingsDrawer() {
         onDirty: () => {
           settingsPendingRebuild = true;
           updateSettingsStatus();
+        },
+        // Backing out of the emblem studio (#111) lands here. Not cosmetic: the
+        // Emblem Editor row's "N layers" value is stale by then, and rebuilding
+        // the panel is what makes its row kit the current one again after the
+        // studio's displaced it.
+        onRefreshPage: () => {
+          if (!ui.isSettingsDrawerOpen) return;
+          generateSettingsDrawer();
+          refreshSettingsValues();
+          setSettingsSelection(Math.max(0, settingsRowKeys.indexOf(EMBLEM_OPEN_ROW_KEY)));
         },
         // W3 custom-wrap uploads change box-panel art cached on shared +
         // per-title materials a no-reload rebuild preserves — full reload,
@@ -1782,6 +1788,9 @@ function openSettingsDrawer(page: SettingGroup | 'Service' | 'Controls' | null =
 
 function closeSettingsDrawer() {
   ui.isSettingsDrawerOpen = false;
+  // Clearing the flag FIRST is what stops the studio's onClose from rebuilding
+  // a drawer that is on its way out.
+  if (isEmblemStudioOpen()) closeEmblemStudio();
   document.getElementById('settings-drawer-overlay')!.classList.remove('visible');
   logToConsole('[Settings] Closed store settings.', 'system');
 
@@ -3957,6 +3966,9 @@ async function main() {
       if (ui.isSearchOpen) return;
       if (ui.isPowerMenuOpen) return;
       if (ui.isCounterTerminalOpen) { counterTerminalInput('left'); return; }
+      // The emblem studio opens OVER the settings drawer, so it is tested first
+      // — while it is up, the drawer underneath must not see a key.
+      if (ui.isEmblemStudioOpen) { emblemStudioActivate(-1); return; }
       if (ui.isSettingsDrawerOpen) {
         if (settingsRowKeys[settingsIndex] !== SETTINGS_CLOSE_KEY) activateSelectedSetting(-1);
         return;
@@ -3984,6 +3996,7 @@ async function main() {
       // the Left press that reached for it (or moves field focus while the
       // date sub-screen is up; the flow decides).
       if (ui.isCounterTerminalOpen) { counterTerminalInput('right'); return; }
+      if (ui.isEmblemStudioOpen) { emblemStudioActivate(1); return; }
       if (ui.isSettingsDrawerOpen) {
         if (settingsRowKeys[settingsIndex] !== SETTINGS_CLOSE_KEY) activateSelectedSetting(1);
         return;
@@ -4008,7 +4021,9 @@ async function main() {
       if (ui.isSearchOpen) return;
       if (ui.isExitConfirmOpen) return;
 
-      if (ui.isSettingsDrawerOpen) {
+      if (ui.isEmblemStudioOpen) {
+        emblemStudioMove(-1);
+      } else if (ui.isSettingsDrawerOpen) {
         const nextIdx = (settingsIndex - 1 + settingsRowKeys.length) % settingsRowKeys.length;
         setSettingsSelection(nextIdx);
       } else if (ui.isPowerMenuOpen) {
@@ -4035,7 +4050,9 @@ async function main() {
       if (ui.isSearchOpen) return;
       if (ui.isExitConfirmOpen) return;
 
-      if (ui.isSettingsDrawerOpen) {
+      if (ui.isEmblemStudioOpen) {
+        emblemStudioMove(1);
+      } else if (ui.isSettingsDrawerOpen) {
         const nextIdx = (settingsIndex + 1) % settingsRowKeys.length;
         setSettingsSelection(nextIdx);
       } else if (ui.isPowerMenuOpen) {
@@ -4061,6 +4078,11 @@ async function main() {
       }
       if (ui.isLoginOpen) return;
       if (ui.isSetupOpen) { await setupTerminalInput('ok'); return; }
+
+      if (ui.isEmblemStudioOpen) {
+        emblemStudioActivate(1);
+        return;
+      }
 
       if (ui.isSettingsDrawerOpen) {
         activateSelectedSetting(1);
@@ -4143,6 +4165,13 @@ async function main() {
       if (videoPlayer?.isOpen) { if (!videoPlayer.handleBack()) videoPlayer.requestClose(); return; }
       if (ui.isLoginOpen) return;
       if (ui.isSetupOpen) { void setupTerminalInput('back'); return; }
+
+      // The studio is one level deep, so Back closes it — back onto the Store
+      // Brand page it was opened from, which is what the drawer regenerates.
+      if (ui.isEmblemStudioOpen) {
+        emblemStudioBack();
+        return;
+      }
 
       if (ui.isSettingsDrawerOpen) {
         // Back from a group page returns to the category index; back from the

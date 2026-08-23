@@ -12,14 +12,14 @@
 // the map below, so picking either in the editor painted the emblem in the
 // system sans — the exact silent substitution this map exists to stop. Every
 // family the picker offers must resolve to a shipped file; adding a name to
-// settings.ts's BRAND_FONTS without adding it here is the bug to watch for.
+// BRAND_FONTS below without adding it here is the bug to watch for.
 //
 // This lives in its own module (rather than inside logo-renderer.ts, where it
 // started) because the emblem composer's text layers need the same answer, and
 // two copies of this map is precisely the trap described above with a second
 // place to forget.
 import { BB_ANTON, BB_ARCHIVO_BLACK, BB_BEBAS, BB_OUTFIT } from './bundled-fonts';
-import { brandPackFontFamily } from './brand-pack';
+import { brandPackFontFamily, brandPackFontFamilies } from './brand-pack';
 
 const BUNDLED_BRAND_FAMILY: Record<string, string> = {
   Anton: BB_ANTON,
@@ -40,4 +40,20 @@ export function brandFontFamilyCss(name: string): string {
   return bundled
     ? `${bundled}, sans-serif`
     : name.includes(',') ? name : `"${name}", sans-serif`;
+}
+
+/**
+ * Display names the brand editors offer. All four are BUNDLED and mapped onto
+ * their shipped files above; adding a name here without adding it to the map
+ * is the silent-substitution bug this module exists to stop.
+ */
+const BRAND_FONTS = ['Archivo Black', 'Bebas Neue', 'Outfit', 'Anton'];
+
+/**
+ * The picker's families: the built-ins plus whatever the installed brand pack
+ * declared. A pack face is as safe to name as a bundled one — brand-pack.ts
+ * registered it through the same registrar and boot waited on it.
+ */
+export function brandFontChoices(): string[] {
+  return [...BRAND_FONTS, ...brandPackFontFamilies()];
 }

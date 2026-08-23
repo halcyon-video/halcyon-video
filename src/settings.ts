@@ -27,12 +27,15 @@ import { COVER_VARIANTS, USER_WRAP_SPECS, getUserWrap, setUserWrap } from './vid
 import type { CaseMedium } from './video-case';
 import { DEFAULT_LOGO_SPECS, getActiveLogoSpec } from './logo-spec';
 import {
-  activeBrandPackId, brandPackFontFamilies, brandPackSource, brandPackStatus, getBrandPack,
+  activeBrandPackId, brandPackSource, brandPackStatus, getBrandPack,
 } from './brand-pack';
 import { brandDropReport } from './brand-drop';
 import type { LogoShape, LogoSpec } from './logo-spec';
 import { drawLogo, getLogoFontString } from './logo-renderer';
 import { activatePanelRow, SettingsRowKit } from './settings-rows';
+import { buildEmblemEditorRow } from './emblem-editor';
+import { brandFontChoices } from './brand-fonts';
+import { buildControlsHelpPanel } from './controls-help';
 import { registerStoreFormatSetting } from './store-format-setting';
 import { loadMediaReleasePin, saveMediaReleasePin } from './media-release-date';
 import { formatUnlockLabel, makeRentalRecord, rentalCapacityAt } from './rental-clock';
@@ -1211,6 +1214,12 @@ export interface BrandPanelHooks {
    * bb_cover_* rows' applyMode: 'reload').
    */
   onNeedsReload?: () => void;
+  /**
+   * Rebuild the page it is on. The emblem studio (#111) asks for this when it
+   * closes: it opens OVER this page, and the page it hands back has a stale
+   * "N layers" readout and a row kit that is no longer the current one.
+   */
+  onRefreshPage?: () => void;
   /** Add a row to the drawer's flat nav list; returns its selection index. */
   registerRow?: (key: string) => number;
   /** Move the drawer selection to a registered row (pointerenter parity). */
@@ -1246,28 +1255,6 @@ const BRAND_SHAPES: { id: LogoShape; label: string }[] = [
   { id: 'shield', label: 'Shield' },
   { id: 'none', label: 'None (text only)' },
 ];
-
-// Display names for the picker. All four are BUNDLED and mapped onto their
-// shipped files when the emblem is painted to canvas (logo-renderer's
-// BUNDLED_BRAND_FAMILY). The Google-Fonts @import in styles.css that used to
-// be their only source was a network fetch, i.e. absent on an offline kiosk
-// boot; it is gone as of 2026-08-06 and every face now ships in src/assets.
-//
-// Anton and Bebas Neue were the two that still substituted: bundled, offered
-// here, but missing from BUNDLED_BRAND_FAMILY, so an emblem naming either
-// painted in whatever the system sans is — silently, and the Reel Time preset
-// below is one of them. Both registered 2026-08-14 (rendered emblems checked
-// against the wrap). Adding a name here means adding it there too.
-const BRAND_FONTS = ['Archivo Black', 'Bebas Neue', 'Outfit', 'Anton'];
-
-/**
- * The picker's families: the built-ins plus whatever the installed brand pack
- * declared. A pack face is as safe to name as a bundled one — brand-pack.ts
- * registered it through the same registrar and boot waited on it.
- */
-export function brandFontChoices(): string[] {
-  return [...BRAND_FONTS, ...brandPackFontFamilies()];
-}
 
 const BRAND_SUB_QUICKS = ['VIDEO', 'VIDEOS', 'ENTERTAINMENT'];
 
@@ -1331,6 +1318,37 @@ function logoSpecDiff(spec: LogoSpec, base: LogoSpec): Partial<LogoSpec> | null 
  * element, after main.ts's Back row). Markup mirrors the drawer's native rows
  * (.settings-row / -label / -hint / -input) so the page reads as one menu.
  */
+/**
+ * Build a drawer page that ISN'T rows of settings — the Store Brand form, the
+ * Controls & Help card. Returns false for a page the registry generator should
+ * handle instead — as a type guard, so the caller's remaining branches still
+ * narrow the page they're left with.
+ *
+ * No sub-page argument: the emblem editor used to be one, and since #111 it is
+ * its own surface opened over the drawer rather than a page inside it.
+ *
+ * The routing lives here rather than in main.ts's drawer generator because
+ * this is where the panels are: main.ts should know that some pages build
+ * their own DOM, not which ones or in what order. (main.ts is the file the
+ * build budget calls the next split candidate, and every custom page added
+ * there was another branch in it.)
+ */
+export function buildCustomSettingsPage(
+  page: SettingGroup | 'Service' | 'Controls' | null,
+  container: HTMLElement,
+  hooks: BrandPanelHooks,
+): page is 'Store Brand' | 'Controls' {
+  if (page === 'Store Brand') {
+    buildStoreBrandPanel(container, hooks);
+    return true;
+  }
+  if (page === 'Controls') {
+    buildControlsHelpPanel(container, hooks);
+    return true;
+  }
+  return false;
+}
+
 export function buildStoreBrandPanel(container: HTMLElement, hooks: BrandPanelHooks = {}): void {
   brandRowActivate.clear();
 
@@ -1438,35 +1456,13 @@ export function buildStoreBrandPanel(container: HTMLElement, hooks: BrandPanelHo
     return `${id} — not installed`;
   });
 
-  // ── Emblem editor (sub-page) ───────────────────────────────────────────────
-  // The build-your-own tier: layered primitive shapes flattened into the brand
-  // (src/emblem-editor.ts). It gets its own page rather than more rows here —
-  // it carries its own preview and a stack of per-layer controls, and a live
-  // emblem overrides the Emblem Shape row below, so the two want separating.
-  {
-    const key = SETTINGS_SUBPAGE_PREFIX + EMBLEM_SUBPAGE;
-    const row = document.createElement('button');
-    row.type = 'button';
-    row.className = 'settings-row settings-brand-row';
-    row.id = `setting-row-${key}`;
-    const doc = getActiveLogoSpec().emblem;
-    const active = doc && doc.enabled && doc.layers.length > 0;
-    row.innerHTML = `
-      <span class="settings-row-main">
-        <span class="settings-row-label">Emblem Editor</span>
-        <span class="settings-row-hint">Build a logo out of layered shapes, ovals, stars and type. The shape you make becomes the shape of the store's signs.</span>
-      </span>
-      <span class="settings-row-leader" aria-hidden="true"></span>
-      <span class="settings-row-value">${active ? `${doc!.layers.length} layers ›` : '›'}</span>
-    `;
-    const index = hooks.registerRow ? hooks.registerRow(key) : -1;
-    row.addEventListener('pointerenter', () => {
-      if (index >= 0) hooks.selectRow?.(index);
-    });
-    // Activation is main.ts's own sub-page route (the key carries its prefix),
-    // so nothing needs registering in the brand row map for it.
-    container.appendChild(row);
-  }
+  // ── Emblem editor ──────────────────────────────────────────────────────────
+  // The build-your-own tier: layered primitive shapes flattened into the brand.
+  // It gets its own SURFACE rather than more rows here — it carries a design
+  // canvas and a stack of per-layer controls, and a live emblem overrides the
+  // Emblem Shape row below, so the two want separating. The row itself is built
+  // by the studio (#111), because opening it is all this page knows about it.
+  buildEmblemEditorRow(kit, hooks);
 
   // ── Preset strip ───────────────────────────────────────────────────────────
   const presets = kit.strip(

@@ -58,12 +58,31 @@ export function activatePanelRow(key: string, dir: number): void {
 
 export class SettingsRowKit {
   private readonly opts: RowKitOpts;
+  /**
+   * Where the NEXT row gets appended. Starts at opts.container and moves with
+   * into(); a single-column panel never touches it.
+   */
+  private target: HTMLElement;
   private readonly activate = new Map<string, (dir: number) => void>();
   private readonly syncFns: (() => void)[] = [];
 
   constructor(opts: RowKitOpts) {
     this.opts = opts;
+    this.target = opts.container;
     currentKit = this;
+  }
+
+  /**
+   * Aim the kit at another element, so ONE kit can fill several columns.
+   *
+   * The drawer's panels are a single column and never call this. The emblem
+   * studio is a wide surface whose rows land in three different panels, and it
+   * still wants one kit: the kit's registration ORDER is the remote's focus
+   * ring, and two kits would mean two dispatch maps and only one of them
+   * current (see currentKit above).
+   */
+  into(el: HTMLElement): void {
+    this.target = el;
   }
 
   /** Re-read every control from the model — after a preset or an undo. */
@@ -110,7 +129,7 @@ export class SettingsRowKit {
     leader.setAttribute('aria-hidden', 'true');
     row.appendChild(leader);
     this.register(id, row, activate);
-    this.opts.container.appendChild(row);
+    this.target.appendChild(row);
     return row;
   }
 
@@ -416,7 +435,7 @@ export class SettingsRowKit {
       apply(next);
       setActive(next);
     });
-    this.opts.container.appendChild(row);
+    this.target.appendChild(row);
     return { setActive };
   }
 }
