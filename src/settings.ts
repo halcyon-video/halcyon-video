@@ -1083,7 +1083,7 @@ export function registerCoreSettings(): void {
     group: 'Connection',
     default: isDemoMode ? ALL_DEFAULT_STREAMING_SERVICES_CSV : '',
     applyMode: 'rebuild-scene',
-    hint: 'Comma list of CHOSEN streaming services (Netflix, Prime Video, Disney+, Hulu, Max, Apple TV+, Paramount+, Peacock). Movies only. Blank = none.',
+    hint: 'Comma list of CHOSEN streaming services (Netflix, Prime Video, Disney+, Hulu, Max, Apple TV+, Paramount+, Peacock). Movies only. Blank = none. Easier: tick them off at the counter terminal — STREAMING SERVICES.',
     visibleWhen: () => getSetting<boolean>('bb_streaming_enabled'),
   });
 

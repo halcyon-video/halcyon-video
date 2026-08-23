@@ -120,6 +120,7 @@ import {
 import type { SettingDef, SettingGroup } from './settings';
 import {
   MEDIA_DATE_BUTTON_ID,
+  STREAMING_BUTTON_ID,
   counterTerminalClose,
   counterTerminalInput,
   counterTerminalOpen,
@@ -721,12 +722,19 @@ let cecDisplayAssumedOn = true;
 
 // The counter CRT carries extra rows the glass power menu doesn't:
 // MANAGER OVERRIDE, the diegetic (and only couch-reachable) entry into the
-// SERVICE MODE settings page (review §4.3), and MEDIA RELEASE DATE (#42),
-// the catalog-pin sub-screen. Inserted just above RETURN TO STORE so the
-// safe exit stays last.
+// SERVICE MODE settings page (review §4.3), MEDIA RELEASE DATE (#42), the
+// catalog-pin sub-screen, and STREAMING SERVICES (#96), the re-entry into the
+// opening-day picker for a store that was already stocked when it shipped.
+// Inserted just above RETURN TO STORE so the safe exit stays last.
+//
+// This ring is now at the CRT's physical ceiling: 11 rows + 2 header lines is
+// 13, which drawTerminal seats only by tightening to its 1.0-leading floor
+// (fitTerminalPitch, #77). A 12th row does not fit and would be clipped with a
+// MORE marker — tests/counter-terminal.test.ts fails first, on purpose. A new
+// row from here on wants a sub-screen to live under, not a slot in this list.
 const COUNTER_TERMINAL_ALL_ROWS = (() => {
   const ids = [...powerButtons];
-  ids.splice(ids.indexOf('btn-cancel'), 0, MEDIA_DATE_BUTTON_ID, 'btn-service');
+  ids.splice(ids.indexOf('btn-cancel'), 0, STREAMING_BUTTON_ID, MEDIA_DATE_BUTTON_ID, 'btn-service');
   return ids;
 })();
 // The row list the CRT is actually drawing. counter-terminal-flow.ts holds this

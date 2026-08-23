@@ -36,7 +36,12 @@ import {
   type MembershipLoginSession,
 } from './membership-cards';
 import { excludedLibraryIds, setLibraryCarried } from './library-settings';
-import { DEFAULT_STREAMING_SERVICES, resolveEnabledServices } from './streaming-catalog';
+import {
+  STREAMING_SERVICES_KEY,
+  streamingChoiceCsv,
+  streamingChoiceScreen,
+} from './streaming-choice';
+import { getSetting, setSetting } from './settings';
 import {
   SetupScreen,
   SetupKey,
@@ -360,19 +365,16 @@ async function afterAuth(url: string, session: MembershipLoginSession): Promise<
  * the player has, offered right after the library checkboxes. Pre-checked
  * against whatever is already persisted (a "Change Server" re-entry keeps
  * an earlier choice) -- a true first run reads blank, i.e. none checked,
- * per the local-install default.
+ * per the local-install default. The rows themselves come from
+ * streaming-choice.ts, shared with the manager terminal's re-entry (#96), so
+ * the two pickers can never offer different lists.
  */
 function initialStreamingScreen(): SetupScreen {
-  const chosen = new Set(resolveEnabledServices(localStorage.getItem('bb_streaming_services')).map((d) => d.id));
-  return {
-    kind: 'streaming',
-    rows: DEFAULT_STREAMING_SERVICES.map((d) => ({ id: d.id, name: d.name, carried: chosen.has(d.id) })),
-    row: 0,
-  };
+  return streamingChoiceScreen(getSetting<string>(STREAMING_SERVICES_KEY));
 }
 
 function persistStreamingChoice(rows: SetupLibraryRow[]): void {
-  localStorage.setItem('bb_streaming_services', rows.filter((r) => r.carried).map((r) => r.id).join(','));
+  setSetting(STREAMING_SERVICES_KEY, streamingChoiceCsv(rows));
 }
 
 async function runSync(): Promise<void> {

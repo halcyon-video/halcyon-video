@@ -32,6 +32,12 @@ export const COUNTER_TERMINAL_LABELS: Record<string, string> = {
   // Lazy: this object is built at module eval, long before the brand pack
   // has loaded, so the one branded row reads through a getter.
   get 'btn-exit'() { return brandStringResolver('terminal-exit-label', 'CLOSE HALCYON APP'); },
+  // CRT-only row (#96): the way back into the streaming-services picker the
+  // opening-day terminal offers once and only once. A store that connected
+  // its media server before that shipped never saw it, so this is the only
+  // remote-driven route to the choice — the settings drawer's row is a typed
+  // comma list, which is not a thing anyone does from a couch.
+  'btn-streaming': 'STREAMING SERVICES (PICK APPS)',
   // CRT-only row (not in the glass power menu): the diegetic door into the
   // SERVICE MODE settings page — the staff knobs hidden from the couch tree.
   'btn-service': 'MANAGER OVERRIDE (STAFF ONLY)',

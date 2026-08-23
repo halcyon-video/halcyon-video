@@ -13,6 +13,14 @@
 // input callbacks; nothing here touches DOM state beyond a keyboard listener
 // for typed digits while the date screen is up.
 import { counterTerminalLines } from './counter-terminal';
+import { SetupScreen, setupScreenKey, setupScreenLines } from './store-setup-screens';
+import {
+  STREAMING_ENABLED_KEY,
+  STREAMING_SERVICES_KEY,
+  streamingChoiceCsv,
+  streamingChoiceScreen,
+} from './streaming-choice';
+import { getSetting, setSetting } from './settings';
 import {
   MediaDateScreenState,
   initMediaDateScreen,
@@ -27,8 +35,18 @@ import {
   saveMediaReleasePin,
 } from './media-release-date';
 
-/** The one row that opens a CRT sub-screen instead of a power action. */
+/** Rows that open a CRT sub-screen instead of running a power action. */
 export const MEDIA_DATE_BUTTON_ID = 'btn-media-date';
+/**
+ * #96 — the way back into the streaming-services picker. Opening day
+ * (store-setup-flow.ts) is the only other place it is offered, and a store
+ * that connected its server before that shipped never had an opening day, so
+ * without this row the choice was a fresh-install privilege. Deliberately its
+ * own row rather than a step inside CHANGE SERVER / LOG OUT: re-authenticating
+ * against a media server is a heavy, alarming thing to make someone do to tick
+ * a box, and it drops the session on the way.
+ */
+export const STREAMING_BUTTON_ID = 'btn-streaming';
 
 interface TerminalScene {
   setTerminalText(lines: string[] | null, cursorLine?: number): void;
@@ -51,9 +69,10 @@ export interface CounterTerminalDeps {
 }
 
 let deps: CounterTerminalDeps | null = null;
-let mode: 'menu' | 'date' = 'menu';
+let mode: 'menu' | 'date' | 'streaming' = 'menu';
 let menuIndex = 0;
 let dateState: MediaDateScreenState | null = null;
+let streamingState: SetupScreen | null = null;
 
 export function initCounterTerminalFlow(d: CounterTerminalDeps): void {
   deps = d;
@@ -65,6 +84,11 @@ function render(): void {
   if (!scene) return;
   if (mode === 'date' && dateState) {
     const { lines, cursorLine } = mediaDateScreenLines(dateState, loadMediaReleasePin(), new Date());
+    scene.setTerminalText(lines, cursorLine);
+  } else if (mode === 'streaming' && streamingState) {
+    // Rendered by the setup terminal's own renderer, not a copy of it — the
+    // player sees the identical checkbox list either way (#96).
+    const { lines, cursorLine } = setupScreenLines(streamingState);
     scene.setTerminalText(lines, cursorLine);
   } else {
     const { lines, cursorLine } = counterTerminalLines(deps.buttons, menuIndex);
@@ -97,6 +121,30 @@ function leaveDateScreen(): void {
   window.removeEventListener('keydown', onDigitKey, true);
 }
 
+/**
+ * #96 — the streaming-services checkbox list, pre-ticked from the CHOICE this
+ * store is currently running. Read through getSetting, not localStorage: on
+ * the hosted demo nothing is persisted and the registry default is all eight,
+ * so a raw read would show a visitor an empty picker standing in front of
+ * eight stocked streaming aisles.
+ */
+function enterStreamingScreen(): void {
+  mode = 'streaming';
+  streamingState = streamingChoiceScreen(getSetting<string>(STREAMING_SERVICES_KEY), 'SAVE AND RESTOCK');
+  render();
+}
+
+function leaveStreamingScreen(): void {
+  mode = 'menu';
+  streamingState = null;
+}
+
+/** Both sub-screens dropped at once — whichever is up, the menu is the floor. */
+function leaveSubScreens(): void {
+  leaveDateScreen();
+  leaveStreamingScreen();
+}
+
 export function counterTerminalOpen(): void {
   if (!deps) return;
   const scene = deps.scene();
@@ -111,7 +159,7 @@ export function counterTerminalOpen(): void {
 
 export function counterTerminalClose(): void {
   if (!deps || !deps.ui.isCounterTerminalOpen) return;
-  leaveDateScreen();
+  leaveSubScreens();
   deps.ui.isCounterTerminalOpen = false;
   // Hands the camera back and resets the CRT to its idle rental screen.
   deps.scene()?.exitSearchMode();
@@ -147,12 +195,49 @@ async function clearPin(): Promise<void> {
 }
 
 /**
+ * #96 — commit the streaming picks and restock. Ticking a service here has to
+ * actually put aisles in the store, so the master toggle comes on with the
+ * first choice: finding STREAMING-SERVICE SECTIONS switched off in a drawer
+ * the player was never sent to, after they picked four apps at the counter,
+ * reads as the feature being broken. Turning every box off is left alone —
+ * that is someone saying "no streaming aisles", and the toggle is theirs.
+ */
+async function saveStreamingChoice(s: SetupScreen): Promise<void> {
+  if (!deps || s.kind !== 'streaming') return;
+  const csv = streamingChoiceCsv(s.rows);
+  setSetting(STREAMING_SERVICES_KEY, csv);
+  if (csv && !getSetting<boolean>(STREAMING_ENABLED_KEY)) setSetting(STREAMING_ENABLED_KEY, true);
+  const count = csv ? csv.split(',').length : 0;
+  deps.log(`[Terminal] Streaming services set to ${count ? csv : 'none'}. Restocking...`);
+  counterTerminalClose();
+  await deps.rebuild();
+}
+
+/**
  * One remote/keyboard press while the terminal is docked. The menu keeps its
  * original moves (Up/Down step, OK runs the row, Right/Back step out); the
- * date screen maps the full BIOS set through media-date-screen's reducer.
+ * date screen maps the full BIOS set through media-date-screen's reducer, and
+ * the streaming picker through store-setup-screens' (#96).
  */
 export async function counterTerminalInput(kind: MediaDateKey): Promise<void> {
   if (!deps || !deps.ui.isCounterTerminalOpen) return;
+
+  if (mode === 'streaming' && streamingState) {
+    deps.keyClick();
+    // Back belongs to this file, not the reducer: on opening day the picker
+    // is a step in a one-way flow with nowhere to go back TO, but here it is
+    // a sub-screen and Back means "up a level" — the menu it opened from.
+    if (kind === 'back') {
+      leaveStreamingScreen();
+      render();
+      return;
+    }
+    const { state, action } = setupScreenKey(streamingState, kind);
+    streamingState = state;
+    if (action === 'open-store') return saveStreamingChoice(state);
+    render();
+    return;
+  }
 
   if (mode === 'date' && dateState) {
     deps.keyClick();
@@ -183,6 +268,11 @@ export async function counterTerminalInput(kind: MediaDateKey): Promise<void> {
       if (btnId === MEDIA_DATE_BUTTON_ID) {
         deps.keyClick();
         enterDateScreen();
+        return;
+      }
+      if (btnId === STREAMING_BUTTON_ID) {
+        deps.keyClick();
+        enterStreamingScreen();
         return;
       }
       // Close first: several actions (settings drawer, logout) take over the
