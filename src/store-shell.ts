@@ -45,11 +45,12 @@ import { buildPreownedPreorderGamesSigns } from './fixtures/preowned-preorder-ga
 import { buildNewReleaseToppers, type NrTopperRun } from './fixtures/new-release-toppers';
 import { StoreClerk, ClerkDest } from './clerk';
 import { ClerkNavGrid, NavRect } from './clerk-nav';
-import { neutralizeScanTexture, createBrandLogoBodyTexture, createBrandLogoTextTexture, createNewReleasesSignTexture, createPromoSignTexture, createCeilingTileTexture, createBrickTexture, createStorefrontLogoYellowTexture, createAsphaltTexture, createParkingStainsTexture, createShelfTextures, createShelfBayShadeTexture, createWireMeshTexture, useCheapMaterials, createGlassSurfaceNormalMap, createAcousticPanelTexture, createTrofferLensTexture, createHvacVentTexture } from './canvas-textures';
+import { neutralizeScanTexture, createBrandLogoBodyTexture, createBrandLogoTextTexture, createNewReleasesSignTexture, createPromoSignTexture, createCeilingTileTexture, createBrickTexture, createStuccoTexture, createStorefrontLogoYellowTexture, createAsphaltTexture, createParkingStainsTexture, createShelfTextures, createShelfBayShadeTexture, createWireMeshTexture, useCheapMaterials, createGlassSurfaceNormalMap, createAcousticPanelTexture, createTrofferLensTexture, createHvacVentTexture } from './canvas-textures';
 import { getActiveTheme, themeTrimDarkHex, themeKneeGoldHex, WALL_PAINT_OPTIONS } from './themes';
 import { getSetting } from './settings';
 import { tryLoadUserAssetTexture, loadUserAssetSurface } from './user-assets';
 import { buildStorefrontFacade, WINDOW_HEAD_Y, SIDE_RIBBON_PANE_W } from './storefront-facade';
+import { buildShopfrontFacade } from './storefront-facade-shop';
 import { buildStorefrontLogo3D } from './logo-storefront';
 import { create3DDoubleLayeredSign, markSignMesh, auditSignMeshes } from './sign-builders';
 import { retailAudio } from './audio';
@@ -346,6 +347,23 @@ export function buildStore(scene: StoreScene) {
     brickMats.push(mat);
     return mat;
   };
+  // GH #110: a 'storefront' facade format wears its own plain painted-block/
+  // stucco cladding, not the chain's brick — this knee veneer (built here,
+  // independently of buildStorefrontFacade below) follows the same choice.
+  const isShopFacade = activeStoreFormat().facadeStyle === 'storefront';
+  const stuccoSrc = createStuccoTexture();
+  const kneeVeneerMaterial = (repX: number, repY: number): THREE.MeshStandardMaterial => {
+    if (!isShopFacade) return brickMaterial(repX, repY);
+    const map = stuccoSrc.map.clone();
+    const normalMap = stuccoSrc.normalMap.clone();
+    const roughnessMap = stuccoSrc.roughnessMap.clone();
+    [map, normalMap, roughnessMap].forEach((t) => {
+      t.wrapS = t.wrapT = THREE.RepeatWrapping;
+      t.repeat.set(repX, repY);
+      t.needsUpdate = true;
+    });
+    return new THREE.MeshStandardMaterial({ map, normalMap, roughnessMap, roughness: 1.0, metalness: 0.0 });
+  };
 
   // The baked scene.environment is an INTERIOR capture (mid-store, troffers
   // and all) and at night its display gain rises to 2.6 — every exterior
@@ -378,7 +396,7 @@ export function buildStore(scene: StoreScene) {
     const segW = b - a;
     const veneer = new THREE.Mesh(
       new THREE.BoxGeometry(segW, KNEE_EXT_H, kneeVeneerThick),
-      brickMaterial(segW / BRICK_FEET, KNEE_EXT_H / BRICK_FEET));
+      kneeVeneerMaterial(segW / BRICK_FEET, KNEE_EXT_H / BRICK_FEET));
     veneer.position.set(STORE_CENTER_X + (a + b) / 2, KNEE_EXT_H / 2, kneeVeneerZ);
     veneer.castShadow = true;
     veneer.receiveShadow = true;
@@ -396,18 +414,30 @@ export function buildStore(scene: StoreScene) {
   const frontGlazedSpan =
     scene.storefrontSpec.windowBays.reduce((s, b) => s + b.width, 0) + 2 * extVestibuleGapHalf;
   const actualFrontCornerMargin = Math.max(0, (storeWidth - frontGlazedSpan) / 2);
-  const facade = buildStorefrontFacade({
-    storeWidth,
-    backWallZ: scene.backWallZ,
-    ceilingY: scene.ceilingY,
-    entryHalfWidth: extVestibuleGapHalf,
-    entryOpeningHalfWidth: entranceOpeningHalfWidth(scene.storefrontSpec),
-    brickMaterial,
-    stripeColor: theme.palette.primary,
-    trimColor: theme.palette.secondary,
-    sideRibbon: scene.sideRibbon,
-    frontCornerMargin: actualFrontCornerMargin,
-  });
+  // GH #110: the format's own building, not a narrower copy of the chain's —
+  // see StoreFormatSpec.facadeStyle and storefront-facade-shop.ts.
+  const facade = isShopFacade
+    ? buildShopfrontFacade({
+        storeWidth,
+        backWallZ: scene.backWallZ,
+        ceilingY: scene.ceilingY,
+        entryHalfWidth: extVestibuleGapHalf,
+        trimColor: theme.palette.secondary,
+        sideRibbon: scene.sideRibbon,
+        frontCornerMargin: actualFrontCornerMargin,
+      })
+    : buildStorefrontFacade({
+        storeWidth,
+        backWallZ: scene.backWallZ,
+        ceilingY: scene.ceilingY,
+        entryHalfWidth: extVestibuleGapHalf,
+        entryOpeningHalfWidth: entranceOpeningHalfWidth(scene.storefrontSpec),
+        brickMaterial,
+        stripeColor: theme.palette.primary,
+        trimColor: theme.palette.secondary,
+        sideRibbon: scene.sideRibbon,
+        frontCornerMargin: actualFrontCornerMargin,
+      });
   dimEnvOutside(facade.group);
   scene.scene.add(facade.group);
 

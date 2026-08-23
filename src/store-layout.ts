@@ -135,6 +135,8 @@ export function getStoreShellSpec(): StoreShellSpec {
 export interface StorefrontSpec {
   doorStyle: 'double-swing' | 'sliding' | 'single';
   doorWidth: number;
+  /** How the entrance is built — see StoreFormatSpec.entryStyle. */
+  entryStyle: 'vestibule' | 'storefront-door';
   windowBays: { width: number; hasCenterMullion: boolean }[]; // left -> right
   frameColor: string;        // '#111' today; must support gray '#888'
   counterStyle: 'laminate-90s' | 'rounded-2000s';
@@ -173,7 +175,10 @@ export const SIDE_PANES_BASELINE = FORMAT.sidePanesBaseline;
 // ribbons carry the same margin via SIDE_RIBBON_FRONT_Z (storefront-facade.ts).
 // This is the MINIMUM margin: whole-pane quantization can leave a wider strip
 // of solid wall at the corners (panes are never stretched to fill it).
-export const FRONT_WINDOW_CORNER_MARGIN = 2.25;
+// FORMAT-DRIVEN: the chain's 2.25 was chosen for a wide brick jamb either
+// side of the glazing; a plainer, smaller storefront doesn't need nearly as
+// much (GH #110).
+export const FRONT_WINDOW_CORNER_MARGIN = FORMAT.frontCornerMargin;
 
 // Width of the narrow sidelight pane flanking each entrance door leaf (ft) —
 // the reference photo's recess composition is sidelight | door | door |
@@ -195,7 +200,7 @@ export function entranceOpeningHalfWidth(spec: Pick<StorefrontSpec, 'doorWidth'>
 // stock overflow still grows the store wider (see StorePlan.computeDimensions).
 export function baselineStorefrontWidth(doorWidth = DEFAULT_DOOR_WIDTH): number {
   return FRONT_PANES_BASELINE * WINDOW_BAY_TARGET_WIDTH
-    + 2 * vestibuleHalfWidth({ doorWidth })
+    + 2 * vestibuleHalfWidth({ doorWidth, entryStyle: FORMAT.entryStyle })
     + 2 * FRONT_WINDOW_CORNER_MARGIN;
 }
 
@@ -227,7 +232,7 @@ export function posterBayIndices(bayCount: number): number[] {
 // The baseline storefront width (baselineStorefrontWidth) resolves to exactly
 // FRONT_PANES_BASELINE/2 panes per wing.
 function defaultWindowBays(storeWidth: number, doorWidth: number, hasCenterMullion = false): StorefrontSpec['windowBays'] {
-  const wingRun = storeWidth / 2 - FRONT_WINDOW_CORNER_MARGIN - vestibuleHalfWidth({ doorWidth });
+  const wingRun = storeWidth / 2 - FRONT_WINDOW_CORNER_MARGIN - vestibuleHalfWidth({ doorWidth, entryStyle: FORMAT.entryStyle });
   const perWing = Math.max(1, Math.floor(wingRun / WINDOW_BAY_TARGET_WIDTH));
   const count = perWing * 2;
   // Bays that will carry a suspended poster stay a single uninterrupted pane
@@ -264,6 +269,9 @@ export function getStorefrontSpec(storeWidth: number): StorefrontSpec {
       counterStyle: 'laminate-90s',
       counterTop: 'white',
       counterShape: 'shield',
+      // Named presets are chain-style looks, choosable regardless of the
+      // active format — always the airlock, same as before entryStyle existed.
+      entryStyle: 'vestibule',
     };
   }
   if (preset === 'rounded-counter') {
@@ -275,6 +283,7 @@ export function getStorefrontSpec(storeWidth: number): StorefrontSpec {
       counterStyle: 'rounded-2000s',
       counterTop: 'speckled',
       counterShape: 'shield',
+      entryStyle: 'vestibule',
     };
   }
   if (preset === 'usquare-counter') {
@@ -286,6 +295,7 @@ export function getStorefrontSpec(storeWidth: number): StorefrontSpec {
       counterStyle: 'laminate-90s',
       counterTop: 'white',
       counterShape: 'usquare',
+      entryStyle: 'vestibule',
     };
   }
   // The unnamed 'standard' storefront IS the active format's own storefront:
@@ -301,15 +311,23 @@ export function getStorefrontSpec(storeWidth: number): StorefrontSpec {
     counterStyle: 'laminate-90s',
     counterTop: FORMAT.counterShape === 'desk' ? 'woodgrain' : 'white',
     counterShape: FORMAT.counterShape,
+    entryStyle: FORMAT.entryStyle,
   };
 }
 
-// Half-width of the vestibule footprint (see src/entrance/index.ts), in feet
+// Half-width of the entrance footprint (see src/entrance/index.ts), in feet
 // from the store centreline. This is the single source of truth for that
-// number — three-scene.ts's storefront knee-wall gap and the entrance
-// module's own footprint both call this instead of each hardcoding
-// `(9.0 + 2 * 3.2) / 2 + 0.2`.
-export function vestibuleHalfWidth(spec: Pick<StorefrontSpec, 'doorWidth'>): number {
+// number — three-scene.ts's storefront knee-wall gap, the exterior facade's
+// entry opening, and the entrance module's own footprint all call this
+// instead of each hardcoding `(9.0 + 2 * 3.2) / 2 + 0.2`.
+//
+// entryStyle 'storefront-door' (GH #110) has no chamber to size — the
+// opening is just the one door leaf plus a jamb reveal, which is most of
+// what shrinks that format's minimum footprint (the chain's 'vestibule'
+// formula below sizes an airlock wide enough to fit a person between two
+// leaves; a door in a wall needs none of that).
+export function vestibuleHalfWidth(spec: Pick<StorefrontSpec, 'doorWidth' | 'entryStyle'>): number {
+  if (spec.entryStyle === 'storefront-door') return spec.doorWidth / 2 + 0.35;
   return (FORMAT.vestibuleInnerWidth + 2 * spec.doorWidth) / 2 + 0.2;
 }
 

@@ -30,6 +30,7 @@ import {
   AISLE_SHELF_HEIGHTS, UNIT_SIDE_CAPACITY, UNIT_CAPACITY, SECTION_CAPACITY,
   CENTER_WALKWAY, LIBRARY_X_SPACING, FIELD_Z_FRONT, CEILING_Y, MAX_RUN_UNITS,
   RUN_BREAK_GAP, UNIT_FRAME_HEIGHT, UNIT_DEPTH, MAX_SHELF_COLS, SECTION_COLS,
+  FRONT_WINDOW_CORNER_MARGIN, vestibuleHalfWidth,
   unitDepthAtHeight,
 } from '../src/store-layout.ts';
 
@@ -73,6 +74,10 @@ test('corporate preset reproduces the pre-format literals exactly', () => {
   assert.equal(corporate.vestibuleInnerWidth, 9.0);
   assert.equal(corporate.doorWidth, 3.2);
   assert.equal(corporate.counterShape, 'shield');
+  assert.equal(corporate.entryStyle, 'vestibule');
+  assert.equal(corporate.frontCornerMargin, 2.25);
+  assert.equal(corporate.facadeStyle, 'chain-tower');
+  assert.equal(corporate.counterTv, false);
   assert.equal(corporate.browseStandoff, 3.8);
   assert.equal(corporate.keyLightSpacingScale, 1.0);
   assert.equal(corporate.keyLightIntensityScale, 1.0);
@@ -93,6 +98,7 @@ test('store-layout exports still carry the corporate literals', () => {
   assert.equal(RUN_BREAK_GAP, 3.0);
   assert.equal(UNIT_FRAME_HEIGHT, 4.6);
   assert.equal(MAX_SHELF_COLS, 12);   // 6-col sections x 2
+  assert.equal(FRONT_WINDOW_CORNER_MARGIN, 2.25);
 });
 
 test('the corporate gondola still tapers with height', () => {
@@ -206,7 +212,7 @@ test('mom-and-pop forces straight runs and hatches one field', () => {
 test('mom-and-pop admits no floor displays and no New Releases wall', () => {
   assert.equal(momAndPop.floorDisplays, false);
   assert.equal(momAndPop.newReleasesWall, false);
-  assert.equal(momAndPop.newReleasesRuns, 1, 'at most ONE dedicated new-releases shelf');
+  assert.equal(momAndPop.newReleasesRuns, 2, 'GH #110: a real library reads thin behind just one bay');
   assert.equal(momAndPop.clerk, false);
   assert.equal(momAndPop.steppedCorner, false, 'the step exists to carry a wall this format has not got');
   // ...and the chain still has all of it.
@@ -244,13 +250,32 @@ test('a mom-and-pop ceiling is a ceiling', () => {
 
 test('the little counter is wide enough for what stands on it', () => {
   // entrance/counter.ts's `desk` branch is 6 ft wide (islandHalf 3.0) and
-  // entrance/index.ts parks the single terminal at cx+1.3 and the bag at
-  // cx-1.9. Both have to stay inside the desk's own ends.
+  // entrance/index.ts parks the single terminal at cx+1.3, the bag at
+  // cx-1.9, and (GH #110) the counterTv bracket at cx+2.2. All three have to
+  // stay inside the desk's own ends.
   assert.equal(momAndPop.counterShape, 'desk');
+  assert.equal(momAndPop.counterTv, true);
   const DESK_HALF = 3.0;
-  for (const [what, off] of [['terminal', 1.3], ['bag', 1.9]] as [string, number][]) {
-    assert.ok(off + 0.7 < DESK_HALF, `${what} at ${off}ft overhangs a ${DESK_HALF * 2}ft desk`);
+  for (const [what, off, half] of [['terminal', 1.3, 0.7], ['bag', 1.9, 0.7], ['counterTv', 2.2, 0.55]] as [string, number, number][]) {
+    assert.ok(off + half < DESK_HALF, `${what} at ${off}ft overhangs a ${DESK_HALF * 2}ft desk`);
   }
+});
+
+test('GH #110: a storefront-door entrance is genuinely smaller than a vestibule', () => {
+  assert.equal(momAndPop.entryStyle, 'storefront-door');
+  assert.equal(corporate.entryStyle, 'vestibule');
+  assert.equal(momAndPop.facadeStyle, 'storefront');
+  assert.equal(corporate.facadeStyle, 'chain-tower');
+  assert.ok(momAndPop.frontCornerMargin < corporate.frontCornerMargin);
+
+  // The whole point: removing the chamber collapses the entrance footprint
+  // from a person-sized airlock down to little more than the door itself.
+  const momHalfWidth = vestibuleHalfWidth({ doorWidth: momAndPop.doorWidth, entryStyle: 'storefront-door' });
+  const momHalfWidthIfVestibule = vestibuleHalfWidth({ doorWidth: momAndPop.doorWidth, entryStyle: 'vestibule' });
+  assert.ok(momHalfWidth < momHalfWidthIfVestibule / 2,
+    `storefront-door half-width ${momHalfWidth} should be well under half the vestibule's ${momHalfWidthIfVestibule}`);
+  // And the door itself still fits inside that half-width (door + jamb reveal).
+  assert.ok(momHalfWidth > momAndPop.doorWidth / 2);
 });
 
 test('a mom-and-pop unit face holds more than a chain one, in the same footprint', () => {

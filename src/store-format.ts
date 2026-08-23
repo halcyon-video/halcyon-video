@@ -127,7 +127,10 @@ export interface StoreFormatSpec {
   frontPanesBaseline: number;
   /** Whole 4-ft panes in each side wall's window ribbon (also sets baseline depth). */
   sidePanesBaseline: number;
-  /** Clear inner width (ft) of the entrance vestibule chamber, door leaves excluded. */
+  /**
+   * Clear inner width (ft) of the entrance vestibule chamber, door leaves
+   * excluded. Only meaningful when entryStyle is 'vestibule' — see that field.
+   */
   vestibuleInnerWidth: number;
   /** Width (ft) of one entrance door leaf. */
   doorWidth: number;
@@ -138,12 +141,37 @@ export interface StoreFormatSpec {
    * the lighter, thinner-framed single-glazed door a small shop hangs, against
    * the chain's heavy pair.
    *
-   * Note what this does NOT do: the vestibule still builds two leaves side by
-   * side either way (entrance/doors.ts reads doorStyle only for the leaf's own
-   * frame/glass thickness). A genuinely single-leaf entrance is a change to the
-   * vestibule itself, not to this field.
+   * Note what this does NOT do BY ITSELF: entrance/doors.ts reads doorStyle
+   * only for a leaf's own frame/glass thickness, never for how many leaves get
+   * built — that count is entryStyle's job (below). A vestibule-style format
+   * with doorStyle 'single' still hangs two thin leaves side by side; only
+   * entryStyle 'storefront-door' actually builds one door.
    */
   doorStyle: 'double-swing' | 'sliding' | 'single';
+  /**
+   * How the entrance is BUILT (src/entrance/index.ts).
+   *
+   * 'vestibule' — the two-chamber glass airlock this app was built with:
+   * paired doors meeting at a centre stile, narrow sidelights, a glazed
+   * divider, and a side door out of each chamber into the sales floor. A
+   * mall entrance, and where vestibuleInnerWidth applies.
+   *
+   * 'storefront-door' — ONE door leaf set directly into the front wall, no
+   * chamber, no sidelights, no divider, no side doors. What a real small
+   * shop's front wall has. This is what actually shrinks the format's floor:
+   * the vestibule chamber alone cost ~6 ft of depth and forced the front
+   * glazing wide enough to flank a 10.6 ft airlock (GH #110) even at the
+   * format's own reduced vestibuleInnerWidth/doorWidth.
+   */
+  entryStyle: 'vestibule' | 'storefront-door';
+  /**
+   * Solid wall margin (ft) between each end of the front window row and the
+   * store corner (store-layout.ts's FRONT_WINDOW_CORNER_MARGIN, which used to
+   * be a bare literal shared by every format). The chain leaves a wide flat
+   * return either side of its glazing; a format with a smaller storefront
+   * (and a plainer facade to match) doesn't need nearly as much.
+   */
+  frontCornerMargin: number;
 
   // ── Shelving ──────────────────────────────────────────────────────────────
 
@@ -204,6 +232,21 @@ export interface StoreFormatSpec {
 
   // ── Shell ─────────────────────────────────────────────────────────────────
 
+  /**
+   * The exterior building envelope (src/storefront-facade.ts /
+   * storefront-facade-shop.ts).
+   *
+   * 'chain-tower' — the reference-photo brick facade this app was built with:
+   * a gabled entrance tower, a glazed-tile stripe band standing in for an
+   * unlit marquee, stepped brick jamb piers. The chain's own building.
+   *
+   * 'storefront' — a plain painted-block/stucco elevation with a flat fascia
+   * board over the door for a hand-lettered wordmark, no tower, no glazed
+   * band. A neighbourhood shop's own building (GH #110), not a narrower copy
+   * of the chain's — what shipped in c55c93c narrowed the chain facade
+   * instead of building this.
+   */
+  facadeStyle: 'chain-tower' | 'storefront';
   /** Ceiling height (ft) before the bb_ceiling 'high' override. */
   ceilingY: number;
   /** Whether this format's back corner steps forward to carry New Releases. */
@@ -274,6 +317,15 @@ export interface StoreFormatSpec {
    * back to the over-the-top shelf wrap (see store-tv-peek.ts).
    */
   ceilingTvs: boolean;
+  /**
+   * A television on a bracket behind the checkout counter — the
+   * "something to watch" a format without headroom for ceilingTvs still
+   * gets (GH #110). Built by entrance/index.ts alongside the desk terminals:
+   * a small set on a short wall-style arm, always showing a static test
+   * card (crt-tube.ts's makeCrtTestCardTexture) rather than a live feed —
+   * this is set dressing, not another peekable screen like ambientTvs.
+   */
+  counterTv: boolean;
   /** The curtained-off back section behind a beaded curtain. */
   curtainedSection: boolean;
   /**
@@ -377,6 +429,8 @@ const CORPORATE: StoreFormatSpec = {
   doorWidth: 3.2,
   counterShape: 'shield',
   doorStyle: 'double-swing',
+  entryStyle: 'vestibule',
+  frontCornerMargin: 2.25,
 
   aisleShelfHeights: [0.5, 1.333, 2.167, 3.0, 3.833],
   unitSections: 2,
@@ -387,6 +441,7 @@ const CORPORATE: StoreFormatSpec = {
   shelfWoodHex: null,
   shelfEndPanelHex: null,
 
+  facadeStyle: 'chain-tower',
   ceilingY: 13.5,
   steppedCorner: true,
   keyLightSpacingScale: 1.0,
@@ -401,6 +456,7 @@ const CORPORATE: StoreFormatSpec = {
   newReleasesRuns: 3,
   clerk: true,
   ceilingTvs: true,
+  counterTv: false,
   curtainedSection: false,
   ceilingMirror: true,
   overheadSignage: true,
@@ -454,10 +510,22 @@ const MOM_AND_POP: StoreFormatSpec = {
 
   frontPanesBaseline: 2,
   sidePanesBaseline: 2,
+  // Unused when entryStyle is 'storefront-door' (below) — there is no
+  // chamber to give an inner width to. Left at its GH #33 value rather than
+  // deleted so a future format that wants a SMALL vestibule (narrower than
+  // the chain's, but still a real airlock) has a real number to start from.
   vestibuleInnerWidth: 4.6,
   doorWidth: 3.0,
   counterShape: 'desk',
   doorStyle: 'single',
+  // GH #110: no chamber at all — one door leaf in the front wall, the way a
+  // real small shop is built. This is what actually shrinks the format's
+  // floor (vestibuleHalfWidth() collapses to little more than the door
+  // itself instead of a 10.6 ft airlock — see store-layout.ts).
+  entryStyle: 'storefront-door',
+  // Half the chain's return: a plain storefront doesn't need a wide flat
+  // brick jamb either side of its glazing the way a gabled brick tower does.
+  frontCornerMargin: 1.0,
 
   aisleShelfHeights: [0.42, 1.295, 2.17, 3.045, 3.92, 4.795, 5.67, 6.545, 7.42],
   unitSections: 1,
@@ -471,6 +539,10 @@ const MOM_AND_POP: StoreFormatSpec = {
   shelfWoodHex: '#b0793f',
   shelfEndPanelHex: '#6f4322',
 
+  // GH #110: its own building, not a narrower copy of the chain's — a plain
+  // painted-block/stucco elevation, hand-lettered fascia, no illuminated
+  // marquee band. See storefront-facade-shop.ts.
+  facadeStyle: 'storefront',
   ceilingY: 9.0,
   steppedCorner: false,
   // ~3x the fixture count at a bit under half the output each: net a little
@@ -490,9 +562,15 @@ const MOM_AND_POP: StoreFormatSpec = {
 
   floorDisplays: false,
   newReleasesWall: false,
-  newReleasesRuns: 1,
+  // GH #110: bumped from 1 — a real library behind this format reads as
+  // thin with only one signboard bay of new releases, and two still reads as
+  // "a shelf of new releases," not a wall.
+  newReleasesRuns: 2,
   clerk: false,
   ceilingTvs: false,
+  // GH #110: no headroom for the ceiling rig (see ceilingTvs), but the room
+  // should still have a television.
+  counterTv: true,
   curtainedSection: true,
   ceilingMirror: false,
   overheadSignage: false,

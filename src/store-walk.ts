@@ -160,24 +160,6 @@ export function constrainWalkPosition(scene: StoreScene, oldX: number, oldZ: num
   x = Math.max(minX, Math.min(maxX, x));
   z = Math.max(minZ, Math.min(maxLotZ, z));
 
-  // 1. Vestibule back wall (Z = 8.6, X between 3.3 and 18.7)
-  if (x > 3.3 - r && x < 18.7 + r) {
-    if (oldZ < 8.6) {
-      z = Math.min(8.6 - r, z);
-    } else if (oldZ >= 8.6) {
-      z = Math.max(8.6 + r, z);
-    }
-  }
-
-  // 2. Vestibule central divider (X = 11.0, Z between 8.6 and 15.0)
-  if (z > 8.6 - r && z < 15.0 + r) {
-    if (oldX < 11.0) {
-      x = Math.min(11.0 - r, x);
-    } else if (oldX >= 11.0) {
-      x = Math.max(11.0 + r, x);
-    }
-  }
-
   // Real vestibule door geometry (entrance/index.ts): the side-wall gaps and
   // the front-wall gaps below used to be hand-copied magic numbers that only
   // matched the DEFAULT doorWidth preset by coincidence, and the front-wall
@@ -192,30 +174,58 @@ export function constrainWalkPosition(scene: StoreScene, oldX: number, oldZ: num
   // the EAS pedestals (storefront-dressing-93.ts) and this same file's
   // spawn-point code already do.
   const vest = scene.entrance?.getVestibuleInfo();
-  const sideDoorZ0 = vest ? vest.sideDoorZ - vest.doorW / 2 : 9.0;
-  const sideDoorZ1 = vest ? vest.sideDoorZ + vest.doorW / 2 : 12.2;
-  const exitFrontX0 = vest ? vest.cx - vest.doorW : 7.8;
-  const exitFrontX1 = vest ? vest.cx : 11.0;
-  const entrFrontX0 = vest ? vest.cx : 11.0;
-  const entrFrontX1 = vest ? vest.cx + vest.doorW : 14.2;
+  // A storefront-door format (GH #110) has no chamber at all — see below,
+  // clamps 1-4 (the airlock's back/side/divider walls) don't apply, and
+  // clamp 5's door gap is the single leaf instead of the paired exit/entrance.
+  const hasChamber = vest ? vest.hasChamber : true;
 
-  // 3. Vestibule left wall (X = 3.3, Z between 8.6 and 15.0), side door at sideDoorZ
-  const isAtLeftSideDoor = z >= sideDoorZ0 + r_door && z <= sideDoorZ1 - r_door;
-  if (z > 8.6 - r && z < 15.0 + r && !isAtLeftSideDoor) {
-    if (oldX < 3.3) {
-      x = Math.min(3.3 - r, x);
-    } else if (oldX >= 3.3) {
-      x = Math.max(3.3 + r, x);
+  if (hasChamber) {
+    // 1. Vestibule back wall (Z = 8.6, X between 3.3 and 18.7)
+    if (x > 3.3 - r && x < 18.7 + r) {
+      if (oldZ < 8.6) {
+        z = Math.min(8.6 - r, z);
+      } else if (oldZ >= 8.6) {
+        z = Math.max(8.6 + r, z);
+      }
+    }
+
+    // 2. Vestibule central divider (X = 11.0, Z between 8.6 and 15.0)
+    if (z > 8.6 - r && z < 15.0 + r) {
+      if (oldX < 11.0) {
+        x = Math.min(11.0 - r, x);
+      } else if (oldX >= 11.0) {
+        x = Math.max(11.0 + r, x);
+      }
     }
   }
 
-  // 4. Vestibule right wall (X = 18.7, Z between 8.6 and 15.0), side door at sideDoorZ
-  const isAtRightSideDoor = z >= sideDoorZ0 + r_door && z <= sideDoorZ1 - r_door;
-  if (z > 8.6 - r && z < 15.0 + r && !isAtRightSideDoor) {
-    if (oldX > 18.7) {
-      x = Math.max(18.7 + r, x);
-    } else if (oldX <= 18.7) {
-      x = Math.min(18.7 - r, x);
+  const sideDoorZ0 = vest ? vest.sideDoorZ - vest.doorW / 2 : 9.0;
+  const sideDoorZ1 = vest ? vest.sideDoorZ + vest.doorW / 2 : 12.2;
+  // Single-leaf entrance: one gap centred on the door, no separate exit leaf.
+  const exitFrontX0 = vest && !hasChamber ? vest.cx : (vest ? vest.cx - vest.doorW : 7.8);
+  const exitFrontX1 = vest && !hasChamber ? vest.cx : (vest ? vest.cx : 11.0);
+  const entrFrontX0 = vest && !hasChamber ? vest.cx - vest.doorW / 2 : (vest ? vest.cx : 11.0);
+  const entrFrontX1 = vest && !hasChamber ? vest.cx + vest.doorW / 2 : (vest ? vest.cx + vest.doorW : 14.2);
+
+  if (hasChamber) {
+    // 3. Vestibule left wall (X = 3.3, Z between 8.6 and 15.0), side door at sideDoorZ
+    const isAtLeftSideDoor = z >= sideDoorZ0 + r_door && z <= sideDoorZ1 - r_door;
+    if (z > 8.6 - r && z < 15.0 + r && !isAtLeftSideDoor) {
+      if (oldX < 3.3) {
+        x = Math.min(3.3 - r, x);
+      } else if (oldX >= 3.3) {
+        x = Math.max(3.3 + r, x);
+      }
+    }
+
+    // 4. Vestibule right wall (X = 18.7, Z between 8.6 and 15.0), side door at sideDoorZ
+    const isAtRightSideDoor = z >= sideDoorZ0 + r_door && z <= sideDoorZ1 - r_door;
+    if (z > 8.6 - r && z < 15.0 + r && !isAtRightSideDoor) {
+      if (oldX > 18.7) {
+        x = Math.max(18.7 + r, x);
+      } else if (oldX <= 18.7) {
+        x = Math.min(18.7 - r, x);
+      }
     }
   }
 
