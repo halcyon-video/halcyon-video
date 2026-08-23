@@ -59,13 +59,16 @@ import {
   isDiscoveryRequested,
   getJellyseerrConfig,
   pingJellyseerr,
-  fetchStreamingMovies,
 } from './jellyseerr';
 import { fetchGames, launchGame } from './romm';
 import { isGamesOnly, storeCatalog } from './games-only';
-import { buildStreamingLibraries, resolveEnabledServices, resolveStreamingSource } from './streaming-catalog';
-import { fetchStreamingMoviesFromTmdb, getTmdbConfig } from './tmdb';
-import { fetchStreamingMoviesFromSnapshot } from './streaming-snapshot';
+import { buildStreamingLibraries, resolveEnabledServices } from './streaming-catalog';
+import {
+  getStreamingMovies,
+  loadStreamingMovies,
+  streamingEnabled,
+  streamingStockIsStale,
+} from './streaming-stock';
 import { isMembershipPickerOpen } from './membership-cards';
 import {
   initBootFlow,
@@ -167,28 +170,6 @@ let discoveryMovies: Movie[] = [];
 // section -- see romm.ts. Stays [] if Romm isn't configured/reachable, same
 // never-block-boot treatment as the Jellyseerr lists above.
 let gameMovies: Movie[] = [];
-// GH #86: streaming-service titles from TMDB watch-provider data, straight
-// from TMDB (tmdb.ts) or via Jellyseerr as a fallback (see
-// streaming-catalog.ts's resolveStreamingSource). Stays [] if neither source
-// is configured/reachable or the master switch is off, same never-block-boot
-// treatment as the other Jellyseerr-adjacent lists above.
-let streamingMovies: Movie[] = [];
-// WHAT THAT STOCK WAS FETCHED FOR. The chosen services are picked in two
-// places long after boot -- the manager terminal (#96) and the settings
-// drawer -- and both answer with a scene rebuild, not a reload. A rebuild
-// re-derives the aisles from `streamingMovies`, so without this key it
-// re-derives them from whatever boot happened to fetch: on a local install
-// that booted with nothing chosen, that is an empty list, and picking four
-// apps at the counter puts four EMPTY aisles in the store. Compared in
-// rebuildStoreScene() to decide whether the stock must be re-fetched first.
-let streamingStockKey = '\u0000never-loaded';
-function streamingChoiceKey(): string {
-  return streamingEnabled() ? (getSetting<string>('bb_streaming_services') || '') : '\u0000off';
-}
-/** `true` unless the owner switched streaming sections off (default ON). */
-function streamingEnabled(): boolean {
-  return getSetting<boolean>('bb_streaming_enabled') !== false;
-}
 // What the STORE is built from, as opposed to what was fetched. Normally these
 // alias librariesList/gameMovies exactly; with GAMES ONLY on (games-only.ts)
 // the Romm platforms stand in as the libraries and the game department empties,
@@ -211,7 +192,7 @@ function refreshStoreCatalog() {
   // rather than cached, so toggling the master switch off and back on without
   // a re-fetch still reflects the current setting immediately.
   const streamingLibs = streamingEnabled()
-    ? buildStreamingLibraries(streamingMovies, resolveEnabledServices(getSetting<string>('bb_streaming_services')))
+    ? buildStreamingLibraries(getStreamingMovies(), resolveEnabledServices(getSetting<string>('bb_streaming_services')))
     : [];
   const mergedLibraries = [...catalog.libraries, ...streamingLibs];
   // Per-library toggles (#41 Store Libraries / #39 Overhead TVs) register
@@ -382,45 +363,6 @@ async function loadDiscoveryMovies(): Promise<void> {
   }
 }
 
-/**
- * GH #86: fetch the CHOSEN streaming services' watch-provider stock, same
- * never-block-boot treatment as the other Jellyseerr loaders. A no-op — []
- * without a single request — while the master switch is off, or while
- * nothing is chosen (bb_streaming_services blank -- a fresh local install's
- * default, owner ruling 2026-08-21), so neither costs anything extra.
- *
- * Source ladder: a direct TMDB key (tmdb_apikey) is a full replacement
- * source, not icing on Jellyseerr — it wins when both are configured (see
- * streaming-catalog.ts's resolveStreamingSource for why), Jellyseerr is the
- * fallback, and neither configured falls back to the bundled snapshot
- * (streaming-snapshot.ts) — the floor of the ladder, so a chosen service
- * ALWAYS stocks, including the hosted demo and a bare local install with
- * nothing set up at all.
- */
-async function loadStreamingMovies(): Promise<void> {
-  streamingStockKey = streamingChoiceKey();
-  if (!streamingEnabled()) {
-    streamingMovies = [];
-    return;
-  }
-  const servicesOverride = getSetting<string>('bb_streaming_services');
-  if (resolveEnabledServices(servicesOverride).length === 0) {
-    streamingMovies = []; // nothing chosen -- no network round trip needed
-    return;
-  }
-  const TIMEOUT_MS = 15_000;
-  const timeoutPromise = new Promise<Movie[]>((resolve) => setTimeout(() => resolve([]), TIMEOUT_MS));
-  const source = resolveStreamingSource(!!getTmdbConfig(), !!getJellyseerrConfig());
-  const fetchPromise = source === 'tmdb' ? fetchStreamingMoviesFromTmdb(servicesOverride)
-    : source === 'jellyseerr' ? fetchStreamingMovies(servicesOverride)
-    : fetchStreamingMoviesFromSnapshot(servicesOverride);
-  try {
-    streamingMovies = await Promise.race([fetchPromise, timeoutPromise]);
-  } catch (e) {
-    console.warn('[Streaming] Failed to load streaming-service titles:', e);
-    streamingMovies = [];
-  }
-}
 
 /**
  * One boot-console line that always states where Jellyseerr stands. The
@@ -2570,7 +2512,7 @@ async function rebuildStoreScene() {
   // only when the choice actually moved, so every other rebuild-scene setting
   // still costs no round trip. The loader is never-block-boot and swallows its
   // own failures, so a dead source degrades to empty aisles, not a stuck store.
-  if (streamingChoiceKey() !== streamingStockKey) await loadStreamingMovies();
+  if (streamingStockIsStale()) await loadStreamingMovies();
 
   const mode = getSetting<string>('bb_render_mode');
   if (mode !== 'flat') {
