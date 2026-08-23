@@ -1,6 +1,9 @@
 # Cuts a GitHub Release — grouped notes plus, where possible, a store
 # screenshot — and lands a matching CHANGELOG.md entry on master, with no
-# human action, every time a version tag is pushed.
+# human action, every time a version tag is pushed. Once the Release exists,
+# fans the same artifact (a short blurb + the screenshot + the demo link) out
+# to Discord, Mastodon, Bluesky and X, and drops a Reddit-ready draft on the
+# Release as a plain file — never auto-posted, see issue #105.
 #
 # Why this exists (issue #104): tags ran to v0.8.1 while the newest Release
 # page still said v0.6.2 — Releases is the only subscribe button this project
@@ -15,6 +18,12 @@
 # them. Every screenshot step below is therefore gated on the shooter actually
 # being present and can never fail the release: notes are the deliverable, the
 # picture is a bonus.
+#
+# EACH FAN-OUT CHANNEL FAILS SOFT (issue #105): every announce-fanout.mjs step
+# below runs with continue-on-error so a dead Discord webhook, an expired
+# Mastodon token, or a rotated X refresh token never blocks the others or the
+# release itself. A channel with no secret configured just no-ops — see that
+# script's header for the full contract. Reddit is drafted, never posted.
 name: Announce a release
 
 on:
@@ -132,3 +141,72 @@ jobs:
             --title "${{ github.ref_name }}" \
             --notes-file release-notes-body.md \
             "${ASSETS[@]}"
+
+      # ---- fan-out (issue #105) ------------------------------------------
+      # Everything below only runs once the Release above actually exists,
+      # and every step is independently soft-failing — see the file header.
+
+      - name: Write the Reddit draft
+        continue-on-error: true
+        run: |
+          node tools/announce-fanout.mjs reddit-draft \
+            --tag "${{ github.ref_name }}" \
+            --repo "${{ github.repository }}" \
+            --out reddit-draft.md
+
+      - name: Attach the Reddit draft to the Release
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ -f reddit-draft.md ]; then
+            gh release upload "${{ github.ref_name }}" reddit-draft.md --repo "${{ github.repository }}"
+          fi
+
+      - name: Announce → Discord
+        continue-on-error: true
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          node tools/announce-fanout.mjs discord \
+            --tag "${{ github.ref_name }}" \
+            --screenshot release-shot.png \
+            --repo "${{ github.repository }}"
+
+      - name: Announce → Mastodon
+        continue-on-error: true
+        env:
+          MASTODON_INSTANCE: ${{ secrets.MASTODON_INSTANCE }}
+          MASTODON_TOKEN: ${{ secrets.MASTODON_TOKEN }}
+        run: |
+          node tools/announce-fanout.mjs mastodon \
+            --tag "${{ github.ref_name }}" \
+            --screenshot release-shot.png \
+            --repo "${{ github.repository }}"
+
+      - name: Announce → Bluesky
+        continue-on-error: true
+        env:
+          BLUESKY_HANDLE: ${{ secrets.BLUESKY_HANDLE }}
+          BLUESKY_APP_PASSWORD: ${{ secrets.BLUESKY_APP_PASSWORD }}
+        run: |
+          node tools/announce-fanout.mjs bluesky \
+            --tag "${{ github.ref_name }}" \
+            --screenshot release-shot.png \
+            --repo "${{ github.repository }}"
+
+      # Pay-per-use (~$0.20/post with a link) — needs a billing account with
+      # a monthly cap set on the developer account. Write-only: this never
+      # reads mentions or a timeline, which is the part that's billed by
+      # volume. See issue #105 for the cost accounting.
+      - name: Announce → X
+        continue-on-error: true
+        env:
+          X_CLIENT_ID: ${{ secrets.X_CLIENT_ID }}
+          X_CLIENT_SECRET: ${{ secrets.X_CLIENT_SECRET }}
+          X_REFRESH_TOKEN: ${{ secrets.X_REFRESH_TOKEN }}
+        run: |
+          node tools/announce-fanout.mjs x \
+            --tag "${{ github.ref_name }}" \
+            --screenshot release-shot.png \
+            --repo "${{ github.repository }}"
