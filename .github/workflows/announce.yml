@@ -1,0 +1,105 @@
+# Cuts a GitHub Release — grouped notes plus a rotating store screenshot —
+# and lands a matching CHANGELOG.md entry on master, with no human action,
+# every time a version tag is pushed.
+#
+# Why this exists (issue #104): tags ran to v0.8.1 while the newest Release
+# page still said v0.6.2 — Releases is the only subscribe button this project
+# has, and fourteen versions shipped past it silently. The notes come from
+# `tools/release-notes.mjs` (deterministic, offline, grouped from commit
+# history — see that file for the rules); this workflow's only job is to run
+# it, take a screenshot, and publish both.
+name: Announce a release
+
+on:
+  push:
+    tags: ["v*.*.*"]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: announce-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  announce:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # release-notes.mjs walks the tag list and diffs `<prev-tag>..<tag>`,
+          # so it needs the whole history, not the default single commit.
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # Unlike deploy-demo.yml, puppeteer's Chromium download is NOT skipped
+      # here — the screenshot step below needs a real browser.
+      - run: npm ci
+
+      - name: Generate release notes + CHANGELOG.md entry
+        run: |
+          node tools/release-notes.mjs \
+            --to "${{ github.ref_name }}" \
+            --repo "${{ github.repository }}" \
+            --changelog --release --out release-notes-body.md
+
+      # Standing brand rule this repo's docs point at: a committed screenshot
+      # must come from a clone with no public/user-assets/ drop-ins. A fresh
+      # checkout of the public repo never has that directory — this just
+      # fails loudly instead of silently shipping a branded shot if that ever
+      # stops being true.
+      - name: Guard against user-assets before shooting
+        run: |
+          if [ -d public/user-assets ]; then
+            echo "::error::public/user-assets present in CI checkout — refusing to screenshot" >&2
+            exit 1
+          fi
+
+      # Rotates through a small table of framings so the Releases feed isn't
+      # the same picture fourteen times. Index = how many version tags exist
+      # at this point, so each new release advances one step through the
+      # table and wraps around — no state to store anywhere.
+      - name: Pick this release's screenshot framing
+        id: frame
+        run: |
+          FRAMES=(
+            "--state browse"
+            "--state nrbrowse"
+            "--full --lib 400 --series 0 --state promo --yaw 1"
+            "--full --lib 400 --series 0 --state endcap"
+            "--state clerk"
+            "--state backroom"
+            "--fly 1 --walk 11,110,0,3,16"
+          )
+          count=$(git tag --list 'v*' | wc -l)
+          idx=$(( (count - 1) % ${#FRAMES[@]} ))
+          echo "args=${FRAMES[$idx]}" >> "$GITHUB_OUTPUT"
+
+      - name: Shoot the release screenshot
+        run: node tools/shot.mjs ${{ steps.frame.outputs.args }} --out release-shot.png
+
+      - name: Commit the CHANGELOG.md entry to master
+        run: |
+          if git diff --quiet -- CHANGELOG.md; then
+            echo "CHANGELOG.md unchanged (entry already present), nothing to commit"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add CHANGELOG.md
+          git commit -m "CHANGELOG: ${{ github.ref_name }}"
+          git push origin HEAD:master
+
+      - name: Cut the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ github.ref_name }}" \
+            --repo "${{ github.repository }}" \
+            --title "${{ github.ref_name }}" \
+            --notes-file release-notes-body.md \
+            release-shot.png
