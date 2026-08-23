@@ -1,0 +1,109 @@
+# Re-announce a release that is already out, by hand.
+#
+# announce.yml fires once, on a tag push, and cannot be re-run without
+# re-cutting the GitHub Release. That is correct for the happy path and
+# useless when a post went out WRONG — which happened with v0.9.0, whose
+# Discord post was built from two commit subjects and led with a revert.
+#
+# So this is the repair tool: dispatch only, fan-out only. It never cuts a
+# Release, never writes a CHANGELOG, never touches a tag. It posts the copy
+# you give it, to the channels you name, with this release's own picture from
+# docs/releases/<tag>.jpg.
+#
+# It cannot un-send the bad post — Discord webhooks cannot delete a message
+# they did not keep the id for. It sends a correct one.
+#
+#   Actions -> "Re-announce a release" -> Run workflow
+#     tag:      v0.9.0
+#     blurb:    what this release ADDED, in plain sentences, most important
+#               first (short channels drop whole trailing sentences to fit)
+#     channels: discord            (space-separated; default discord only)
+#
+# Leave `blurb` empty to use the annotated tag's own message, which is where
+# a release description belongs in the first place — see the header of
+# tools/announce-fanout.mjs.
+name: Re-announce a release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to announce (e.g. v0.9.0)"
+        required: true
+      blurb:
+        description: "What this release added. Empty = use the tag's own message."
+        required: false
+        default: ""
+      channels:
+        description: "Space-separated: discord mastodon bluesky x"
+        required: false
+        default: "discord"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: announce-again-${{ inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  reannounce:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The tagged tree, so docs/releases/<tag>.jpg is the one that
+          # belonged to this release. Full history: announce-fanout reads the
+          # tag's message and walks the range behind it.
+          ref: ${{ inputs.tag }}
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      # Preview first, into the run log, so a wrong blurb is visible in the
+      # job output even though the post has already gone.
+      - name: Preview the copy
+        run: |
+          node tools/announce-fanout.mjs preview \
+            --tag "${{ inputs.tag }}" \
+            ${{ inputs.blurb != '' && format('--blurb {0}', toJSON(inputs.blurb)) || '' }}
+
+      - name: Resolve this release's picture
+        id: shot
+        run: |
+          for cand in "docs/releases/${{ inputs.tag }}.jpg" "docs/releases/${{ inputs.tag }}.png"; do
+            if [ -f "$cand" ]; then
+              echo "path=$cand" >> "$GITHUB_OUTPUT"
+              echo "::notice::using $cand"
+              exit 0
+            fi
+          done
+          echo "::warning::no docs/releases/${{ inputs.tag }} picture — posting text only"
+          echo "path=" >> "$GITHUB_OUTPUT"
+
+      # Same fail-soft contract as announce.yml: one dead channel never stops
+      # the others.
+      - name: Fan out
+        continue-on-error: true
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          MASTODON_INSTANCE: ${{ secrets.MASTODON_INSTANCE }}
+          MASTODON_TOKEN: ${{ secrets.MASTODON_TOKEN }}
+          BLUESKY_HANDLE: ${{ secrets.BLUESKY_HANDLE }}
+          BLUESKY_APP_PASSWORD: ${{ secrets.BLUESKY_APP_PASSWORD }}
+          X_CLIENT_ID: ${{ secrets.X_CLIENT_ID }}
+          X_CLIENT_SECRET: ${{ secrets.X_CLIENT_SECRET }}
+          X_REFRESH_TOKEN: ${{ secrets.X_REFRESH_TOKEN }}
+          BLURB: ${{ inputs.blurb }}
+          SHOT: ${{ steps.shot.outputs.path }}
+        run: |
+          for ch in ${{ inputs.channels }}; do
+            echo "::group::$ch"
+            args=(--tag "${{ inputs.tag }}")
+            [ -n "$BLURB" ] && args+=(--blurb "$BLURB")
+            [ -n "$SHOT" ] && args+=(--screenshot "$SHOT")
+            node tools/announce-fanout.mjs "$ch" "${args[@]}"
+            echo "::endgroup::"
+          done

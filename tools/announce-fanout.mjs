@@ -15,9 +15,20 @@
 // ::notice::, not an error.
 //
 // The text posted here is NOT the full release notes (that's the GitHub
-// Release body from tools/release-notes.mjs) — it's a short blurb built the
-// same deterministic, no-model way: the first couple of non-chore commit
-// subjects in the tag range, same grouping rules as release-notes.mjs.
+// Release body from tools/release-notes.mjs) — it's a short blurb saying what
+// the release ADDED, in the order it prefers a source:
+//
+//   1. --blurb "..."            an explicit override
+//   2. the annotated tag's own message   <- write the description when you tag
+//   3. the first non-internal commit subjects in the range   (last resort)
+//
+// (2) is the one to use. Commit subjects are written for someone reading git
+// log, and the newest two are whatever happened to land last, not the
+// release's headline — v0.9.0 went out reading "Its own building, a real
+// door, and a set behind the till. A reverted commit never reaches the
+// notes.", which is nonsense to a reader and advertised a REVERT as a
+// feature. So (3) now also refuses internal work outright, and stays a
+// fallback for a tag someone forgot to describe.
 //
 // Reddit is never auto-posted (owner ruling, GH #105): the value on Reddit
 // is the comment thread underneath, which no webhook can hold up, and
@@ -43,10 +54,11 @@ function git(args) {
 
 function parseArgs(argv) {
   const [channel, ...rest] = argv;
-  const opts = { channel, tag: null, screenshot: null, repo: DEFAULT_REPO, out: null };
+  const opts = { channel, tag: null, screenshot: null, repo: DEFAULT_REPO, out: null, blurb: null };
   for (let i = 0; i < rest.length; i++) {
     const a = rest[i];
     if (a === '--tag') opts.tag = rest[++i];
+    else if (a === '--blurb') opts.blurb = rest[++i];
     else if (a === '--screenshot') opts.screenshot = rest[++i];
     else if (a === '--repo') opts.repo = rest[++i];
     else if (a === '--out') opts.out = rest[++i];
@@ -74,6 +86,18 @@ function printHelp() {
 // one-or-two-sentence highlight instead of a full grouped changelog.
 
 const CHORE_PATTERNS = [/^bump version to /i, /^release v\d/i];
+
+// Work that is real but is NOT an announcement. A revert is the sharp case:
+// it ships the ABSENCE of something, so leading a release post with it tells
+// readers a feature arrived when it was taken away. The rest is plumbing
+// nobody outside the repo has a use for.
+const INTERNAL_PATTERNS = [
+  /^revert(ing|ed)?\b/i,
+  /\brevert(s|ed)\b/i,
+  /^(refactor|rename|move|extract|split|inline|tidy|cleanup|chore|typo)\b/i,
+  /\b(line budget|file budget|lint|typecheck|tsc|ci|workflow|test harness)\b/i,
+  /^(add|update|fix) (a )?test\b/i,
+];
 const AREA_RE = /^([A-Z0-9][A-Za-z0-9&'/.-]*(?:\s+[A-Za-z0-9&'/.-]+){0,2}):\s+(.+)$/;
 
 function parseSemver(tag) {
@@ -100,6 +124,43 @@ function capitalize(s) {
   return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
 }
 
+/**
+ * The annotated tag's own message, cleaned into prose — the intended source.
+ * Falls back to null for a lightweight tag with nothing to say.
+ *
+ * Stripped: a leading "Halcyon Video vX.Y.Z —" that would just repeat the
+ * post's title, git trailers (`Fixes #12`, `Co-Authored-By:`, `Shot:`), and
+ * any PGP signature block.
+ */
+function tagMessageBlurb(tag) {
+  let raw;
+  try {
+    raw = git(['tag', '-l', '--format=%(contents)', tag]);
+  } catch {
+    return null;
+  }
+  const lines = [];
+  for (const line of raw.split('\n')) {
+    if (line.startsWith('-----BEGIN PGP SIGNATURE-----')) break;
+    if (/^(fixes|closes|resolves)\s+#\d+\s*$/i.test(line.trim())) continue;
+    if (/^[A-Z][A-Za-z-]+:\s/.test(line) && !/^[A-Z][a-z]+ [a-z]/.test(line)) continue;
+    lines.push(line);
+  }
+  let text = lines.join('\n').trim();
+  if (!text) return null;
+
+  // Drop a title-ish first line when real prose follows it; otherwise keep it
+  // and just shave the redundant "Halcyon Video vX.Y.Z — " prefix.
+  const parts = text.split(/\n\s*\n/).map((s) => s.trim()).filter(Boolean);
+  const titleish = /^(halcyon video\s+)?v?\d+\.\d+\.\d+\s*[—–-]?/i;
+  if (parts.length > 1 && titleish.test(parts[0])) parts.shift();
+  text = parts.join(' ').replace(titleish, '').trim();
+  text = text.replace(/\s*\n\s*/g, ' ').replace(/\s{2,}/g, ' ');
+  if (!text) return null;
+  // Shaving the "v0.9.0 —" prefix usually leaves a lowercase word mid-sentence.
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
 function commitHighlights(tag) {
   const from = previousTag(tag);
   const range = from ? `${from}..${tag}` : tag;
@@ -112,6 +173,7 @@ function commitHighlights(tag) {
   }
   return raw.split(sep).map((s) => s.trim()).filter(Boolean)
     .filter((subject) => !CHORE_PATTERNS.some((re) => re.test(subject)))
+    .filter((subject) => !INTERNAL_PATTERNS.some((re) => re.test(subject)))
     .map((subject) => {
       const m = AREA_RE.exec(subject);
       return capitalize(m ? m[2] : subject);
@@ -123,12 +185,41 @@ function truncate(text, maxLen) {
   return `${text.slice(0, Math.max(0, maxLen - 1)).trimEnd()}…`;
 }
 
+/**
+ * Fit prose to a limit by dropping WHOLE SENTENCES from the end. A release
+ * blurb long enough for Discord gets guillotined mid-word on Bluesky and X
+ * otherwise, which reads as a broken bot rather than as an announcement.
+ * Write the blurb most-important-sentence-first and the short channels take
+ * care of themselves; a single sentence over the limit still gets an ellipsis,
+ * because something has to give.
+ */
+function fitSentences(text, maxLen) {
+  if (text.length <= maxLen) return text;
+  const sentences = text.match(/[^.!?]+[.!?]+(\s|$)/g);
+  if (!sentences) return truncate(text, maxLen);
+  let out = '';
+  for (const sentence of sentences) {
+    const next = (out + sentence).trimEnd();
+    if (next.length > maxLen) break;
+    out = next + ' ';
+  }
+  out = out.trim();
+  return out || truncate(text, maxLen);
+}
+
 /** { title, blurb, url } — the raw material every channel formats to its own limit. */
 function buildAnnouncement(opts) {
   const [org, name] = opts.repo.split('/');
   const title = `Halcyon Video ${opts.tag}`;
-  const highlights = commitHighlights(opts.tag).slice(0, 2);
-  const blurb = highlights.length ? `${highlights.join('. ')}.` : 'A new release is out.';
+  const written = opts.blurb?.trim() || tagMessageBlurb(opts.tag);
+  let blurb = written;
+  if (!blurb) {
+    const highlights = commitHighlights(opts.tag).slice(0, 2);
+    blurb = highlights.length ? `${highlights.join('. ')}.` : 'A new release is out.';
+    console.log('::warning::announce-fanout: no --blurb and no annotated tag message —'
+      + ' falling back to commit subjects. Describe the release in the tag:'
+      + ' git tag -a <tag> -m "<what this adds>"');
+  }
   const url = `https://${org}.github.io/${name}/`;
   return { title, blurb, url };
 }
@@ -137,7 +228,7 @@ function composeText(maxLen, { title, blurb, url }, identity = null) {
   const urlLine = `Try it in a browser, no server needed: ${url}`;
   const suffix = identity ? `\n\n${identity}\n\n${urlLine}` : `\n\n${urlLine}`;
   const budget = Math.max(0, maxLen - title.length - suffix.length - 1);
-  return `${title}\n${truncate(blurb, budget)}${suffix}`;
+  return `${title}\n${fitSentences(blurb, budget)}${suffix}`;
 }
 
 // ---- secrets / soft-skip ----------------------------------------------------
@@ -402,7 +493,27 @@ function channelRedditDraft(opts, ann) {
 
 // ---- main ---------------------------------------------------------------
 
+/**
+ * Print what every channel WOULD post, and send nothing. The only way to
+ * check release copy before it is irreversibly in front of people.
+ */
+function channelPreview(opts, ann) {
+  const src = opts.blurb ? '--blurb' : (tagMessageBlurb(opts.tag) ? 'tag message' : 'commit subjects (FALLBACK)');
+  console.log(`source: ${src}`);
+  console.log(`title:  ${ann.title}`);
+  console.log(`url:    ${ann.url}`);
+  console.log(`image:  ${opts.screenshot || '(none)'}`);
+  console.log(`\nblurb:\n${ann.blurb}\n`);
+  for (const [name, limit] of [['discord', 4096], ['mastodon', 500], ['bluesky', 300], ['x', 280]]) {
+    const text = name === 'discord'
+      ? `${ann.title}\n\n${ann.blurb}\n\n${ann.url}`
+      : composeText(limit, ann, IDENTITY);
+    console.log(`--- ${name} (${text.length}/${limit}) ---\n${text}\n`);
+  }
+}
+
 const CHANNELS = {
+  preview: channelPreview,
   discord: channelDiscord,
   mastodon: channelMastodon,
   bluesky: channelBluesky,
