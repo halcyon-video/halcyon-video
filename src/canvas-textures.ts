@@ -5,7 +5,7 @@
 import * as THREE from 'three';
 import { getActiveTheme, type StoreTheme } from './themes';
 import { getActiveLogoSpec, storefrontBrandGold } from './logo-spec';
-import { bb93SignageOn } from './genre-colors';
+import { dressing93Active } from './genre-colors';
 import { registerBrandRepaint } from './brand-live';
 import {
   drawLogo, getLogoFontString, logoFontFamily, buildLogoShapePath, logoShapeInnerBox,
@@ -418,13 +418,13 @@ export function createCategorySignTexture(
   faceAspect = 4.0,
   blade = false,
 ): THREE.Texture {
-  // OPT-IN (bb_93_signage, ceiling-nav only — `ribbon` is passed solely by
-  // the ceiling-nav catalog entry so endcap placards etc. never restyle):
+  // 1993 ERA ONLY, and ceiling-nav only (`ribbon` is passed solely by the
+  // ceiling-nav catalog entry so endcap placards etc. never restyle):
   // the 1993 ceiling CATEGORY PLATE. The measured reconstruction and its
   // mirrored-layout back twin live in fixtures/category-plate-1993.ts (one
   // source of truth shared with the solid-body fixture builder — frame
   // citations there). Other themes keep the muted rectangles + plain label.
-  if (ribbon && bb93SignageOn()) {
+  if (ribbon && dressing93Active()) {
     return createCategoryPlate1993Texture(categoryName, faceAspect);
   }
 

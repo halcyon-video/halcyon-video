@@ -21,7 +21,7 @@ import {
 } from './fixtures/ticket-board-sign';
 import { createTrapezoidGeometry, splitTrapezoidGroups, createLibraryEndCapMaterial, markSignMesh } from './sign-builders';
 import { createFasciaBladeFactory, FASCIA_BLADE_H } from './fixtures/genre-fascia';
-import { bb93SignageOn } from './genre-colors';
+import { dressing93Active } from './genre-colors';
 import { getActiveTheme } from './themes';
 import { CASE_WIDTH, CASE_HEIGHT } from './video-case';
 import type { ClaspPlacement } from './fixtures/shelf-clasp';
@@ -195,8 +195,8 @@ export function buildAisleShelving(deps: AisleShelvingDeps): void {
   // themes.ts — not id checks). 'flush' (2010 / Night Owl) and 'arched-plaque'
   // (2000) are both rounded-top plaques mounted on the shelf top and share the
   // extrude/label machinery below, differing only in height, corner radius,
-  // body color and label face. 'ticket-board' (1990) and 'fascia-blade' (1993,
-  // or the legacy bb_93_signage overlay) take their own paths further down.
+  // body color and label face. 'ticket-board' (1990) and 'fascia-blade' (1993)
+  // take their own paths further down.
   const plaqueTopper = theme.topperStyle === 'flush' || theme.topperStyle === 'arched-plaque';
   const archedTopper = theme.topperStyle === 'arched-plaque';
   const fasciaFactory = createFasciaBladeFactory();
@@ -578,13 +578,13 @@ export function buildAisleShelving(deps: AisleShelvingDeps): void {
         continue;
       }
 
-      // 1993-footage OPTION (bb_93_signage): fascia blades. Sections are
+      // 1993-footage era dressing: fascia blades. Sections are
       // only COLLECTED here — the real boards are long planks spanning a
       // whole same-genre run (SUSPENSE ≈ 8ft x 10in, ~9:1 wide), so after
       // the loop contiguous sections sharing both face labels merge into
       // one blade instead of a row of stubby 4:1 per-section tiles
       // (user-flagged ratio).
-      if (bb93SignageOn()) {
+      if (dressing93Active()) {
         const sectionSpan = (endCol - startCol + 1) * BOX_SPACING;
         fasciaRuns.push({ plusXLabel, minusXLabel, z: zSecCenter, span: sectionSpan });
         continue;

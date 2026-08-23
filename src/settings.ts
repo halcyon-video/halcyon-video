@@ -242,7 +242,6 @@ export function resolveHint(def: SettingDef): string | undefined {
 
 const THUMBED_SETTINGS = new Set([
   'bb_theme',
-  'bb_93_signage',
   'bb_medium',
   'bb_case_art',
   'bb_cover_vhs',
@@ -364,20 +363,6 @@ function brandPackDiagnostic(): string {
   }
   if (status === 'failed') return `${id}: FAILED to load — see the console. Using the built-in brand.`;
   return `${id}: not installed (no brands/${id}/brand.json). Using the built-in brand.`;
-}
-
-/**
- * The 1993-dressing row's hint. On the 1993 era the pack is already deployed
- * (bb93SignageOn reads the era first), so the row is a no-op there — say so
- * rather than leaving an "Off" that visibly changes nothing.
- * Both branches fit the footer bar's 62-char clip.
- */
-function dressing93Hint(): string {
-  let era1993 = false;
-  try { era1993 = getActiveTheme().dressingEra === '1993'; } catch { /* pre-theme boot */ }
-  return era1993
-    ? 'Already on: the 1993 era wears this pack by default.'
-    : 'Adds 1993 fascia blades + ribbon ceiling to this era.';
 }
 
 /**
@@ -506,34 +491,6 @@ export function registerCoreSettings(): void {
     // a pack that failed to load is otherwise indistinguishable from no pack.
     get hint() { return brandPackDiagnostic(); },
     hidden: true,
-  });
-
-  // Layers the 1993 store-dressing pack (fascia blades over the aisle runs,
-  // ribbon ceiling panels, the flat-oblique NEW RELEASES band, the period
-  // counter/storefront/security props) onto whichever era is selected. The
-  // 1993 era theme turns the same pack on by itself — this row exists to put
-  // it on the OTHER eras.
-  //
-  // It used to be called "1993 Footage Signage" and live on the staff-only
-  // SERVICE page. Both were wrong for what it is (owner report 2026-08-12,
-  // "makes no sense being in the options nest it is in and what does it even
-  // do?"): "Footage" named our reference material — the 1993 store video the
-  // pack was reconstructed from — which means nothing to anyone looking at
-  // the row, and a purely cosmetic choice does not belong among the dev
-  // knobs. It is a look, so it sits in Store Look, directly under the era it
-  // modifies, and says what it adds.
-  registerSetting({
-    key: 'bb_93_signage',
-    label: '1993 Store Dressing',
-    kind: 'cycle',
-    group: 'Store Look',
-    values: [
-      { id: 'off', label: 'Off' },
-      { id: 'on', label: 'On' },
-    ],
-    default: 'off',
-    applyMode: 'rebuild-scene',
-    hint: dressing93Hint,
   });
 
   // Studio-spotlight floor stands used to pick from a fixed curated list
