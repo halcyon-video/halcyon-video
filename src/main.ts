@@ -41,7 +41,14 @@ import {
   playbackProgressed,
   playbackStopped,
 } from './playback-routing';
-import { activeProvider as provider, sessionOf } from './providers/active-provider';
+import {
+  activeProvider as provider,
+  providerForSource as providerFor,
+  sessionOf,
+} from './providers/active-provider';
+// GH #84: a title knows which connected server shelved it, and every call
+// made ABOUT a title routes back to that one.
+import { connectionForTitle, findTitleByCarryId } from './media-sources';
 import {
   fetchComingSoonMovies,
   fetchDiscoverMovies,
@@ -2724,16 +2731,17 @@ async function initializeStoreScene(preservePosterCache = false) {
     // when a series is actually inspected (never at boot).
     scene.onFetchEpisodes = async (movie) => {
       if (isDemoMode) return makeSyntheticEpisodes(movie);
-      const jellyfinUrl = localStorage.getItem('jellyfin_url');
-      const token = localStorage.getItem('jellyfin_token');
+      // Routed to the server THIS series came from (GH #84) — on a two-server
+      // store the friend's series would otherwise be asked for from your own
+      // box, which answers 404 and paints the season panel NONE.
       // Address and token are the credentials; a user id is not one (GH #66).
       // It is a Jellyfin concept, and a Plex session's is empty whenever
       // plex.tv didn't resolve the server — so requiring it here returned []
       // for every Plex series and painted the season panel NONE. It is still
       // PASSED, because the Jellyfin provider needs it; the provider decides.
-      const userId = localStorage.getItem('jellyfin_userid') ?? '';
-      if (!jellyfinUrl || !token) return [];
-      return provider().fetchSeriesEpisodes(jellyfinUrl, sessionOf(token, userId), movie.id);
+      const conn = connectionForTitle(movie);
+      if (!conn) return [];
+      return providerFor(conn.source).fetchSeriesEpisodes(conn.url, conn.session, movie.id);
     };
 
     // Canvas click on an already-selected slot: confirm selection directly,
@@ -2781,7 +2789,10 @@ async function initializeStoreScene(preservePosterCache = false) {
     scene.onCheckoutComplete = (items) => {
       logToConsole(`[System] Checkout complete: ${items.length} title(s) rented (${items.join(', ')}).`, 'system');
       if (scene.rentalMode || items.length === 0) return; // rental continues into the back room
-      const movie = storeLibraries.flatMap((l) => l.movies).find((m) => m.id === items[0]);
+      // Source-aware (GH #84): `items` carries qualified ids, because a bare
+      // item id is ambiguous across servers — both boxes issue "1"/"m0", and
+      // first-match-wins played the OTHER server's film off the wrong address.
+      const movie = findTitleByCarryId(storeLibraries, items[0]);
       if (!movie) {
         logToConsole(`[Video] Checked-out title ${items[0]} not found in any library — cannot start playback.`, 'video');
         // The exit walk already carried the bag out under the whiteout —
@@ -3390,11 +3401,10 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
       overrideItemId = selected.id;
       overridePath = selected.path || undefined;
     } else {
-      const jellyfinUrl = localStorage.getItem('jellyfin_url');
-      const token = localStorage.getItem('jellyfin_token');
-      const userId = localStorage.getItem('jellyfin_userid') ?? '';
-      const first = (jellyfinUrl && token)
-        ? await provider().fetchFirstEpisodeOfSeries(jellyfinUrl, sessionOf(token, userId), movie.id)
+      const seriesConn = connectionForTitle(movie);
+      const first = seriesConn
+        ? await providerFor(seriesConn.source).fetchFirstEpisodeOfSeries(
+            seriesConn.url, seriesConn.session, movie.id)
         : null;
       if (!first) {
         logToConsole(`[Video] Could not resolve an episode for "${movie.title}".`, 'video');
@@ -3412,11 +3422,16 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
   const mediaSourceId = version?.mediaSourceId;
   const localPath = overridePath || version?.localPath || movie.localPath;
 
-  const jellyfinUrl = localStorage.getItem('jellyfin_url');
-  const token = localStorage.getItem('jellyfin_token');
+  // The server this very title came from (GH #84), not "the" server: a store
+  // stocked from two boxes must stream each title back to whichever one
+  // shelved it, or every title from the second server plays the wrong file or
+  // none at all.
+  const titleConn = connectionForTitle(movie);
+  const jellyfinUrl = titleConn?.url ?? null;
+  const token = titleConn?.token ?? null;
   // Never a credential test — see the note on onFetchEpisodes. Carried so the
   // Jellyfin provider can address /Users/<id>/..., empty on Plex by design.
-  const userId = localStorage.getItem('jellyfin_userid') ?? '';
+  const userId = titleConn?.userId ?? '';
 
   // Without a media-server endpoint there's nothing to stream into the webview
   // — fall back to the external player on the original file.
@@ -3432,7 +3447,7 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
   if (movie.isSeries) {
     let episodes = storeScene?.getSeriesEpisodes(movie.id) ?? null;
     if (!episodes?.length) {
-      episodes = await provider().fetchSeriesEpisodes(jellyfinUrl, sessionOf(token, userId), movie.id);
+      episodes = await providerFor(titleConn?.source).fetchSeriesEpisodes(jellyfinUrl, sessionOf(token, userId), movie.id);
     }
     seriesQueue = episodes?.length ? { seriesId: movie.id, episodes } : null;
   } else {
@@ -3477,6 +3492,8 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
           finishPlayback(movie, fromCouch);
         },
         (msg) => logToConsole(msg, 'video'),
+        // Report progress to the server that shelved this title (GH #84).
+        { url: jellyfinUrl, token },
       );
       if (started) {
         // The store is behind a fullscreen window now — stop drawing it.
@@ -3645,6 +3662,9 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
     directPlayable,
     mediaInfoSummary,
     title: movie.title,
+    // Which server is encoding this (GH #84), so closing the player tears the
+    // transcode down on THAT box rather than on whichever one is primary.
+    server: { url: jellyfinUrl, token },
     audioTracks,
     subtitleTracks,
     defaultAudioIndex: initialAudioIndex,

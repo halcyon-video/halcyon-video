@@ -5,6 +5,7 @@
 // debug entries. Every function takes the StoreScene as its first parameter
 // and reads/writes scene state exactly as the original methods did.
 import { Movie } from './jellyfin';
+import { findTitleByCarryId } from './media-sources';
 import { BACK_WALL_UNIT_IDX } from './store-layout';
 import { retailAudio } from './audio';
 import { DEFAULT_CARRY_CAPACITY } from './carried-tapes';
@@ -48,16 +49,17 @@ export function setRentalMode(scene: StoreScene, enabled: boolean): void {
   scene.requestRender();
 }
 
+/**
+ * Carried/rented ids back to the titles they name. Source-aware (GH #84): the
+ * ids persisted by a multi-server store are qualified, and a bare one written
+ * by an older build (or a single-server one) still resolves — a rental lockout
+ * must not survive an upgrade only to find none of its tapes.
+ */
 export function resolveRentalMovies(scene: StoreScene, ids: string[]): Movie[] {
   const movies: Movie[] = [];
   for (const id of ids) {
-    for (const lib of scene.libraries) {
-      const m = lib.movies.find((mm) => mm.id === id);
-      if (m) {
-        movies.push(m);
-        break;
-      }
-    }
+    const m = findTitleByCarryId(scene.libraries, id);
+    if (m) movies.push(m);
   }
   return movies;
 }

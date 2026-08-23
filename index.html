@@ -256,7 +256,12 @@
                   </div>
                   <div class="input-group" id="plex-server-group" style="display:none">
                     <label for="plex-server">Your Servers</label>
-                    <select id="plex-server"></select>
+                    <!-- Multi-select (GH #84): an account routinely carries your
+                         own server AND ones shared with you, and the store can
+                         stock from several at once. Ctrl/Cmd-click or drag to
+                         pick more than one. -->
+                    <select id="plex-server" multiple size="4"></select>
+                    <small id="plex-server-hint" class="plex-server-hint">Pick one or more — hold Ctrl (⌘) to add servers.</small>
                   </div>
                 </div>
               </div>

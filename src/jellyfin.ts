@@ -1294,9 +1294,16 @@ export async function reportPlaybackProgress(
  * main.ts persists them under instead of threading them through every
  * caller.
  */
-export async function stopActiveEncoding(playSessionId: string, log?: (msg: string) => void): Promise<void> {
-  const jellyfinUrl = localStorage.getItem("jellyfin_url");
-  const token = localStorage.getItem("jellyfin_token");
+export async function stopActiveEncoding(
+  playSessionId: string,
+  log?: (msg: string) => void,
+  /** The server running the encode (GH #84). Falls back to the singleton keys,
+   *  which is still right for a one-server store and for anything that has no
+   *  title to resolve a source from. */
+  conn?: { url: string; token: string } | null
+): Promise<void> {
+  const jellyfinUrl = conn?.url ?? localStorage.getItem("jellyfin_url");
+  const token = conn?.token ?? localStorage.getItem("jellyfin_token");
   if (!jellyfinUrl || !token) return;
   const url = jellyfinUrl.replace(/\/$/, "");
   try {

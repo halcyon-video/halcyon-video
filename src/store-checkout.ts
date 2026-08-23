@@ -7,6 +7,7 @@
 // first parameter and reads/writes scene state exactly as the original
 // methods did.
 import * as THREE from 'three';
+import { findTitleByCarryId } from './media-sources';
 import { Movie } from './jellyfin';
 import { CASE_MEDIUM, getRentalCaseGeometry, createHeroRentalMaterials } from './video-case';
 import { BACK_WALL_UNIT_IDX, MovieSlot } from './store-layout';
@@ -100,12 +101,11 @@ export function rehydrateCarried(scene: StoreScene): void {
   const now = performance.now();
   const carried = scene.ensureCarried();
   for (const id of ids) {
-    let movie: Movie | undefined;
-    for (const lib of scene.libraries) {
-      movie = lib.movies.find((m) => m.id === id);
-      if (movie) break;
-    }
-    if (movie) carried.take(movie, scene.findSlotKeyForMovie(id), null, now);
+    // Source-aware (GH #84): the stored id may be qualified, and a bare one
+    // from an older build still resolves. findSlotKeyForMovie takes the BARE
+    // id — the shelf slot is the server's own item.
+    const movie = findTitleByCarryId(scene.libraries, id);
+    if (movie) carried.take(movie, scene.findSlotKeyForMovie(movie.id), null, now);
   }
   if (carried.count > 0) {
     scene.onConsoleLog(`[System] Still carrying ${carried.count} tape(s) from last visit.`, 'system');
@@ -115,7 +115,7 @@ export function rehydrateCarried(scene: StoreScene): void {
 export function collectHeldTapesForReturn(scene: StoreScene): Movie[] {
   const carried = scene.carried;
   if (!carried || carried.count === 0) return [];
-  const movies = scene.resolveRentalMovies(carried.ids());
+  const movies = scene.resolveRentalMovies(carried.carryIds());
   carried.clearAll(true);
   return movies;
 }
@@ -394,7 +394,7 @@ export function confirmCheckoutVR(scene: StoreScene): boolean {
   }
   retailAudio.playCheckoutChime();
   showClerkToast('All set — great picks! Enjoy your movies tonight.');
-  scene.finishCheckout(carried.ids());
+  scene.finishCheckout(carried.carryIds());
   return true;
 }
 

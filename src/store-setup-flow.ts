@@ -35,7 +35,25 @@ import {
   isMembershipPickerOpen,
   type MembershipLoginSession,
 } from './membership-cards';
-import { excludedLibraryIds, setLibraryCarried } from './library-settings';
+import { isLibraryCarried, setLibraryCarried } from './library-settings';
+import {
+  addMediaSource,
+  knownLibrariesBySource,
+  rememberSourceLibraries,
+  labelForUrl,
+  listMediaSources,
+  namespaceLibraryId,
+  removeMediaSource,
+  type MediaSource,
+} from './media-sources';
+import {
+  isSourceScreen,
+  sourceScreenKey,
+  sourceScreenLines,
+  type SetupGroupedLibraryRow,
+  type SetupServerRow,
+  type SourceScreen,
+} from './setup-source-screens';
 import {
   STREAMING_SERVICES_KEY,
   streamingChoiceCsv,
@@ -90,10 +108,17 @@ export interface SetupFlowDeps {
 }
 
 let deps: SetupFlowDeps | null = null;
-let screen: SetupScreen = initialHomeScreen();
+// Widened for the multi-server screens (GH #84). They live in their own module
+// (setup-source-screens.ts) rather than in store-setup-screens.ts's union: this
+// flow drives both, and the base screens are shared ground the counter terminal
+// renders too.
+let screen: SetupScreen | SourceScreen = initialHomeScreen();
 // The authenticated connection carried between the member pick and the sync.
 let pendingUrl = '';
 let pendingSession: MembershipLoginSession | null = null;
+// The plex.tv account token from THIS sign-in, held so every server ticked on
+// the account's server list can be authenticated in turn (GH #84).
+let pendingPlexToken: string | null = null;
 
 export function initSetupFlow(d: SetupFlowDeps): void {
   deps = d;
@@ -103,7 +128,9 @@ function render(): void {
   if (!deps?.ui.isSetupOpen) return;
   const scene = deps.scene();
   if (!scene) return;
-  const { lines, cursorLine } = setupScreenLines(screen);
+  const { lines, cursorLine } = isSourceScreen(screen)
+    ? sourceScreenLines(screen)
+    : setupScreenLines(screen);
   scene.setTerminalText(lines, cursorLine);
   // Verification hook (same idiom as __promoStands & co): what the setup CRT
   // is showing right now, for scripts that drive the real first-run flow.
@@ -117,15 +144,19 @@ function render(): void {
 // the menus identically to a keyboard.
 function onTypedKey(e: KeyboardEvent): void {
   if (!deps?.ui.isSetupOpen || isMembershipPickerOpen()) return;
+  // No multi-server screen has a text field — they are all checkbox lists and
+  // menus — so a source screen never takes typed characters (GH #84).
+  if (isSourceScreen(screen)) return;
+  const active: SetupScreen = screen;
   const typing =
-    (screen.kind === 'home' && screen.row === 1) ||
-    (screen.kind === 'manual-auth' && (screen.row === 0 || screen.row === 1));
+    (active.kind === 'home' && active.row === 1) ||
+    (active.kind === 'manual-auth' && (active.row === 0 || active.row === 1));
   if (!typing) return;
   if (e.key === 'Backspace') {
-    screen = setupScreenBackspace(screen);
+    screen = setupScreenBackspace(active);
   } else if (e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
-    const next = setupScreenChar(screen, e.key);
-    if (next === screen) return;
+    const next = setupScreenChar(active, e.key);
+    if (next === active) return;
     screen = next;
   } else {
     return;
@@ -263,6 +294,7 @@ async function dialPlex(address: string): Promise<void> {
       return;
     }
     localStorage.setItem(PLEX_ACCOUNT_TOKEN_KEY, token);
+    pendingPlexToken = token;
 
     screen = { kind: 'dialing', address: typed || 'PLEX.TV', step: 'LOOKING UP YOUR SERVERS...' };
     render();
@@ -270,15 +302,38 @@ async function dialPlex(address: string): Promise<void> {
     let url = typed;
     if (!url || url === 'http://' || url === 'https://') {
       const servers = await fetchPlexServers(token);
-      const first = servers.find((s) => s.connections.length)?.connections[0];
-      if (!first) {
+      const offerable = servers.filter((s) => s.connections.length);
+      if (!offerable.length) {
         screen = { ...initialHomeScreen(address), row: 1,
           error: 'NO SERVERS ON THAT ACCOUNT. TYPE ONE.' };
         render();
         return;
       }
-      url = normalizeUrl(first);
-      deps.log(`[Setup] Plex account supplied ${servers.length} server(s); using ${url}.`);
+      // MORE THAN ONE SERVER ON THE ACCOUNT = ASK (GH #84). This used to take
+      // `servers[0].connections[0]` and log "using <url>", which is precisely
+      // the reported bug: an account carrying your own server AND ones shared
+      // with you silently stocked from whichever came back first, and there
+      // was no way to say "both". Sharing makes this the normal case on Plex,
+      // not an edge one.
+      if (offerable.length > 1) {
+        deps.log(`[Setup] Plex account supplied ${offerable.length} server(s) — pick which to stock from.`);
+        screen = {
+          kind: 'plex-servers',
+          rows: offerable.map((srv, i): SetupServerRow => ({
+            url: normalizeUrl(srv.connections[0]),
+            name: srv.name,
+            owned: srv.owned,
+            // Your own servers start ticked; a shared one is a deliberate
+            // choice, not a default.
+            chosen: srv.owned || i === 0,
+          })),
+          row: 0,
+        };
+        render();
+        return;
+      }
+      url = normalizeUrl(offerable[0].connections[0]);
+      deps.log(`[Setup] Plex account supplied 1 server; using ${url}.`);
     }
 
     pendingUrl = url;
@@ -323,15 +378,27 @@ async function manualSignIn(): Promise<void> {
 }
 
 /** Authenticated — persist the session, then offer the library checkboxes. */
-async function afterAuth(url: string, session: MembershipLoginSession): Promise<void> {
+async function afterAuth(
+  url: string,
+  session: MembershipLoginSession,
+  opts?: { displayName?: string }
+): Promise<void> {
   if (!deps) return;
   pendingUrl = url;
   pendingSession = session;
-  localStorage.setItem('jellyfin_url', url);
-  localStorage.setItem('jellyfin_token', session.accessToken);
-  localStorage.setItem('jellyfin_userid', session.userId);
+  // CONNECT, don't overwrite (GH #84): addMediaSource appends a new server or
+  // refreshes one already known, and mirrors the primary back into the legacy
+  // jellyfin_* keys so everything that still reads them is fed.
+  const source = addMediaSource({
+    kind: activeProvider().id,
+    url,
+    token: session.accessToken,
+    userId: session.userId,
+    userName: session.userName,
+    name: opts?.displayName || labelForUrl(url),
+  });
   localStorage.setItem('jellyfin_last_userid', session.userId);
-  deps.log(`[Setup] Authenticated as ${session.userName}.`);
+  deps.log(`[Setup] Authenticated as ${session.userName} on ${source.name}.`);
   screen = { kind: 'dialing', address: url, step: 'PULLING THE CATALOG LIST...' };
   render();
   try {
@@ -340,22 +407,92 @@ async function afterAuth(url: string, session: MembershipLoginSession): Promise<
     // so every Plex install failed setup here with COULD NOT LIST LIBRARIES
     // however healthy the connection was.
     const libs = await activeProvider().listLibraries(url, session);
-    rememberKnownLibraries(libs);
+    rememberSourceLibraries(source, libs);
+    rememberKnownLibraries(libs); // legacy single-server memory, kept in step
     if (libs.length === 0) {
       screen = { ...initialHomeScreen(url), error: 'THE DISTRIBUTOR LISTS NO LIBRARIES.' };
       render();
       return;
     }
-    const excluded = excludedLibraryIds();
-    screen = {
-      kind: 'libraries',
-      rows: libs.map((l) => ({ id: l.id, name: l.name, carried: !excluded.has(l.id) })),
-      row: 0,
-    };
-    render();
+    showLibraryChoices();
   } catch (e: any) {
     deps.log(`[Setup] Library list failed: ${e?.message ?? e}`);
     screen = { ...initialHomeScreen(url), error: 'COULD NOT LIST LIBRARIES. RETRY.' };
+    render();
+  }
+}
+
+/**
+ * The carried-library checkboxes, over EVERY connected server (GH #84).
+ *
+ * One server keeps the original flat screen; two or more get the grouped one,
+ * because "Movies" listed twice with nothing to say whose it is would be worse
+ * than not offering the choice. Ids are namespaced either way, so a Plex
+ * section key of "1" on both servers stays two distinct rows.
+ */
+function showLibraryChoices(): void {
+  const remembered = knownLibrariesBySource();
+  const rows: SetupGroupedLibraryRow[] = remembered.flatMap((entry) =>
+    entry.libraries.map((l) => ({
+      id: namespaceLibraryId(entry.sourceId, l.id),
+      name: l.name,
+      carried: isLibraryCarried(entry.sourceId, l.id),
+      group: entry.sourceName,
+    }))
+  );
+  if (!rows.length) return;
+  screen = remembered.length > 1
+    ? { kind: 'libraries-multi', rows, row: 0 }
+    : { kind: 'libraries', rows: rows.map(({ id, name, carried }) => ({ id, name, carried })), row: 0 };
+  render();
+}
+
+/**
+ * CONNECTED DISTRIBUTORS — what this store is stocked from, with the door open
+ * to another one. This screen is the whole point of #84 at the terminal: the
+ * setup flow used to end at one server with no way back in short of starting
+ * over, so "my libraries AND my friend's" was unreachable however many servers
+ * the account had.
+ */
+function showSourcesScreen(error?: string): void {
+  const counts = new Map(knownLibrariesBySource().map((e) => [e.sourceId, e.libraries.length]));
+  const entries = listMediaSources().map((src: MediaSource) => ({
+    id: src.id,
+    name: src.name,
+    kind: src.kind.toUpperCase(),
+    libraryCount: counts.get(src.id) ?? 0,
+  }));
+  screen = { kind: 'sources', entries, row: entries.length ? entries.length + 1 : 0, error };
+  render();
+}
+
+/** Sign in to every server ticked on the account's list, then carry on. */
+async function connectChosenPlexServers(rows: SetupServerRow[]): Promise<void> {
+  if (!deps) return;
+  const token = pendingPlexToken || localStorage.getItem(PLEX_ACCOUNT_TOKEN_KEY);
+  const chosen = rows.filter((r) => r.chosen);
+  if (!token || !chosen.length) return;
+  let connected = 0;
+  let lastError = '';
+  for (const row of chosen) {
+    screen = { kind: 'dialing', address: row.url, step: `SIGNING IN AT ${row.name.toUpperCase().slice(0, 22)}...` };
+    render();
+    try {
+      const session = await activeProvider().authenticate(row.url, { accountToken: token });
+      // afterAuth registers the source and remembers its libraries; the last
+      // one through also leaves the library checkboxes on screen.
+      await afterAuth(row.url, session as MembershipLoginSession, { displayName: row.name });
+      connected++;
+    } catch (e: any) {
+      // One unreachable server must not sink the rest — a friend's box being
+      // asleep is the ordinary condition, not a setup failure.
+      lastError = String(e?.message ?? e);
+      deps.log(`[Setup] Could not connect ${row.name}: ${lastError}`);
+    }
+  }
+  if (!connected) {
+    screen = { ...initialHomeScreen(), row: 1,
+      error: lastError ? lastError.toUpperCase().slice(0, 40) : 'NO SERVER WOULD CONNECT.' };
     render();
   }
 }
@@ -409,6 +546,10 @@ function runDemo(): void {
 /** One remote/keyboard press while the setup terminal is up. */
 export async function setupTerminalInput(kind: SetupKey): Promise<void> {
   if (!deps?.ui.isSetupOpen || isMembershipPickerOpen()) return;
+  if (isSourceScreen(screen)) {
+    await sourceTerminalInput(screen, kind);
+    return;
+  }
   const { state, action } = setupScreenKey(screen, kind);
   if (state !== screen || action) deps.keyClick();
   screen = state;
@@ -447,8 +588,11 @@ export async function setupTerminalInput(kind: SetupKey): Promise<void> {
       // real "go" -- persist the choice and run the catalog sync.
       if (screen.kind === 'libraries') {
         for (const row of screen.rows) setLibraryCarried(row.id, row.carried);
-        screen = initialStreamingScreen();
-        render();
+        // The CONNECTED DISTRIBUTORS screen sits between the library choice
+        // and the streaming one (GH #84) — it is the only place the terminal
+        // offers to add a SECOND server, and it also confirms what the store
+        // is about to be stocked from.
+        showSourcesScreen();
         return;
       }
       if (screen.kind === 'streaming') {
@@ -464,6 +608,52 @@ export async function setupTerminalInput(kind: SetupKey): Promise<void> {
     case 'change-server':
       deps.callbacks.changeServer();
       screen = initialHomeScreen(localStorage.getItem('jellyfin_url'));
+      render();
+      return;
+  }
+}
+
+/** One press on a multi-server screen (GH #84). */
+async function sourceTerminalInput(current: SourceScreen, key: SetupKey): Promise<void> {
+  if (!deps) return;
+  const { state, action } = sourceScreenKey(current, key);
+  if (state !== current || action) deps.keyClick();
+  screen = state;
+  if (!action) {
+    render();
+    return;
+  }
+  switch (action) {
+    case 'connect-servers':
+      if (state.kind === 'plex-servers') await connectChosenPlexServers(state.rows);
+      return;
+    case 'libraries-done':
+      if (state.kind === 'libraries-multi') {
+        for (const row of state.rows) setLibraryCarried(row.id, row.carried);
+        showSourcesScreen();
+      }
+      return;
+    case 'add-another':
+      // Back to the distributor home screen with a BLANK address: the point is
+      // a different server, so prefilling the one already connected would only
+      // invite reconnecting it. The sources already registered stay put.
+      pendingUrl = '';
+      pendingSession = null;
+      screen = initialHomeScreen();
+      render();
+      return;
+    case 'drop-source':
+      if (state.kind === 'sources') {
+        const entry = state.entries[state.row];
+        if (entry) {
+          removeMediaSource(entry.id);
+          deps.log(`[Setup] Disconnected ${entry.name}.`);
+        }
+        showSourcesScreen();
+      }
+      return;
+    case 'continue':
+      screen = initialStreamingScreen();
       render();
       return;
   }
