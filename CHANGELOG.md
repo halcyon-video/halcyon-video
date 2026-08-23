@@ -5,6 +5,21 @@ All notable changes to Halcyon Video, generated from commit history by
 it on every version tag push. Deterministic and offline: no entry here was
 written by a model.
 
+## [v0.9.1] — 2026-08-23
+
+### CHANGELOG
+- V0.9.0
+
+### Mom & pop
+- The props catch up with the moved desk, and the shop is one pick
+
+### General
+- Re-announce every channel by default — a bad post is bad everywhere
+- Re-announce must run the current tooling, not the tree that got it wrong
+- Re-announce must run the current tooling, not the tree that got it wrong
+- A way to re-announce a release whose post went out wrong
+- Announce posts must say what was added, not recite git log
+
 ## [v0.9.0] — 2026-08-23
 
 ### Announce
