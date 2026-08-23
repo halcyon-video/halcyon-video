@@ -20,6 +20,7 @@ import { isDiscoveryRequested } from './jellyseerr';
 import { SP_HERO, CT_HERO, updatedMeshes } from './scene-shared';
 import { getGoldCaseMaterials } from './fixtures/gold-clamshell';
 import type { StoreScene } from './three-scene';
+import { counterFrame } from './counter-anchors';
 
 // Whether the current hero back materials are the NR gold case — part of the
 // ensureHeroCases rebuild key alongside heroMovieId, so stepping between an
@@ -368,12 +369,17 @@ export function updateLaunchAnimation(scene: StoreScene, now: number): boolean {
   const bagBase = scene.entrance?.bagBaseWorld ??
     _bagBaseFallback.set(bag.x, bag.y - 1.1, bag.z);
 
-  // The customer (and camera) watch from the store side, i.e. -Z of the bag;
-  // the "front of the counter" is a spot a short way out on that side, at
-  // counter-top height, where a movie gets set down before it's bagged.
+  // The customer (and camera) watch from the counter's CUSTOMER SIDE — its
+  // own outward normal, which is −Z only while the counter faces the store
+  // that way. The mom-and-pop desk runs along a side wall (GH #116), where
+  // the −Z of the bag is a spot further down the counter, so the case would
+  // have flown to a stop on the desk instead of out in front of it and the
+  // bagging camera would have watched from over the clerk's shoulder.
+  const cf = counterFrame(scene);
+  const outX = -cf.nx, outZ = -cf.nz;
   const FRONT_GAP = 1.5;
-  const frontX = bagBase.x;
-  const frontZ = bagBase.z - FRONT_GAP;
+  const frontX = bagBase.x + outX * FRONT_GAP;
+  const frontZ = bagBase.z + outZ * FRONT_GAP;
   const standY = bagBase.y + 0.75;            // a case standing on the counter
 
   // Collapse this slot's two instanced shelf copies so nothing is left
@@ -415,7 +421,10 @@ export function updateLaunchAnimation(scene: StoreScene, now: number): boolean {
     const posZ = THREE.MathUtils.lerp(anim.baseZ, frontZ, fe);
     const arc = Math.sin(ft * Math.PI) * 2.6;             // lob up over the shelves
     const posY = THREE.MathUtils.lerp(anim.baseY + RISE, standY, fe) + arc;
-    scene.targetCameraPos.set(11.0, 5.2, scene.deskApexZ() - 2.5);
+    // Stood off the counter's customer face by 2.5 ft, along its own outward
+    // normal — the mom-and-pop desk faces across the shop (GH #116), where
+    // `x = 11, apex − 2.5` puts the camera out in the middle of the floor.
+    scene.targetCameraPos.set(cf.fx + outX * 2.5, 5.2, cf.fz + outZ * 2.5);
     scene.targetLookAt.set(bagBase.x, bagBase.y + 0.2, bagBase.z);
     scene.driveLaunchCase(slot, posX, posY, posZ, 0, rotY, 1);
     return true;
@@ -429,7 +438,7 @@ export function updateLaunchAnimation(scene: StoreScene, now: number): boolean {
     const posZ = THREE.MathUtils.lerp(frontZ, bag.z, se);
     const posY = THREE.MathUtils.lerp(standY, bag.y + 0.15, se);
     const rotX = -se * 0.5;                                // tips back as it slides in
-    scene.targetCameraPos.set(bag.x, bag.y + 0.7, bag.z - 1.6);
+    scene.targetCameraPos.set(bag.x + outX * 1.6, bag.y + 0.7, bag.z + outZ * 1.6);
     scene.targetLookAt.set(bag.x, bag.y - 0.15, bag.z);
     scene.driveLaunchCase(slot, posX, posY, posZ, rotX, anim.baseRotY, 1);
     return true;
@@ -445,7 +454,7 @@ export function updateLaunchAnimation(scene: StoreScene, now: number): boolean {
       anim.chimed = true;
       retailAudio.playCheckoutChime();                    // scanner beep + happy tone
     }
-    scene.targetCameraPos.set(bag.x, bag.y + 0.7, bag.z - 1.6);
+    scene.targetCameraPos.set(bag.x + outX * 1.6, bag.y + 0.7, bag.z + outZ * 1.6);
     scene.targetLookAt.set(bag.x, bag.y - 0.15, bag.z);
     return true;
   }

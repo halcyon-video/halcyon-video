@@ -4,6 +4,7 @@ import { registerFixtureKind } from './fixture-registry';
 import { StructureFootprint } from './fixtures/period-fixtures';
 import { PV_DRAPE_TABLE_POP_KIT } from './fixtures/pv-drape-table';
 import { COMING_SOON_LETTERBOARD_THEMES } from './fixtures/coming-soon-letterboard';
+import { deskGroundPlan } from './entrance/desk-plan';
 
 // 'structure-footprint' is registered here rather than in fixture-registry.ts
 // because it is pure layout data — an invisible marker that only feeds the
@@ -449,22 +450,25 @@ export function admitFixturePlacements(
 
 export function counterAnchoredPlacements(
   spec: { counterShape: CounterShape; doorWidth: number; entryStyle: 'vestibule' | 'storefront-door' },
+  storeWidth: number,
 ): FixturePlacement[] {
   const counterShape = spec.counterShape;
   if (counterShape === 'desk') {
     // The mom-and-pop format's standalone counter (GH #33): a 6 ft wooden desk
-    // set 3 ft off the entrance glass so there is room to stand behind it
-    // (see entrance/counter.ts's `desk` branch). Its z DEPENDS on the entry
-    // style: counter.ts anchors the desk off the entrance's store-side wall
-    // (backZ), which is the vestibule chamber's inner wall for a 'vestibule'
-    // format but the front glass line itself for 'storefront-door' (GH #110
-    // deleted the chamber). The old hardcoded z 5.1 here was the VESTIBULE
-    // answer — after #110 the real desk stood at z ≈ 11.1 while the tip jar
-    // and the validator footprint stayed six feet out on the open floor.
-    // Same derivation as counter.ts: zBackC = backZ − 0.1, desk back 3 ft
-    // further in, desk centre half the 1.6 ft island depth past that.
-    const backZ = 15.0 - (spec.entryStyle === 'vestibule' ? spec.doorWidth * 2 : 0);
-    const deskZ = backZ - 0.1 - 3.0 - 0.8;
+    // with room to stand behind it, running down a side wall since GH #116
+    // instead of sitting across the entrance. Where exactly comes from
+    // entrance/desk-plan.ts, the same function entrance/counter.ts BUILDS the
+    // desk from — this list is assembled before the entrance exists, so it
+    // cannot read the built geometry back, and the two hand-derivations
+    // drifting apart is precisely how GH #110 left the tip jar and this
+    // footprint six feet out on the open floor (fixed in 1af1683).
+    const plan = deskGroundPlan({
+      storeCenterX: STORE_CENTER_X, storeWidth, frontGlassZ: 15.0,
+      entryStyle: spec.entryStyle, doorWidth: spec.doorWidth,
+    });
+    // Tip jar's spot, −0.95 ft along the counter from its centre — see below.
+    const jarX = plan.cx + plan.ux * -0.95;
+    const jarZ = plan.cz + plan.uz * -0.95;
     // There is no band and no queue rail, so the props that live ON a band —
     // the candy queue rack, the tape-cleaner clamshell display — have no
     // surface here and are simply not placed. That is the format's whole
@@ -473,22 +477,22 @@ export function counterAnchoredPlacements(
       {
         id: 'counter-desk',
         kind: 'structure-footprint',
-        position: { x: STORE_CENTER_X, z: deskZ },
-        yaw: 0,
-        options: { footprintWidth: 6.0, footprintDepth: 1.6 }
+        position: { x: plan.cx, z: plan.cz },
+        yaw: plan.yaw,
+        options: { footprintWidth: plan.length, footprintDepth: plan.depth }
       },
       {
         // Tip jar on the desk top (surfaceY 2.82 = innerH 2.7 + the 0.12 slab,
         // the island top — NOT the 3.54 band top, which this format has no
         // band to provide). Parked in the desk's one clear stretch, between
-        // the bag's rest spot (x 9.1) and the terminal (x 12.3, whose CRT
-        // reaches ~11.7) — the old +X-end spot (13.5) sat jammed between the
-        // counter-TV bracket (x 13.2) and the desk end. This also puts it
-        // right where a customer through the door (cx 11) stands.
+        // the bag's rest spot (−1.9 along the counter) and the terminal
+        // (+1.3, whose CRT reaches ~+0.7); the far end is jammed between the
+        // counter-TV bracket (+2.2) and the desk's own end. Held as an
+        // along-counter offset so it turns with the desk.
         id: 'tip-jar-counter',
         kind: 'tip-jar',
-        position: { x: 10.05, z: deskZ },
-        yaw: Math.PI, // card toward the customer side (-z)
+        position: { x: jarX, z: jarZ },
+        yaw: plan.facingYaw, // card toward the customer side
         options: { surfaceY: 2.82 }
       },
     ];

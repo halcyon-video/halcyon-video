@@ -2238,7 +2238,7 @@ export function buildStore(scene: StoreScene) {
     // Counter validator rects + counter-anchored props follow the active
     // counter SHAPE — and, for the standalone desk, the ENTRY STYLE that
     // decides where the desk stands (see counterAnchoredPlacements).
-    ...counterAnchoredPlacements(scene.storefrontSpec),
+    ...counterAnchoredPlacements(scene.storefrontSpec, storeWidth),
     ...(scene.gameMovies.length > 0 ? gameSectionPlacements(scene.getStoreWidth()) : []),
     // Staff-picks genre endcaps at aisle-run ends — computed above, before
     // the shelving build; present only when the watch-history engine
@@ -2359,17 +2359,22 @@ export function buildStore(scene: StoreScene) {
   // because the real geometry doesn't exist before then — see period-fixtures.ts's
   // TapeRewinder/TapeCleanerDisplay for the consumer this can't reach.
   const counterAnchor = scene.entrance?.getCounterTopAnchor();
-  if (counterAnchor) {
+  const counterTopFrame = scene.entrance?.getCounterFrame();
+  if (counterAnchor && counterTopFrame) {
     const counterRunHalfWidth = 6.0;
+    // Laid out along the counter's OWN axes rather than world X/Z: the
+    // mom-and-pop desk runs down a side wall (GH #116), and a surface pinned
+    // to +X there would hang off both ends of it and out over the floor.
+    const { ux, uz, nx, nz } = counterTopFrame;
     scene.surfaces.register({
       id: 'counter-top',
       origin: {
-        x: counterAnchor.x - counterRunHalfWidth,
+        x: counterAnchor.x - ux * counterRunHalfWidth - nx * counterAnchor.depth / 2,
         y: counterAnchor.y,
-        z: counterAnchor.z - counterAnchor.depth / 2,
+        z: counterAnchor.z - uz * counterRunHalfWidth - nz * counterAnchor.depth / 2,
       },
-      uDir: { x: 1, y: 0, z: 0 },
-      vDir: { x: 0, y: 0, z: 1 },
+      uDir: { x: ux, y: 0, z: uz },
+      vDir: { x: nx, y: 0, z: nz },
       normal: { x: 0, y: 1, z: 0 },
       width: counterRunHalfWidth * 2,
       height: counterAnchor.depth,

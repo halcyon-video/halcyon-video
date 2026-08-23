@@ -13,13 +13,36 @@ import { StorefrontSpec } from '../store-layout';
 import { getActiveTheme } from '../themes';
 import { createShelfTextures } from '../canvas-textures';
 import { Footprint } from '../layout-validator';
+import { deskGroundPlan, DeskGroundPlan, DESK_LENGTH, DESK_DEPTH } from './desk-plan';
 
 // A spot the clerk can stand at, with the world heading she should face while
 // standing there (heading convention: atan2(dirX, dirZ), see clerk.ts).
 export interface ClerkStanding { x: number; z: number; yaw: number }
 
+// The counter's own frame in world space, published so nothing downstream has
+// to know which SHAPE is active or which way it is turned. Every prop, camera
+// vantage and walk waypoint the app anchors to the counter is expressible as
+// "u feet along it, v feet into it" — and expressing them that way is what
+// lets the standalone desk turn 90° onto a side wall (GH #116) without a
+// single consumer carrying a second set of literals for the rotated case.
+export interface CounterFrame {
+  // Centre of the customer-facing face.
+  fx: number; fz: number;
+  // Unit vector ALONG the counter, +u. World +X on every front-facing shape,
+  // so the historical `cx + off` anchors are literally `off` here.
+  ux: number; uz: number;
+  // Unit vector from the customer side INTO the counter body (toward the
+  // clerk) — the direction getInnerCounterSpine's rotY points.
+  nx: number; nz: number;
+  // Heading the counter FACES (clerk.ts convention: atan2(dirX, dirZ)).
+  facingYaw: number;
+}
+
 export interface CounterBuildResult {
   // The counter's store-facing point Z (frames the checkout camera move).
+  // Kept for the front-facing shapes, whose "apex" really is a Z; a side-wall
+  // desk faces across the room, so anything positional should read `frame`
+  // instead of pairing this with a hardcoded x = 11.
   deskApexZ: number;
   cx: number;
   innerH: number;
@@ -32,6 +55,18 @@ export interface CounterBuildResult {
   // anchor the desk terminals, the bag, and the register signs to the
   // counter's actual geometry rather than hardcoded constants.
   getInnerCounterSpine: (x: number) => { z: number; rotY: number };
+  // The counter's world frame — see CounterFrame.
+  frame: CounterFrame;
+  // A point on the inner counter's SPINE (the mid-depth line of its top),
+  // `u` feet along the counter from its centre. THE anchor accessor: on every
+  // front-facing shape +u is world +X, so `spineAt(off)` is exactly the old
+  // `getInnerCounterSpine(cx + off)` at x = cx + off, and on the side-wall
+  // desk it follows the counter instead of walking off the end of it.
+  spineAt: (u: number) => { x: number; z: number; rotY: number };
+  // Where the clerk stands to work the counter at `u`: behind the spine on
+  // her side, turned to face across the counter. `getTerminalStanding` is
+  // this in world-X clothing.
+  standingAt: (u: number) => ClerkStanding;
   // Exact ground-plan rectangles of the built counter for the clerk's nav
   // grid: the five mitred shield-band segments (with the real walk-through
   // gap — and ONLY that gap — left open) plus the two inner-island segments.
@@ -105,7 +140,10 @@ export function buildCheckoutCounter(
   group: THREE.Group,
   cx: number,
   backZ: number,
-  spec: Pick<StorefrontSpec, 'counterStyle' | 'counterTop' | 'counterShape'>,
+  spec: Pick<StorefrontSpec, 'counterStyle' | 'counterTop' | 'counterShape' | 'entryStyle' | 'doorWidth'>,
+  // Shell width (ft). Only the standalone desk needs it — it stands against a
+  // side WALL, and the wall moves with the store's size (see desk-plan.ts).
+  storeWidth: number,
 ): CounterBuildResult {
   const rounded = spec.counterStyle === 'rounded-2000s';
   // 'usquare': a half-square of roughly the shield's size — three straight
@@ -122,7 +160,18 @@ export function buildCheckoutCounter(
   // wooden desk with the register on it and room to stand behind. Everything
   // downstream still reads the same anchors (spine, apex, standings) because
   // they are all derived from the island, which every shape builds.
+  //
+  // GH #116: it stands ALONG A SIDE WALL now rather than across the entrance,
+  // and its whole ground plan — which wall, how far off it, how far in from
+  // the glass, which way +u runs — comes from desk-plan.ts, because the layout
+  // validator has to declare the same rectangle before this function ever runs.
   const desk = spec.counterShape === 'desk';
+  const deskPlan: DeskGroundPlan | null = desk
+    ? deskGroundPlan({
+        storeCenterX: cx, storeWidth, frontGlassZ: 15.0,
+        entryStyle: spec.entryStyle, doorWidth: spec.doorWidth,
+      })
+    : null;
 
   const theme = getActiveTheme();
   // Laminate mottle/scuff albedo + micro-stipple normal (shared generator with
@@ -151,8 +200,10 @@ export function buildCheckoutCounter(
   const bandD = 1.5;
   // Front-to-back depth of the inner counter island (ft). Hoisted above the
   // outline so the standalone desk — whose outline IS the island — can size
-  // itself from the same number the island is extruded with.
-  const innerD = 1.6;
+  // itself from the same number the island is extruded with, and TAKEN from
+  // desk-plan.ts because the layout validator has to declare that rect before
+  // this function runs. One definition beats two that agree today.
+  const innerD = DESK_DEPTH;
   const backHalf = 6.2;
   const shoulderHalf = 9.8;
   const zBackC = backZ - 0.1;
@@ -166,28 +217,51 @@ export function buildCheckoutCounter(
   // encloses roughly the same area as the shield's tapering 19.6 ft span.
   const uHalf = 6.8;
   const zFrontU = zBackC - 12.0;
-  // Standalone desk: 6 ft wide, one island-depth deep, standing 3 ft clear of
-  // the vestibule glass so there is somewhere to stand behind it, and no
-  // deeper into the store than that — the shelves start a few feet past it.
-  const deskHalf = 3.0;
-  const zBackDesk = zBackC - 3.0;
-  const zFrontDesk = zBackDesk - innerD;
-  const deskApexZ = desk ? zFrontDesk : (usquare ? zFrontU : zPoint);
+  // Standalone desk: a 6 ft run, one island-depth deep, standing along a side
+  // wall with the clerk's work strip behind it (desk-plan.ts owns all four
+  // numbers and the run's direction). `deskHalf` stays the island's half-span
+  // below; the desk's own rect comes off the plan.
+  const deskHalf = DESK_LENGTH / 2;
+  // The counter's local frame: +u along the run, +n from the customer side
+  // into the body. Every shape but the desk faces the store down −Z with its
+  // run along +X, which is precisely why `cx + off` worked as an anchor for
+  // as long as it did.
+  const uVec = deskPlan
+    ? new THREE.Vector2(deskPlan.ux, deskPlan.uz)
+    : new THREE.Vector2(1, 0);
+  const nVec = deskPlan
+    ? new THREE.Vector2(deskPlan.nx, deskPlan.nz)
+    : new THREE.Vector2(0, 1);
+  // The WINDING axis, which is not always the anchor axis. Every polygon here
+  // is wound so an edge tangent t yields an inward normal (−t.z, t.x), so the
+  // front face's tangent is pinned by which side the customer stands on:
+  // wind = (n.z, −n.x). +u, by contrast, means "along the counter, away from
+  // the door" wherever the desk is parked, so on a left-wall desk the two run
+  // opposite. The rect is symmetric about its centre, so only the front
+  // line's ORDER cares — and it cares absolutely, because getting it backwards
+  // builds the counter facing its own wall.
+  const windU = new THREE.Vector2(nVec.y, -nVec.x);
+  // Centre of the customer-facing face, and the centre of the body behind it.
+  const deskFront = deskPlan ? new THREE.Vector2(deskPlan.frontX, deskPlan.frontZ) : null;
+  const deskBack = deskFront ? deskFront.clone().addScaledVector(nVec, innerD) : null;
+  const deskApexZ = deskFront ? deskFront.y : (usquare ? zFrontU : zPoint);
 
   // Outline points, wound so each edge's inward normal (-t.y, t.x) points
   // into the counter interior. For 'usquare' the loop still CLOSES across
   // the back (the offset/mitre math below needs a closed polygon) but that
   // closing edge is never built — it's the open walk-in side.
-  const shield: { x: number; z: number }[] = desk
-    ? [
-        // The desk's own rect. No band is built from it (bandSegDefs is empty
-        // below), but the offset/mitre ring wants a closed polygon and the
-        // rect is the honest one to give it.
-        { x: cx - deskHalf, z: zBackDesk },
-        { x: cx - deskHalf, z: zFrontDesk },
-        { x: cx + deskHalf, z: zFrontDesk },
-        { x: cx + deskHalf, z: zBackDesk },
-      ]
+  const shield: { x: number; z: number }[] = deskFront && deskBack
+    ? // The desk's own rect, wound back-of-run-start → front-of-run-start →
+      // front-of-run-end → back-of-run-end so each edge's inward normal turns
+      // inward exactly as the other shapes' do. No band is built from it
+      // (bandSegDefs is empty below), but the offset/mitre ring wants a
+      // closed polygon and the rect is the honest one to give it.
+      [
+        deskBack.clone().addScaledVector(windU, -deskHalf),
+        deskFront.clone().addScaledVector(windU, -deskHalf),
+        deskFront.clone().addScaledVector(windU, deskHalf),
+        deskBack.clone().addScaledVector(windU, deskHalf),
+      ].map((p) => ({ x: p.x, z: p.y }))
     : usquare
     ? [
         { x: cx - uHalf, z: zBackC },
@@ -438,24 +512,33 @@ export function buildCheckoutCounter(
   // (a V); on the usquare and the standalone desk all three points are
   // collinear along one straight front, and the V math below degenerates
   // cleanly (equal edge normals, unit bisector, mitre length = innerD).
-  const innerFrontZU = zFrontU + bandD;
+  const innerFrontZ = zFrontU + bandD;
   const straightFront = usquare || desk;
-  const innerFrontZ = desk ? zFrontDesk : innerFrontZU;
   // Island half-span: the usquare's narrower well (inner half-width
   // uHalf−bandD = 5.3) takes a shorter island than the shield's ±6, and the
   // standalone desk is the whole counter, so it is exactly the desk.
   const islandHalf = desk ? deskHalf : (usquare ? 5.0 : 6.0);
-  const pFront1 = straightFront ? new THREE.Vector2(cx, innerFrontZ) : P_in[2].clone();
+  // The desk's front line is its own front face, stepped along the run; the
+  // other shapes' is a Z at a world-X. Same three collinear points either
+  // way, so the V math below degenerates identically and nothing after this
+  // knows the desk is turned.
+  const pFront1 = deskFront
+    ? deskFront.clone()
+    : straightFront ? new THREE.Vector2(cx, innerFrontZ) : P_in[2].clone();
   const pFront0X = cx - islandHalf;
   const pFront0Y = straightFront
     ? innerFrontZ
     : P_in[1].y + (pFront0X - P_in[1].x) * (P_in[2].y - P_in[1].y) / (P_in[2].x - P_in[1].x);
-  const pFront0 = new THREE.Vector2(pFront0X, pFront0Y);
+  const pFront0 = deskFront
+    ? deskFront.clone().addScaledVector(windU, -islandHalf)
+    : new THREE.Vector2(pFront0X, pFront0Y);
   const pFront2X = cx + islandHalf;
   const pFront2Y = straightFront
     ? innerFrontZ
     : P_in[2].y + (pFront2X - P_in[2].x) * (P_in[3].y - P_in[2].y) / (P_in[3].x - P_in[2].x);
-  const pFront2 = new THREE.Vector2(pFront2X, pFront2Y);
+  const pFront2 = deskFront
+    ? deskFront.clone().addScaledVector(windU, islandHalf)
+    : new THREE.Vector2(pFront2X, pFront2Y);
 
   const tLeft = new THREE.Vector2().subVectors(pFront1, pFront0).normalize();
   const nLeft = new THREE.Vector2(-tLeft.y, tLeft.x);
@@ -503,32 +586,82 @@ export function buildCheckoutCounter(
       { A_out: pFront1, B_out: pFront2, A_in: pBack1, B_in: pBack2, T: tRight }, innerD),
   );
 
+  // Mid-depth centre of the island's top — the origin of the counter's own
+  // (u, n) frame, and the point every anchor below is measured from.
+  const spineCentre = new THREE.Vector2().addVectors(pFront1, pBack1).multiplyScalar(0.5);
+
+  // A point on the spine `u` feet along the counter. On the front-facing
+  // shapes +u is world +X, so this is bit-for-bit the old
+  // `getInnerCounterSpine(cx + u)` at x = cx + u; on the side-wall desk it
+  // steps along the desk instead, which the world-X accessor cannot do
+  // (every point of that spine shares one x).
+  const spineAt = (u: number): { x: number; z: number; rotY: number } => {
+    if (deskFront) {
+      return {
+        x: spineCentre.x + uVec.x * u,
+        z: spineCentre.y + uVec.y * u,
+        rotY: rotLeft,
+      };
+    }
+    const s = getInnerCounterSpine(cx + u);
+    return { x: cx + u, z: s.z, rotY: s.rotY };
+  };
+
+  // Heading that faces back OUT across the counter, given a normal pointing
+  // into its body. The epsilon snap is load-bearing: a symmetric counter's
+  // bisector comes out of the normalize as x = ±1e-16 rather than a clean
+  // zero, and atan2 turns the sign of that dust into +π or −π. Same
+  // direction, not the same number — and the clerk's facing is interpolated,
+  // so the wrong one of the two is a full spin on the spot.
+  const faceOut = (v: THREE.Vector2) =>
+    Math.atan2(Math.abs(v.x) < 1e-9 ? 0 : -v.x, -v.y);
+
+  // Where the clerk stands to work the counter at `u`: behind the spine on
+  // her side (the spine normal points into her work strip), turned to face
+  // across the counter at whatever is anchored there.
+  const standingAt = (u: number): ClerkStanding => {
+    const s = spineAt(u);
+    const nSide = u <= 0 ? nLeft : nRight;
+    const standOff = innerD / 2 + 1.15;
+    return {
+      x: s.x + nSide.x * standOff,
+      z: s.z + nSide.y * standOff,
+      yaw: faceOut(nSide),
+    };
+  };
+
   // Register duty spot: centered in the counter well, a good step back from
   // the inner island's apex (into the work strip toward the back band) so she
   // stands clearly in the open rather than embedded in the white island.
   // On a standalone desk there is no well to stand in — the working side is
-  // the strip of floor between the desk's back edge and the vestibule glass,
-  // which is why the desk is set 3 ft off that glass in the first place.
+  // the strip of floor between the desk's back edge and the side wall, which
+  // is the whole reason the desk stands off that wall (desk-plan.ts's
+  // DESK_WALL_STRIP, sized so her nav grid leaves a lane there).
+  //
+  // Stepping along the island's own bisector rather than +Z is what turns
+  // with the desk; on every front-facing shape the bisector IS +Z, so the
+  // spot and its heading are unchanged.
+  const registerBack = pBack1.clone().addScaledVector(bisector, desk ? 1.4 : 1.7);
   const registerStanding: ClerkStanding = {
-    x: cx, z: pBack1.y + (desk ? 1.4 : 1.7), yaw: Math.PI,
+    x: registerBack.x, z: registerBack.y, yaw: faceOut(bisector),
   };
 
-  // Standing spot at a rental terminal anchored at world-X `x`: behind the
-  // inner counter's spine on the clerk side (the spine normal points into her
-  // work strip), turned to face the terminal screen.
-  const getTerminalStanding = (x: number): ClerkStanding => {
-    const spine = getInnerCounterSpine(x);
-    const nSide = x <= cx ? nLeft : nRight;
-    const standOff = innerD / 2 + 1.15;
-    return {
-      x: x + nSide.x * standOff,
-      z: spine.z + nSide.y * standOff,
-      yaw: Math.atan2(-nSide.x, -nSide.y),
-    };
+  // Standing spot at a rental terminal anchored at world-X `x` — the
+  // world-X clothing on standingAt(), kept for the front-facing shapes'
+  // callers (a side-wall desk has no meaningful world-X anchor).
+  const getTerminalStanding = (x: number): ClerkStanding => standingAt(x - cx);
+
+  const frame: CounterFrame = {
+    fx: deskFront ? deskFront.x : cx,
+    fz: deskFront ? deskFront.y : deskApexZ,
+    ux: uVec.x, uz: uVec.y,
+    nx: nVec.x, nz: nVec.y,
+    facingYaw: deskPlan ? deskPlan.facingYaw : Math.PI,
   };
 
   return {
     deskApexZ, cx, innerH, innerDepth: innerD, getInnerCounterSpine,
+    frame, spineAt, standingAt,
     navFootprints, registerStanding, getTerminalStanding,
   };
 }
