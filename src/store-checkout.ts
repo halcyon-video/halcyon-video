@@ -262,20 +262,40 @@ export function talkToClerkAtCounter(scene: StoreScene): boolean {
 }
 
 export function checkoutStand(scene: StoreScene, out: THREE.Vector3): THREE.Vector3 {
+  const base = scene.entrance?.bagBaseWorld;
+  // Standalone desk (mom-and-pop): no band, no props — stand square in front
+  // of the desk on the store side, a step right of the bag's rest spot so the
+  // wrap camera looks across the desk top rather than down its edge.
+  if (base && scene.storefrontSpec.counterShape === 'desk') {
+    return out.set(base.x + 2.6, 5.4, base.z - 4.5);
+  }
   // Tuned against the shield band's prop layout: the taper's outer face is
   // crowded (candy rack x≈4.9–7.3, tent sign ~(8.2,-2.4), cleaner display
   // on the band top at (4.6,0.5)) — this spot faces the clear band stretch
   // between the tent sign and the apex, beside the exit walkway.
-  const base = scene.entrance?.bagBaseWorld;
   if (base) return out.set(base.x + 2.1, 5.4, base.z - 8.2);
   return out.set(7.7, 5.4, scene.deskApexZ() - 1.0);
 }
 
 export function checkoutCounterSpots(scene: StoreScene): CarryPose[] {
+  const b = scene.entrance?.bagBaseWorld;
+  // Standalone desk: ONE PILE, on the desk top itself (island top y 2.82 —
+  // there is no 3.54 band to lift them onto, and no band-length to fan four
+  // cases along either: the only clear stretch between the tip jar at
+  // x 10.05 and the terminal's CRT at ~11.7 is about a case wide, so the
+  // clerk stacks them the way a real one would on a desk this size).
+  if (b && scene.storefrontSpec.counterShape === 'desk') {
+    const y = b.y + 0.06;
+    return [
+      { x: b.x + 2.05, y, z: b.z - 0.05, rotY: 0.15, rotX: -Math.PI / 2 },
+      { x: b.x + 2.05, y: y + 0.09, z: b.z - 0.05, rotY: -0.10, rotX: -Math.PI / 2 },
+      { x: b.x + 2.05, y: y + 0.18, z: b.z - 0.05, rotY: 0.30, rotX: -Math.PI / 2 },
+      { x: b.x + 2.05, y: y + 0.27, z: b.z - 0.05, rotY: 0.05, rotX: -Math.PI / 2 },
+    ];
+  }
   // The clear band-top stretch between the tent sign and the apex, fanned
   // up-band away from the stand (bag-anchored so counter shapes track).
   const y = 3.4 + 0.14 + 0.06;
-  const b = scene.entrance?.bagBaseWorld;
   const bx = b ? b.x : 5.6;
   const bz = b ? b.z : scene.deskApexZ() + 7.2;
   return [
@@ -462,8 +482,14 @@ export function updateCheckoutExit(scene: StoreScene, now: number): void {
   // bag's island rest spot, measured against counter.ts's outline (trimmed
   // gap end ~(2.9, 0.9), band top y 3.54; the tape-cleaner display sits
   // down-band of this stretch, see store-fixtures-config.ts).
-  const WAIT_DX = -1.55, WAIT_DZ = -0.75;
-  const WAIT_RISE = 3.4 + 0.14 - bagBase.y; // island top → SITTING on the band top
+  //
+  // Standalone desk (mom-and-pop): there is no band to hop onto — the shove
+  // just slides the bag along the desk top to its left end (the side the
+  // walk-out rounds), and the "rise over the lip" term collapses to zero so
+  // the vertical never leaves the one surface the counter has.
+  const isDesk = scene.storefrontSpec.counterShape === 'desk';
+  const WAIT_DX = isDesk ? -0.5 : -1.55, WAIT_DZ = isDesk ? 0 : -0.75;
+  const WAIT_RISE = isDesk ? 0 : 3.4 + 0.14 - bagBase.y; // island top → SITTING on the band top
   const HAND_Y = 0.38;                      // carry height above the island top
 
   if (t >= T_SLIDE0 && !exit.slid) {
@@ -624,6 +650,27 @@ export function updateCheckoutExit(scene: StoreScene, now: number): void {
 
 export function buildCheckoutExitPath(scene: StoreScene, stand: THREE.Vector3): THREE.CatmullRomCurve3 {
   const doorW = scene.storefrontSpec.doorWidth;
+  // Storefront-door entry (GH #110, the mom-and-pop building): there is no
+  // vestibule, no side door and no exit corridor — the vestibule waypoints
+  // below would swing the walker around a phantom airlock corner that sits
+  // OUTSIDE this little building's left wall (the camera visibly punched
+  // through the front glazing). One door, straight route: from the stand,
+  // angle left across the desk front, round the desk's left end past the
+  // waiting bag, then turn right and out the single leaf at the store's
+  // centreline. Offsets ride the bag's rest spot (desk-anchored) so the path
+  // tracks the desk wherever the entry geometry puts it.
+  if (scene.storefrontSpec.entryStyle === 'storefront-door') {
+    const b = scene.entrance?.bagBaseWorld;
+    const bx = b ? b.x : 9.1, bz = b ? b.z : scene.deskApexZ() + 0.8;
+    return new THREE.CatmullRomCurve3([
+      new THREE.Vector3(stand.x, 0, stand.z),
+      new THREE.Vector3(bx - 0.5, 0, bz - 3.5),  // angling left along the desk front
+      new THREE.Vector3(bx - 2.2, 0, bz - 1.5),  // rounding the desk's left corner (grab beat)
+      new THREE.Vector3(bx - 2.2, 0, bz + 1.3),  // past the desk end
+      new THREE.Vector3(bx + 0.1, 0, bz + 3.1),  // turning right toward the door
+      new THREE.Vector3(11.0, 0, 15.9),          // out the single front leaf
+    ], false, 'centripetal');
+  }
   const backZ = 15.0 - 2 * doorW;            // vestibule store-side wall
   const xL = 11.0 - (9.0 + 2 * doorW) / 2;   // vestibule left (-X, exit-side) wall
   const sideDoorZ = backZ + doorW / 2 + 0.4; // exiters' door in that wall

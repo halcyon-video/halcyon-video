@@ -34,6 +34,17 @@ export function registerStoreFormatSetting(): void {
     // See the header of store-format.ts.
     applyMode: 'reload',
     hint: 'The kind of store this is. Changes the floor plan, not just the finishes — reloads.',
-    subpage: 'Building & Storefront',
+    // Service knob since the owner's 2026-08-23 ruling: the couch-facing way
+    // to pick the format is the Store Theme cycle's "Mom & pop" entry
+    // (mutually exclusive with the era themes — see settings.ts). This row
+    // stays registered so the key is documented and service mode can still
+    // flip it directly; the onChange keeps bb_theme in lockstep so the two
+    // rows never disagree.
+    hidden: true,
+    onChange: (value) => {
+      if (typeof localStorage === 'undefined') return;
+      if (value === 'mom-and-pop') localStorage.setItem('bb_theme', 'mom-and-pop');
+      else if (localStorage.getItem('bb_theme') === 'mom-and-pop') localStorage.setItem('bb_theme', 'bb-1990');
+    },
   });
 }

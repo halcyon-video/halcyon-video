@@ -447,11 +447,24 @@ export function admitFixturePlacements(
     && (!noBand || !COUNTER_BAND_KINDS.has(p.kind)));
 }
 
-export function counterAnchoredPlacements(counterShape: CounterShape): FixturePlacement[] {
+export function counterAnchoredPlacements(
+  spec: { counterShape: CounterShape; doorWidth: number; entryStyle: 'vestibule' | 'storefront-door' },
+): FixturePlacement[] {
+  const counterShape = spec.counterShape;
   if (counterShape === 'desk') {
     // The mom-and-pop format's standalone counter (GH #33): a 6 ft wooden desk
-    // at x 8..14, z 4.3..5.9 (see entrance/counter.ts's `desk` branch — it is
-    // set 3 ft off the vestibule glass so there is room to stand behind it).
+    // set 3 ft off the entrance glass so there is room to stand behind it
+    // (see entrance/counter.ts's `desk` branch). Its z DEPENDS on the entry
+    // style: counter.ts anchors the desk off the entrance's store-side wall
+    // (backZ), which is the vestibule chamber's inner wall for a 'vestibule'
+    // format but the front glass line itself for 'storefront-door' (GH #110
+    // deleted the chamber). The old hardcoded z 5.1 here was the VESTIBULE
+    // answer — after #110 the real desk stood at z ≈ 11.1 while the tip jar
+    // and the validator footprint stayed six feet out on the open floor.
+    // Same derivation as counter.ts: zBackC = backZ − 0.1, desk back 3 ft
+    // further in, desk centre half the 1.6 ft island depth past that.
+    const backZ = 15.0 - (spec.entryStyle === 'vestibule' ? spec.doorWidth * 2 : 0);
+    const deskZ = backZ - 0.1 - 3.0 - 0.8;
     // There is no band and no queue rail, so the props that live ON a band —
     // the candy queue rack, the tape-cleaner clamshell display — have no
     // surface here and are simply not placed. That is the format's whole
@@ -460,18 +473,21 @@ export function counterAnchoredPlacements(counterShape: CounterShape): FixturePl
       {
         id: 'counter-desk',
         kind: 'structure-footprint',
-        position: { x: STORE_CENTER_X, z: 5.1 },
+        position: { x: STORE_CENTER_X, z: deskZ },
         yaw: 0,
         options: { footprintWidth: 6.0, footprintDepth: 1.6 }
       },
       {
         // Tip jar on the desk top (surfaceY 2.82 = innerH 2.7 + the 0.12 slab,
         // the island top — NOT the 3.54 band top, which this format has no
-        // band to provide). Parked at the +X end, clear of the single terminal
-        // at x 12.3 and of the bag's rest spot at x 9.1.
+        // band to provide). Parked in the desk's one clear stretch, between
+        // the bag's rest spot (x 9.1) and the terminal (x 12.3, whose CRT
+        // reaches ~11.7) — the old +X-end spot (13.5) sat jammed between the
+        // counter-TV bracket (x 13.2) and the desk end. This also puts it
+        // right where a customer through the door (cx 11) stands.
         id: 'tip-jar-counter',
         kind: 'tip-jar',
-        position: { x: 13.5, z: 5.1 },
+        position: { x: 10.05, z: deskZ },
         yaw: Math.PI, // card toward the customer side (-z)
         options: { surfaceY: 2.82 }
       },

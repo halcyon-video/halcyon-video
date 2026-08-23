@@ -49,6 +49,7 @@ import {
 // GH #84: a title knows which connected server shelved it, and every call
 // made ABOUT a title routes back to that one.
 import { connectionForTitle, findTitleByCarryId } from './media-sources';
+import { isMomAndPop } from './store-format';
 import {
   fetchComingSoonMovies,
   fetchDiscoverMovies,
@@ -223,7 +224,10 @@ function refreshStoreCatalog() {
   // This is the one override that SHOULD win without asking (that's what the
   // follow is for), so when it actually changes the era, say so — the store
   // looking different today needs a line explaining why.
-  if (loadMediaReleasePin()?.matchEra) {
+  // ...unless the store IS the mom-and-pop format (owner ruling 2026-08-23:
+  // that pick shares the Store Theme cycle, mutually exclusive with the eras)
+  // — the little shop keeps its own look whichever era the date falls in.
+  if (loadMediaReleasePin()?.matchEra && !isMomAndPop()) {
     const era = eraThemeIdForDate(cutoff, Object.keys(THEMES));
     if (era && resolveThemeId(getSetting<string>('bb_theme')) !== era) {
       setSetting('bb_theme', era);
@@ -1648,6 +1652,13 @@ function activateSetting(key: string, dir: number) {
 
   if (key === 'bb_theme') {
     applyThemeCssVars(getActiveTheme());
+    // The cycle's "Mom & pop" entry changes the STORE FORMAT, which only a
+    // full page load can apply (store-format.ts header) — so a pick that
+    // crosses the era/mom-and-pop line escalates the batched rebuild to a
+    // reload. The row's onChange keeps bb_store_format itself in lockstep.
+    if ((String(getSetting('bb_theme')) === 'mom-and-pop') !== isMomAndPop()) {
+      settingsPendingReload = true;
+    }
   }
 
   // Route the change by apply mode.

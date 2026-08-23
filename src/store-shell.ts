@@ -761,7 +761,16 @@ export function buildStore(scene: StoreScene) {
   // non-shadow-casting decoration, so without this the directional sun shone
   // straight through the "roof" and painted daylight across the whole floor —
   // interior sun patches must only come in through the storefront glass.
-  const roofGeo = new THREE.BoxGeometry(storeWidth + 4.0, 0.5, floorCeilLen + 4.0);
+  // The chain box hides its 2 ft eave behind a deep brick parapet. The little
+  // shop's false front (storefront-facade-shop.ts) is a thin stucco skin
+  // standing just 0.6 ft off the walls, so the same eave punched through it
+  // and hung over the door as a dark awning-like slab (owner hotfix
+  // 2026-08-23) — tuck the slab inside the parapet ring instead. 0.25 ft
+  // still laps every wall head, and the parapet skirts run floor-to-coping
+  // on all four sides, so nothing shows and no daylight leaks. (The sky-dome
+  // radius above keeps the fixed 2.0 ROOF_OVERHANG as a conservative bound.)
+  const roofOverhang = isShopFacade ? 0.25 : 2.0;
+  const roofGeo = new THREE.BoxGeometry(storeWidth + 2 * roofOverhang, 0.5, floorCeilLen + 2 * roofOverhang);
   const roofMat = new THREE.MeshStandardMaterial({ color: 0x35383c, roughness: 0.95 });
   const roof = new THREE.Mesh(roofGeo, roofMat);
   roof.position.set(STORE_CENTER_X, ceilingY + 0.6, sideWallZ);
@@ -2227,8 +2236,9 @@ export function buildStore(scene: StoreScene) {
     // up empty builds nothing.
     ...promoStandPlacements(scene.backWallZ),
     // Counter validator rects + counter-anchored props follow the active
-    // counter SHAPE (shield or usquare) — see counterAnchoredPlacements.
-    ...counterAnchoredPlacements(scene.storefrontSpec.counterShape),
+    // counter SHAPE — and, for the standalone desk, the ENTRY STYLE that
+    // decides where the desk stands (see counterAnchoredPlacements).
+    ...counterAnchoredPlacements(scene.storefrontSpec),
     ...(scene.gameMovies.length > 0 ? gameSectionPlacements(scene.getStoreWidth()) : []),
     // Staff-picks genre endcaps at aisle-run ends — computed above, before
     // the shelving build; present only when the watch-history engine

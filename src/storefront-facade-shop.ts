@@ -37,10 +37,14 @@ export function buildShopfrontFacade(params: ShopFacadeBuildParams): StorefrontF
   const leftEdgeX = CX - storeWidth / 2;
   const rightEdgeX = CX + storeWidth / 2;
 
-  // A short parapet — this format's own 9 ft ceiling doesn't want the chain's
-  // 4.6 ft rise above the glazing head, just enough to close the roofline.
+  // The parapet rises well past the interior ceiling (owner ruling
+  // 2026-08-23): at the old ceilingY + 1.8 the fascia was a 1.9 ft sliver and
+  // the wordmark sat jammed under the coping cap, half lost against the dark
+  // roof edge. A false front taller than the room behind it is exactly how
+  // these one-storey shops were really built — the extra height exists to
+  // give the hand-painted sign clear board above the door.
   const fasciaBot = WINDOW_HEAD_Y - 0.1;
-  const parapetTop = ceilingY + 1.8;
+  const parapetTop = ceilingY + 3.4;
   const fasciaH = parapetTop - fasciaBot;
   const fasciaCY = (fasciaBot + parapetTop) / 2;
 
@@ -139,9 +143,12 @@ export function buildShopfrontFacade(params: ShopFacadeBuildParams): StorefrontF
   // facade) so any brand LogoSpec that asks for freestanding 3D letters —
   // logo-storefront.ts reads anchor.gable/anchor.fascia interchangeably —
   // still resolves to sane geometry instead of dividing by a zero height. ────
+  // Deliberately SMALL (owner ruling 2026-08-23: "really tiny, right above
+  // the door") — a modest sign sitting low on the now-taller fascia board,
+  // directly over the door leaf, with clear stucco above it.
   const fasciaWidth = storeWidth + 0.6;
-  const logoHeight = Math.min(fasciaH * 0.62, 1.9);
-  const logoWidth = Math.min(fasciaWidth * 0.58, logoHeight * 1.8);
+  const logoHeight = Math.min(fasciaH * 0.34, 1.2);
+  const logoWidth = Math.min(fasciaWidth * 0.4, logoHeight * 1.8);
   const logoAnchor: FacadeLogoAnchor = {
     x: CX,
     // Empirically, not geometrically, centred: create3DDoubleLayeredSign's
