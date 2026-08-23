@@ -8,7 +8,7 @@ import { getActiveTheme } from '../themes';
 import { getActiveLogoSpec } from '../logo-spec';
 import { drawLogo } from '../logo-renderer';
 import { flatSignal } from './flat-lifecycle';
-import { resolveEpisodePlaybackArgs } from './flat-playback';
+import { resolveEpisodePlaybackArgs, resolveFlatDetailAction } from './flat-playback';
 
 let launchVideoPlaybackFn: ((movie: Movie, overrideItemId?: string, overridePath?: string) => Promise<void>) | null = null;
 
@@ -143,22 +143,11 @@ export function openDetailsOverlay(
   // Determine button text/state
   const isRequested = (movie.discovery || movie.collectionGap) &&
     (movie.discoveryRequested || isDiscoveryRequested(movie.tmdbId));
-  let playBtnText = 'Play';
-  let playBtnDisabled = '';
-  let playBtnIcon = '▶';
+  const action = resolveFlatDetailAction(movie, { isRequested });
+  const playBtnText = action.text;
+  const playBtnDisabled = action.disabled ? 'disabled' : '';
+  const playBtnIcon = action.icon;
 
-  if (movie.game) {
-    playBtnText = 'Rent';
-    playBtnIcon = '🎮';
-  } else if (movie.discovery || movie.collectionGap) {
-    playBtnText = isRequested ? (movie.collectionGap ? 'Coming Soon' : 'Requested') : 'Request';
-    playBtnIcon = isRequested ? '✓' : '✦';
-    playBtnDisabled = isRequested ? 'disabled' : '';
-  } else if (movie.comingSoon) {
-    playBtnText = 'Coming Soon';
-    playBtnIcon = '⏱';
-    playBtnDisabled = 'disabled';
-  }
 
   // The clamshell lip's small embossed brand mark: the ACTIVE emblem, painted
   // from the LogoSpec onto an offscreen canvas (one-shot — flat mode is DOM,
@@ -426,6 +415,19 @@ export function openDetailsOverlay(
       } else {
         logSystemMessage(`[System] Failed to request "${movie.title}" (Jellyseerr unreachable or rejected the request).`);
       }
+    } else if (movie.streaming) {
+      if (!movie.streamingUrl) {
+        logSystemMessage(`[System] "${movie.title}" has no streaming link.`);
+        return;
+      }
+      logSystemMessage(`[System] Opening ${movie.streamingServiceName || 'the streaming service'} for "${movie.title}"...`);
+      try {
+        window.open(movie.streamingUrl, '_blank', 'noopener');
+      } catch {
+        logSystemMessage(`[System] Couldn't open the link for "${movie.title}" (popup blocked?).`);
+      }
+      closeOverlay();
+
     } else {
       if (movie.isSeries) {
         if (episodesList.length > 0) {
@@ -436,6 +438,7 @@ export function openDetailsOverlay(
       }
     }
   });
+
 
   closeBtn.addEventListener('click', () => {
     closeOverlay();
