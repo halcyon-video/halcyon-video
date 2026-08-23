@@ -16,6 +16,7 @@ import {
   resolveActiveItemTiming,
   markWatchedAndFindNext,
   isMpvNaturalFinish,
+  playLocalWithMpv,
   type SeriesQueue,
 } from '../src/playback-flow.ts';
 
@@ -130,3 +131,136 @@ test('isMpvNaturalFinish: within tolerance of the known runtime counts as finish
   assert.equal(isMpvNaturalFinish(duration - 2 * TICKS_PER_SECOND, duration), true); // within tolerance
   assert.equal(isMpvNaturalFinish(duration - 30 * TICKS_PER_SECOND, duration), false); // an early quit
 });
+
+test('playLocalWithMpv: returns false when endpoint is unreachable', async () => {
+  const origFetch = globalThis.fetch;
+  try {
+    globalThis.fetch = async () => {
+      throw new Error('Connection refused');
+    };
+    const started = await playLocalWithMpv(
+      '/media/test.mkv',
+      'movie-1',
+      0,
+      1000,
+      {},
+      () => {},
+      () => {}
+    );
+    assert.equal(started, false);
+  } finally {
+    globalThis.fetch = origFetch;
+  }
+});
+
+test('playLocalWithMpv: routes playback reporting to active provider (Jellyfin vs Plex)', async () => {
+  const origFetch = globalThis.fetch;
+  const origLocalStorage = globalThis.localStorage;
+  const origSetInterval = globalThis.setInterval;
+  const origClearInterval = globalThis.clearInterval;
+
+  const store = new Map<string, string>();
+  (globalThis as any).localStorage = {
+    getItem: (k: string) => store.get(k) ?? null,
+    setItem: (k: string, v: string) => void store.set(k, String(v)),
+    removeItem: (k: string) => void store.delete(k),
+  };
+
+  store.set('jellyfin_url', 'http://media.local:8096');
+  store.set('jellyfin_token', 'test-token');
+
+  const requests: string[] = [];
+  const timerCallbacks: Array<() => Promise<void> | void> = [];
+  (globalThis as any).setInterval = (fn: any) => {
+    timerCallbacks.push(fn);
+    return 123 as any;
+  };
+  (globalThis as any).clearInterval = () => {};
+
+  try {
+    let mpvExited = false;
+    let mpvPosition = 10;
+    globalThis.fetch = async (input: RequestInfo | URL) => {
+      const url = String(input);
+      requests.push(url);
+      if (url === '/__play') {
+        return new Response(JSON.stringify({ id: 'mpv-1' }), { status: 200 });
+      }
+      if (url.startsWith('/__play?id=')) {
+        return new Response(JSON.stringify({ id: 'mpv-1', position: mpvPosition, exited: mpvExited }), { status: 200 });
+      }
+      return new Response(JSON.stringify({}), { status: 200 });
+    };
+
+    // Test under Jellyfin
+    store.set('provider_kind', 'jellyfin');
+    requests.length = 0;
+    timerCallbacks.length = 0;
+    mpvExited = false;
+    let exitedNaturally = false;
+    const startedJellyfin = await playLocalWithMpv(
+      '/media/test.mkv',
+      'item-1',
+      0,
+      100 * 10_000_000,
+      {},
+      (_ticks, natural) => { exitedNaturally = natural; },
+      () => {}
+    );
+    assert.equal(startedJellyfin, true);
+    assert(requests.some((r) => r.includes('/Sessions/Playing')), 'Jellyfin receives /Sessions/Playing on start');
+    assert(!requests.some((r) => r.includes('/:/progress')), 'Plex endpoint not called under Jellyfin');
+
+    // Poll progress under Jellyfin
+    requests.length = 0;
+    await timerCallbacks[0]();
+    assert(requests.some((r) => r.includes('/Sessions/Playing/Progress')), 'Jellyfin receives progress');
+
+    // Exit under Jellyfin
+    requests.length = 0;
+    mpvExited = true;
+    mpvPosition = 99; // finished naturally
+    await timerCallbacks[0]();
+    assert(requests.some((r) => r.includes('/Sessions/Playing/Stopped')), 'Jellyfin receives stop');
+    assert.equal(exitedNaturally, true);
+
+    // Test under Plex
+    store.set('provider_kind', 'plex');
+    requests.length = 0;
+    timerCallbacks.length = 0;
+    mpvExited = false;
+    mpvPosition = 20;
+    exitedNaturally = false;
+    const startedPlex = await playLocalWithMpv(
+      '/media/test.mkv',
+      'item-2',
+      0,
+      100 * 10_000_000,
+      {},
+      (_ticks, natural) => { exitedNaturally = natural; },
+      () => {}
+    );
+    assert.equal(startedPlex, true);
+    assert(!requests.some((r) => r.includes('/Sessions/Playing')), 'Jellyfin start endpoint not called under Plex');
+
+    // Poll progress under Plex
+    requests.length = 0;
+    await timerCallbacks[0]();
+    assert(requests.some((r) => r.includes('/:/progress') && r.includes('state=playing')), 'Plex receives progress ping');
+
+    // Exit naturally under Plex (>=90% for scrobble, within 3s for natural finish)
+    requests.length = 0;
+    mpvExited = true;
+    mpvPosition = 99;
+    await timerCallbacks[0]();
+    assert(requests.some((r) => r.includes('/:/scrobble')), 'Plex receives scrobble on natural finish');
+    assert.equal(exitedNaturally, true);
+  } finally {
+    globalThis.fetch = origFetch;
+    globalThis.localStorage = origLocalStorage;
+    globalThis.setInterval = origSetInterval;
+    globalThis.clearInterval = origClearInterval;
+  }
+});
+
+
