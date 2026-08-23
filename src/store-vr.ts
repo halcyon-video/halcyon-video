@@ -399,6 +399,7 @@ function cleanupAfterSession(scene: StoreScene, state: VRState): void {
   const x = state.rig.position.x;
   const z = state.rig.position.z;
   state.rig.remove(scene.camera);
+  if (scene.carried) scene.scene.add(scene.camera);
   scene.camera.position.set(x, VR_EYE_HEIGHT_FT, z);
   // WebXRManager overwrote fov/zoom from the eye projection for the
   // session's duration (see updateUserCamera in three's WebXRManager.js) —
