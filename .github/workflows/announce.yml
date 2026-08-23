@@ -1,13 +1,20 @@
-# Cuts a GitHub Release — grouped notes plus a rotating store screenshot —
-# and lands a matching CHANGELOG.md entry on master, with no human action,
-# every time a version tag is pushed.
+# Cuts a GitHub Release — grouped notes plus, where possible, a store
+# screenshot — and lands a matching CHANGELOG.md entry on master, with no
+# human action, every time a version tag is pushed.
 #
 # Why this exists (issue #104): tags ran to v0.8.1 while the newest Release
 # page still said v0.6.2 — Releases is the only subscribe button this project
 # has, and fourteen versions shipped past it silently. The notes come from
 # `tools/release-notes.mjs` (deterministic, offline, grouped from commit
 # history — see that file for the rules); this workflow's only job is to run
-# it, take a screenshot, and publish both.
+# it and publish.
+#
+# THE SCREENSHOT IS BEST-EFFORT ON PURPOSE. The shooter (tools/shot.mjs) and
+# the synthetic-library harness it drives are development scaffolding that is
+# deliberately not part of this repository, so a public checkout does not have
+# them. Every screenshot step below is therefore gated on the shooter actually
+# being present and can never fail the release: notes are the deliverable, the
+# picture is a bonus.
 name: Announce a release
 
 on:
@@ -36,9 +43,21 @@ jobs:
           node-version: 22
           cache: npm
 
-      # Unlike deploy-demo.yml, puppeteer's Chromium download is NOT skipped
-      # here — the screenshot step below needs a real browser.
-      - run: npm ci
+      - name: Is the screenshot harness in this checkout?
+        id: harness
+        run: |
+          if [ -f tools/shot.mjs ]; then
+            echo "present=1" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=0" >> "$GITHUB_OUTPUT"
+            echo "::notice::tools/shot.mjs not in this checkout — publishing notes without a screenshot"
+          fi
+
+      # Only needed by the screenshot path: release-notes.mjs is pure node
+      # stdlib, and puppeteer's Chromium download is the expensive part.
+      - name: Install dependencies
+        if: steps.harness.outputs.present == '1'
+        run: npm ci
 
       - name: Generate release notes + CHANGELOG.md entry
         run: |
@@ -47,16 +66,19 @@ jobs:
             --repo "${{ github.repository }}" \
             --changelog --release --out release-notes-body.md
 
-      # Standing brand rule this repo's docs point at: a committed screenshot
+      # Standing brand rule this repo's docs point at: a published screenshot
       # must come from a clone with no public/user-assets/ drop-ins. A fresh
-      # checkout of the public repo never has that directory — this just
-      # fails loudly instead of silently shipping a branded shot if that ever
-      # stops being true.
+      # checkout of the public repo never has that directory — this just skips
+      # the shot loudly instead of ever publishing a branded one.
       - name: Guard against user-assets before shooting
+        id: brandguard
+        if: steps.harness.outputs.present == '1'
         run: |
           if [ -d public/user-assets ]; then
-            echo "::error::public/user-assets present in CI checkout — refusing to screenshot" >&2
-            exit 1
+            echo "shoot=0" >> "$GITHUB_OUTPUT"
+            echo "::warning::public/user-assets present in CI checkout — skipping the screenshot"
+          else
+            echo "shoot=1" >> "$GITHUB_OUTPUT"
           fi
 
       # Rotates through a small table of framings so the Releases feed isn't
@@ -65,6 +87,7 @@ jobs:
       # table and wraps around — no state to store anywhere.
       - name: Pick this release's screenshot framing
         id: frame
+        if: steps.brandguard.outputs.shoot == '1'
         run: |
           FRAMES=(
             "--state browse"
@@ -80,6 +103,8 @@ jobs:
           echo "args=${FRAMES[$idx]}" >> "$GITHUB_OUTPUT"
 
       - name: Shoot the release screenshot
+        if: steps.brandguard.outputs.shoot == '1'
+        continue-on-error: true
         run: node tools/shot.mjs ${{ steps.frame.outputs.args }} --out release-shot.png
 
       - name: Commit the CHANGELOG.md entry to master
@@ -98,8 +123,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          # The screenshot is optional (see the header) — attach it only if a
+          # shot actually landed.
+          ASSETS=()
+          if [ -f release-shot.png ]; then ASSETS+=(release-shot.png); fi
           gh release create "${{ github.ref_name }}" \
             --repo "${{ github.repository }}" \
             --title "${{ github.ref_name }}" \
             --notes-file release-notes-body.md \
-            release-shot.png
+            "${ASSETS[@]}"
