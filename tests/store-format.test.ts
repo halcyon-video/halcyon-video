@@ -215,6 +215,33 @@ test('mom-and-pop admits no floor displays and no New Releases wall', () => {
   assert.equal(corporate.clerk, true);
 });
 
+test('a mom-and-pop ceiling is a ceiling', () => {
+  // GH #114. Everything the chain hangs over its sales floor, gone: the CRT
+  // rig, the mirrored cornice (and the bulb chase riding it), and the overhead
+  // wayfinding programme — per-aisle nav signs, the GAMES hanger, the hanging
+  // promo cards, the membership oval.
+  assert.equal(momAndPop.ceilingTvs, false);
+  assert.equal(momAndPop.ceilingMirror, false);
+  assert.equal(momAndPop.overheadSignage, false);
+  assert.equal(corporate.ceilingTvs, true);
+  assert.equal(corporate.ceilingMirror, true);
+  assert.equal(corporate.overheadSignage, true);
+
+  // The headroom argument all three share, stated as arithmetic so a future
+  // format cannot quietly re-admit them under a lid that has no room. The
+  // ceiling-nav slots hang their panel at a fixed y 9.75 (store-shell.ts
+  // ceilingSlots) and the shelf runs crown at unitFrameHeight, so a format
+  // wanting an overhead programme needs a ceiling clear of BOTH.
+  const CEILING_NAV_PANEL_Y = 9.75;
+  for (const f of [corporate, momAndPop]) {
+    if (!f.overheadSignage) continue;
+    assert.ok(f.ceilingY > CEILING_NAV_PANEL_Y,
+      `${f.id}: a nav panel at ${CEILING_NAV_PANEL_Y} ft is above a ${f.ceilingY} ft ceiling`);
+    assert.ok(f.ceilingY > f.unitFrameHeight,
+      `${f.id}: nothing can hang between ${f.unitFrameHeight} ft of shelving and a ${f.ceilingY} ft lid`);
+  }
+});
+
 test('the little counter is wide enough for what stands on it', () => {
   // entrance/counter.ts's `desk` branch is 6 ft wide (islandHalf 3.0) and
   // entrance/index.ts parks the single terminal at cx+1.3 and the bag at

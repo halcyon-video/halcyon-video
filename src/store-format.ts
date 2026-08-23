@@ -292,6 +292,35 @@ export interface StoreFormatSpec {
    */
   ceilingMirror: boolean;
   /**
+   * The chain's OVERHEAD WAYFINDING PROGRAMME — everything hung from the
+   * ceiling out over the sales floor. The genre/library nav sign centred over
+   * every shelving line ('ceiling-nav', store-shell.ts ceilingSlots, including
+   * the 1993 category wedges those slots build), the GAMES department hanger,
+   * the hanging promo cards ('ceiling-promo', e.g. INCREDIBLE VALUES over the
+   * bargain bin) and the 2012 MEMBERSHIP SERVICES oval
+   * (fixtures/membership-oval-hanger.ts).
+   *
+   * A chain hangs these because its shopper is thirty feet from the aisle they
+   * want and has to be aimed at it from across a room. Nobody needs aiming in a
+   * shop four aisles wide, and this format already answers the same question
+   * closer to the stock: `unitSections: 1` gives EVERY unit its own overhead
+   * signboard, so the run itself says what it holds (GH #114).
+   *
+   * It is also unbuildable here as authored. The slots hang their panel at a
+   * fixed y 9.75 under a `slot.ceilingY ?? 13.5` deck — numbers that belong to
+   * a 13.5 ft chain ceiling. In a 9 ft room that is the far side of the
+   * ceiling: the whole programme was being built into the roof void, paying for
+   * its textures, meshes and per-line genre tally to put nothing on screen.
+   * Lowering it instead is not an option — under a lid the shelving already
+   * reaches to within a foot of, there is no air left to hang anything in,
+   * which is the same headroom argument that decided `ceilingTvs`.
+   *
+   * What stays is the room: the tile deck, its troffers, the vents and
+   * sprinklers, the wall signs and the ceiling-mounted security camera the
+   * library-select vantage belongs to. A mom-and-pop ceiling is a ceiling.
+   */
+  overheadSignage: boolean;
+  /**
    * The chain's checkout FURNITURE: the RETURN TAPES HERE drop chute
    * (entrance/return-slot.ts), the register signage — BE KIND REWIND, the
    * rental-policy and membership snap frames, NEXT REGISTER PLEASE — and the
@@ -374,6 +403,7 @@ const CORPORATE: StoreFormatSpec = {
   ceilingTvs: true,
   curtainedSection: false,
   ceilingMirror: true,
+  overheadSignage: true,
   counterDressing: true,
 };
 
@@ -465,6 +495,7 @@ const MOM_AND_POP: StoreFormatSpec = {
   ceilingTvs: false,
   curtainedSection: true,
   ceilingMirror: false,
+  overheadSignage: false,
   counterDressing: false,
 };
 

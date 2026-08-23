@@ -2501,38 +2501,47 @@ export function buildStore(scene: StoreScene) {
     return bestLabel;
   };
 
-  const lineIds = Array.from(new Set(scene.plan.shelvingUnits.map(u => u.lineId)));
   // Each hanging sign turns its broad face toward the middle of the checkout
   // counter (centreline x=11, z=deskApexZ) so a customer standing at the
   // register reads every aisle sign head-on.
   const counterMidZ = scene.deskApexZ();
-  const ceilingSlots: SignSlot[] = lineIds.map(lineId => {
-    const lineUnits = scene.plan.shelvingUnits.filter(u => u.lineId === lineId);
-    const xCenterAvg = lineUnits.reduce((sum, u) => sum + u.xCenter, 0) / lineUnits.length;
-    const zCenterAvg = lineUnits.reduce((sum, u) => sum + scene.plan.aisleZCenter(u), 0) / lineUnits.length;
-    const genreName = getLineGenreName(lineId);
-    return {
-      id: `ceiling-nav-line-${lineId}`,
-      category: 'ceiling-nav',
-      pos: new THREE.Vector3(xCenterAvg, 9.75, zCenterAvg),
-      yaw: Math.atan2(STORE_CENTER_X - xCenterAvg, counterMidZ - zCenterAvg),
-      genreName
-    };
-  });
-  // GAMES wedge (owner, 2026-08-09): the games department gets its own
-  // ceiling-nav hanger, centered over the game-section units (slotted
-  // fixtures are installed earlier in this same build pass).
-  const gameUnits = scene.slottedFixtures.filter(f => f.placement?.id?.startsWith('game-section'));
-  if (gameUnits.length) {
-    const gx = gameUnits.reduce((s, f) => s + f.placement.position.x, 0) / gameUnits.length;
-    const gz = gameUnits.reduce((s, f) => s + f.placement.position.z, 0) / gameUnits.length;
-    ceilingSlots.push({
-      id: 'ceiling-nav-games-dept',
-      category: 'ceiling-nav',
-      pos: new THREE.Vector3(gx, 9.75, gz),
-      yaw: Math.atan2(STORE_CENTER_X - gx, counterMidZ - gz),
-      genreName: 'GAMES'
+  // ...on the formats that hang an overhead wayfinding programme at all
+  // (StoreFormatSpec.overheadSignage). The panel y and its `?? 13.5` deck are
+  // chain-ceiling numbers, so under a 9 ft lid the whole programme built into
+  // the roof void — and a shop four aisles wide has its unit signboards to say
+  // what each run holds (GH #114). Empty list: nothing to place, nothing to
+  // tally, no genre pass over the shelving lines.
+  const ceilingSlots: SignSlot[] = [];
+  if (activeStoreFormat().overheadSignage) {
+    const lineIds = Array.from(new Set(scene.plan.shelvingUnits.map(u => u.lineId)));
+    lineIds.forEach(lineId => {
+      const lineUnits = scene.plan.shelvingUnits.filter(u => u.lineId === lineId);
+      const xCenterAvg = lineUnits.reduce((sum, u) => sum + u.xCenter, 0) / lineUnits.length;
+      const zCenterAvg = lineUnits.reduce((sum, u) => sum + scene.plan.aisleZCenter(u), 0) / lineUnits.length;
+      const genreName = getLineGenreName(lineId);
+      ceilingSlots.push({
+        id: `ceiling-nav-line-${lineId}`,
+        category: 'ceiling-nav',
+        pos: new THREE.Vector3(xCenterAvg, 9.75, zCenterAvg),
+        yaw: Math.atan2(STORE_CENTER_X - xCenterAvg, counterMidZ - zCenterAvg),
+        genreName
+      });
     });
+    // GAMES wedge (owner, 2026-08-09): the games department gets its own
+    // ceiling-nav hanger, centered over the game-section units (slotted
+    // fixtures are installed earlier in this same build pass).
+    const gameUnits = scene.slottedFixtures.filter(f => f.placement?.id?.startsWith('game-section'));
+    if (gameUnits.length) {
+      const gx = gameUnits.reduce((s, f) => s + f.placement.position.x, 0) / gameUnits.length;
+      const gz = gameUnits.reduce((s, f) => s + f.placement.position.z, 0) / gameUnits.length;
+      ceilingSlots.push({
+        id: 'ceiling-nav-games-dept',
+        category: 'ceiling-nav',
+        pos: new THREE.Vector3(gx, 9.75, gz),
+        yaw: Math.atan2(STORE_CENTER_X - gx, counterMidZ - gz),
+        genreName: 'GAMES'
+      });
+    }
   }
 
   const signageSlots: SignSlot[] = [
@@ -2594,6 +2603,11 @@ export function buildStore(scene: StoreScene) {
     // config placement. Under the cash-wrap soffit the wires shorten to the
     // dropped lid instead of stabbing through it.
     ...(() => {
+      // Same overhead-programme gate as the ceiling-nav slots above (GH #114).
+      // Belt and braces today — the bin is a floor display, so a format with no
+      // overhead signage has none of those either — but the two are separate
+      // questions and a future format may answer them differently.
+      if (!activeStoreFormat().overheadSignage) return [] as SignSlot[];
       const bin = fixtureFootprints.find(f => f.label.startsWith('fixture:bargain-bin'));
       if (!bin) return [] as SignSlot[];
       const underSoffit = pointInSoffit(bin.cx, bin.cz, soffitPoly);
@@ -2642,9 +2656,16 @@ export function buildStore(scene: StoreScene) {
     pointInSoffit(px, pz, soffitPoly) ? frontSoffitY(ceilingY) : ceilingY);
 
   // 2012 MEMBERSHIP SERVICES die-cut oval over the checkout counter (see
-  // fixtures/membership-oval-hanger.ts) — same soffit-aware hang height.
-  buildMembershipOvalHanger(scene, (px, pz) =>
-    pointInSoffit(px, pz, soffitPoly) ? frontSoffitY(ceilingY) : ceilingY);
+  // fixtures/membership-oval-hanger.ts) — same soffit-aware hang height, and
+  // the same overhead-programme gate as the ceiling-nav signs: a corporate
+  // membership kit on two monofilaments is the definition of chain overhead
+  // furniture (GH #114). The security camera just above is NOT gated: a camera
+  // bolted to the ceiling is store hardware rather than dressing, and the
+  // library-select vantage is borrowed from it.
+  if (activeStoreFormat().overheadSignage) {
+    buildMembershipOvalHanger(scene, (px, pz) =>
+      pointInSoffit(px, pz, soffitPoly) ? frontSoffitY(ceilingY) : ceilingY);
+  }
 
   // (The 2006 MOVIES IN THE MIDDLE / 99c two-tier hanger was wired over the
   // centre walkway here on 2026-08-02 and UNWIRED the same day: the owner saw
