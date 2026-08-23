@@ -202,20 +202,30 @@ async function channelMastodon(opts, ann) {
   let mediaIds = [];
   const shot = readScreenshot(opts);
   if (shot) {
-    const form = new FormData();
-    form.append('file', new Blob([shot.bytes], { type: shot.mime }), shot.name);
-    form.append('description', `${ann.title} screenshot`);
-    const res = await assertOk(await fetch(`${base}/api/v2/media`, { method: 'POST', headers: auth, body: form }), 'mastodon media upload');
-    const media = await res.json();
-    // Images process synchronously and come back with `url` set; video/gifv
-    // would come back 202 with `url: null` until processed. Poll a few times
-    // regardless — cheap, and covers instances that behave differently.
-    for (let i = 0; i < 5 && !media.url; i++) {
-      await new Promise((r) => setTimeout(r, 1000));
-      const poll = await fetch(`${base}/api/v1/media/${media.id}`, { headers: auth });
-      if (poll.ok) Object.assign(media, await poll.json());
+    // The image is attempted, never required. A token missing write:media
+    // 403s here, and letting that throw would lose the ANNOUNCEMENT over a
+    // picture — the channel's own try/catch would swallow the whole post.
+    // Attested: the first Mastodon app cut for this project was scoped
+    // write:mutes + write:statuses by a mis-tick, so uploads failed while
+    // posting worked perfectly.
+    try {
+      const form = new FormData();
+      form.append('file', new Blob([shot.bytes], { type: shot.mime }), shot.name);
+      form.append('description', `${ann.title} screenshot`);
+      const res = await assertOk(await fetch(`${base}/api/v2/media`, { method: 'POST', headers: auth, body: form }), 'mastodon media upload');
+      const media = await res.json();
+      // Images process synchronously and come back with `url` set; video/gifv
+      // would come back 202 with `url: null` until processed. Poll a few times
+      // regardless — cheap, and covers instances that behave differently.
+      for (let i = 0; i < 5 && !media.url; i++) {
+        await new Promise((r) => setTimeout(r, 1000));
+        const poll = await fetch(`${base}/api/v1/media/${media.id}`, { headers: auth });
+        if (poll.ok) Object.assign(media, await poll.json());
+      }
+      mediaIds = [media.id];
+    } catch (err) {
+      console.log(`::warning::announce-fanout: Mastodon image upload failed (${err.message}) — posting without it. If this says "outside the authorized scopes", the token needs write:media.`);
     }
-    mediaIds = [media.id];
   }
   const status = composeText(500, ann);
   await assertOk(await fetch(`${base}/api/v1/statuses`, {
