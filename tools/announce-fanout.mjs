@@ -154,7 +154,10 @@ function tagMessageBlurb(tag) {
   const parts = text.split(/\n\s*\n/).map((s) => s.trim()).filter(Boolean);
   const titleish = /^(halcyon video\s+)?v?\d+\.\d+\.\d+\s*[—–-]?/i;
   if (parts.length > 1 && titleish.test(parts[0])) parts.shift();
-  text = parts.join(' ').replace(titleish, '').trim();
+  // A kept first line is usually the commit-subject title, which rarely ends
+  // in sentence punctuation — join it as its own sentence rather than running
+  // it into the next paragraph with a bare space.
+  text = parts.map((p) => (/[.!?]$/.test(p) ? p : `${p}.`)).join(' ').replace(titleish, '').trim();
   text = text.replace(/\s*\n\s*/g, ' ').replace(/\s{2,}/g, ' ');
   if (!text) return null;
   // Shaving the "v0.9.0 —" prefix usually leaves a lowercase word mid-sentence.
@@ -185,6 +188,14 @@ function truncate(text, maxLen) {
   return `${text.slice(0, Math.max(0, maxLen - 1)).trimEnd()}…`;
 }
 
+// Split on whitespace that immediately FOLLOWS a terminator — never on a
+// terminator alone. A version number or a "z 5.1" coordinate has a period
+// with no space after it, so it never counts as a boundary; requiring the
+// space is what tells those apart from a real sentence end.
+function splitSentences(text) {
+  return text.split(/(?<=[.!?])\s+/).filter(Boolean);
+}
+
 /**
  * Fit prose to a limit by dropping WHOLE SENTENCES from the end. A release
  * blurb long enough for Discord gets guillotined mid-word on Bluesky and X
@@ -195,15 +206,13 @@ function truncate(text, maxLen) {
  */
 function fitSentences(text, maxLen) {
   if (text.length <= maxLen) return text;
-  const sentences = text.match(/[^.!?]+[.!?]+(\s|$)/g);
-  if (!sentences) return truncate(text, maxLen);
+  const sentences = splitSentences(text);
   let out = '';
   for (const sentence of sentences) {
-    const next = (out + sentence).trimEnd();
+    const next = out ? `${out} ${sentence}` : sentence;
     if (next.length > maxLen) break;
-    out = next + ' ';
+    out = next;
   }
-  out = out.trim();
   return out || truncate(text, maxLen);
 }
 
@@ -273,11 +282,18 @@ function readScreenshot(opts) {
 
 // ---- channels ---------------------------------------------------------------
 
+// Discord renders an embed description in full — no client-side clamp like a
+// tweet's card — so an unbounded blurb (the tag-message fallback can run to
+// several paragraphs of dev-notes prose) posts as a wall of text nobody
+// scans. Same fitSentences budget Mastodon already applies via composeText,
+// just sized for an embed instead of a status.
+const DISCORD_BLURB_MAX = 350;
+
 async function channelDiscord(opts, ann) {
   const creds = requireEnv('DISCORD_WEBHOOK_URL');
   if (!creds) return;
   const shot = readScreenshot(opts);
-  const embed = { title: ann.title, description: `${ann.blurb}\n\n${ann.url}`, color: 0x2b6cb0 };
+  const embed = { title: ann.title, description: `${fitSentences(ann.blurb, DISCORD_BLURB_MAX)}\n\n${ann.url}`, color: 0x2b6cb0 };
   const form = new FormData();
   if (shot) {
     embed.image = { url: `attachment://${shot.name}` };
@@ -505,8 +521,11 @@ function channelPreview(opts, ann) {
   console.log(`image:  ${opts.screenshot || '(none)'}`);
   console.log(`\nblurb:\n${ann.blurb}\n`);
   for (const [name, limit] of [['discord', 4096], ['mastodon', 500], ['bluesky', 300], ['x', 280]]) {
+    // Mirror each channel's real formatting exactly, or a clean preview can
+    // hide a wall-of-text post that only shows up once it's already live —
+    // which is what happened to v0.9.1's Discord embed.
     const text = name === 'discord'
-      ? `${ann.title}\n\n${ann.blurb}\n\n${ann.url}`
+      ? `${ann.title}\n\n${fitSentences(ann.blurb, DISCORD_BLURB_MAX)}\n\n${ann.url}`
       : composeText(limit, ann, IDENTITY);
     console.log(`--- ${name} (${text.length}/${limit}) ---\n${text}\n`);
   }
