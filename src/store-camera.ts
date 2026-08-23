@@ -8,6 +8,7 @@ import * as THREE from 'three';
 import { CASE_WIDTH, CASE_HEIGHT } from './video-case';
 import { FIELD_Z_FRONT, BROWSE_WINDOW_SIZE, AISLE_SHELF_HEIGHTS, WALL_SHELF_HEIGHTS, BOX_SPACING, UNIT_FRAME_HEIGHT, unitDepthAtHeight, BACK_WALL_UNIT_IDX, extraCopiesCount, MovieSlot, STORE_CENTER_X } from './store-layout';
 import { getActiveTheme } from './themes';
+import { activeStoreFormat } from './store-format';
 import { OVERVIEW_POS, OVERVIEW_PITCH_MIN, OVERVIEW_PITCH_MAX, INSPECT_FAN_X, INSPECT_CASE_Z, INSPECT_FIT_MARGIN } from './scene-shared';
 import { BB_ARCHIVO_BLACK } from './bundled-fonts';
 import { getActiveLogoSpec } from './logo-spec';
@@ -314,13 +315,18 @@ export function updateCameraTarget(scene: StoreScene) {
       
       const xCenterVal = activeUnit ? activeUnit.xCenter : STORE_CENTER_X;
       
-      // Backed up distance of 3.8 feet from active shelf side. The browse-front
-      // side's local-X direction is the unit's stored browseSign, so the camera
-      // approaches from that same side.
+      // Backed off the active shelf face by the FORMAT's browse stand-off (3.8 ft
+      // on the corporate box). The browse-front side's local-X direction is the
+      // unit's stored browseSign, so the camera approaches from that same side.
+      //
+      // Format-driven because the stand-off has to fit inside the AISLE: back a
+      // camera 3.8 ft off a shelf face in a 4 ft aisle and it ends up standing
+      // inside the run opposite. See StoreFormatSpec.browseStandoff, which
+      // tests/store-format.test.ts checks against the run pitch.
       const isBack = scene.selectedSide === 'back';
       const dir = (isBack ? -1 : 1) * (activeUnit ? activeUnit.browseSign : 1);
       const shelfDepthAtHeight = unitDepthAtHeight(shelfY);
-      const cameraX = xCenterVal + dir * (shelfDepthAtHeight / 2 + 3.8);
+      const cameraX = xCenterVal + dir * (shelfDepthAtHeight / 2 + activeStoreFormat().browseStandoff);
 
       // Straight view, no Z offset (computed in layout space, then rotated to
       // follow this unit's arrangement yaw).

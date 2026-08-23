@@ -21,6 +21,7 @@
 // materials flip back to normal depth testing so it occludes naturally in
 // the world.
 import * as THREE from 'three';
+import { carryIdFor } from './media-sources';
 import type { Movie } from './jellyfin';
 import {
   CASE_MEDIUM,
@@ -159,8 +160,19 @@ export class CarriedTapes {
     this._capacity = Math.max(1, Math.min(MAX_CARRY_CAPACITY, capacity));
   }
 
+  /** Bare item ids — for slot lookups and anything server-facing. */
   ids(): string[] {
     return this.entries.map((e) => e.movie.id);
+  }
+
+  /**
+   * Ids that survive a round trip through localStorage or an event (GH #84):
+   * each carries the server its title came from, because item ids collide
+   * across servers and a bare one resolves to whichever library is searched
+   * first. Single-source stores emit exactly what they always did.
+   */
+  carryIds(): string[] {
+    return this.entries.map((e) => carryIdFor(e.movie));
   }
 
   topMovie(): Movie | null {

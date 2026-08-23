@@ -1,5 +1,6 @@
 import type { Movie, Episode } from '../jellyfin';
-import { activeProvider, sessionOf } from '../providers/active-provider';
+import { activeProvider, providerForKind, sessionOf } from '../providers/active-provider';
+import { connectionForTitle } from '../media-sources';
 import { launchGame } from '../romm';
 import { retailAudio } from '../audio';
 import { requestMovie, isDiscoveryRequested } from '../jellyseerr';
@@ -53,7 +54,13 @@ function logSystemMessage(message: string): void {
  * dead on Plex installs (GH #66). Token plus address is the whole test; the
  * provider decides for itself whether it needs a user id.
  */
-function storedConnection(): { server: string; session: ReturnType<typeof sessionOf> } | null {
+function storedConnection(
+  title?: { sourceId?: string } | null
+): { server: string; session: ReturnType<typeof sessionOf>; kind?: string } | null {
+  // The server THIS title came from (GH #84); the primary when it carries no
+  // source, which covers the demo catalog and every pre-#84 install.
+  const conn = connectionForTitle(title);
+  if (conn) return { server: conn.url, session: conn.session, kind: conn.source.kind };
   const server = localStorage.getItem('jellyfin_url') || '';
   const token = localStorage.getItem('jellyfin_token') || '';
   if (!server || !token) return null;
@@ -452,9 +459,10 @@ export function openDetailsOverlay(
     // function so an unresolvable provider kind rejects into the catch below
     // rather than throwing out of the overlay build.
     const loadEpisodes = async (): Promise<Episode[]> => {
-      const conn = storedConnection();
+      const conn = storedConnection(movie);
       if (!conn) return [];
-      return activeProvider().fetchSeriesEpisodes(conn.server, conn.session, movie.id);
+      return providerForKind(conn.kind ?? activeProvider().id)
+        .fetchSeriesEpisodes(conn.server, conn.session, movie.id);
     };
 
     loadEpisodes()

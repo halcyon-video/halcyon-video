@@ -1,0 +1,277 @@
+# Cuts a GitHub Release — grouped notes plus, where possible, a store
+# screenshot — and lands a matching CHANGELOG.md entry on master, with no
+# human action, every time a version tag is pushed. Once the Release exists,
+# fans the same artifact (a short blurb + the screenshot + the demo link) out
+# to Discord, Mastodon, Bluesky and X, and drops a Reddit-ready draft on the
+# Release as a plain file — never auto-posted, see issue #105.
+#
+# Why this exists (issue #104): tags ran to v0.8.1 while the newest Release
+# page still said v0.6.2 — Releases is the only subscribe button this project
+# has, and fourteen versions shipped past it silently. The notes come from
+# `tools/release-notes.mjs` (deterministic, offline, grouped from commit
+# history — see that file for the rules); this workflow's only job is to run
+# it and publish.
+#
+# THE SCREENSHOT IS BEST-EFFORT ON PURPOSE. The shooter (tools/shot.mjs) and
+# the synthetic-library harness it drives are development scaffolding that is
+# deliberately not part of this repository, so a public checkout does not have
+# them. Every screenshot step below is therefore gated on the shooter actually
+# being present and can never fail the release: notes are the deliverable, the
+# picture is a bonus.
+#
+# EACH FAN-OUT CHANNEL FAILS SOFT (issue #105): every announce-fanout.mjs step
+# below runs with continue-on-error so a dead Discord webhook, an expired
+# Mastodon token, or a rotated X refresh token never blocks the others or the
+# release itself. A channel with no secret configured just no-ops — see that
+# script's header for the full contract. Reddit is drafted, never posted.
+name: Announce a release
+
+on:
+  push:
+    tags: ["v*.*.*"]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: announce-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  announce:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # release-notes.mjs walks the tag list and diffs `<prev-tag>..<tag>`,
+          # so it needs the whole history, not the default single commit.
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Is the screenshot harness in this checkout?
+        id: harness
+        run: |
+          if [ -f tools/shot.mjs ]; then
+            echo "present=1" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=0" >> "$GITHUB_OUTPUT"
+            echo "::notice::tools/shot.mjs not in this checkout — publishing notes without a screenshot"
+          fi
+
+      # Only needed by the screenshot path: release-notes.mjs is pure node
+      # stdlib, and puppeteer's Chromium download is the expensive part.
+      - name: Install dependencies
+        if: steps.harness.outputs.present == '1'
+        run: npm ci
+
+      - name: Generate release notes + CHANGELOG.md entry
+        run: |
+          node tools/release-notes.mjs \
+            --to "${{ github.ref_name }}" \
+            --repo "${{ github.repository }}" \
+            --changelog --release --out release-notes-body.md
+
+      # Standing brand rule this repo's docs point at: a published screenshot
+      # must come from a clone with no public/user-assets/ drop-ins. A fresh
+      # checkout of the public repo never has that directory — this just skips
+      # the shot loudly instead of ever publishing a branded one.
+      - name: Guard against user-assets before shooting
+        id: brandguard
+        if: steps.harness.outputs.present == '1'
+        run: |
+          if [ -d public/user-assets ]; then
+            echo "shoot=0" >> "$GITHUB_OUTPUT"
+            echo "::warning::public/user-assets present in CI checkout — skipping the screenshot"
+          else
+            echo "shoot=1" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Rotates through a small table of framings so the Releases feed isn't
+      # the same picture fourteen times. Index = how many version tags exist
+      # at this point, so each new release advances one step through the
+      # table and wraps around — no state to store anywhere.
+      - name: Pick this release's screenshot framing
+        id: frame
+        if: steps.brandguard.outputs.shoot == '1'
+        run: |
+          FRAMES=(
+            "--state browse"
+            "--state nrbrowse"
+            "--full --lib 400 --series 0 --state promo --yaw 1"
+            "--full --lib 400 --series 0 --state endcap"
+            "--state clerk"
+            "--state backroom"
+            "--fly 1 --walk 11,110,0,3,16"
+          )
+          count=$(git tag --list 'v*' | wc -l)
+          idx=$(( (count - 1) % ${#FRAMES[@]} ))
+          echo "args=${FRAMES[$idx]}" >> "$GITHUB_OUTPUT"
+
+      - name: Shoot the release screenshot
+        if: steps.brandguard.outputs.shoot == '1'
+        continue-on-error: true
+        run: node tools/shot.mjs ${{ steps.frame.outputs.args }} --out release-shot.png
+
+      # The shooter above only exists in the maintainer's working clone, so in
+      # a public CI checkout EVERY announcement would go out as bare text —
+      # and this project's entire argument is that it looks like the thing it
+      # describes. Fall back to the brand-free stills the repo already ships.
+      # Those were deliberately shot from a clone with no public/user-assets/
+      # drop-ins (see the repo's screenshot rule), which is why they are safe
+      # to publish; the brand guard above does not need to re-run on them.
+      # Rotation matches the framing table: index = number of version tags, so
+      # each release advances one step and wraps — no state stored anywhere.
+      - name: Resolve the announcement image
+        id: shot
+        continue-on-error: true
+        run: |
+          # 1. The picture chosen FOR THIS RELEASE, committed before the tag.
+          # A generic photo of the store does not sell the thing that just
+          # shipped: if a release adds VR walk mode, the post has to show VR
+          # walk mode or the post is not doing its job. The shooter only
+          # exists in the maintainer's clone, so the shot is taken there and
+          # committed as docs/releases/<tag>.jpg — see that directory's
+          # README. This is the path that should be taken every time.
+          for cand in "docs/releases/${{ github.ref_name }}.jpg" \
+                      "docs/releases/${{ github.ref_name }}.png"; do
+            if [ -f "$cand" ]; then
+              echo "path=$cand" >> "$GITHUB_OUTPUT"
+              echo "::notice::announcing with this release's own screenshot ($cand)"
+              exit 0
+            fi
+          done
+          echo "::warning::no docs/releases/${{ github.ref_name }} screenshot — this release will be announced with a generic picture of the store, which shows nothing about what shipped"
+
+          # 2. A live shot, if this checkout happens to carry the harness.
+          if [ -f release-shot.png ]; then
+            echo "path=release-shot.png" >> "$GITHUB_OUTPUT"
+            echo "::notice::announcing with the live screenshot"
+            exit 0
+          fi
+          # 3. Last resort: a wide hero view of the store.
+          # Wide hero views ONLY. Deliberately excluded: the 2D/flat-mode
+          # shots, settings and terminal UI, and close detail crops — all of
+          # them read as a screenshot of software rather than a picture of a
+          # store, which is the opposite of the point at social-post size.
+          SHOTS=(
+            docs/screenshots/facade-sunset.jpg
+            docs/screenshots/overview.jpg
+            docs/screenshots/browse-aisle.jpg
+            docs/screenshots/new-releases.jpg
+            docs/screenshots/walk-mode.jpg
+            docs/screenshots/clerk.jpg
+            docs/screenshots/checkout-ritual.jpg
+            docs/screenshots/back-room.jpg
+            docs/screenshots/games-department.jpg
+            docs/screenshots/facade-night.jpg
+          )
+          count=$(git tag --list 'v*' | wc -l)
+          idx=$(( (count - 1) % ${#SHOTS[@]} ))
+          pick="${SHOTS[$idx]}"
+          if [ -f "$pick" ]; then
+            cp "$pick" release-shot.jpg
+            echo "path=release-shot.jpg" >> "$GITHUB_OUTPUT"
+            echo "::notice::no live screenshot — announcing with $pick"
+          else
+            echo "path=" >> "$GITHUB_OUTPUT"
+            echo "::warning::no screenshot available — announcements will be text-only"
+          fi
+
+      - name: Commit the CHANGELOG.md entry to master
+        run: |
+          if git diff --quiet -- CHANGELOG.md; then
+            echo "CHANGELOG.md unchanged (entry already present), nothing to commit"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add CHANGELOG.md
+          git commit -m "CHANGELOG: ${{ github.ref_name }}"
+          git push origin HEAD:master
+
+      - name: Cut the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # The screenshot is optional (see the header) — attach it only if a
+          # shot actually landed.
+          ASSETS=()
+          if [ -f release-shot.png ]; then ASSETS+=(release-shot.png); fi
+          gh release create "${{ github.ref_name }}" \
+            --repo "${{ github.repository }}" \
+            --title "${{ github.ref_name }}" \
+            --notes-file release-notes-body.md \
+            "${ASSETS[@]}"
+
+      # ---- fan-out (issue #105) ------------------------------------------
+      # Everything below only runs once the Release above actually exists,
+      # and every step is independently soft-failing — see the file header.
+
+      - name: Write the Reddit draft
+        continue-on-error: true
+        run: |
+          node tools/announce-fanout.mjs reddit-draft \
+            --tag "${{ github.ref_name }}" \
+            --repo "${{ github.repository }}" \
+            --out reddit-draft.md
+
+      - name: Attach the Reddit draft to the Release
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ -f reddit-draft.md ]; then
+            gh release upload "${{ github.ref_name }}" reddit-draft.md --repo "${{ github.repository }}"
+          fi
+
+      - name: Announce → Discord
+        continue-on-error: true
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          node tools/announce-fanout.mjs discord \
+            --tag "${{ github.ref_name }}" \
+            --screenshot "${{ steps.shot.outputs.path }}" \
+            --repo "${{ github.repository }}"
+
+      - name: Announce → Mastodon
+        continue-on-error: true
+        env:
+          MASTODON_INSTANCE: ${{ secrets.MASTODON_INSTANCE }}
+          MASTODON_TOKEN: ${{ secrets.MASTODON_TOKEN }}
+        run: |
+          node tools/announce-fanout.mjs mastodon \
+            --tag "${{ github.ref_name }}" \
+            --screenshot "${{ steps.shot.outputs.path }}" \
+            --repo "${{ github.repository }}"
+
+      - name: Announce → Bluesky
+        continue-on-error: true
+        env:
+          BLUESKY_HANDLE: ${{ secrets.BLUESKY_HANDLE }}
+          BLUESKY_APP_PASSWORD: ${{ secrets.BLUESKY_APP_PASSWORD }}
+        run: |
+          node tools/announce-fanout.mjs bluesky \
+            --tag "${{ github.ref_name }}" \
+            --screenshot "${{ steps.shot.outputs.path }}" \
+            --repo "${{ github.repository }}"
+
+      # Pay-per-use (~$0.20/post with a link) — needs a billing account with
+      # a monthly cap set on the developer account. Write-only: this never
+      # reads mentions or a timeline, which is the part that's billed by
+      # volume. See issue #105 for the cost accounting.
+      - name: Announce → X
+        continue-on-error: true
+        env:
+          X_CLIENT_ID: ${{ secrets.X_CLIENT_ID }}
+          X_CLIENT_SECRET: ${{ secrets.X_CLIENT_SECRET }}
+          X_REFRESH_TOKEN: ${{ secrets.X_REFRESH_TOKEN }}
+        run: |
+          node tools/announce-fanout.mjs x \
+            --tag "${{ github.ref_name }}" \
+            --screenshot "${{ steps.shot.outputs.path }}" \
+            --repo "${{ github.repository }}"

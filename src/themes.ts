@@ -21,9 +21,10 @@ export interface StoreTheme {
   shelfStyleId: string;
   // The shelf-run genre topper style for this era (see TopperStyle above).
   topperStyle: TopperStyle;
-  // When set, this era's period store-dressing pack is ON by default (no
-  // bb_93_signage toggle needed). '1993' = fascia blades + counter/storefront/
-  // security props + ribbon ceiling panels. Absent = classic dressing.
+  // When set, this era wears its period store-dressing pack — the era IS the
+  // switch, there is no separate row (issue #113). '1993' = fascia blades +
+  // counter/storefront/security props + ribbon ceiling panels. Absent =
+  // classic dressing.
   dressingEra?: '1993';
   palette: {
     primary: string;
@@ -176,8 +177,8 @@ export const THEMES: Record<string, StoreTheme> = {
 // combined "bb-90s" theme and "bb-2000s" became "bb-2010". Old saved bb_theme
 // values, harness `--theme` flags, screenshots, memories and CLAUDE.md commands
 // all still name the retired ids — resolve them so nothing breaks. bb-90s maps
-// to the classic 1990 look (the fascia-blade look it used to reach via
-// bb_93_signage is now its own bb-1993 theme).
+// to the classic 1990 look (the fascia-blade look it used to reach via the
+// retired "1993 Store Dressing" row is now its own bb-1993 theme).
 export const THEME_ALIASES: Record<string, string> = {
   'bb-90s': 'bb-1990',
   'bb-2000s': 'bb-2010',

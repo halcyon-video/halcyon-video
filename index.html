@@ -164,6 +164,13 @@
         </div>
       </div>
 
+      <!-- Emblem Studio (#111) — the logo composer's own wide surface, opened
+           from the Store Brand page's Emblem Editor row. It is NOT here: unlike
+           every overlay above, it builds its whole surface in JS
+           (src/emblem-editor.ts). One reason — the screenshot harness has no
+           app DOM, and an editor whose markup lives only in index.html is an
+           editor no harness state can shoot. -->
+
       <!-- Exit Confirmation — small CRT panel (same POS tokens as the drawer) -->
       <div id="exit-confirm-overlay">
         <div class="exit-card crt-panel">
@@ -256,7 +263,12 @@
                   </div>
                   <div class="input-group" id="plex-server-group" style="display:none">
                     <label for="plex-server">Your Servers</label>
-                    <select id="plex-server"></select>
+                    <!-- Multi-select (GH #84): an account routinely carries your
+                         own server AND ones shared with you, and the store can
+                         stock from several at once. Ctrl/Cmd-click or drag to
+                         pick more than one. -->
+                    <select id="plex-server" multiple size="4"></select>
+                    <small id="plex-server-hint" class="plex-server-hint">Pick one or more — hold Ctrl (⌘) to add servers.</small>
                   </div>
                 </div>
               </div>

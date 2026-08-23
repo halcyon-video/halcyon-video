@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { createSignTextTexture, createCategorySignTexture, createNewReleasesSignTexture } from './canvas-textures';
-import { bb93SignageOn } from './genre-colors';
+import { dressing93Active } from './genre-colors';
 
 export type SignCategory =
   | 'bin-topper'        // above previously-viewed bins
@@ -21,7 +21,7 @@ export interface SignDef {
   /**
    * This sign belongs to a period dressing pack and deploys ONLY where that
    * pack is on (the era that owns it, or another era with the pack switched on
-   * — see bb93SignageOn). Absent = a house sign, correct in every era.
+   * — see dressing93Active). Absent = a house sign, correct in every era.
    *
    * The placement config keys by SLOT and knows nothing about eras, so without
    * this a period prop stands in every era that has the slot. buildSignage
@@ -105,12 +105,12 @@ export function getSignDef(id: string): SignDef | undefined {
   // If it's a dynamic ceiling nav sign (e.g. 'ceiling-nav-ACTION' or 'ceiling-nav-COMEDY')
   if (id.startsWith('ceiling-nav-')) {
     const genreOrLibName = id.slice('ceiling-nav-'.length).toUpperCase();
-    // Opt-in bb_93_signage: the solid equilateral category WEDGE (owner
+    // On the 1993 era: the solid equilateral category WEDGE (owner
     // spec 2026-08-09) — 3.1 ft wide, 15 in tall; end-on an equilateral ∇
     // (top depth 2h/√3 ≈ 17 in). Nameplate proportions from the warped
     // rUhRHo44CIA f0013 (see fixtures/category-plate-1993.ts). Default
     // keeps the #34 rectangle.
-    const ribbon93 = bb93SignageOn();
+    const ribbon93 = dressing93Active();
     const size = ribbon93 ? { w: 3.1, h: 1.25 } : { w: 4.2, h: 1.2 };
     return {
       id,

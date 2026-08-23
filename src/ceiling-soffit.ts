@@ -24,6 +24,7 @@
 import * as THREE from 'three';
 import { Reflector } from 'three/examples/jsm/objects/Reflector.js';
 import { vestibuleHalfWidth, type StorefrontSpec, STORE_CENTER_X, FRONT_GLASS_Z } from './store-layout';
+import { activeStoreFormat } from './store-format';
 
 export interface SoffitPoint { x: number; z: number }
 
@@ -52,6 +53,14 @@ export function frontSoffitY(ceilingY: number): number {
 // behind it. The chamber read as a glass box parked in the room with its top
 // off rather than as part of the building.
 export function vestibuleCeilingY(ceilingY: number): number {
+  // ...unless this format builds no soffit at all (a standalone DESK counter —
+  // see frontSoffitPolygon). Then there is no dropped front deck for the
+  // chamber to line up WITH, and dropping it regardless would cap a 7 ft door
+  // with a 7 ft lid: in a 9 ft room frontSoffitY lands exactly on the door
+  // head. The chamber runs to the main ceiling instead, which is also how a
+  // small shop's entry is actually built — a door in the front wall, not an
+  // airlock under its own deck.
+  if (activeStoreFormat().counterShape === 'desk') return ceilingY;
   return frontSoffitY(ceilingY);
 }
 
@@ -99,6 +108,16 @@ export function frontSoffitPolygon(
   // Where the front cornice runs stop, and the z of their inner (mirrored)
   // face. The soffit's back corners are pinned to exactly these so the two
   // bands meet at an outside corner instead of leaving a gap.
+  // A standalone DESK counter has no cash wrap to hang a lid over. The soffit
+  // exists because a chain's walk-in counter is a whole zone of the store with
+  // its own dropped, lit ceiling; a mom-and-pop's register is a table with a
+  // computer on it under a 9 ft ceiling, and a dropped deck reaching 8 ft down
+  // the centreline toward it would be the biggest object in the room. Empty
+  // polygon: every consumer (pointInSoffit, tileOverlapsSoffit,
+  // soffitMirroredEdges, buildFrontSoffit) then does nothing, and the ordinary
+  // ceiling grid simply runs all the way to the glass.
+  if (spec.counterShape === 'desk') return [];
+
   const armHalf = soffitConnectHalf(spec, storeWidth, corniceWallGap);
   const backZ = FRONT_Z - corniceWallGap - corniceBand;
 
@@ -144,6 +163,7 @@ export function frontSoffitLidPolygon(
   spec: StorefrontSpec, storeWidth: number, corniceWallGap: number, corniceBand: number,
 ): SoffitPoint[] {
   const band = frontSoffitPolygon(spec, storeWidth, corniceWallGap, corniceBand);
+  if (band.length === 0) return []; // no soffit on this counter shape — see above
   const armHalf = soffitConnectHalf(spec, storeWidth, corniceWallGap);
   // Run both ends of the band's closing edge straight out to the glass. The
   // arms are always at least vestibuleHalfWidth + corniceWallGap from the
@@ -327,6 +347,13 @@ export function buildFrontSoffit(params: FrontSoffitParams): FrontSoffitResult {
 
   const poly = frontSoffitPolygon(storefrontSpec, storeWidth, corniceWallGap, corniceBand);
   const soffitY = frontSoffitY(ceilingY);
+  // Nothing to build (see frontSoffitPolygon): hand back an empty group and an
+  // empty polygon so the caller's own soffit-aware branches all fall through to
+  // "plain ceiling" without needing to know why.
+  if (poly.length === 0) {
+    scene.add(group);
+    return { group, polygon: poly, soffitY, troffers: [] };
+  }
 
   // Same chrome as buildCeilingFrame's cornice — the two bands are one run of
   // trim, so they must not drift apart in colour or gloss.

@@ -11,6 +11,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { JellyfinLibrary } from './jellyfin';
 import {
   FIELD_Z_FRONT, AISLE_SHELF_HEIGHTS, BOX_SPACING, SECTION_COLS,
+  UNIT_SECTIONS,
   UNIT_DEPTH, UNIT_SIDE_CAPACITY, UNIT_FRAME_HEIGHT, unitDepthAtHeight,
 } from './store-layout';
 import { StorePlan } from './store-plan';
@@ -20,7 +21,7 @@ import {
 } from './fixtures/ticket-board-sign';
 import { createTrapezoidGeometry, splitTrapezoidGroups, createLibraryEndCapMaterial, markSignMesh } from './sign-builders';
 import { createFasciaBladeFactory, FASCIA_BLADE_H } from './fixtures/genre-fascia';
-import { bb93SignageOn } from './genre-colors';
+import { dressing93Active } from './genre-colors';
 import { getActiveTheme } from './themes';
 import { CASE_WIDTH, CASE_HEIGHT } from './video-case';
 import type { ClaspPlacement } from './fixtures/shelf-clasp';
@@ -194,8 +195,8 @@ export function buildAisleShelving(deps: AisleShelvingDeps): void {
   // themes.ts — not id checks). 'flush' (2010 / Night Owl) and 'arched-plaque'
   // (2000) are both rounded-top plaques mounted on the shelf top and share the
   // extrude/label machinery below, differing only in height, corner radius,
-  // body color and label face. 'ticket-board' (1990) and 'fascia-blade' (1993,
-  // or the legacy bb_93_signage overlay) take their own paths further down.
+  // body color and label face. 'ticket-board' (1990) and 'fascia-blade' (1993)
+  // take their own paths further down.
   const plaqueTopper = theme.topperStyle === 'flush' || theme.topperStyle === 'arched-plaque';
   const archedTopper = theme.topperStyle === 'arched-plaque';
   const fasciaFactory = createFasciaBladeFactory();
@@ -481,7 +482,8 @@ export function buildAisleShelving(deps: AisleShelvingDeps): void {
     // column order is mirrored (see aisleColZ: -X-browsed fronts, and the
     // reverse of that on backs) have logical section 0 at the far end, so
     // reflect over the unit's full section count. Labels are keyed by GLOBAL
-    // section index: one block = two sections.
+    // section index: one block = UNIT_SECTIONS sections (two on the corporate
+    // box, one on a format whose units are a single signboard bay wide).
     const sectionLabelFor = (side: 'front' | 'back', p: number): string => {
       const cnt = sideEntryCount(side);
       if (cnt <= 0) return lib.name;
@@ -489,7 +491,7 @@ export function buildAisleShelving(deps: AisleShelvingDeps): void {
       const mirrored = (unit.browseSign < 0) !== (side === 'back');
       const s = mirrored ? (totalSecs - 1 - p) : p;
       const block = plan.blockIndexOf(unit.libraryIdx, unit.unitIdxInLibrary, side);
-      return layout.sectionLabels.get(String(block * 2 + s)) ?? lib.name;
+      return layout.sectionLabels.get(String(block * UNIT_SECTIONS + s)) ?? lib.name;
     };
 
     // Create signboards running long ways above each shelf section at the top
@@ -576,13 +578,13 @@ export function buildAisleShelving(deps: AisleShelvingDeps): void {
         continue;
       }
 
-      // 1993-footage OPTION (bb_93_signage): fascia blades. Sections are
+      // 1993-footage era dressing: fascia blades. Sections are
       // only COLLECTED here — the real boards are long planks spanning a
       // whole same-genre run (SUSPENSE ≈ 8ft x 10in, ~9:1 wide), so after
       // the loop contiguous sections sharing both face labels merge into
       // one blade instead of a row of stubby 4:1 per-section tiles
       // (user-flagged ratio).
-      if (bb93SignageOn()) {
+      if (dressing93Active()) {
         const sectionSpan = (endCol - startCol + 1) * BOX_SPACING;
         fasciaRuns.push({ plusXLabel, minusXLabel, z: zSecCenter, span: sectionSpan });
         continue;

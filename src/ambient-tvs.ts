@@ -22,7 +22,14 @@ import { makeCrtGlassMaterial } from './glass-reflection';
 import { tvPoolLibraryIds } from './library-settings';
 import { TV_PATCH_LAYER } from './scene-shared';
 import { assetUrl } from './asset-url';
-import { activeProvider, sessionOf } from './providers/active-provider';
+import {
+  activeProvider,
+  providerForKind,
+  providerForSource,
+  sessionOf,
+} from './providers/active-provider';
+import { connectionForTitle } from './media-sources';
+import type { ProviderSession } from './providers/media-source-provider';
 import type { PlaybackRequestOptions } from './providers/media-source-provider';
 import { getSegmentFixLoader } from './hls-segment-fix';
 
@@ -240,6 +247,13 @@ export class AmbientTvs implements StoreFixture {
   // one back (PlaybackSource.sessionId). Null on a direct stream, on the
   // bundled loop, and once the encode has been cancelled.
   private transcodeSessionId: string | null = null;
+  // Which backend that encode is running on (GH #84) — on a multi-server store
+  // the tube's current title may belong to a different server (and a different
+  // provider kind) than the primary, and tearing the encode down through the
+  // wrong one leaves it pinning CPU until it times out.
+  private transcodeSourceKind: string | null = null;
+  /** …and WHERE, so the DELETE lands on the box actually encoding. */
+  private transcodeConn: { server: string; session: ProviderSession } | null = null;
   // What the shared <video> is currently carrying. 'stream' = the media
   // server's; 'loop' = the bundled promo clip; 'dead' = nothing, tubes dark.
   // The fallback ladder only ever descends, so this doubles as the guard that
@@ -721,11 +735,17 @@ export class AmbientTvs implements StoreFixture {
     let url: string;
     let kind: 'direct' | 'transcode';
     try {
-      const provider = activeProvider();
-      const session = sessionOf(
-        this.ctx.jellyfinToken,
-        localStorage.getItem('jellyfin_userid') ?? ''
-      );
+      // Routed to the server THIS title came from (GH #84). The pool draws
+      // from the whole merged catalog, so on a two-server store roughly half
+      // the ceiling's picks belong to the other box — asking the primary for
+      // them is the same 404-into-black-glass failure #67 fixed for Plex,
+      // just arriving by a different route.
+      const conn = connectionForTitle(movie);
+      const provider = providerForSource(conn?.source);
+      const session = conn
+        ? conn.session
+        : sessionOf(this.ctx.jellyfinToken, localStorage.getItem('jellyfin_userid') ?? '');
+      const server = conn?.url ?? this.ctx.jellyfinUrl;
 
       // A series container has no file behind it — what a TV-Shows library
       // actually contributes to the monitors is an EPISODE (#67). The first one
@@ -734,7 +754,7 @@ export class AmbientTvs implements StoreFixture {
       let itemId = movie.id;
       if (movie.isSeries) {
         const episode = await provider.fetchFirstEpisodeOfSeries(
-          this.ctx.jellyfinUrl,
+          server,
           session,
           movie.id
         );
@@ -763,7 +783,7 @@ export class AmbientTvs implements StoreFixture {
         startPositionTicks: Math.round(seekSec * TICKS_PER_SECOND),
       };
       const source = await provider.resolvePlaybackSource(
-        this.ctx.jellyfinUrl,
+        server,
         session,
         itemId,
         req
@@ -771,7 +791,11 @@ export class AmbientTvs implements StoreFixture {
       url = source.url;
       kind = source.kind;
       // Held so the encode can be torn down again — see cancelTranscode().
-      if (source.kind === 'transcode') this.transcodeSessionId = source.sessionId ?? null;
+      if (source.kind === 'transcode') {
+        this.transcodeSessionId = source.sessionId ?? null;
+        this.transcodeSourceKind = conn?.source.kind ?? null;
+        this.transcodeConn = { server, session };
+      }
     } catch (e: any) {
       console.warn('[ambient-tvs] could not resolve a stream:', e);
       this.giveUpOnStream(`server would not name a stream (${e?.message ?? e})`);
@@ -845,12 +869,16 @@ export class AmbientTvs implements StoreFixture {
    */
   private cancelTranscode(): void {
     const sessionId = this.transcodeSessionId;
+    const kind = this.transcodeSourceKind;
+    const conn = this.transcodeConn;
     this.transcodeSessionId = null;
+    this.transcodeSourceKind = null;
+    this.transcodeConn = null;
     if (!sessionId) return;
     try {
-      const provider = activeProvider();
+      const provider = kind ? providerForKind(kind) : activeProvider();
       if (!provider.capabilities.transcoding) return;
-      provider.cancelActiveTranscode?.(sessionId)?.catch(() => {});
+      provider.cancelActiveTranscode?.(sessionId, undefined, conn ?? undefined)?.catch(() => {});
     } catch {
       // Teardown never throws: an unknown provider kind here would mean the
       // install was downgraded mid-session, and the encode times out anyway.

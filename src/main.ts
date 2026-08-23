@@ -41,7 +41,14 @@ import {
   playbackProgressed,
   playbackStopped,
 } from './playback-routing';
-import { activeProvider as provider, sessionOf } from './providers/active-provider';
+import {
+  activeProvider as provider,
+  providerForSource as providerFor,
+  sessionOf,
+} from './providers/active-provider';
+// GH #84: a title knows which connected server shelved it, and every call
+// made ABOUT a title routes back to that one.
+import { connectionForTitle, findTitleByCarryId } from './media-sources';
 import {
   fetchComingSoonMovies,
   fetchDiscoverMovies,
@@ -52,13 +59,16 @@ import {
   isDiscoveryRequested,
   getJellyseerrConfig,
   pingJellyseerr,
-  fetchStreamingMovies,
 } from './jellyseerr';
 import { fetchGames, launchGame } from './romm';
 import { isGamesOnly, storeCatalog } from './games-only';
-import { buildStreamingLibraries, resolveEnabledServices, resolveStreamingSource } from './streaming-catalog';
-import { fetchStreamingMoviesFromTmdb, getTmdbConfig } from './tmdb';
-import { fetchStreamingMoviesFromSnapshot } from './streaming-snapshot';
+import { buildStreamingLibraries, resolveEnabledServices } from './streaming-catalog';
+import {
+  getStreamingMovies,
+  loadStreamingMovies,
+  streamingEnabled,
+  streamingStockIsStale,
+} from './streaming-stock';
 import { isMembershipPickerOpen } from './membership-cards';
 import {
   initBootFlow,
@@ -114,12 +124,18 @@ import {
   buildStoreBrandPanel,
   activateBrandRow,
   BRAND_ROW_PREFIX,
+  SETTINGS_SUBPAGE_PREFIX,
   createSettingThumb,
   refreshSettingThumb,
 } from './settings';
 import type { SettingDef, SettingGroup } from './settings';
 import {
+  closeEmblemStudio, emblemStudioActivate, emblemStudioBack, emblemStudioMove,
+  EMBLEM_OPEN_ROW_KEY, isEmblemStudioOpen,
+} from './emblem-editor';
+import {
   MEDIA_DATE_BUTTON_ID,
+  STREAMING_BUTTON_ID,
   counterTerminalClose,
   counterTerminalInput,
   counterTerminalOpen,
@@ -156,16 +172,6 @@ let discoveryMovies: Movie[] = [];
 // section -- see romm.ts. Stays [] if Romm isn't configured/reachable, same
 // never-block-boot treatment as the Jellyseerr lists above.
 let gameMovies: Movie[] = [];
-// GH #86: streaming-service titles from TMDB watch-provider data, straight
-// from TMDB (tmdb.ts) or via Jellyseerr as a fallback (see
-// streaming-catalog.ts's resolveStreamingSource). Stays [] if neither source
-// is configured/reachable or the master switch is off, same never-block-boot
-// treatment as the other Jellyseerr-adjacent lists above.
-let streamingMovies: Movie[] = [];
-/** `true` unless the owner switched streaming sections off (default ON). */
-function streamingEnabled(): boolean {
-  return getSetting<boolean>('bb_streaming_enabled') !== false;
-}
 // What the STORE is built from, as opposed to what was fetched. Normally these
 // alias librariesList/gameMovies exactly; with GAMES ONLY on (games-only.ts)
 // the Romm platforms stand in as the libraries and the game department empties,
@@ -188,7 +194,7 @@ function refreshStoreCatalog() {
   // rather than cached, so toggling the master switch off and back on without
   // a re-fetch still reflects the current setting immediately.
   const streamingLibs = streamingEnabled()
-    ? buildStreamingLibraries(streamingMovies, resolveEnabledServices(getSetting<string>('bb_streaming_services')))
+    ? buildStreamingLibraries(getStreamingMovies(), resolveEnabledServices(getSetting<string>('bb_streaming_services')))
     : [];
   const mergedLibraries = [...catalog.libraries, ...streamingLibs];
   // Per-library toggles (#41 Store Libraries / #39 Overhead TVs) register
@@ -359,44 +365,6 @@ async function loadDiscoveryMovies(): Promise<void> {
   }
 }
 
-/**
- * GH #86: fetch the CHOSEN streaming services' watch-provider stock, same
- * never-block-boot treatment as the other Jellyseerr loaders. A no-op — []
- * without a single request — while the master switch is off, or while
- * nothing is chosen (bb_streaming_services blank -- a fresh local install's
- * default, owner ruling 2026-08-21), so neither costs anything extra.
- *
- * Source ladder: a direct TMDB key (tmdb_apikey) is a full replacement
- * source, not icing on Jellyseerr — it wins when both are configured (see
- * streaming-catalog.ts's resolveStreamingSource for why), Jellyseerr is the
- * fallback, and neither configured falls back to the bundled snapshot
- * (streaming-snapshot.ts) — the floor of the ladder, so a chosen service
- * ALWAYS stocks, including the hosted demo and a bare local install with
- * nothing set up at all.
- */
-async function loadStreamingMovies(): Promise<void> {
-  if (!streamingEnabled()) {
-    streamingMovies = [];
-    return;
-  }
-  const servicesOverride = getSetting<string>('bb_streaming_services');
-  if (resolveEnabledServices(servicesOverride).length === 0) {
-    streamingMovies = []; // nothing chosen -- no network round trip needed
-    return;
-  }
-  const TIMEOUT_MS = 15_000;
-  const timeoutPromise = new Promise<Movie[]>((resolve) => setTimeout(() => resolve([]), TIMEOUT_MS));
-  const source = resolveStreamingSource(!!getTmdbConfig(), !!getJellyseerrConfig());
-  const fetchPromise = source === 'tmdb' ? fetchStreamingMoviesFromTmdb(servicesOverride)
-    : source === 'jellyseerr' ? fetchStreamingMovies(servicesOverride)
-    : fetchStreamingMoviesFromSnapshot(servicesOverride);
-  try {
-    streamingMovies = await Promise.race([fetchPromise, timeoutPromise]);
-  } catch (e) {
-    console.warn('[Streaming] Failed to load streaming-service titles:', e);
-    streamingMovies = [];
-  }
-}
 
 /**
  * One boot-console line that always states where Jellyseerr stands. The
@@ -699,11 +667,22 @@ const ui = {
   // owns-the-keys treatment as the manager terminal above.
   isSetupOpen: false,
 
+  /**
+   * The emblem studio (#111) — the logo composer's own wide surface, opened
+   * over the Store Brand drawer page. A GETTER rather than a flag: the studio
+   * module already knows whether it is built, and a second copy of that
+   * answer here is one more thing that can disagree with the DOM.
+   */
+  get isEmblemStudioOpen(): boolean {
+    return isEmblemStudioOpen();
+  },
+
   /** True if any overlay is blocking main navigation */
   get isAnyOverlayOpen(): boolean {
     return this.isPowerMenuOpen || this.isSettingsDrawerOpen || this.isLoginOpen || this.isExitConfirmOpen
       || this.isVersionPickerOpen || this.isSearchOpen || this.isCandyCheckoutOpen
-      || this.isFeedbackOpen || this.isCounterTerminalOpen || this.isSetupOpen || isMembershipPickerOpen();
+      || this.isFeedbackOpen || this.isCounterTerminalOpen || this.isSetupOpen
+      || this.isEmblemStudioOpen || isMembershipPickerOpen();
   }
 };
 
@@ -721,12 +700,19 @@ let cecDisplayAssumedOn = true;
 
 // The counter CRT carries extra rows the glass power menu doesn't:
 // MANAGER OVERRIDE, the diegetic (and only couch-reachable) entry into the
-// SERVICE MODE settings page (review §4.3), and MEDIA RELEASE DATE (#42),
-// the catalog-pin sub-screen. Inserted just above RETURN TO STORE so the
-// safe exit stays last.
+// SERVICE MODE settings page (review §4.3), MEDIA RELEASE DATE (#42), the
+// catalog-pin sub-screen, and STREAMING SERVICES (#96), the re-entry into the
+// opening-day picker for a store that was already stocked when it shipped.
+// Inserted just above RETURN TO STORE so the safe exit stays last.
+//
+// This ring is now at the CRT's physical ceiling: 11 rows + 2 header lines is
+// 13, which drawTerminal seats only by tightening to its 1.0-leading floor
+// (fitTerminalPitch, #77). A 12th row does not fit and would be clipped with a
+// MORE marker — tests/counter-terminal.test.ts fails first, on purpose. A new
+// row from here on wants a sub-screen to live under, not a slot in this list.
 const COUNTER_TERMINAL_ALL_ROWS = (() => {
   const ids = [...powerButtons];
-  ids.splice(ids.indexOf('btn-cancel'), 0, MEDIA_DATE_BUTTON_ID, 'btn-service');
+  ids.splice(ids.indexOf('btn-cancel'), 0, STREAMING_BUTTON_ID, MEDIA_DATE_BUTTON_ID, 'btn-service');
   return ids;
 })();
 // The row list the CRT is actually drawing. counter-terminal-flow.ts holds this
@@ -1119,7 +1105,9 @@ const SETTINGS_CLOSE_KEY = '__close__';
 const SWITCH_MEMBER_KEY = '__switch_member__';
 const SETTINGS_BACK_KEY = '__back__';
 const SETTINGS_GROUP_PREFIX = '__group__:';
-const SETTINGS_SUBPAGE_PREFIX = '__subpage__:';
+// SETTINGS_SUBPAGE_PREFIX comes from settings.ts: custom panels emit sub-page
+// rows of their own (the Store Brand page's Emblem Editor row), so the prefix
+// can't live only here.
 
 // The drawer is paginated: a category index page (settingsPage === null) with
 // one row per settings group, and one sub-page per group. Keeping each area
@@ -1322,6 +1310,16 @@ function generateSettingsDrawer() {
         onDirty: () => {
           settingsPendingRebuild = true;
           updateSettingsStatus();
+        },
+        // Backing out of the emblem studio (#111) lands here. Not cosmetic: the
+        // Emblem Editor row's "N layers" value is stale by then, and rebuilding
+        // the panel is what makes its row kit the current one again after the
+        // studio's displaced it.
+        onRefreshPage: () => {
+          if (!ui.isSettingsDrawerOpen) return;
+          generateSettingsDrawer();
+          refreshSettingsValues();
+          setSettingsSelection(Math.max(0, settingsRowKeys.indexOf(EMBLEM_OPEN_ROW_KEY)));
         },
         // W3 custom-wrap uploads change box-panel art cached on shared +
         // per-title materials a no-reload rebuild preserves — full reload,
@@ -1790,6 +1788,9 @@ function openSettingsDrawer(page: SettingGroup | 'Service' | 'Controls' | null =
 
 function closeSettingsDrawer() {
   ui.isSettingsDrawerOpen = false;
+  // Clearing the flag FIRST is what stops the studio's onClose from rebuilding
+  // a drawer that is on its way out.
+  if (isEmblemStudioOpen()) closeEmblemStudio();
   document.getElementById('settings-drawer-overlay')!.classList.remove('visible');
   logToConsole('[Settings] Closed store settings.', 'system');
 
@@ -2514,6 +2515,14 @@ async function rebuildStoreScene() {
     await loadGameMovies();
   }
 
+  // The chosen streaming services (#86/#96) can change between boot and this
+  // rebuild -- at the manager terminal or in the settings drawer -- and the
+  // aisles are built from the fetched stock, not from the setting. Re-fetch
+  // only when the choice actually moved, so every other rebuild-scene setting
+  // still costs no round trip. The loader is never-block-boot and swallows its
+  // own failures, so a dead source degrades to empty aisles, not a stuck store.
+  if (streamingStockIsStale()) await loadStreamingMovies();
+
   const mode = getSetting<string>('bb_render_mode');
   if (mode !== 'flat') {
     // Pick up a media-format change: recompute case geometry + poster crop, and
@@ -2716,16 +2725,17 @@ async function initializeStoreScene(preservePosterCache = false) {
     // when a series is actually inspected (never at boot).
     scene.onFetchEpisodes = async (movie) => {
       if (isDemoMode) return makeSyntheticEpisodes(movie);
-      const jellyfinUrl = localStorage.getItem('jellyfin_url');
-      const token = localStorage.getItem('jellyfin_token');
+      // Routed to the server THIS series came from (GH #84) — on a two-server
+      // store the friend's series would otherwise be asked for from your own
+      // box, which answers 404 and paints the season panel NONE.
       // Address and token are the credentials; a user id is not one (GH #66).
       // It is a Jellyfin concept, and a Plex session's is empty whenever
       // plex.tv didn't resolve the server — so requiring it here returned []
       // for every Plex series and painted the season panel NONE. It is still
       // PASSED, because the Jellyfin provider needs it; the provider decides.
-      const userId = localStorage.getItem('jellyfin_userid') ?? '';
-      if (!jellyfinUrl || !token) return [];
-      return provider().fetchSeriesEpisodes(jellyfinUrl, sessionOf(token, userId), movie.id);
+      const conn = connectionForTitle(movie);
+      if (!conn) return [];
+      return providerFor(conn.source).fetchSeriesEpisodes(conn.url, conn.session, movie.id);
     };
 
     // Canvas click on an already-selected slot: confirm selection directly,
@@ -2773,7 +2783,10 @@ async function initializeStoreScene(preservePosterCache = false) {
     scene.onCheckoutComplete = (items) => {
       logToConsole(`[System] Checkout complete: ${items.length} title(s) rented (${items.join(', ')}).`, 'system');
       if (scene.rentalMode || items.length === 0) return; // rental continues into the back room
-      const movie = storeLibraries.flatMap((l) => l.movies).find((m) => m.id === items[0]);
+      // Source-aware (GH #84): `items` carries qualified ids, because a bare
+      // item id is ambiguous across servers — both boxes issue "1"/"m0", and
+      // first-match-wins played the OTHER server's film off the wrong address.
+      const movie = findTitleByCarryId(storeLibraries, items[0]);
       if (!movie) {
         logToConsole(`[Video] Checked-out title ${items[0]} not found in any library — cannot start playback.`, 'video');
         // The exit walk already carried the bag out under the whiteout —
@@ -3382,11 +3395,10 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
       overrideItemId = selected.id;
       overridePath = selected.path || undefined;
     } else {
-      const jellyfinUrl = localStorage.getItem('jellyfin_url');
-      const token = localStorage.getItem('jellyfin_token');
-      const userId = localStorage.getItem('jellyfin_userid') ?? '';
-      const first = (jellyfinUrl && token)
-        ? await provider().fetchFirstEpisodeOfSeries(jellyfinUrl, sessionOf(token, userId), movie.id)
+      const seriesConn = connectionForTitle(movie);
+      const first = seriesConn
+        ? await providerFor(seriesConn.source).fetchFirstEpisodeOfSeries(
+            seriesConn.url, seriesConn.session, movie.id)
         : null;
       if (!first) {
         logToConsole(`[Video] Could not resolve an episode for "${movie.title}".`, 'video');
@@ -3404,11 +3416,19 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
   const mediaSourceId = version?.mediaSourceId;
   const localPath = overridePath || version?.localPath || movie.localPath;
 
-  const jellyfinUrl = localStorage.getItem('jellyfin_url');
-  const token = localStorage.getItem('jellyfin_token');
+  // The server this very title came from (GH #84), not "the" server: a store
+  // stocked from two boxes must stream each title back to whichever one
+  // shelved it, or every title from the second server plays the wrong file or
+  // none at all.
+  const titleConn = connectionForTitle(movie);
+  const jellyfinUrl = titleConn?.url ?? null;
+  const token = titleConn?.token ?? null;
+  // …and which BACKEND that server speaks, so a mixed Jellyfin+Plex store
+  // builds each title's URLs in the right shape rather than the primary's.
+  const titleKind = titleConn?.source.kind;
   // Never a credential test — see the note on onFetchEpisodes. Carried so the
   // Jellyfin provider can address /Users/<id>/..., empty on Plex by design.
-  const userId = localStorage.getItem('jellyfin_userid') ?? '';
+  const userId = titleConn?.userId ?? '';
 
   // Without a media-server endpoint there's nothing to stream into the webview
   // — fall back to the external player on the original file.
@@ -3424,7 +3444,7 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
   if (movie.isSeries) {
     let episodes = storeScene?.getSeriesEpisodes(movie.id) ?? null;
     if (!episodes?.length) {
-      episodes = await provider().fetchSeriesEpisodes(jellyfinUrl, sessionOf(token, userId), movie.id);
+      episodes = await providerFor(titleConn?.source).fetchSeriesEpisodes(jellyfinUrl, sessionOf(token, userId), movie.id);
     }
     seriesQueue = episodes?.length ? { seriesId: movie.id, episodes } : null;
   } else {
@@ -3469,6 +3489,8 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
           finishPlayback(movie, fromCouch);
         },
         (msg) => logToConsole(msg, 'video'),
+        // Report progress to the server that shelved this title (GH #84).
+        { url: jellyfinUrl, token },
       );
       if (started) {
         // The store is behind a fullscreen window now — stop drawing it.
@@ -3504,7 +3526,7 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
 
   ui.isPlaybackActive = true;
 
-  const staticSrc = directStreamUrl(jellyfinUrl, token, playbackId, mediaSourceId);
+  const staticSrc = directStreamUrl(jellyfinUrl, token, playbackId, mediaSourceId, titleKind);
 
   // Decide direct-play vs. HLS transcode from the item's real container/codecs
   // BEFORE playing: WebKitGTK silently drops audio tracks whose codec isn't in
@@ -3521,7 +3543,7 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
   // Jellyfin branch is unchanged because a Jellyfin install always has one —
   // it also already returns undefined rather than throwing if the probe fails.
   const mediaInfo: MediaPlaybackInfo | undefined = overrideItemId
-    ? await probeItemPlaybackInfo(jellyfinUrl, token, userId, playbackId)
+    ? await probeItemPlaybackInfo(jellyfinUrl, token, userId, playbackId, titleKind)
     : (version?.mediaPlaybackInfo ?? movie.mediaPlaybackInfo);
   // Codec hint for buildHlsStreamUrl: HEVC sources get hevc pass-through
   // (fMP4) when the webview can decode it; everything else stays on TS.
@@ -3585,7 +3607,7 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
   // Direct play can't switch audio tracks, and burned-in subtitles are encoded
   // server-side — either forces the HLS transcode path. Text subtitles no
   // longer do.
-  const directPlayable = playbackIsDirectSafe(mediaInfo) && initialAudioIndex === undefined && burnInSubtitleIndex === undefined;
+  const directPlayable = playbackIsDirectSafe(mediaInfo, titleKind) && initialAudioIndex === undefined && burnInSubtitleIndex === undefined;
   let hlsSrc: string;
   try {
     hlsSrc = await transcodeStreamUrl(jellyfinUrl, token, playbackId, {
@@ -3594,7 +3616,7 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
       audioStreamIndex: initialAudioIndex,
       subtitleStreamIndex: burnInSubtitleIndex,
       startPositionTicks: resumeTicks || undefined,
-    });
+    }, titleKind);
   } catch (e: any) {
     // On Plex this is where a failed /decision pre-flight surfaces (#76) —
     // the real playback error, not a bare hls.js 400 the player would
@@ -3620,7 +3642,7 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
   // Fire-and-forget: awaiting here would sever the user-gesture chain before
   // video.play(), tripping autoplay policy. (It never rejects — errors are
   // caught and logged inside.)
-  playbackStarted(jellyfinUrl, token, playbackId);
+  playbackStarted(jellyfinUrl, token, playbackId, titleKind);
 
   // Yield GPU/CPU to the decoder (only if not hidden). Couch playback yields
   // too now that it is fullscreen: nothing of the room is on screen behind it.
@@ -3637,6 +3659,9 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
     directPlayable,
     mediaInfoSummary,
     title: movie.title,
+    // Which server is encoding this (GH #84), so closing the player tears the
+    // transcode down on THAT box rather than on whichever one is primary.
+    server: { url: jellyfinUrl, token },
     audioTracks,
     subtitleTracks,
     defaultAudioIndex: initialAudioIndex,
@@ -3659,10 +3684,10 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
     // dismiss the controls doesn't dump the viewer at the storefront. Couch
     // playback just drops back onto the couch, so no confirm is needed.
     confirmExit: !fromCouch,
-    buildStream: (sel) => transcodeStreamUrlSync(jellyfinUrl, token, playbackId, { ...sel, sourceVideoCodec, mediaSourceId }),
+    buildStream: (sel) => transcodeStreamUrlSync(jellyfinUrl, token, playbackId, { ...sel, sourceVideoCodec, mediaSourceId }, titleKind),
     log: (msg) => logToConsole(msg, 'video'),
     onProgress: (positionTicks, isPaused) => {
-      playbackProgressed(jellyfinUrl, token, playbackId, positionTicks, isPaused);
+      playbackProgressed(jellyfinUrl, token, playbackId, positionTicks, isPaused, titleKind);
     },
     onClose: (positionTicks, endedNaturally) => {
       ui.isPlaybackActive = false;
@@ -3670,7 +3695,7 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
         // The WebGL context died while the movie played; the store behind the
         // player is a dead canvas. Report the stop, then take the reload we
         // deferred instead of "resuming" a frozen scene. Issue #70.
-        playbackStopped(jellyfinUrl, token, playbackId, positionTicks, movie.runTimeTicks);
+        playbackStopped(jellyfinUrl, token, playbackId, positionTicks, movie.runTimeTicks, titleKind);
         logToConsole('[System] Applying deferred context-loss reload...', 'system');
         setTimeout(() => location.reload(), 250);
         return;
@@ -3682,7 +3707,7 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
       // STARTING a title, not for continuing one.
       const nextEp = markWatchedAndFindNext(movie, endedNaturally, seriesQueue, playbackId, () => storeScene?.restockSlottedFixtures());
       if (nextEp) {
-        playbackStopped(jellyfinUrl, token, playbackId, positionTicks, movie.runTimeTicks);
+        playbackStopped(jellyfinUrl, token, playbackId, positionTicks, movie.runTimeTicks, titleKind);
         logToConsole(`[Video] "${movie.title}" — up next: ${episodeLabel(nextEp)}.`, 'video');
         videoPlayer?.beginTransition(`Up next — ${episodeLabel(nextEp)}`);
         void launchVideoPlayback(movie, nextEp.id, nextEp.path || undefined, false, fromCouch)
@@ -3694,7 +3719,7 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
           });
         return;
       }
-      playbackStopped(jellyfinUrl, token, playbackId, positionTicks, movie.runTimeTicks);
+      playbackStopped(jellyfinUrl, token, playbackId, positionTicks, movie.runTimeTicks, titleKind);
       finishPlayback(movie, fromCouch);
     },
     onFatalError: () => {
@@ -3941,6 +3966,9 @@ async function main() {
       if (ui.isSearchOpen) return;
       if (ui.isPowerMenuOpen) return;
       if (ui.isCounterTerminalOpen) { counterTerminalInput('left'); return; }
+      // The emblem studio opens OVER the settings drawer, so it is tested first
+      // — while it is up, the drawer underneath must not see a key.
+      if (ui.isEmblemStudioOpen) { emblemStudioActivate(-1); return; }
       if (ui.isSettingsDrawerOpen) {
         if (settingsRowKeys[settingsIndex] !== SETTINGS_CLOSE_KEY) activateSelectedSetting(-1);
         return;
@@ -3968,6 +3996,7 @@ async function main() {
       // the Left press that reached for it (or moves field focus while the
       // date sub-screen is up; the flow decides).
       if (ui.isCounterTerminalOpen) { counterTerminalInput('right'); return; }
+      if (ui.isEmblemStudioOpen) { emblemStudioActivate(1); return; }
       if (ui.isSettingsDrawerOpen) {
         if (settingsRowKeys[settingsIndex] !== SETTINGS_CLOSE_KEY) activateSelectedSetting(1);
         return;
@@ -3992,7 +4021,9 @@ async function main() {
       if (ui.isSearchOpen) return;
       if (ui.isExitConfirmOpen) return;
 
-      if (ui.isSettingsDrawerOpen) {
+      if (ui.isEmblemStudioOpen) {
+        emblemStudioMove(-1);
+      } else if (ui.isSettingsDrawerOpen) {
         const nextIdx = (settingsIndex - 1 + settingsRowKeys.length) % settingsRowKeys.length;
         setSettingsSelection(nextIdx);
       } else if (ui.isPowerMenuOpen) {
@@ -4019,7 +4050,9 @@ async function main() {
       if (ui.isSearchOpen) return;
       if (ui.isExitConfirmOpen) return;
 
-      if (ui.isSettingsDrawerOpen) {
+      if (ui.isEmblemStudioOpen) {
+        emblemStudioMove(1);
+      } else if (ui.isSettingsDrawerOpen) {
         const nextIdx = (settingsIndex + 1) % settingsRowKeys.length;
         setSettingsSelection(nextIdx);
       } else if (ui.isPowerMenuOpen) {
@@ -4045,6 +4078,11 @@ async function main() {
       }
       if (ui.isLoginOpen) return;
       if (ui.isSetupOpen) { await setupTerminalInput('ok'); return; }
+
+      if (ui.isEmblemStudioOpen) {
+        emblemStudioActivate(1);
+        return;
+      }
 
       if (ui.isSettingsDrawerOpen) {
         activateSelectedSetting(1);
@@ -4127,6 +4165,13 @@ async function main() {
       if (videoPlayer?.isOpen) { if (!videoPlayer.handleBack()) videoPlayer.requestClose(); return; }
       if (ui.isLoginOpen) return;
       if (ui.isSetupOpen) { void setupTerminalInput('back'); return; }
+
+      // The studio is one level deep, so Back closes it — back onto the Store
+      // Brand page it was opened from, which is what the drawer regenerates.
+      if (ui.isEmblemStudioOpen) {
+        emblemStudioBack();
+        return;
+      }
 
       if (ui.isSettingsDrawerOpen) {
         // Back from a group page returns to the category index; back from the

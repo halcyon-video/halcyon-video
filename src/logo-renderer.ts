@@ -11,8 +11,10 @@
 // Pure 2D canvas: no three.js here (textures are the caller's business), and
 // everything is painted once at boot — nothing in this file runs per frame.
 import type { LogoArtLayer, LogoSpec } from './logo-spec';
-import { BB_ANTON, BB_ARCHIVO_BLACK, BB_BEBAS, BB_OUTFIT } from './bundled-fonts';
-import { brandImage, brandPackFontFamily } from './brand-pack';
+import { brandFontFamilyCss } from './brand-fonts';
+import { emblemDocActive } from './emblem-doc';
+import { drawEmblemArt, emblemColorsFromSpec } from './emblem-render';
+import { brandImage } from './brand-pack';
 
 // ─── Small utilities ─────────────────────────────────────────────────────────
 
@@ -157,6 +159,20 @@ function applyPathFrame(loops: LogoPoint[][], f: PathFrame): LogoPoint[][] {
   );
 }
 
+// How many distinct outlines each cache below keeps.
+//
+// These used to be unbounded, on the reasonable assumption that a brand's
+// outline is fixed for the boot. The emblem editor broke that: it derives a
+// NEW `pathD` on every keystroke, so a design session feeds these caches an
+// endless stream of distinct keys, each holding a few hundred flattened
+// points. Oldest-out at a couple of dozen keeps every surface of the live
+// brand resident while a long session stays flat.
+const OUTLINE_CACHE_MAX = 24;
+
+function capCache(map: Map<string, unknown>): void {
+  while (map.size > OUTLINE_CACHE_MAX) map.delete(map.keys().next().value!);
+}
+
 // Brand-supplied `pathD` outlines, cached per (path, tilt) — a spec's outline
 // is fixed for the boot, and every emblem surface asks for the same one. The
 // frame is cached alongside the loops because artLayers needs it.
@@ -169,6 +185,7 @@ function getCustomPath(d: string, tiltDeg: number): { loops: LogoPoint[][]; fram
     const frame = computePathFrame(flat, (tiltDeg * Math.PI) / 180);
     entry = { loops: applyPathFrame(flat, frame), frame };
     customLoopsCache.set(key, entry);
+    capCache(customLoopsCache as Map<string, unknown>);
   }
   return entry;
 }
@@ -369,25 +386,6 @@ export function buildLogoShapePath(spec: LogoSpec, w: number, h: number): Path2D
   return path;
 }
 
-// The brand editor's family picker (settings.ts BRAND_FONTS) stores display
-// names, and two of them used to arrive only over a Google-Fonts @import in
-// styles.css — i.e. never on an offline kiosk boot, where the emblem then
-// painted in whatever the system sans is and nothing said so. Both are now
-// bundled (and that @import is gone as of 2026-08-06), so the picker's name
-// maps onto the shipped file. The stored spec keeps the human name; only the
-// canvas font string changes.
-// Anton and Bebas Neue were bundled with the others but never listed here, so
-// picking either in the editor painted the emblem in the system sans — the
-// exact silent substitution this map exists to stop. Every family the picker
-// offers now resolves to a shipped file; adding a name to settings.ts's
-// BRAND_FONTS without adding it here is the bug to watch for.
-const BUNDLED_BRAND_FAMILY: Record<string, string> = {
-  Anton: BB_ANTON,
-  'Archivo Black': BB_ARCHIVO_BLACK,
-  'Bebas Neue': BB_BEBAS,
-  Outfit: BB_OUTFIT,
-};
-
 /**
  * The CSS font-family list the spec letters in — the family half of
  * getLogoFontString, split out for the sign painters that size their type by
@@ -395,12 +393,7 @@ const BUNDLED_BRAND_FAMILY: Record<string, string> = {
  * size to the string builder.
  */
 export function logoFontFamily(spec: LogoSpec): string {
-  // A brand pack's own faces resolve the same way: brand-pack.ts registered
-  // each under a BBPack-prefixed family, and the spec keeps the human name.
-  const bundled = BUNDLED_BRAND_FAMILY[spec.fontFamily] ?? brandPackFontFamily(spec.fontFamily);
-  return bundled
-    ? `${bundled}, sans-serif`
-    : spec.fontFamily.includes(',') ? spec.fontFamily : `"${spec.fontFamily}", sans-serif`;
+  return brandFontFamilyCss(spec.fontFamily);
 }
 
 /**
@@ -504,6 +497,7 @@ export function logoShapeInnerBox(spec: LogoSpec): LogoBox {
   }
   box = largestInsideRect(inside, g);
   innerBoxCache.set(key, box);
+  capCache(innerBoxCache as Map<string, unknown>);
   return box;
 }
 
@@ -602,6 +596,7 @@ function wordmarkBox(d: string): { x: number; y: number; w: number; h: number } 
       ? { x: x0, y: y0, w: x1 - x0, h: y1 - y0 }
       : { x: 0, y: 0, w: 0, h: 0 };
     wordmarkBoxCache.set(d, box);
+    capCache(wordmarkBoxCache as Map<string, unknown>);
   }
   return box;
 }
@@ -705,6 +700,14 @@ function drawGeneric(ctx: CanvasRenderingContext2D, spec: LogoSpec, opts: DrawLo
     ? null
     : buildLogoShapePath(spec, ew, eh);
 
+  // A COMPOSED emblem (the emblem editor's document) replaces the filled body
+  // silhouette with its own artwork. Suppressed on labels, which carry the
+  // LIBRARY's name on the brand's shape rather than the brand's own art.
+  const emblemDoc = !isLabel && spec.emblem && emblemDocActive(spec.emblem) ? spec.emblem : null;
+  // Where the outline actually sits inside the emblem box. The art has to land
+  // on exactly this rect or the printing and the die-cut edge disagree.
+  const outlineFit = spec.shape === 'path' ? logoShapeFitRect(spec, ew, eh) : null;
+
   ctx.save();
   ctx.translate(ecx, ecy);
   ctx.rotate(tilt + (opts.rotation ?? 0));
@@ -715,6 +718,18 @@ function drawGeneric(ctx: CanvasRenderingContext2D, spec: LogoSpec, opts: DrawLo
     ctx.fillStyle = spec.bodyColor;
     ctx.fill(shapePath);
     ctx.restore();
+  }
+
+  // The composition rides the BODY layer, with the wordmark left on the text
+  // layer above it. That split is what the double-layered signs are for: the
+  // storefront's front board glows hard enough for bloom, which is right for
+  // gold lettering and wrong for a whole printed face — put the face up there
+  // and the sign reads as a blown-out cream slab after dark.
+  if (wantBody && emblemDoc && outlineFit) {
+    drawEmblemArt(
+      ctx, emblemDoc, emblemColorsFromSpec(spec),
+      -ew / 2 + outlineFit.x, -eh / 2 + outlineFit.y, outlineFit.w, outlineFit.h,
+    );
   }
 
   if (wantBody && emblemImg && emblemImg.width > 0 && emblemImg.height > 0) {
@@ -754,12 +769,28 @@ function drawGeneric(ctx: CanvasRenderingContext2D, spec: LogoSpec, opts: DrawLo
     ctx.textBaseline = 'middle';
     const text = (opts.textOverride ?? spec.mainText).toUpperCase().trim();
     const noEmblem = spec.shape === 'none';
+    // A BRAND'S OWN OUTLINE gets its lettering placed in the shape's INK-SAFE
+    // BOX (the largest rectangle inside the silhouette), not on the bounding
+    // rectangle: a notch, a ragged end, or a composed emblem's off-centre mass
+    // pulls the usable middle away from the box centre, and type centred on the
+    // box then sits visibly off-centre in the shape the eye reads. This is the
+    // same rule the die-cut signboards follow (canvas-textures.ts). Every other
+    // shape keeps the fixed fractions it always used.
+    const inkBox = spec.shape === 'path' && outlineFit ? logoShapeInnerBox(spec) : null;
+    const bx = inkBox && outlineFit ? outlineFit.x + inkBox.x * outlineFit.w - ew / 2 : -ew / 2;
+    const by = inkBox && outlineFit ? outlineFit.y + inkBox.y * outlineFit.h - eh / 2 : -eh / 2;
+    const bw = inkBox && outlineFit ? inkBox.w * outlineFit.w : ew;
+    const bh = inkBox && outlineFit ? inkBox.h * outlineFit.h : eh;
+    // Text origin: the ink box's centre, which IS the emblem centre for every
+    // shape whose outline is its own bounding rectangle.
+    const tcx = bx + bw / 2;
+    const tcy = by + bh / 2;
     // Round shapes have no full-width band for the text to ride: fit it into
     // the rectangle inscribed in the circle (diameter min(ew,eh)) / ellipse
     // (~1/√2 of each axis) instead, unless textOverflow spills it anyway.
     const overflow = spec.textOverflow && !isLabel;
-    let maxW = noEmblem ? w * 0.92 : overflow ? w * 0.96 : ew * 0.84;
-    let maxH = noEmblem ? h * 0.6 : eh * (hasSub ? 0.52 : 0.64);
+    let maxW = noEmblem ? w * 0.92 : overflow ? w * 0.96 : bw * 0.84;
+    let maxH = noEmblem ? h * 0.6 : bh * (hasSub ? 0.52 : 0.64);
     if (!noEmblem && spec.shape === 'circle') {
       const d = Math.min(ew, eh);
       if (!overflow) maxW = d * 0.74;
@@ -768,7 +799,7 @@ function drawGeneric(ctx: CanvasRenderingContext2D, spec: LogoSpec, opts: DrawLo
       if (!overflow) maxW = ew * 0.7;
       maxH = eh * (hasSub ? 0.38 : 0.48);
     }
-    const startPx = (noEmblem ? h * 0.5 : eh * 0.8) * (opts.fontScale ?? 1);
+    const startPx = (noEmblem ? h * 0.5 : bh * 0.8) * (opts.fontScale ?? 1);
     // A brand-supplied vector wordmark replaces the type entirely. Library
     // labels never use it — they set the LIBRARY's name, not the brand's.
     const wordmarkD = isLabel ? undefined : spec.wordmarkPathD;
@@ -778,11 +809,14 @@ function drawGeneric(ctx: CanvasRenderingContext2D, spec: LogoSpec, opts: DrawLo
     ctx.save();
     applyShadow(ctx, opts);
     ctx.fillStyle = spec.textColor;
+    // Main block and subText ride the ink box; the side band below stays on the
+    // emblem's own edge, which is where a band belongs.
+    ctx.translate(tcx, tcy);
     const lineHeight = fitted.fontSize * 1.05;
     // Nudge the main block up a touch when a subText sits under it.
-    const blockShift = hasSub ? -eh * 0.09 : 0;
+    const blockShift = hasSub ? -bh * 0.09 : 0;
     const startY = blockShift - ((fitted.lines.length - 1) * lineHeight) / 2;
-    if (artLayers) {
+    if (artLayers || (emblemDoc && !emblemDoc.wordmark)) {
       // The art already carries the lettering — nothing to type.
     } else if (wordmarkD) {
       drawWordmarkPath(ctx, wordmarkD, maxW, maxH, blockShift);
@@ -791,7 +825,7 @@ function drawGeneric(ctx: CanvasRenderingContext2D, spec: LogoSpec, opts: DrawLo
       fitted.lines.forEach((line, idx) => ctx.fillText(line, 0, startY + idx * lineHeight));
     }
 
-    if (hasSub) {
+    if (hasSub && !(emblemDoc && !emblemDoc.wordmark)) {
       // Right-aligned under the wordmark, the classic "…VIDEO" placement.
       const subPx = Math.max(14, fitted.fontSize * 0.4);
       ctx.font = getLogoFontString(spec, subPx);
@@ -801,10 +835,11 @@ function drawGeneric(ctx: CanvasRenderingContext2D, spec: LogoSpec, opts: DrawLo
       ctx.textAlign = 'center';
     }
     if (!isLabel && spec.bandText !== '') {
-      // Vertical band hugging the emblem's left inside edge.
+      // Vertical band hugging the emblem's left inside edge — in EMBLEM-box
+      // coordinates, so it stays on the edge instead of following the type.
       const bandPx = Math.max(12, eh * 0.11);
       ctx.save();
-      ctx.translate(-ew / 2 + eh * 0.1, 0);
+      ctx.translate(-ew / 2 + eh * 0.1 - tcx, -tcy);
       ctx.rotate(-Math.PI / 2);
       ctx.font = getLogoFontString(spec, bandPx);
       ctx.fillText(spec.bandText.toUpperCase(), 0, 0);

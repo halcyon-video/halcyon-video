@@ -3,6 +3,7 @@
 // endcap materials. Stateless — callers position the returned objects.
 import * as THREE from 'three';
 import { getActiveTheme } from './themes';
+import { formatShelfWood } from './format-surfaces';
 
 // ── The one chokepoint every sign mesh goes through ────────────────────────
 //
@@ -409,15 +410,20 @@ export function createLibraryEndCapMaterial(isBack: boolean = false): THREE.Mesh
   // #ffffff at roughness 0.8 was an out-of-gamut albedo with zero view
   // response — under the troffers the caps blew out flat white ("shining
   // like the sun") instead of reading as the same laminate as the run.
-  const sideColor = '#f8f2e8'; // tracks sharedShelfMat's warm off-white
-  const sideRoughness = 0.55;
-  const sideMetalness = 0.05;
+  // ...unless the FORMAT's shelving is timber rather than melamine, in which
+  // case the cap is a piece of the same carcass and takes the same stain (see
+  // format-surfaces.ts formatShelfWood — null on every laminate format, so the
+  // corporate cap is untouched).
+  const wood = formatShelfWood();
+  const sideColor = wood ? wood.hex : '#f8f2e8'; // tracks sharedShelfMat's warm off-white
+  const sideRoughness = wood ? 0.62 : 0.55;
+  const sideMetalness = wood ? 0.0 : 0.05;
 
   // 2000s theme: the non-front faces (the flat inner panel facing into the
   // run, plus the thin perimeter return edges) get a beige slatwall look
   // instead of plain white, per issue #48/#49a — no white end-cap geometry
   // should remain visible in this theme.
-  const sideMat = is2000sWireShelving
+  const sideMat = is2000sWireShelving && !wood
     ? new THREE.MeshStandardMaterial({
         map: getSlatwallEndCapTexture(),
         roughness: 0.85,
@@ -425,6 +431,7 @@ export function createLibraryEndCapMaterial(isBack: boolean = false): THREE.Mesh
       })
     : new THREE.MeshStandardMaterial({
         color: sideColor,
+        map: wood ? wood.textures.map : null,
         roughness: sideRoughness,
         metalness: sideMetalness
       });
@@ -438,8 +445,10 @@ export function createLibraryEndCapMaterial(isBack: boolean = false): THREE.Mesh
   canvas.height = 2048;
   const ctx = canvas.getContext('2d')!;
 
-  // Background color fill from active theme
-  ctx.fillStyle = theme.palette.primary;
+  // Background colour: the house colour on a chain's painted end panel, the
+  // format's own darker stain where the cap is a piece of timber. Both are
+  // DATA (theme palette / format preset) — signage rule 2 either way.
+  ctx.fillStyle = wood ? wood.endPanelHex : theme.palette.primary;
   ctx.fillRect(0, 0, 1024, 2048);
 
   const tex = new THREE.CanvasTexture(canvas);
@@ -450,8 +459,8 @@ export function createLibraryEndCapMaterial(isBack: boolean = false): THREE.Mesh
 
   const faceMat = new THREE.MeshStandardMaterial({
     map: tex,
-    roughness: 0.55, // satin, same family as the shelf melamine — see sideColor note
-    metalness: 0.05
+    roughness: wood ? 0.6 : 0.55, // satin, same family as the shelf finish — see sideColor note
+    metalness: wood ? 0.0 : 0.05
   });
 
   // Material index 0 is front face, 1 is sides, 2 is back face

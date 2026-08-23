@@ -57,7 +57,7 @@ import {
   StoreShellSpec,
   getStoreShellSpec,
   StorefrontSpec,
-  FixturePlacement,
+  FixturePlacement, newReleasesWallSpan, newReleasesLeftWallCols,
 } from './store-layout';
 import { activeMediaCutoff } from './media-release-date';
 import { titleMatchKeys } from './staff-picks';
@@ -1182,8 +1182,8 @@ export class StoreScene {
       const sw = this.getStoreWidth();
       const leftEdge = 11.0 - sw / 2;
       const rightEdge = 11.0 + sw / 2;
-      this.nrBackLeftX = leftEdge + this.LEFT_SLIVER;
-      this.nrBackRightEdgeX = rightEdge - 0.2;
+      // How much back wall New Releases gets is the FORMAT's call (GH #33).
+      [this.nrBackLeftX, this.nrBackRightEdgeX] = newReleasesWallSpan(leftEdge + this.LEFT_SLIVER, rightEdge - 0.2);
       // Stepped-corner footprint comes from the shell spec (T07). Width sets how
       // far left the step begins; depth is clamped to the section width so the
       // NR connector run is never longer than the section it wraps, and stays
@@ -1256,8 +1256,7 @@ export class StoreScene {
       // glass). The whole point of this calc is described right above it as
       // ADAPTIVE — sized to whatever the ribbon leaves behind it — so let it
       // actually use the space it computed instead of throwing some away.
-      this.nrLeftWallCols = Math.max(0, Math.floor((unitSpace - 1.0) / BOX_SPACING));
-      if (this.nrLeftWallCols < SECTION_COLS) this.nrLeftWallCols = 0; // below one section, drop the run
+      this.nrLeftWallCols = newReleasesLeftWallCols(unitSpace);
 
       this.nrTotalCols = this.nrLeftWallCols + this.nrBackWallCols;
     }
@@ -3113,6 +3112,11 @@ export class StoreScene {
   // so no slot state changes — matching how the launch flourish reads.
   public takeSelectedTape(): boolean { return checkout.takeSelectedTape(this); }
 
+  // Shared take-into-carry mechanics for a caller that already has the
+  // movie/slot in hand (2D selection OR a VR raycast hit) — see
+  // checkout.takeTapeIntoCarry's header.
+  public takeTapeIntoCarry(movie: Movie, slot: MovieSlot | null): boolean { return checkout.takeTapeIntoCarry(this, movie, slot); }
+
   /** Put the top carried tape back on its shelf (R / LB). */
   public returnCarriedTape(): void { return checkout.returnCarriedTape(this); }
 
@@ -3139,6 +3143,15 @@ export class StoreScene {
   // Enter at the counter: with tapes, run the checkout flourish; empty-handed,
   // the clerk nudges you back to the shelves.
   public confirmCheckout(): boolean { return checkout.confirmCheckout(this); }
+
+  // Whether confirmCheckoutVR would succeed right now, with no side effects
+  // (see checkout.canConfirmCheckout's header) — store-vr.ts checks this
+  // before tearing down a VR session for a checkout confirm.
+  public canConfirmCheckout(): boolean { return checkout.canConfirmCheckout(this); }
+
+  // The VR counter confirm: same guards as confirmCheckout, no flourish —
+  // see checkout.confirmCheckoutVR's header.
+  public confirmCheckoutVR(): boolean { return checkout.confirmCheckoutVR(this); }
 
   // Checkout flourish done: emit the event, clear the stack (dispose + wipe
   // bb_carried), release the clerk, and return to the overview. What happens

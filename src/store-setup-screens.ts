@@ -54,7 +54,10 @@ export type SetupScreen =
   // catalog sync. Same checkbox-list shape as 'libraries' (reuses
   // SetupLibraryRow), but zero chosen is a legitimate answer -- unlike an
   // empty library list, it never blocks OPEN THE STORE.
-  | { kind: 'streaming'; rows: SetupLibraryRow[]; row: number }
+  // `confirm` overrides the last row's label (#96): the manager terminal
+  // shows this same screen to a store that is already open, where OPEN THE
+  // STORE would be a lie -- see streaming-choice.ts, which builds it for both.
+  | { kind: 'streaming'; rows: SetupLibraryRow[]; row: number; confirm?: string }
   | { kind: 'sync'; stage: string; pages: number }
   | { kind: 'arriving' }
   | { kind: 'notice'; address: string; detail: string; row: number };
@@ -323,7 +326,7 @@ export function setupScreenLines(s: SetupScreen): { lines: string[]; cursorLine:
         lines.push(sel(!onOpen && idx === s.row, `[${r.carried ? 'X' : ' '}] ${r.name.toUpperCase().slice(0, 32)}`));
       });
       const openLineIdx = lines.length;
-      lines.push(sel(onOpen, 'OPEN THE STORE'));
+      lines.push(sel(onOpen, (s.confirm || 'OPEN THE STORE').slice(0, 38)));
       const cursorLine = onOpen ? openLineIdx : 3 + (s.row - start);
       return { lines, cursorLine };
     }

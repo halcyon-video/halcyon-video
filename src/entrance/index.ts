@@ -44,14 +44,16 @@ import { makeCrtGlassMaterial, addGlassReflectionPane } from '../glass-reflectio
 import { assetUrl } from '../asset-url';
 import { FixtureContext, StoreFixture } from '../fixtures';
 import { getActiveTheme, themeKneeGoldHex } from '../themes';
-import { ENTRANCE_SIDELIGHT_WIDTH, CEILING_Y, mapWallSegmentUV } from '../store-layout';
+import { ENTRANCE_SIDELIGHT_WIDTH, CEILING_Y, mapWallSegmentUV, vestibuleHalfWidth } from '../store-layout';
 import { vestibuleCeilingY } from '../ceiling-soffit';
 import { WINDOW_HEAD_Y } from '../storefront-facade';
 import { buildVestibuleDoor, updateVestibuleDoors, VestibuleDoor } from './doors';
 import { buildCheckoutCounter, ClerkStanding } from './counter';
+import { buildCounterTv } from './counter-tv';
 import { Footprint } from '../layout-validator';
 import { CheckoutBag } from '../checkout-bag';
 import { ReturnSlot } from './return-slot';
+import { activeStoreFormat } from '../store-format';
 import type { Movie } from '../jellyfin';
 import { CRT_BLACK, CRT_GOLD, CRT_INK, CRT_TEXT } from '../crt-theme';
 import { brandString } from '../brand-pack';
@@ -116,12 +118,12 @@ export class EntranceCheckout implements StoreFixture {
   // with the centre divider glass between them. Populated by build().
   private vestibuleInfo: {
     cx: number; xL: number; xR: number; frontZ: number; backZ: number;
-    doorW: number; sideDoorZ: number;
+    doorW: number; sideDoorZ: number; hasChamber: boolean;
   } | null = null;
 
   getVestibuleInfo(): {
     cx: number; xL: number; xR: number; frontZ: number; backZ: number;
-    doorW: number; sideDoorZ: number;
+    doorW: number; sideDoorZ: number; hasChamber: boolean;
   } | null {
     return this.vestibuleInfo;
   }
@@ -197,10 +199,22 @@ export class EntranceCheckout implements StoreFixture {
     const cx = 11.0;             // centred on the store
     const doorH = 7.0;
     const doorW = spec.doorWidth;
-    const boxW = 9.0 + 2 * doorW; // widened by two door-widths
-    const boxDepth = doorW * 2;  // depth = two door-widths (~6.4 ft)
+    // entryStyle 'storefront-door' (GH #110): no chamber at all — a real
+    // small shop has a door in the front wall, not an airlock. See the branch
+    // below and StoreFormatSpec.entryStyle.
+    const hasChamber = spec.entryStyle === 'vestibule';
+    // Entrance footprint width. DERIVED from vestibuleHalfWidth() rather than
+    // re-stating its formula, because that function is what the facade's
+    // entry opening, the storefront knee-wall gap and the baseline store
+    // width are all sized from — and it is FORMAT-DRIVEN (a mom-and-pop's
+    // chamber is a 4.6 ft lobby with one leaf, not a 9 ft airlock with two;
+    // a storefront-door format has no chamber at all, just a door + jamb
+    // reveal). A second copy of the formula here is exactly how the facade
+    // and the entrance would drift apart on a new format.
+    const boxW = hasChamber ? 2 * vestibuleHalfWidth(spec) - 0.4 : 2 * vestibuleHalfWidth(spec);
+    const boxDepth = hasChamber ? doorW * 2 : 0;  // chamber depth = two door-widths (~6.4 ft); none otherwise
     const frontZ = 15.0;         // street side (front glass wall)
-    const backZ = frontZ - boxDepth; // store side (= counter back)
+    const backZ = frontZ - boxDepth; // store side (= counter back); == frontZ with no chamber
     const xL = cx - boxW / 2;    // -X (left) wall
     const xR = cx + boxW / 2;    // +X (right) wall
     // The chamber is capped at the cash-wrap soffit's height rather than
@@ -324,143 +338,195 @@ export class EntranceCheckout implements StoreFixture {
     };
 
     const sideDoorZ = backZ + doorW / 2 + 0.4; // side doors sit on the store-side (inner) half
-    this.vestibuleInfo = { cx, xL, xR, frontZ, backZ, doorW, sideDoorZ };
-
-    // ----- Front wall (Z = frontZ): the reference photo's recessed-entry
-    // composition — narrow sidelight | door | door | narrow sidelight. The two
-    // full-glass leaves are ADJACENT at the store centreline, meeting at a
-    // center stile; the exit leaf is on the left (-X, swings out to the
-    // street), the entrance leaf on the right (+X, swings into the vestibule).
-    // A continuous transom of glass runs above doors and sidelights up to the
-    // storefront glazing head (WINDOW_HEAD_Y), where every window head across
-    // the whole storefront aligns. -----
-    const exitX = cx - doorW / 2;  // left leaf, hinged at its left jamb
-    const entrX = cx + doorW / 2;  // right leaf, hinged at its right jamb
-    buildGlazedWall('X', frontZ, xL, xR, [exitX, entrX], {
-      transomY: WINDOW_HEAD_Y,
-      extraMullions: [
-        cx - doorW - ENTRANCE_SIDELIGHT_WIDTH, // left sidelight's outer post
-        cx + doorW + ENTRANCE_SIDELIGHT_WIDTH, // right sidelight's outer post
-      ],
-    });
+    this.vestibuleInfo = { cx, xL, xR, frontZ, backZ, doorW, sideDoorZ, hasChamber };
     const doorMats = { frameMat, glassMat, chrome };
-    // The glazed wall above already frames the paired opening completely: the
-    // full-width transom bar at the door head is the shared header, and the
-    // posts at cx ± doorW (hinge jambs) and cx (the meeting stile) are the
-    // uprights — so each leaf's own static frame parts are all suppressed
-    // (duplicating them would coincide with those posts and z-fight).
-    //
-    // Swing leaves hinge at the OUTER jambs (exit swings out to the street,
-    // entrance swings into the vestibule — both openAngle -1.4 given their
-    // mirrored hinge sides). For the 'sliding' doorStyle the same flag is the
-    // slide direction instead: the pair parts from the centre, each leaf
-    // tucking into a pocket behind the sidelight glass on its own side.
-    const sliding = spec.doorStyle === 'sliding';
-    const noFrame = { header: false, jambLeft: false, jambRight: false };
-    this.doors.push(buildVestibuleDoor(this.ctx, group, doorMats, spec, exitX, frontZ, doorH, true, !sliding, -1.4, noFrame));
-    this.doors.push(buildVestibuleDoor(this.ctx, group, doorMats, spec, entrX, frontZ, doorH, true, sliding, -1.4, noFrame));
 
-    // ----- Back wall (Z = backZ): glass too, so the whole chamber is glazed -----
-    buildGlazedWall('X', backZ, xL, xR, []);
+    if (hasChamber) {
+      // ----- Front wall (Z = frontZ): the reference photo's recessed-entry
+      // composition — narrow sidelight | door | door | narrow sidelight. The two
+      // full-glass leaves are ADJACENT at the store centreline, meeting at a
+      // center stile; the exit leaf is on the left (-X, swings out to the
+      // street), the entrance leaf on the right (+X, swings into the vestibule).
+      // A continuous transom of glass runs above doors and sidelights up to the
+      // storefront glazing head (WINDOW_HEAD_Y), where every window head across
+      // the whole storefront aligns. -----
+      const exitX = cx - doorW / 2;  // left leaf, hinged at its left jamb
+      const entrX = cx + doorW / 2;  // right leaf, hinged at its right jamb
+      buildGlazedWall('X', frontZ, xL, xR, [exitX, entrX], {
+        transomY: WINDOW_HEAD_Y,
+        extraMullions: [
+          cx - doorW - ENTRANCE_SIDELIGHT_WIDTH, // left sidelight's outer post
+          cx + doorW + ENTRANCE_SIDELIGHT_WIDTH, // right sidelight's outer post
+        ],
+      });
+      // The glazed wall above already frames the paired opening completely: the
+      // full-width transom bar at the door head is the shared header, and the
+      // posts at cx ± doorW (hinge jambs) and cx (the meeting stile) are the
+      // uprights — so each leaf's own static frame parts are all suppressed
+      // (duplicating them would coincide with those posts and z-fight).
+      //
+      // Swing leaves hinge at the OUTER jambs (exit swings out to the street,
+      // entrance swings into the vestibule — both openAngle -1.4 given their
+      // mirrored hinge sides). For the 'sliding' doorStyle the same flag is the
+      // slide direction instead: the pair parts from the centre, each leaf
+      // tucking into a pocket behind the sidelight glass on its own side.
+      const sliding = spec.doorStyle === 'sliding';
+      const noFrame = { header: false, jambLeft: false, jambRight: false };
+      this.doors.push(buildVestibuleDoor(this.ctx, group, doorMats, spec, exitX, frontZ, doorH, true, !sliding, -1.4, noFrame));
+      this.doors.push(buildVestibuleDoor(this.ctx, group, doorMats, spec, entrX, frontZ, doorH, true, sliding, -1.4, noFrame));
 
-    // ----- Side walls (glass), each with one door on the inner (store-side) half -----
-    buildGlazedWall('Z', xR, backZ, frontZ, [sideDoorZ]); // right wall -> into store
-    buildGlazedWall('Z', xL, backZ, frontZ, [sideDoorZ]); // left wall  -> exiters enter
-    this.doors.push(buildVestibuleDoor(this.ctx, group, doorMats, spec, xR, sideDoorZ, doorH, false, true, 1.4));
-    this.doors.push(buildVestibuleDoor(this.ctx, group, doorMats, spec, xL, sideDoorZ, doorH, false, true, 1.4));
+      // ----- Back wall (Z = backZ): glass too, so the whole chamber is glazed -----
+      buildGlazedWall('X', backZ, xL, xR, []);
 
-    // ----- Central glass divider splitting entrance (+X) from exit (-X) -----
-    buildGlazedWall('Z', cx, backZ, frontZ, []);
+      // ----- Side walls (glass), each with one door on the inner (store-side) half -----
+      buildGlazedWall('Z', xR, backZ, frontZ, [sideDoorZ]); // right wall -> into store
+      buildGlazedWall('Z', xL, backZ, frontZ, [sideDoorZ]); // left wall  -> exiters enter
+      this.doors.push(buildVestibuleDoor(this.ctx, group, doorMats, spec, xR, sideDoorZ, doorH, false, true, 1.4));
+      this.doors.push(buildVestibuleDoor(this.ctx, group, doorMats, spec, xL, sideDoorZ, doorH, false, true, 1.4));
 
-    // ----- Solid soffit cap (opens up only when soffitCapY > wallH, i.e. the
-    // 'high' ceiling preset) -----
-    // Every wall above closed its glass at the clamped wallH, leaving a gap
-    // up to the soffit's real height (soffitCapY) that used to be more
-    // glass. Instead of glazing it, box it in solid and finish it in the
-    // store's own wall material — "the vestibule top half should be a
-    // solid soffit that extends from the upper soffit, [with] walls that
-    // match the color of the store walls" (feedback/057). Reuses the same
-    // wallSurface material + mapWallSegmentUV helper every other recycled
-    // wall surface in the store goes through (store-shell.ts's knee walls,
-    // the front window's kneeSurface, ...) so it carries the same mottle/
-    // orange-peel/contact-AO as the rest of the room instead of a flat
-    // patch of color, and falls back to the theme's knee-gold approximation
-    // in a context with no live wall build (matching store-shell.ts's own
-    // kneeMat fallback) rather than a hardcoded hex.
-    const capH = soffitCapY - wallH;
-    if (capH > 0.05) {
+      // ----- Central glass divider splitting entrance (+X) from exit (-X) -----
+      buildGlazedWall('Z', cx, backZ, frontZ, []);
+
+      // ----- Solid soffit cap (opens up only when soffitCapY > wallH, i.e. the
+      // 'high' ceiling preset) -----
+      // Every wall above closed its glass at the clamped wallH, leaving a gap
+      // up to the soffit's real height (soffitCapY) that used to be more
+      // glass. Instead of glazing it, box it in solid and finish it in the
+      // store's own wall material — "the vestibule top half should be a
+      // solid soffit that extends from the upper soffit, [with] walls that
+      // match the color of the store walls" (feedback/057). Reuses the same
+      // wallSurface material + mapWallSegmentUV helper every other recycled
+      // wall surface in the store goes through (store-shell.ts's knee walls,
+      // the front window's kneeSurface, ...) so it carries the same mottle/
+      // orange-peel/contact-AO as the rest of the room instead of a flat
+      // patch of color, and falls back to the theme's knee-gold approximation
+      // in a context with no live wall build (matching store-shell.ts's own
+      // kneeMat fallback) rather than a hardcoded hex.
+      const capH = soffitCapY - wallH;
+      if (capH > 0.05) {
+        const wallSurf = this.ctx.wallSurface;
+        const capMat = wallSurf?.material
+          ?? new THREE.MeshStandardMaterial({ color: new THREE.Color(themeKneeGoldHex()), roughness: 0.92, metalness: 0.0 });
+        const capGeo = new THREE.BoxGeometry(boxW, capH, boxDepth);
+        if (wallSurf) mapWallSegmentUV(capGeo, boxW, capH, wallH, wallSurf.storeWidth, wallSurf.roomHeight);
+        const cap = new THREE.Mesh(capGeo, capMat);
+        cap.position.set(cx, wallH + capH / 2, (frontZ + backZ) / 2);
+        cap.castShadow = true;
+        cap.receiveShadow = true;
+        group.add(cap);
+        this.ctx.addCollider(cap);
+
+        // HVAC diffusers on the entrance (+X chamber) and exit (-X chamber)
+        // sides — "maybe an AC vent on the entrance and exit sides" — set
+        // into the cap's underside over each chamber, same spot the walk-off
+        // mats below centre on (cx ± boxW/4), and the same slotted-diffuser
+        // texture/material recipe the main ceiling's own vents use
+        // (createHvacVentTexture, store-shell.ts).
+        const ventTex = createHvacVentTexture();
+        const ventMat = new THREE.MeshStandardMaterial({
+          map: ventTex, roughness: 0.5, metalness: 0.06,
+          emissive: 0xffffff, emissiveMap: ventTex, emissiveIntensity: 0.15,
+        });
+        const ventW = Math.min(boxDepth * 0.6, 2.0);
+        const ventH = ventW / 2; // matches the texture's 256x128 (2:1) aspect
+        [cx + boxW / 4, cx - boxW / 4].forEach((vx) => {
+          const vent = new THREE.Mesh(new THREE.PlaneGeometry(ventW, ventH), ventMat);
+          // Just BELOW the cap's own bottom face (which sits exactly at wallH) —
+          // proud of it toward the chamber, or the solid box's opaque underside
+          // wins the depth test and hides the vent plane entirely.
+          vent.position.set(vx, wallH - 0.01, (frontZ + backZ) / 2);
+          vent.rotation.x = Math.PI / 2; // normal points down, into the chamber below
+          group.add(vent);
+        });
+      }
+
+      // ----- Vestibule ceiling -----
+      // There isn't one, and there are no fittings in it either. The cash-wrap
+      // soffit's lid runs on past its fascia, over this chamber, and into the
+      // storefront wall (frontSoffitLidPolygon in src/ceiling-soffit.ts), so the
+      // front of the store carries ONE tile deck at vestibuleCeilingY ==
+      // frontSoffitY with no joint over the entrance. A second lid here only ever
+      // meant a seam to get wrong — at a different height it was a slot you could
+      // see through, and at the same height it was coplanar overlap, i.e.
+      // z-fighting.
+      //
+      // The two flush lenses that used to hang under it went with it. They were
+      // there to keep the chamber off black after dark back when it had its own
+      // low lid closing it off from the room; sitting proud of a deck that now
+      // runs straight through, they read as two panels stuck on the ceiling for
+      // no reason. The deck's own troffers and the marquee carry the entrance.
+
+      // ----- Walk-off mats -----
+      // Ribbed charcoal rubber mats on each half of the vestibule floor (entry
+      // +X, exit -X) — every real retail vestibule has them, and they break up
+      // what was pristine carpet running straight to the door line.
+      {
+        const { map: matTex, normalMap: matNorm } = createWalkOffMatTexture();
+        const matW = (boxW / 2) - doorW * 0.55;
+        const matD = boxDepth - 1.1;
+        matTex.repeat.set(matW / 1.5, matD / 1.5);
+        matNorm.repeat.copy(matTex.repeat);
+        const matMat = new THREE.MeshStandardMaterial({
+          map: matTex, normalMap: matNorm, normalScale: new THREE.Vector2(0.5, 0.5),
+          roughness: 0.95, metalness: 0.0,
+        });
+        [cx + boxW / 4, cx - boxW / 4].forEach((mx) => {
+          const mat = new THREE.Mesh(new THREE.BoxGeometry(matW, 0.025, matD), matMat);
+          mat.position.set(mx, 0.0125, (frontZ + backZ) / 2);
+          mat.receiveShadow = true;
+          group.add(mat);
+        });
+      }
+    } else {
+      // ----- Storefront door (GH #110): ONE door leaf set directly into the
+      // front wall, in a solid wall finished like the sales floor's own
+      // walls — no chamber, no sidelights, no divider. What a real small
+      // shop's front wall has. The exterior side of this same opening is
+      // dressed by storefront-facade-shop.ts, which is exterior-only
+      // (z > 15) and never builds anything on the walkable glass line — this
+      // interior wall is the one thing standing at frontZ. -----
+      const doorHalf = doorW / 2;
       const wallSurf = this.ctx.wallSurface;
-      const capMat = wallSurf?.material
+      const doorWallMat = wallSurf?.material
         ?? new THREE.MeshStandardMaterial({ color: new THREE.Color(themeKneeGoldHex()), roughness: 0.92, metalness: 0.0 });
-      const capGeo = new THREE.BoxGeometry(boxW, capH, boxDepth);
-      if (wallSurf) mapWallSegmentUV(capGeo, boxW, capH, wallH, wallSurf.storeWidth, wallSurf.roomHeight);
-      const cap = new THREE.Mesh(capGeo, capMat);
-      cap.position.set(cx, wallH + capH / 2, (frontZ + backZ) / 2);
-      cap.castShadow = true;
-      cap.receiveShadow = true;
-      group.add(cap);
-      this.ctx.addCollider(cap);
+      const panel = (w: number, h: number, x: number, y: number, yStart: number) => {
+        if (w < 0.05 || h < 0.05) return;
+        const geo = new THREE.BoxGeometry(w, h, wallT * 3);
+        if (wallSurf) mapWallSegmentUV(geo, w, h, yStart, wallSurf.storeWidth, wallSurf.roomHeight);
+        const m = new THREE.Mesh(geo, doorWallMat);
+        m.position.set(x, y, frontZ);
+        m.castShadow = true;
+        m.receiveShadow = true;
+        group.add(m);
+        this.ctx.addCollider(m);
+      };
+      // Jamb reveals flanking the door, floor to door head.
+      const jambW = boxW / 2 - doorHalf;
+      panel(jambW, doorH, (xL + (cx - doorHalf)) / 2, doorH / 2, 0);
+      panel(jambW, doorH, ((cx + doorHalf) + xR) / 2, doorH / 2, 0);
+      // Header above the door, straight up to the soffit — no glass transom
+      // to keep proportioned, so this runs to the LIVE ceiling's soffit
+      // height (soffitCapY) rather than the wallH clamp the chamber uses.
+      panel(boxW, soffitCapY - doorH, cx, doorH + (soffitCapY - doorH) / 2, doorH);
 
-      // HVAC diffusers on the entrance (+X chamber) and exit (-X chamber)
-      // sides — "maybe an AC vent on the entrance and exit sides" — set
-      // into the cap's underside over each chamber, same spot the walk-off
-      // mats below centre on (cx ± boxW/4), and the same slotted-diffuser
-      // texture/material recipe the main ceiling's own vents use
-      // (createHvacVentTexture, store-shell.ts).
-      const ventTex = createHvacVentTexture();
-      const ventMat = new THREE.MeshStandardMaterial({
-        map: ventTex, roughness: 0.5, metalness: 0.06,
-        emissive: 0xffffff, emissiveMap: ventTex, emissiveIntensity: 0.15,
-      });
-      const ventW = Math.min(boxDepth * 0.6, 2.0);
-      const ventH = ventW / 2; // matches the texture's 256x128 (2:1) aspect
-      [cx + boxW / 4, cx - boxW / 4].forEach((vx) => {
-        const vent = new THREE.Mesh(new THREE.PlaneGeometry(ventW, ventH), ventMat);
-        // Just BELOW the cap's own bottom face (which sits exactly at wallH) —
-        // proud of it toward the chamber, or the solid box's opaque underside
-        // wins the depth test and hides the vent plane entirely.
-        vent.position.set(vx, wallH - 0.01, (frontZ + backZ) / 2);
-        vent.rotation.x = Math.PI / 2; // normal points down, into the chamber below
-        group.add(vent);
-      });
-    }
+      this.doors.push(buildVestibuleDoor(this.ctx, group, doorMats, spec, cx, frontZ, doorH, true, true, -1.4));
 
-    // ----- Vestibule ceiling -----
-    // There isn't one, and there are no fittings in it either. The cash-wrap
-    // soffit's lid runs on past its fascia, over this chamber, and into the
-    // storefront wall (frontSoffitLidPolygon in src/ceiling-soffit.ts), so the
-    // front of the store carries ONE tile deck at vestibuleCeilingY ==
-    // frontSoffitY with no joint over the entrance. A second lid here only ever
-    // meant a seam to get wrong — at a different height it was a slot you could
-    // see through, and at the same height it was coplanar overlap, i.e.
-    // z-fighting.
-    //
-    // The two flush lenses that used to hang under it went with it. They were
-    // there to keep the chamber off black after dark back when it had its own
-    // low lid closing it off from the room; sitting proud of a deck that now
-    // runs straight through, they read as two panels stuck on the ceiling for
-    // no reason. The deck's own troffers and the marquee carry the entrance.
-
-    // ----- Walk-off mats -----
-    // Ribbed charcoal rubber mats on each half of the vestibule floor (entry
-    // +X, exit -X) — every real retail vestibule has them, and they break up
-    // what was pristine carpet running straight to the door line.
-    {
-      const { map: matTex, normalMap: matNorm } = createWalkOffMatTexture();
-      const matW = (boxW / 2) - doorW * 0.55;
-      const matD = boxDepth - 1.1;
-      matTex.repeat.set(matW / 1.5, matD / 1.5);
-      matNorm.repeat.copy(matTex.repeat);
-      const matMat = new THREE.MeshStandardMaterial({
-        map: matTex, normalMap: matNorm, normalScale: new THREE.Vector2(0.5, 0.5),
-        roughness: 0.95, metalness: 0.0,
-      });
-      [cx + boxW / 4, cx - boxW / 4].forEach((mx) => {
+      // A single walk-off mat at the door.
+      {
+        const { map: matTex, normalMap: matNorm } = createWalkOffMatTexture();
+        const matW = doorW + 1.0;
+        const matD = 2.2;
+        matTex.repeat.set(matW / 1.5, matD / 1.5);
+        matNorm.repeat.copy(matTex.repeat);
+        const matMat = new THREE.MeshStandardMaterial({
+          map: matTex, normalMap: matNorm, normalScale: new THREE.Vector2(0.5, 0.5),
+          roughness: 0.95, metalness: 0.0,
+        });
         const mat = new THREE.Mesh(new THREE.BoxGeometry(matW, 0.025, matD), matMat);
-        mat.position.set(mx, 0.0125, (frontZ + backZ) / 2);
+        mat.position.set(cx, 0.0125, frontZ - 0.1 - matD / 2);
         mat.receiveShadow = true;
         group.add(mat);
-      });
+      }
     }
 
     // ----- Checkout counter: the classic shield pentagon, now a WALK-IN desk -----
@@ -491,18 +557,26 @@ export class EntranceCheckout implements StoreFixture {
         },
       ],
       register: counterResult.registerStanding,
-      terminals: [
-        counterResult.getTerminalStanding(cx - 4.0),
-        counterResult.getTerminalStanding(cx + 4.0),
-      ],
+      // Same anchors the terminal props are built at, below.
+      terminals: spec.counterShape === 'desk'
+        ? [counterResult.getTerminalStanding(cx + 1.3)]
+        : [
+            counterResult.getTerminalStanding(cx - 4.0),
+            counterResult.getTerminalStanding(cx + 4.0),
+          ],
     };
 
     // Anchor X offsets along the inner island. The usquare counter's island
     // is shorter (±5.0 vs the shield's ±6.0 — see counter.ts islandHalf), so
     // everything that parks ON it pulls proportionally toward the centre.
+    // 'desk' (the mom-and-pop format's standalone 6 ft counter, islandHalf 3.0)
+    // is the tight one: the owner's spec is a counter "that fits a single
+    // computer", so the terminal sits just right of centre and the bag waits
+    // just left of it, both well inside the desk's own ends.
     const sq = spec.counterShape === 'usquare';
-    const termOff = sq ? 3.5 : 4.0;
-    const bagOff = sq ? 4.6 : 5.4;
+    const isDesk = spec.counterShape === 'desk';
+    const termOff = isDesk ? 1.3 : (sq ? 3.5 : 4.0);
+    const bagOff = isDesk ? 1.9 : (sq ? 4.6 : 5.4);
     const term1 = getInnerCounterSpine(cx - termOff);
     const term2 = getInnerCounterSpine(cx + termOff);
     const bagSpine = getInnerCounterSpine(cx - bagOff);
@@ -510,10 +584,13 @@ export class EntranceCheckout implements StoreFixture {
     // Rental terminals on the inner counter, screens facing the clerk side
     // (away from the store) like a real register — the gold-on-black rental
     // system reads to whoever is working the register, not the customer.
-    this.buildDeskTerminals(group, [
-      { x: cx - termOff, y: innerH + 0.12, z: term1.z, rotY: term1.rotY },
-      { x: cx + termOff, y: innerH + 0.12, z: term2.z, rotY: term2.rotY },
-    ]);
+    // A single computer on the desk format, the classic pair otherwise.
+    this.buildDeskTerminals(group, isDesk
+      ? [{ x: cx + termOff, y: innerH + 0.12, z: term2.z, rotY: term2.rotY }]
+      : [
+          { x: cx - termOff, y: innerH + 0.12, z: term1.z, rotY: term1.rotY },
+          { x: cx + termOff, y: innerH + 0.12, z: term2.z, rotY: term2.rotY },
+        ]);
 
     // Glossy white plastic rental bag waiting at the end of the counter
     // nearest the exit door (-X side) — the launch flourish drops your movie
@@ -522,6 +599,14 @@ export class EntranceCheckout implements StoreFixture {
     this.bagMouthWorld = this.bag.mouthWorld;
     this.bagBaseWorld = new THREE.Vector3(cx - bagOff, innerH + 0.12, bagSpine.z);
     this.bagRestYaw = bagSpine.rotY;
+
+    // A television on a bracket behind the counter (StoreFormatSpec.counterTv,
+    // GH #110) — near the desk's far edge from the bag, clear of the terminal.
+    if (activeStoreFormat().counterTv) {
+      const tvOff = isDesk ? 2.2 : (sq ? 4.6 : 5.4);
+      const tvSpine = getInnerCounterSpine(cx + tvOff);
+      buildCounterTv(this.ctx, group, cx + tvOff, innerH + 0.12, tvSpine.z, tvSpine.rotY);
+    }
 
     // "RETURN TAPES HERE" chute grown off the counter band INSIDE the store,
     // on the shoulder face nearest the entrance-side door — immediately on
@@ -537,13 +622,39 @@ export class EntranceCheckout implements StoreFixture {
     // protrudes into walkable floor now, so its footprint joins the clerk nav
     // rects below.
     // A RETURN TAPES chute belongs to the VHS-rental store — the tape eras
-    // (1990 / 1993 / 2000), not the DVD-era 2010.
+    // (1990 / 1993 / 2000), not the DVD-era 2010. And it belongs to a store
+    // big enough to bolt one to: it is chain counter furniture, so a FORMAT
+    // can decline it (StoreFormatSpec.counterDressing). Mom-and-pop does —
+    // its whole counter is a 6 ft desk, and a drop box standing off the end
+    // of it was wider than the desk was deep (GH #112). Every consumer of the
+    // return ritual already guards on hasReturnSlot(), because the 2010 store
+    // has had none since the theme shipped; tapes still come back, they just
+    // come back without the drop animation.
     const chuteTheme = getActiveTheme();
-    if (chuteTheme.defaultMedium === 'vhs') {
+    if (chuteTheme.defaultMedium === 'vhs' && activeStoreFormat().counterDressing) {
       const zBackC = backZ - 0.1; // counter.ts's band outline datum
+      // Mirrored from return-slot.ts's CHUTE_BACK, the same way BAND_H is
+      // mirrored from counter.ts below — those files stay layout-agnostic.
+      const RETURN_CHUTE_BACK = 1.5;
       let anchor: { x: number; z: number };
       let faceYaw: number;
-      if (sq) {
+      if (isDesk) {
+        // Standalone desk (mom-and-pop): there is no band to grow the chute
+        // OUT OF, so it stands as its own drop box at the desk's +X end, slot
+        // facing +X — still the first thing on your left as you come through
+        // the door, still clear of the vestibule glazing and the door swing.
+        //
+        // The anchor is the SLOT FACE, and the body runs CHUTE_BACK (1.5 ft)
+        // behind it — that depth exists to tuck the chute's rear wall inside
+        // the counter band it normally bumps out of. Anchoring it at the desk's
+        // own end face therefore buried 1.5 ft of chute IN the desk, on top of
+        // the terminal: from the manager terminal the blue shell covered a
+        // third of the screen. Offsetting by that same depth stands its rear
+        // wall flush with the desk end instead. Desk rect: x = cx ± 3.0,
+        // z = zBackC-4.6 .. zBackC-3.0 (see counter.ts's `desk` branch).
+        anchor = { x: cx + 3.0 + RETURN_CHUTE_BACK, z: zBackC - 3.8 };
+        faceYaw = Math.PI / 2;
+      } else if (sq) {
         // Flat right side, facing +X; biased toward the back (door) end but
         // clear of the back corner's square cut.
         anchor = { x: cx + 6.8, z: zBackC - 3.2 };
@@ -562,7 +673,23 @@ export class EntranceCheckout implements StoreFixture {
       this.clerkNavInfo.footprints.push(this.returnSlot.getFootprint());
     }
 
-    // Populate sign placement anchors on the register counter top spine
+    // Populate sign placement anchors on the register counter top spine.
+    //
+    // ...unless the format wears no counter dressing (mom-and-pop, GH #112):
+    // the four register slots carry BE KIND REWIND, the rental-policy and
+    // membership snap frames and NEXT REGISTER PLEASE, which is chain signage
+    // in a family shop. Two of the four are ALSO impossible here — they are
+    // anchored to the blue top of the walk-in BAND at y 3.54 (see the BAND_H
+    // note above) and a standalone desk has no band, so the REWIND tent hung
+    // in mid-air over the clerk's floor. Leaving the anchor list empty is the
+    // whole mechanism: buildSignage() only ever builds slots it is handed, and
+    // its drift check runs the other way (a slot BUILT but unregistered is the
+    // error), so no config, catalog entry or slot-id list changes.
+    if (!activeStoreFormat().counterDressing) {
+      this.signAnchors = [];
+      return;
+    }
+
     const rightSignOff = sq ? 4.4 : 5.4;
     const leftAnchor = getInnerCounterSpine(cx - 1.8);
     const middleAnchor = getInnerCounterSpine(cx + 1.8);

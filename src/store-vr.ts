@@ -8,19 +8,31 @@
 // parameter, matching the store-*.ts extraction pattern; nothing is ever
 // bolted onto the class.
 //
-// Design invariant: a VR session never outlives walk-around mode. Every
-// other screen (inspect, browse, playback, checkout, the CRT terminals...) is
-// a flat camera-glide view with no head-tracking story yet, and
-// store-walk.ts's walkInspectSlot() already calls toggleWalkAround() the
-// instant a case is picked up. So "end the session before starting
-// playback" (the issue's requirement) falls out of ONE check in onXRFrame —
-// nothing reachable from walk mode can start playback without leaving walk
-// mode first, and leaving walk mode for any reason ends the session.
+// Design invariant (issue #97 tightened this from issue #79's original): a
+// VR session never outlives walk-around mode, AND picking up a case never
+// ends it either — trigger-selecting a shelf case routes to
+// store-walk.ts's walkTakeSlot() (carry it, stay in walk mode) instead of
+// walkInspectSlot() (flat inspect view, which still ends the session exactly
+// as before for every OTHER walk-mode exit). Playback can only start by
+// physically walking the case to the checkout counter and confirming there
+// — see onSelectStart's near-counter fallback and confirmCheckoutInVR() —
+// so "end the session before starting playback" now falls out of two
+// checks instead of one: the walk-mode check in onXRFrame (unchanged), plus
+// confirmCheckoutInVR() ending the session itself as the one deliberate
+// exception, right before finishCheckout() hands off to playback. Nothing
+// else reachable from walk mode can start playback without leaving walk
+// mode first, and leaving walk mode for any other reason still ends the
+// session immediately.
 //
 // CONTROLLER MAPPING (either hand — handedness only matters for the sticks):
 //   Trigger (select)    -> OK: raycasts from that controller and resolves it
 //                          through resolveWalkRaycastHit(), the exact same
-//                          tail the mouse-look reticle's click uses.
+//                          tail the mouse-look reticle's click uses (a case
+//                          hit takes it into the carried stack via
+//                          walkTakeSlot instead of inspecting it). If the ray
+//                          hits nothing AND the player is standing near the
+//                          checkout counter, the same trigger instead
+//                          confirms checkout — see confirmCheckoutInVR().
 //   Grip (squeeze)       -> Back: toggleWalkAround() + end the session — the
 //                          same call main.ts's onBack makes for the keyboard/
 //                          gamepad Back binding while isWalkAroundMode.
@@ -41,7 +53,8 @@
 // backed by localStorage bb_vr_render_scale (default 1.0).
 import * as THREE from 'three';
 import type { StoreScene } from './three-scene';
-import { resolveWalkRaycastHit } from './store-walk';
+import { resolveWalkRaycastHit, walkTakeSlot } from './store-walk';
+import { _checkoutStand } from './scene-shared';
 
 const VR_RENDER_SCALE_KEY = 'bb_vr_render_scale';
 
@@ -52,6 +65,13 @@ const VR_SNAP_ENGAGE = 0.7;            // stick deflection that fires a snap-tur
 const VR_SNAP_RESET = 0.3;             // must fall back below this before it can fire again
 const VR_EYE_HEIGHT_FT = 5.5;          // matches the flat walk mode's forced eye height
 const VR_PITCH_PAD = 0.05;             // matches the flat loop's pitch clamp pole padding
+// issue #97: how close (ft, horizontal only) the rig must be to
+// StoreScene.checkoutStand() — the same spot the flat "C" checkout glides
+// the camera to — before an empty trigger pull (raycast hit nothing) counts
+// as a checkout confirm instead of just... nothing. Generous on purpose:
+// there's no visual "you're at the counter" affordance in VR yet, so a tight
+// radius would just read as a dead button.
+const VR_CHECKOUT_RANGE_FT = 6.0;
 
 interface VRState {
   rig: THREE.Group;
@@ -60,6 +80,12 @@ interface VRState {
   pending: boolean;    // requestSession() in flight — guards a double-click racing the promise
   snapReady: boolean;
   lastTime: number;
+  // One-shot hand-off run at the END of cleanupAfterSession (issue #97's
+  // VR checkout confirm): stashed by confirmCheckoutInVR right before it
+  // triggers the normal exit-VR path, so the sale completes (and starts
+  // playback) only once the session has actually finished tearing down and
+  // the flat camera is restored — never while VR is still presenting.
+  onExited: (() => void) | null;
 }
 
 const vrStates = new WeakMap<StoreScene, VRState>();
@@ -91,7 +117,7 @@ function getOrCreateState(scene: StoreScene): VRState {
 
   const rig = new THREE.Group();
   scene.scene.add(rig);
-  const state: VRState = { rig, raycaster: new THREE.Raycaster(), session: null, pending: false, snapReady: true, lastTime: 0 };
+  const state: VRState = { rig, raycaster: new THREE.Raycaster(), session: null, pending: false, snapReady: true, lastTime: 0, onExited: null };
   vrStates.set(scene, state);
 
   // Both controllers get the SAME two bindings — handedness only matters for
@@ -220,14 +246,52 @@ function requestExitVR(scene: StoreScene): void {
   void state.session.end().catch(() => { /* already ending — cleanupAfterSession handles the rest */ });
 }
 
+// Horizontal-only distance from the rig to the flat mode's checkout stand
+// spot (see store-checkout.ts's checkoutStand) — eye height doesn't matter
+// for "are you standing at the counter".
+function nearCheckoutCounter(scene: StoreScene, state: VRState): boolean {
+  const stand = scene.checkoutStand(_checkoutStand);
+  const dx = state.rig.position.x - stand.x;
+  const dz = state.rig.position.z - stand.z;
+  return dx * dx + dz * dz <= VR_CHECKOUT_RANGE_FT * VR_CHECKOUT_RANGE_FT;
+}
+
+// The counter half of issue #97: confirming checkout in VR must not fly the
+// camera through the flat flourish (confirmCheckout's wrap/slide/walk-out
+// ritual is timed off the flat animate() loop, which doesn't run during a
+// WebXR session — see store-checkout.ts's confirmCheckoutVR header). Instead
+// this ends the session through the exact same path grip/Back already uses
+// (requestExitVR, the single cleanupAfterSession teardown), and only once
+// that teardown has actually finished — camera restored, flat rendering
+// resumed — does the stashed hand-off fire confirmCheckoutVR(), which is what
+// starts playback. A deny (nothing carried, over the rental cap) is checked
+// FIRST with no side effects (canConfirmCheckout), so a bad-timed trigger
+// pull never tears down the headset view for nothing — confirmCheckoutVR()
+// still runs to voice the same deny buzz/toast confirmCheckout() would, but
+// entirely in-session.
+function confirmCheckoutInVR(scene: StoreScene, state: VRState): void {
+  if (!scene.canConfirmCheckout()) {
+    scene.confirmCheckoutVR();
+    return;
+  }
+  state.onExited = () => scene.confirmCheckoutVR();
+  requestExitVR(scene);
+}
+
 function onSelectStart(scene: StoreScene, state: VRState, controller: THREE.Object3D): void {
   if (!state.session) return;
   _tmpMatrix.identity().extractRotation(controller.matrixWorld);
   state.raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
   state.raycaster.ray.direction.set(0, 0, -1).applyMatrix4(_tmpMatrix);
-  resolveWalkRaycastHit(scene, state.raycaster.intersectObjects(scene.scene.children, true));
-  // A hit that picked up a case already called toggleWalkAround() inside
-  // walkInspectSlot() (store-walk.ts) — end the session to match.
+  const hit = resolveWalkRaycastHit(scene, state.raycaster.intersectObjects(scene.scene.children, true), walkTakeSlot);
+  if (!hit && nearCheckoutCounter(scene, state)) {
+    confirmCheckoutInVR(scene, state);
+    return;
+  }
+  // A hit that still ended walk mode some other way (a clasp/tip-jar flow
+  // with no VR story yet) ends the session to match — picking up a case no
+  // longer does this (walkTakeSlot keeps walk mode active so the case can be
+  // carried to the counter).
   if (!scene.isWalkAroundMode) requestExitVR(scene);
 }
 
@@ -298,6 +362,14 @@ function onXRFrame(scene: StoreScene, state: VRState, time: number, frame: XRFra
     state.rig.position.z = constrained.z;
   }
 
+  // A carried case's shelf->hand flight (store-walk.ts's walkTakeSlot, via
+  // CarriedTapes.take) only advances here — the flat animate() loop that
+  // normally drives it doesn't run while renderer.setAnimationLoop owns the
+  // frame (see enterVR). No walk-bob/glide-sway in v1 (0, 0, 0): the holder
+  // is a child of scene.camera already, so it rides the head correctly
+  // either way, just without the extra bob flourish the flat loop adds.
+  if (scene.carried) scene.carried.update(time, 0, 0, 0);
+
   // renderer.render() detects renderer.xr.isPresenting itself and draws both
   // eyes once scene.camera is carrying the XR pose (WebXRManager.updateCamera,
   // called inside this render() call) — see the module header for why this
@@ -346,4 +418,13 @@ function cleanupAfterSession(scene: StoreScene, state: VRState): void {
   scene.resumeRendering();
   setVRButtonEnabled(true);
   scene.onConsoleLog('[System] Exited VR.', 'system');
+
+  // issue #97: a VR checkout confirm stashes its completion here (see
+  // confirmCheckoutInVR) so the sale — and the playback it starts — lands
+  // only once the flat camera above is fully restored, never while VR was
+  // still presenting. Every OTHER way of leaving VR (grip/Back, the headset's
+  // own exit, walking away and picking something else) leaves this null.
+  const onExited = state.onExited;
+  state.onExited = null;
+  onExited?.();
 }

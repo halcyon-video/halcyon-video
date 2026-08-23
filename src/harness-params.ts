@@ -23,6 +23,7 @@ const SETTING_SHORTCUTS: [string, string][] = [
   ['storefront', 'bb_storefront'],
   ['ceiling', 'bb_ceiling'],
   ['theme', 'bb_theme'],
+  ['format', 'bb_store_format'],  // store-format preset (src/store-format.ts)
   ['logo', 'bb_logo'],            // partial LogoSpec JSON (see src/logo-spec.ts)
   ['overview', 'bb_overview_start'], // T21: '0' boots at the security-cam section view
   ['rental', 'bb_rental_mode'],      // T23: '1' boots with rental mode on

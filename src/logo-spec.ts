@@ -13,7 +13,9 @@
 // specs from here to embed as `theme.brand.logo`; this file only imports the
 // StoreTheme TYPE (erased at compile time), so there is no import cycle.
 import type { StoreTheme } from './themes';
+import type { EmblemDoc } from './emblem-doc';
 import { getBrandPack } from './brand-pack';
+import { applyEmblemToSpec, loadEmblemDoc } from './emblem-render';
 
 export type LogoShape =
   | 'rect'
@@ -111,6 +113,19 @@ export interface LogoSpec {
    * them); subText / bandText / taglineText still paint on top.
    */
   artLayers?: LogoArtLayer[];
+  /**
+   * A BUILT emblem: the layered-primitive composition from the in-store emblem
+   * editor (src/emblem-doc.ts). This is the AUTHORED form and the only part
+   * persisted — `shape`, `pathD`, `pathFit` and `textTilt` above are DERIVED
+   * from it by applyEmblemToSpec() when the spec resolves, so a composed
+   * emblem arrives downstream as an ordinary brand-supplied outline and every
+   * surface that already draws one picks it up unchanged.
+   *
+   * A brand pack can ship one the same way a user builds one: `logo.emblem` in
+   * brand.json is a document, not a picture, so it re-inks with the palette
+   * and re-cuts the signs with the shape.
+   */
+  emblem?: EmblemDoc;
 }
 
 /** One vector layer of a traced emblem, in `pathD`'s authored coordinates. */
@@ -264,11 +279,22 @@ export function getActiveLogoSpec(theme?: StoreTheme): LogoSpec {
   const packLogo = getBrandPack()?.logo;
   if (packLogo) base = mergeLogoSpec(base, packLogo);
   const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('bb_logo') : null;
-  if (!raw) return base;
-  try {
-    return mergeLogoSpec(base, JSON.parse(raw) as Partial<LogoSpec>);
-  } catch (e) {
-    console.error('Failed to parse bb_logo spec, using theme default:', e);
-    return base;
+  if (raw) {
+    try {
+      base = mergeLogoSpec(base, JSON.parse(raw) as Partial<LogoSpec>);
+    } catch (e) {
+      console.error('Failed to parse bb_logo spec, using theme default:', e);
+    }
   }
+  // The emblem editor's document is stored on its own (bb_emblem) rather than
+  // inside bb_logo: it is a whole composition, not a field diff, and keeping
+  // it separate means the two editors can't clobber each other's save. It sits
+  // LAST in the chain for the same reason every other tier does — the thing
+  // the user built here wins over the thing a pack shipped.
+  const savedEmblem = loadEmblemDoc();
+  if (savedEmblem) base = { ...base, emblem: savedEmblem };
+  // Derive the outline fields from whichever emblem survived. A no-emblem spec
+  // comes back byte-identical, so the hot path still returns the shared
+  // default object verbatim.
+  return applyEmblemToSpec(base);
 }

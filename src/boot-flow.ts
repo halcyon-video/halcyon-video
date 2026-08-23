@@ -20,7 +20,13 @@ import {
   sessionOf,
   PROVIDER_KIND_KEY,
 } from './providers/active-provider';
-import { plexAccountToken, selectedBackendKind, setupPlexSignInHandlers } from './plex-signin';
+import {
+  plexAccountToken,
+  plexServerNameFor,
+  selectedBackendKind,
+  selectedPlexServerUrls,
+  setupPlexSignInHandlers,
+} from './plex-signin';
 import { blurFocusWithin } from './text-entry-focus';
 import {
   openMembershipCardPicker,
@@ -30,7 +36,14 @@ import {
 import { buildDemoLibraries, buildDemoGames } from './demo-library';
 import { getSetting } from './settings';
 import { isDemoMode } from './demo-mode';
-import { excludedLibraryIds } from './library-settings';
+import { fetchCatalogFromAllSources } from './catalog-sync';
+import {
+  addMediaSource,
+  clearMediaSources,
+  labelForUrl,
+  listMediaSources,
+  primaryMediaSource,
+} from './media-sources';
 import {
   initSetupFlow,
   openSetupTerminal,
@@ -103,11 +116,12 @@ export function initBootFlow(d: BootFlowDeps): void {
       },
       changeServer: () => {
         cancelRetryHook?.();
-        localStorage.removeItem('jellyfin_url');
+        // EVERY connected server, not just the primary (GH #84) — "change
+        // server" on a two-server store that leaves the second one connected
+        // would re-stock from a distributor the person just walked away from.
+        clearMediaSources();
         localStorage.removeItem('jellyfin_username');
-        localStorage.removeItem('jellyfin_token');
-        localStorage.removeItem('jellyfin_userid');
-        d.log('[Setup] Saved server dropped — pick a new distributor.', 'system');
+        d.log('[Setup] Saved servers dropped — pick a new distributor.', 'system');
       },
       retryNow: () => retryNowHook?.(),
     },
@@ -151,12 +165,14 @@ export function maybeOpenSetupTerminal(): void {
  */
 export function logOutToOpeningDay(): void {
   if (!deps) return;
-  deps.log(`[System] Logging out and resetting ${provider().displayName} session...`, 'system');
-  localStorage.removeItem('jellyfin_url');
+  const count = listMediaSources().length;
+  deps.log(
+    `[System] Logging out and resetting ${count > 1 ? `${count} server sessions` : `${provider().displayName} session`}...`,
+    'system'
+  );
+  clearMediaSources();
   localStorage.removeItem('jellyfin_username');
   localStorage.removeItem('jellyfin_password');
-  localStorage.removeItem('jellyfin_token');
-  localStorage.removeItem('jellyfin_userid');
   deps.teardownScene();
   if (getSetting<string>('bb_render_mode') === 'flat') {
     showLoginOverlay();
@@ -166,14 +182,38 @@ export function logOutToOpeningDay(): void {
 }
 
 /**
+ * Sync every connected server (GH #84) and say what happened.
+ *
+ * The one place all three boot paths get their catalog, so the multi-server
+ * reporting reads the same whether you arrived by setup terminal, login form
+ * or saved session. A source that failed is NAMED rather than folded into a
+ * total: "3 of 5 libraries" with no explanation is how a friend's sleeping
+ * server turns into a bug report about missing shelves.
+ */
+async function syncAllSources(onProgress?: (stage: string) => void): Promise<JellyfinLibrary[]> {
+  const result = await fetchCatalogFromAllSources({ onProgress });
+  for (const failure of result.failures) {
+    deps?.log(`[System] ${failure.source.name} did not answer: ${failure.error}`, 'system');
+  }
+  if (result.synced.length > 1) {
+    const names = result.synced.map((s) => s.name).join(', ');
+    deps?.log(`[System] Stocked from ${result.synced.length} servers: ${names}.`, 'system');
+  }
+  return result.libraries;
+}
+
+/**
  * The setup terminal's catalog sync: same stall watchdog + sidecar loaders as
  * finishLoginAndLaunch, but progress renders as a CRT readout instead of the
  * boot console, and the carried-library exclusions just chosen on the
  * checkbox screen are honored (their item sync is skipped entirely).
  */
 async function syncForSetup(
-  url: string,
-  session: MembershipLoginSession,
+  // The server the terminal finished on is already persisted as a connected
+  // source by afterAuth, and the sync fans out over ALL of them (GH #84) — so
+  // these two are now only part of the callback's shape, not its input.
+  _url: string,
+  _session: MembershipLoginSession,
   onStage: (stage: string, pages: number) => void
 ): Promise<void> {
   if (!deps) throw new Error('Boot flow not initialized.');
@@ -200,12 +240,10 @@ async function syncForSetup(
   let libs: JellyfinLibrary[];
   try {
     [libs] = await Promise.all([
-      Promise.race([
-        provider().fetchLibraries(url, session, onProgress, {
-          excludeLibraryIds: excludedLibraryIds(),
-        }),
-        stallPromise,
-      ]),
+      // `url`/`session` are already persisted as a connected source by
+      // afterAuth — the sync fans out over ALL of them, not just the one the
+      // terminal happened to finish on (GH #84).
+      Promise.race([syncAllSources(onProgress), stallPromise]),
       d.loadComingSoon(),
       d.loadDiscovery(),
       d.loadGames(),
@@ -342,9 +380,19 @@ export function showBootOverlay() {
 async function finishLoginAndLaunch(urlInput: string, session: MembershipLoginSession) {
   if (!deps) return;
   deps.log(`[System] Authenticated successfully as ${session.userName}.`, 'system');
-  localStorage.setItem('jellyfin_url', urlInput);
-  localStorage.setItem('jellyfin_token', session.accessToken);
-  localStorage.setItem('jellyfin_userid', session.userId);
+  // Connect (or refresh) this server as a source rather than overwriting the
+  // singleton keys (GH #84) — addMediaSource mirrors the primary back into
+  // them, so everything that still reads jellyfin_url/token/userid is fed.
+  // Matching on (kind, url) means re-authenticating a server the store already
+  // knows keeps its id, and therefore its carried-library choices.
+  addMediaSource({
+    kind: provider().id,
+    url: urlInput,
+    token: session.accessToken,
+    userId: session.userId,
+    userName: session.userName,
+    name: labelForUrl(urlInput),
+  });
   localStorage.setItem('jellyfin_last_userid', session.userId); // remembered for next boot's card highlight
 
   deps.log('[System] Downloading movie libraries and catalog metadata...', 'system');
@@ -364,12 +412,7 @@ async function finishLoginAndLaunch(urlInput: string, session: MembershipLoginSe
   let libs: JellyfinLibrary[];
   try {
     [libs] = await Promise.all([
-      Promise.race([
-        provider().fetchLibraries(urlInput, session, armLoginStall, {
-          excludeLibraryIds: excludedLibraryIds(),
-        }),
-        loginTimeout
-      ]),
+      Promise.race([syncAllSources(armLoginStall), loginTimeout]),
       deps.loadComingSoon(),
       deps.loadDiscovery(),
       deps.loadGames(),
@@ -441,6 +484,12 @@ export async function showLoginOrCards(reason?: string) {
 export function switchMember() {
   if (!deps) return;
   deps.log('[System] Switching membership card...', 'system');
+  // Clears the SINGLETON session only, deliberately: the connected-source list
+  // keeps every server (and every carried-library choice) so the card just
+  // picked lands back on the same store. checkCredentialsAndLoad still gates on
+  // these keys, so a reload in this state shows the card picker rather than
+  // syncing on the outgoing member's token; finishLoginAndLaunch then refreshes
+  // the primary source in place, matching it by (kind, url).
   localStorage.removeItem('jellyfin_token');
   localStorage.removeItem('jellyfin_userid');
   deps.teardownScene();
@@ -587,7 +636,9 @@ export async function checkCredentialsAndLoad() {
     const attemptSync = async () => {
       if (escaped) return;
 
-      const activeToken = localStorage.getItem('jellyfin_token') || token;
+      // The token/user id below are only for the PRIMARY source's stale-session
+      // re-auth in the retry tail; the sync itself reads each source's own
+      // credentials out of the connected-source list (GH #84).
       // Falls back to '' rather than null: reaching here with no stored user id
       // is now normal (Plex), and ProviderSession.userId is typed a string —
       // the Jellyfin provider interpolates it straight into /Users/<id>/Items,
@@ -608,12 +659,7 @@ export async function checkCredentialsAndLoad() {
       try {
         let libs: JellyfinLibrary[];
         [libs] = await Promise.all([
-          Promise.race([
-            provider().fetchLibraries(jellyfinUrl, sessionOf(activeToken!, activeUserId), armStall, {
-              excludeLibraryIds: excludedLibraryIds(),
-            }),
-            stallPromise
-          ]),
+          Promise.race([syncAllSources(armStall), stallPromise]),
           d.loadComingSoon(),
           d.loadDiscovery(),
           d.loadGames(),
@@ -687,8 +733,20 @@ export async function checkCredentialsAndLoad() {
               if (user && pass && jellyfinUrl) {
                 d.log(`[System] ${provider().displayName} token stale — re-authenticating...`, 'system');
                 const session = await provider().authenticate(jellyfinUrl, { username: user, password: pass });
-                localStorage.setItem('jellyfin_token', session.accessToken);
-                localStorage.setItem('jellyfin_userid', session.userId);
+                // Through the source list, not the bare keys: the sync reads
+                // its credentials from there now, so writing only the legacy
+                // keys would refresh a token nothing goes on to use and retry
+                // forever against the stale one (GH #84).
+                const stale = primaryMediaSource();
+                addMediaSource({
+                  id: stale?.id,
+                  kind: stale?.kind ?? provider().id,
+                  url: jellyfinUrl,
+                  token: session.accessToken,
+                  userId: session.userId,
+                  userName: session.userName,
+                  name: stale?.name ?? labelForUrl(jellyfinUrl),
+                });
                 d.log('[System] Re-auth OK.', 'system');
               }
             }
@@ -839,6 +897,44 @@ export function setupLoginHandlers() {
         } else {
           localStorage.removeItem('romm_url');
           localStorage.removeItem('romm_apikey');
+        }
+
+        // MULTI-SERVER (GH #84): the Plex list is a multi-select, so connect
+        // every OTHER ticked server too before the sync runs. The one the
+        // form's address field holds is registered first and stays primary —
+        // it is the one the person actually typed or picked first, and the
+        // singleton consumers (Jellyseerr, remote play, the Settings rows)
+        // resolve to it.
+        addMediaSource({
+          kind: backendKind,
+          url: urlInput,
+          token: session.accessToken,
+          userId: session.userId,
+          userName: session.userName,
+          name: (backendKind === 'plex' ? plexServerNameFor(urlInput) : '') || labelForUrl(urlInput),
+        });
+        if (backendKind === 'plex') {
+          const extras = selectedPlexServerUrls()
+            .map((u) => normalizeUrl(u))
+            .filter((u) => u && u !== urlInput);
+          for (const extra of extras) {
+            try {
+              const extraSession = await provider().authenticate(extra, creds);
+              addMediaSource({
+                kind: backendKind,
+                url: extra,
+                token: extraSession.accessToken,
+                userId: extraSession.userId,
+                userName: extraSession.userName,
+                name: plexServerNameFor(extra) || labelForUrl(extra),
+              });
+              deps?.log(`[System] Also connected ${plexServerNameFor(extra) || extra}.`, 'system');
+            } catch (e: any) {
+              // One unreachable extra must not sink a connect that otherwise
+              // worked — a shared server being asleep is the ordinary case.
+              deps?.log(`[System] Could not connect ${extra}: ${e?.message ?? e}`, 'system');
+            }
+          }
         }
 
         await finishLoginAndLaunch(urlInput, session);

@@ -28,6 +28,31 @@ export function activeProvider(): MediaSourceProvider {
 /** Drop the cached instance — for a backend switch, and for tests. */
 export function resetActiveProvider(): void {
   cached = null;
+  byKind.clear();
+}
+
+// Multi-source (GH #84): "the" active provider is only the right answer for
+// the PRIMARY source. A store can be stocked from a Jellyfin box and a Plex
+// box at once, so anything that acts on a specific title or a specific server
+// resolves the provider from THAT source's kind instead. Cached per kind for
+// the same reason the singleton is: cheap, but not free, and these are hit on
+// artwork and playback paths.
+const byKind = new Map<string, MediaSourceProvider>();
+
+export function providerForKind(kind: string): MediaSourceProvider {
+  let instance = byKind.get(kind);
+  if (!instance) {
+    registerBuiltInProviders();
+    instance = createProvider(kind);
+    byKind.set(kind, instance);
+  }
+  return instance;
+}
+
+/** The backend to talk to one connected source with; the install's active
+ *  provider when there is no source (demo, or nothing configured). */
+export function providerForSource(source: { kind: string } | null | undefined): MediaSourceProvider {
+  return source ? providerForKind(source.kind) : activeProvider();
 }
 
 /**

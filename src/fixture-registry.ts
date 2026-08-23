@@ -16,6 +16,7 @@ import { PvDrapeTable } from './fixtures/pv-drape-table';
 import { ComingSoonLetterboard } from './fixtures/coming-soon-letterboard';
 import { TipJar } from './fixtures/tip-jar';
 import { MirrorColumn } from './fixtures/mirror-column';
+import { CurtainedAlcove } from './fixtures/curtained-alcove';
 
 export interface PlacedFixture extends StoreFixture {
   placement: FixturePlacement;
@@ -62,3 +63,4 @@ registerFixtureKind('pv-drape-table', (placement, ctx) => new PvDrapeTable(place
 registerFixtureKind('coming-soon-letterboard', (placement, ctx) => new ComingSoonLetterboard(placement, ctx));
 registerFixtureKind('tip-jar', (placement, ctx) => new TipJar(placement, ctx));
 registerFixtureKind('mirror-column', (placement, ctx) => new MirrorColumn(placement, ctx));
+registerFixtureKind('curtained-alcove', (placement, ctx) => new CurtainedAlcove(placement, ctx));

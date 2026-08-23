@@ -110,11 +110,12 @@ export function buildStorefrontDressing93(scene: StoreScene): void {
   // as the small white-and-blue door decal these really were needs a photo of
   // one — a rule-6 ask, not something to invent — so this pass moves the
   // object and leaves letterboardTex() exactly as it was.
-  {
+  if ((scene.storefrontSpec ?? getStorefrontSpec(storeWidth)).entryStyle === 'vestibule') {
     const spec = scene.storefrontSpec ?? getStorefrontSpec(storeWidth);
     // Sidelight centre: the entry runs sidelight | door | door | sidelight
     // about the centreline (see buildGlazedWall's extraMullions in
-    // src/entrance/index.ts).
+    // src/entrance/index.ts). A storefront-door entrance has no sidelight to
+    // hang this on (GH #110) — see the gate above the EAS pedestals below.
     const x = 11.0 + spec.doorWidth + ENTRANCE_SIDELIGHT_WIDTH / 2;
     const panel = new THREE.Mesh(new THREE.PlaneGeometry(1.35, 0.9), printedOut(letterboardTex()));
     panel.position.set(x, 4.8, glassZ - 0.06);
@@ -145,7 +146,12 @@ export function buildStorefrontDressing93(scene: StoreScene): void {
   // than being re-derived here, so the gate tracks the real exit door for any
   // doorWidth/storefront preset.
   const vest = scene.entrance?.getVestibuleInfo();
-  if (vest) {
+  // Both this gate and the STORE HOURS panel above assume the real chamber
+  // composition (sidelights, a side door into the sales floor) — neither
+  // exists on a storefront-door entrance (GH #110), and there is nothing
+  // sensible to gate them off instead: one door in a plain wall has no
+  // sidelight to hang a notice on and no side-door choke point to gate.
+  if (vest && vest.hasChamber) {
     const pedestalShape = new THREE.Shape();
     const pw = 0.5, ph = 3.4, r = 0.24;
     pedestalShape.moveTo(-pw / 2, 0);

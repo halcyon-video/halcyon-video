@@ -1089,6 +1089,20 @@ html, body {
   color: var(--crt-gold);
 }
 
+/* A custom-panel row that doesn't apply to what's currently selected — the
+   emblem editor's Text row on a star layer, say. It stays in place (removing
+   it would take its slot in the drawer's nav list and its measured height with
+   it) and simply reads as unavailable. */
+.settings-row-inert {
+  opacity: 0.42;
+}
+
+.settings-row-inert .settings-row-value,
+.settings-row-inert .brand-range-value,
+.settings-row-inert .brand-color-hex {
+  color: var(--crt-text);
+}
+
 .settings-row-select {
   flex: 0 1 46%;
   min-width: 130px;
@@ -2968,6 +2982,7 @@ html, body {
 #boot-overlay:not(.visible) *,
 #power-menu-overlay:not(.visible) *,
 #settings-drawer-overlay:not(.visible) *,
+#emblem-studio-overlay:not(.visible) *,
 #exit-confirm-overlay:not(.visible) *,
 #genre-menu-overlay:not(.visible) *,
 #login-overlay:not(.visible) *,
@@ -2979,3 +2994,348 @@ html, body {
   pointer-events: none !important;
 }
 
+
+/* ── EMBLEM STUDIO (#111) ────────────────────────────────────────────────────
+   The logo composer's own surface. Same CRT tube as the settings drawer — gold
+   title/footer bars, black body, reverse-video selection — but WIDE: the drawer
+   caps its body at 1060px and pages what doesn't fit, which is exactly what
+   made shaping a logo a hunt. Here the body runs to 1760px and lays out four
+   columns (design stage · layer stack · the selected shape · the emblem), so at
+   1080p every control a shape carries is on screen simultaneously.
+
+   Rows are the drawer's own .settings-row markup, scaled down to column size
+   below — one visual language across both surfaces, because from the couch it
+   is still one menu. */
+#emblem-studio-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* Above the settings drawer (1200): the studio opens OVER the Store Brand
+     page it was launched from and hands it back on close. */
+  z-index: 1250;
+  opacity: 0;
+  pointer-events: none;
+  visibility: hidden;
+  transition: opacity 0.25s ease, visibility 0s linear 0.25s;
+}
+
+#emblem-studio-overlay.visible {
+  opacity: 1;
+  pointer-events: auto;
+  visibility: visible;
+  transition: opacity 0.25s ease;
+}
+
+.emblem-studio-body {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  width: min(1760px, 97vw);
+  margin: 0 auto;
+  padding: 18px 0 8px;
+  color: var(--crt-text);
+  text-shadow: 0 0 8px rgba(255, 204, 0, 0.3);
+}
+
+.emblem-studio-grid {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(255px, 0.68fr) minmax(340px, 0.98fr) minmax(265px, 0.8fr);
+  gap: 16px;
+  /* stretch, NOT start: the design stage has to take the height it is given —
+     a canvas that only fills the top third of the screen is exactly the cramp
+     this surface exists to undo. */
+  align-items: stretch;
+}
+
+.emblem-col {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  gap: 4px;
+}
+
+/* Panel captions: dim mono small-caps, the drawer's group-title voice. */
+.emblem-panel-title {
+  flex: 0 0 auto;
+  font-family: var(--font-mono);
+  font-size: 15px;
+  color: var(--crt-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  margin: 6px 0 2px;
+  padding: 0 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.emblem-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-height: 0;
+  overflow: hidden auto;
+  scrollbar-width: thin;
+}
+
+/* ── The stage: interactive design canvas + the real sign preview ─────────── */
+.emblem-stage {
+  flex: 1 1 auto;
+  min-height: 220px;
+  border: 1px solid rgba(255, 204, 0, 0.3);
+  background: #0a0d12;
+  position: relative;
+  overflow: hidden;
+}
+
+.emblem-design-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  /* The pointer gestures are the point of this surface; text selection
+     dragging across it is not. */
+  user-select: none;
+  touch-action: none;
+}
+
+.emblem-sign-canvas {
+  flex: 0 1 auto;
+  display: block;
+  width: 100%;
+  min-height: 0;
+  max-height: 30vh;
+  object-fit: contain;
+  border: 1px solid rgba(255, 204, 0, 0.3);
+}
+
+/* ── The layer stack ─────────────────────────────────────────────────────── */
+/* One focus stop holding a scrollable list. It keeps .settings-row's selection
+   contract (main.ts's ring focuses and marks it) but not its reverse video — a
+   tall block flipped to solid gold would drown the column. */
+.emblem-stack-row {
+  flex: 0 1 auto;
+  display: block;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.emblem-stack-row::before {
+  display: none;
+}
+
+.emblem-stack-row.selected {
+  background: transparent;
+  color: var(--crt-text);
+  text-shadow: inherit;
+  outline: 2px solid var(--crt-gold);
+  outline-offset: -1px;
+}
+
+.emblem-stack-row:focus-visible {
+  outline: 2px solid var(--crt-gold);
+}
+
+.emblem-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  max-height: 34vh;
+  overflow: hidden auto;
+  scrollbar-width: thin;
+}
+
+.emblem-stack-empty {
+  padding: 10px 8px;
+  font-family: var(--font-mono);
+  font-size: 15px;
+  color: var(--crt-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: normal;
+}
+
+.emblem-stack-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  font-family: var(--font-mono);
+  font-size: 16px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.emblem-stack-item:hover {
+  border-color: rgba(255, 204, 0, 0.45);
+}
+
+.emblem-stack-item.active {
+  background: var(--crt-gold);
+  color: var(--crt-ink);
+  text-shadow: none;
+}
+
+.emblem-stack-swatch {
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+  border: 1px solid rgba(0, 0, 0, 0.55);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.35);
+}
+
+/* A cut-out reads as absence, not as a colour — hatch it rather than lie. */
+.emblem-stack-swatch.is-hole {
+  background-image: repeating-linear-gradient(
+    45deg, rgba(0, 0, 0, 0.85) 0 3px, rgba(255, 255, 255, 0.85) 3px 6px) !important;
+}
+
+.emblem-stack-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.emblem-stack-role {
+  flex: 0 0 auto;
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  opacity: 0.65;
+}
+
+.emblem-stack-ops {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 2px;
+}
+
+.emblem-stack-op {
+  background: transparent;
+  border: 1px solid rgba(255, 204, 0, 0.4);
+  border-radius: 0;
+  color: inherit;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1;
+  padding: 3px 5px;
+  cursor: pointer;
+}
+
+.emblem-stack-op:hover {
+  background: rgba(255, 204, 0, 0.25);
+}
+
+.emblem-stack-item.active .emblem-stack-op {
+  border-color: rgba(0, 10, 28, 0.5);
+}
+
+/* ── Rows, at column scale ───────────────────────────────────────────────── */
+/* The drawer's rows are sized for a ten-foot read on one wide column. In a
+   340px column at the same 26px they would be nothing but ellipsis, so the
+   studio scales the whole row vocabulary down together — label, value, leader
+   and embedded controls — rather than letting any one of them clip. */
+.emblem-studio .settings-row {
+  font-size: 16px;
+  padding: 4px 8px;
+}
+
+/* Labels WRAP here rather than ellipsing. In a 260px column the drawer's
+   nowrap-and-clip rule turns "Move In Stack" into "MOVE IN S…", which is a
+   worse answer than two lines — and unlike a width tweak, wrapping keeps
+   working at whatever width the columns end up. */
+.emblem-studio .settings-row-label {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+}
+
+.emblem-studio .settings-row-main {
+  flex: 1 1 auto;
+}
+
+.emblem-studio .settings-row::before {
+  width: 1.1ch;
+}
+
+.emblem-studio .settings-row-leader {
+  min-width: 8px;
+  margin: 0 7px;
+  font-size: 15px;
+}
+
+.emblem-studio .settings-row-value,
+.emblem-studio .brand-range-value,
+.emblem-studio .brand-color-hex {
+  font-size: 15px;
+}
+
+.emblem-studio .brand-range-value {
+  min-width: 48px;
+}
+
+.emblem-studio .settings-row-select,
+.emblem-studio .settings-row-input {
+  font-size: 15px;
+  padding: 3px 6px;
+  min-width: 92px;
+  flex: 0 1 46%;
+}
+
+.emblem-studio .brand-range-wrap {
+  flex: 0 1 50%;
+  min-width: 112px;
+  gap: 6px;
+}
+
+.emblem-studio .brand-color-wrap input[type='color'] {
+  width: 34px;
+  height: 24px;
+}
+
+.emblem-studio .brand-preset-row {
+  padding-left: 8px;
+}
+
+.emblem-studio .brand-preset-btn {
+  font-size: 14px;
+  padding: 3px 7px;
+}
+
+.emblem-studio-status {
+  flex: 0 0 auto;
+  margin-top: 8px;
+  padding: 6px 8px 0;
+  font-size: 16px;
+}
+
+/* Narrower desktops: the emblem-wide column drops under the stack and property
+   columns. DOM order is untouched, so the remote's focus ring still walks the
+   surface in the same order it reads. */
+@media (max-width: 1560px) {
+  .emblem-studio-grid {
+    grid-template-columns: minmax(0, 1.25fr) minmax(210px, 0.6fr) minmax(300px, 0.9fr);
+  }
+
+  .emblem-col-stage {
+    grid-row: span 2;
+  }
+
+  .emblem-col-meta {
+    grid-column: 2 / span 2;
+  }
+}

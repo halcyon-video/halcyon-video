@@ -73,29 +73,67 @@ export function applyBackendSelection(kind: string): void {
   }
 }
 
-/** Fill the server dropdown from the account, and adopt the first address. */
+/**
+ * Fill the server list from the account.
+ *
+ * MULTI-SELECT since GH #84: an account carries the servers you own AND the
+ * ones friends have shared with you (fetchPlexServers never filtered on
+ * `owned`), and a store can now be stocked from several at once — which was
+ * the whole complaint. One server per entry, its BEST connection: the old list
+ * had a row per connection, so a server reachable four ways appeared four
+ * times and ticking two of its rows would have "connected" the same box twice.
+ *
+ * `#login-url` still tracks the FIRST selection, because that field is what
+ * the single-server submit path and every saved-address prefill read.
+ */
 function showServers(servers: PlexServer[], log?: (m: string) => void): void {
   discovered = servers;
   const group = byId('plex-server-group');
   const select = byId<HTMLSelectElement>('plex-server');
   const url = byId<HTMLInputElement>('login-url');
+  const hint = byId('plex-server-hint');
   if (!select || !group) return;
 
+  select.multiple = true;
   select.innerHTML = '';
   for (const s of servers) {
-    for (const conn of s.connections) {
-      const opt = document.createElement('option');
-      opt.value = conn;
-      opt.text = servers.length > 1 || s.connections.length > 1 ? `${s.name} — ${conn}` : s.name;
-      select.appendChild(opt);
-    }
+    const conn = s.connections[0];
+    if (!conn) continue; // a server with no reachable address isn't offerable
+    const opt = document.createElement('option');
+    opt.value = conn;
+    // Say which ones are someone else's: that distinction is the reason the
+    // list has more than one row for most people.
+    opt.text = s.owned ? s.name : `${s.name} (shared)`;
+    select.appendChild(opt);
   }
-  group.style.display = servers.length ? '' : 'none';
-  if (url && select.options.length) url.value = select.options[0].value;
+  group.style.display = select.options.length ? '' : 'none';
+  if (hint) hint.style.display = select.options.length > 1 ? '' : 'none';
+  if (select.options.length) {
+    select.options[0].selected = true;
+    if (url) url.value = select.options[0].value;
+  }
   select.addEventListener('change', () => {
-    if (url) url.value = select.value;
+    const first = selectedPlexServerUrls()[0];
+    if (url && first) url.value = first;
   });
   log?.(`[System] Plex account has ${servers.length} server(s).`);
+}
+
+/**
+ * Every server ticked in the list, in display order. Empty when the list was
+ * never populated (a hand-typed address), which is the caller's cue to fall
+ * back to whatever is in `#login-url`.
+ */
+export function selectedPlexServerUrls(): string[] {
+  const select = byId<HTMLSelectElement>('plex-server');
+  if (!select) return [];
+  return [...select.options].filter((o) => o.selected).map((o) => o.value).filter(Boolean);
+}
+
+/** The account's server list as last discovered, keyed by connection URL —
+ *  lets a caller recover a server's display name after the fact. */
+export function plexServerNameFor(connectionUrl: string): string | undefined {
+  return discovered.find((s) => s.connections.includes(connectionUrl))?.name;
 }
 
 async function loadServers(token: string, log?: (m: string) => void): Promise<void> {
@@ -110,7 +148,11 @@ async function loadServers(token: string, log?: (m: string) => void): Promise<vo
       return;
     }
     showServers(servers, log);
-    if (status) status.innerText = 'Signed in. Pick a server, then Connect & Sync.';
+    if (status) {
+      status.innerText = servers.length > 1
+        ? 'Signed in. Pick one or more servers, then Connect & Sync.'
+        : 'Signed in. Pick a server, then Connect & Sync.';
+    }
   } catch (e: any) {
     // Discovery is a convenience — a LAN address typed by hand still works.
     if (status) status.innerText = `Signed in, but couldn't list servers: ${e?.message ?? e}`;

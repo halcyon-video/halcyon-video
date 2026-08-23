@@ -60,6 +60,64 @@ extruded wall lettering (transparent pixels cut away).
 Data maps (normal, roughness, …) must load linear, not sRGB — pass
 `{ srgb: false }` to `tryLoadUserAssetTexture` for those.
 
+## clerk/ — a custom sprite sheet for the store clerk
+
+The clerk is a Doom-style directional billboard whose sprite sheet is painted
+procedurally at boot (`src/clerk-art.ts`). Drop a finished sheet here and it
+replaces her art wholesale — the rig, roaming, and animation timing all stay:
+
+```
+user-assets/
+  clerk/
+    default.png      # your sheet, any theme
+    <theme-id>.png   # optional per-theme variant (bb-1990, bb-1993, bb-2000,
+                     # bb-2010, owl-90s) — beats default.png while that theme
+                     # is active
+```
+
+**Getting a template:** open the store with `?clerk_template=1` on the URL
+(any mode, the hosted demo included) and the current procedural sheet
+downloads as `clerk-sprite-template.png` — edit that. It wears the active
+theme's livery, so grab it under the theme you're customizing for.
+
+**Working one cell at a time.** A 4096x1920 sheet is a miserable thing to
+edit, and hopeless as the target of an image generator, which wants one
+picture at a time. `tools/clerk-sheet.mjs` takes the sheet apart and puts it
+back together:
+
+```sh
+node tools/clerk-sheet.mjs split  clerk-sprite-template.png cells/ --scale 3
+node tools/clerk-sheet.mjs stitch cells/ default.png
+node tools/clerk-sheet.mjs check  default.png
+```
+
+`split` writes 80 PNGs named `RR-CC_<facing>_<animation><frame>.png` plus a
+`grid.json` manifest, at `--scale` times the atlas cell (3x = 768x1152, which
+is a comfortable size to draw or generate at). Replace the cells however you
+like — the leading `RR-CC` is the only part of the name `stitch` reads, so
+the rest is yours to rename. `stitch` scales everything back down to the
+atlas cell and refuses a sheet with holes or with cells that aren't 2:3.
+`check` reads a finished sheet and reports empty cells, figures floating
+clear of the cell foot, and soft mattes that `alphaTest` will cut ragged.
+
+The grid is the contract (the runtime pages cells by fraction, so any
+resolution works as long as the layout matches):
+
+- **5 rows** = directions, top to bottom: front, front-side, side, back-side,
+  back — all drawn heading screen-RIGHT; the runtime mirrors them for the
+  other three octants.
+- **16 columns** = animation frames, left to right: idle 2, walk 4,
+  stock-high 2, stock-mid 2, stock-low 2, talk 2, type 2.
+- Cells must stay **2:3** (the template's are 256x384) — the in-store
+  billboard is 5.7 ft tall at that aspect, so a different cell shape
+  stretches the character.
+- **Transparent background required** — the sprite renders with
+  `alphaTest: 0.5`, so pixels below 50% alpha are cut (no soft glows).
+
+An installed brand pack can carry the same files
+(`brands/<pack-id>/clerk/…`), which beat this flat tree per file, like every
+other asset kind.
+
 ## brand/ — drop your logo in a folder (the two-step rebrand)
 
 The short way to make this store yours. **No setting, no manifest, no JSON.**
@@ -156,7 +214,17 @@ name); every other field is an override and absence means "keep today's value":
   the in-app brand editor writes, plus `pathD`/`pathTiltDeg` (`shape: "path"` —
   your own emblem outline as SVG path data), `imageSrc` (`shape: "image"`) and
   `wordmarkPathD` (a vector wordmark painted instead of type). Precedence is
-  theme default < pack < your own `bb_logo` edits.
+  theme default < pack < your own `bb_logo` edits < your own emblem
+  (`bb_emblem`).
+- `logo.emblem` is a **built emblem** — the layered-shape document the in-app
+  Emblem Editor writes (`src/emblem-doc.ts`: `{version, aspect, tilt, wordmark,
+  layers[]}`). Shipping one rather than a `pathD` keeps the mark editable and
+  re-inkable: layers naming `body`/`text`/`border` follow the palette, so the
+  same emblem repaints itself when the era does. The silhouette, the die-cut
+  signboards and the extruded storefront sign are all derived from it, so a
+  pack that sets `emblem` should not also set `shape`/`pathD` — the emblem
+  wins. Easiest way to author one: build it in the editor, then copy
+  `localStorage.bb_emblem` into your `brand.json`.
 - `fonts[].family` is the name your `logo.fontFamily` refers to; the file is
   registered under a private family so it can never collide with a host font.
 - `themes.<theme-id>.palette` is that era's deviation from `palette`, merged

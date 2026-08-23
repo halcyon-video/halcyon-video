@@ -258,15 +258,21 @@ export class PlexProvider implements MediaSourceProvider {
   }
 
   /**
-   * The interface passes only a session id, but Plex's stop endpoint is on the
-   * SERVER — so the address and token are recovered from the connection this
-   * provider last saw itself (rememberConnection, below). Held here rather
-   * than widening the interface for one backend; see the note in
-   * media-source-provider.ts on cancelActiveTranscode being capability-gated.
+   * Plex's stop endpoint is on the SERVER, so this needs an address and token.
+   * `conn` carries them now (GH #84 widened the interface — a multi-server
+   * store has no single "the" server to fall back on). The remembered
+   * connection below stays as the fallback for callers that can't name one,
+   * which is what every call site did before that widening.
    */
-  async cancelActiveTranscode(sessionId: string, log?: (msg: string) => void): Promise<void> {
-    if (!this.lastServer || !this.lastToken) return;
-    return stopPlexTranscode(this.lastServer, this.lastToken, sessionId, log);
+  async cancelActiveTranscode(
+    sessionId: string,
+    log?: (msg: string) => void,
+    conn?: { server: string; session: ProviderSession }
+  ): Promise<void> {
+    const server = conn?.server || this.lastServer;
+    const token = conn?.session.accessToken || this.lastToken;
+    if (!server || !token) return;
+    return stopPlexTranscode(server, token, sessionId, log);
   }
 
   private lastServer = '';

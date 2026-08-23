@@ -110,3 +110,38 @@ test('a resume position survives into the stream URL on both backends', async ()
     'Plex takes seconds where Jellyfin takes ticks'
   );
 });
+
+// ── Mixed-backend stores (GH #84) ────────────────────────────────────────────
+//
+// A store can now be stocked from several servers at once, and they need not
+// all speak the same backend. `provider_kind` describes only the PRIMARY one,
+// so every routed call takes the kind of the source it is actually addressing;
+// reading the install-wide one for a second, different backend is how a Plex
+// server would be handed Jellyfin URLs — the exact failure this file exists
+// for, arriving by a new route.
+
+test('an explicit kind overrides the install-wide one, both directions', async () => {
+  useBackend('jellyfin'); // primary is Jellyfin…
+  // …but THIS title came from a Plex source.
+  const hls = await transcodeStreamUrl(SERVER, 'tok', '42', {}, 'plex');
+  assert.match(hls, /\/video\/:\/transcode\/universal\/start\.m3u8/);
+  assert.doesNotMatch(hls, /\/Videos\//, 'a Plex source must never get a Jellyfin route');
+  assert.match(transcodeStreamUrlSync(SERVER, 'tok', '42', {}, 'plex'),
+    /\/video\/:\/transcode\/universal\/start\.m3u8/);
+  assert.doesNotMatch(directStreamUrl(SERVER, 'tok', '42', undefined, 'plex'), /\/Videos\//);
+  assert.equal(playbackIsDirectSafe(MP4, 'plex'), false, 'Plex is never direct-play');
+
+  useBackend('plex'); // and the mirror image: primary Plex, this title Jellyfin
+  assert.match(await transcodeStreamUrl(SERVER, 'tok', '42', {}, 'jellyfin'), /\/Videos\/42\//);
+  assert.match(transcodeStreamUrlSync(SERVER, 'tok', '42', {}, 'jellyfin'), /\/Videos\/42\//);
+  assert.match(directStreamUrl(SERVER, 'tok', '42', undefined, 'jellyfin'), /\/Videos\/42\//);
+  assert.equal(playbackIsDirectSafe(MP4, 'jellyfin'), true);
+});
+
+test('omitting the kind still falls back to the install-wide backend', async () => {
+  // Single-backend stores pass nothing and must behave exactly as before.
+  useBackend('plex');
+  assert.doesNotMatch(await transcodeStreamUrl(SERVER, 'tok', '42', {}), /\/Videos\//);
+  useBackend('jellyfin');
+  assert.match(await transcodeStreamUrl(SERVER, 'tok', '42', {}), /\/Videos\/42\//);
+});

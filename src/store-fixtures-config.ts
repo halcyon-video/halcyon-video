@@ -1,4 +1,5 @@
 import { FixturePlacement, BOX_SPACING, STORE_CENTER_X } from './store-layout';
+import type { CounterShape } from './store-format';
 import { registerFixtureKind } from './fixture-registry';
 import { StructureFootprint } from './fixtures/period-fixtures';
 import { PV_DRAPE_TABLE_POP_KIT } from './fixtures/pv-drape-table';
@@ -376,7 +377,106 @@ export function promoStandPlacements(backWallZ: number): FixturePlacement[] {
 //    positions are the long-validated #57/#60 spots; the usquare positions
 //    are the same relationships re-derived against the straight front band
 //    (outer face z=-3.6, inner island spine z=-1.3, band top centre z=-2.85).
-export function counterAnchoredPlacements(counterShape: 'shield' | 'usquare'): FixturePlacement[] {
+// ─── What a store FORMAT admits onto its floor ──────────────────────────────
+//
+// Fixture kinds that stand on the OPEN SALES FLOOR: they need a walk-around
+// footprint (FLOOR_DISPLAY_CLEARANCE demands 3 ft to everything, walls
+// included), and they exist because a chain box has acres of floor between its
+// aisles to fill. A format with no open floor admits none of them — the owner's
+// mom-and-pop spec (GH #33) bans them outright: "less floor space around the
+// runs, no big open areas, no floor displays".
+const FLOOR_DISPLAY_KINDS = new Set([
+  'four-sided-display',      // promo floor stands
+  'bargain-bin',             // dump tub
+  'pv-drape-table',          // previously-viewed drape table
+  'mirror-column',           // clad structural pillar
+  'previously-viewed-bin',
+  'gold-clamshell',
+]);
+
+// Fixture kinds that mount ON the checkout counter's walk-in BAND — its blue
+// top at y 3.54, or the queue rail along its outer face. A format whose counter
+// is a standalone desk (counterShape 'desk') has no band, so these have nothing
+// to sit on and would hang in mid-air over the clerk's strip of floor.
+const COUNTER_BAND_KINDS = new Set([
+  'coming-soon-letterboard',
+  'candy-display',
+  'tape-cleaner-display',
+]);
+
+/**
+ * The back-room alcove, for a format that has one (StoreFormatSpec.curtainedSection).
+ *
+ * A single placement, and everything about where it lands is derived inside the
+ * fixture from the built shell (store width, back wall Z) rather than stated
+ * here — the store's size follows the library, so a hand-written x/z would be
+ * in the middle of the floor on one library and outside the building on the
+ * next. See fixtures/curtained-alcove.ts.
+ *
+ * The format also has to leave the room ROOM: StoreFormatSpec.backAisleClearance
+ * is what holds the shelf runs far enough off the back wall for the alcove to
+ * stand in front of it, so the two numbers are read together.
+ */
+export function curtainedAlcovePlacements(): FixturePlacement[] {
+  return [{
+    id: 'curtained-alcove',
+    kind: 'curtained-alcove',
+    position: { x: STORE_CENTER_X, z: 0 }, // derived in the fixture — see above
+    yaw: 0,
+    options: { cornerSide: 'right' },
+  }];
+}
+
+/**
+ * Drop the fixtures the active store format has no room (or no surface) for.
+ *
+ * Applied once to the ASSEMBLED placement list in buildStore, rather than at
+ * each source, so a fixture added to any of those sources later is covered by
+ * the same rule without anyone remembering to gate it. A dropped fixture is
+ * never built, never validated and never gets an overview cursor — exactly as
+ * if the config had not listed it.
+ */
+export function admitFixturePlacements(
+  placements: FixturePlacement[],
+  opts: { floorDisplays: boolean; counterShape: CounterShape },
+): FixturePlacement[] {
+  const noBand = opts.counterShape === 'desk';
+  if (opts.floorDisplays && !noBand) return placements;
+  return placements.filter((p) =>
+    (opts.floorDisplays || !FLOOR_DISPLAY_KINDS.has(p.kind))
+    && (!noBand || !COUNTER_BAND_KINDS.has(p.kind)));
+}
+
+export function counterAnchoredPlacements(counterShape: CounterShape): FixturePlacement[] {
+  if (counterShape === 'desk') {
+    // The mom-and-pop format's standalone counter (GH #33): a 6 ft wooden desk
+    // at x 8..14, z 4.3..5.9 (see entrance/counter.ts's `desk` branch — it is
+    // set 3 ft off the vestibule glass so there is room to stand behind it).
+    // There is no band and no queue rail, so the props that live ON a band —
+    // the candy queue rack, the tape-cleaner clamshell display — have no
+    // surface here and are simply not placed. That is the format's whole
+    // point: this counter fits a computer, and the computer is already on it.
+    return [
+      {
+        id: 'counter-desk',
+        kind: 'structure-footprint',
+        position: { x: STORE_CENTER_X, z: 5.1 },
+        yaw: 0,
+        options: { footprintWidth: 6.0, footprintDepth: 1.6 }
+      },
+      {
+        // Tip jar on the desk top (surfaceY 2.82 = innerH 2.7 + the 0.12 slab,
+        // the island top — NOT the 3.54 band top, which this format has no
+        // band to provide). Parked at the +X end, clear of the single terminal
+        // at x 12.3 and of the bag's rest spot at x 9.1.
+        id: 'tip-jar-counter',
+        kind: 'tip-jar',
+        position: { x: 13.5, z: 5.1 },
+        yaw: Math.PI, // card toward the customer side (-z)
+        options: { surfaceY: 2.82 }
+      },
+    ];
+  }
   if (counterShape === 'usquare') {
     // counter.ts usquare outline with the default storefront (counter back
     // z 8.4): sides x = 11±6.8 from z 8.4 to z -3.6, flat front across, with

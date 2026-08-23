@@ -151,10 +151,17 @@ export async function playLocalWithMpv(
   durationTicks: number,
   prefs: MpvPrefArgs,
   onExit: (positionTicks: number, endedNaturally: boolean) => void,
-  log: (msg: string) => void
+  log: (msg: string) => void,
+  /** Where to REPORT this playback (GH #84): the server the title came from,
+   *  which on a multi-server store is not necessarily the primary. Omitted,
+   *  it falls back to the singleton keys — still correct for a one-server
+   *  install, and for anything synthesized. Kept as a plain pair rather than a
+   *  media-sources import so this module stays loadable under `node --test`'s
+   *  type-stripping loader (see the .ts specifiers above). */
+  reportTo?: { url: string | null; token: string | null } | null
 ): Promise<boolean> {
-  const jellyfinUrl = localStorage.getItem('jellyfin_url');
-  const token = localStorage.getItem('jellyfin_token');
+  const jellyfinUrl = reportTo ? reportTo.url : localStorage.getItem('jellyfin_url');
+  const token = reportTo ? reportTo.token : localStorage.getItem('jellyfin_token');
   const startSeconds = Math.max(0, Math.floor(startPositionTicks / TICKS_PER_SECOND));
 
   let id: string;

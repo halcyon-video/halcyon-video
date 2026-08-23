@@ -23,7 +23,7 @@ import {
   createNewReleasesSignTexture,
   createNewReleasesStarBadgeTexture
 } from '../canvas-textures';
-import { bb93SignageOn } from '../genre-colors';
+import { dressing93Active } from '../genre-colors';
 import { getActiveTheme } from '../themes';
 import { createExtrudedMaterials, create3DDoubleLayeredSign, create3DExtrudedSign } from '../sign-builders';
 import { SECTION_COLS, BOX_SPACING } from '../store-layout';
@@ -249,15 +249,14 @@ export function buildSignage(ctx: FixtureContext, slots: SignSlot[], activeSigna
     }
 
     // Period-pack signs belong to the era they were measured from. A sign
-    // tagged `dressing: '1993'` is part of the 1993 footage pack and only
-    // deploys where that pack is on — the 1993 era itself, or another era with
-    // the bb_93_signage row switched on. DEFAULT_SIGNAGE_CONFIG places by SLOT
+    // tagged `dressing: '1993'` is part of the 1993 footage pack and deploys
+    // on the 1993 era, full stop. DEFAULT_SIGNAGE_CONFIG places by SLOT
     // and has no era vocabulary of its own, so before this the closed-lane
     // counter tent stood on the 1990, 2000 and 2010 counters too: a 1993 prop
     // in three eras it never existed in. Gating on the def (data) rather than
     // on the slot (a special case in the placer) keeps the next period pack a
     // registry entry instead of another branch here.
-    if (signDef.dressing === '1993' && !bb93SignageOn()) {
+    if (signDef.dressing === '1993' && !dressing93Active()) {
       return;
     }
 
@@ -339,7 +338,7 @@ export function buildSignage(ctx: FixtureContext, slots: SignSlot[], activeSigna
       // The 1993 footage shows the wall band's "NEW RELEASES" as FLAT paint
       // on the gold band, not dimensional letters — bb-90s drops the
       // extrusion to a print-thin skin; other themes keep the deep letters.
-      const extrudeDepth = bb93SignageOn() ? 0.02 : 0.1667;
+      const extrudeDepth = dressing93Active() ? 0.02 : 0.1667;
       const shelfLenUnit = SECTION_COLS * BOX_SPACING; // "one shelf length"
       const pairPitch = pairWidth + 2 * shelfLenUnit; // + two bare shelf-lengths before the next pair
 
@@ -403,7 +402,7 @@ export function buildSignage(ctx: FixtureContext, slots: SignSlot[], activeSigna
         // (fixtures/category-plate-1993.ts — owner rulings feedback/049 +
         // 2026-08-09). Promo hangers and other themes stay rectangular
         // framed boxes.
-        const nav93 = bb93SignageOn() && slot.category === 'ceiling-nav';
+        const nav93 = dressing93Active() && slot.category === 'ceiling-nav';
         fixtureMesh = nav93
           ? buildCategoryPlate1993(texture, w, h, slot.ceilingY ?? 13.5)
           : ceilingHangingSign(texture, w, h, slot.ceilingY ?? 13.5, slot.pos.y);

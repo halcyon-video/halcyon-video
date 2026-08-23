@@ -34,6 +34,9 @@ import {
   buildLogoShapePoints, drawLogo, getLogoFontString, logoShapeFitRect,
 } from './logo-renderer';
 import type { LogoPoint } from './logo-renderer';
+import {
+  ALPHA_THRESHOLD, loopArea, nestLoops, simplifyLoop, traceAlphaContours,
+} from './alpha-trace';
 import type { FacadeLogoAnchor } from './storefront-facade';
 
 export interface StorefrontLogo3D {
@@ -53,6 +56,9 @@ const FRAME_H = 600;
 // intensity 3.5 lands it back on the flat sign's value.
 const EMISSIVE_INTENSITY = 3.5;
 const BODY_GLOW_BG = 'rgb(1, 2, 11)'; // 0x020825 pre-divided by 3.5
+// See buildExtrudedEmblem: a whole composed emblem face glows at this fraction
+// of the lettering's strength.
+const EMBLEM_GLOW_ALPHA = 0.3;
 
 function rotate(p: LogoPoint, rad: number): LogoPoint {
   const c = Math.cos(rad), s = Math.sin(rad);
@@ -110,18 +116,24 @@ function toSignTexture(canvas: HTMLCanvasElement): THREE.CanvasTexture {
 // The storefront wears ~11% larger lettering and a deeper shadow than the
 // interior boards — same treatment createStorefrontLogoYellowTexture applies.
 // The pinstripe matches the emblem's thin inner rule (7 units at this scale).
-function drawStorefrontTextLayer(ctx: CanvasRenderingContext2D, spec: LogoSpec): void {
+function drawStorefrontLogoLayer(
+  ctx: CanvasRenderingContext2D, spec: LogoSpec, layer: 'body' | 'text',
+): void {
   const textSpec = {
     ...spec,
     textColor: storefrontBrandGold(spec.textColor),
     borderColor: storefrontBrandGold(spec.borderColor),
   };
   drawLogo(ctx, textSpec, {
-    x: 0, y: 0, w: FRAME_W, h: FRAME_H, layer: 'text',
+    x: 0, y: 0, w: FRAME_W, h: FRAME_H, layer,
     pinstripeWidth: 7,
     fontScale: 100 / 90,
     shadow: { color: 'rgba(0,0,0,0.7)', blur: 8, ox: 3, oy: 4 },
   });
+}
+
+function drawStorefrontTextLayer(ctx: CanvasRenderingContext2D, spec: LogoSpec): void {
+  drawStorefrontLogoLayer(ctx, spec, 'text');
 }
 
 // ─── Extruded emblem ─────────────────────────────────────────────────────────
@@ -141,6 +153,10 @@ function buildExtrudedEmblem(spec: LogoSpec, anchor: FacadeLogoAnchor): Storefro
   const faceCtx = faceCanvas.getContext('2d')!;
   faceCtx.fillStyle = spec.bodyColor;
   faceCtx.fillRect(0, 0, FRAME_W, FRAME_H);
+  // A composed emblem's artwork lives on the BODY layer (see drawGeneric), so
+  // the cap has to take both passes or the sign extrudes the right shape and
+  // wears none of the art.
+  if (spec.emblem) drawStorefrontLogoLayer(faceCtx, spec, 'body');
   drawStorefrontTextLayer(faceCtx, spec);
   const faceTex = toSignTexture(faceCanvas);
 
@@ -151,14 +167,31 @@ function buildExtrudedEmblem(spec: LogoSpec, anchor: FacadeLogoAnchor): Storefro
   const glowCtx = glowCanvas.getContext('2d')!;
   glowCtx.fillStyle = BODY_GLOW_BG;
   glowCtx.fillRect(0, 0, FRAME_W, FRAME_H);
+  // A COMPOSED emblem's whole face is artwork, and at the lettering's emissive
+  // strength it would read as a white slab after dark. The face goes on at a
+  // lit-lightbox level instead — EMBLEM_GLOW_ALPHA x EMISSIVE_INTENSITY lands
+  // it near 1.0, in the brand's own colours — and the wordmark over it keeps
+  // full strength, so the store's NAME is what actually glows.
+  if (spec.emblem) {
+    glowCtx.globalAlpha = EMBLEM_GLOW_ALPHA;
+    drawStorefrontLogoLayer(glowCtx, spec, 'body');
+    glowCtx.globalAlpha = 1;
+  }
   drawStorefrontTextLayer(glowCtx, spec);
   const glowTex = toSignTexture(glowCanvas);
 
   // Loops → world-feet shapes, y flipped (canvas is y-down), centred on the
   // anchor like the flat quads were. ExtrudeGeometry fixes winding itself.
-  const shapes = frameLoops.map((loop) => new THREE.Shape(
-    loop.map((p) => new THREE.Vector2((p.x - 0.5) * logoW, (0.5 - p.y) * logoH)),
-  ));
+  // Nested, not flat: a composed emblem can carry real windows (a ring, a
+  // counter, a punched hole), and a hole handed to the extruder as a sibling
+  // shape comes back as a solid plug sitting in the middle of the sign. Every
+  // built-in outline is a single loop, so nesting is a no-op for them.
+  const toV2 = (p: LogoPoint) => new THREE.Vector2((p.x - 0.5) * logoW, (0.5 - p.y) * logoH);
+  const shapes = nestLoops(frameLoops).map(({ outer, holes }) => {
+    const shape = new THREE.Shape(outer.map(toV2));
+    for (const hole of holes) shape.holes.push(new THREE.Path(hole.map(toV2)));
+    return shape;
+  });
   const geo = new THREE.ExtrudeGeometry(shapes, {
     depth: spec.storefront.extrudeDepth,
     bevelEnabled: false, // a bevel would push the rim past the texture-aligned silhouette
@@ -233,7 +266,7 @@ function buildExtrudedEmblem(spec: LogoSpec, anchor: FacadeLogoAnchor): Storefro
 // when the name simply cannot fit the facade at the requested height.
 
 const GLYPH_FONT_PX = 320;   // raster size: big enough for smooth traces
-const GLYPH_ALPHA_T = 127.5; // inside/outside threshold on the alpha channel
+const GLYPH_ALPHA_T = ALPHA_THRESHOLD; // inside/outside threshold on the alpha channel
 const GLYPH_SIMPLIFY_EPS = GLYPH_FONT_PX * 0.004; // ~1.3px: kills stairsteps, keeps curves
 const LETTER_GAP_N = 0.10;   // gap between letters, in cap-height units
 const SPACE_ADV_N = 0.42;    // word-space advance, in cap-height units
@@ -249,141 +282,9 @@ interface TracedGlyph {
 // data, no GPU resources.
 const tracedGlyphCache = new Map<string, TracedGlyph | null>();
 
-// Marching squares over the glyph's alpha field. Segments are emitted per
-// cell between interpolated edge crossings and keyed by the grid edge they
-// end on, so chaining is exact (no float matching): every crossed edge is
-// shared by exactly two segments → the segment graph is disjoint cycles.
-function traceAlphaContours(
-  alpha: Float32Array, w: number, h: number,
-): LogoPoint[][] {
-  const at = (x: number, y: number) => alpha[y * w + x];
-  const inside = (v: number) => v >= GLYPH_ALPHA_T;
-  // Crossing points, computed once per grid edge so neighbours agree exactly.
-  const crossings = new Map<string, LogoPoint>();
-  const crossH = (x: number, y: number): string => {
-    const key = `h${x},${y}`;
-    if (!crossings.has(key)) {
-      const a = at(x, y), b = at(x + 1, y);
-      crossings.set(key, { x: x + (GLYPH_ALPHA_T - a) / (b - a), y });
-    }
-    return key;
-  };
-  const crossV = (x: number, y: number): string => {
-    const key = `v${x},${y}`;
-    if (!crossings.has(key)) {
-      const a = at(x, y), b = at(x, y + 1);
-      crossings.set(key, { x, y: y + (GLYPH_ALPHA_T - a) / (b - a) });
-    }
-    return key;
-  };
-
-  const segs: { a: string; b: string }[] = [];
-  const byEdge = new Map<string, number[]>();
-  const addSeg = (a: string, b: string) => {
-    const idx = segs.length;
-    segs.push({ a, b });
-    (byEdge.get(a) ?? byEdge.set(a, []).get(a)!).push(idx);
-    (byEdge.get(b) ?? byEdge.set(b, []).get(b)!).push(idx);
-  };
-
-  for (let y = 0; y < h - 1; y++) {
-    for (let x = 0; x < w - 1; x++) {
-      const v0 = at(x, y), v1 = at(x + 1, y), v2 = at(x + 1, y + 1), v3 = at(x, y + 1);
-      const mask = (inside(v0) ? 1 : 0) | (inside(v1) ? 2 : 0) | (inside(v2) ? 4 : 0) | (inside(v3) ? 8 : 0);
-      if (mask === 0 || mask === 15) continue;
-      const T = () => crossH(x, y), B = () => crossH(x, y + 1);
-      const L = () => crossV(x, y), R = () => crossV(x + 1, y);
-      switch (mask) {
-        case 1: case 14: addSeg(T(), L()); break;
-        case 2: case 13: addSeg(T(), R()); break;
-        case 3: case 12: addSeg(L(), R()); break;
-        case 4: case 11: addSeg(R(), B()); break;
-        case 6: case 9: addSeg(T(), B()); break;
-        case 7: case 8: addSeg(B(), L()); break;
-        case 5: // TL+BR inside: split by the cell-centre average
-          if ((v0 + v1 + v2 + v3) / 4 >= GLYPH_ALPHA_T) { addSeg(T(), R()); addSeg(B(), L()); }
-          else { addSeg(T(), L()); addSeg(R(), B()); }
-          break;
-        case 10: // TR+BL inside
-          if ((v0 + v1 + v2 + v3) / 4 >= GLYPH_ALPHA_T) { addSeg(T(), L()); addSeg(R(), B()); }
-          else { addSeg(T(), R()); addSeg(B(), L()); }
-          break;
-      }
-    }
-  }
-
-  // Chain the degree-2 edge graph into closed loops.
-  const visited = new Uint8Array(segs.length);
-  const loops: LogoPoint[][] = [];
-  for (let s = 0; s < segs.length; s++) {
-    if (visited[s]) continue;
-    const pts: LogoPoint[] = [];
-    let cur = s;
-    let edge = segs[s].a;
-    for (;;) {
-      visited[cur] = 1;
-      pts.push(crossings.get(edge)!);
-      const nextEdge = segs[cur].a === edge ? segs[cur].b : segs[cur].a;
-      const cands = byEdge.get(nextEdge)!;
-      const next = cands[0] === cur ? cands[1] : cands[0];
-      if (next === undefined || visited[next]) break; // closed (or open at the pad, which can't happen)
-      edge = nextEdge;
-      cur = next;
-    }
-    if (pts.length >= 3) loops.push(pts);
-  }
-  return loops;
-}
-
-// Douglas-Peucker on a closed loop (split at two far-apart anchors so the
-// closure itself can't be simplified away).
-function simplifyLoop(pts: LogoPoint[], eps: number): LogoPoint[] {
-  if (pts.length <= 4) return pts;
-  const dp = (arr: LogoPoint[], lo: number, hi: number, out: LogoPoint[]) => {
-    if (hi - lo < 2) return;
-    const A = arr[lo], B = arr[hi];
-    const dx = B.x - A.x, dy = B.y - A.y;
-    const len = Math.hypot(dx, dy) || 1e-9;
-    let maxD = -1, maxI = -1;
-    for (let i = lo + 1; i < hi; i++) {
-      const d = Math.abs((arr[i].x - A.x) * dy - (arr[i].y - A.y) * dx) / len;
-      if (d > maxD) { maxD = d; maxI = i; }
-    }
-    if (maxD > eps) {
-      dp(arr, lo, maxI, out);
-      out.push(arr[maxI]);
-      dp(arr, maxI, hi, out);
-    }
-  };
-  const mid = Math.floor(pts.length / 2);
-  const half1 = pts.slice(0, mid + 1);
-  const half2 = pts.slice(mid).concat([pts[0]]);
-  const out: LogoPoint[] = [pts[0]];
-  dp(half1, 0, half1.length - 1, out);
-  out.push(pts[mid]);
-  dp(half2, 0, half2.length - 1, out);
-  return out.length >= 3 ? out : pts;
-}
-
-function pointInLoop(p: LogoPoint, loop: LogoPoint[]): boolean {
-  let in_ = false;
-  for (let i = 0, j = loop.length - 1; i < loop.length; j = i++) {
-    const a = loop[i], b = loop[j];
-    if ((a.y > p.y) !== (b.y > p.y) &&
-        p.x < ((b.x - a.x) * (p.y - a.y)) / (b.y - a.y) + a.x) {
-      in_ = !in_;
-    }
-  }
-  return in_;
-}
-
-function loopArea(loop: LogoPoint[]): number {
-  let s = 0;
-  for (let i = 0, j = loop.length - 1; i < loop.length; j = i++) {
-    s += (loop[j].x + loop[i].x) * (loop[j].y - loop[i].y);
-  }
-  return Math.abs(s / 2);
-}
+// Glyph tracing lives in src/alpha-trace.ts — the same marching-squares pass
+// the emblem composer flattens a whole layered composition with, so a
+// freestanding letter and the sign beside it agree about where an edge is.
 
 // Rasterize + trace one glyph. Returns null for characters with no ink.
 function traceGlyph(ch: string, fontStr: string, capPx: number): TracedGlyph | null {
@@ -426,40 +327,14 @@ function traceGlyph(ch: string, fontStr: string, capPx: number): TracedGlyph | n
     .filter((loop) => loopArea(loop) > 4); // drop speck contours
   if (raw.length === 0) return null;
 
-  // Containment nesting: even depth = outer outline, odd depth = counter
-  // hole (assigned to its smallest containing outer). Contours from marching
-  // squares are disjoint, so testing one vertex is exact.
-  const depths = raw.map((loop, i) => {
-    let d = 0;
-    for (let j = 0; j < raw.length; j++) {
-      if (i !== j && pointInLoop(loop[0], raw[j])) d++;
-    }
-    return d;
-  });
+  // Nest the counters (O/B/R) into the outlines that contain them, then
+  // normalize into cap-height units with the baseline at y=0, y UP.
   const norm = (p: LogoPoint): LogoPoint => ({ x: (p.x - penX) / capPx, y: (baseY - p.y) / capPx });
-  const outers: { pts: LogoPoint[]; area: number; holes: LogoPoint[][] }[] = [];
-  const outerIdx = new Map<number, number>();
-  raw.forEach((loop, i) => {
-    if (depths[i] % 2 === 0) {
-      outerIdx.set(i, outers.length);
-      outers.push({ pts: loop.map(norm), area: loopArea(loop), holes: [] });
-    }
-  });
-  raw.forEach((loop, i) => {
-    if (depths[i] % 2 === 1) {
-      let best = -1, bestArea = Infinity;
-      raw.forEach((cand, j) => {
-        if (depths[j] % 2 === 0 && pointInLoop(loop[0], cand)) {
-          const a = loopArea(cand);
-          if (a < bestArea) { bestArea = a; best = j; }
-        }
-      });
-      if (best >= 0) outers[outerIdx.get(best)!].holes.push(loop.map(norm));
-    }
-  });
-
   return {
-    loops: outers.map((o) => ({ outer: o.pts, holes: o.holes })),
+    loops: nestLoops(raw).map(({ outer, holes }) => ({
+      outer: outer.map(norm),
+      holes: holes.map((hole) => hole.map(norm)),
+    })),
     advance,
   };
 }

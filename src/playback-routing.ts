@@ -39,7 +39,14 @@ import {
 import { isDirectPlaySafe as codecsAreDirectPlaySafe } from './playback-capability.ts';
 import type { MediaPlaybackInfo } from './providers/media-source-provider.ts';
 
-const isPlex = () => activeProviderKind() === 'plex';
+// WHICH backend's endpoint shapes to use. `kind` names the source being
+// addressed (GH #84): a store can be stocked from a Jellyfin box and a Plex box
+// at once, so the install-wide provider_kind is only the right answer for the
+// primary one — reading it for every title is how a second, different backend
+// would get Jellyfin-shaped URLs pointed at it, the same failure #66 fixed.
+// Falls back to the install-wide kind, so every single-backend store behaves
+// exactly as before.
+const isPlex = (kind?: string) => (kind ?? activeProviderKind()) === 'plex';
 
 export interface StreamUrlOptions {
   sourceVideoCodec?: string;
@@ -62,8 +69,11 @@ export interface StreamUrlOptions {
  * worst, not a re-encode — the wrong trade would be blocking the gesture chain
  * on a probe to save it.
  */
-export function playbackIsDirectSafe(info: MediaPlaybackInfo | undefined | null): boolean {
-  if (isPlex()) return false;
+export function playbackIsDirectSafe(
+  info: MediaPlaybackInfo | undefined | null,
+  kind?: string
+): boolean {
+  if (isPlex(kind)) return false;
   return codecsAreDirectPlaySafe(info);
 }
 
@@ -72,9 +82,10 @@ export function directStreamUrl(
   server: string,
   token: string,
   itemId: string,
-  mediaSourceId?: string
+  mediaSourceId?: string,
+  kind?: string
 ): string {
-  if (isPlex()) {
+  if (isPlex(kind)) {
     // Unreachable while playbackIsDirectSafe() is false for Plex; kept correct
     // rather than throwing, so a future direct path can't silently serve a
     // Jellyfin URL.
@@ -97,9 +108,10 @@ export async function transcodeStreamUrl(
   server: string,
   token: string,
   itemId: string,
-  opts: StreamUrlOptions
+  opts: StreamUrlOptions,
+  kind?: string
 ): Promise<string> {
-  if (isPlex()) {
+  if (isPlex(kind)) {
     // Plex selects audio/subtitle tracks through its own transcode-decision
     // parameters rather than the stream indices Jellyfin takes; the picker's
     // per-track switching is Jellyfin-only for now (see the README note).
@@ -131,9 +143,10 @@ export function transcodeStreamUrlSync(
   server: string,
   token: string,
   itemId: string,
-  opts: StreamUrlOptions
+  opts: StreamUrlOptions,
+  kind?: string
 ): string {
-  if (isPlex()) {
+  if (isPlex(kind)) {
     const sessionId = `halcyon-${Date.now().toString(36)}`;
     const plexOpts = {
       maxBitrate: opts.maxBitrate,
@@ -154,18 +167,19 @@ export async function probeItemPlaybackInfo(
   server: string,
   token: string,
   userId: string,
-  itemId: string
+  itemId: string,
+  kind?: string
 ): Promise<MediaPlaybackInfo | undefined> {
-  if (isPlex()) {
+  if (isPlex(kind)) {
     return (await fetchPlexItemPlaybackInfo(server, token, itemId)).info;
   }
   return fetchItemPlaybackInfo(server, token, userId, itemId);
 }
 
-export function playbackStarted(server: string, token: string, itemId: string): void {
+export function playbackStarted(server: string, token: string, itemId: string, kind?: string): void {
   // Plex has no "started" write outside a timeline session; its first progress
   // ping is what registers the play. See plex.ts's note on /:/timeline.
-  if (isPlex()) return;
+  if (isPlex(kind)) return;
   void reportPlaybackStart(server, token, itemId);
 }
 
@@ -174,9 +188,10 @@ export function playbackProgressed(
   token: string,
   itemId: string,
   positionTicks: number,
-  isPaused: boolean
+  isPaused: boolean,
+  kind?: string
 ): void {
-  if (isPlex()) {
+  if (isPlex(kind)) {
     void reportPlexPlaybackProgress(server, token, itemId, positionTicks);
     return;
   }
@@ -188,9 +203,10 @@ export function playbackStopped(
   token: string,
   itemId: string,
   positionTicks: number,
-  runTimeTicks?: number
+  runTimeTicks?: number,
+  kind?: string
 ): void {
-  if (isPlex()) {
+  if (isPlex(kind)) {
     void reportPlexPlaybackStopped(server, token, itemId, positionTicks, runTimeTicks);
     return;
   }

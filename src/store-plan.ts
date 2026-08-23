@@ -9,7 +9,7 @@ import type * as THREE from 'three';
 import type { Movie, JellyfinLibrary } from './jellyfin.ts';
 import {
   LIBRARY_X_SPACING, FIELD_Z_FRONT, CENTER_WALKWAY, AISLE_ANGLE, HERRINGBONE_AISLE_ANGLE, BOX_SPACING,
-  MAX_SHELF_COLS, UNIT_CAPACITY, MAX_RUN_UNITS, RUN_BREAK_GAP,
+  MAX_SHELF_COLS, UNIT_CAPACITY, MAX_RUN_UNITS, RUN_BREAK_GAP, UNIT_SECTIONS,
   SECTION_CAPACITY, TINY_LIBRARY_MOVIES, MIN_CATEGORY_TITLES,
   STORE_CATEGORY_ORDER, shelfTitleCompare, sectionFillCopies, columnFillCount,
   collectionCategoryCandidates, shelfCategoryCandidatesOf,
@@ -25,7 +25,15 @@ import {
   // parse a real (non-type-only) import it would have to resolve at runtime
   // through a bare specifier like the un-stripped original.
 } from './store-layout.ts';
+import { activeStoreFormat } from './store-format.ts';
 import type { Footprint } from './layout-validator.ts';
+
+// The active store-format preset: what shape of store this is, as data. Every
+// geometry rule the planner used to hardcode as a literal (wall margin, run
+// length growth, width cap, how the floor is divided into fields) reads from
+// here, so a new format is an entry in store-format.ts rather than another
+// branch in this file. See that module's header.
+const FORMAT = activeStoreFormat();
 
 /**
  * One line-front run end that opens onto walkway — an endcap host site.
@@ -43,8 +51,12 @@ export interface OpenRunEnd {
 
 export class StorePlan {
   // Active floor arrangement. Decides each unit's yaw/browseSign (see runFields).
-  public arrangement: ArrangementId =
-    ((typeof localStorage !== 'undefined' && localStorage.getItem('bb_arrangement')) as ArrangementId) || 'herringbone';
+  // FORMAT wins over the user's pick when it declares one: a cramped store is
+  // straight-only by construction (a tilted run sheds unusable floor at both
+  // ends, and this format has no floor to shed), so bb_arrangement simply does
+  // not apply there — see StoreFormatSpec.forcedArrangement.
+  public arrangement: ArrangementId = FORMAT.forcedArrangement
+    ?? (((typeof localStorage !== 'undefined' && localStorage.getItem('bb_arrangement')) as ArrangementId) || 'herringbone');
 
   // Where special-interest / documentary titles that don't warrant a headline
   // shelf category are surfaced (see OverflowPolicy). Default: on the display
@@ -98,12 +110,13 @@ export class StorePlan {
     // overflow still deepens the store past this (the ribbon then re-quantizes
     // to whole panes as close to half-depth as it can — see three-scene.ts).
     let minZ = FRONT_GLASS_Z - baselineStoreDepth();
+    const backClear = FORMAT.backAisleClearance;
     this.shelvingUnits.forEach(u => {
       const halfLen = ((u.cols - 1) * BOX_SPACING + 1.0) / 2;
       const backLocalZ = this.aisleZCenter(u) - halfLen;
       const cornerZ = this.unitToWorld(u, u.xCenter, backLocalZ).z;
-      if (cornerZ - 8.0 < minZ) {
-        minZ = cornerZ - 8.0;
+      if (cornerZ - backClear < minZ) {
+        minZ = cornerZ - backClear;
       }
     });
     this.backWallZ = minZ;
@@ -165,28 +178,44 @@ export class StorePlan {
   private computeDimensions() {
     const totalUnits = this.totalPlannedUnits();
 
-    // Longer continuous runs for bigger stores: ~20+ units -> 5, ~32+ -> 6.
-    // MAX_RUN_UNITS (4) stays the small-store floor, 6 the ceiling.
-    this.maxRunUnits = Math.min(6, Math.max(MAX_RUN_UNITS, MAX_RUN_UNITS + Math.floor(totalUnits / 16)));
+    // Longer continuous runs for bigger stores. On the corporate box: ~20+
+    // units -> 5, ~32+ -> 6, with MAX_RUN_UNITS (4) the small-store floor and 6
+    // the ceiling. All three numbers are format data now, because a format's
+    // run length is a statement about its floor: a mom-and-pop starts at 6 and
+    // climbs to 10, since long unbroken runs down a narrow room are the whole
+    // idea there, not a concession to a big store.
+    this.maxRunUnits = Math.min(
+      FORMAT.maxRunUnitsCap,
+      Math.max(MAX_RUN_UNITS, MAX_RUN_UNITS + Math.floor(totalUnits / FORMAT.runGrowthPerUnits)),
+    );
 
     // Estimate the world-space store depth a candidate width W implies, using
     // the same geometry fillField() hatches with (see runFields/fillField):
     // two side fields of width fieldW share the unit load; runs repeat at
     // pitch p; each unit occupies L along its run plus its amortized share of
     // the cross-aisle break gap.
-    const margin = 7.5; // runFields' wall margin
+    const margin = FORMAT.wallMargin; // runFields' wall margin
     const L = (MAX_SHELF_COLS - 1) * BOX_SPACING + 1.0; // unit length along the run
-    const p = LIBRARY_X_SPACING * Math.cos(AISLE_ANGLE); // run-to-run pitch (~8.43ft)
+    // Run-to-run pitch (~8.43ft on the corporate box). A format that FORCES an
+    // arrangement is estimated against that arrangement's own tilt — an
+    // untilted mom-and-pop run steps a full runSpacing sideways, not
+    // runSpacing·cos(35°), and estimating it at the diagonal's pitch would
+    // under-count its depth by a fifth.
+    const p = LIBRARY_X_SPACING * Math.cos(FORMAT.forcedArrangement === 'straight' ? 0 : AISLE_ANGLE);
     const lEff = L + RUN_BREAK_GAP / this.maxRunUnits;
     // Tilted fields never pack their whole area: runs clipped by the field
     // corners shed unusable stubs, and the one-library-boundary-per-run rule
     // leaves tail slack. ~0.85 matches what fillField actually achieves.
     const packEfficiency = 0.85;
     const estWorldDepth = (w: number): number => {
-      const fieldW = (w - 2 * margin - CENTER_WALKWAY) / 2; // per-side field width
+      // TOTAL hatchable width across every field — one field on a single-field
+      // format, two flanking the central walkway otherwise. (Algebraically
+      // identical to the old per-side `(w - 2m - walkway)/2` divided into
+      // `2 * fieldW`, so the corporate estimate is unchanged to the digit.)
+      const fieldW = w - 2 * margin - CENTER_WALKWAY;
       if (fieldW <= 0) return Infinity;
-      const dLayout = (totalUnits * p * lEff) / (2 * fieldW * packEfficiency); // layout-space field depth
-      const backWallZ = this.scaleZ(FIELD_Z_FRONT - dLayout) - 8.0; // 8ft back margin (see plan())
+      const dLayout = (totalUnits * p * lEff) / (fieldW * packEfficiency); // layout-space field depth
+      const backWallZ = this.scaleZ(FIELD_Z_FRONT - dLayout) - FORMAT.backAisleClearance; // see plan()
       return FRONT_GLASS_Z - backWallZ; // front glass sits at z=15
     };
 
@@ -198,9 +227,9 @@ export class StorePlan {
     // arbitrary facade width (this replaced the old 90-ft reference floor).
     // Growth only ever ADDS whole panes: defaultWindowBays() floors the pane
     // count per wing and leaves the leftover as solid corner wall.
-    const WIDTH_CAP = 110.0;
+    const WIDTH_CAP = FORMAT.widthCap;
     let w = baselineStorefrontWidth();
-    while (w < WIDTH_CAP && estWorldDepth(w) > 0.9 * w) w += 2.0;
+    while (w < WIDTH_CAP && estWorldDepth(w) > FORMAT.depthToWidthRatio * w) w += 2.0;
     this.cachedStoreWidth = Math.min(w, WIDTH_CAP);
   }
 
@@ -213,9 +242,24 @@ export class StorePlan {
   // (the main Movies library) stocks the right side of the store.
   private runFields(): { xLo: number; xHi: number; yaw: number; browseSign: number }[] {
     const storeWidth = this.getStoreWidth();
-    const margin = 7.5; // keep shelves ~7.5ft off the side walls (increased from 6.0)
+    // Keep shelves this far off the side walls: 7.5 ft on the corporate box
+    // (increased from 6.0), 2.6 in a mom-and-pop — just enough to walk the end
+    // of a run and turn into the next aisle.
+    const margin = FORMAT.wallMargin;
     const lo = STORE_CENTER_X - storeWidth / 2 + margin;
     const hi = STORE_CENTER_X + storeWidth / 2 - margin;
+    // A SINGLE-FIELD format hatches the whole floor as one slab with no central
+    // walkway carved out of it, so the first run lands ON the store centreline
+    // (fillField hatches outward from each field's own centre, and this field's
+    // centre IS STORE_CENTER_X) — "one long shelf run down the middle", with
+    // further runs appearing either side of it as the library grows. The tilt
+    // still follows the arrangement, which such a format normally forces.
+    if (FORMAT.singleField) {
+      const yaw = this.arrangement === 'herringbone' ? Math.abs(HERRINGBONE_AISLE_ANGLE)
+        : this.arrangement === 'diagonal' ? Math.abs(AISLE_ANGLE)
+        : 0;
+      return [{ xLo: lo, xHi: hi, yaw, browseSign: 1 }];
+    }
     switch (this.arrangement) {
       case 'straight':
         return [
@@ -353,7 +397,7 @@ export class StorePlan {
       // GLOBAL section index (entry idx / SECTION_CAPACITY). Which physical
       // unit face a section lands on isn't known until units are placed;
       // consumers translate (unit, side) -> entry block via blockIndexOf()
-      // and read sections 2*block and 2*block+1.
+      // and read sections UNIT_SECTIONS*block .. UNIT_SECTIONS*block+UNIT_SECTIONS-1.
       const sectionLabels = new Map<string, string>();
       for (const { cat, start, end } of catRanges) {
         for (let idx = start; idx < end; idx += SECTION_CAPACITY) {
@@ -672,7 +716,20 @@ export class StorePlan {
         // for any tilt; for a straight run tlo already lands on the Z=Zf edge).
         runs.push({ fx: ax + seg.tlo * dx, fz: az + seg.tlo * dz, cap });
       }
-      runs.sort((a, b) => (b.fz - a.fz) || (a.fx - b.fx));
+      // Pour order. Normally: deepest-fronted run first, then left to right.
+      // On a SINGLE-FIELD format every straight run shares one front Z, so that
+      // tie-break alone would stock the leftmost run first and leave the middle
+      // of an almost-empty store bare. Order those from the centreline outward
+      // instead, so the smallest store puts its one run down the middle and
+      // each new run appears alternately either side of it.
+      if (FORMAT.singleField) {
+        runs.sort((a, b) =>
+          (b.fz - a.fz)
+          || (Math.abs(a.fx - cx) - Math.abs(b.fx - cx))
+          || (a.fx - b.fx));
+      } else {
+        runs.sort((a, b) => (b.fz - a.fz) || (a.fx - b.fx));
+      }
       return runs;
     };
 
@@ -767,6 +824,7 @@ export class StorePlan {
 
   // Switch the floor arrangement (persisted; caller decides how to rebuild).
   setArrangement(id: ArrangementId) {
+    if (FORMAT.forcedArrangement) return; // this format lays out one way only
     this.arrangement = id;
     if (typeof localStorage !== 'undefined') localStorage.setItem('bb_arrangement', id);
   }
@@ -919,8 +977,11 @@ export class StorePlan {
         const b = this.blockIndexOf(u.libraryIdx, u.unitIdxInLibrary, 'front');
         const mirrored = u.browseSign < 0;
         genreLabel =
-          layout.sectionLabels.get(String(2 * b + (mirrored ? 1 : 0))) ??
-          layout.sectionLabels.get(String(2 * b + (mirrored ? 0 : 1))) ??
+          // One entry block = UNIT_SECTIONS signboard sections. On a mirrored
+          // run the section at THIS end of the unit is the block's last, not
+          // its first; both are tried so a partly-filled block still labels.
+          layout.sectionLabels.get(String(UNIT_SECTIONS * b + (mirrored ? UNIT_SECTIONS - 1 : 0))) ??
+          layout.sectionLabels.get(String(UNIT_SECTIONS * b + (mirrored ? 0 : UNIT_SECTIONS - 1))) ??
           null;
       }
 

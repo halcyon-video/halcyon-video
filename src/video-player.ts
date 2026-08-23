@@ -95,6 +95,11 @@ export interface VideoPlayerOptions {
    *  the quality/audio/subtitle picker button appears; the player reloads the
    *  returned URL at the current position. */
   buildStream?: (sel: StreamSelection) => string;
+  /** The server this stream came from (GH #84) — needed to tear the transcode
+   *  down again, since a store can be stocked from several and the DELETE has
+   *  to reach the box actually encoding. Omitted, the singleton keys stand in,
+   *  which is what every one-server install has always done. */
+  server?: { url: string; token: string };
   /** Ask "are you sure?" before a USER-initiated exit (Back button/key).
    *  Set for store playback, where closing drops the viewer back at the store
    *  entrance — a stray Back press meant to dismiss the on-screen controls
@@ -1584,7 +1589,11 @@ export class VideoPlayer {
    *  live for this player, and the session id can't be double-stopped. */
   private stopCurrentEncode(): void {
     if (!this.currentPlaySessionId) return;
-    void stopActiveEncoding(this.currentPlaySessionId, (msg) => this.log(msg)).catch(() => {});
+    void stopActiveEncoding(
+      this.currentPlaySessionId,
+      (msg) => this.log(msg),
+      this.opts?.server ?? null
+    ).catch(() => {});
     this.currentPlaySessionId = undefined;
   }
 

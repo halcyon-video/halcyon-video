@@ -32,18 +32,18 @@ export function bb93GenreColor(label: string): string {
 
 /**
  * The 1993-footage store dressing (fascia blades, ribbon ceiling panels,
- * flat-oblique NEW RELEASES band, counter/storefront/security props). ON
- * whenever the active era IS the 1993 theme (theme.dressingEra === '1993'),
- * and additionally as a legacy opt-in (bb_93_signage) that layers the look
- * onto any other era theme.
+ * flat-oblique NEW RELEASES band, counter/storefront/security props). ON for
+ * exactly one thing: the 1993 era (theme.dressingEra === '1993').
+ *
+ * There is no separate switch. The pack IS the 1993 store, so pick that era
+ * and you get all of it; pick any other and you get none of it (issue #113 —
+ * the retired "1993 Store Dressing" row existed only to layer 1993 signage
+ * onto the 1990/2000/2010 stores, a distinction nobody asked for).
  *
  * This is the single lever every 93-dressing gate reads, so selecting the
  * 1993 era turns the whole pack on at once.
  */
-export function bb93SignageOn(): boolean {
-  if (typeof localStorage !== 'undefined' && localStorage.getItem('bb_93_signage') === 'on') {
-    return true;
-  }
+export function dressing93Active(): boolean {
   // getActiveTheme reads localStorage/THEMES; guarded so pure-node callers
   // (unit tests, tooling) that never set a theme fall back to "off".
   try {

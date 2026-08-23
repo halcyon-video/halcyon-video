@@ -6,7 +6,10 @@ import {
   buildClerkAtlasCanvas, type AnimKey,
 } from './clerk-art';
 import { ClerkNavGrid } from './clerk-nav';
+import { maybeServeClerkTemplate } from './clerk-template';
 import { BOX_SPACING, UNIT_DEPTH, UNIT_SECTIONS } from './store-layout';
+import { getActiveTheme } from './themes';
+import { tryLoadUserAssetTexture } from './user-assets';
 
 /**
  * StoreClerk — a Doom-style directional 2D billboard clerk.
@@ -420,6 +423,7 @@ export class StoreClerk {
     this.group.add(this.sprite);
 
     this.setCell('idle', 0, 0);
+    this.trySwapUserAtlas();
   }
 
   /**
@@ -463,12 +467,46 @@ export class StoreClerk {
   private buildAtlas(): THREE.Texture {
     // All character art is generated in src/clerk-art.ts — this just wraps the
     // finished sprite sheet in a GPU texture.
-    const tex = new THREE.CanvasTexture(buildClerkAtlasCanvas());
+    const canvas = buildClerkAtlasCanvas();
+    maybeServeClerkTemplate(canvas);
+    const tex = new THREE.CanvasTexture(canvas);
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.magFilter = THREE.LinearFilter;
     tex.minFilter = THREE.LinearFilter;
     tex.generateMipmaps = false;
     return tex;
+  }
+
+  /**
+   * Custom sprite-sheet drop-in (public/user-assets/README.md "clerk/"): the
+   * procedural atlas above is the shipped fallback; a user-installed sheet —
+   * same 16x5 grid, any resolution — replaces the art without touching the
+   * rig, roaming or animation timing. The active theme's variant beats
+   * default.png, and an installed brand pack's copy beats both (the overlay
+   * inside tryLoadUserAssetTexture). A 404 is the not-installed normal case
+   * and stays silent.
+   */
+  private trySwapUserAtlas() {
+    const swap = (tex: THREE.Texture) => {
+      // Same sampling as the procedural atlas: mipmaps bleed between cells.
+      tex.magFilter = THREE.LinearFilter;
+      tex.minFilter = THREE.LinearFilter;
+      tex.generateMipmaps = false;
+      // setCell writes the UV window onto the TEXTURE, not the material —
+      // carry the live one over so the current cell stays on screen.
+      tex.repeat.copy(this.spriteTex.repeat);
+      tex.offset.copy(this.spriteTex.offset);
+      tex.center.copy(this.spriteTex.center);
+      const old = this.spriteTex;
+      this.spriteTex = tex;
+      const mat = this.sprite.material as THREE.SpriteMaterial;
+      mat.map = tex;
+      mat.needsUpdate = true;
+      old.dispose();
+    };
+    tryLoadUserAssetTexture(`clerk/${getActiveTheme().id}.png`, swap, {
+      onMiss: () => tryLoadUserAssetTexture('clerk/default.png', swap),
+    });
   }
 
   // ── Navigation ─────────────────────────────────────────────────────────────

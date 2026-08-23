@@ -15,6 +15,15 @@
 /** One shelvable item: a film, a series container, or a game carton. */
 export interface Title {
   id: string;
+  // Which connected server this title came from (GH #84) — the id of a
+  // MediaSource, not a URL. Everything that has to talk to a server ABOUT a
+  // title routes on this: stream URLs, episode lists, progress reports, the
+  // ceiling TVs. Absent means the primary source, which is what makes every
+  // pre-#84 title, the demo catalog and every synthesized title (discovery,
+  // collection gap, streaming, game) behave exactly as they did when a store
+  // could only have one server. `id` itself is NOT namespaced — it is only
+  // ever handed back to the server that issued it.
+  sourceId?: string;
   title: string;
   year: number;
   duration: string;
@@ -227,10 +236,18 @@ export interface Episode {
 }
 
 export interface Library {
+  /**
+   * Namespaced `<sourceId>:<libraryId>` above the provider boundary (GH #84).
+   * A provider always emits and receives the BARE id; catalog-sync.ts stamps
+   * the namespace on the way out and library-settings strips it on the way
+   * back in, because two servers routinely hand out the same library id.
+   */
   id: string;
   name: string;
   movies: Title[];
   genres: string[];
+  /** Which connected server shelved this (GH #84) — see Title.sourceId. */
+  sourceId?: string;
   /**
    * Synthesized by games-only.ts: this "library" is one Romm platform, not a
    * media-server one. Its titles carry no wall categories, so the shelf
@@ -448,6 +465,20 @@ export interface MediaSourceProvider {
     itemId: string,
     positionTicks: number
   ): Promise<void>;
-  /** capability: transcoding — tear down an abandoned server-side encode. */
-  cancelActiveTranscode?(sessionId: string, log?: (msg: string) => void): Promise<void>;
+  /**
+   * capability: transcoding — tear down an abandoned server-side encode.
+   *
+   * `conn` says WHICH server is running it (GH #84). Optional so the one-server
+   * behaviour is unchanged when a caller can't name one, but a multi-source
+   * store must pass it: cancelling against the wrong box is a no-op there and
+   * leaves the real encode pinning CPU until it times out. It is also what
+   * retires the Plex adapter's lastServer/lastToken workaround, which
+   * remembered a single connection precisely because this signature had
+   * nowhere to put one.
+   */
+  cancelActiveTranscode?(
+    sessionId: string,
+    log?: (msg: string) => void,
+    conn?: { server: string; session: ProviderSession }
+  ): Promise<void>;
 }

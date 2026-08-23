@@ -115,6 +115,14 @@ export function buildCheckoutCounter(
   // standings) are computed from the same point lists, so nothing outside
   // this function knows which shape is active.
   const usquare = spec.counterShape === 'usquare';
+  // 'desk': the mom-and-pop format's counter (GH #33) — "no front counter, just
+  // a tiny counter that fits a single computer". There is NO walk-in band at
+  // all: a store this cramped cannot spend a 20 ft pentagon of floor on its
+  // register, so the counter IS the inner island, standing alone as a 6 ft
+  // wooden desk with the register on it and room to stand behind. Everything
+  // downstream still reads the same anchors (spine, apex, standings) because
+  // they are all derived from the island, which every shape builds.
+  const desk = spec.counterShape === 'desk';
 
   const theme = getActiveTheme();
   // Laminate mottle/scuff albedo + micro-stipple normal (shared generator with
@@ -141,6 +149,10 @@ export function buildCheckoutCounter(
 
   const bandH = 3.4;
   const bandD = 1.5;
+  // Front-to-back depth of the inner counter island (ft). Hoisted above the
+  // outline so the standalone desk — whose outline IS the island — can size
+  // itself from the same number the island is extruded with.
+  const innerD = 1.6;
   const backHalf = 6.2;
   const shoulderHalf = 9.8;
   const zBackC = backZ - 0.1;
@@ -154,13 +166,29 @@ export function buildCheckoutCounter(
   // encloses roughly the same area as the shield's tapering 19.6 ft span.
   const uHalf = 6.8;
   const zFrontU = zBackC - 12.0;
-  const deskApexZ = usquare ? zFrontU : zPoint;
+  // Standalone desk: 6 ft wide, one island-depth deep, standing 3 ft clear of
+  // the vestibule glass so there is somewhere to stand behind it, and no
+  // deeper into the store than that — the shelves start a few feet past it.
+  const deskHalf = 3.0;
+  const zBackDesk = zBackC - 3.0;
+  const zFrontDesk = zBackDesk - innerD;
+  const deskApexZ = desk ? zFrontDesk : (usquare ? zFrontU : zPoint);
 
   // Outline points, wound so each edge's inward normal (-t.y, t.x) points
   // into the counter interior. For 'usquare' the loop still CLOSES across
   // the back (the offset/mitre math below needs a closed polygon) but that
   // closing edge is never built — it's the open walk-in side.
-  const shield: { x: number; z: number }[] = usquare
+  const shield: { x: number; z: number }[] = desk
+    ? [
+        // The desk's own rect. No band is built from it (bandSegDefs is empty
+        // below), but the offset/mitre ring wants a closed polygon and the
+        // rect is the honest one to give it.
+        { x: cx - deskHalf, z: zBackDesk },
+        { x: cx - deskHalf, z: zFrontDesk },
+        { x: cx + deskHalf, z: zFrontDesk },
+        { x: cx + deskHalf, z: zBackDesk },
+      ]
+    : usquare
     ? [
         { x: cx - uHalf, z: zBackC },
         { x: cx - uHalf, z: zFrontU },
@@ -312,7 +340,9 @@ export function buildCheckoutCounter(
   // where a corner gap between two inflated band ends rasterizes shut. The
   // 0.01 pseudo-trims swap the phantom back edge's mitres for square cuts.
   const uSideLen = zBackC - zFrontU; // 12
-  const bandSegDefs: [number, number, number][] = usquare
+  const bandSegDefs: [number, number, number][] = desk
+    ? [] // no walk-in band on a standalone desk — see `desk` above
+    : usquare
     ? [
         [0, 0.01, uSideLen - 2.9],   // left side, back piece (z 8.4..5.5)
         [0, 5.1, 0.01],              // left side, front piece (z 3.3..-3.6)
@@ -398,26 +428,32 @@ export function buildCheckoutCounter(
   });
 
   // ----- Inner counter: angled V-shaped island inside the shield -----
-  const innerD = 1.6;
   const innerH = 2.7;
 
   // Island front line: on the shield it follows the two edges tapering to the
   // apex (a V); on the usquare it runs straight along the front band's inner
   // face (all three points collinear — the V math below degenerates cleanly:
   // equal edge normals, unit bisector, mitre length = innerD).
+  // Front line of the island. On the shield it follows the two tapering edges
+  // (a V); on the usquare and the standalone desk all three points are
+  // collinear along one straight front, and the V math below degenerates
+  // cleanly (equal edge normals, unit bisector, mitre length = innerD).
   const innerFrontZU = zFrontU + bandD;
+  const straightFront = usquare || desk;
+  const innerFrontZ = desk ? zFrontDesk : innerFrontZU;
   // Island half-span: the usquare's narrower well (inner half-width
-  // uHalf−bandD = 5.3) takes a shorter island than the shield's ±6.
-  const islandHalf = usquare ? 5.0 : 6.0;
-  const pFront1 = usquare ? new THREE.Vector2(cx, innerFrontZU) : P_in[2].clone();
+  // uHalf−bandD = 5.3) takes a shorter island than the shield's ±6, and the
+  // standalone desk is the whole counter, so it is exactly the desk.
+  const islandHalf = desk ? deskHalf : (usquare ? 5.0 : 6.0);
+  const pFront1 = straightFront ? new THREE.Vector2(cx, innerFrontZ) : P_in[2].clone();
   const pFront0X = cx - islandHalf;
-  const pFront0Y = usquare
-    ? innerFrontZU
+  const pFront0Y = straightFront
+    ? innerFrontZ
     : P_in[1].y + (pFront0X - P_in[1].x) * (P_in[2].y - P_in[1].y) / (P_in[2].x - P_in[1].x);
   const pFront0 = new THREE.Vector2(pFront0X, pFront0Y);
   const pFront2X = cx + islandHalf;
-  const pFront2Y = usquare
-    ? innerFrontZU
+  const pFront2Y = straightFront
+    ? innerFrontZ
     : P_in[2].y + (pFront2X - P_in[2].x) * (P_in[3].y - P_in[2].y) / (P_in[3].x - P_in[2].x);
   const pFront2 = new THREE.Vector2(pFront2X, pFront2Y);
 
@@ -470,7 +506,12 @@ export function buildCheckoutCounter(
   // Register duty spot: centered in the counter well, a good step back from
   // the inner island's apex (into the work strip toward the back band) so she
   // stands clearly in the open rather than embedded in the white island.
-  const registerStanding: ClerkStanding = { x: cx, z: pBack1.y + 1.7, yaw: Math.PI };
+  // On a standalone desk there is no well to stand in — the working side is
+  // the strip of floor between the desk's back edge and the vestibule glass,
+  // which is why the desk is set 3 ft off that glass in the first place.
+  const registerStanding: ClerkStanding = {
+    x: cx, z: pBack1.y + (desk ? 1.4 : 1.7), yaw: Math.PI,
+  };
 
   // Standing spot at a rental terminal anchored at world-X `x`: behind the
   // inner counter's spine on the clerk side (the spine normal points into her

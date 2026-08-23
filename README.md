@@ -420,7 +420,18 @@ emblem paths, per-sign art, wrap prints, rendered strings. There's also a live
 **brand editor** in the settings drawer — emblem shape, both wordmark lines,
 colors, tilt, storefront extrusion, and the typeface (four bundled display
 faces, plus whatever your pack registers), with two complete original identities
-in the box to start from (Megahit Video and Reel Time). Run
+in the box to start from (Megahit Video and Reel Time).
+
+And if you don't have a logo at all, **build one**: the brand editor's *Emblem
+Editor* page stacks primitive shapes — rectangles, ovals, wedges, stars, rings,
+banners and type — each with its own colour, place and angle, and flattens the
+pile into the store's mark. Shapes can be solid parts, cut-out holes, or ink
+printed on the face, and what comes out has real transparency: empty space
+stays empty. The **outline is the sign**, not artwork pasted on a board — make
+an oval and the extruded storefront sign is an oval, punch a hole and the sign
+has a window, and the same silhouette die-cuts every aisle header, wall mark
+and box spine in the store. Export it as a transparent PNG if you want to take
+it elsewhere. Run
 `node tools/list-slots.mjs` for the full manifest of every overridable surface,
 and `npm run build` validates an installed pack so a typo fails loudly.
 

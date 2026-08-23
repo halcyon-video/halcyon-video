@@ -209,7 +209,15 @@ export class JellyfinProvider implements MediaSourceProvider {
     return reportPlaybackStopped(server, session.accessToken, itemId, positionTicks);
   }
 
-  async cancelActiveTranscode(sessionId: string, log?: (msg: string) => void): Promise<void> {
-    return stopActiveEncoding(sessionId, log);
+  async cancelActiveTranscode(
+    sessionId: string,
+    log?: (msg: string) => void,
+    conn?: { server: string; session: ProviderSession }
+  ): Promise<void> {
+    return stopActiveEncoding(
+      sessionId,
+      log,
+      conn ? { url: conn.server, token: conn.session.accessToken } : null
+    );
   }
 }
