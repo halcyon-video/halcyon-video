@@ -80,6 +80,26 @@ user-assets/
 downloads as `clerk-sprite-template.png` — edit that. It wears the active
 theme's livery, so grab it under the theme you're customizing for.
 
+**Working one cell at a time.** A 4096x1920 sheet is a miserable thing to
+edit, and hopeless as the target of an image generator, which wants one
+picture at a time. `tools/clerk-sheet.mjs` takes the sheet apart and puts it
+back together:
+
+```sh
+node tools/clerk-sheet.mjs split  clerk-sprite-template.png cells/ --scale 3
+node tools/clerk-sheet.mjs stitch cells/ default.png
+node tools/clerk-sheet.mjs check  default.png
+```
+
+`split` writes 80 PNGs named `RR-CC_<facing>_<animation><frame>.png` plus a
+`grid.json` manifest, at `--scale` times the atlas cell (3x = 768x1152, which
+is a comfortable size to draw or generate at). Replace the cells however you
+like — the leading `RR-CC` is the only part of the name `stitch` reads, so
+the rest is yours to rename. `stitch` scales everything back down to the
+atlas cell and refuses a sheet with holes or with cells that aren't 2:3.
+`check` reads a finished sheet and reports empty cells, figures floating
+clear of the cell foot, and soft mattes that `alphaTest` will cut ragged.
+
 The grid is the contract (the runtime pages cells by fraction, so any
 resolution works as long as the layout matches):
 
