@@ -129,11 +129,30 @@ jobs:
         id: shot
         continue-on-error: true
         run: |
+          # 1. The picture chosen FOR THIS RELEASE, committed before the tag.
+          # A generic photo of the store does not sell the thing that just
+          # shipped: if a release adds VR walk mode, the post has to show VR
+          # walk mode or the post is not doing its job. The shooter only
+          # exists in the maintainer's clone, so the shot is taken there and
+          # committed as docs/releases/<tag>.jpg — see that directory's
+          # README. This is the path that should be taken every time.
+          for cand in "docs/releases/${{ github.ref_name }}.jpg" \
+                      "docs/releases/${{ github.ref_name }}.png"; do
+            if [ -f "$cand" ]; then
+              echo "path=$cand" >> "$GITHUB_OUTPUT"
+              echo "::notice::announcing with this release's own screenshot ($cand)"
+              exit 0
+            fi
+          done
+          echo "::warning::no docs/releases/${{ github.ref_name }} screenshot — this release will be announced with a generic picture of the store, which shows nothing about what shipped"
+
+          # 2. A live shot, if this checkout happens to carry the harness.
           if [ -f release-shot.png ]; then
             echo "path=release-shot.png" >> "$GITHUB_OUTPUT"
             echo "::notice::announcing with the live screenshot"
             exit 0
           fi
+          # 3. Last resort: a wide hero view of the store.
           # Wide hero views ONLY. Deliberately excluded: the 2D/flat-mode
           # shots, settings and terminal UI, and close detail crops — all of
           # them read as a screenshot of software rather than a picture of a
