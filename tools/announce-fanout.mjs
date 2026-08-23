@@ -32,6 +32,8 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DEFAULT_REPO = 'halcyon-video/halcyon-video';
+// app.bsky.embed.images blob ceiling (bytes) — hard-rejected above this.
+const BLUESKY_MAX_BLOB = 1000000;
 
 function git(args) {
   return execFileSync('git', args, { cwd: root, encoding: 'utf8' });
@@ -59,7 +61,7 @@ function printHelp() {
     'Usage: node tools/announce-fanout.mjs <channel> --tag <vX.Y.Z> [options]',
     '',
     '  channel                one of: discord, mastodon, bluesky, x, reddit-draft',
-    '  --screenshot <path>    release screenshot PNG (optional, best-effort)',
+    '  --screenshot <path>    release screenshot, PNG or JPEG (optional, best-effort)',
     '  --repo <owner/name>    default: halcyon-video/halcyon-video',
     '  --out <path>           reddit-draft: where to write the draft (required)',
   ].join('\n'));
@@ -158,9 +160,21 @@ async function assertOk(res, label) {
   return res;
 }
 
+// The announcement image is not always a PNG: when the live shooter isn't in
+// the checkout, announce.yml falls back to one of the committed JPEGs in
+// docs/screenshots/. Every upload below therefore takes its content type from
+// the file's own magic bytes rather than assuming — a JPEG announced as
+// image/png is rejected outright by Mastodon and stored with the wrong
+// mimeType by Bluesky.
 function readScreenshot(opts) {
   if (!opts.screenshot || !fs.existsSync(opts.screenshot)) return null;
-  return fs.readFileSync(opts.screenshot);
+  const bytes = fs.readFileSync(opts.screenshot);
+  const jpeg = bytes.length > 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+  return {
+    bytes,
+    mime: jpeg ? 'image/jpeg' : 'image/png',
+    name: jpeg ? 'screenshot.jpg' : 'screenshot.png',
+  };
 }
 
 // ---- channels ---------------------------------------------------------------
@@ -172,8 +186,8 @@ async function channelDiscord(opts, ann) {
   const embed = { title: ann.title, description: `${ann.blurb}\n\n${ann.url}`, color: 0x2b6cb0 };
   const form = new FormData();
   if (shot) {
-    embed.image = { url: 'attachment://screenshot.png' };
-    form.append('files[0]', new Blob([shot], { type: 'image/png' }), 'screenshot.png');
+    embed.image = { url: `attachment://${shot.name}` };
+    form.append('files[0]', new Blob([shot.bytes], { type: shot.mime }), shot.name);
   }
   form.append('payload_json', JSON.stringify({ embeds: [embed] }));
   await assertOk(await fetch(creds.DISCORD_WEBHOOK_URL, { method: 'POST', body: form }), 'discord');
@@ -189,7 +203,7 @@ async function channelMastodon(opts, ann) {
   const shot = readScreenshot(opts);
   if (shot) {
     const form = new FormData();
-    form.append('file', new Blob([shot], { type: 'image/png' }), 'screenshot.png');
+    form.append('file', new Blob([shot.bytes], { type: shot.mime }), shot.name);
     form.append('description', `${ann.title} screenshot`);
     const res = await assertOk(await fetch(`${base}/api/v2/media`, { method: 'POST', headers: auth, body: form }), 'mastodon media upload');
     const media = await res.json();
@@ -247,11 +261,17 @@ async function channelBluesky(opts, ann) {
 
   let embed;
   const shot = readScreenshot(opts);
-  if (shot) {
+  // Bluesky rejects a blob over ~1,000,000 bytes outright, and this channel's
+  // try/catch would turn that into NO POST AT ALL rather than a post without a
+  // picture. A 1920x1080 PNG straight off the shooter is ~3MB, so this is the
+  // normal case, not an edge one: drop the image, keep the announcement.
+  if (shot && shot.bytes.length > BLUESKY_MAX_BLOB) {
+    console.log(`::warning::announce-fanout: screenshot is ${shot.bytes.length} bytes, over Bluesky's ${BLUESKY_MAX_BLOB} limit — posting without it`);
+  } else if (shot) {
     const blobRes = await assertOk(await fetch(`${service}/xrpc/com.atproto.repo.uploadBlob`, {
       method: 'POST',
-      headers: { ...auth, 'Content-Type': 'image/png' },
-      body: shot,
+      headers: { ...auth, 'Content-Type': shot.mime },
+      body: shot.bytes,
     }), 'bluesky blob upload');
     const { blob } = await blobRes.json();
     embed = { $type: 'app.bsky.embed.images', images: [{ image: blob, alt: ann.title }] };
@@ -275,12 +295,13 @@ async function channelBluesky(opts, ann) {
 
 // Command-based v2 chunked upload (docs.x.com/x-api/media/quickstart/media-upload-chunked):
 // INIT/APPEND/FINALIZE all hit the same endpoint as multipart form fields. A
-// release screenshot is one small PNG — a single APPEND chunk, and no
+// release screenshot is one small still — a single APPEND chunk, and no
 // processing_info to poll (that only ever applies to video/gif).
-async function uploadXMedia(bytes, auth) {
+async function uploadXMedia(shot, auth) {
+  const bytes = shot.bytes;
   const initForm = new FormData();
   initForm.append('command', 'INIT');
-  initForm.append('media_type', 'image/png');
+  initForm.append('media_type', shot.mime);
   initForm.append('media_category', 'tweet_image');
   initForm.append('total_bytes', String(bytes.length));
   const initRes = await assertOk(await fetch('https://api.x.com/2/media/upload', { method: 'POST', headers: auth, body: initForm }), 'x media init');
@@ -291,7 +312,7 @@ async function uploadXMedia(bytes, auth) {
   appendForm.append('command', 'APPEND');
   appendForm.append('media_id', mediaId);
   appendForm.append('segment_index', '0');
-  appendForm.append('media', new Blob([bytes], { type: 'image/png' }), 'screenshot.png');
+  appendForm.append('media', new Blob([bytes], { type: shot.mime }), shot.name);
   await assertOk(await fetch('https://api.x.com/2/media/upload', { method: 'POST', headers: auth, body: appendForm }), 'x media append');
 
   const finalForm = new FormData();

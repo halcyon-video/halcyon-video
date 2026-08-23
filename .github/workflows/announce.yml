@@ -116,6 +116,52 @@ jobs:
         continue-on-error: true
         run: node tools/shot.mjs ${{ steps.frame.outputs.args }} --out release-shot.png
 
+      # The shooter above only exists in the maintainer's working clone, so in
+      # a public CI checkout EVERY announcement would go out as bare text —
+      # and this project's entire argument is that it looks like the thing it
+      # describes. Fall back to the brand-free stills the repo already ships.
+      # Those were deliberately shot from a clone with no public/user-assets/
+      # drop-ins (see the repo's screenshot rule), which is why they are safe
+      # to publish; the brand guard above does not need to re-run on them.
+      # Rotation matches the framing table: index = number of version tags, so
+      # each release advances one step and wraps — no state stored anywhere.
+      - name: Resolve the announcement image
+        id: shot
+        continue-on-error: true
+        run: |
+          if [ -f release-shot.png ]; then
+            echo "path=release-shot.png" >> "$GITHUB_OUTPUT"
+            echo "::notice::announcing with the live screenshot"
+            exit 0
+          fi
+          # Wide hero views ONLY. Deliberately excluded: the 2D/flat-mode
+          # shots, settings and terminal UI, and close detail crops — all of
+          # them read as a screenshot of software rather than a picture of a
+          # store, which is the opposite of the point at social-post size.
+          SHOTS=(
+            docs/screenshots/facade-sunset.jpg
+            docs/screenshots/overview.jpg
+            docs/screenshots/browse-aisle.jpg
+            docs/screenshots/new-releases.jpg
+            docs/screenshots/walk-mode.jpg
+            docs/screenshots/clerk.jpg
+            docs/screenshots/checkout-ritual.jpg
+            docs/screenshots/back-room.jpg
+            docs/screenshots/games-department.jpg
+            docs/screenshots/facade-night.jpg
+          )
+          count=$(git tag --list 'v*' | wc -l)
+          idx=$(( (count - 1) % ${#SHOTS[@]} ))
+          pick="${SHOTS[$idx]}"
+          if [ -f "$pick" ]; then
+            cp "$pick" release-shot.jpg
+            echo "path=release-shot.jpg" >> "$GITHUB_OUTPUT"
+            echo "::notice::no live screenshot — announcing with $pick"
+          else
+            echo "path=" >> "$GITHUB_OUTPUT"
+            echo "::warning::no screenshot available — announcements will be text-only"
+          fi
+
       - name: Commit the CHANGELOG.md entry to master
         run: |
           if git diff --quiet -- CHANGELOG.md; then
@@ -170,7 +216,7 @@ jobs:
         run: |
           node tools/announce-fanout.mjs discord \
             --tag "${{ github.ref_name }}" \
-            --screenshot release-shot.png \
+            --screenshot "${{ steps.shot.outputs.path }}" \
             --repo "${{ github.repository }}"
 
       - name: Announce → Mastodon
@@ -181,7 +227,7 @@ jobs:
         run: |
           node tools/announce-fanout.mjs mastodon \
             --tag "${{ github.ref_name }}" \
-            --screenshot release-shot.png \
+            --screenshot "${{ steps.shot.outputs.path }}" \
             --repo "${{ github.repository }}"
 
       - name: Announce → Bluesky
@@ -192,7 +238,7 @@ jobs:
         run: |
           node tools/announce-fanout.mjs bluesky \
             --tag "${{ github.ref_name }}" \
-            --screenshot release-shot.png \
+            --screenshot "${{ steps.shot.outputs.path }}" \
             --repo "${{ github.repository }}"
 
       # Pay-per-use (~$0.20/post with a link) — needs a billing account with
@@ -208,5 +254,5 @@ jobs:
         run: |
           node tools/announce-fanout.mjs x \
             --tag "${{ github.ref_name }}" \
-            --screenshot release-shot.png \
+            --screenshot "${{ steps.shot.outputs.path }}" \
             --repo "${{ github.repository }}"
