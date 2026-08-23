@@ -34,6 +34,8 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DEFAULT_REPO = 'halcyon-video/halcyon-video';
 // app.bsky.embed.images blob ceiling (bytes) — hard-rejected above this.
 const BLUESKY_MAX_BLOB = 1000000;
+// Identity line for broadcast channels, explaining what Halcyon is to strangers.
+const IDENTITY = 'Your own Jellyfin or Plex library, as a video store you can walk.';
 
 function git(args) {
   return execFileSync('git', args, { cwd: root, encoding: 'utf8' });
@@ -131,8 +133,9 @@ function buildAnnouncement(opts) {
   return { title, blurb, url };
 }
 
-function composeText(maxLen, { title, blurb, url }) {
-  const suffix = `\n\nTry it in a browser, no server needed: ${url}`;
+function composeText(maxLen, { title, blurb, url }, identity = null) {
+  const urlLine = `Try it in a browser, no server needed: ${url}`;
+  const suffix = identity ? `\n\n${identity}\n\n${urlLine}` : `\n\n${urlLine}`;
   const budget = Math.max(0, maxLen - title.length - suffix.length - 1);
   return `${title}\n${truncate(blurb, budget)}${suffix}`;
 }
@@ -227,7 +230,7 @@ async function channelMastodon(opts, ann) {
       console.log(`::warning::announce-fanout: Mastodon image upload failed (${err.message}) — posting without it. If this says "outside the authorized scopes", the token needs write:media.`);
     }
   }
-  const status = composeText(500, ann);
+  const status = composeText(500, ann, IDENTITY);
   await assertOk(await fetch(`${base}/api/v1/statuses`, {
     method: 'POST',
     headers: { ...auth, 'Content-Type': 'application/json' },
@@ -286,7 +289,7 @@ async function channelBluesky(opts, ann) {
     const { blob } = await blobRes.json();
     embed = { $type: 'app.bsky.embed.images', images: [{ image: blob, alt: ann.title }] };
   }
-  const text = composeText(300, ann);
+  const text = composeText(300, ann, IDENTITY);
   const facets = linkFacets(text);
   const record = {
     $type: 'app.bsky.feed.post',
@@ -359,7 +362,7 @@ async function channelX(opts, ann) {
 
   const shot = readScreenshot(opts);
   const mediaId = shot ? await uploadXMedia(shot, auth) : null;
-  const body = { text: composeText(280, ann) };
+  const body = { text: composeText(280, ann, IDENTITY) };
   if (mediaId) body.media = { media_ids: [mediaId] };
   await assertOk(await fetch('https://api.x.com/2/tweets', {
     method: 'POST',
