@@ -52,10 +52,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          # The tagged tree, so docs/releases/<tag>.jpg is the one that
-          # belonged to this release. Full history: announce-fanout reads the
-          # tag's message and walks the range behind it.
-          ref: ${{ inputs.tag }}
+          # The DEFAULT branch, not the tagged tree. A repair run has to use
+          # the CURRENT tooling and the CURRENT picture: the whole reason to
+          # re-announce is that something about the tagged tree was wrong, and
+          # v0.9.0 proved it — its tag predates both the fixed blurb source and
+          # its own docs/releases picture, so checking out the tag would have
+          # faithfully reproduced the broken post.
+          # fetch-depth 0 brings the tags, which is all announce-fanout needs
+          # to read the tag's message and walk the range behind it.
           fetch-depth: 0
 
       - uses: actions/setup-node@v4
