@@ -173,6 +173,18 @@ let gameMovies: Movie[] = [];
 // is configured/reachable or the master switch is off, same never-block-boot
 // treatment as the other Jellyseerr-adjacent lists above.
 let streamingMovies: Movie[] = [];
+// WHAT THAT STOCK WAS FETCHED FOR. The chosen services are picked in two
+// places long after boot -- the manager terminal (#96) and the settings
+// drawer -- and both answer with a scene rebuild, not a reload. A rebuild
+// re-derives the aisles from `streamingMovies`, so without this key it
+// re-derives them from whatever boot happened to fetch: on a local install
+// that booted with nothing chosen, that is an empty list, and picking four
+// apps at the counter puts four EMPTY aisles in the store. Compared in
+// rebuildStoreScene() to decide whether the stock must be re-fetched first.
+let streamingStockKey = '\u0000never-loaded';
+function streamingChoiceKey(): string {
+  return streamingEnabled() ? (getSetting<string>('bb_streaming_services') || '') : '\u0000off';
+}
 /** `true` unless the owner switched streaming sections off (default ON). */
 function streamingEnabled(): boolean {
   return getSetting<boolean>('bb_streaming_enabled') !== false;
@@ -386,6 +398,7 @@ async function loadDiscoveryMovies(): Promise<void> {
  * nothing set up at all.
  */
 async function loadStreamingMovies(): Promise<void> {
+  streamingStockKey = streamingChoiceKey();
   if (!streamingEnabled()) {
     streamingMovies = [];
     return;
@@ -2550,6 +2563,14 @@ async function rebuildStoreScene() {
     settingsPendingGameRefetch = false;
     await loadGameMovies();
   }
+
+  // The chosen streaming services (#86/#96) can change between boot and this
+  // rebuild -- at the manager terminal or in the settings drawer -- and the
+  // aisles are built from the fetched stock, not from the setting. Re-fetch
+  // only when the choice actually moved, so every other rebuild-scene setting
+  // still costs no round trip. The loader is never-block-boot and swallows its
+  // own failures, so a dead source degrades to empty aisles, not a stuck store.
+  if (streamingChoiceKey() !== streamingStockKey) await loadStreamingMovies();
 
   const mode = getSetting<string>('bb_render_mode');
   if (mode !== 'flat') {
