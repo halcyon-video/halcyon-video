@@ -1089,6 +1089,20 @@ html, body {
   color: var(--crt-gold);
 }
 
+/* A custom-panel row that doesn't apply to what's currently selected — the
+   emblem editor's Text row on a star layer, say. It stays in place (removing
+   it would take its slot in the drawer's nav list and its measured height with
+   it) and simply reads as unavailable. */
+.settings-row-inert {
+  opacity: 0.42;
+}
+
+.settings-row-inert .settings-row-value,
+.settings-row-inert .brand-range-value,
+.settings-row-inert .brand-color-hex {
+  color: var(--crt-text);
+}
+
 .settings-row-select {
   flex: 0 1 46%;
   min-width: 130px;

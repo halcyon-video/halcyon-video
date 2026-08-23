@@ -32,6 +32,7 @@ import {
 import { brandDropReport } from './brand-drop';
 import type { LogoShape, LogoSpec } from './logo-spec';
 import { drawLogo, getLogoFontString } from './logo-renderer';
+import { activatePanelRow, SettingsRowKit } from './settings-rows';
 import { loadMediaReleasePin, saveMediaReleasePin } from './media-release-date';
 import { formatUnlockLabel, makeRentalRecord, rentalCapacityAt } from './rental-clock';
 import { activeProviderKind } from './providers/provider-registry';
@@ -1227,6 +1228,16 @@ export function registerCoreSettings(): void {
 
 export const BRAND_ROW_PREFIX = '__brand__:';
 
+/**
+ * Sub-page row keys. main.ts owns the routing (activateSetting parses this
+ * prefix and repaints the drawer), but a custom panel has to be able to emit
+ * one — the emblem editor is reached from a row on the Store Brand page.
+ */
+export const SETTINGS_SUBPAGE_PREFIX = '__subpage__:';
+
+/** The Store Brand sub-page the emblem editor is built on. */
+export const EMBLEM_SUBPAGE = 'Emblem Editor';
+
 export interface BrandPanelHooks {
   /** The persisted bb_logo actually changed — flag the drawer-close rebuild. */
   onDirty?: () => void;
@@ -1247,9 +1258,21 @@ export interface BrandPanelHooks {
 // its DOM on every page change, which rebuilds this map).
 const brandRowActivate = new Map<string, (dir: number) => void>();
 
-/** main.ts's activateSetting() hands BRAND_ROW_PREFIX keys back through here. */
+/**
+ * main.ts's activateSetting() hands BRAND_ROW_PREFIX keys back through here.
+ *
+ * Both the Store Brand form and the emblem editor build their rows on
+ * SettingsRowKit and share this one prefix, so the routing in main.ts stays a
+ * single branch however many custom brand pages there are. The local map is
+ * kept for any row a panel registers by hand rather than through the kit.
+ */
 export function activateBrandRow(key: string, dir: number): void {
-  brandRowActivate.get(key)?.(dir);
+  const local = brandRowActivate.get(key);
+  if (local) {
+    local(dir);
+    return;
+  }
+  activatePanelRow(key, dir);
 }
 
 const BRAND_SHAPES: { id: LogoShape; label: string }[] = [
@@ -1279,7 +1302,7 @@ const BRAND_FONTS = ['Archivo Black', 'Bebas Neue', 'Outfit', 'Anton'];
  * declared. A pack face is as safe to name as a bundled one — brand-pack.ts
  * registered it through the same registrar and boot waited on it.
  */
-function brandFontChoices(): string[] {
+export function brandFontChoices(): string[] {
   return [...BRAND_FONTS, ...brandPackFontFamilies()];
 }
 
@@ -1340,18 +1363,6 @@ function logoSpecDiff(spec: LogoSpec, base: LogoSpec): Partial<LogoSpec> | null 
   return Object.keys(diff).length > 0 ? (diff as Partial<LogoSpec>) : null;
 }
 
-let brandScratchCtx: CanvasRenderingContext2D | null = null;
-/** Normalize any CSS color to #rrggbb for <input type=color>. */
-function toHexColor(c: string): string {
-  if (/^#[0-9a-fA-F]{6}$/.test(c)) return c.toLowerCase();
-  brandScratchCtx ??= document.createElement('canvas').getContext('2d');
-  if (!brandScratchCtx) return '#000000';
-  brandScratchCtx.fillStyle = '#000000';
-  brandScratchCtx.fillStyle = c;
-  const v = String(brandScratchCtx.fillStyle);
-  return /^#[0-9a-fA-F]{6}$/.test(v) ? v : '#000000';
-}
-
 /**
  * Build the Store Brand editor into `container` (the page's .settings-group
  * element, after main.ts's Back row). Markup mirrors the drawer's native rows
@@ -1364,8 +1375,6 @@ export function buildStoreBrandPanel(container: HTMLElement, hooks: BrandPanelHo
   const baseSpec = DEFAULT_LOGO_SPECS[themeId] ?? DEFAULT_LOGO_SPECS['bb-1990'];
   let working = cloneLogoSpec(getActiveLogoSpec());
   let lastSaved = typeof localStorage !== 'undefined' ? localStorage.getItem('bb_logo') : null;
-  const syncFns: (() => void)[] = [];
-  const presetButtons: HTMLButtonElement[] = [];
 
   // ── Live preview (event-driven redraws only — no rAF, no polling) ─────────
   const previewRow = document.createElement('div');
@@ -1402,11 +1411,6 @@ export function buildStoreBrandPanel(container: HTMLElement, hooks: BrandPanelHo
     ensurePreviewFont();
   };
 
-  // ── Shared row plumbing ────────────────────────────────────────────────────
-  const setPresetHighlight = (idx: number) => {
-    presetButtons.forEach((b, i) => b.classList.toggle('active', i === idx));
-  };
-
   /** Persist the diff; only an actual change dirties the drawer session. */
   const commit = () => {
     const diff = logoSpecDiff(working, baseSpec);
@@ -1431,46 +1435,18 @@ export function buildStoreBrandPanel(container: HTMLElement, hooks: BrandPanelHo
     hooks.onDirty?.();
   };
 
-  /** Commit from an individual control: no preset claims the result anymore. */
-  const commitEdit = () => {
-    setPresetHighlight(-1);
-    commit();
-  };
-
-  const registerRow = (id: string, row: HTMLElement, activate: (dir: number) => void) => {
-    const key = BRAND_ROW_PREFIX + id;
-    row.id = `setting-row-${key}`;
-    brandRowActivate.set(key, activate);
-    const index = hooks.registerRow ? hooks.registerRow(key) : -1;
-    row.addEventListener('pointerenter', () => {
-      if (index >= 0) hooks.selectRow?.(index);
-    });
-  };
-
-  const makeRowShell = (id: string, label: string, hint: string, activate: (dir: number) => void, tag: 'div' | 'button' = 'div') => {
-    const row = document.createElement(tag);
-    row.className = 'settings-row settings-brand-row';
-    if (tag === 'button') (row as HTMLButtonElement).type = 'button';
-    else row.tabIndex = -1; // focusable by setSettingsSelection, not in tab order
-    const main = document.createElement('span');
-    main.className = 'settings-row-main';
-    main.innerHTML = `
-      <span class="settings-row-label">${label}</span>
-      ${hint ? `<span class="settings-row-hint">${hint}</span>` : ''}
-    `;
-    row.appendChild(main);
-    // Dot leader between the label and whatever control the caller appends —
-    // keeps the Store Brand rows on the same rental-receipt line as the rest
-    // of the drawer (the hint span above is CSS-hidden; the CRT footer bar
-    // reads it for the selected row).
-    const leader = document.createElement('span');
-    leader.className = 'settings-row-leader';
-    leader.setAttribute('aria-hidden', 'true');
-    row.appendChild(leader);
-    registerRow(id, row, activate);
-    container.appendChild(row);
-    return row;
-  };
+  // Every control commits through the kit, and an individual edit means no
+  // preset owns the result anymore — so the strip's highlight comes off.
+  const kit = new SettingsRowKit({
+    container,
+    prefix: BRAND_ROW_PREFIX,
+    hooks,
+    preview: redrawPreview,
+    commit: () => {
+      presets?.setActive(-1);
+      commit();
+    },
+  });
 
   // ── Dropped logo (read-only) ───────────────────────────────────────────────
   // The simple-drop tier has NO setting by design — you put a file in a folder
@@ -1478,299 +1454,84 @@ export function buildStoreBrandPanel(container: HTMLElement, hooks: BrandPanelHo
   // it see my logo, and what did it make of it?". A drop that produced no
   // silhouette, or sampled one ink instead of two, looks from the couch exactly
   // like a drop that never happened.
-  {
+  kit.readout('drop', 'Dropped Logo', brandDropDiagnostic(), () => {
     const drop = brandDropReport();
-    const active = brandPackSource() === 'drop';
-    const value = document.createElement('span');
-    value.className = 'settings-row-value';
-    value.textContent = !drop
-      ? 'Empty'
-      : active ? `${drop.file} — active`
-      : `${drop.file} — overridden`;
-    const row = makeRowShell(
-      'drop', 'Dropped Logo', brandDropDiagnostic(),
-      () => { /* read-only: this tier is a folder, not a knob */ },
-    );
-    row.appendChild(value);
-  }
+    if (!drop) return 'Empty';
+    return brandPackSource() === 'drop' ? `${drop.file} — active` : `${drop.file} — overridden`;
+  });
 
   // ── Brand pack status (read-only) ──────────────────────────────────────────
   // Diagnostic, not a control: the id is typed on the SERVICE MODE page
   // (bb_brand_pack) because it names a directory. What belongs HERE is the
   // answer to "is the pack I installed actually dressing this store?", which
   // is otherwise invisible — a misspelt id looks exactly like no pack at all.
-  {
+  kit.readout('pack', 'Brand Pack', brandPackDiagnostic(), () => {
     const id = activeBrandPackId();
     const pack = getBrandPack();
     const status = brandPackStatus();
-    const value = document.createElement('span');
-    value.className = 'settings-row-value';
-    value.textContent = !id
-      ? 'None'
-      : status === 'loaded' ? `${pack?.displayName ?? pack?.name ?? id} (${id})`
-      : status === 'failed' ? `${id} — FAILED`
-      : `${id} — not installed`;
-    const row = makeRowShell(
-      'pack', 'Brand Pack', brandPackDiagnostic(),
-      () => { /* read-only: the id is typed on the SERVICE MODE page */ },
-    );
-    row.appendChild(value);
-  }
+    if (!id) return 'None';
+    if (status === 'loaded') return `${pack?.displayName ?? pack?.name ?? id} (${id})`;
+    if (status === 'failed') return `${id} — FAILED`;
+    return `${id} — not installed`;
+  });
 
-  // ── Preset strip ───────────────────────────────────────────────────────────
+  // ── Emblem editor (sub-page) ───────────────────────────────────────────────
+  // The build-your-own tier: layered primitive shapes flattened into the brand
+  // (src/emblem-editor.ts). It gets its own page rather than more rows here —
+  // it carries its own preview and a stack of per-layer controls, and a live
+  // emblem overrides the Emblem Shape row below, so the two want separating.
   {
-    const row = document.createElement('div');
-    row.className = 'settings-row settings-brand-row brand-preset-row';
-    row.tabIndex = -1;
-    const main = document.createElement('span');
-    main.className = 'settings-row-main';
-    main.innerHTML = `
-      <span class="settings-row-label">Presets</span>
-      <span class="settings-row-hint">Theme Default clears your edits. Left/Right cycles.</span>
+    const key = SETTINGS_SUBPAGE_PREFIX + EMBLEM_SUBPAGE;
+    const row = document.createElement('button');
+    row.type = 'button';
+    row.className = 'settings-row settings-brand-row';
+    row.id = `setting-row-${key}`;
+    const doc = getActiveLogoSpec().emblem;
+    const active = doc && doc.enabled && doc.layers.length > 0;
+    row.innerHTML = `
+      <span class="settings-row-main">
+        <span class="settings-row-label">Emblem Editor</span>
+        <span class="settings-row-hint">Build a logo out of layered shapes, ovals, stars and type. The shape you make becomes the shape of the store's signs.</span>
+      </span>
+      <span class="settings-row-leader" aria-hidden="true"></span>
+      <span class="settings-row-value">${active ? `${doc!.layers.length} layers ›` : '›'}</span>
     `;
-    row.appendChild(main);
-    const strip = document.createElement('span');
-    strip.className = 'brand-preset-strip';
-    let applied = -1;
-    const applyPreset = (i: number) => {
-      applied = i;
-      const preset = BRAND_PRESETS[i];
-      working = preset.spec ? mergeLogoPartial(baseSpec, preset.spec) : cloneLogoSpec(baseSpec);
-      syncFns.forEach((fn) => fn());
-      commit();
-      setPresetHighlight(i);
-    };
-    BRAND_PRESETS.forEach((preset, i) => {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'brand-preset-btn';
-      btn.textContent = preset.label;
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        applyPreset(i);
-      });
-      presetButtons.push(btn);
-      strip.appendChild(btn);
+    const index = hooks.registerRow ? hooks.registerRow(key) : -1;
+    row.addEventListener('pointerenter', () => {
+      if (index >= 0) hooks.selectRow?.(index);
     });
-    row.appendChild(strip);
-    registerRow('presets', row, (dir) => {
-      applyPreset(((applied < 0 ? (dir > 0 ? -1 : 0) : applied) + dir + BRAND_PRESETS.length) % BRAND_PRESETS.length);
-    });
+    // Activation is main.ts's own sub-page route (the key carries its prefix),
+    // so nothing needs registering in the brand row map for it.
     container.appendChild(row);
   }
 
-  // ── Dropdown rows ──────────────────────────────────────────────────────────
-  const makeSelectRow = (
-    id: string, label: string, hint: string,
-    options: { id: string; label: string }[],
-    get: () => string, set: (v: string) => void,
-  ) => {
-    const select = document.createElement('select');
-    select.className = 'settings-row-select';
-    select.id = `setting-input-${BRAND_ROW_PREFIX}${id}`;
-    const syncOptions = () => {
-      select.innerHTML = '';
-      const opts = options.slice();
-      // Keep an off-menu current value (e.g. the HV theme's serif font stack)
-      // selectable rather than silently misreporting it as the first option.
-      if (!opts.some((o) => o.id === get())) opts.unshift({ id: get(), label: 'Theme Font' });
-      for (const o of opts) {
-        const opt = document.createElement('option');
-        opt.value = o.id;
-        opt.textContent = o.label;
-        select.appendChild(opt);
-      }
-      select.value = get();
-    };
-    syncOptions();
-    select.addEventListener('change', () => {
-      set(select.value);
-      commitEdit();
-    });
-    select.addEventListener('click', (e) => e.stopPropagation());
-    const activate = (dir: number) => {
-      const idx = Math.max(0, Array.from(select.options).findIndex((o) => o.value === get()));
-      const next = (idx + dir + select.options.length) % select.options.length;
-      select.value = select.options[next].value;
-      set(select.value);
-      commitEdit();
-    };
-    const row = makeRowShell(id, label, hint, activate);
-    row.appendChild(select);
-    row.addEventListener('click', (e) => {
-      if (e.target !== select) activate(1);
-    });
-    syncFns.push(syncOptions);
-    return row;
-  };
-
-  // ── Toggle rows (native look: yellow On/Off value, whole row flips) ───────
-  const makeToggleRow = (id: string, label: string, hint: string, get: () => boolean, set: (v: boolean) => void) => {
-    const value = document.createElement('span');
-    value.className = 'settings-row-value';
-    const sync = () => { value.textContent = get() ? 'On' : 'Off'; };
-    sync();
-    const activate = () => {
-      set(!get());
-      sync();
-      commitEdit();
-    };
-    const row = makeRowShell(id, label, hint, activate, 'button');
-    row.appendChild(value);
-    row.addEventListener('click', activate);
-    syncFns.push(sync);
-  };
-
-  // ── Color rows ─────────────────────────────────────────────────────────────
-  const makeColorRow = (id: string, label: string, hint: string, get: () => string, set: (v: string) => void) => {
-    const wrap = document.createElement('span');
-    wrap.className = 'brand-color-wrap';
-    const hex = document.createElement('span');
-    hex.className = 'brand-color-hex';
-    const input = document.createElement('input');
-    input.type = 'color';
-    input.id = `setting-input-${BRAND_ROW_PREFIX}${id}`;
-    const sync = () => {
-      input.value = toHexColor(get());
-      hex.textContent = input.value;
-    };
-    sync();
-    // Live preview while scrubbing the picker; persist on close (change).
-    input.addEventListener('input', () => {
-      set(input.value);
-      hex.textContent = input.value;
-      redrawPreview();
-    });
-    input.addEventListener('change', () => {
-      set(input.value);
-      commitEdit();
-    });
-    input.addEventListener('click', (e) => e.stopPropagation());
-    wrap.appendChild(hex);
-    wrap.appendChild(input);
-    // Enter/Right opens the native picker, like activating a text row focuses
-    // its input.
-    const activate = (_dir?: number) => input.click();
-    const row = makeRowShell(id, label, hint, activate);
-    row.appendChild(wrap);
-    row.addEventListener('click', (e) => {
-      if (e.target !== input) activate();
-    });
-    syncFns.push(sync);
-  };
-
-  // ── Text rows (commit on change/blur — mirrors the Connection rows) ───────
-  const makeBrandTextRow = (
-    id: string, label: string, hint: string,
-    get: () => string, set: (v: string) => void,
-    datalistId?: string,
-  ) => {
-    const input = document.createElement('input');
-    input.type = 'text';
-    input.className = 'settings-row-input';
-    input.id = `setting-input-${BRAND_ROW_PREFIX}${id}`;
-    input.autocomplete = 'off';
-    input.spellcheck = false;
-    input.placeholder = '(none)';
-    if (datalistId) input.setAttribute('list', datalistId);
-    let committed = get();
-    const sync = () => {
-      committed = get();
-      input.value = committed;
-    };
-    sync();
-    // Keystrokes repaint the preview only; the spec is persisted on commit.
-    input.addEventListener('input', () => {
-      set(input.value);
-      redrawPreview();
-    });
-    input.addEventListener('change', () => {
-      committed = input.value.trim();
-      input.value = committed;
-      set(committed);
-      commitEdit();
-    });
-    const activate = () => input.focus();
-    const row = makeRowShell(id, label, hint, activate);
-    row.classList.add('settings-text-row');
-    input.addEventListener('keydown', (e) => {
-      // Same edit-mode exits as the Connection inputs: Enter commits (via
-      // change), Escape reverts; both return focus to the row for remote nav.
-      if (e.key === 'Escape') {
-        input.value = committed;
-        set(committed);
-        redrawPreview();
-      }
-      if (e.key === 'Enter' || e.key === 'Escape') {
-        e.preventDefault();
-        e.stopPropagation();
-        input.blur();
-        row.focus();
-      }
-    });
-    row.appendChild(input);
-    row.addEventListener('click', (e) => {
-      if (e.target !== input) input.focus();
-    });
-    syncFns.push(sync);
-  };
-
-  // ── Slider rows ────────────────────────────────────────────────────────────
-  const makeSliderRow = (
-    id: string, label: string, hint: string,
-    min: number, max: number, step: number, navStep: number,
-    format: (v: number) => string,
-    get: () => number, set: (v: number) => void,
-  ) => {
-    const wrap = document.createElement('span');
-    wrap.className = 'brand-range-wrap';
-    const input = document.createElement('input');
-    input.type = 'range';
-    input.id = `setting-input-${BRAND_ROW_PREFIX}${id}`;
-    input.min = String(min);
-    input.max = String(max);
-    input.step = String(step);
-    const readout = document.createElement('span');
-    readout.className = 'brand-range-value';
-    const sync = () => {
-      input.value = String(get());
-      readout.textContent = format(get());
-    };
-    sync();
-    input.addEventListener('input', () => {
-      set(parseFloat(input.value));
-      readout.textContent = format(get());
-      redrawPreview();
-    });
-    input.addEventListener('change', () => commitEdit());
-    input.addEventListener('click', (e) => e.stopPropagation());
-    const activate = (dir: number) => {
-      set(Math.min(max, Math.max(min, get() + dir * navStep)));
-      sync();
-      commitEdit();
-    };
-    wrap.appendChild(input);
-    wrap.appendChild(readout);
-    const row = makeRowShell(id, label, hint, activate);
-    row.appendChild(wrap);
-    syncFns.push(sync);
-  };
+  // ── Preset strip ───────────────────────────────────────────────────────────
+  const presets = kit.strip(
+    'presets', 'Presets', 'Theme Default clears your edits. Left/Right cycles.',
+    BRAND_PRESETS.map((p) => p.label),
+    (i) => {
+      const preset = BRAND_PRESETS[i];
+      working = preset.spec ? mergeLogoPartial(baseSpec, preset.spec) : cloneLogoSpec(baseSpec);
+      kit.syncAll();
+      commit();
+    },
+  );
 
   // ── The form ───────────────────────────────────────────────────────────────
-  makeSelectRow('shape', 'Emblem Shape', 'The badge behind the wordmark.',
+  kit.select('shape', 'Emblem Shape', 'The badge behind the wordmark.',
     BRAND_SHAPES, () => working.shape, (v) => { working.shape = v as LogoShape; });
 
-  makeToggleRow('torn', 'Torn Edge', 'Rip the emblem’s right edge, ticket-stub style.',
+  kit.toggle('torn', 'Torn Edge', 'Rip the emblem’s right edge, ticket-stub style.',
     () => working.tornEdge, (v) => { working.tornEdge = v; });
 
-  makeColorRow('body', 'Body Color', 'Emblem fill.',
+  kit.color('body', 'Body Color', 'Emblem fill.',
     () => working.bodyColor, (v) => { working.bodyColor = v; });
-  makeColorRow('text', 'Text Color', 'Wordmark lettering.',
+  kit.color('text', 'Text Color', 'Wordmark lettering.',
     () => working.textColor, (v) => { working.textColor = v; });
-  makeColorRow('border', 'Border Color', 'Inner pinstripe and 3D sign sides.',
+  kit.color('border', 'Border Color', 'Inner pinstripe and 3D sign sides.',
     () => working.borderColor, (v) => { working.borderColor = v; });
 
-  makeBrandTextRow('main', 'Main Text', 'The big wordmark.',
+  kit.text('main', 'Main Text', 'The big wordmark.',
     () => working.mainText, (v) => { working.mainText = v; });
 
   // Sub text quick-picks (datalist) — the classic "…VIDEO" suffixes.
@@ -1784,31 +1545,32 @@ export function buildStoreBrandPanel(container: HTMLElement, hooks: BrandPanelHo
     datalist.appendChild(opt);
   }
   container.appendChild(datalist);
-  makeBrandTextRow('sub', 'Sub Text', 'Small line under the wordmark — VIDEO, VIDEOS, ENTERTAINMENT…',
+  kit.text('sub', 'Sub Text', 'Small line under the wordmark — VIDEO, VIDEOS, ENTERTAINMENT…',
     () => working.subText, (v) => { working.subText = v; }, datalistId);
 
-  makeBrandTextRow('band', 'Band Text', 'Rotated side band, e.g. OPEN ALL NIGHT.',
+  kit.text('band', 'Band Text', 'Rotated side band, e.g. OPEN ALL NIGHT.',
     () => working.bandText, (v) => { working.bandText = v; });
-  makeBrandTextRow('tagline', 'Tagline', 'Banner under the emblem.',
+  kit.text('tagline', 'Tagline', 'Banner under the emblem.',
     () => working.taglineText, (v) => { working.taglineText = v; });
 
-  makeSelectRow('font', 'Font', 'Wordmark typeface.',
-    brandFontChoices().map((f) => ({ id: f, label: f })),
+  kit.select('font', 'Font', 'Wordmark typeface.',
+    () => brandFontChoices().map((f) => ({ id: f, label: f })),
     () => working.fontFamily, (v) => { working.fontFamily = v; });
 
-  makeSliderRow('tilt', 'Text Tilt', 'Classic video-store lean ≈ 4–10°.',
-    0, 20, 0.5, 1, (v) => `${(Math.round(v * 10) / 10).toString()}°`,
+  kit.slider('tilt', 'Text Tilt', 'Classic video-store lean ≈ 4–10°.',
+    { min: 0, max: 20, step: 0.5, navStep: 1 },
+    (v) => `${(Math.round(v * 10) / 10).toString()}°`,
     () => working.textTilt, (v) => { working.textTilt = v; });
 
-  makeToggleRow('overflow', 'Text Overflow', 'Let the wordmark spill past the emblem edges.',
+  kit.toggle('overflow', 'Text Overflow', 'Let the wordmark spill past the emblem edges.',
     () => working.textOverflow, (v) => { working.textOverflow = v; });
 
-  makeSelectRow('sfmode', 'Storefront Sign', 'Emblem board, or channel letters straight on the fascia.',
+  kit.select('sfmode', 'Storefront Sign', 'Emblem board, or channel letters straight on the fascia.',
     [{ id: 'emblem', label: 'Emblem' }, { id: 'letters', label: 'Letters' }],
     () => working.storefront.mode, (v) => { working.storefront.mode = v as 'emblem' | 'letters'; });
 
-  makeSliderRow('sfdepth', 'Sign Extrusion', '3D depth of the storefront sign. 0 = flat.',
-    0, 1.5, 0.05, 0.1, (v) => `${v.toFixed(2)} ft`,
+  kit.slider('sfdepth', 'Sign Extrusion', '3D depth of the storefront sign. 0 = flat.',
+    { min: 0, max: 1.5, step: 0.05, navStep: 0.1 }, (v) => `${v.toFixed(2)} ft`,
     () => working.storefront.extrudeDepth, (v) => { working.storefront.extrudeDepth = v; });
 
   // ── Custom Wrap (W3): drop-in full box-wrap image, one per medium ─────────
@@ -1867,7 +1629,6 @@ export function buildStoreBrandPanel(container: HTMLElement, hooks: BrandPanelHo
       }
     };
     sync();
-    syncFns.push(sync);
 
     /** Normalize + persist: cover-fit onto the exact scan canvas, then store
      *  the smallest encoding that fits the ~2 MB practical cap. */
@@ -1938,15 +1699,14 @@ export function buildStoreBrandPanel(container: HTMLElement, hooks: BrandPanelHo
     clearBtn.addEventListener('click', (e) => { e.stopPropagation(); clear(); });
 
     // Remote nav: Enter/Right opens the file picker, Left removes the upload.
-    const activate = (dir: number) => {
-      if (dir < 0) clear();
-      else fileInput.click();
-    };
-    const row = makeRowShell(
+    const row = kit.rowShell(
       `wrap-${medium}`,
       `${medium.toUpperCase()} Wrap Image`,
       `Your own print on every ${medium.toUpperCase()} rental case — normalized to ${ws.w}×${ws.h}, fold lines at x=${ws.folds[0]} and x=${ws.folds[1]}. PNG or JPEG. Enter uploads; Left removes.`,
-      activate,
+      (dir) => {
+        if (dir < 0) clear();
+        else fileInput.click();
+      },
     );
     const controls = document.createElement('span');
     controls.className = 'brand-wrap-controls';

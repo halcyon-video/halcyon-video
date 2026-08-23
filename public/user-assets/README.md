@@ -194,7 +194,17 @@ name); every other field is an override and absence means "keep today's value":
   the in-app brand editor writes, plus `pathD`/`pathTiltDeg` (`shape: "path"` —
   your own emblem outline as SVG path data), `imageSrc` (`shape: "image"`) and
   `wordmarkPathD` (a vector wordmark painted instead of type). Precedence is
-  theme default < pack < your own `bb_logo` edits.
+  theme default < pack < your own `bb_logo` edits < your own emblem
+  (`bb_emblem`).
+- `logo.emblem` is a **built emblem** — the layered-shape document the in-app
+  Emblem Editor writes (`src/emblem-doc.ts`: `{version, aspect, tilt, wordmark,
+  layers[]}`). Shipping one rather than a `pathD` keeps the mark editable and
+  re-inkable: layers naming `body`/`text`/`border` follow the palette, so the
+  same emblem repaints itself when the era does. The silhouette, the die-cut
+  signboards and the extruded storefront sign are all derived from it, so a
+  pack that sets `emblem` should not also set `shape`/`pathD` — the emblem
+  wins. Easiest way to author one: build it in the editor, then copy
+  `localStorage.bb_emblem` into your `brand.json`.
 - `fonts[].family` is the name your `logo.fontFamily` refers to; the file is
   registered under a private family so it can never collide with a host font.
 - `themes.<theme-id>.palette` is that era's deviation from `palette`, merged

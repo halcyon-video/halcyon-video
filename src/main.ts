@@ -121,10 +121,13 @@ import {
   buildStoreBrandPanel,
   activateBrandRow,
   BRAND_ROW_PREFIX,
+  SETTINGS_SUBPAGE_PREFIX,
+  EMBLEM_SUBPAGE,
   createSettingThumb,
   refreshSettingThumb,
 } from './settings';
 import type { SettingDef, SettingGroup } from './settings';
+import { buildEmblemEditorPanel } from './emblem-editor';
 import {
   MEDIA_DATE_BUTTON_ID,
   STREAMING_BUTTON_ID,
@@ -1134,7 +1137,9 @@ const SETTINGS_CLOSE_KEY = '__close__';
 const SWITCH_MEMBER_KEY = '__switch_member__';
 const SETTINGS_BACK_KEY = '__back__';
 const SETTINGS_GROUP_PREFIX = '__group__:';
-const SETTINGS_SUBPAGE_PREFIX = '__subpage__:';
+// SETTINGS_SUBPAGE_PREFIX comes from settings.ts: custom panels emit sub-page
+// rows of their own (the Store Brand page's Emblem Editor row), so the prefix
+// can't live only here.
 
 // The drawer is paginated: a category index page (settingsPage === null) with
 // one row per settings group, and one sub-page per group. Keeping each area
@@ -1329,7 +1334,24 @@ function generateSettingsDrawer() {
         groupEl.appendChild(makeRow(def.key, def.label, resolveHint(def), '', `setting-value-${def.key}`));
       }
     };
-    if (settingsPage === 'Store Brand') {
+    if (settingsPage === 'Store Brand' && settingsSubpage === EMBLEM_SUBPAGE) {
+      // The build-your-own emblem composer (src/emblem-editor.ts). Same deal as
+      // the brand panel below — its rows share BRAND_ROW_PREFIX, so
+      // activateSetting()'s existing delegation covers it.
+      buildEmblemEditorPanel(groupEl, {
+        onDirty: () => {
+          // An emblem edit repaints the 2D brand surfaces live, but the
+          // storefront sign's SILHOUETTE is geometry: it needs the rebuild.
+          settingsPendingRebuild = true;
+          updateSettingsStatus();
+        },
+        registerRow: (key) => {
+          settingsRowKeys.push(key);
+          return settingsRowKeys.length - 1;
+        },
+        selectRow: (idx) => setSettingsSelection(idx),
+      });
+    } else if (settingsPage === 'Store Brand') {
       // Custom LogoSpec editor page (live preview, presets, pickers/sliders) —
       // built by settings.ts; its rows join settingsRowKeys / the selection
       // flow here, and activateSetting() delegates back via activateBrandRow.
