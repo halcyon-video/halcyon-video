@@ -5,6 +5,54 @@ All notable changes to Halcyon Video, generated from commit history by
 it on every version tag push. Deterministic and offline: no entry here was
 written by a model.
 
+## [v0.9.0] — 2026-08-23
+
+### Announce
+- Broadcast posts identify what Halcyon IS (Closes [#107](https://github.com/halcyon-video/halcyon-video/issues/107))
+- A missing image must never cost the Mastodon post
+- The release picture must show what actually shipped
+
+### Announce fan-out
+- Every post carries a picture, and the right MIME
+- Make the demo link on Bluesky an actual link
+
+### Announce the ship
+- Fan a release out to Discord, Mastodon, Bluesky and X (Closes [#105](https://github.com/halcyon-video/halcyon-video/issues/105))
+
+### Emblem editor
+- Build the store's logo out of layered shapes (Closes [#34](https://github.com/halcyon-video/halcyon-video/issues/34))
+
+### Mom & pop
+- Its own building, a real door, and a set behind the till (Closes [#110](https://github.com/halcyon-video/halcyon-video/issues/110))
+- A small shop's ceiling is a ceiling (Closes [#114](https://github.com/halcyon-video/halcyon-video/issues/114))
+- No chrome overhead, no chain furniture on the desk (Closes [#112](https://github.com/halcyon-video/halcyon-video/issues/112))
+- The store's shape becomes data, not another theme (Closes [#33](https://github.com/halcyon-video/halcyon-video/issues/33))
+
+### Release announce
+- Never let the missing screenshot harness kill a release
+
+### Release notes
+- A reverted commit never reaches the notes
+
+### Streaming picker
+- A way back in for a store that is already open (Closes [#96](https://github.com/halcyon-video/halcyon-video/issues/96))
+
+### VR
+- Carry a picked-up movie to the counter instead of warping to flat checkout (Closes [#97](https://github.com/halcyon-video/halcyon-video/issues/97))
+
+### General
+- Take the clerk sheet apart so one cell at a time is possible
+- The emblem editor gets a workbench instead of a drawer (Closes [#111](https://github.com/halcyon-video/halcyon-video/issues/111))
+- The 1993 signs are the 1993 store, not a switch you flip (Closes [#113](https://github.com/halcyon-video/halcyon-video/issues/113))
+- Move the streaming stock out of main.ts, under the line budget
+- Picking streaming services must actually stock the shelves
+- A mixed store must not hand Plex a Jellyfin URL (Closes [#84](https://github.com/halcyon-video/halcyon-video/issues/84))
+- One store, stocked from every server you have (Closes [#84](https://github.com/halcyon-video/halcyon-video/issues/84))
+- Release notes generate themselves: CHANGELOG + auto-cut GitHub Release on tag push (Closes [#104](https://github.com/halcyon-video/halcyon-video/issues/104))
+- Expose streaming-service and TMDB settings in drawer for existing stores (Closes [#96](https://github.com/halcyon-video/halcyon-video/issues/96))
+- Atlas the low-res poster bank so the layer budget stops being a wall (Closes [#60](https://github.com/halcyon-video/halcyon-video/issues/60))
+- Custom clerk sprite sheets: user-assets drop-in + template export (Closes [#98](https://github.com/halcyon-video/halcyon-video/issues/98))
+
 ## [v0.8.1] — 2026-08-21
 
 ### General
