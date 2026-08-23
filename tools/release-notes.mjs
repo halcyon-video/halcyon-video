@@ -141,11 +141,40 @@ function tagDate(tag) {
   return git(['for-each-ref', `refs/tags/${tag}`, '--format=%(creatordate:short)']).trim();
 }
 
+/**
+ * `Reverts <sha>` / git's own `This reverts commit <sha>` — either spelling,
+ * anywhere in a commit body.
+ */
+const REVERTS_RE = /\b(?:this\s+)?reverts?(?:\s+commit)?\s+([0-9a-f]{7,40})\b/gi;
+
+/**
+ * Drop revert pairs. If a release range contains both a commit and the commit
+ * that reverted it, neither shipped anything, and listing the original is a
+ * release note that advertises a feature the release does not contain — which
+ * is worse than saying nothing. A revert whose target is NOT in the range is a
+ * real change (it removes something an earlier release shipped) and stays.
+ */
+function dropRevertPairs(commits) {
+  const inRange = new Map();
+  for (const c of commits) for (let n = 7; n <= c.hash.length; n++) inRange.set(c.hash.slice(0, n), c.hash);
+
+  const dropped = new Set();
+  for (const c of commits) {
+    REVERTS_RE.lastIndex = 0;
+    let m;
+    while ((m = REVERTS_RE.exec(c.body))) {
+      const target = inRange.get(m[1].toLowerCase());
+      if (target) { dropped.add(target); dropped.add(c.hash); }
+    }
+  }
+  return commits.filter((c) => !dropped.has(c.hash));
+}
+
 function collectCommits(from, to) {
   const range = from ? `${from}..${to}` : to;
   const format = `${RECORD_SEP}%H${FIELD_SEP}%s${FIELD_SEP}%b`;
   const raw = git(['log', '--no-merges', `--pretty=format:${format}`, range]);
-  return raw
+  const commits = raw
     .split(RECORD_SEP)
     .map((s) => s.trim())
     .filter(Boolean)
@@ -153,6 +182,7 @@ function collectCommits(from, to) {
       const [hash, subject = '', body = ''] = rec.split(FIELD_SEP);
       return { hash, subject: subject.trim(), body: body.trim() };
     });
+  return dropRevertPairs(commits);
 }
 
 function isChore(subject) {
