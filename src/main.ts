@@ -3429,6 +3429,9 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
   const titleConn = connectionForTitle(movie);
   const jellyfinUrl = titleConn?.url ?? null;
   const token = titleConn?.token ?? null;
+  // …and which BACKEND that server speaks, so a mixed Jellyfin+Plex store
+  // builds each title's URLs in the right shape rather than the primary's.
+  const titleKind = titleConn?.source.kind;
   // Never a credential test — see the note on onFetchEpisodes. Carried so the
   // Jellyfin provider can address /Users/<id>/..., empty on Plex by design.
   const userId = titleConn?.userId ?? '';
@@ -3529,7 +3532,7 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
 
   ui.isPlaybackActive = true;
 
-  const staticSrc = directStreamUrl(jellyfinUrl, token, playbackId, mediaSourceId);
+  const staticSrc = directStreamUrl(jellyfinUrl, token, playbackId, mediaSourceId, titleKind);
 
   // Decide direct-play vs. HLS transcode from the item's real container/codecs
   // BEFORE playing: WebKitGTK silently drops audio tracks whose codec isn't in
@@ -3546,7 +3549,7 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
   // Jellyfin branch is unchanged because a Jellyfin install always has one —
   // it also already returns undefined rather than throwing if the probe fails.
   const mediaInfo: MediaPlaybackInfo | undefined = overrideItemId
-    ? await probeItemPlaybackInfo(jellyfinUrl, token, userId, playbackId)
+    ? await probeItemPlaybackInfo(jellyfinUrl, token, userId, playbackId, titleKind)
     : (version?.mediaPlaybackInfo ?? movie.mediaPlaybackInfo);
   // Codec hint for buildHlsStreamUrl: HEVC sources get hevc pass-through
   // (fMP4) when the webview can decode it; everything else stays on TS.
@@ -3610,7 +3613,7 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
   // Direct play can't switch audio tracks, and burned-in subtitles are encoded
   // server-side — either forces the HLS transcode path. Text subtitles no
   // longer do.
-  const directPlayable = playbackIsDirectSafe(mediaInfo) && initialAudioIndex === undefined && burnInSubtitleIndex === undefined;
+  const directPlayable = playbackIsDirectSafe(mediaInfo, titleKind) && initialAudioIndex === undefined && burnInSubtitleIndex === undefined;
   let hlsSrc: string;
   try {
     hlsSrc = await transcodeStreamUrl(jellyfinUrl, token, playbackId, {
@@ -3619,7 +3622,7 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
       audioStreamIndex: initialAudioIndex,
       subtitleStreamIndex: burnInSubtitleIndex,
       startPositionTicks: resumeTicks || undefined,
-    });
+    }, titleKind);
   } catch (e: any) {
     // On Plex this is where a failed /decision pre-flight surfaces (#76) —
     // the real playback error, not a bare hls.js 400 the player would
@@ -3645,7 +3648,7 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
   // Fire-and-forget: awaiting here would sever the user-gesture chain before
   // video.play(), tripping autoplay policy. (It never rejects — errors are
   // caught and logged inside.)
-  playbackStarted(jellyfinUrl, token, playbackId);
+  playbackStarted(jellyfinUrl, token, playbackId, titleKind);
 
   // Yield GPU/CPU to the decoder (only if not hidden). Couch playback yields
   // too now that it is fullscreen: nothing of the room is on screen behind it.
@@ -3687,10 +3690,10 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
     // dismiss the controls doesn't dump the viewer at the storefront. Couch
     // playback just drops back onto the couch, so no confirm is needed.
     confirmExit: !fromCouch,
-    buildStream: (sel) => transcodeStreamUrlSync(jellyfinUrl, token, playbackId, { ...sel, sourceVideoCodec, mediaSourceId }),
+    buildStream: (sel) => transcodeStreamUrlSync(jellyfinUrl, token, playbackId, { ...sel, sourceVideoCodec, mediaSourceId }, titleKind),
     log: (msg) => logToConsole(msg, 'video'),
     onProgress: (positionTicks, isPaused) => {
-      playbackProgressed(jellyfinUrl, token, playbackId, positionTicks, isPaused);
+      playbackProgressed(jellyfinUrl, token, playbackId, positionTicks, isPaused, titleKind);
     },
     onClose: (positionTicks, endedNaturally) => {
       ui.isPlaybackActive = false;
@@ -3698,7 +3701,7 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
         // The WebGL context died while the movie played; the store behind the
         // player is a dead canvas. Report the stop, then take the reload we
         // deferred instead of "resuming" a frozen scene. Issue #70.
-        playbackStopped(jellyfinUrl, token, playbackId, positionTicks, movie.runTimeTicks);
+        playbackStopped(jellyfinUrl, token, playbackId, positionTicks, movie.runTimeTicks, titleKind);
         logToConsole('[System] Applying deferred context-loss reload...', 'system');
         setTimeout(() => location.reload(), 250);
         return;
@@ -3710,7 +3713,7 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
       // STARTING a title, not for continuing one.
       const nextEp = markWatchedAndFindNext(movie, endedNaturally, seriesQueue, playbackId, () => storeScene?.restockSlottedFixtures());
       if (nextEp) {
-        playbackStopped(jellyfinUrl, token, playbackId, positionTicks, movie.runTimeTicks);
+        playbackStopped(jellyfinUrl, token, playbackId, positionTicks, movie.runTimeTicks, titleKind);
         logToConsole(`[Video] "${movie.title}" — up next: ${episodeLabel(nextEp)}.`, 'video');
         videoPlayer?.beginTransition(`Up next — ${episodeLabel(nextEp)}`);
         void launchVideoPlayback(movie, nextEp.id, nextEp.path || undefined, false, fromCouch)
@@ -3722,7 +3725,7 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
           });
         return;
       }
-      playbackStopped(jellyfinUrl, token, playbackId, positionTicks, movie.runTimeTicks);
+      playbackStopped(jellyfinUrl, token, playbackId, positionTicks, movie.runTimeTicks, titleKind);
       finishPlayback(movie, fromCouch);
     },
     onFatalError: () => {
