@@ -52,6 +52,7 @@ import { buildCheckoutCounter, ClerkStanding } from './counter';
 import { Footprint } from '../layout-validator';
 import { CheckoutBag } from '../checkout-bag';
 import { ReturnSlot } from './return-slot';
+import { activeStoreFormat } from '../store-format';
 import type { Movie } from '../jellyfin';
 import { CRT_BLACK, CRT_GOLD, CRT_INK, CRT_TEXT } from '../crt-theme';
 import { brandString } from '../brand-pack';
@@ -555,9 +556,16 @@ export class EntranceCheckout implements StoreFixture {
     // protrudes into walkable floor now, so its footprint joins the clerk nav
     // rects below.
     // A RETURN TAPES chute belongs to the VHS-rental store — the tape eras
-    // (1990 / 1993 / 2000), not the DVD-era 2010.
+    // (1990 / 1993 / 2000), not the DVD-era 2010. And it belongs to a store
+    // big enough to bolt one to: it is chain counter furniture, so a FORMAT
+    // can decline it (StoreFormatSpec.counterDressing). Mom-and-pop does —
+    // its whole counter is a 6 ft desk, and a drop box standing off the end
+    // of it was wider than the desk was deep (GH #112). Every consumer of the
+    // return ritual already guards on hasReturnSlot(), because the 2010 store
+    // has had none since the theme shipped; tapes still come back, they just
+    // come back without the drop animation.
     const chuteTheme = getActiveTheme();
-    if (chuteTheme.defaultMedium === 'vhs') {
+    if (chuteTheme.defaultMedium === 'vhs' && activeStoreFormat().counterDressing) {
       const zBackC = backZ - 0.1; // counter.ts's band outline datum
       // Mirrored from return-slot.ts's CHUTE_BACK, the same way BAND_H is
       // mirrored from counter.ts below — those files stay layout-agnostic.
@@ -599,7 +607,23 @@ export class EntranceCheckout implements StoreFixture {
       this.clerkNavInfo.footprints.push(this.returnSlot.getFootprint());
     }
 
-    // Populate sign placement anchors on the register counter top spine
+    // Populate sign placement anchors on the register counter top spine.
+    //
+    // ...unless the format wears no counter dressing (mom-and-pop, GH #112):
+    // the four register slots carry BE KIND REWIND, the rental-policy and
+    // membership snap frames and NEXT REGISTER PLEASE, which is chain signage
+    // in a family shop. Two of the four are ALSO impossible here — they are
+    // anchored to the blue top of the walk-in BAND at y 3.54 (see the BAND_H
+    // note above) and a standalone desk has no band, so the REWIND tent hung
+    // in mid-air over the clerk's floor. Leaving the anchor list empty is the
+    // whole mechanism: buildSignage() only ever builds slots it is handed, and
+    // its drift check runs the other way (a slot BUILT but unregistered is the
+    // error), so no config, catalog entry or slot-id list changes.
+    if (!activeStoreFormat().counterDressing) {
+      this.signAnchors = [];
+      return;
+    }
+
     const rightSignOff = sq ? 4.4 : 5.4;
     const leftAnchor = getInnerCounterSpine(cx - 1.8);
     const middleAnchor = getInnerCounterSpine(cx + 1.8);

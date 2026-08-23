@@ -90,11 +90,17 @@ export interface StoreFormatSpec {
   /**
    * Layout-space Z of the shelf field's front edge. LAYOUT z is compressed
    * 0.75x toward the glass (StorePlan.scaleZ), so the world front edge is
-   * 15 + 0.75*(this - 15). Corporate's -14.4 puts it at world z = -7.05, well
-   * behind the big shield counter. Mom-and-pop's -3.0 puts it at world z = 1.5,
-   * which is 2.8 ft past the store-facing edge of its little desk (that desk
-   * fronts at z = 4.3) — a cramped store cannot spend 22 ft getting to its
-   * first shelf the way the chain does.
+   * 15 + 0.75*(this - 15) — i.e. a layout foot moves the real edge 9 inches.
+   * Corporate's -14.4 puts it at world z = -7.05, well behind the big shield
+   * counter. Mom-and-pop's -6.4 puts it at world z = -1.05, which is 5.35 ft
+   * past the store-facing edge of its little desk (that desk fronts at
+   * z = 4.3): a cramped store cannot spend 22 ft getting to its first shelf
+   * the way the chain does, but it does have to leave somewhere to STAND. At
+   * the -3.0 this shipped with the gap was 2.8 ft — one person deep, so a
+   * customer at the till was standing in the mouth of the first aisle and the
+   * run crowded the counter (GH #112). backWallZ derives from this edge, so
+   * spending the floor here simply makes the room 2.55 ft deeper; it does not
+   * come out of the aisles.
    */
   fieldZFront: number;
   /** Clear floor (ft) left between the deepest run and the back wall. */
@@ -270,6 +276,43 @@ export interface StoreFormatSpec {
   ceilingTvs: boolean;
   /** The curtained-off back section behind a beaded curtain. */
   curtainedSection: boolean;
+  /**
+   * The mirrored chrome cornice ring around the top of the sales floor
+   * (store-shell.ts buildCeilingFrame) — and, with it, the marquee bulb chase
+   * that rides its bottom rim (buildMarqueeBulbs works off the same cornice
+   * geometry, so with no cornice it would be a ring of bulbs hanging in air).
+   *
+   * A chain fixture in the most literal sense: a mitred chrome band with live
+   * planar Reflectors set into its inner face, proportioned for a 13.5 ft
+   * ceiling. Under a 9 ft one it hangs at standing eye height and reads as
+   * somebody else's store. It is also the most expensive thing in the frame —
+   * every Reflector renders the whole scene a second time (see
+   * store-mirrors.ts) — so a format that says no here stops paying for it as
+   * well as stops looking at it.
+   */
+  ceilingMirror: boolean;
+  /**
+   * The chain's checkout FURNITURE: the RETURN TAPES HERE drop chute
+   * (entrance/return-slot.ts), the register signage — BE KIND REWIND, the
+   * rental-policy and membership snap frames, NEXT REGISTER PLEASE — and the
+   * 1993 counter dressing lifted from the store footage (customer VFD pole
+   * display, balloon cluster, presale letterboard, receipt printer, card
+   * display; fixtures/counter-props-93.ts).
+   *
+   * Off for mom-and-pop (GH #112): the counter there is "a desk someone sits
+   * behind — a till and the person, nothing bolted to it". Nothing FUNCTIONAL
+   * rides on this flag: the desk CRT / manager terminal, the checkout ritual
+   * and the rental bag are built by the counter itself (entrance/counter.ts +
+   * entrance/index.ts), not by its dressing.
+   *
+   * Worth knowing WHY this reads as a defect and not merely a preference on
+   * the desk format: two of those register anchors are pinned to the blue top
+   * of the walk-in BAND (y 3.54), and a standalone desk has no band — so the
+   * REWIND tent and the balloon cluster tied to it were hanging in mid-air
+   * over the clerk's strip of floor. Same failure the COUNTER_BAND_KINDS set
+   * in store-fixtures-config.ts already catches for band-mounted fixtures.
+   */
+  counterDressing: boolean;
 }
 
 // ── The presets ─────────────────────────────────────────────────────────────
@@ -330,6 +373,8 @@ const CORPORATE: StoreFormatSpec = {
   clerk: true,
   ceilingTvs: true,
   curtainedSection: false,
+  ceilingMirror: true,
+  counterDressing: true,
 };
 
 /**
@@ -359,7 +404,7 @@ const MOM_AND_POP: StoreFormatSpec = {
   // Half the chain's cross-aisle break: 3 ft of dead floor between run chunks
   // is a luxury this store doesn't have.
   runBreakGap: 1.5,
-  fieldZFront: -3.0,
+  fieldZFront: -6.4,
   // 8.0, not the 3 ft a cramped aisle would otherwise want, because THE BACK
   // ROOM stands in this strip: the curtained alcove is 5 ft deep against the
   // back wall (fixtures/curtained-alcove.ts), leaving ~3 ft of cross-aisle in
@@ -419,6 +464,8 @@ const MOM_AND_POP: StoreFormatSpec = {
   clerk: false,
   ceilingTvs: false,
   curtainedSection: true,
+  ceilingMirror: false,
+  counterDressing: false,
 };
 
 export const STORE_FORMATS: Record<StoreFormatId, StoreFormatSpec> = {

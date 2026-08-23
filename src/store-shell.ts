@@ -2289,12 +2289,17 @@ export function buildStore(scene: StoreScene) {
   // --- Contiguous chrome + mirror cornice framing the entire ceiling ---
   // The 2000 store drops the mirrored perimeter cornice entirely (user): its
   // periwinkle room reads as a plain drop-ceiling shop, no chrome border.
-  const is2000Store = getActiveTheme().id === 'bb-2000';
-  if (!is2000Store) scene.buildCeilingFrame(storeWidth, backWallZ);
+  // A FORMAT can decline it too (StoreFormatSpec.ceilingMirror): mom-and-pop
+  // does, because a mitred chrome band with live Reflectors in it is a chain
+  // fixture, and under a 9 ft ceiling it hangs at eye height (GH #112).
+  const wantsCornice = getActiveTheme().id !== 'bb-2000' && activeStoreFormat().ceilingMirror;
+  if (wantsCornice) scene.buildCeilingFrame(storeWidth, backWallZ);
 
   // --- T13: optional old-cinema marquee bulbs (cornice rim + window posters) ---
-  // Marquee bulbs are off in the 2000 store (user).
-  if (!is2000Store) scene.buildMarqueeBulbs(storeWidth, backWallZ);
+  // Marquee bulbs are off in the 2000 store (user). They ride the CORNICE's
+  // bottom rim off the same geometry constants, so wherever there is no
+  // cornice they would be a ring of bulbs hanging in mid-air — same gate.
+  if (wantsCornice) scene.buildMarqueeBulbs(storeWidth, backWallZ);
 
   // --- Front entrance/exit vestibule + walk-in checkout counter ---
   scene.entrance = new EntranceCheckout(scene.fixtureContext());
@@ -2616,7 +2621,10 @@ export function buildStore(scene: StoreScene) {
   // receipt printer, hurricane standee, RENT A GAME card display (see
   // fixtures/counter-props-93.ts). After buildSignage: its group registers in
   // activeSignageObjects, which buildSignage clears at ITS start.
-  buildCounterProps93(scene);
+  // Chain counter furniture, so a format can decline the lot of it
+  // (StoreFormatSpec.counterDressing) — and mom-and-pop must, since half of
+  // this dressing anchors to a walk-in band its standalone desk doesn't have.
+  if (activeStoreFormat().counterDressing) buildCounterProps93(scene);
 
   // 1993 storefront dressing — QUIK DROP window vinyl, RETURN BY MIDNIGHT
   // posters, letterboard hours sign, EAS pedestals (see
