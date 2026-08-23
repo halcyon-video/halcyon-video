@@ -212,6 +212,27 @@ async function channelMastodon(opts, ann) {
   console.log('announce-fanout: posted to Mastodon');
 }
 
+// A URL in an AT Proto post is plain text unless the record carries a
+// richtext facet pointing at it — and the facet's index is in UTF-8 BYTES,
+// not JS string offsets, so the em-dash and ellipsis this blurb can contain
+// would shift it if we measured in characters. Without this the one thing
+// the post exists to do (send someone to the demo) isn't clickable.
+function linkFacets(text) {
+  const facets = [];
+  const re = /https?:\/\/[^\s]+/g;
+  let m;
+  while ((m = re.exec(text)) !== null) {
+    const uri = m[0].replace(/[.,;:)\]]+$/, '');
+    const byteStart = Buffer.byteLength(text.slice(0, m.index), 'utf8');
+    const byteEnd = byteStart + Buffer.byteLength(uri, 'utf8');
+    facets.push({
+      index: { byteStart, byteEnd },
+      features: [{ $type: 'app.bsky.richtext.facet#link', uri }],
+    });
+  }
+  return facets;
+}
+
 async function channelBluesky(opts, ann) {
   const creds = requireEnv('BLUESKY_HANDLE', 'BLUESKY_APP_PASSWORD');
   if (!creds) return;
@@ -236,7 +257,14 @@ async function channelBluesky(opts, ann) {
     embed = { $type: 'app.bsky.embed.images', images: [{ image: blob, alt: ann.title }] };
   }
   const text = composeText(300, ann);
-  const record = { $type: 'app.bsky.feed.post', text, createdAt: new Date().toISOString(), ...(embed ? { embed } : {}) };
+  const facets = linkFacets(text);
+  const record = {
+    $type: 'app.bsky.feed.post',
+    text,
+    createdAt: new Date().toISOString(),
+    ...(facets.length ? { facets } : {}),
+    ...(embed ? { embed } : {}),
+  };
   await assertOk(await fetch(`${service}/xrpc/com.atproto.repo.createRecord`, {
     method: 'POST',
     headers: { ...auth, 'Content-Type': 'application/json' },
