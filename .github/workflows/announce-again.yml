@@ -17,7 +17,15 @@
 #     tag:      v0.9.0
 #     blurb:    what this release ADDED, in plain sentences, most important
 #               first (short channels drop whole trailing sentences to fit)
-#     channels: discord            (space-separated; default discord only)
+#     channels: discord mastodon bluesky x   (space-separated; default ALL)
+#
+# The default is EVERY channel on purpose. A bad post is bad on every network
+# at once — they all take the same blurb from the same run — so a repair
+# scoped to the one channel someone happened to look at leaves the same wrong
+# text sitting on the others. That is exactly what happened with v0.9.0:
+# Discord was fixed, Mastodon was not, and the second complaint was the only
+# reason anyone noticed. A channel with no secret configured no-ops, so
+# naming them all costs nothing.
 #
 # Leave `blurb` empty to use the annotated tag's own message, which is where
 # a release description belongs in the first place — see the header of
@@ -35,9 +43,9 @@ on:
         required: false
         default: ""
       channels:
-        description: "Space-separated: discord mastodon bluesky x"
+        description: "Space-separated. Default is all — a bad post is bad everywhere."
         required: false
-        default: "discord"
+        default: "discord mastodon bluesky x"
 
 permissions:
   contents: read
