@@ -123,15 +123,22 @@ export class CarriedTapes {
   private readonly _m = new THREE.Matrix4();
   private readonly _m2 = new THREE.Matrix4();
 
+  private scene: THREE.Scene;
+  private camera: THREE.PerspectiveCamera;
+  private onChange?: () => void;
+
   // T23: rental mode retunes this per the weekday/weekend rule (setCapacity).
   private _capacity: number;
 
   constructor(
-    private scene: THREE.Scene,
-    private camera: THREE.PerspectiveCamera,
+    scene: THREE.Scene,
+    camera: THREE.PerspectiveCamera,
     capacity: number,
-    private onChange?: () => void,
+    onChange?: () => void,
   ) {
+    this.scene = scene;
+    this.camera = camera;
+    this.onChange = onChange;
     this._capacity = Math.max(1, Math.min(MAX_CARRY_CAPACITY, capacity));
     // Viewmodel: the holder rides the camera. The owner guarantees the camera
     // is in the scene graph (StoreScene adds it on first use).

@@ -14,6 +14,7 @@ import { CandyRow } from './fixtures/period-fixtures';
 import { retailAudio } from './audio';
 import { CarriedTapes, CarryPose, showClerkToast, CARRY_STORAGE_KEY, DEFAULT_CARRY_CAPACITY } from './carried-tapes';
 import { saveRentalRecord, makeRentalRecord, rentalCapacityAt } from './rental-clock';
+import { isDiscoveryRequested } from './jellyseerr';
 import { tipJarEnabled } from './tip-jar';
 import {
   _bagBaseFallback, _checkoutBagFallback, _checkoutCarry, _checkoutStand,
@@ -145,6 +146,42 @@ export function slotBackBoxPose(_scene: StoreScene, slot: MovieSlot): CarryPose 
 // shelf case raycast hit directly out of walk mode. Does not touch scene.mode
 // or the camera — callers decide what happens to the view afterward.
 export function takeTapeIntoCarry(scene: StoreScene, movie: Movie, slot: MovieSlot | null): boolean {
+  if (movie.comingSoon) {
+    retailAudio.playDenyBuzz();
+    showClerkToast(`"${movie.title}" is already on order, hon — it should be in soon.`);
+    scene.onConsoleLog(`[System] "${movie.title}" is coming soon and isn't available to rent yet.`, 'system');
+    return false;
+  }
+  if (movie.discovery || movie.collectionGap) {
+    retailAudio.playDenyBuzz();
+    if (movie.discoveryRequested || isDiscoveryRequested(movie.tmdbId)) {
+      showClerkToast(`"${movie.title}" is already on order, hon — it should be in soon.`);
+      scene.onConsoleLog(`[System] "${movie.title}" has already been requested.`, 'system');
+    } else {
+      showClerkToast(`"${movie.title}" isn't in stock, hon — examine it to request an order.`);
+      scene.onConsoleLog(`[System] "${movie.title}" is not in stock.`, 'system');
+    }
+    return false;
+  }
+  if (movie.streaming) {
+    retailAudio.playDenyBuzz();
+    showClerkToast(`"${movie.title}" is on ${movie.streamingServiceName || 'streaming'} — examine it to open the service.`);
+    scene.onConsoleLog(`[System] "${movie.title}" is on ${movie.streamingServiceName || 'streaming'} and has no in-store rental copy.`, 'system');
+    return false;
+  }
+  if (movie.game) {
+    retailAudio.playDenyBuzz();
+    showClerkToast(`"${movie.title}" is a game — examine it to rent and play.`);
+    scene.onConsoleLog(`[System] "${movie.title}" is a video game and cannot be carried to checkout.`, 'system');
+    return false;
+  }
+  if (movie.isSeries) {
+    retailAudio.playDenyBuzz();
+    showClerkToast(`"${movie.title}" is a series boxset — examine it to pick an episode.`);
+    scene.onConsoleLog(`[System] "${movie.title}" is a series boxset and cannot be carried.`, 'system');
+    return false;
+  }
+
   const carried = scene.ensureCarried();
   const verdict = carried.canTake(movie.id);
   if (verdict === 'full') {

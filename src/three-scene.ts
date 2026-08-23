@@ -1124,7 +1124,8 @@ export class StoreScene {
       let shelfLib: JellyfinLibrary | null = null;
       let best = -1;
       for (const lib of this.libraries) {
-        const n = lib.movies.filter((m) => !m.isSeries && !m.game && !m.collectionGap).length;
+        if (lib.streaming) continue;
+        const n = lib.movies.filter((m) => !m.isSeries && !m.game && !m.collectionGap && !m.discovery && !m.comingSoon && !m.streaming).length;
         if (n > best) { best = n; shelfLib = lib; }
       }
       if (shelfLib) {
@@ -1269,7 +1270,7 @@ export class StoreScene {
     const allMoviesMap = new Map<string, Movie>();
     this.libraries.forEach((lib) => {
       lib.movies.forEach((m) => {
-        if (m.discovery || m.collectionGap || m.comingSoon) return;
+        if (m.discovery || m.collectionGap || m.comingSoon || m.streaming || m.game) return;
         allMoviesMap.set(m.id, m);
       });
     });
