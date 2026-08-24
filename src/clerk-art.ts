@@ -108,6 +108,38 @@ function applyClerkLivery(): void {
   PAL.caseLabel = tintHex(p.secondary, 0.15);
 }
 
+// ── Joint capture (GH #115) ─────────────────────────────────────────────────
+// drawFigure already solves every joint on its way to painting her — shoulder,
+// elbow and wrist from the sagittal arm angles, knee from the leg IK. Those
+// solved points ARE the ground truth of what each cell depicts, so rather than
+// let a pose DETECTOR guess a skeleton back out of the finished art (openpose
+// finds nothing in flat cel work and invents a crouch), we tap them here and
+// hand them out. A null sink costs one comparison per joint and changes
+// nothing about the drawing.
+
+export type JointName =
+  | 'head' | 'neck'
+  | 'shoulderL' | 'elbowL' | 'wristL' | 'handL'
+  | 'shoulderR' | 'elbowR' | 'wristR' | 'handR'
+  | 'hipL' | 'kneeL' | 'ankleL'
+  | 'hipR' | 'kneeR' | 'ankleR';
+
+export type JointMap = Partial<Record<JointName, { x: number; y: number }>>;
+
+let jointSink: JointMap | null = null;
+const joint = (name: JointName, x: number, y: number): void => {
+  if (jointSink) jointSink[name] = { x, y };
+};
+
+/** Run `fn` with joint capture on, and return everything it solved. */
+export function captureJoints(fn: () => void): JointMap {
+  const prev = jointSink;
+  const out: JointMap = {};
+  jointSink = out;
+  try { fn(); } finally { jointSink = prev; }
+  return out;
+}
+
 // ── Pose model ──────────────────────────────────────────────────────────────
 interface Pose {
   strideL: number; liftL: number;   // foot forward offset (px along heading) + height off ground
@@ -275,6 +307,8 @@ function drawFigure(ctx: Ctx, dir: Dir, p: Pose) {
   const chestX = cx - p.sway * 1.5 * F.lat + leanX * 0.7;
   const shoulderX = chestX + leanX * 0.3;
   const headX = shoulderX + leanX * 0.5 + F.faceShift * 0.4;
+  joint('head', headX, headCy);
+  joint('neck', shoulderX, shoulderY + 4);
 
   const shoulderHalf = 43 * F.width;
   const waistHalf = 27 * F.width;
@@ -293,6 +327,10 @@ function drawFigure(ctx: Ctx, dir: Dir, p: Pose) {
     // Knees bend toward the heading in profile-ish views, outward face-on.
     const bendX = F.fwd >= 0.5 ? 1 : (s || 1) * 0.8 + 0.3 * F.fwd;
     const k = ik(h, t, THIGH, SHIN, bendX);
+    const legSide = s < 0 ? 'L' : 'R';
+    joint(`hip${legSide}` as JointName, h.x, h.y);
+    joint(`knee${legSide}` as JointName, k.x, k.y);
+    joint(`ankle${legSide}` as JointName, t.x, t.y);
     const kk = tint(PAL.khaki, dark);
     capsule(ctx, h, k, legR.r0, legR.r1, kk);
     capsule(ctx, k, t, legR.r1 * 0.96, legR.r1 * 0.88, kk);
@@ -356,6 +394,10 @@ function drawFigure(ctx: Ctx, dir: Dir, p: Pose) {
     const wX = eX + (Math.sin(ang + elb) * armF + Math.sin(splay)) * ARM_FORE;
     const wY = eY + Math.cos(ang + elb) * ARM_FORE;
     const sh: Pt = { x: sx, y: sy }, el: Pt = { x: eX, y: eY }, wr: Pt = { x: wX, y: wY };
+    const armSide = s < 0 ? 'L' : 'R';
+    joint(`shoulder${armSide}` as JointName, sx, sy);
+    joint(`elbow${armSide}` as JointName, eX, eY);
+    joint(`wrist${armSide}` as JointName, wX, wY);
     // upper arm skin (peeks past the sleeve), then the polo sleeve over it
     capsule(ctx, sh, el, 9, 7.5, tint(PAL.skin, dark));
     const sleeveEnd: Pt = { x: sx + (eX - sx) * 0.72, y: sy + (eY - sy) * 0.72 };
@@ -368,6 +410,7 @@ function drawFigure(ctx: Ctx, dir: Dir, p: Pose) {
     capsule(ctx, el, wr, 7.5, 6, tint(PAL.skin, dark));
     const hx2 = wX + Math.sin(ang + elb) * armF * 6, hy2 = wY + Math.cos(ang + elb) * 6;
     ell(ctx, hx2, hy2, 6.8, 7.4, tint(PAL.skin, dark - 0.02));
+    joint(`hand${armSide}` as JointName, hx2, hy2);
     return { x: hx2, y: hy2 };
   };
 
@@ -713,6 +756,43 @@ function applyLighting(ctx: Ctx) {
 const OUTLINE_OFFS: ReadonlyArray<readonly [number, number]> = [
   [2, 0], [-2, 0], [0, 2], [0, -2], [1.5, 1.5], [-1.5, 1.5], [1.5, -1.5], [-1.5, -1.5],
 ];
+
+/** One cell's identity plus every joint drawFigure solved for it. */
+export interface CellSkeleton {
+  dir: Dir;
+  anim: AnimKey;
+  frame: number;
+  /** Atlas grid position, so a consumer can line these up with the sprite sheet. */
+  col: number;
+  row: number;
+  joints: JointMap;
+}
+
+/**
+ * Solve every cell's skeleton without painting a sheet anyone keeps.
+ *
+ * Same three loops as buildClerkAtlasCanvas, deliberately: if a pose or a
+ * facing is ever added, both walk it or the two outputs stop lining up. The
+ * scratch canvas exists only because drawFigure needs somewhere to draw — the
+ * pixels are thrown away and the joints are the product.
+ */
+export function buildClerkSkeletons(): CellSkeleton[] {
+  applyClerkLivery();
+  const scratch = document.createElement('canvas');
+  scratch.width = CELL_W; scratch.height = CELL_H;
+  const sctx = scratch.getContext('2d')!;
+  const out: CellSkeleton[] = [];
+  DIRS.forEach((dirKey, row) => {
+    for (const anim of ANIM_ORDER) {
+      for (let f = 0; f < ANIM_DEF[anim].frames; f++) {
+        sctx.clearRect(0, 0, CELL_W, CELL_H);
+        const joints = captureJoints(() => drawFigure(sctx, dirKey, poseFor(anim, f)));
+        out.push({ dir: dirKey, anim, frame: f, col: ANIM_COL[anim] + f, row, joints });
+      }
+    }
+  });
+  return out;
+}
 
 /**
  * Build the full 5-direction × 14-frame sprite atlas. Pure canvas — the caller

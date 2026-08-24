@@ -7,6 +7,7 @@ import {
 } from './clerk-art';
 import { ClerkNavGrid } from './clerk-nav';
 import { maybeServeClerkTemplate } from './clerk-template';
+import { maybeServeClerkSkeleton } from './clerk-skeleton';
 import { BOX_SPACING, UNIT_DEPTH, UNIT_SECTIONS } from './store-layout';
 import { getActiveTheme } from './themes';
 import { tryLoadUserAssetTexture } from './user-assets';
@@ -469,6 +470,7 @@ export class StoreClerk {
     // finished sprite sheet in a GPU texture.
     const canvas = buildClerkAtlasCanvas();
     maybeServeClerkTemplate(canvas);
+    maybeServeClerkSkeleton();
     const tex = new THREE.CanvasTexture(canvas);
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.magFilter = THREE.LinearFilter;
