@@ -496,6 +496,14 @@ instances boot the demo library. Instances are capped
 (`REMOTE_PLAY_MAX_INSTANCES`, default 2) and viewers past the cap are turned
 away until one frees up.
 
+**No Roku app, and none planned for now** — Roku has no browser, no WebView,
+and no WebRTC, so neither the 3D store nor the Remote Play thin client can run
+there; supporting it would mean a full separate BrightScript/SceneGraph client
+re-implementing what generic Jellyfin/Plex Roku channels already do. TV
+support today means Fire TV and Android TV, with Apple TV next in line.
+Tracked in [#82](https://github.com/halcyon-video/halcyon-video/issues/82) —
+revisit if the platform ever grows a real web/WebRTC runtime.
+
 > **Private instances need a GPU on the server** — they render the real 3D
 > store, so the machine (or container) needs working hardware GL. In Docker
 > that means mapping one in: `devices: [/dev/dri:/dev/dri]`, or
