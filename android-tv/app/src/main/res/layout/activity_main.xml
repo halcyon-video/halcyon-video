@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The store, and an error card that only shows when the page will not load.
+     The WebView keeps focus so the d-pad reaches the page rather than the
+     error card underneath it. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/store_black">
+
+    <WebView
+        android:id="@+id/web"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:focusable="true"
+        android:focusableInTouchMode="true" />
+
+    <LinearLayout
+        android:id="@+id/errorCard"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@color/store_black"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:padding="48dp"
+        android:visibility="gone">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/error_title"
+            android:textColor="@color/store_gold"
+            android:textSize="26sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/errorDetail"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:layout_marginBottom="26dp"
+            android:gravity="center_horizontal"
+            android:maxWidth="680dp"
+            android:textColor="@color/store_slate"
+            android:textSize="16sp" />
+
+        <Button
+            android:id="@+id/retry"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="@drawable/button_background"
+            android:focusable="true"
+            android:minWidth="220dp"
+            android:padding="16dp"
+            android:text="@string/error_retry"
+            android:textColor="@color/store_navy"
+            android:textStyle="bold" />
+
+        <Button
+            android:id="@+id/changeAddress"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:background="@drawable/button_background"
+            android:focusable="true"
+            android:minWidth="220dp"
+            android:padding="16dp"
+            android:text="@string/error_change"
+            android:textColor="@color/store_navy"
+            android:textStyle="bold" />
+    </LinearLayout>
+</FrameLayout>

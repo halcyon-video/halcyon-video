@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Focus has to be visible from the couch: the resting field is a thin navy
+     rule, the focused one a gold one on a lighter fill. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_focused="true">
+        <shape android:shape="rectangle">
+            <solid android:color="#111C3D" />
+            <stroke android:width="3dp" android:color="@color/store_gold" />
+            <corners android:radius="10dp" />
+        </shape>
+    </item>
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="#0B1226" />
+            <stroke android:width="2dp" android:color="@color/store_rule" />
+            <corners android:radius="10dp" />
+        </shape>
+    </item>
+</selector>

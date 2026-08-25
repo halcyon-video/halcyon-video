@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Fullscreen and dark: the page paints its own chrome, and any window
+         background that is not the viewer's own near-black shows as a border
+         on a TV panel. -->
+    <style name="Theme.HalcyonTv" parent="Theme.AppCompat.NoActionBar">
+        <item name="android:windowBackground">@color/store_black</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowContentTransitions">false</item>
+    </style>
+</resources>

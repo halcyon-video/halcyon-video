@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Gold pill, brightening on focus — the same affordance the viewer's own
+     on-screen buttons use. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_focused="true">
+        <shape android:shape="rectangle">
+            <solid android:color="#FFE27A" />
+            <stroke android:width="3dp" android:color="@color/store_cream" />
+            <corners android:radius="999dp" />
+        </shape>
+    </item>
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="@color/store_gold" />
+            <corners android:radius="999dp" />
+        </shape>
+    </item>
+</selector>

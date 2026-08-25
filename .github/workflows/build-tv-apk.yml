@@ -1,0 +1,62 @@
+# Builds the Android TV wrapper (android-tv/) and uploads the APK as a
+# workflow artifact. There is no Play listing and none is planned: the app is
+# a WebView on your own store's Remote Play viewer, so the delivery mechanism
+# is "download the APK and sideload it" (android-tv/README.md).
+#
+# Runs only when the wrapper itself changes — the store's own build is a
+# separate workflow and this one has nothing to say about it.
+name: Build Android TV APK
+
+on:
+  push:
+    branches: [master, dev]
+    paths: ['android-tv/**', '.github/workflows/build-tv-apk.yml']
+  pull_request:
+    paths: ['android-tv/**', '.github/workflows/build-tv-apk.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # AGP 8.5 wants JDK 17+; 17 is what the module compiles against.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      # No gradle-wrapper.jar is committed — a binary blob in a public repo is
+      # exactly the supply-chain artifact nobody can review in a diff. This
+      # action installs Gradle itself and caches the dependency downloads.
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      # The address parser, on a plain JVM — no emulator involved.
+      - name: Unit tests
+        working-directory: android-tv
+        run: gradle --no-daemon test
+
+      - name: Lint the manifest and resources
+        working-directory: android-tv
+        run: gradle --no-daemon :app:lintDebug || true
+
+      # Unsigned-by-us: with no keystore configured the release build falls
+      # back to the debug key, which is fine for sideloading and is what the
+      # artifact below carries. See android-tv/README.md, "Signing".
+      - name: Assemble
+        working-directory: android-tv
+        run: gradle --no-daemon assembleDebug assembleRelease
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: halcyon-tv-apk
+          path: |
+            android-tv/app/build/outputs/apk/debug/*.apk
+            android-tv/app/build/outputs/apk/release/*.apk
+          if-no-files-found: error

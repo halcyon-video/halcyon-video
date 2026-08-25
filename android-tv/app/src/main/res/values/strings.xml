@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Halcyon Video</string>
+
+    <string name="setup_title">Where is your store?</string>
+    <string name="setup_blurb">Type the address of the computer running Halcyon Video. It is shown in the store\'s Connection settings — usually something like 192.168.1.20:1420</string>
+    <string name="setup_hint">192.168.1.20:1420</string>
+    <string name="setup_connect">Connect</string>
+    <string name="setup_empty">Type an address first.</string>
+    <string name="setup_footnote">Long-press BACK at any time to come back here.</string>
+
+    <string name="error_title">Can\'t reach the store</string>
+    <string name="error_retry">Try again</string>
+    <string name="error_change">Change address</string>
+</resources>
