@@ -5946,7 +5946,7 @@ export class StoreScene {
     // stale poster/bulb pointers.
     this.marqueeBulbsMesh = null;
     this.posterMarqueeFrames = [];
-    this.clerk?.dispose(); // tear down her DOM prompt/dialog so rebuilds don't stack them
+    this.clerk?.dispose(); this.clerk = null; // tear down her DOM prompt/dialog and GPU textures/materials
     this.entrance?.dispose();
     this.entrance = null;
     this.slottedFixtures.forEach(f => f.dispose());
@@ -6051,6 +6051,8 @@ export class StoreScene {
     this.floorAOTex?.dispose();
     this.floorAOTex = null;
     this.floorMat = null;
+
+    vr.disposeVR(this);
 
     window.removeEventListener('keydown', this.handleWalkKeyDown);
     window.removeEventListener('keydown', this.onClaspKey, true);
