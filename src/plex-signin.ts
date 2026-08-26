@@ -28,6 +28,19 @@ const byId = <T extends HTMLElement>(id: string) => document.getElementById(id) 
 let accountToken: string | null = null;
 let discovered: PlexServer[] = [];
 let polling = false;
+/**
+ * Has the person typed into #login-url (or explicitly picked a server) since
+ * the last time it was genuinely theirs to reclaim? Tracked as an actual
+ * "did they touch it" flag rather than a written-value comparison, because
+ * the field ships with a non-empty default (`value="http://localhost:8096"`
+ * for the Jellyfin path) — neither empty nor something discovery wrote, so a
+ * comparison-based check would wrongly treat that boilerplate as hand-typed
+ * and refuse to ever prefill it (#120).
+ */
+let urlHandEdited = false;
+/** showServers() re-runs on every fresh discovery (boot, and again after a
+ *  new PIN sign-in) — the dropdown's change listener must not stack. */
+let serverListenerWired = false;
 
 export function selectedBackendKind(): string {
   return byId<HTMLSelectElement>('login-backend')?.value || 'jellyfin';
@@ -110,12 +123,23 @@ function showServers(servers: PlexServer[], log?: (m: string) => void): void {
   if (hint) hint.style.display = select.options.length > 1 ? '' : 'none';
   if (select.options.length) {
     select.options[0].selected = true;
-    if (url) url.value = select.options[0].value;
+    // The address field belongs to the person: population may only claim it
+    // while they haven't typed into it themselves. Once hand-edited,
+    // re-discovery (boot, sign-in) never touches it again.
+    if (url && !urlHandEdited) url.value = select.options[0].value;
   }
-  select.addEventListener('change', () => {
-    const first = selectedPlexServerUrls()[0];
-    if (url && first) url.value = first;
-  });
+  if (!serverListenerWired) {
+    select.addEventListener('change', () => {
+      // Picking a server IS the explicit act — it always sets the field, and
+      // sticks the same way hand-typing does.
+      const first = selectedPlexServerUrls()[0];
+      if (url && first) {
+        url.value = first;
+        urlHandEdited = true;
+      }
+    });
+    serverListenerWired = true;
+  }
   log?.(`[System] Plex account has ${servers.length} server(s).`);
 }
 
@@ -241,6 +265,12 @@ export function setupPlexSignInHandlers(log?: (m: string) => void): void {
   }
   button?.addEventListener('click', () => void beginPlexSignIn(log));
 
+  // The moment the person types into the address field, it's theirs — never
+  // clobbered by a later discovery pass again (#120).
+  byId<HTMLInputElement>('login-url')?.addEventListener('input', () => {
+    urlHandEdited = true;
+  });
+
   // A remembered token means the servers can be listed without a new code.
   const existing = plexAccountToken();
   if (existing && selectedBackendKind() === 'plex') void loadServers(existing, log);
@@ -249,4 +279,21 @@ export function setupPlexSignInHandlers(log?: (m: string) => void): void {
 /** For tests and the setup terminal — the servers discovery last found. */
 export function discoveredPlexServers(): PlexServer[] {
   return discovered;
+}
+
+/**
+ * CHANGE SERVER / LOG OUT (#121): forget the linked plex.tv account outright,
+ * not just the persisted token. Without clearing the in-memory copy too, a
+ * Plex sign-in attempted later in the same session finds `accountToken` still
+ * set and silently reuses it — the account never actually left.
+ */
+export function forgetPlexAccount(): void {
+  accountToken = null;
+  discovered = [];
+  urlHandEdited = false;
+  try {
+    localStorage.removeItem(PLEX_ACCOUNT_TOKEN_KEY);
+  } catch {
+    /* nothing persisted to forget */
+  }
 }

@@ -21,6 +21,7 @@ import {
   PROVIDER_KIND_KEY,
 } from './providers/active-provider';
 import {
+  forgetPlexAccount,
   plexAccountToken,
   plexServerNameFor,
   selectedBackendKind,
@@ -120,6 +121,7 @@ export function initBootFlow(d: BootFlowDeps): void {
         // server" on a two-server store that leaves the second one connected
         // would re-stock from a distributor the person just walked away from.
         clearMediaSources();
+        forgetPlexAccount();
         localStorage.removeItem('jellyfin_username');
         d.log('[Setup] Saved servers dropped — pick a new distributor.', 'system');
       },
@@ -171,6 +173,7 @@ export function logOutToOpeningDay(): void {
     'system'
   );
   clearMediaSources();
+  forgetPlexAccount();
   localStorage.removeItem('jellyfin_username');
   localStorage.removeItem('jellyfin_password');
   deps.teardownScene();
