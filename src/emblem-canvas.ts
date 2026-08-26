@@ -124,6 +124,11 @@ export function createEmblemCanvas(session: EmblemSession, host: HTMLElement): E
   let drag: Drag | null = null;
   let shiftHeld = false;
 
+  // The store's global ten-foot `cursor: none !important` — and the studio's
+  // own visible-arrow carve-out in styles.css — both outrank a plain inline
+  // style, so the live grab/resize cursor must be inline AND important.
+  const setCursor = (v: string) => canvas.style.setProperty('cursor', v, 'important');
+
   // ── Geometry ───────────────────────────────────────────────────────────────
 
   const designH = () => DESIGN_W / Math.max(0.05, session.doc.aspect);
@@ -237,9 +242,9 @@ export function createEmblemCanvas(session: EmblemSession, host: HTMLElement): E
     if (drag) return;
     const p = toDesign(e);
     const grabbed = handleAt(p);
-    if (grabbed === 'rotate') canvas.style.cursor = 'grab';
-    else if (grabbed) canvas.style.cursor = handleCursor(grabbed, session.layer()?.rot ?? 0);
-    else canvas.style.cursor = layerAt(p) >= 0 ? 'move' : 'default';
+    if (grabbed === 'rotate') setCursor('grab');
+    else if (grabbed) setCursor(handleCursor(grabbed, session.layer()?.rot ?? 0));
+    else setCursor(layerAt(p) >= 0 ? 'move' : 'default');
   };
 
   // ── Gestures ───────────────────────────────────────────────────────────────
@@ -335,7 +340,7 @@ export function createEmblemCanvas(session: EmblemSession, host: HTMLElement): E
       drag = { kind: 'move', grab: p, start: boxOf(session.doc.layers[hit]) };
     }
     canvas.setPointerCapture(e.pointerId);
-    canvas.style.cursor = drag.kind === 'rotate' ? 'grabbing' : canvas.style.cursor;
+    if (drag.kind === 'rotate') setCursor('grabbing');
     e.preventDefault();
   };
 
@@ -365,7 +370,7 @@ export function createEmblemCanvas(session: EmblemSession, host: HTMLElement): E
   canvas.addEventListener('pointermove', onPointerMove);
   canvas.addEventListener('pointerup', endDrag);
   canvas.addEventListener('pointercancel', endDrag);
-  canvas.addEventListener('pointerleave', () => { if (!drag) canvas.style.cursor = 'default'; });
+  canvas.addEventListener('pointerleave', () => { if (!drag) setCursor('default'); });
 
   // ── Painting ───────────────────────────────────────────────────────────────
 

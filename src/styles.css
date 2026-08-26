@@ -3069,6 +3069,24 @@ html, body {
   transition: opacity 0.25s ease;
 }
 
+/* THE STUDIO IS THE OTHER SCREEN YOU MAY POINT AT. Like the player's carve-out
+   above, this lifts the global ten-foot `cursor: none` while the studio is up:
+   a design canvas is mouse work by nature — shapes drag, handles pull, stems
+   turn — and the canvas was already setting grab/resize cursors nobody could
+   see. The .visible gate keeps the rest of the store cursorless. The canvas
+   itself is absent here on purpose: its live cursor is set inline !important
+   from emblem-canvas.ts, which outranks these rules. */
+#emblem-studio-overlay.visible,
+#emblem-studio-overlay.visible * {
+  cursor: default !important;
+}
+
+#emblem-studio-overlay.visible .settings-row,
+#emblem-studio-overlay.visible .emblem-stack-item,
+#emblem-studio-overlay.visible .emblem-stack-op {
+  cursor: pointer !important;
+}
+
 .emblem-studio-body {
   flex: 1 1 auto;
   display: flex;
