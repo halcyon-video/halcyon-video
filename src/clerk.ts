@@ -96,8 +96,10 @@ export class StoreClerk {
 
   private sprite!: THREE.Sprite;
   private spriteTex!: THREE.Texture;
+  private shadowMesh!: THREE.Mesh;
   private shadowMat!: THREE.MeshBasicMaterial; // blob shadow — fades with the sprite
   private fade = 1; // sleep fade level last applied via setFade()
+  private disposed = false;
 
   // Animation + facing state
   private heading = Math.PI;          // world yaw she faces (atan2(x,z) convention)
@@ -289,8 +291,22 @@ export class StoreClerk {
   }
 
   public dispose() {
+    this.disposed = true;
     this.interaction?.dispose();
     this.interaction = null;
+    this.spriteTex?.dispose();
+    if (this.sprite) {
+      (this.sprite.material as THREE.Material)?.dispose();
+      this.sprite.geometry?.dispose();
+    }
+    if (this.shadowMat) {
+      this.shadowMat.map?.dispose();
+      this.shadowMat.dispose();
+    }
+    if (this.shadowMesh) {
+      this.shadowMesh.geometry?.dispose();
+    }
+    this.group.clear();
   }
 
   /**
@@ -402,11 +418,11 @@ export class StoreClerk {
     // Grounding shadow blob (a billboard can't cast a real shadow).
     const shadowTex = this.buildShadowTexture();
     this.shadowMat = new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, opacity: 0.34, depthWrite: false });
-    const shadow = new THREE.Mesh(new THREE.PlaneGeometry(2.3, 1.3), this.shadowMat);
-    shadow.rotation.x = -Math.PI / 2;
-    shadow.position.y = 0.02;
-    shadow.renderOrder = 1;
-    this.group.add(shadow);
+    this.shadowMesh = new THREE.Mesh(new THREE.PlaneGeometry(2.3, 1.3), this.shadowMat);
+    this.shadowMesh.rotation.x = -Math.PI / 2;
+    this.shadowMesh.position.y = 0.02;
+    this.shadowMesh.renderOrder = 1;
+    this.group.add(this.shadowMesh);
 
     this.spriteTex = this.buildAtlas();
     this.spriteTex.repeat.set(1 / ATLAS_COLS, 1 / ATLAS_ROWS);
@@ -490,6 +506,10 @@ export class StoreClerk {
    */
   private trySwapUserAtlas() {
     const swap = (tex: THREE.Texture) => {
+      if (this.disposed) {
+        tex.dispose();
+        return;
+      }
       // Same sampling as the procedural atlas: mipmaps bleed between cells.
       tex.magFilter = THREE.LinearFilter;
       tex.minFilter = THREE.LinearFilter;
@@ -507,7 +527,10 @@ export class StoreClerk {
       old.dispose();
     };
     tryLoadUserAssetTexture(`clerk/${getActiveTheme().id}.png`, swap, {
-      onMiss: () => tryLoadUserAssetTexture('clerk/default.png', swap),
+      onMiss: () => {
+        if (this.disposed) return;
+        tryLoadUserAssetTexture('clerk/default.png', swap);
+      },
     });
   }
 

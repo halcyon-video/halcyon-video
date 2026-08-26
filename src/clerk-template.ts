@@ -10,7 +10,9 @@ let served = false;
 
 export function maybeServeClerkTemplate(atlas: HTMLCanvasElement): void {
   if (served) return;
+  if (typeof location === 'undefined' || typeof document === 'undefined') return;
   if (new URLSearchParams(location.search).get('clerk_template') !== '1') return;
+  if (typeof atlas?.toBlob !== 'function') return;
   served = true;
   atlas.toBlob((blob) => {
     if (!blob) return;
@@ -21,4 +23,8 @@ export function maybeServeClerkTemplate(atlas: HTMLCanvasElement): void {
     a.download = 'clerk-sprite-template.png';
     a.click();
   }, 'image/png');
+}
+
+export function resetClerkTemplateServedForTesting(): void {
+  served = false;
 }
