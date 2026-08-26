@@ -5946,8 +5946,7 @@ export class StoreScene {
     // stale poster/bulb pointers.
     this.marqueeBulbsMesh = null;
     this.posterMarqueeFrames = [];
-    this.clerk?.dispose(); // tear down her DOM prompt/dialog and GPU textures/materials
-    this.clerk = null;
+    this.clerk?.dispose(); this.clerk = null; // tear down her DOM prompt/dialog and GPU textures/materials
     this.entrance?.dispose();
     this.entrance = null;
     this.slottedFixtures.forEach(f => f.dispose());
