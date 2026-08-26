@@ -1,0 +1,9 @@
+# Local build output and machine-specific config. The signing keystore never
+# goes in the repo — see README.md ("Signing").
+.gradle/
+build/
+app/build/
+local.properties
+keystore.properties
+*.jks
+*.keystore

@@ -2461,6 +2461,43 @@ html, body {
   pointer-events: none;
 }
 
+/* THE PLAYER IS THE ONE SCREEN YOU MAY POINT AT. Everywhere else the store is
+   a ten-foot console and the global `cursor: none` rule holds, but these
+   controls have always answered the mouse — the buttons click, the timeline
+   seeks wherever you land on it — so the pointer must be visible to aim.
+   It comes up with the controls and goes away with them (mousemove nudges
+   them back), which keeps a film clean of a parked arrow. */
+#video-player-overlay,
+#video-player-overlay * {
+  cursor: default !important;
+}
+
+#video-player-overlay .vp-icon-btn,
+#video-player-overlay .vp-play-btn,
+#video-player-overlay .vp-progress,
+#video-player-overlay .vp-progress *,
+#video-player-overlay .vp-volume-slider,
+#video-player-overlay .vp-menu-row,
+#video-player-overlay .exit-btn {
+  cursor: pointer !important;
+}
+
+#video-player-overlay.controls-hidden,
+#video-player-overlay.controls-hidden * {
+  cursor: none !important;
+}
+
+/* ...except the stop-watching card, which can be up while the control bar has
+   faded: a dialog you cannot see to click is worse than a visible arrow. */
+#video-player-overlay #vp-exit-confirm:not([hidden]),
+#video-player-overlay #vp-exit-confirm:not([hidden]) * {
+  cursor: default !important;
+}
+
+#video-player-overlay #vp-exit-confirm:not([hidden]) .exit-btn {
+  cursor: pointer !important;
+}
+
 /* Shared look for every icon control (back, seek, mute, subtitles, fullscreen). */
 .vp-icon-btn {
   display: flex;
@@ -3030,6 +3067,24 @@ html, body {
   pointer-events: auto;
   visibility: visible;
   transition: opacity 0.25s ease;
+}
+
+/* THE STUDIO IS THE OTHER SCREEN YOU MAY POINT AT. Like the player's carve-out
+   above, this lifts the global ten-foot `cursor: none` while the studio is up:
+   a design canvas is mouse work by nature — shapes drag, handles pull, stems
+   turn — and the canvas was already setting grab/resize cursors nobody could
+   see. The .visible gate keeps the rest of the store cursorless. The canvas
+   itself is absent here on purpose: its live cursor is set inline !important
+   from emblem-canvas.ts, which outranks these rules. */
+#emblem-studio-overlay.visible,
+#emblem-studio-overlay.visible * {
+  cursor: default !important;
+}
+
+#emblem-studio-overlay.visible .settings-row,
+#emblem-studio-overlay.visible .emblem-stack-item,
+#emblem-studio-overlay.visible .emblem-stack-op {
+  cursor: pointer !important;
 }
 
 .emblem-studio-body {

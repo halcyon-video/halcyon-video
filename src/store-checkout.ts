@@ -10,7 +10,7 @@ import * as THREE from 'three';
 import { findTitleByCarryId } from './media-sources';
 import { Movie } from './jellyfin';
 import { CASE_MEDIUM, getRentalCaseGeometry, createHeroRentalMaterials } from './video-case';
-import { BACK_WALL_UNIT_IDX, MovieSlot } from './store-layout';
+import { BACK_WALL_UNIT_IDX, MovieSlot, STORE_CENTER_X } from './store-layout';
 import { CandyRow } from './fixtures/period-fixtures';
 import { retailAudio } from './audio';
 import { CarriedTapes, CarryPose, showClerkToast, CARRY_STORAGE_KEY, DEFAULT_CARRY_CAPACITY } from './carried-tapes';
@@ -21,6 +21,7 @@ import {
   _checkoutWalkPos, _checkoutWalkAhead,
 } from './scene-shared';
 import type { StoreScene } from './three-scene';
+import { counterFrame } from './counter-anchors';
 
 export function ensureCarried(scene: StoreScene): CarriedTapes {
   if (!scene.carried) {
@@ -219,8 +220,15 @@ export function enterCheckout(scene: StoreScene): void {
   const stand = scene.checkoutStand(_checkoutStand);
   scene.targetCameraPos.copy(stand);
   const bagM = scene.entrance?.bagMouthWorld;
-  if (bagM) scene.targetLookAt.set(bagM.x + 3.4, 3.6, bagM.z + 0.9);
-  else scene.targetLookAt.set(11.0, 3.6, scene.deskApexZ() + 1.6);
+  const cf = counterFrame(scene);
+  // Up-counter of the bag and a step into it — the register end. Held in the
+  // counter's frame so it follows the mom-and-pop desk onto its side wall
+  // (GH #116); on every front-facing counter +u is +X and +n is +Z, so this
+  // is the same (+3.4, +0.9) it has always been.
+  if (bagM) scene.targetLookAt.set(
+    bagM.x + cf.ux * 3.4 + cf.nx * 0.9, 3.6,
+    bagM.z + cf.uz * 3.4 + cf.nz * 0.9);
+  else scene.targetLookAt.set(cf.fx + cf.nx * 1.6, 3.6, cf.fz + cf.nz * 1.6);
   scene.clerk?.goToRegister();
   scene.updateSelectionArrow();
   scene.triggerLibrarySelectUpdate(false);
@@ -264,10 +272,15 @@ export function talkToClerkAtCounter(scene: StoreScene): boolean {
 export function checkoutStand(scene: StoreScene, out: THREE.Vector3): THREE.Vector3 {
   const base = scene.entrance?.bagBaseWorld;
   // Standalone desk (mom-and-pop): no band, no props — stand square in front
-  // of the desk on the store side, a step right of the bag's rest spot so the
-  // wrap camera looks across the desk top rather than down its edge.
+  // of the desk on the customer side, a step up-counter of the bag's rest
+  // spot so the wrap camera looks across the desk top rather than down its
+  // edge. Frame-held: the desk runs along a side wall (GH #116), so "in
+  // front" is its own outward normal, not −Z.
   if (base && scene.storefrontSpec.counterShape === 'desk') {
-    return out.set(base.x + 2.6, 5.4, base.z - 4.5);
+    const cf = counterFrame(scene);
+    return out.set(
+      base.x + cf.ux * 2.6 - cf.nx * 4.5, 5.4,
+      base.z + cf.uz * 2.6 - cf.nz * 4.5);
   }
   // Tuned against the shield band's prop layout: the taper's outer face is
   // crowded (candy rack x≈4.9–7.3, tent sign ~(8.2,-2.4), cleaner display
@@ -286,11 +299,18 @@ export function checkoutCounterSpots(scene: StoreScene): CarryPose[] {
   // clerk stacks them the way a real one would on a desk this size).
   if (b && scene.storefrontSpec.counterShape === 'desk') {
     const y = b.y + 0.06;
+    const cf = counterFrame(scene);
+    // 2.05 ft up-counter of the bag, a hair proud of the spine, and turned
+    // with the counter — a flat-laid case whose long edge runs across the
+    // desk instead of along it reads as dropped, not stacked.
+    const px = b.x + cf.ux * 2.05 - cf.nx * 0.05;
+    const pz = b.z + cf.uz * 2.05 - cf.nz * 0.05;
+    const spin = cf.facingYaw - Math.PI; // 0 on a front-facing counter
     return [
-      { x: b.x + 2.05, y, z: b.z - 0.05, rotY: 0.15, rotX: -Math.PI / 2 },
-      { x: b.x + 2.05, y: y + 0.09, z: b.z - 0.05, rotY: -0.10, rotX: -Math.PI / 2 },
-      { x: b.x + 2.05, y: y + 0.18, z: b.z - 0.05, rotY: 0.30, rotX: -Math.PI / 2 },
-      { x: b.x + 2.05, y: y + 0.27, z: b.z - 0.05, rotY: 0.05, rotX: -Math.PI / 2 },
+      { x: px, y, z: pz, rotY: spin + 0.15, rotX: -Math.PI / 2 },
+      { x: px, y: y + 0.09, z: pz, rotY: spin - 0.10, rotX: -Math.PI / 2 },
+      { x: px, y: y + 0.18, z: pz, rotY: spin + 0.30, rotX: -Math.PI / 2 },
+      { x: px, y: y + 0.27, z: pz, rotY: spin + 0.05, rotX: -Math.PI / 2 },
     ];
   }
   // The clear band-top stretch between the tent sign and the apex, fanned
@@ -484,11 +504,17 @@ export function updateCheckoutExit(scene: StoreScene, now: number): void {
   // down-band of this stretch, see store-fixtures-config.ts).
   //
   // Standalone desk (mom-and-pop): there is no band to hop onto — the shove
-  // just slides the bag along the desk top to its left end (the side the
-  // walk-out rounds), and the "rise over the lip" term collapses to zero so
+  // just slides the bag along the desk top toward the door end (the end the
+  // walk-out passes), and the "rise over the lip" term collapses to zero so
   // the vertical never leaves the one surface the counter has.
+  //
+  // −u, not −X: the desk runs down a side wall now (GH #116) and its own axis
+  // is the only thing that still points at the door there. On a front-facing
+  // counter −u IS −X, so the shove is the half-foot it always was.
   const isDesk = scene.storefrontSpec.counterShape === 'desk';
-  const WAIT_DX = isDesk ? -0.5 : -1.55, WAIT_DZ = isDesk ? 0 : -0.75;
+  const cf = counterFrame(scene);
+  const WAIT_DX = isDesk ? -cf.ux * 0.5 : -1.55;
+  const WAIT_DZ = isDesk ? -cf.uz * 0.5 : -0.75;
   const WAIT_RISE = isDesk ? 0 : 3.4 + 0.14 - bagBase.y; // island top → SITTING on the band top
   const HAND_Y = 0.38;                      // carry height above the island top
 
@@ -654,21 +680,32 @@ export function buildCheckoutExitPath(scene: StoreScene, stand: THREE.Vector3): 
   // vestibule, no side door and no exit corridor — the vestibule waypoints
   // below would swing the walker around a phantom airlock corner that sits
   // OUTSIDE this little building's left wall (the camera visibly punched
-  // through the front glazing). One door, straight route: from the stand,
-  // angle left across the desk front, round the desk's left end past the
-  // waiting bag, then turn right and out the single leaf at the store's
-  // centreline. Offsets ride the bag's rest spot (desk-anchored) so the path
-  // tracks the desk wherever the entry geometry puts it.
+  // through the front glazing). One door, one short route.
+  //
+  // GH #116 turned that route again, because the desk it was written for has
+  // turned: it now RUNS ALONG A SIDE WALL, so there is nothing to round. The
+  // walk is the one a real customer takes — step onto the counter's line,
+  // collect the bag the clerk slid to its door end, and out — and it is
+  // written in the counter's own frame (+u along it, +o out from its face)
+  // so it tracks the desk wherever the plan parks it.
   if (scene.storefrontSpec.entryStyle === 'storefront-door') {
+    const cf = counterFrame(scene);
+    const ox = -cf.nx, oz = -cf.nz;           // out from the customer face
     const b = scene.entrance?.bagBaseWorld;
-    const bx = b ? b.x : 9.1, bz = b ? b.z : scene.deskApexZ() + 0.8;
+    const bx = b ? b.x : cf.fx + cf.nx * 0.8, bz = b ? b.z : cf.fz + cf.nz * 0.8;
+    // (along, out) from the bag's rest spot: +along is down-counter toward the
+    // door, +out is away from the counter face. The approach runs roughly
+    // PARALLEL to the counter rather than into it — the walk camera looks 5 ft
+    // down its own heading, so a leg aimed at the counter spends the whole
+    // walk with a faceful of the side glazing behind it.
+    const at = (along: number, out: number) =>
+      new THREE.Vector3(bx - cf.ux * along + ox * out, 0, bz - cf.uz * along + oz * out);
     return new THREE.CatmullRomCurve3([
       new THREE.Vector3(stand.x, 0, stand.z),
-      new THREE.Vector3(bx - 0.5, 0, bz - 3.5),  // angling left along the desk front
-      new THREE.Vector3(bx - 2.2, 0, bz - 1.5),  // rounding the desk's left corner (grab beat)
-      new THREE.Vector3(bx - 2.2, 0, bz + 1.3),  // past the desk end
-      new THREE.Vector3(bx + 0.1, 0, bz + 3.1),  // turning right toward the door
-      new THREE.Vector3(11.0, 0, 15.9),          // out the single front leaf
+      at(-1.5, 3.6), // swinging onto the counter's line, already pointed doorward
+      at(0.5, 2.5),  // beside the waiting bag at arm's length (grab beat)
+      at(1.1, 4.6),  // clear of the desk's door end, turning out
+      new THREE.Vector3(STORE_CENTER_X, 0, 15.9), // out the single front leaf
     ], false, 'centripetal');
   }
   const backZ = 15.0 - 2 * doorW;            // vestibule store-side wall

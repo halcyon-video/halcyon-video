@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The viewer's own palette (remote.html): the setup screen and the
+         WebView's letterbox must read as one surface. -->
+    <color name="store_black">#06080F</color>
+    <color name="store_navy">#0A1944</color>
+    <color name="store_gold">#FFD23F</color>
+    <color name="store_cream">#F2E8C9</color>
+    <color name="store_slate">#9DB2E8</color>
+    <color name="store_rule">#2A4AA0</color>
+</resources>

@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The one screen with any chrome of its own. Sized for a ten-foot read and
+     driven entirely by the d-pad: the address field takes focus on entry, DOWN
+     reaches Connect, and both wear a visible focus state because a TV has no
+     cursor to show you where you are. The 48dp padding is the standard TV
+     overscan margin — panels still crop the outer ~5%. -->
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/store_black"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_horizontal"
+        android:orientation="vertical"
+        android:paddingLeft="48dp"
+        android:paddingTop="32dp"
+        android:paddingRight="48dp"
+        android:paddingBottom="32dp">
+
+        <ImageView
+            android:layout_width="213dp"
+            android:layout_height="120dp"
+            android:layout_marginBottom="14dp"
+            android:contentDescription="@string/app_name"
+            android:src="@drawable/banner" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/setup_title"
+            android:textColor="@color/store_gold"
+            android:textSize="28sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:layout_marginBottom="22dp"
+            android:gravity="center_horizontal"
+            android:maxWidth="640dp"
+            android:text="@string/setup_blurb"
+            android:textColor="@color/store_slate"
+            android:textSize="16sp" />
+
+        <EditText
+            android:id="@+id/address"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:maxWidth="560dp"
+            android:background="@drawable/field_background"
+            android:focusable="true"
+            android:focusableInTouchMode="true"
+            android:hint="@string/setup_hint"
+            android:imeOptions="actionGo"
+            android:importantForAutofill="no"
+            android:inputType="textUri"
+            android:maxLines="1"
+            android:padding="18dp"
+            android:textColor="@color/store_cream"
+            android:textColorHint="#5E6C93"
+            android:textSize="20sp" />
+
+        <Button
+            android:id="@+id/connect"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:background="@drawable/button_background"
+            android:focusable="true"
+            android:minWidth="220dp"
+            android:paddingLeft="34dp"
+            android:paddingTop="16dp"
+            android:paddingRight="34dp"
+            android:paddingBottom="16dp"
+            android:text="@string/setup_connect"
+            android:textColor="@color/store_navy"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/message"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="18dp"
+            android:gravity="center_horizontal"
+            android:textColor="@color/store_gold"
+            android:textSize="15sp"
+            android:visibility="gone" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="26dp"
+            android:alpha="0.7"
+            android:text="@string/setup_footnote"
+            android:textColor="@color/store_slate"
+            android:textSize="13sp" />
+
+    </LinearLayout>
+</ScrollView>

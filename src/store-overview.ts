@@ -23,6 +23,7 @@ import { aimOverviewAt } from './store-camera';
 import { isEndcapKind } from './fixtures/genre-endcap';
 import { slottedFixtureLabel, qualifyDuplicateLabels } from './fixture-labels';
 import type { StoreScene } from './three-scene';
+import { counterFrame } from './counter-anchors';
 
 export function buildOverviewCursorTargets(scene: StoreScene): OverviewCursorTarget[] {
   const targets: OverviewCursorTarget[] = [];
@@ -108,13 +109,18 @@ export function buildOverviewCursorTargets(scene: StoreScene): OverviewCursorTar
   // T22: the front-counter checkout waypoint. Always present (not just in
   // carry mode): the clerk's desk terminal — Left at the counter — is the
   // diegetic settings/power menu, so the counter must stay reachable by
-  // arrow keys even empty-handed. Floats just above the counter band's
-  // store-facing apex.
+  // arrow keys even empty-handed.
+  //
+  // It floats 0.6 ft INTO the counter from its customer-facing face, along
+  // the counter's own normal (and 3.5 ft along it for 2D MODE below), held in
+  // that frame because the mom-and-pop desk stands on a side wall (GH #116) —
+  // `x = 11, z = apex + 0.6` names a patch of open floor there.
+  const cf = counterFrame(scene);
   targets.push({
     label: 'CHECKOUT',
-    x: 11.0,
+    x: cf.fx + cf.nx * 0.6,
     y: 5.4,
-    z: scene.deskApexZ() + 0.6,
+    z: cf.fz + cf.nz * 0.6,
     libraryIdx: CHECKOUT_CURSOR_LIB,
     unitIdxInLibrary: 0,
     side: 'front',
@@ -128,9 +134,9 @@ export function buildOverviewCursorTargets(scene: StoreScene): OverviewCursorTar
   // target's label via the shared selection arrow, so it reads on landing.)
   targets.push({
     label: '2D MODE',
-    x: 14.5,
+    x: cf.fx + cf.nx * 0.6 + cf.ux * 3.5,
     y: 5.4,
-    z: scene.deskApexZ() + 0.6,
+    z: cf.fz + cf.nz * 0.6 + cf.uz * 3.5,
     libraryIdx: FLAT_MODE_CURSOR_LIB,
     unitIdxInLibrary: 0, side: 'front', col: 0,
   });

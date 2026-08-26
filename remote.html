@@ -49,7 +49,14 @@
   </style>
 </head>
 <body>
-  <div id="stage"><video id="screen" autoplay playsinline muted></video></div>
+  <!-- The transparent poster is not decoration. A <video> with no source and
+       no poster gets the browser's own placeholder, and in an Android WebView
+       that is a full-size play triangle — so a TV showing "looking for the
+       store" showed a giant play button under the message instead of an empty
+       screen. A 1x1 transparent GIF is the smallest thing that suppresses it;
+       the first frame of the stream replaces it. -->
+  <div id="stage"><video id="screen" autoplay playsinline muted
+    poster="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"></video></div>
   <div id="status">Looking for the store…</div>
   <div id="modebtn"></div>
   <div id="helpbtn" title="Show the controls">?</div>

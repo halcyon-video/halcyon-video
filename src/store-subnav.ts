@@ -67,6 +67,7 @@ import { isEndcapKind } from './fixtures/genre-endcap';
 import { slottedFixtureLabel, qualifyDuplicateLabels } from './fixture-labels';
 import { retailAudio } from './audio';
 import type { StoreScene } from './three-scene';
+import { counterFrame } from './counter-anchors';
 
 export type SubNavKind = 'library' | 'new-releases' | 'genre' | 'fixture' | 'endcap' | 'checkout'
   | 'flat-mode';
@@ -193,13 +194,16 @@ function declutter(items: SubNavItem[]): void {
 function buildLibraryRow(scene: StoreScene): SubNavItem[] {
   const out: SubNavItem[] = [];
   const genres: SubNavItem[] = [];
+  // Same anchors the overview's CHECKOUT / 2D MODE cursors float on, in the
+  // counter's own frame: 0.6 ft in from its customer-facing face, and 3.5 ft
+  // along it for the peer entry. Frame-held because the mom-and-pop desk runs
+  // down a side wall (GH #116) — `x = 11` names open floor there.
+  const cf = counterFrame(scene);
   out.push({
     label: 'CHECKOUT COUNTER',
     kind: 'checkout',
     libraryIdx: -1, unitIdxInLibrary: -1, side: 'front', col: 0, fixtureIdx: -1,
-    // Same anchor the overview's CHECKOUT cursor floats on: just above the
-    // counter band's store-facing apex.
-    x: 11.0, y: 5.4, z: scene.deskApexZ() + 0.6, yaw: 0, lookY: 3.0,
+    x: cf.fx + cf.nx * 0.6, y: 5.4, z: cf.fz + cf.nz * 0.6, yaw: 0, lookY: 3.0,
   });
   // 2D MODE rides beside the counter for exactly the reason the counter itself
   // is here: it was reachable ONLY from the entrance overview's arrow layer, so
@@ -213,8 +217,10 @@ function buildLibraryRow(scene: StoreScene): SubNavItem[] {
       label: '2D MODE',
       kind: 'flat-mode',
       libraryIdx: -1, unitIdxInLibrary: -1, side: 'front', col: 0, fixtureIdx: -1,
-      // The overview parks its own 2D MODE cursor here, just right of CHECKOUT.
-      x: 14.5, y: 5.4, z: scene.deskApexZ() + 0.6, yaw: 0, lookY: 3.0,
+      // The overview parks its own 2D MODE cursor here, one counter-length
+      // step along from CHECKOUT.
+      x: cf.fx + cf.nx * 0.6 + cf.ux * 3.5, y: 5.4,
+      z: cf.fz + cf.nz * 0.6 + cf.uz * 3.5, yaw: 0, lookY: 3.0,
     });
   }
   for (let libIdx = 0; libIdx < scene.libraries.length; libIdx++) {

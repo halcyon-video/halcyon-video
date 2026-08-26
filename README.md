@@ -483,11 +483,26 @@ walks the aisles at full fidelity. TV browsers (Fire TV, Android TV, and
 friends) get the ten-foot treatment automatically: the remote's D-pad and OK
 drive the store, BACK backs out instead of leaving the page, play/pause and
 rewind/fast-forward do what they say during a film, and MENU recalls the
-controls — add `?tv=1` if your TV's browser isn't recognized. Until someone donates a login
+controls — add `?tv=1` if your TV's browser isn't recognized.
+
+**On Android TV and Fire TV there is an app instead**, so there is no browser
+to sideload and no address bar to drive with a d-pad: install the APK from
+[`android-tv/`](android-tv/README.md) and the store gets a launcher tile like
+any other TV app. Type your server's address once and it opens straight into
+the aisles — and because the app owns the remote rather than a browser, BACK
+is the store's back button, not the browser's. Until someone donates a login
 (**Settings → Connection → Remote Play**, from any logged-in browser), the
 instances boot the demo library. Instances are capped
 (`REMOTE_PLAY_MAX_INSTANCES`, default 2) and viewers past the cap are turned
 away until one frees up.
+
+**No Roku app, and none planned for now** — Roku has no browser, no WebView,
+and no WebRTC, so neither the 3D store nor the Remote Play thin client can run
+there; supporting it would mean a full separate BrightScript/SceneGraph client
+re-implementing what generic Jellyfin/Plex Roku channels already do. TV
+support today means Fire TV and Android TV, with Apple TV next in line.
+Tracked in [#82](https://github.com/halcyon-video/halcyon-video/issues/82) —
+revisit if the platform ever grows a real web/WebRTC runtime.
 
 > **Private instances need a GPU on the server** — they render the real 3D
 > store, so the machine (or container) needs working hardware GL. In Docker

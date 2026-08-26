@@ -48,7 +48,7 @@ import { ENTRANCE_SIDELIGHT_WIDTH, CEILING_Y, mapWallSegmentUV, vestibuleHalfWid
 import { vestibuleCeilingY } from '../ceiling-soffit';
 import { WINDOW_HEAD_Y } from '../storefront-facade';
 import { buildVestibuleDoor, updateVestibuleDoors, VestibuleDoor } from './doors';
-import { buildCheckoutCounter, ClerkStanding } from './counter';
+import { buildCheckoutCounter, ClerkStanding, CounterFrame } from './counter';
 import { buildCounterTv } from './counter-tv';
 import { Footprint } from '../layout-validator';
 import { CheckoutBag } from '../checkout-bag';
@@ -80,18 +80,39 @@ export class EntranceCheckout implements StoreFixture {
     cx: number;
     topY: number;
     depth: number;
-    getSpine: (x: number) => { z: number; rotY: number };
+    frame: CounterFrame;
+    spineAt: (u: number) => { x: number; z: number; rotY: number };
   } | null = null;
 
   // Anchor for a counter-top MountSurface at world-X `x` (defaults to the
   // counter's own centreline): real top height + spine z/rotY, straight from
   // counter.ts's build() output. Null until build() has run.
+  //
+  // World-X only makes sense on a counter that faces the store down −Z, which
+  // is every shape but the side-wall desk (GH #116); the one prop pack that
+  // passes an x is chain-only. Anything that must work on the desk asks
+  // getCounterTopAnchorAt() for a point ALONG the counter instead.
   getCounterTopAnchor(x?: number): { x: number; y: number; z: number; rotY: number; depth: number } | null {
     if (!this.counterTopInfo) return null;
-    const { cx, topY, depth, getSpine } = this.counterTopInfo;
-    const atX = x ?? cx;
-    const spine = getSpine(atX);
-    return { x: atX, y: topY, z: spine.z, rotY: spine.rotY, depth };
+    return this.getCounterTopAnchorAt(x === undefined ? 0 : x - this.counterTopInfo.cx);
+  }
+
+  // Anchor on the counter top `u` feet ALONG the counter from its centre —
+  // the shape- and orientation-independent form of the above.
+  getCounterTopAnchorAt(u: number): { x: number; y: number; z: number; rotY: number; depth: number } | null {
+    if (!this.counterTopInfo) return null;
+    const { topY, depth, spineAt } = this.counterTopInfo;
+    const s = spineAt(u);
+    return { x: s.x, y: topY, z: s.z, rotY: s.rotY, depth };
+  }
+
+  // The counter's world frame (see CounterFrame): the centre of its
+  // customer-facing face, the direction it runs, the direction into its body,
+  // and the heading it faces. Every camera vantage, cursor anchor and walk
+  // waypoint that used to pair `x = 11` with `deskApexZ` reads this instead,
+  // which is what let the desk turn onto a side wall. Null until build().
+  getCounterFrame(): CounterFrame | null {
+    return this.counterTopInfo?.frame ?? null;
   }
 
   // Everything the clerk's navigation needs from the entrance architecture:
@@ -540,10 +561,13 @@ export class EntranceCheckout implements StoreFixture {
     // keyboards, gold-on-black screens) and the bag stand. See counter.ts for
     // the counterStyle/counterTop variants — the footprint below is identical
     // across styles so every anchor below is unaffected by which style is active.
-    const counterResult = buildCheckoutCounter(this.ctx, group, cx, backZ, spec);
+    const counterResult = buildCheckoutCounter(this.ctx, group, cx, backZ, spec, this.ctx.storeWidth);
     this.deskApexZ = counterResult.deskApexZ;
-    const { getInnerCounterSpine, innerH, innerDepth } = counterResult;
-    this.counterTopInfo = { cx, topY: innerH + 0.12, depth: innerDepth, getSpine: getInnerCounterSpine };
+    const { getInnerCounterSpine, spineAt, standingAt, innerH, innerDepth } = counterResult;
+    this.counterTopInfo = {
+      cx, topY: innerH + 0.12, depth: innerDepth,
+      frame: counterResult.frame, spineAt,
+    };
 
     // Clerk nav data: counter rects + the vestibule chamber (glass box, never
     // walkable for her) + work spots at the register and the two terminals
@@ -559,53 +583,56 @@ export class EntranceCheckout implements StoreFixture {
       register: counterResult.registerStanding,
       // Same anchors the terminal props are built at, below.
       terminals: spec.counterShape === 'desk'
-        ? [counterResult.getTerminalStanding(cx + 1.3)]
-        : [
-            counterResult.getTerminalStanding(cx - 4.0),
-            counterResult.getTerminalStanding(cx + 4.0),
-          ],
+        ? [standingAt(1.3)]
+        : [standingAt(-4.0), standingAt(4.0)],
     };
 
-    // Anchor X offsets along the inner island. The usquare counter's island
-    // is shorter (±5.0 vs the shield's ±6.0 — see counter.ts islandHalf), so
-    // everything that parks ON it pulls proportionally toward the centre.
-    // 'desk' (the mom-and-pop format's standalone 6 ft counter, islandHalf 3.0)
-    // is the tight one: the owner's spec is a counter "that fits a single
-    // computer", so the terminal sits just right of centre and the bag waits
-    // just left of it, both well inside the desk's own ends.
+    // Anchor offsets ALONG the inner island, in feet from its centre. The
+    // usquare counter's island is shorter (±5.0 vs the shield's ±6.0 — see
+    // counter.ts islandHalf), so everything that parks ON it pulls
+    // proportionally toward the centre. 'desk' (the mom-and-pop format's
+    // standalone 6 ft counter, islandHalf 3.0) is the tight one: the owner's
+    // spec is a counter "that fits a single computer", so the terminal sits
+    // just up-counter of centre and the bag waits just down-counter of it,
+    // both well inside the desk's own ends.
+    //
+    // These are ALONG-counter offsets, not world X: the desk runs down a side
+    // wall (GH #116) and +u there points away from the door, which is what
+    // keeps the bag at the end the walk-out passes without re-tuning a single
+    // number here. spineAt() is the accessor that makes them portable.
     const sq = spec.counterShape === 'usquare';
     const isDesk = spec.counterShape === 'desk';
     const termOff = isDesk ? 1.3 : (sq ? 3.5 : 4.0);
     const bagOff = isDesk ? 1.9 : (sq ? 4.6 : 5.4);
-    const term1 = getInnerCounterSpine(cx - termOff);
-    const term2 = getInnerCounterSpine(cx + termOff);
-    const bagSpine = getInnerCounterSpine(cx - bagOff);
+    const term1 = spineAt(-termOff);
+    const term2 = spineAt(termOff);
+    const bagSpine = spineAt(-bagOff);
 
     // Rental terminals on the inner counter, screens facing the clerk side
     // (away from the store) like a real register — the gold-on-black rental
     // system reads to whoever is working the register, not the customer.
     // A single computer on the desk format, the classic pair otherwise.
     this.buildDeskTerminals(group, isDesk
-      ? [{ x: cx + termOff, y: innerH + 0.12, z: term2.z, rotY: term2.rotY }]
+      ? [{ x: term2.x, y: innerH + 0.12, z: term2.z, rotY: term2.rotY }]
       : [
-          { x: cx - termOff, y: innerH + 0.12, z: term1.z, rotY: term1.rotY },
-          { x: cx + termOff, y: innerH + 0.12, z: term2.z, rotY: term2.rotY },
+          { x: term1.x, y: innerH + 0.12, z: term1.z, rotY: term1.rotY },
+          { x: term2.x, y: innerH + 0.12, z: term2.z, rotY: term2.rotY },
         ]);
 
     // Glossy white plastic rental bag waiting at the end of the counter
-    // nearest the exit door (-X side) — the launch flourish drops your movie
-    // into it before you leave.
-    this.bag = new CheckoutBag(group, cx - bagOff, innerH + 0.12, bagSpine.z, bagSpine.rotY);
+    // nearest the exit door — the launch flourish drops your movie into it
+    // before you leave.
+    this.bag = new CheckoutBag(group, bagSpine.x, innerH + 0.12, bagSpine.z, bagSpine.rotY);
     this.bagMouthWorld = this.bag.mouthWorld;
-    this.bagBaseWorld = new THREE.Vector3(cx - bagOff, innerH + 0.12, bagSpine.z);
+    this.bagBaseWorld = new THREE.Vector3(bagSpine.x, innerH + 0.12, bagSpine.z);
     this.bagRestYaw = bagSpine.rotY;
 
     // A television on a bracket behind the counter (StoreFormatSpec.counterTv,
-    // GH #110) — near the desk's far edge from the bag, clear of the terminal.
+    // GH #110) — near the desk's far end from the bag, clear of the terminal.
     if (activeStoreFormat().counterTv) {
       const tvOff = isDesk ? 2.2 : (sq ? 4.6 : 5.4);
-      const tvSpine = getInnerCounterSpine(cx + tvOff);
-      buildCounterTv(this.ctx, group, cx + tvOff, innerH + 0.12, tvSpine.z, tvSpine.rotY);
+      const tvSpine = spineAt(tvOff);
+      buildCounterTv(this.ctx, group, tvSpine.x, innerH + 0.12, tvSpine.z, tvSpine.rotY);
     }
 
     // "RETURN TAPES HERE" chute grown off the counter band INSIDE the store,
@@ -639,10 +666,9 @@ export class EntranceCheckout implements StoreFixture {
       let anchor: { x: number; z: number };
       let faceYaw: number;
       if (isDesk) {
-        // Standalone desk (mom-and-pop): there is no band to grow the chute
-        // OUT OF, so it stands as its own drop box at the desk's +X end, slot
-        // facing +X — still the first thing on your left as you come through
-        // the door, still clear of the vestibule glazing and the door swing.
+        // Standalone desk: there is no band to grow the chute OUT OF, so it
+        // stands as its own drop box off the desk's far end (the end away
+        // from the door), slot turned to face the customer side.
         //
         // The anchor is the SLOT FACE, and the body runs CHUTE_BACK (1.5 ft)
         // behind it — that depth exists to tuck the chute's rear wall inside
@@ -650,10 +676,11 @@ export class EntranceCheckout implements StoreFixture {
         // own end face therefore buried 1.5 ft of chute IN the desk, on top of
         // the terminal: from the manager terminal the blue shell covered a
         // third of the screen. Offsetting by that same depth stands its rear
-        // wall flush with the desk end instead. Desk rect: x = cx ± 3.0,
-        // z = zBackC-4.6 .. zBackC-3.0 (see counter.ts's `desk` branch).
-        anchor = { x: cx + 3.0 + RETURN_CHUTE_BACK, z: zBackC - 3.8 };
-        faceYaw = Math.PI / 2;
+        // wall flush with the desk end instead. Stepped along the counter's
+        // own axis so it follows the desk onto its side wall (GH #116).
+        const end = spineAt(3.0 + RETURN_CHUTE_BACK);
+        anchor = { x: end.x, z: end.z };
+        faceYaw = counterResult.frame.facingYaw;
       } else if (sq) {
         // Flat right side, facing +X; biased toward the back (door) end but
         // clear of the back corner's square cut.

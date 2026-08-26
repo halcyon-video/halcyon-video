@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The store is a box on your own LAN serving plain HTTP (http://192.168.x.x:1420),
+     and since Android 9 cleartext is refused by default. There is no fixed
+     hostname to allow-list here — the address is whatever the owner types on
+     the setup screen — so cleartext is permitted broadly and the app carries
+     no credentials of its own: it opens one page on a server you named. HTTPS
+     is used unchanged if you type an https:// address. -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="user" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>
