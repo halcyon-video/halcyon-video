@@ -5,6 +5,33 @@ All notable changes to Halcyon Video, generated from commit history by
 it on every version tag push. Deterministic and offline: no entry here was
 written by a model.
 
+## [v0.9.2] — 2026-08-25
+
+### Android TV
+- The store gets its own launcher tile, not a browser (Closes [#85](https://github.com/halcyon-video/halcyon-video/issues/85))
+
+### CHANGELOG
+- V0.9.1
+
+### Mom & pop
+- The till moves off the doorway and onto the side wall (Closes [#116](https://github.com/halcyon-video/halcyon-video/issues/116))
+
+### README
+- Document the Roku decision — no browser, no app coming
+
+### General
+- Fold the clerk teardown onto one line to hold the three-scene budget
+- The emblem studio gets the pointer the player got
+- The player's controls get a pointer you can actually see
+- The clerk's sheet can hand out its own poses, not just its art
+- Release picture for v0.9.1: the shelves, not the desk close-up
+- Announce-fanout: cap Discord's embed, fix silent sentence-split data loss
+- Announce-fanout: cap Discord's embed, fix silent sentence-split data loss
+- Release picture for v0.9.1: the actual mom & pop interior, not the corporate store
+- Release picture for v0.9.1: a properly sunset-lit interior
+- Clean up clerk sprite, textures, and in-flight atlas swaps on scene teardown
+- Clean up VR affordance click listener and add disposeVR on scene teardown
+
 ## [v0.9.1] — 2026-08-23
 
 ### CHANGELOG
