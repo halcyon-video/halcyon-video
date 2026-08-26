@@ -20,6 +20,7 @@ import {
   collectionCategoryCandidates,
   shelfCategoryCandidatesOf,
   extraCopiesCount,
+  categoryRank,
 } from '../src/store-layout.ts';
 
 function mk(title: string, extra: Partial<Movie> = {}): Movie {
@@ -123,9 +124,10 @@ test('genre tags yield every qualifying category in shelving-priority order', ()
   // returns the top candidate.
   assert.deepEqual(storeCategoryCandidates(mk('C', { genres: ['Comedy'] })), ['COMEDY']);
   assert.equal(storeCategory(mk('Hist', { genres: ['History', 'Drama'] })), 'SPECIAL INTEREST');
-  // No recognised tag at all: no candidates, so the planner's fallback applies.
-  assert.deepEqual(storeCategoryCandidates(mk('X', { genres: ['Nonsense'] })), []);
-  assert.equal(storeCategory(mk('X', { genres: ['Nonsense'] })), 'GENERAL');
+  // No recognised tag at all: the raw genre itself becomes the candidate
+  // (GH #117) so the label can earn a section instead of vanishing.
+  assert.deepEqual(storeCategoryCandidates(mk('X', { genres: ['Nonsense'] })), ['NONSENSE']);
+  assert.equal(storeCategory(mk('X', { genres: ['Nonsense'] })), 'NONSENSE');
   // Series short-circuit is preserved.
   assert.deepEqual(storeCategoryCandidates(mk('S', { isSeries: true, genres: ['Drama'] })), ['TELEVISION']);
 });
@@ -200,4 +202,43 @@ test('a collection gap carries no backstock copies, however well rated', () => {
   // assertion above is testing the flag and not a broken threshold.
   const owned = mk('Return of the Harness', { communityRating: 9.4, criticRating: 96 });
   assert.equal(extraCopiesCount(owned), 2);
+});
+
+test('a genre outside the classic wall list becomes its own candidate (GH #117)', () => {
+  // "Racing" matches no has(...) rule: before the fix it returned no
+  // candidates and the label vanished into GENERAL everywhere in 3D.
+  assert.deepEqual(storeCategoryCandidates(mk('Pole Position', { genres: ['Racing'] })), ['RACING']);
+  assert.equal(storeCategory(mk('Pole Position', { genres: ['Racing'] })), 'RACING');
+
+  // A genre the classic rules already claim is untouched by the fallback.
+  assert.deepEqual(storeCategoryCandidates(mk('Scream Test', { genres: ['Horror'] })), ['HORROR']);
+
+  // The fallback only fires when NO rule matched — a mixed tag list keeps its
+  // classic candidates and gains nothing.
+  assert.deepEqual(
+    storeCategoryCandidates(mk('Rubber', { genres: ['Racing', 'Horror'] })),
+    ['HORROR']
+  );
+
+  // No genres at all still lands in GENERAL.
+  assert.equal(storeCategory(mk('Blank Tape')), 'GENERAL');
+
+  // A literal "General" genre must not fabricate a section that shadows the
+  // real GENERAL fallback.
+  assert.deepEqual(storeCategoryCandidates(mk('Misc', { genres: ['General'] })), []);
+});
+
+test('a raw-genre category never outranks a named wall category (GH #117)', () => {
+  // indexOf would return -1 for RACING and win every comparison; categoryRank
+  // pins novel labels after the whole named list instead.
+  assert.ok(categoryRank('RACING') > categoryRank('GENERAL'));
+  assert.ok(categoryRank('ACTION') < categoryRank('RACING'));
+
+  // Collection tie-break: equal votes between a named wall and a novel genre
+  // go to the named wall.
+  const map = collectionCategoryMap([
+    mk('Fast Lap', { collectionName: 'Speed Collection', genres: ['Racing'] }),
+    mk('Slow Burn', { collectionName: 'Speed Collection', genres: ['Drama'] }),
+  ]);
+  assert.equal(map.get('Speed Collection'), 'DRAMA');
 });
