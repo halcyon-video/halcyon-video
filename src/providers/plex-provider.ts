@@ -72,6 +72,14 @@ export const PLEX_CAPABILITIES: ProviderCapabilities = {
   transcoding: true,          // /video/:/transcode/universal
   watchState: true,           // viewCount / lastViewedAt
   resumePosition: true,       // viewOffset
+  // GH #123, v1 non-goal: Plex exposes no per-user key/value surface a
+  // third-party client may write. Its own client prefs live behind endpoints
+  // reserved for Plex's apps, and the alternatives (a playlist used as a
+  // storage bucket, a fake library section) would put our settings somewhere
+  // the person can see, can't recognize, and would reasonably delete. A Plex
+  // store therefore stays configured per-machine, which is what it did before
+  // this capability existed — not a regression, just not an improvement yet.
+  userConfigStorage: false,
 };
 
 export class PlexProvider implements MediaSourceProvider {

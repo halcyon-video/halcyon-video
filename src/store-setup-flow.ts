@@ -60,6 +60,7 @@ import {
   streamingChoiceScreen,
 } from './streaming-choice';
 import { getSetting, setSetting } from './settings';
+import { flushConfigPush, hydrateStoreConfig } from './store-config-sync';
 import {
   SetupScreen,
   SetupKey,
@@ -399,6 +400,23 @@ async function afterAuth(
   });
   localStorage.setItem('jellyfin_last_userid', session.userId);
   deps.log(`[Setup] Authenticated as ${session.userName} on ${source.name}.`);
+  // Ask the server what this person's store already looks like, BEFORE the
+  // checkbox screens (GH #123). Get the order wrong and setup is worse than
+  // useless here: the boxes would show defaults, the person would re-tick the
+  // libraries they already chose on their other machine, and the sync's later
+  // hydrate would then be the thing overwriting a choice they just made.
+  // Hydrating first means the boxes come up already right, and anything they
+  // change from here is genuinely newer than the server's copy — which is what
+  // makes the once-per-boot guard in hydrateStoreConfig correct rather than
+  // merely convenient.
+  screen = { kind: 'dialing', address: url, step: 'READING YOUR STORE SETTINGS...' };
+  render();
+  const restored = await hydrateStoreConfig();
+  if (restored.status === 'applied') {
+    deps.log(`[Setup] Restored ${restored.written} store setting(s) from your account.`);
+  } else if (restored.status === 'failed') {
+    deps.log(`[Setup] No saved store settings read back: ${restored.error}`);
+  }
   screen = { kind: 'dialing', address: url, step: 'PULLING THE CATALOG LIST...' };
   render();
   try {
@@ -531,6 +549,12 @@ async function runSync(): Promise<void> {
     render();
     return;
   }
+  // Everything ticked on the way through — carried libraries, streaming
+  // services — scheduled a debounced save. Land it before the terminal closes
+  // rather than trusting a timer to outlive the scene rebuild that follows
+  // (GH #123): this is the one flow where the whole point is that the person
+  // never has to do it again.
+  await flushConfigPush();
   screen = { kind: 'arriving' };
   render();
   closeSetupTerminal({ keepCamera: true });

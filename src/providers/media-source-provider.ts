@@ -319,6 +319,19 @@ export interface ProviderCapabilities {
   /** Server reports a resume position, so playback can start where the user
    *  left off rather than at 0:00. */
   resumePosition: boolean;
+  /**
+   * Per-user storage the server will hold on THIS CLIENT's behalf for its own
+   * settings (GH #123) — Jellyfin/Emby's DisplayPreferences CustomPrefs. Gates
+   * loadUserConfig/saveUserConfig, i.e. whether a person's store follows them
+   * to another machine or has to be set up again there.
+   *
+   * False is not a defect: it means "this install is configured here", which
+   * is what every backend did before this flag existed. It must stay false
+   * unless the server offers a per-user key/value surface a third-party client
+   * may write — reusing some other feature's storage would put our settings
+   * somewhere the person can neither see nor clear.
+   */
+  userConfigStorage: boolean;
 }
 
 export interface ProviderCredentials {
@@ -341,6 +354,24 @@ export interface ProviderSession {
   /** Provider-specific extras neither renamed nor interpreted by core code
    *  (e.g. Plex's machineIdentifier) — an escape hatch, not a dumping ground. */
   raw?: Record<string, unknown>;
+}
+
+/**
+ * The store's own configuration as a backend holds it for one user (GH #123).
+ *
+ * Deliberately a flat string map rather than a typed settings object: the
+ * key-space is the app's `bb_*` localStorage family, which grows every time
+ * someone adds a setting, and a schema here would have to be edited in lockstep
+ * forever. What may travel and what may not is decided in ONE place
+ * (store-config-sync.ts), not re-litigated per backend.
+ */
+export interface UserConfigSnapshot {
+  /** key -> value, exactly as localStorage holds them (always strings). */
+  values: Record<string, string>;
+  /** ISO stamp written by whichever install last pushed. Informational only:
+   *  boot takes the server's snapshot wholesale rather than comparing clocks
+   *  the two machines don't share. */
+  savedAt?: string;
 }
 
 /** One selectable account on the login screen — a membership card's face. */
@@ -480,5 +511,25 @@ export interface MediaSourceProvider {
     sessionId: string,
     log?: (msg: string) => void,
     conn?: { server: string; session: ProviderSession }
+  ): Promise<void>;
+
+  /**
+   * capability: userConfigStorage — this user's stored store-configuration on
+   * this server, or null when the server holds none yet (a first run, which is
+   * NOT an error and must leave local config alone).
+   *
+   * Must throw on a transport failure rather than returning null, for the same
+   * reason validateSession must: the caller treats null as "nothing saved
+   * there" and a blip is not an empty store.
+   */
+  loadUserConfig?(server: string, session: ProviderSession): Promise<UserConfigSnapshot | null>;
+
+  /** capability: userConfigStorage — replace this user's stored configuration
+   *  on this server. Whole-snapshot, not a patch: a key the snapshot omits is
+   *  a key the user cleared, and a merging backend would resurrect it. */
+  saveUserConfig?(
+    server: string,
+    session: ProviderSession,
+    snapshot: UserConfigSnapshot
   ): Promise<void>;
 }

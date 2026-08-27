@@ -28,6 +28,8 @@ import {
   isDirectPlaySafe,
   getLastHlsPlaySessionId,
   normalizeUrl,
+  fetchUserConfigPrefs,
+  saveUserConfigPrefs,
 } from '../jellyfin';
 import type {
   AccountSummary,
@@ -43,6 +45,7 @@ import type {
   ProviderCapabilities,
   ProviderCredentials,
   ProviderSession,
+  UserConfigSnapshot,
 } from './media-source-provider';
 
 /**
@@ -68,7 +71,31 @@ export const JELLYFIN_CAPABILITIES: ProviderCapabilities = {
   transcoding: true,          // HLS via buildHlsStreamUrl
   watchState: true,           // UserData.Played -> staff-picks anchors
   resumePosition: true,       // UserData.PlaybackPositionTicks
+  userConfigStorage: true,    // DisplayPreferences CustomPrefs (GH #123)
 };
+
+// Metadata entries, not settings — hoisted off on load so they never reach
+// localStorage, and written on every save.
+const SAVED_AT_PREF = 'halcyon_saved_at';
+
+/**
+ * The marker that says THIS CLIENT has written here, and the reason it exists.
+ *
+ * A DisplayPreferences record is never empty on a stock Jellyfin: verified on
+ * 10.11.11, a GET for a client that has never saved anything still returns
+ * server-injected defaults (chromecastVersion, skipForwardLength,
+ * dashboardTheme, …) in CustomPrefs. So "CustomPrefs has entries" does NOT mean
+ * "this user has a saved store", and treating it that way is actively
+ * dangerous: store-config-sync reconciles against the snapshot, so a first boot
+ * on a well-configured machine would read those defaults, find none of its own
+ * settings among them, and conclude the user had cleared every one — deleting a
+ * working store's configuration on the strength of a record we never wrote.
+ *
+ * Hence an explicit marker rather than a count. Absent means "no Halcyon config
+ * here", which is a first run, which leaves local settings alone.
+ */
+const CONFIG_MARKER_PREF = 'halcyon_config_v';
+const CONFIG_FORMAT_VERSION = '1';
 
 export class JellyfinProvider implements MediaSourceProvider {
   readonly id = 'jellyfin';
@@ -207,6 +234,45 @@ export class JellyfinProvider implements MediaSourceProvider {
     positionTicks: number
   ): Promise<void> {
     return reportPlaybackStopped(server, session.accessToken, itemId, positionTicks);
+  }
+
+  // ── Per-user store configuration (GH #123) ────────────────────────────────
+  //
+  // The snapshot is one CustomPrefs ENTRY PER SETTING rather than a single
+  // JSON blob under one key. It costs nothing here and buys two things: each
+  // value stays far inside the server's per-value size limit however many
+  // settings the app grows, and the record is legible in Jellyfin's own
+  // database — a person who wants to know what this client stored about them,
+  // or wants to clear one setting, can see it item by item.
+
+  async loadUserConfig(
+    server: string,
+    session: ProviderSession
+  ): Promise<UserConfigSnapshot | null> {
+    const stored = await fetchUserConfigPrefs(server, session.accessToken, session.userId);
+    if (!stored || !stored[CONFIG_MARKER_PREF]) return null;
+    const {
+      [SAVED_AT_PREF]: savedAt,
+      [CONFIG_MARKER_PREF]: _version,
+      ...values
+    } = stored;
+    return { values, savedAt };
+  }
+
+  async saveUserConfig(
+    server: string,
+    session: ProviderSession,
+    snapshot: UserConfigSnapshot
+  ): Promise<void> {
+    const values: Record<string, string> = { ...snapshot.values };
+    // Stamped into the record itself so the stored preferences say when, and by
+    // implication from where, the store was last configured. Costs one entry
+    // and makes an otherwise opaque row in someone's Jellyfin database
+    // self-explanatory; hoisted back off on load so it never reaches storage
+    // as a setting.
+    if (snapshot.savedAt) values[SAVED_AT_PREF] = snapshot.savedAt;
+    values[CONFIG_MARKER_PREF] = CONFIG_FORMAT_VERSION;
+    return saveUserConfigPrefs(server, session.accessToken, session.userId, values);
   }
 
   async cancelActiveTranscode(

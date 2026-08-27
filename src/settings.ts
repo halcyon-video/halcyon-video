@@ -19,6 +19,11 @@
 // mandate to migrate every read.
 
 import { isDemoMode } from './demo-mode';
+// The key-space rule comes from the import-free module, the push from the
+// transport one — settings.ts is imported by nearly everything, so it takes
+// the lighter dependency where it can.
+import { isSyncedConfigKey } from './store-config-keys';
+import { scheduleConfigPush } from './store-config-sync';
 import { enableFpsMeter, initFpsMeter, FPS_METER_KEY } from './fps-meter';
 import { setRemotePlayEnabled } from './remote-play';
 import { THEMES, getActiveTheme, resolveThemeId, WALL_PAINT_OPTIONS, applyThemeCssVars } from './themes';
@@ -195,7 +200,15 @@ export function getSetting<T = unknown>(key: string): T {
   return (def ? (def.default as unknown as T) : (undefined as unknown as T));
 }
 
-/** Persist a setting value. Toggles serialize to '1'/'0'. */
+/**
+ * Persist a setting value. Toggles serialize to '1'/'0'.
+ *
+ * Also the one place a settings change becomes a SAVE (GH #123): the push is
+ * debounced and whole-snapshot, so hooking the single writer covers every
+ * caller — including the handful of rows whose onChange writes a companion key
+ * straight to localStorage, since the snapshot is read at flush time rather
+ * than assembled from the value passed here.
+ */
 export function setSetting<T = unknown>(key: string, value: T): void {
   if (typeof localStorage === 'undefined') return;
   const def = registry.get(key);
@@ -204,6 +217,7 @@ export function setSetting<T = unknown>(key: string, value: T): void {
   } else {
     localStorage.setItem(key, String(value));
   }
+  if (isSyncedConfigKey(key)) scheduleConfigPush();
 }
 
 /** The next value id for a 'cycle' setting, wrapping around. */

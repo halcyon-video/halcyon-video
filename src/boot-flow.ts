@@ -38,6 +38,7 @@ import { buildDemoLibraries, buildDemoGames } from './demo-library';
 import { getSetting } from './settings';
 import { isDemoMode } from './demo-mode';
 import { fetchCatalogFromAllSources } from './catalog-sync';
+import { hydrateStoreConfig, resetStoreConfigSync } from './store-config-sync';
 import {
   addMediaSource,
   clearMediaSources,
@@ -122,6 +123,10 @@ export function initBootFlow(d: BootFlowDeps): void {
         // would re-stock from a distributor the person just walked away from.
         clearMediaSources();
         forgetPlexAccount();
+        // A different distributor holds a different saved store (GH #123):
+        // re-arm the hydrate so the next connection reads ITS settings rather
+        // than assuming this boot already read the right ones.
+        resetStoreConfigSync();
         localStorage.removeItem('jellyfin_username');
         d.log('[Setup] Saved servers dropped — pick a new distributor.', 'system');
       },
@@ -194,6 +199,24 @@ export function logOutToOpeningDay(): void {
  * server turns into a bug report about missing shelves.
  */
 async function syncAllSources(onProgress?: (stage: string) => void): Promise<JellyfinLibrary[]> {
+  // BEFORE the catalog, not after (GH #123): the carried-library choices are
+  // part of the configuration being fetched, and they decide which libraries
+  // are worth syncing at all. Hydrating afterwards would have this machine pay
+  // to fetch libraries the person switched off on their other one, then hide
+  // them. Cheap and silent when there is nothing to fetch from — the demo, a
+  // Plex store, a server with no record yet — and never fatal: a store that
+  // opens on local settings beats a store that doesn't open.
+  onProgress?.('settings');
+  const config = await hydrateStoreConfig();
+  if (config.status === 'applied') {
+    deps?.log(
+      `[System] Store settings restored from your account (${config.written} applied` +
+      `${config.removed ? `, ${config.removed} cleared` : ''}).`,
+      'system'
+    );
+  } else if (config.status === 'failed') {
+    deps?.log(`[System] Could not read your saved store settings: ${config.error}`, 'system');
+  }
   const result = await fetchCatalogFromAllSources({ onProgress });
   for (const failure of result.failures) {
     deps?.log(`[System] ${failure.source.name} did not answer: ${failure.error}`, 'system');
@@ -495,6 +518,10 @@ export function switchMember() {
   // the primary source in place, matching it by (kind, url).
   localStorage.removeItem('jellyfin_token');
   localStorage.removeItem('jellyfin_userid');
+  // The next person gets THEIR store, not a skipped hydrate onto the outgoing
+  // member's settings — and any save still pending is dropped rather than
+  // landing on whoever just picked up the remote (GH #123).
+  resetStoreConfigSync();
   deps.teardownScene();
   void showLoginOrCards();
 }

@@ -1583,3 +1583,168 @@ export function isStreamCopyUrl(src: string): boolean {
   }
 }
 
+
+// ─── Per-user store configuration (GH #123) ──────────────────────────────────
+//
+// Where a person's store settings live so they follow them to another machine,
+// instead of dying in the localStorage of whichever browser happened to run
+// the setup terminal.
+//
+// The surface is DisplayPreferences: a per-user, per-client key/value record
+// Jellyfin already keeps for exactly this ("remember how this client is set
+// up for this person"). Two properties are what make it the right shelf:
+//
+//  - It is scoped by CLIENT, and we pass our own ('halcyon'). Nothing this
+//    writes can collide with Jellyfin Web's own preferences, and no server
+//    schema change is involved — a stock server supports this today.
+//  - It is scoped by USER, so two people sharing one Jellyfin get two stores,
+//    which is the whole point. A shared-account household still shares a
+//    store, and that is the correct reading of "the same account".
+//
+// `usersettings` is the record id Jellyfin's own web client uses for its
+// client-wide (non-per-library) prefs, and the id is only unique WITHIN a
+// client — so ours is a separate record that merely shares a name.
+const DISPLAY_PREFS_ID = 'usersettings';
+const DISPLAY_PREFS_CLIENT = 'halcyon';
+
+/**
+ * One CustomPrefs value's ceiling. Jellyfin stores these in a relational
+ * column, and a single oversized value fails the whole POST — which would take
+ * every OTHER setting down with it. Anything past this is dropped from the
+ * push (and said so, loudly) rather than being allowed to poison the snapshot.
+ * No setting the store writes today comes near it.
+ */
+const MAX_PREF_VALUE_LEN = 8192;
+
+function displayPreferencesUrl(jellyfinUrl: string, userId: string): string {
+  const base = jellyfinUrl.replace(/\/$/, '');
+  const params = new URLSearchParams({ userId, client: DISPLAY_PREFS_CLIENT });
+  return `${base}/DisplayPreferences/${DISPLAY_PREFS_ID}?${params.toString()}`;
+}
+
+/**
+ * The non-CustomPrefs half of the last DTO we read, per server+user.
+ *
+ * DisplayPreferences is a whole-object PUT-alike: to change CustomPrefs you
+ * must send back every other field or the server resets them. Remembering the
+ * DTO lets a save skip its read — which is what makes the page-exit flush
+ * possible at all, since there is no time for a round trip there.
+ */
+const displayPrefsDtoCache = new Map<string, Record<string, unknown>>();
+
+/** Fill the fields Jellyfin requires on a DTO we have never read. */
+function withDisplayPrefsDefaults(dto: Record<string, unknown>): Record<string, unknown> {
+  const out = { ...dto };
+  out.Id = typeof out.Id === 'string' && out.Id ? out.Id : DISPLAY_PREFS_ID;
+  out.Client = DISPLAY_PREFS_CLIENT;
+  if (typeof out.SortBy !== 'string') out.SortBy = 'SortName';
+  if (typeof out.SortOrder !== 'string') out.SortOrder = 'Ascending';
+  if (typeof out.ViewType !== 'string') out.ViewType = '';
+  if (typeof out.IndexBy !== 'string') out.IndexBy = '';
+  if (typeof out.ScrollDirection !== 'string') out.ScrollDirection = 'Horizontal';
+  if (typeof out.RememberIndexing !== 'boolean') out.RememberIndexing = false;
+  if (typeof out.RememberSorting !== 'boolean') out.RememberSorting = false;
+  if (typeof out.ShowBackdrop !== 'boolean') out.ShowBackdrop = true;
+  if (typeof out.ShowSidebar !== 'boolean') out.ShowSidebar = false;
+  if (typeof out.PrimaryImageHeight !== 'number') out.PrimaryImageHeight = 250;
+  if (typeof out.PrimaryImageWidth !== 'number') out.PrimaryImageWidth = 250;
+  return out;
+}
+
+/**
+ * This user's stored Halcyon settings, or null when the server holds none.
+ *
+ * THROWS on a transport failure — the caller must be able to tell "nothing
+ * saved yet" (leave local config alone; this may be the machine about to do
+ * the saving) from "the server didn't answer" (also leave it alone, but say
+ * so, because silently booting an unconfigured store looks like data loss).
+ */
+export async function fetchUserConfigPrefs(
+  jellyfinUrl: string,
+  token: string,
+  userId: string
+): Promise<Record<string, string> | null> {
+  const url = displayPreferencesUrl(jellyfinUrl, userId);
+  const body = await jellyfinRequest('GET', url, clientIdentity(), token);
+  if (!body) return null;
+  const dto = JSON.parse(body);
+  if (dto && typeof dto === 'object') {
+    const { CustomPrefs: _drop, ...rest } = dto as Record<string, unknown>;
+    displayPrefsDtoCache.set(`${jellyfinUrl}|${userId}`, rest);
+  }
+  const custom = dto?.CustomPrefs;
+  if (!custom || typeof custom !== 'object') return null;
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(custom as Record<string, unknown>)) {
+    // Jellyfin hands back nulls for cleared entries; a null is an absent key,
+    // not the string "null".
+    if (typeof v === 'string') out[k] = v;
+  }
+  return Object.keys(out).length ? out : null;
+}
+
+/**
+ * Replace this user's stored Halcyon settings.
+ *
+ * CustomPrefs is replaced WHOLESALE: an omitted key is a key the user cleared,
+ * so merging server-side would resurrect settings they turned off. The rest of
+ * the DTO is preserved — we own this record (it is keyed to our own client
+ * string), but owning it is not a reason to discard fields we don't read.
+ *
+ * `keepalive` is the page-exit path: no read-modify-write (there is no time
+ * for a round trip while the tab is closing) and a fetch the browser promises
+ * to finish after the document goes away. Bodies there are capped at 64 KB by
+ * spec, which the size guard below already keeps us far inside.
+ */
+export async function saveUserConfigPrefs(
+  jellyfinUrl: string,
+  token: string,
+  userId: string,
+  prefs: Record<string, string>,
+  opts?: { keepalive?: boolean }
+): Promise<void> {
+  const url = displayPreferencesUrl(jellyfinUrl, userId);
+  const cacheKey = `${jellyfinUrl}|${userId}`;
+  let dto: Record<string, unknown> = displayPrefsDtoCache.get(cacheKey) ?? {};
+  if (!opts?.keepalive) {
+    try {
+      const existing = await jellyfinRequest('GET', url, clientIdentity(), token);
+      if (existing) {
+        const parsed = JSON.parse(existing);
+        if (parsed && typeof parsed === 'object') {
+          const { CustomPrefs: _drop, ...rest } = parsed as Record<string, unknown>;
+          dto = rest;
+          displayPrefsDtoCache.set(cacheKey, rest);
+        }
+      }
+    } catch {
+      // No record yet, or an unreadable one: the POST creates it from the
+      // defaults below rather than failing the save.
+    }
+  }
+  const custom: Record<string, string> = {};
+  for (const [k, v] of Object.entries(prefs)) {
+    if (v.length > MAX_PREF_VALUE_LEN) {
+      console.warn(
+        `[Jellyfin] Store config: "${k}" is ${v.length} chars, past the ${MAX_PREF_VALUE_LEN} ` +
+        `limit — left off the server (it stays set on this machine).`
+      );
+      continue;
+    }
+    custom[k] = v;
+  }
+  const body = JSON.stringify({ ...withDisplayPrefsDefaults(dto), CustomPrefs: custom });
+  if (opts?.keepalive && typeof fetch === 'function') {
+    await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `${clientIdentity()}, Token="${token}"`,
+      },
+      body,
+      keepalive: true,
+    });
+    return;
+  }
+  await jellyfinRequest('POST', url, clientIdentity(), token, body);
+}
