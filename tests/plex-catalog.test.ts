@@ -14,6 +14,7 @@ import {
   fetchPlexLibrariesAndMovies,
   fetchPlexLibraryList,
   fetchPlexSeriesEpisodes,
+  fetchPlexServers,
   buildPlexImageUrl,
   buildPlexHlsStreamUrl,
   buildPlexDirectStreamUrl,
@@ -377,4 +378,41 @@ test('server addresses are normalized the way a person would type them', () => {
   assert.equal(normalizePlexUrl('http://plex.local:32400/'), 'http://plex.local:32400');
   assert.equal(normalizePlexUrl('  https://plex.example.com  '), 'https://plex.example.com');
   assert.equal(normalizePlexUrl(''), '');
+});
+
+// GH #120: a plain LAN IP must beat plex.direct, which fails outright on
+// DNS-rebind-protecting resolvers (Pi-hole, pfSense, common router defaults).
+test('fetchPlexServers: plain-IP local beats plex.direct local beats remote beats relay', async () => {
+  const originalFetch = globalThis.fetch;
+  (globalThis as any).fetch = async () => ({
+    ok: true,
+    status: 200,
+    text: async () => JSON.stringify([
+      {
+        name: 'Home',
+        clientIdentifier: 'abc123',
+        accessToken: 'srv-token',
+        owned: true,
+        provides: 'server',
+        connections: [
+          { uri: 'https://192-168-1-50.aabbccdd.plex.direct:32400', local: true, relay: false },
+          { uri: 'https://relay.plex.direct:32400', local: false, relay: true },
+          { uri: 'https://1-2-3-4.plex.tv:32400', local: false, relay: false },
+          { uri: 'http://192.168.1.50:32400', local: true, relay: false },
+        ],
+      },
+    ]),
+  });
+  try {
+    const servers = await fetchPlexServers('acct-token');
+    assert.equal(servers.length, 1);
+    assert.deepEqual(servers[0].connections, [
+      'http://192.168.1.50:32400',
+      'https://192-168-1-50.aabbccdd.plex.direct:32400',
+      'https://1-2-3-4.plex.tv:32400',
+      'https://relay.plex.direct:32400',
+    ]);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });

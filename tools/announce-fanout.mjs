@@ -135,6 +135,11 @@ function capitalize(s) {
 function tagMessageBlurb(tag) {
   let raw;
   try {
+    // Only an annotated tag object carries a message of its own. On a
+    // lightweight tag %(contents) falls through to the commit it points at —
+    // text written for git log, not for a public post (v0.9.2 went out
+    // announcing its merge commit's internal narrative verbatim).
+    if (git(['cat-file', '-t', tag]).trim() !== 'tag') return null;
     raw = git(['tag', '-l', '--format=%(contents)', tag]);
   } catch {
     return null;

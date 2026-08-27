@@ -192,6 +192,21 @@ export interface PlexServer {
   owned: boolean;
 }
 
+/** A plex.direct hostname resolves to the same box a plain LAN IP would, but
+ *  fails outright on DNS-rebind-protecting resolvers (Pi-hole, pfSense, and
+ *  common router defaults) — issue #120's reported symptom. */
+function isPlexDirectUri(uri: string): boolean {
+  return /\.plex\.direct(?::|\/|$)/i.test(uri);
+}
+
+/** plain-IP local, then plex.direct local, then remote non-relay, then relay —
+ *  making the doc comment on PlexServer.connections (below) true. */
+function connectionRank(c: any): number {
+  if (c.relay) return 3;
+  if (!c.local) return 2;
+  return isPlexDirectUri(String(c.uri || '')) ? 1 : 0;
+}
+
 /**
  * The person's servers, from the account token. `resources` returns every
  * device on the account (players and servers alike), so this filters to
@@ -208,11 +223,7 @@ export async function fetchPlexServers(accountToken: string): Promise<PlexServer
     .filter((r) => typeof r?.provides === 'string' && r.provides.split(',').includes('server'))
     .map((r) => {
       const conns = (r.connections || []) as any[];
-      const ordered = [...conns].sort((a, b) => {
-        // local before remote, then non-relay before relay
-        if (!!b.local !== !!a.local) return b.local ? 1 : -1;
-        return (a.relay ? 1 : 0) - (b.relay ? 1 : 0);
-      });
+      const ordered = [...conns].sort((a, b) => connectionRank(a) - connectionRank(b));
       return {
         name: r.name || 'Plex Media Server',
         machineIdentifier: r.clientIdentifier,

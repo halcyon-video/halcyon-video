@@ -344,9 +344,18 @@ export class StorePlan {
       const fileUnder = (m: Movie, viable: Set<string>): string =>
         candidatesOf.get(m)!.find((c) => viable.has(c)) ?? 'GENERAL';
 
-      let viable = new Set(STORE_CATEGORY_ORDER.filter(
-        (c) => c !== 'GENERAL' && !banned.has(c),
-      ));
+      // Raw-genre categories (GH #117): candidates outside the classic wall
+      // list. They enter the viability cascade like any named category — earn
+      // MIN_CATEGORY_TITLES or fold into GENERAL — and section before GENERAL
+      // in the shelf order below, alphabetical among themselves.
+      const novelCats = new Set<string>();
+      candidatesOf.forEach((cands) => cands.forEach((c) => {
+        if (!STORE_CATEGORY_ORDER.includes(c)) novelCats.add(c);
+      }));
+      let viable = new Set([
+        ...STORE_CATEGORY_ORDER.filter((c) => c !== 'GENERAL' && !banned.has(c)),
+        ...novelCats,
+      ]);
       for (;;) {
         const counts = new Map<string, number>();
         movies.forEach((m) => {
@@ -370,7 +379,9 @@ export class StorePlan {
 
       const entries: (Movie | null)[] = [];
       const catRanges: { cat: string; start: number; end: number }[] = [];
-      STORE_CATEGORY_ORDER.forEach((cat) => {
+      const sectionOrder = [...STORE_CATEGORY_ORDER];
+      sectionOrder.splice(sectionOrder.indexOf('GENERAL'), 0, ...[...novelCats].sort());
+      sectionOrder.forEach((cat) => {
         const list = byCat.get(cat);
         if (!list || list.length === 0) return;
         list.sort(shelfTitleCompare);

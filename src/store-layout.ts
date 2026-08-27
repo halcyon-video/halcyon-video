@@ -774,7 +774,28 @@ export function storeCategoryCandidates(movie: Movie): string[] {
   // Still a fallback: if DRAMA never gets built, a dramedy lands in COMEDY
   // rather than GENERAL.
   if (has('comedy') && outrankedByDrama) out.push('COMEDY');
+  // No classic wall category claimed this title: offer its own first genre as
+  // a candidate section instead of discarding the label on sight (GH #117 —
+  // a niche genre like "Racing" showed in 2D but vanished everywhere in 3D).
+  // The planner still applies MIN_CATEGORY_TITLES, so the genre either earns
+  // its own signboard section or folds into GENERAL exactly as before.
+  if (out.length === 0) {
+    const raw = movie.genres.find((x) => x.trim().length > 0);
+    if (raw) {
+      const label = raw.trim().toUpperCase();
+      if (label !== 'GENERAL') out.push(label);
+    }
+  }
   return out;
+}
+
+// Wall-order rank for sorts and tie-breaks. A raw-genre category (GH #117)
+// isn't in STORE_CATEGORY_ORDER — it ranks after every named category, so an
+// unlisted label never beats an attested wall section. Without this, indexOf
+// returns -1 and a novel category would win every comparison.
+export function categoryRank(cat: string): number {
+  const i = STORE_CATEGORY_ORDER.indexOf(cat);
+  return i === -1 ? STORE_CATEGORY_ORDER.length : i;
 }
 
 export function storeCategory(movie: Movie): string {
@@ -801,8 +822,8 @@ export function collectionCategoryMap(movies: Movie[]): Map<string, string> {
     let best = '';
     let bestScore = -1;
     v.forEach((n, cat) => {
-      const rank = STORE_CATEGORY_ORDER.indexOf(cat);
-      const bestRank = best ? STORE_CATEGORY_ORDER.indexOf(best) : Infinity;
+      const rank = categoryRank(cat);
+      const bestRank = best ? categoryRank(best) : Infinity;
       if (n > bestScore || (n === bestScore && rank < bestRank)) {
         best = cat;
         bestScore = n;
@@ -835,7 +856,7 @@ export function collectionCategoryCandidates(movies: Movie[]): Map<string, strin
     const best = majority.get(coll);
     const rest = [...set]
       .filter((c) => c !== best)
-      .sort((a, b) => STORE_CATEGORY_ORDER.indexOf(a) - STORE_CATEGORY_ORDER.indexOf(b));
+      .sort((a, b) => categoryRank(a) - categoryRank(b) || a.localeCompare(b));
     result.set(coll, best ? [best, ...rest] : rest);
   });
   return result;
