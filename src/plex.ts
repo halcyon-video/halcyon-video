@@ -62,6 +62,20 @@ export function plexClientIdentifier(): string {
   }
 }
 
+/**
+ * Forget this install's plex.tv device identity — part of a full "forget this
+ * server and start over" reset (#124), never an ordinary log-out/reconnect:
+ * plex.tv keys a device's authorization to this id, so minting a fresh one on
+ * every disconnect would make plex.tv see a brand-new device every session.
+ */
+export function forgetPlexClientIdentity(): void {
+  try {
+    localStorage.removeItem(CLIENT_ID_KEY);
+  } catch {
+    /* nothing persisted to forget */
+  }
+}
+
 /** The X-Plex-* identity every request carries, token folded in when present. */
 export function plexHeaders(token?: string): Record<string, string> {
   const h: Record<string, string> = {

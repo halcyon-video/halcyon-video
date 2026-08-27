@@ -82,6 +82,7 @@ import {
   setupLoginHandlers,
   maybeOpenSetupTerminal,
   logOutToOpeningDay,
+  FORGET_SERVER_KEY, activateForgetServer,
 } from './boot-flow';
 import { setupTerminalInput } from './store-setup-flow';
 import { registerLibraryToggles } from './library-settings';
@@ -1266,16 +1267,15 @@ function generateSettingsDrawer() {
     // in isn't a persisted "value," it tears down the session and re-shows the
     // membership card picker. Only worth showing once we actually have a
     // server URL to fetch cards from.
-    if (localStorage.getItem('jellyfin_url')) {
+    if (localStorage.getItem('jellyfin_url') || localStorage.getItem('plex_account_token')) {
       const accountGroupEl = document.createElement('div');
       accountGroupEl.className = 'settings-group';
       const accountTitleEl = document.createElement('div');
       accountTitleEl.className = 'settings-group-title';
       accountTitleEl.textContent = 'Account';
       accountGroupEl.appendChild(accountTitleEl);
-      accountGroupEl.appendChild(
-        makeRow(SWITCH_MEMBER_KEY, 'Switch Member', 'Return to the membership card picker.', '')
-      );
+      accountGroupEl.appendChild(makeRow(SWITCH_MEMBER_KEY, 'Switch Member', 'Return to the membership card picker.', ''));
+      accountGroupEl.appendChild(makeRow(FORGET_SERVER_KEY, 'Forget This Server & Start Over', 'Wipe every saved credential. Press again to confirm.', ''));
       groupsEl.appendChild(accountGroupEl);
     }
 
@@ -1622,6 +1622,7 @@ function activateSetting(key: string, dir: number) {
     switchMember();
     return;
   }
+  if (key === FORGET_SERVER_KEY) { if (activateForgetServer()) closeSettingsDrawer(); return; }
   if (key.startsWith(BRAND_ROW_PREFIX)) {
     // Store Brand rows carry their own controls; settings.ts routes dir.
     activateBrandRow(key, dir);

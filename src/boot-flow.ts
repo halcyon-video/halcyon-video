@@ -28,6 +28,7 @@ import {
   selectedPlexServerUrls,
   setupPlexSignInHandlers,
 } from './plex-signin';
+import { forgetPlexClientIdentity } from './plex';
 import { blurFocusWithin } from './text-entry-focus';
 import {
   openMembershipCardPicker,
@@ -181,6 +182,88 @@ export function logOutToOpeningDay(): void {
   forgetPlexAccount();
   localStorage.removeItem('jellyfin_username');
   localStorage.removeItem('jellyfin_password');
+  deps.teardownScene();
+  if (getSetting<string>('bb_render_mode') === 'flat') {
+    showLoginOverlay();
+    return;
+  }
+  enterOpeningDay();
+}
+
+/** Settings-drawer key for FORGET THIS SERVER & START OVER (main.ts's Account
+ *  group, #124) — exported so main.ts's row and this module's arm/confirm
+ *  logic agree on the same DOM id. */
+export const FORGET_SERVER_KEY = '__forget_server__';
+
+let forgetArmed = false;
+let forgetDisarmTimer: ReturnType<typeof setTimeout> | null = null;
+
+function forgetServerValueEl(): Element | null | undefined {
+  return document.getElementById(`setting-row-${FORGET_SERVER_KEY}`)?.querySelector('.settings-row-value');
+}
+
+function disarmForgetServer(): void {
+  forgetArmed = false;
+  if (forgetDisarmTimer) {
+    clearTimeout(forgetDisarmTimer);
+    forgetDisarmTimer = null;
+  }
+  const value = forgetServerValueEl();
+  if (value) value.textContent = '';
+}
+
+/**
+ * FORGET THIS SERVER & START OVER (#124): a two-tap confirm on its own
+ * settings row rather than a modal overlay — every row already has working
+ * Up/Down/Enter navigation, remote and mouse alike, and a destructive wipe
+ * still wants a genuine second step. Re-reads the row's own rendered text
+ * (not just the module-level flag) before treating a press as the confirm:
+ * the settings drawer regenerates its DOM on every page change, so a stale
+ * flag surviving a navigate-away-and-back must not fire on what reads to the
+ * player as a first press.
+ *
+ * Returns whether this press actually fired the wipe (the second, confirming
+ * one) — main.ts's dispatch uses that to decide whether to close the settings
+ * drawer: closing it on the arming press would hide the "press again" label
+ * the player is meant to read.
+ */
+export function activateForgetServer(): boolean {
+  const value = forgetServerValueEl();
+  if (!forgetArmed || value?.textContent !== 'PRESS AGAIN TO CONFIRM') {
+    forgetArmed = true;
+    if (value) value.textContent = 'PRESS AGAIN TO CONFIRM';
+    if (forgetDisarmTimer) clearTimeout(forgetDisarmTimer);
+    forgetDisarmTimer = setTimeout(disarmForgetServer, 5000);
+    return false;
+  }
+  disarmForgetServer();
+  forgetEverythingAndStartOver();
+  return true;
+}
+
+/**
+ * The actual wipe. CHANGE SERVER / LOG OUT (logOutToOpeningDay, above)
+ * deliberately keeps provider_kind (so a reconnect doesn't silently revert
+ * Plex back to Jellyfin) and the Plex client id (plex.tv keys a device's
+ * authorization to it — a fresh one on every ordinary log-out would look
+ * like a new device every session). This is "start completely fresh": those
+ * two, plus every Jellyseerr/Romm credential, cleared as well (#124).
+ */
+function forgetEverythingAndStartOver(): void {
+  if (!deps) return;
+  deps.log('[System] Forgetting this server — wiping every saved credential...', 'system');
+  clearMediaSources();
+  forgetPlexAccount();
+  forgetPlexClientIdentity();
+  resetStoreConfigSync();
+  resetActiveProvider();
+  for (const key of [
+    'jellyfin_username', 'jellyfin_password', 'jellyfin_last_userid',
+    'jellyseerr_url', 'jellyseerr_apikey', 'romm_url', 'romm_apikey',
+    PROVIDER_KIND_KEY,
+  ]) {
+    localStorage.removeItem(key);
+  }
   deps.teardownScene();
   if (getSetting<string>('bb_render_mode') === 'flat') {
     showLoginOverlay();
