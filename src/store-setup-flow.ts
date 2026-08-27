@@ -70,6 +70,7 @@ import {
   setupScreenChar,
   setupScreenBackspace,
   setupScreenLines,
+  wrapSetupError,
   SETUP_PROVIDER_KINDS,
 } from './store-setup-screens';
 
@@ -276,7 +277,10 @@ async function dial(address: string): Promise<void> {
  */
 async function dialPlex(address: string): Promise<void> {
   if (!deps) return;
-  const typed = normalizeUrl(address.trim());
+  // The PROVIDER's rule, not Jellyfin's: normalizeUrl forces http:// on a bare
+  // address, which on a hosted HTTPS build is an address the browser refuses to
+  // send and the person only ever sees as a timeout (#125).
+  const typed = activeProvider().normalizeServerAddress(address.trim());
   try {
     const pin = await createPlexPin();
     screen = { kind: 'plex-link', code: pin.code, step: 'WAITING FOR AUTHORIZATION...' };
@@ -321,7 +325,7 @@ async function dialPlex(address: string): Promise<void> {
         screen = {
           kind: 'plex-servers',
           rows: offerable.map((srv, i): SetupServerRow => ({
-            url: normalizeUrl(srv.connections[0]),
+            url: activeProvider().normalizeServerAddress(srv.connections[0]),
             name: srv.name,
             owned: srv.owned,
             // Your own servers start ticked; a shared one is a deliberate
@@ -333,7 +337,7 @@ async function dialPlex(address: string): Promise<void> {
         render();
         return;
       }
-      url = normalizeUrl(offerable[0].connections[0]);
+      url = activeProvider().normalizeServerAddress(offerable[0].connections[0]);
       deps.log(`[Setup] Plex account supplied 1 server; using ${url}.`);
     }
 
@@ -342,8 +346,11 @@ async function dialPlex(address: string): Promise<void> {
     await afterAuth(url, session as MembershipLoginSession);
   } catch (e: any) {
     deps.log(`[Setup] Plex sign-in failed: ${e?.message ?? e}`);
+    // The whole reason, wrapped — a connect that failed because the browser
+    // refuses plain HTTP from an HTTPS page has to be able to SAY that (#125),
+    // and 40 clipped characters of it said nothing.
     screen = { ...initialHomeScreen(address), row: 1,
-      error: String(e?.message ?? e).toUpperCase().slice(0, 40) };
+      error: wrapSetupError(String(e?.message ?? e)) };
     render();
   }
 }
@@ -385,6 +392,13 @@ async function afterAuth(
   opts?: { displayName?: string }
 ): Promise<void> {
   if (!deps) return;
+  // A provider may have connected on a DIFFERENT address than the one asked
+  // for — same server, a connection this page can actually use (#125). Every
+  // line below persists or calls against an address, so take that one.
+  if (session.serverAddress && session.serverAddress !== url) {
+    deps.log(`[Setup] Connected on ${session.serverAddress} (${url} was not reachable from here).`);
+    url = session.serverAddress;
+  }
   pendingUrl = url;
   pendingSession = session;
   // CONNECT, don't overwrite (GH #84): addMediaSource appends a new server or
@@ -510,7 +524,7 @@ async function connectChosenPlexServers(rows: SetupServerRow[]): Promise<void> {
   }
   if (!connected) {
     screen = { ...initialHomeScreen(), row: 1,
-      error: lastError ? lastError.toUpperCase().slice(0, 40) : 'NO SERVER WOULD CONNECT.' };
+      error: wrapSetupError(lastError || 'No server would connect.') };
     render();
   }
 }

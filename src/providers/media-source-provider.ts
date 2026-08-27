@@ -351,6 +351,19 @@ export interface ProviderSession {
   accessToken: string;
   userId: string;
   userName: string;
+  /**
+   * The address that actually answered, when it is not the one authenticate()
+   * was asked for (GH #125). A backend may reach one server at several
+   * addresses and only some of them work from where the page is running — a
+   * plain-HTTP LAN address is refused outright by an HTTPS page, while the
+   * same server's plex.direct connection is fine — so the provider is allowed
+   * to fall through to a sibling address and report which one it used.
+   *
+   * A caller that persists a server address MUST prefer this over the address
+   * it passed in, or it saves one it has just been told does not work. Absent
+   * means "the address you gave me is the one I used".
+   */
+  serverAddress?: string;
   /** Provider-specific extras neither renamed nor interpreted by core code
    *  (e.g. Plex's machineIdentifier) — an escape hatch, not a dumping ground. */
   raw?: Record<string, unknown>;

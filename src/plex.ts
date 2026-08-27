@@ -91,13 +91,309 @@ export function plexHeaders(token?: string): Record<string, string> {
   return h;
 }
 
-export function normalizePlexUrl(url: string): string {
-  let cleaned = (url || '').trim().replace(/\/$/, '');
+// ─── Addresses, and whether THIS page can reach them (GH #125) ───────────────
+//
+// An address that a browser will never fetch is the failure this section
+// exists for. On the hosted build the page is HTTPS, so every plain-HTTP
+// request is refused as mixed content BEFORE it leaves the tab: no status
+// code, no network error the app can read as one, just a promise that settles
+// into a generic failure — or, on the boot path, nothing at all until the 45s
+// stall watchdog calls it a timeout. That is the reported symptom ("times out
+// whatever I set it to", including localhost), and none of it is Plex's fault
+// or the address's. The rule is cheap to apply up front, so apply it up front
+// and say the reason in words.
+
+/** The page's own scheme. A DOM-less caller (unit tests, tooling) is treated
+ *  as insecure — it has no mixed-content rule to break. */
+export function isSecurePage(): boolean {
+  try {
+    return typeof location !== 'undefined' && location.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+/** host + port out of an address that may or may not carry a scheme. */
+function hostPortOf(address: string): { host: string; port: string } {
+  const rest = String(address || '').trim().replace(/^https?:\/\//i, '').split('/')[0];
+  const v6 = /^\[([^\]]+)\](?::(\d+))?$/.exec(rest); // [::1]:32400
+  if (v6) return { host: v6[1].toLowerCase(), port: v6[2] || '' };
+  const [host, port] = rest.split(':');
+  return { host: (host || '').toLowerCase(), port: port || '' };
+}
+
+/** How an address reads on screen: the part the person typed, no scheme. */
+function hostLabel(address: string): string {
+  const { host, port } = hostPortOf(address);
+  if (!host) return address;
+  return port ? `${host}:${port}` : host;
+}
+
+function isIpLiteral(host: string): boolean {
+  return /^(\d{1,3}\.){3}\d{1,3}$/.test(host) || host.includes(':');
+}
+
+/**
+ * Loopback = the browser's OWN machine, and the two things that follow pull in
+ * opposite directions — which is why it needs its own predicate rather than
+ * being folded into the mixed-content test.
+ *
+ * Browsers class a loopback origin as potentially trustworthy, so
+ * `http://localhost:32400` is NOT blocked from an HTTPS page. But it can only
+ * ever reach a Plex running on the very machine the browser is on, which for a
+ * hosted store is the viewer's laptop and almost never where their server is.
+ * So it must not be reported as blocked, and it must not be reported as an
+ * ordinary unreachable address either.
+ */
+export function isLoopbackHost(host: string): boolean {
+  const h = host.replace(/^\[|\]$/g, '').toLowerCase();
+  return h === 'localhost' || h.endsWith('.localhost') || h === '::1' || /^127\./.test(h);
+}
+
+/**
+ * The LAN address a plex.direct hostname stands for.
+ *
+ * Plex issues one wildcard cert per server and encodes the target in the
+ * hostname's first label with dashes for dots, so
+ * `192-168-1-50.<hash>.plex.direct` IS 192.168.1.50 — reached over TLS with a
+ * certificate that validates, which a bare `https://192.168.1.50` never could.
+ * Resolving the alias is what lets a typed LAN IP be recognised as the same
+ * endpoint as the HTTPS connection plex.tv advertises for it, so a hosted page
+ * can fall through to the address that actually works.
+ */
+export function plexDirectTarget(host: string): string | null {
+  if (!/\.plex\.direct$/i.test(host)) return null;
+  const ipv4 = (host.split('.')[0] || '').replace(/-/g, '.');
+  return /^(\d{1,3}\.){3}\d{1,3}$/.test(ipv4) ? ipv4 : null;
+}
+
+/** host:port with the plex.direct alias resolved and Plex's default port
+ *  filled in — the identity two addresses are compared on. */
+function plexEndpointKey(address: string): string {
+  const { host, port } = hostPortOf(address);
+  if (!host) return '';
+  return `${plexDirectTarget(host) || host}:${port || '32400'}`;
+}
+
+/** Do two addresses name the same server? Scheme is ignored on purpose:
+ *  http://192.168.1.50:32400 and https://192-168-1-50.<hash>.plex.direct:32400
+ *  are one box reached two ways, which byte-comparing the strings misses. */
+export function samePlexEndpoint(a: string, b: string): boolean {
+  const ka = plexEndpointKey(a);
+  return !!ka && ka === plexEndpointKey(b);
+}
+
+/** True when the browser will refuse this address outright: the page is HTTPS
+ *  and the address is plain HTTP to somewhere that isn't the local machine.
+ *  Nothing else about the address matters — no request is ever sent. */
+export function isMixedContentBlocked(url: string): boolean {
+  if (!isSecurePage()) return false;
+  if (!/^http:\/\//i.test(url)) return false;
+  return !isLoopbackHost(hostPortOf(url).host);
+}
+
+/**
+ * `opts.secureDefault` forces the scheme a BARE address gets; left off, it
+ * follows the page (see the section note above). Everything else is the old
+ * behaviour: trim, drop a trailing slash, leave an explicit scheme alone.
+ */
+export function normalizePlexUrl(url: string, opts?: { secureDefault?: boolean }): string {
+  let cleaned = (url || '').trim().replace(/\/+$/, '');
   if (!cleaned) return '';
+  // A SCHEME WITH NOTHING AFTER IT IS NOT AN ADDRESS — it is a blank field.
+  // The setup terminal seeds its address row with the literal 'http://', and
+  // that used to survive normalising as `http://http:/`: non-empty, so the
+  // Plex path's "no address given, ask the account for its servers" branch
+  // never fired, and the connect went out against nonsense. Blank in, blank
+  // out, and the caller's own emptiness check then does the right thing.
+  if (/^https?:$/i.test(cleaned)) return '';
   if (!/^https?:\/\//i.test(cleaned)) {
-    cleaned = `http://${cleaned}`;
+    // This used to be an unconditional `http://`, which on the hosted build
+    // manufactured an address the browser refuses to send (#125). Take the
+    // page's own scheme instead — except for loopback, which is exempt from
+    // the mixed-content rule and which Plex answers over plain HTTP.
+    const { host } = hostPortOf(cleaned);
+    const secure = opts?.secureDefault ?? (isSecurePage() && !isLoopbackHost(host));
+    cleaned = `${secure ? 'https' : 'http'}://${cleaned}`;
   }
   return cleaned;
+}
+
+// ─── Connect-time reachability probe (GH #125) ───────────────────────────────
+
+/** How long one probe waits. Short on purpose: the point of #125 is that a
+ *  wrong address says so at once rather than dying in the boot watchdog three
+ *  quarters of a minute later, and a server on the LAN answers /identity in
+ *  milliseconds or not at all. */
+export const PLEX_PROBE_TIMEOUT_MS = 8000;
+
+/** Ceiling on a whole connect sweep. A server can advertise half a dozen
+ *  connections, and probing each for the full timeout would rebuild the 45s
+ *  stall this issue is about out of parts that individually behave. Blocked
+ *  candidates cost nothing, so this only ever bounds real network waits. */
+export const PLEX_CONNECT_BUDGET_MS = 20_000;
+
+export type PlexProbeCode =
+  | 'blank'
+  | 'mixed-content'
+  | 'timeout'
+  | 'unreachable'
+  | 'refused'
+  | 'http-error'
+  | 'not-plex';
+
+export interface PlexProbe {
+  ok: boolean;
+  /** The normalized address that was tried. */
+  url: string;
+  code?: PlexProbeCode;
+  /** Plain words, written to be shown to the person unedited. */
+  message?: string;
+  machineIdentifier?: string;
+}
+
+// Ordered cause, then action, then why — because the 40-column CRT can only
+// seat about five rows of it and clips the tail, so whatever a person most
+// needs has to come first. The DOM login form shows the whole thing.
+function mixedContentMessage(url: string): string {
+  return (
+    `This page is served over HTTPS, so your browser blocks plain http:// ` +
+    `requests to ${hostLabel(url)}. ` +
+    `Sign in with your Plex account and pick the server from the list. ` +
+    `Plex's own secure plex.direct address for that server works from a hosted ` +
+    `page; a plain LAN address cannot.`
+  );
+}
+
+function unreachableMessage(url: string, timedOut: boolean, timeoutMs: number): string {
+  const head = timedOut
+    ? `${hostLabel(url)} did not answer within ${Math.round(timeoutMs / 1000)} seconds.`
+    : `Could not reach ${hostLabel(url)}.`;
+  const { host } = hostPortOf(url);
+  if (isLoopbackHost(host)) {
+    return `${head} A loopback address only reaches Plex running on this same ` +
+      `computer, not one on another machine. Type the server's own address, or ` +
+      `sign in with your Plex account and pick it from the list.`;
+  }
+  if (/^https:\/\//i.test(url) && isIpLiteral(host)) {
+    return `${head} An https:// address written as a bare IP fails Plex's ` +
+      `certificate check — use the plex.direct address from your account instead.`;
+  }
+  return `${head} Check the address, that Plex is running, and that this device can ` +
+    `see it on the network.`;
+}
+
+/**
+ * Ask an address whether it is a reachable Plex server, and say why not.
+ *
+ * `/identity` is the right question: every PMS serves it, it is the same call
+ * validatePlexToken already makes (so its CORS behaviour is proven on the
+ * wire), and its machineIdentifier is what distinguishes a real server from a
+ * captive portal or a reverse proxy answering 200 with HTML.
+ *
+ * Never throws — a probe is a measurement, and the caller wants every result
+ * so it can compare candidates and report the best explanation.
+ */
+export async function probePlexServer(
+  server: string,
+  token?: string,
+  opts?: { timeoutMs?: number }
+): Promise<PlexProbe> {
+  const url = normalizePlexUrl(server);
+  if (!url) {
+    return { ok: false, url: '', code: 'blank', message: 'No Plex server address to try.' };
+  }
+  if (isMixedContentBlocked(url)) {
+    return { ok: false, url, code: 'mixed-content', message: mixedContentMessage(url) };
+  }
+  const timeoutMs = opts?.timeoutMs ?? PLEX_PROBE_TIMEOUT_MS;
+  const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const timer = setTimeout(() => controller?.abort(), timeoutMs);
+  try {
+    const res = await fetch(`${url}/identity`, {
+      headers: plexHeaders(token),
+      signal: controller?.signal,
+    });
+    if (res.status === 401 || res.status === 403) {
+      return {
+        ok: false, url, code: 'refused',
+        message: `${hostLabel(url)} answered but refused this sign-in. Link your Plex account again.`,
+      };
+    }
+    if (!res.ok) {
+      return {
+        ok: false, url, code: 'http-error',
+        message: `${hostLabel(url)} answered HTTP ${res.status}. That address is reachable but it is not serving Plex.`,
+      };
+    }
+    let machineIdentifier: string | undefined;
+    try {
+      machineIdentifier = JSON.parse(await res.text())?.MediaContainer?.machineIdentifier;
+    } catch {
+      /* not JSON — handled as not-Plex below */
+    }
+    if (!machineIdentifier) {
+      return {
+        ok: false, url, code: 'not-plex',
+        message: `Something answered at ${hostLabel(url)}, but it is not a Plex server.`,
+      };
+    }
+    return { ok: true, url, machineIdentifier };
+  } catch (e: any) {
+    const timedOut = e?.name === 'AbortError';
+    return {
+      ok: false, url,
+      code: timedOut ? 'timeout' : 'unreachable',
+      message: unreachableMessage(url, timedOut, timeoutMs),
+    };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Every address worth trying for a connect, best first.
+ *
+ * The typed one leads — it is the only one the person can act on, so it must
+ * be the one the failure message talks about — then the account's advertised
+ * connections for the same server (already ranked, blocked ones last), then
+ * the https:// twin of a typed plain-HTTP address. That last one is a long
+ * shot on a bare LAN IP (Plex's cert won't validate for it) and exactly right
+ * for a server behind a reverse proxy with a real certificate, and it costs
+ * one fast failure to find out.
+ */
+export function plexConnectCandidates(typed: string, connections: readonly string[] = []): string[] {
+  const out: string[] = [];
+  const add = (raw: string) => {
+    const url = normalizePlexUrl(raw);
+    if (url && !out.includes(url)) out.push(url);
+  };
+  const target = normalizePlexUrl(typed);
+  add(target);
+  for (const c of connections) add(c);
+  if (/^http:\/\//i.test(target) && !isLoopbackHost(hostPortOf(target).host)) {
+    add(target.replace(/^http:/i, 'https:'));
+  }
+  return out;
+}
+
+/**
+ * One plain-words explanation for a connect that reached nothing, built from
+ * every address tried. The FIRST attempt leads — it is the one the person
+ * typed or picked, and so the only one they can act on — and the rest is a
+ * count, because listing four plex.direct hostnames on a 40-column CRT helps
+ * nobody.
+ */
+export function describePlexConnectFailure(attempts: PlexProbe[]): string {
+  if (!attempts.length) {
+    return 'No Plex server address to connect to. Type one, or sign in and pick a server.';
+  }
+  const first = attempts[0];
+  const others = attempts.length - 1;
+  const tail = others > 0
+    ? ` Also tried ${others} other address${others === 1 ? '' : 'es'} for that server, with no answer.`
+    : '';
+  return `${first.message || `Could not reach ${hostLabel(first.url)}.`}${tail}`;
 }
 
 async function plexJson<T = any>(
@@ -214,11 +510,19 @@ function isPlexDirectUri(uri: string): boolean {
 }
 
 /** plain-IP local, then plex.direct local, then remote non-relay, then relay —
- *  making the doc comment on PlexServer.connections (below) true. */
+ *  making the doc comment on PlexServer.connections (below) true.
+ *
+ *  ...UNLESS the page cannot use the connection at all. #120 put a plain LAN
+ *  IP ahead of plex.direct because a DNS-rebind-protecting resolver breaks the
+ *  latter, which is right in the desktop shell and on a LAN-hosted install —
+ *  and exactly backwards on the hosted HTTPS build, where the plain-HTTP LAN
+ *  address is refused by the browser before it is sent (#125). So blocked
+ *  connections keep their relative order and sink below every usable one,
+ *  rather than the preference being flipped for everybody. */
 function connectionRank(c: any): number {
-  if (c.relay) return 3;
-  if (!c.local) return 2;
-  return isPlexDirectUri(String(c.uri || '')) ? 1 : 0;
+  const uri = String(c.uri || '');
+  const base = c.relay ? 3 : !c.local ? 2 : isPlexDirectUri(uri) ? 1 : 0;
+  return isMixedContentBlocked(uri) ? base + 10 : base;
 }
 
 /**

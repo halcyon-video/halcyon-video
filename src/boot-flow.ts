@@ -11,7 +11,6 @@
 // main.ts directly, so the two can't tangle.
 import {
   fetchPublicUsers,
-  normalizeUrl,
   JellyfinLibrary,
 } from './jellyfin';
 import {
@@ -948,7 +947,6 @@ export function setupLoginHandlers() {
       }
 
       const rawUrl = (document.getElementById('login-url') as HTMLInputElement).value.trim();
-      const urlInput = normalizeUrl(rawUrl);
       const userInput = (document.getElementById('login-user') as HTMLInputElement).value.trim();
       const passInput = (document.getElementById('login-pass') as HTMLInputElement).value;
       // Jellyseerr is entirely optional -- both fields are blank by default and
@@ -983,9 +981,22 @@ export function setupLoginHandlers() {
       }
       resetActiveProvider();
 
+      // Normalised by the PROVIDER, not by Jellyfin's helper: a bare address
+      // becomes http:// on Jellyfin and follows the page's own scheme on Plex,
+      // where an unconditional http:// is an address a hosted HTTPS build can
+      // never send (#125).
+      const urlInput = provider().normalizeServerAddress(rawUrl);
+
       try {
         deps?.log(`[System] Contacting ${backendKind} server: ${urlInput}`, 'system');
         const session = await provider().authenticate(urlInput, creds);
+        // The address that ANSWERED. A provider may fall through to a sibling
+        // connection for the same server (see ProviderSession.serverAddress),
+        // and everything below persists an address — so persist that one.
+        const connectedUrl = session.serverAddress || urlInput;
+        if (connectedUrl !== urlInput) {
+          deps?.log(`[System] Connected on ${connectedUrl} instead — ${urlInput} was not reachable from this page.`, 'system');
+        }
 
         // Only the manual single-login form remembers username (to prefill);
         // the password is never persisted in plaintext localStorage. Plex has
@@ -1020,26 +1031,28 @@ export function setupLoginHandlers() {
         // resolve to it.
         addMediaSource({
           kind: backendKind,
-          url: urlInput,
+          url: connectedUrl,
           token: session.accessToken,
           userId: session.userId,
           userName: session.userName,
-          name: (backendKind === 'plex' ? plexServerNameFor(urlInput) : '') || labelForUrl(urlInput),
+          name: (backendKind === 'plex' ? (plexServerNameFor(urlInput) || plexServerNameFor(connectedUrl)) : '')
+            || labelForUrl(connectedUrl),
         });
         if (backendKind === 'plex') {
           const extras = selectedPlexServerUrls()
-            .map((u) => normalizeUrl(u))
-            .filter((u) => u && u !== urlInput);
+            .map((u) => provider().normalizeServerAddress(u))
+            .filter((u) => u && u !== urlInput && u !== connectedUrl);
           for (const extra of extras) {
             try {
               const extraSession = await provider().authenticate(extra, creds);
+              const extraUrl = extraSession.serverAddress || extra;
               addMediaSource({
                 kind: backendKind,
-                url: extra,
+                url: extraUrl,
                 token: extraSession.accessToken,
                 userId: extraSession.userId,
                 userName: extraSession.userName,
-                name: plexServerNameFor(extra) || labelForUrl(extra),
+                name: plexServerNameFor(extra) || labelForUrl(extraUrl),
               });
               deps?.log(`[System] Also connected ${plexServerNameFor(extra) || extra}.`, 'system');
             } catch (e: any) {
@@ -1050,7 +1063,7 @@ export function setupLoginHandlers() {
           }
         }
 
-        await finishLoginAndLaunch(urlInput, session);
+        await finishLoginAndLaunch(connectedUrl, session);
       } catch (err: any) {
         deps?.log(`[System] Connection error: ${err.message}`, 'system');
         if (errorMsg) {

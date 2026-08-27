@@ -11,6 +11,7 @@ import {
   createPlexPin,
   fetchPlexServers,
   pollPlexPin,
+  samePlexEndpoint,
   type PlexServer,
 } from './plex';
 import { PROVIDER_KIND_KEY } from './providers/active-provider';
@@ -155,9 +156,12 @@ export function selectedPlexServerUrls(): string[] {
 }
 
 /** The account's server list as last discovered, keyed by connection URL —
- *  lets a caller recover a server's display name after the fact. */
+ *  lets a caller recover a server's display name after the fact. Matched on the
+ *  ENDPOINT rather than the string (#125): a connect may land on a different
+ *  one of the server's addresses than the caller asked for, and the box is
+ *  still called the same thing. */
 export function plexServerNameFor(connectionUrl: string): string | undefined {
-  return discovered.find((s) => s.connections.includes(connectionUrl))?.name;
+  return discovered.find((s) => s.connections.some((c) => samePlexEndpoint(c, connectionUrl)))?.name;
 }
 
 async function loadServers(token: string, log?: (m: string) => void): Promise<void> {

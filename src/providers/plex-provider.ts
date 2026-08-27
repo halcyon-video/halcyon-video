@@ -24,13 +24,21 @@ import {
   fetchPlexSeriesEpisodes,
   fetchPlexServers,
   normalizePlexUrl,
+  isMixedContentBlocked,
+  plexConnectCandidates,
+  probePlexServer,
+  describePlexConnectFailure,
+  samePlexEndpoint,
+  PLEX_CONNECT_BUDGET_MS,
+  PLEX_PROBE_TIMEOUT_MS,
   reportPlexPlaybackProgress,
   reportPlexPlaybackStart,
   reportPlexPlaybackStopped,
   stopPlexTranscode,
   validatePlexToken,
-} from '../plex';
-import { isDirectPlaySafe } from '../playback-capability';
+  type PlexProbe,
+} from '../plex.ts';
+import { isDirectPlaySafe } from '../playback-capability.ts';
 import type {
   ArtworkRef,
   Episode,
@@ -97,10 +105,12 @@ export class PlexProvider implements MediaSourceProvider {
    * resource list is what supplies the per-server token, because an account
    * token is NOT accepted by a server for library reads.
    *
-   * When the address matches none of the account's servers we still return a
-   * session carrying the account token — an unclaimed server on the LAN answers
-   * to it, and refusing outright would lock out exactly the person testing a
-   * fresh install.
+   * When the address matches none of the account's servers we still TRY it with
+   * the account token — an unclaimed server on the LAN answers to it, and
+   * refusing outright would lock out exactly the person testing a fresh
+   * install. What no longer happens is returning a session for an address
+   * nothing answered at (#125): every candidate is probed, and a connect that
+   * reached nothing throws with the reason rather than succeeding quietly.
    *
    * READ THIS BEFORE TREATING `session.userId` AS A CREDENTIAL. Plex has no
    * user id in Jellyfin's sense, and the field below is a SERVER
@@ -127,16 +137,55 @@ export class PlexProvider implements MediaSourceProvider {
     } catch {
       // Offline plex.tv shouldn't block a LAN server that already works.
     }
-    const match = servers.find((s) =>
-      s.connections.some((c) => normalizePlexUrl(c) === target)
-    );
+    // Match on the ENDPOINT, not the string. plex.tv advertises one server at
+    // several URLs and the person types whichever one they know; byte-equality
+    // therefore missed the common case — a typed LAN IP against the account's
+    // https://192-168-1-50.<hash>.plex.direct twin — and fell through to the
+    // "unclaimed server" branch, discarding the per-server token for no reason.
+    const match = servers.find((s) => s.connections.some((c) => samePlexEndpoint(c, target)));
+    const token = match?.accessToken || accountToken;
+
+    // The fallbacks are what let a hosted HTTPS page connect a LAN server at
+    // all: the typed http:// address can never be sent from there, but the
+    // plex.direct connection plex.tv advertises for the same box can.
+    const candidates = plexConnectCandidates(target, match?.connections);
+
+    // PROBE BEFORE DECLARING SUCCESS (#125). This used to return a session
+    // without ever contacting the address, so "Connect & Sync" reported a
+    // connection to a server that was never reached and the real failure
+    // surfaced minutes later as a library-sync stall with nothing useful in it.
+    //
+    // The sweep is budgeted as a whole, not just per probe: a server with six
+    // advertised connections that all hang would otherwise add up to a longer
+    // wait than the boot watchdog this issue is about.
+    const deadline = Date.now() + PLEX_CONNECT_BUDGET_MS;
+    const attempts: PlexProbe[] = [];
+    let reached: PlexProbe | undefined;
+    for (const url of candidates) {
+      const left = deadline - Date.now();
+      // A blocked address is decided without a request, so it is always worth
+      // asking about even with the budget spent — its message is the useful one.
+      if (left <= 0 && !isMixedContentBlocked(url)) break;
+      // Per-probe cap AND what's left of the sweep, whichever is shorter.
+      const probe = await probePlexServer(url, token, {
+        timeoutMs: Math.max(1, Math.min(PLEX_PROBE_TIMEOUT_MS, left)),
+      });
+      attempts.push(probe);
+      if (probe.ok) { reached = probe; break; }
+    }
+    if (!reached) throw new Error(describePlexConnectFailure(attempts));
+
     const session: ProviderSession = {
-      accessToken: match?.accessToken || accountToken,
-      userId: match?.machineIdentifier || '',
+      accessToken: token,
+      userId: match?.machineIdentifier || reached.machineIdentifier || '',
       userName: match?.name || 'Plex',
+      // The address that ANSWERED, which is not always the one asked for — see
+      // ProviderSession.serverAddress. A caller that persists `server` instead
+      // saves an address it has just been told does not work.
+      serverAddress: reached.url,
       raw: { accountToken, machineIdentifier: match?.machineIdentifier },
     };
-    this.rememberConnection(target, session);
+    this.rememberConnection(reached.url, session);
     return session;
   }
 

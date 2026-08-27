@@ -207,6 +207,52 @@ function sel(active: boolean, label: string): string {
   return `${active ? '>' : ' '} ${label}`;
 }
 
+/** The widest line drawTerminal will show whole. */
+const TERMINAL_COLS = 40;
+/** Rows the home screen can give a failure once its intro copy steps aside:
+ *  drawTerminal seats 12, the menu keeps 6 plus a spacer. */
+const HOME_ERROR_LINES = 5;
+
+/**
+ * A failure worth reading, folded into terminal rows (GH #125).
+ *
+ * Screen errors used to be `msg.toUpperCase().slice(0, 40)`, which is fine for
+ * the fixed slogans this module raises itself ("TYPE THE SERVER ADDRESS
+ * FIRST.") and useless for one that has to EXPLAIN something — a browser
+ * blocking plain HTTP from an HTTPS page cannot be said in 40 characters, and
+ * clipping it produced a truncated fragment that read as a glitch. So wrap
+ * instead, on word boundaries, and cap the row count so the screen still fits
+ * (the home screen budgets 9 rows, and drawTerminal seats 12 by tightening its
+ * leading). The last kept row gets an ellipsis when there was more to say —
+ * a visible clip, never a silent one.
+ */
+export function wrapSetupError(message: string, maxLines = HOME_ERROR_LINES): string {
+  const words = String(message || '').toUpperCase().split(/\s+/).filter(Boolean);
+  const lines: string[] = [];
+  let line = '';
+  for (const word of words) {
+    const next = line ? `${line} ${word}` : word;
+    if (next.length <= TERMINAL_COLS) { line = next; continue; }
+    if (line) lines.push(line);
+    line = word.length > TERMINAL_COLS ? word.slice(0, TERMINAL_COLS) : word;
+    if (lines.length === maxLines) break;
+  }
+  if (line && lines.length < maxLines) lines.push(line);
+  const clipped = lines.length < maxLines
+    ? false
+    : words.join(' ').length > lines.join(' ').length;
+  if (clipped && lines.length) {
+    lines[lines.length - 1] = `${lines[lines.length - 1].slice(0, TERMINAL_COLS - 1)}…`;
+  }
+  return lines.join('\n');
+}
+
+/** Push a (possibly wrapped) error onto a screen's rows. */
+function pushError(lines: string[], error: string | undefined): void {
+  if (!error) return;
+  for (const line of error.split('\n')) lines.push(line.slice(0, TERMINAL_COLS));
+}
+
 export function setupScreenLines(s: SetupScreen): { lines: string[]; cursorLine: number } {
   switch (s.kind) {
     case 'home': {
@@ -214,19 +260,25 @@ export function setupScreenLines(s: SetupScreen): { lines: string[]; cursorLine:
       // Short labels on purpose: the value column gets 25 of the 40 chars, so
       // a typical http://<lan-ip>:8096 shows whole instead of clipped.
       const addr = clipTail(s.address, s.row === 1 ? 24 : 25) + (s.row === 1 ? '_' : '');
+      // The onboarding couplet steps aside for a real failure (#125). It is
+      // there to explain an EMPTY store to someone who has not tried anything
+      // yet; once a connect has come back with a reason, the reason is what
+      // the screen is for, and the three rows it frees are what let the reason
+      // reach its second sentence — the one saying what to do about it.
+      const intro = s.error ? [] : ['BARE SHELVES, NO STOCK. PICK A', 'DISTRIBUTOR TO SUPPLY THIS STORE.', ''];
       const lines = [
         'NEW STORE SETUP — OPENING DAY',
         '',
-        'BARE SHELVES, NO STOCK. PICK A',
-        'DISTRIBUTOR TO SUPPLY THIS STORE.',
-        '',
+        ...intro,
         sel(s.row === 0, `DISTRIBUTOR  ${provider}`),
         sel(s.row === 1, `ADDRESS      ${addr}`),
         sel(s.row === 2, 'CONNECT'),
         sel(s.row === 3, 'TRY A DEMO STORE'),
       ];
-      if (s.error) lines.push(s.error.slice(0, 40));
-      return { lines, cursorLine: 5 + s.row };
+      const menuTop = lines.length - HOME_ROWS;
+      if (s.error) lines.push('');
+      pushError(lines, s.error);
+      return { lines, cursorLine: menuTop + s.row };
     }
     case 'plex-link': {
       const lines = [
@@ -240,7 +292,7 @@ export function setupScreenLines(s: SetupScreen): { lines: string[]; cursorLine:
         '',
         s.step.slice(0, 40),
       ];
-      if (s.error) lines.push(s.error.slice(0, 40));
+      pushError(lines, s.error);
       return { lines, cursorLine: 6 };
     }
     case 'dialing':
@@ -279,7 +331,7 @@ export function setupScreenLines(s: SetupScreen): { lines: string[]; cursorLine:
         sel(s.row === 2, 'SIGN IN'),
         sel(s.row === 3, 'BACK'),
       ];
-      if (s.error) lines.push(s.error.slice(0, 40));
+      pushError(lines, s.error);
       return { lines, cursorLine: 5 + s.row };
     }
     case 'libraries': {
