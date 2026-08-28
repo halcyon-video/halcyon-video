@@ -33,6 +33,7 @@
 // what keeps an existing store's choices: a bare key belongs to the primary
 // source, and a namespaced key for the same library always wins over it.
 import { registerSetting } from './settings';
+import { scheduleConfigPush } from './store-config-sync';
 import { knownServerLibraries } from './jellyfin';
 import type { LibrarySummary } from './jellyfin';
 import {
@@ -207,7 +208,16 @@ export function tvPoolLibraryIds(): Set<string> {
   return out;
 }
 
-/** Persist one carried-library choice (the setup terminal's checkbox rows). */
+/**
+ * Persist one carried-library choice (the setup terminal's checkbox rows).
+ *
+ * Writes localStorage directly rather than through setSetting because these
+ * rows exist before any registration has run (see the header), so the push
+ * that setSetting would have scheduled is scheduled here instead — which
+ * libraries a store carries is exactly the kind of choice GH #123 exists to
+ * stop people from making twice.
+ */
 export function setLibraryCarried(id: string, carried: boolean): void {
   localStorage.setItem(`${CARRY_LIB_PREFIX}${id}`, carried ? '1' : '0');
+  scheduleConfigPush();
 }

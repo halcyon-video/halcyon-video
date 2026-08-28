@@ -11,7 +11,6 @@
 // main.ts directly, so the two can't tangle.
 import {
   fetchPublicUsers,
-  normalizeUrl,
   JellyfinLibrary,
 } from './jellyfin';
 import {
@@ -28,6 +27,7 @@ import {
   selectedPlexServerUrls,
   setupPlexSignInHandlers,
 } from './plex-signin';
+import { forgetPlexClientIdentity } from './plex';
 import { blurFocusWithin } from './text-entry-focus';
 import {
   openMembershipCardPicker,
@@ -38,6 +38,7 @@ import { buildDemoLibraries, buildDemoGames } from './demo-library';
 import { getSetting } from './settings';
 import { isDemoMode } from './demo-mode';
 import { fetchCatalogFromAllSources } from './catalog-sync';
+import { hydrateStoreConfig, resetStoreConfigSync } from './store-config-sync';
 import {
   addMediaSource,
   clearMediaSources,
@@ -122,6 +123,10 @@ export function initBootFlow(d: BootFlowDeps): void {
         // would re-stock from a distributor the person just walked away from.
         clearMediaSources();
         forgetPlexAccount();
+        // A different distributor holds a different saved store (GH #123):
+        // re-arm the hydrate so the next connection reads ITS settings rather
+        // than assuming this boot already read the right ones.
+        resetStoreConfigSync();
         localStorage.removeItem('jellyfin_username');
         d.log('[Setup] Saved servers dropped — pick a new distributor.', 'system');
       },
@@ -184,6 +189,88 @@ export function logOutToOpeningDay(): void {
   enterOpeningDay();
 }
 
+/** Settings-drawer key for FORGET THIS SERVER & START OVER (main.ts's Account
+ *  group, #124) — exported so main.ts's row and this module's arm/confirm
+ *  logic agree on the same DOM id. */
+export const FORGET_SERVER_KEY = '__forget_server__';
+
+let forgetArmed = false;
+let forgetDisarmTimer: ReturnType<typeof setTimeout> | null = null;
+
+function forgetServerValueEl(): Element | null | undefined {
+  return document.getElementById(`setting-row-${FORGET_SERVER_KEY}`)?.querySelector('.settings-row-value');
+}
+
+function disarmForgetServer(): void {
+  forgetArmed = false;
+  if (forgetDisarmTimer) {
+    clearTimeout(forgetDisarmTimer);
+    forgetDisarmTimer = null;
+  }
+  const value = forgetServerValueEl();
+  if (value) value.textContent = '';
+}
+
+/**
+ * FORGET THIS SERVER & START OVER (#124): a two-tap confirm on its own
+ * settings row rather than a modal overlay — every row already has working
+ * Up/Down/Enter navigation, remote and mouse alike, and a destructive wipe
+ * still wants a genuine second step. Re-reads the row's own rendered text
+ * (not just the module-level flag) before treating a press as the confirm:
+ * the settings drawer regenerates its DOM on every page change, so a stale
+ * flag surviving a navigate-away-and-back must not fire on what reads to the
+ * player as a first press.
+ *
+ * Returns whether this press actually fired the wipe (the second, confirming
+ * one) — main.ts's dispatch uses that to decide whether to close the settings
+ * drawer: closing it on the arming press would hide the "press again" label
+ * the player is meant to read.
+ */
+export function activateForgetServer(): boolean {
+  const value = forgetServerValueEl();
+  if (!forgetArmed || value?.textContent !== 'PRESS AGAIN TO CONFIRM') {
+    forgetArmed = true;
+    if (value) value.textContent = 'PRESS AGAIN TO CONFIRM';
+    if (forgetDisarmTimer) clearTimeout(forgetDisarmTimer);
+    forgetDisarmTimer = setTimeout(disarmForgetServer, 5000);
+    return false;
+  }
+  disarmForgetServer();
+  forgetEverythingAndStartOver();
+  return true;
+}
+
+/**
+ * The actual wipe. CHANGE SERVER / LOG OUT (logOutToOpeningDay, above)
+ * deliberately keeps provider_kind (so a reconnect doesn't silently revert
+ * Plex back to Jellyfin) and the Plex client id (plex.tv keys a device's
+ * authorization to it — a fresh one on every ordinary log-out would look
+ * like a new device every session). This is "start completely fresh": those
+ * two, plus every Jellyseerr/Romm credential, cleared as well (#124).
+ */
+function forgetEverythingAndStartOver(): void {
+  if (!deps) return;
+  deps.log('[System] Forgetting this server — wiping every saved credential...', 'system');
+  clearMediaSources();
+  forgetPlexAccount();
+  forgetPlexClientIdentity();
+  resetStoreConfigSync();
+  resetActiveProvider();
+  for (const key of [
+    'jellyfin_username', 'jellyfin_password', 'jellyfin_last_userid',
+    'jellyseerr_url', 'jellyseerr_apikey', 'romm_url', 'romm_apikey',
+    PROVIDER_KIND_KEY,
+  ]) {
+    localStorage.removeItem(key);
+  }
+  deps.teardownScene();
+  if (getSetting<string>('bb_render_mode') === 'flat') {
+    showLoginOverlay();
+    return;
+  }
+  enterOpeningDay();
+}
+
 /**
  * Sync every connected server (GH #84) and say what happened.
  *
@@ -194,6 +281,24 @@ export function logOutToOpeningDay(): void {
  * server turns into a bug report about missing shelves.
  */
 async function syncAllSources(onProgress?: (stage: string) => void): Promise<JellyfinLibrary[]> {
+  // BEFORE the catalog, not after (GH #123): the carried-library choices are
+  // part of the configuration being fetched, and they decide which libraries
+  // are worth syncing at all. Hydrating afterwards would have this machine pay
+  // to fetch libraries the person switched off on their other one, then hide
+  // them. Cheap and silent when there is nothing to fetch from — the demo, a
+  // Plex store, a server with no record yet — and never fatal: a store that
+  // opens on local settings beats a store that doesn't open.
+  onProgress?.('settings');
+  const config = await hydrateStoreConfig();
+  if (config.status === 'applied') {
+    deps?.log(
+      `[System] Store settings restored from your account (${config.written} applied` +
+      `${config.removed ? `, ${config.removed} cleared` : ''}).`,
+      'system'
+    );
+  } else if (config.status === 'failed') {
+    deps?.log(`[System] Could not read your saved store settings: ${config.error}`, 'system');
+  }
   const result = await fetchCatalogFromAllSources({ onProgress });
   for (const failure of result.failures) {
     deps?.log(`[System] ${failure.source.name} did not answer: ${failure.error}`, 'system');
@@ -495,6 +600,10 @@ export function switchMember() {
   // the primary source in place, matching it by (kind, url).
   localStorage.removeItem('jellyfin_token');
   localStorage.removeItem('jellyfin_userid');
+  // The next person gets THEIR store, not a skipped hydrate onto the outgoing
+  // member's settings — and any save still pending is dropped rather than
+  // landing on whoever just picked up the remote (GH #123).
+  resetStoreConfigSync();
   deps.teardownScene();
   void showLoginOrCards();
 }
@@ -838,7 +947,6 @@ export function setupLoginHandlers() {
       }
 
       const rawUrl = (document.getElementById('login-url') as HTMLInputElement).value.trim();
-      const urlInput = normalizeUrl(rawUrl);
       const userInput = (document.getElementById('login-user') as HTMLInputElement).value.trim();
       const passInput = (document.getElementById('login-pass') as HTMLInputElement).value;
       // Jellyseerr is entirely optional -- both fields are blank by default and
@@ -873,9 +981,22 @@ export function setupLoginHandlers() {
       }
       resetActiveProvider();
 
+      // Normalised by the PROVIDER, not by Jellyfin's helper: a bare address
+      // becomes http:// on Jellyfin and follows the page's own scheme on Plex,
+      // where an unconditional http:// is an address a hosted HTTPS build can
+      // never send (#125).
+      const urlInput = provider().normalizeServerAddress(rawUrl);
+
       try {
         deps?.log(`[System] Contacting ${backendKind} server: ${urlInput}`, 'system');
         const session = await provider().authenticate(urlInput, creds);
+        // The address that ANSWERED. A provider may fall through to a sibling
+        // connection for the same server (see ProviderSession.serverAddress),
+        // and everything below persists an address — so persist that one.
+        const connectedUrl = session.serverAddress || urlInput;
+        if (connectedUrl !== urlInput) {
+          deps?.log(`[System] Connected on ${connectedUrl} instead — ${urlInput} was not reachable from this page.`, 'system');
+        }
 
         // Only the manual single-login form remembers username (to prefill);
         // the password is never persisted in plaintext localStorage. Plex has
@@ -910,26 +1031,28 @@ export function setupLoginHandlers() {
         // resolve to it.
         addMediaSource({
           kind: backendKind,
-          url: urlInput,
+          url: connectedUrl,
           token: session.accessToken,
           userId: session.userId,
           userName: session.userName,
-          name: (backendKind === 'plex' ? plexServerNameFor(urlInput) : '') || labelForUrl(urlInput),
+          name: (backendKind === 'plex' ? (plexServerNameFor(urlInput) || plexServerNameFor(connectedUrl)) : '')
+            || labelForUrl(connectedUrl),
         });
         if (backendKind === 'plex') {
           const extras = selectedPlexServerUrls()
-            .map((u) => normalizeUrl(u))
-            .filter((u) => u && u !== urlInput);
+            .map((u) => provider().normalizeServerAddress(u))
+            .filter((u) => u && u !== urlInput && u !== connectedUrl);
           for (const extra of extras) {
             try {
               const extraSession = await provider().authenticate(extra, creds);
+              const extraUrl = extraSession.serverAddress || extra;
               addMediaSource({
                 kind: backendKind,
-                url: extra,
+                url: extraUrl,
                 token: extraSession.accessToken,
                 userId: extraSession.userId,
                 userName: extraSession.userName,
-                name: plexServerNameFor(extra) || labelForUrl(extra),
+                name: plexServerNameFor(extra) || labelForUrl(extraUrl),
               });
               deps?.log(`[System] Also connected ${plexServerNameFor(extra) || extra}.`, 'system');
             } catch (e: any) {
@@ -940,7 +1063,7 @@ export function setupLoginHandlers() {
           }
         }
 
-        await finishLoginAndLaunch(urlInput, session);
+        await finishLoginAndLaunch(connectedUrl, session);
       } catch (err: any) {
         deps?.log(`[System] Connection error: ${err.message}`, 'system');
         if (errorMsg) {

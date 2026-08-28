@@ -63,12 +63,33 @@ export function applyHarnessSettingParams(params: URLSearchParams): void {
     localStorage.setItem('bb_quality', 'low');
     localStorage.setItem('bb_ssao', '0');
   }
+  const pinned: string[] = [];
   for (const [param, key] of SETTING_SHORTCUTS) {
     const v = params.get(param);
-    if (v) localStorage.setItem(key, v);
+    if (v) {
+      localStorage.setItem(key, v);
+      pinned.push(key);
+    }
   }
   for (const kv of params.getAll('set')) {
     const eq = kv.indexOf('=');
-    if (eq > 0) localStorage.setItem(kv.slice(0, eq), kv.slice(eq + 1));
+    if (eq > 0) {
+      const key = kv.slice(0, eq);
+      localStorage.setItem(key, kv.slice(eq + 1));
+      pinned.push(key);
+    }
   }
+  // Declare what this URL pinned, so server-side store configuration can never
+  // win over it (GH #123 — read by store-config-sync.ts, which keeps the key
+  // name and skips it from the synced set).
+  //
+  // A screenshot is only evidence because the same URL makes the same store
+  // twice. Once settings can arrive from a media server, `--theme bb-2000`
+  // silently losing to whatever the account last saved would not fail a
+  // checkpoint — it would quietly photograph the wrong store. The harness has
+  // no media source today, so nothing fetches anything; this is what keeps
+  // that true if one is ever pointed at a real server.
+  //
+  // Still no imports: the list travels through storage rather than a call.
+  localStorage.setItem('bb_config_pins', JSON.stringify(pinned));
 }

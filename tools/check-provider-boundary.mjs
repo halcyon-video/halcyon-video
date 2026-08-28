@@ -41,8 +41,8 @@ const EXEMPT_DIR = resolve(SRC, 'providers');
  */
 const ALLOWED = {
   'src/boot-flow.ts': {
-    names: ['fetchPublicUsers', 'normalizeUrl'],
-    why: 'membership-card picker + address normalising, both pending the multiUserPicker reshape',
+    names: ['fetchPublicUsers'],
+    why: 'membership-card picker, pending the multiUserPicker reshape (address normalising went through the provider in #125)',
   },
   'src/library-settings.ts': {
     names: ['knownServerLibraries'],

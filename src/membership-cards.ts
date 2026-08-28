@@ -25,6 +25,9 @@ export interface MembershipLoginSession {
   accessToken: string;
   userId: string;
   userName: string;
+  /** Mirrors ProviderSession.serverAddress — the address that actually
+   *  answered, when the provider fell through to a sibling connection. */
+  serverAddress?: string;
 }
 
 export interface OpenCardPickerOptions {
