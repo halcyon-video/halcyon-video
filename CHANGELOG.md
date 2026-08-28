@@ -5,6 +5,13 @@ All notable changes to Halcyon Video, generated from commit history by
 it on every version tag push. Deterministic and offline: no entry here was
 written by a model.
 
+## [v0.10.0] — 2026-08-27
+
+### General
+- Fix(plex): probe a typed address at connect, and stop forcing it to http:// (Closes [#125](https://github.com/halcyon-video/halcyon-video/issues/125))
+- Feat(setup): add a real credential reset — Forget This Server & Start Over (Closes [#124](https://github.com/halcyon-video/halcyon-video/issues/124))
+- Feat(config): keep the store on the media server, not in one browser (Closes [#123](https://github.com/halcyon-video/halcyon-video/issues/123))
+
 ## [v0.9.3] — 2026-08-26
 
 ### Announce-fanout
