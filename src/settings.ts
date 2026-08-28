@@ -19,6 +19,7 @@
 // mandate to migrate every read.
 
 import { isDemoMode } from './demo-mode';
+import { operatorDefault, type OperatorServiceId } from './operator-defaults';
 // The key-space rule comes from the import-free module, the push from the
 // transport one — settings.ts is imported by nearly everything, so it takes
 // the lighter dependency where it can.
@@ -1046,8 +1047,28 @@ export function registerCoreSettings(): void {
     visibleWhen: jellyfinAuthVisible,
   });
 
-  cred('jellyseerr_url', 'Jellyseerr / Overseerr URL', 'text');
-  cred('jellyseerr_apikey', 'Jellyseerr / Overseerr API Key', 'secret');
+  // Connection rows this instance's OPERATOR supplies for everyone (#129).
+  // The API-key row goes away entirely: there is no key for this visitor to
+  // type — it lives on the server — and pasting one would only swap a working
+  // connection for a personal one. The URL row stays, because entering an
+  // address of your own is exactly how you opt out onto your own server, and
+  // its hint (re-resolved on every render, so it tracks the live state) says
+  // what is in force. Both gates read the URL rather than the resolved config,
+  // which is what makes a visitor's own address take the rows back.
+  const operatorManaged = (id: OperatorServiceId, urlKey: string) => (): boolean =>
+    !!operatorDefault(id) && !getSetting<string>(urlKey);
+  const operatorHint = (id: OperatorServiceId, urlKey: string, otherwise = '') => (): string => {
+    if (!operatorManaged(id, urlKey)()) return otherwise;
+    return `Provided by this store's server (${operatorDefault(id)!.url}) — its API key stays there `
+      + 'and never reaches your browser. Enter an address to use your own instead.';
+  };
+
+  cred('jellyseerr_url', 'Jellyseerr / Overseerr URL', 'text', {
+    hint: operatorHint('jellyseerr', 'jellyseerr_url'),
+  });
+  cred('jellyseerr_apikey', 'Jellyseerr / Overseerr API Key', 'secret', {
+    visibleWhen: () => !operatorManaged('jellyseerr', 'jellyseerr_url')(),
+  });
 
   // Streaming-service sections' primary source (GH #86 follow-up, owner
   // correction 2026-08-21): a direct TMDB key works with no Jellyseerr
@@ -1062,7 +1083,7 @@ export function registerCoreSettings(): void {
   // shelves, staff-pick seeds, un-ordered collection gaps) — a static window
   // that does NOT move with the clock, unlike the terminal's rolling Media
   // Release Date pin. The two compose: tighter bound wins (#42).
-  const seerrOn = (): boolean => !!getSetting<string>('jellyseerr_url');
+  const seerrOn = (): boolean => !!getSetting<string>('jellyseerr_url') || !!operatorDefault('jellyseerr');
   cred('jellyseerr_suggest_from', 'Suggestions From', 'text', {
     visibleWhen: seerrOn,
     hint: 'YYYY or YYYY-MM-DD. Never suggest titles released earlier.',
@@ -1124,8 +1145,13 @@ export function registerCoreSettings(): void {
   // Romm connection fields only make sense once the Video Games section itself
   // is switched on (see bb_games_enabled below).
   const gamesOn = (): boolean => getSetting<boolean>('bb_games_enabled');
-  cred('romm_url', 'Romm URL', 'text', { visibleWhen: gamesOn });
-  cred('romm_apikey', 'Romm API Key', 'secret', { visibleWhen: gamesOn });
+  cred('romm_url', 'Romm URL', 'text', {
+    visibleWhen: gamesOn,
+    hint: operatorHint('romm', 'romm_url'),
+  });
+  cred('romm_apikey', 'Romm API Key', 'secret', {
+    visibleWhen: () => gamesOn() && !operatorManaged('romm', 'romm_url')(),
+  });
 
   // Video Games -----------------------------------------------------------------
   // Off by default: an unconfigured store issues zero Romm requests and shows

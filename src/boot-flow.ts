@@ -36,6 +36,7 @@ import {
 } from './membership-cards';
 import { buildDemoLibraries, buildDemoGames } from './demo-library';
 import { getSetting } from './settings';
+import { operatorDefault, type OperatorServiceId } from './operator-defaults';
 import { isDemoMode } from './demo-mode';
 import { fetchCatalogFromAllSources } from './catalog-sync';
 import { hydrateStoreConfig, resetStoreConfigSync } from './store-config-sync';
@@ -272,6 +273,21 @@ function forgetEverythingAndStartOver(): void {
 }
 
 /**
+ * The blunt stall watchdog's error, shared by all three sync entry points
+ * (GH #128). By the time this fires, plexJson's/jellyfin's own per-request
+ * timeouts have already had their chance to fail with a specific cause — this
+ * is what's left for a stage that genuinely never returns anything at all, so
+ * it names what was in flight and what's worth checking, rather than the bare
+ * "No response from Plex for 45s" that gave a real report nothing to go on.
+ */
+function stallMessage(displayName: string, stallMs: number, lastStage: string): string {
+  return (
+    `No response from ${displayName} for ${stallMs / 1000}s (last step: ${lastStage}). ` +
+    `Check that the server is awake, not mid-scan, and reachable from this device.`
+  );
+}
+
+/**
  * Sync every connected server (GH #84) and say what happened.
  *
  * The one place all three boot paths get their catalog, so the multi-server
@@ -333,12 +349,16 @@ async function syncForSetup(
     if (stallTimer) clearTimeout(stallTimer);
     stallTimer = setTimeout(() => onStall?.(), LOGIN_STALL_MS);
   };
-  const stallPromise = new Promise<never>((_, reject) => {
-    onStall = () => reject(new Error(`No response from ${provider().displayName} for ${LOGIN_STALL_MS / 1000}s`));
-    armStall();
-  });
   let pages = 0;
   let lastStage = 'CONTACTING DISTRIBUTOR...';
+  const stallPromise = new Promise<never>((_, reject) => {
+    // Named cause, not a blank stall (GH #128): plexJson/jellyfin's own
+    // per-request timeouts now fail fast with a specific reason before this
+    // ever fires, so reaching here means the last stage itself never even
+    // returned an error — worth saying which one it was.
+    onStall = () => reject(new Error(stallMessage(provider().displayName, LOGIN_STALL_MS, lastStage)));
+    armStall();
+  });
   const onProgress = (stage: string) => {
     armStall();
     if (stage === 'page') pages++;
@@ -371,6 +391,37 @@ async function syncForSetup(
 }
 
 // ─── Login / boot overlays ────────────────────────────────────────────────────
+
+/**
+ * Replace a login column's credential boxes with a line saying the server
+ * already supplies this service (#129).
+ *
+ * Skipped when the visitor has a value of their own, so their fields stay
+ * editable and their own server keeps winning — the operator's default is a
+ * default, not a lock. Idempotent: showLoginOverlay() can run several times in
+ * a session, so the note is keyed by id and never stacks up.
+ */
+function hideIfOperatorManaged(
+  id: OperatorServiceId,
+  ownValue: string | null | undefined,
+  inputs: (HTMLInputElement | null)[]
+): void {
+  const operator = operatorDefault(id);
+  const column = inputs.find((i) => i)?.closest('.login-column') as HTMLElement | null;
+  const noteId = `login-${id}-operator-note`;
+  document.getElementById(noteId)?.remove();
+  for (const input of inputs) {
+    const group = input?.closest('.input-group') as HTMLElement | null;
+    if (group) group.style.display = operator && !ownValue ? 'none' : '';
+  }
+  if (!operator || ownValue || !column) return;
+  const note = document.createElement('p');
+  note.id = noteId;
+  note.className = 'column-desc';
+  note.textContent = `Provided by this store's server (${operator.url}). Nothing to enter — `
+    + 'the API key stays on the server and is never sent to your browser.';
+  column.appendChild(note);
+}
 
 export function showLoginOverlay() {
   if (isDemoMode) return; // the demo never logs in
@@ -413,6 +464,12 @@ export function showLoginOverlay() {
     const jellyseerrKeyInput = document.getElementById('login-jellyseerr-key') as HTMLInputElement;
     if (jellyseerrKeyInput) jellyseerrKeyInput.value = savedJellyseerrKey || '';
 
+    // Don't ask for what this server already supplies (#129). An
+    // operator-managed service has no key to type — asking for one invites a
+    // visitor to paste a credential that would only override a working
+    // connection with their own.
+    hideIfOperatorManaged('jellyseerr', savedJellyseerrUrl, [jellyseerrUrlInput, jellyseerrKeyInput]);
+
     // T18: Romm (optional) -- same prefill treatment as Jellyseerr. Column
     // stays hidden (values still prefilled, just not shown) unless the Video
     // Games section is switched on in Settings, so opting in still requires a
@@ -420,9 +477,11 @@ export function showLoginOverlay() {
     const envRommUrl = typeof import.meta.env !== 'undefined' ? import.meta.env.VITE_ROMM_URL : undefined;
     const envRommKey = typeof import.meta.env !== 'undefined' ? import.meta.env.VITE_ROMM_APIKEY : undefined;
     const rommUrlInput = document.getElementById('login-romm-url') as HTMLInputElement | null;
-    if (rommUrlInput) rommUrlInput.value = localStorage.getItem('romm_url') || envRommUrl || '';
+    const savedRommUrl = localStorage.getItem('romm_url') || envRommUrl || '';
+    if (rommUrlInput) rommUrlInput.value = savedRommUrl;
     const rommKeyInput = document.getElementById('login-romm-key') as HTMLInputElement | null;
     if (rommKeyInput) rommKeyInput.value = localStorage.getItem('romm_apikey') || envRommKey || '';
+    hideIfOperatorManaged('romm', savedRommUrl, [rommUrlInput, rommKeyInput]);
     const rommColumn = document.getElementById('login-romm-column');
     if (rommColumn) rommColumn.style.display = getSetting<boolean>('bb_games_enabled') ? '' : 'none';
   }
@@ -509,12 +568,14 @@ async function finishLoginAndLaunch(urlInput: string, session: MembershipLoginSe
   const LOGIN_STALL_MS = 45_000;
   let loginStallTimer: ReturnType<typeof setTimeout> | null = null;
   let onLoginStall: (() => void) | null = null;
-  const armLoginStall = () => {
+  let lastLoginStage = 'Contacting server';
+  const armLoginStall = (stage?: string) => {
+    if (stage && stage !== 'page') lastLoginStage = stage;
     if (loginStallTimer) clearTimeout(loginStallTimer);
     loginStallTimer = setTimeout(() => onLoginStall?.(), LOGIN_STALL_MS);
   };
   const loginTimeout = new Promise<never>((_, reject) => {
-    onLoginStall = () => reject(new Error(`No response from ${provider().displayName} for ${LOGIN_STALL_MS / 1000}s`));
+    onLoginStall = () => reject(new Error(stallMessage(provider().displayName, LOGIN_STALL_MS, lastLoginStage)));
     armLoginStall();
   });
   let libs: JellyfinLibrary[];
@@ -652,11 +713,97 @@ export async function startDemoAndLoad() {
   deps.launchStore();
 }
 
+/** Marker for "this browser has already been offered the build's defaults". */
+const DEFAULTS_SEEDED_KEY = 'halcyon_defaults_seeded';
+
+/**
+ * Connection defaults an OPERATOR set for everyone on their instance (#129),
+ * applied on this visitor's first boot and reported plainly, because the two
+ * tiers expose very different things:
+ *
+ *   TIER 1, build-time `VITE_ROMM_*` / `VITE_JELLYSEERR_*`: seeded into this
+ *     browser's localStorage here. The key is inside the bundle — every
+ *     visitor can read it. Right for a household, wrong for a public instance,
+ *     and the log line says so rather than letting an operator assume secrecy
+ *     they don't have.
+ *   TIER 2, server-side `HALCYON_*`: nothing to seed. The browser was told the
+ *     addresses and no key at all (operator-defaults.ts), and getRommConfig()/
+ *     getJellyseerrConfig() fall back to them at read time.
+ *
+ * Seeding was previously nested inside the `VITE_JELLYFIN_*` auto-login branch,
+ * so an operator who set Romm/Jellyseerr defaults but no file credentials for
+ * Jellyfin — every operator whose visitors sign in as themselves — saw them
+ * silently ignored. It runs on its own now, once per browser: only ever
+ * filling a key that is absent, and never a second time, so a field the
+ * visitor deliberately cleared stays cleared.
+ */
+function seedConnectionDefaults(log: BootFlowDeps['log']): void {
+  const managed = [
+    operatorDefault('romm') ? 'Romm' : '',
+    operatorDefault('jellyseerr') ? 'Jellyseerr / Overseerr' : '',
+  ].filter(Boolean);
+  if (managed.length) {
+    log(
+      `[System] ${managed.join(' and ')} ${managed.length > 1 ? 'are' : 'is'} provided by this server — `
+      + 'its API key stays server-side and never reaches this browser.',
+      'system'
+    );
+  }
+  if (operatorDefault('romm') && !localStorage.getItem('bb_games_enabled')) {
+    // Same reasoning as the seeded case below: an operator who pointed their
+    // instance at a Romm meant for the game department to be there.
+    localStorage.setItem('bb_games_enabled', '1');
+  }
+
+  if (typeof import.meta.env === 'undefined') return;
+  if (localStorage.getItem(DEFAULTS_SEEDED_KEY)) return;
+  localStorage.setItem(DEFAULTS_SEEDED_KEY, '1');
+
+  const seed = (key: string, value: string | undefined): boolean => {
+    if (!value || localStorage.getItem(key)) return false;
+    localStorage.setItem(key, value);
+    return true;
+  };
+  const seeded: string[] = [];
+  // A service the SERVER manages is never seeded from the bundle: writing the
+  // build's copy of the key into this browser would win over the operator's
+  // (both halves present beats the operator fallback) and put the credential
+  // back in the visitor's hands — losing the whole point of tier 2 to a
+  // leftover .env.local.
+  if (!operatorDefault('jellyseerr')
+      && import.meta.env.VITE_JELLYSEERR_URL && import.meta.env.VITE_JELLYSEERR_APIKEY) {
+    const a = seed('jellyseerr_url', import.meta.env.VITE_JELLYSEERR_URL);
+    const b = seed('jellyseerr_apikey', import.meta.env.VITE_JELLYSEERR_APIKEY);
+    if (a || b) seeded.push('Jellyseerr / Overseerr');
+  }
+  if (!operatorDefault('romm')
+      && import.meta.env.VITE_ROMM_URL && import.meta.env.VITE_ROMM_APIKEY) {
+    const a = seed('romm_url', import.meta.env.VITE_ROMM_URL);
+    const b = seed('romm_apikey', import.meta.env.VITE_ROMM_APIKEY);
+    if (a || b) {
+      seeded.push('Romm');
+      // A seeded Romm with the game section still off would stock nothing.
+      if (!localStorage.getItem('bb_games_enabled')) localStorage.setItem('bb_games_enabled', '1');
+    }
+  }
+  if (seeded.length) {
+    log(
+      `[System] ${seeded.join(' and ')} configured from this build's env. Note the API key ships `
+      + 'inside the bundle: anyone using this store can read it.',
+      'system'
+    );
+  }
+}
+
 export async function checkCredentialsAndLoad() {
   if (!deps) return;
   const d = deps;
   // Security hardening: Purge any stored plaintext password
   localStorage.removeItem('jellyfin_password');
+
+  // Before the credential checks below, and before any shelf reads a config:
+  // an operator's defaults are what an arriving visitor is meant to boot into.
+  seedConnectionDefaults(d.log);
 
   const envUrl = (typeof import.meta.env !== 'undefined' ? import.meta.env.VITE_JELLYFIN_URL : undefined) || '';
   const envUser = (typeof import.meta.env !== 'undefined' ? import.meta.env.VITE_JELLYFIN_USERNAME : undefined) || '';
@@ -680,20 +827,8 @@ export async function checkCredentialsAndLoad() {
       token = session.accessToken;
       userId = session.userId;
       d.log(`[System] Auto-authenticated successfully as ${session.userName}.`, 'system');
-
-      if (typeof import.meta.env !== 'undefined') {
-        if (import.meta.env.VITE_JELLYSEERR_URL && import.meta.env.VITE_JELLYSEERR_APIKEY) {
-          localStorage.setItem('jellyseerr_url', import.meta.env.VITE_JELLYSEERR_URL);
-          localStorage.setItem('jellyseerr_apikey', import.meta.env.VITE_JELLYSEERR_APIKEY);
-        }
-        if (import.meta.env.VITE_ROMM_URL && import.meta.env.VITE_ROMM_APIKEY) {
-          localStorage.setItem('romm_url', import.meta.env.VITE_ROMM_URL);
-          localStorage.setItem('romm_apikey', import.meta.env.VITE_ROMM_APIKEY);
-          if (!localStorage.getItem('bb_games_enabled')) {
-            localStorage.setItem('bb_games_enabled', '1');
-          }
-        }
-      }
+      // (The Jellyseerr/Romm seed that used to live here now runs for every
+      // boot, in seedConnectionDefaults above — GH #129.)
     } catch (err: any) {
       d.log(`[System] Auto-authentication from file credentials failed: ${err?.message || err}`, 'system');
     }
@@ -759,12 +894,14 @@ export async function checkCredentialsAndLoad() {
 
       let stallTimer: ReturnType<typeof setTimeout> | null = null;
       let onStall: (() => void) | null = null;
-      const armStall = () => {
+      let lastSyncStage = 'Contacting server';
+      const armStall = (stage?: string) => {
+        if (stage && stage !== 'page') lastSyncStage = stage;
         if (stallTimer) clearTimeout(stallTimer);
         stallTimer = setTimeout(() => onStall?.(), STALL_MS);
       };
       const stallPromise = new Promise<never>((_, reject) => {
-        onStall = () => reject(new Error(`No response from ${provider().displayName} for ${STALL_MS / 1000}s`));
+        onStall = () => reject(new Error(stallMessage(provider().displayName, STALL_MS, lastSyncStage)));
         armStall();
       });
 

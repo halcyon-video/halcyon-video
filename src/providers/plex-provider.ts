@@ -175,6 +175,13 @@ export class PlexProvider implements MediaSourceProvider {
     }
     if (!reached) throw new Error(describePlexConnectFailure(attempts));
 
+    // Reaching a relay address means every better candidate (LAN, plex.direct)
+    // either wasn't advertised or didn't answer — connectionRank already sorts
+    // relay last, so this can only be true when it was the best/only option
+    // (GH #128). Surfaced on the session so the setup flow can warn: relay
+    // answers /identity fast but is far too slow to carry a real library sync.
+    const isRelay = !!match?.relayConnections?.some((u) => samePlexEndpoint(u, reached!.url));
+
     const session: ProviderSession = {
       accessToken: token,
       userId: match?.machineIdentifier || reached.machineIdentifier || '',
@@ -183,7 +190,7 @@ export class PlexProvider implements MediaSourceProvider {
       // ProviderSession.serverAddress. A caller that persists `server` instead
       // saves an address it has just been told does not work.
       serverAddress: reached.url,
-      raw: { accountToken, machineIdentifier: match?.machineIdentifier },
+      raw: { accountToken, machineIdentifier: match?.machineIdentifier, isRelay },
     };
     this.rememberConnection(reached.url, session);
     return session;

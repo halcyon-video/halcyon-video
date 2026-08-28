@@ -13,6 +13,14 @@ import { spawn, execFileSync } from "node:child_process";
 import * as net from "node:net";
 // @ts-expect-error plain-js module, no declarations (see header note)
 import { remotePlayPlugin } from "./tools/remote-play-server.mjs";
+import {
+  OPERATOR_CONFIG_PATH,
+  operatorAuthHeaders,
+  operatorRequestAllowed,
+  operatorServiceForTarget,
+  publicOperatorDefaults,
+  readOperatorEnv,
+} from "./src/operator-defaults";
 
 // @ts-expect-error process is a nodejs global
 const host = process.env.TAURI_DEV_HOST;
@@ -84,6 +92,21 @@ function ownHostNames(): string[] {
   add(host); // TAURI_DEV_HOST, when set
   return [...names];
 }
+
+// ─── Operator-provided connection defaults (GH #129) ─────────────────────────
+//
+// An operator hosting Halcyon for other people sets HALCYON_ROMM_URL /
+// HALCYON_ROMM_APIKEY / HALCYON_JELLYSEERR_URL / HALCYON_JELLYSEERR_APIKEY (or
+// the SEERR/OVERSEERR aliases) here, on the SERVER, and every visitor arrives
+// with those services already wired up. The names are deliberately NOT
+// `VITE_`-prefixed: vite inlines those into the bundle, which is precisely the
+// thing this exists to avoid. The browser is told the service ADDRESS via
+// /__halcyon/config below and never the key; /dev-proxy attaches the
+// credential on the way out. Same env-var shape as HALCYON_ALLOWED_HOSTS
+// above, so a `docker run -e ...` line configures the lot.
+// @ts-expect-error process is a nodejs global
+const operatorEnv = readOperatorEnv(process.env);
+const operatorPublic = publicOperatorDefaults(operatorEnv);
 
 // @ts-expect-error process is a nodejs global
 const configuredHosts: string[] = (process.env.HALCYON_ALLOWED_HOSTS ?? "")
@@ -399,6 +422,28 @@ function integrationProxyPlugin() {
         if (req.headers[h]) headers[h] = String(req.headers[h]);
       }
       const method = String(req.method || "GET");
+
+      // Operator-managed credentials (GH #129). A client that holds no key of
+      // its own sends none; if the target is one of the operator's own
+      // servers, theirs is attached HERE, host-side, where the browser can
+      // never read it. A client that DID send a credential keeps it — a
+      // visitor with their own Romm is not rerouted onto the operator's.
+      //
+      // The endpoint allow-list is not optional: the operator's server address
+      // is necessarily public (the browser has to name it as the proxy
+      // target), so without it this would be an authenticated open door onto
+      // their Romm/Jellyseerr for anyone who loaded the page.
+      if (!headers["x-api-key"] && !headers["authorization"]) {
+        const service = operatorServiceForTarget(operatorEnv, target);
+        if (service) {
+          if (!operatorRequestAllowed(service, method, target)) {
+            return json(403, {
+              error: `${method} ${target} is not an endpoint the store calls on the operator's ${service}`,
+            });
+          }
+          Object.assign(headers, operatorAuthHeaders(service, operatorEnv[service]!));
+        }
+      }
       const r = await fetch(target, {
         method,
         headers,
@@ -413,6 +458,34 @@ function integrationProxyPlugin() {
   }
   return {
     name: "integration-proxy",
+    configureServer(server: any) {
+      server.middlewares.use(handler);
+    },
+    configurePreviewServer(server: any) {
+      server.middlewares.use(handler);
+    },
+  };
+}
+
+// What this instance provides on its operator's behalf (GH #129): the service
+// ADDRESSES and a flag saying the server holds the credential. Never the
+// credential — this response is the whole client-visible surface of tier 2,
+// and `publicOperatorDefaults` is what guarantees a key can't reach it.
+// Answers `{}` when the operator configured nothing, which is every ordinary
+// install; the client treats that, a 404 from a static host, and a network
+// failure identically (operator-defaults.ts loadOperatorDefaults).
+function operatorConfigPlugin() {
+  function handler(req: any, res: any, next: any) {
+    if ((req.url || "").split("?")[0] !== OPERATOR_CONFIG_PATH) return next();
+    res.statusCode = 200;
+    res.setHeader("Content-Type", "application/json");
+    // Per-visitor and cheap to answer; a cached copy would outlive the
+    // operator changing their env and restarting.
+    res.setHeader("Cache-Control", "no-store");
+    res.end(JSON.stringify(operatorPublic));
+  }
+  return {
+    name: "halcyon-operator-config",
     configureServer(server: any) {
       server.middlewares.use(handler);
     },
@@ -503,6 +576,7 @@ export default defineConfig(async () => ({
     feedbackPinPlugin(),
     mpvPlayerPlugin(),
     integrationProxyPlugin(),
+    operatorConfigPlugin(),
     remotePlayPlugin(),
   ],
 

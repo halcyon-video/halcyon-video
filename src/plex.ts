@@ -233,6 +233,16 @@ export const PLEX_PROBE_TIMEOUT_MS = 8000;
  *  candidates cost nothing, so this only ever bounds real network waits. */
 export const PLEX_CONNECT_BUDGET_MS = 20_000;
 
+/** Per-request cap for everything the SYNC stage does — library lists,
+ *  collections, token checks (GH #128). Connect-time probing already had its
+ *  own budget (PLEX_PROBE_TIMEOUT_MS); every request downstream of a
+ *  successful connect had none at all, so a single hung request rode the 45s
+ *  boot stall watchdog with no attribution. Deliberately under that 45s —
+ *  close enough that a real, large-but-working library list still fits, far
+ *  enough that the request which actually stalled fails, by name, before the
+ *  blunt catch-all ever gets to. */
+export const PLEX_SYNC_TIMEOUT_MS = 40_000;
+
 export type PlexProbeCode =
   | 'blank'
   | 'mixed-content'
@@ -396,15 +406,38 @@ export function describePlexConnectFailure(attempts: PlexProbe[]): string {
   return `${first.message || `Could not reach ${hostLabel(first.url)}.`}${tail}`;
 }
 
+/**
+ * `label` names what's being fetched ("the Movies library", "collections")
+ * in plain words for the timeout message — the caller knows that, a bare URL
+ * doesn't, and "No response from Plex for 45s" with nothing else is exactly
+ * the diagnosis-free stall this exists to replace (GH #128).
+ */
 async function plexJson<T = any>(
   url: string,
   token?: string,
-  init?: { method?: string }
+  init?: { method?: string; timeoutMs?: number; label?: string }
 ): Promise<T> {
-  const res = await fetch(url, {
-    method: init?.method ?? 'GET',
-    headers: plexHeaders(token),
-  });
+  const timeoutMs = init?.timeoutMs ?? PLEX_SYNC_TIMEOUT_MS;
+  const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const timer = setTimeout(() => controller?.abort(), timeoutMs);
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: init?.method ?? 'GET',
+      headers: plexHeaders(token),
+      signal: controller?.signal,
+    });
+  } catch (e: any) {
+    if (e?.name === 'AbortError') {
+      throw new Error(
+        `${init?.label ?? hostLabel(url)} did not answer within ${Math.round(timeoutMs / 1000)}s. ` +
+        `The server may be busy, asleep, or reachable only through a slow connection.`
+      );
+    }
+    throw e;
+  } finally {
+    clearTimeout(timer);
+  }
   if (!res.ok) {
     throw new Error(`Plex HTTP error ${res.status} for ${redactToken(url)}`);
   }
@@ -499,6 +532,13 @@ export interface PlexServer {
   accessToken: string;
   /** Reachable base URLs, local ones first (a LAN address beats plex.direct). */
   connections: string[];
+  /** The subset of `connections` that route through Plex Relay — a proxy
+   *  through Plex's own servers, ranked last by connectionRank because it can
+   *  answer /identity in milliseconds while being far too slow to carry a
+   *  real library sync (GH #128). Kept as its own list, not a bool on
+   *  PlexServer, because relay-ness is per-connection: the same server can
+   *  advertise both a fast LAN address and a relay fallback. */
+  relayConnections: string[];
   owned: boolean;
 }
 
@@ -547,15 +587,39 @@ export async function fetchPlexServers(accountToken: string): Promise<PlexServer
         machineIdentifier: r.clientIdentifier,
         accessToken: r.accessToken,
         connections: ordered.map((c) => String(c.uri || '')).filter(Boolean),
+        relayConnections: ordered.filter((c) => !!c.relay).map((c) => String(c.uri || '')).filter(Boolean),
         owned: !!r.owned,
       };
     });
 }
 
-/** True = token still good against THIS server. Throws on a network blip. */
-export async function validatePlexToken(server: string, token: string): Promise<boolean> {
+/** True = token still good against THIS server. Throws on a network blip
+ *  (including a timeout — GH #128, this had none before) so a caller that
+ *  wants "still reachable, still authorized" told apart from "no answer"
+ *  can look at the message; every existing caller already treats a throw
+ *  as "couldn't tell, don't act on it" either way. */
+export async function validatePlexToken(
+  server: string,
+  token: string,
+  opts?: { timeoutMs?: number }
+): Promise<boolean> {
   const url = `${normalizePlexUrl(server)}/identity`;
-  const res = await fetch(url, { headers: plexHeaders(token) });
+  const timeoutMs = opts?.timeoutMs ?? PLEX_SYNC_TIMEOUT_MS;
+  const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const timer = setTimeout(() => controller?.abort(), timeoutMs);
+  let res: Response;
+  try {
+    res = await fetch(url, { headers: plexHeaders(token), signal: controller?.signal });
+  } catch (e: any) {
+    if (e?.name === 'AbortError') {
+      throw new Error(
+        `${hostLabel(url)} did not answer the sign-in check within ${Math.round(timeoutMs / 1000)}s.`
+      );
+    }
+    throw e;
+  } finally {
+    clearTimeout(timer);
+  }
   if (res.status === 401 || res.status === 403) return false;
   if (!res.ok) throw new Error(`Plex reachability check failed (HTTP ${res.status})`);
   return true;
@@ -768,12 +832,15 @@ async function applyPlexCollections(
   server: string,
   token: string,
   sectionKey: string,
-  byId: Map<string, Movie>
+  byId: Map<string, Movie>,
+  timeoutMs?: number
 ): Promise<void> {
   const base = normalizePlexUrl(server);
   let collections: any[] = [];
   try {
-    const res = await plexJson<any>(`${base}/library/sections/${sectionKey}/collections`, token);
+    const res = await plexJson<any>(`${base}/library/sections/${sectionKey}/collections`, token, {
+      timeoutMs,
+    });
     collections = res?.MediaContainer?.Metadata ?? [];
   } catch {
     return; // a server without the endpoint simply has no collection endcaps
@@ -782,7 +849,8 @@ async function applyPlexCollections(
     try {
       const res = await plexJson<any>(
         `${base}/library/metadata/${col.ratingKey}/children`,
-        token
+        token,
+        { timeoutMs }
       );
       for (const child of res?.MediaContainer?.Metadata ?? []) {
         const movie = byId.get(String(child.ratingKey));
@@ -820,10 +888,14 @@ async function applyPlexCollections(
  */
 export async function fetchPlexLibraryList(
   server: string,
-  token: string
+  token: string,
+  opts?: { timeoutMs?: number }
 ): Promise<LibrarySummary[]> {
   const base = normalizePlexUrl(server);
-  const secRes = await plexJson<any>(`${base}/library/sections`, token);
+  const secRes = await plexJson<any>(`${base}/library/sections`, token, {
+    label: 'The library list',
+    timeoutMs: opts?.timeoutMs,
+  });
   const sections: any[] = secRes?.MediaContainer?.Directory ?? [];
   return sections
     .filter((s) => s?.type === 'movie' || s?.type === 'show')
@@ -834,11 +906,17 @@ export async function fetchPlexLibrariesAndMovies(
   server: string,
   token: string,
   onProgress?: (stage: string) => void,
-  opts?: { excludeLibraryIds?: ReadonlySet<string> }
+  // `timeoutMs` overrides PLEX_SYNC_TIMEOUT_MS per request — a real knob (not
+  // just a test seam): a server known to be slow-but-reachable can be given
+  // more rope without touching the default everyone else gets.
+  opts?: { excludeLibraryIds?: ReadonlySet<string>; timeoutMs?: number }
 ): Promise<Library[]> {
   const base = normalizePlexUrl(server);
   onProgress?.('Reading libraries');
-  const secRes = await plexJson<any>(`${base}/library/sections`, token);
+  const secRes = await plexJson<any>(`${base}/library/sections`, token, {
+    label: 'The library list',
+    timeoutMs: opts?.timeoutMs,
+  });
   const sections: any[] = secRes?.MediaContainer?.Directory ?? [];
 
   const libraries: Library[] = [];
@@ -851,13 +929,14 @@ export async function fetchPlexLibrariesAndMovies(
     onProgress?.(`Stocking ${section.title}`);
     const listRes = await plexJson<any>(
       `${base}/library/sections/${key}/all?includeGuids=1`,
-      token
+      token,
+      { label: `The "${section.title}" library`, timeoutMs: opts?.timeoutMs }
     );
     const items: any[] = listRes?.MediaContainer?.Metadata ?? [];
     const movies = items.map((it) => toMovie(server, token, it, section.title));
 
     const byId = new Map(movies.map((m) => [m.id, m]));
-    await applyPlexCollections(server, token, key, byId);
+    await applyPlexCollections(server, token, key, byId, opts?.timeoutMs);
 
     const genres = [...new Set(movies.flatMap((m) => m.genres))].sort();
     libraries.push({ id: key, name: section.title, movies, genres });

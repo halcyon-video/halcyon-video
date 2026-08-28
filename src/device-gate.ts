@@ -34,6 +34,12 @@ import { getSetting, setSetting } from './settings';
 const ANSWER_KEY = 'bb_device_gate';
 const TOUR_URL = 'https://youtu.be/TCkEpeL8Y3w';
 
+/**
+ * Does a phone get walked straight into 2.5D instead of being asked? See the
+ * note in runDeviceGate — this is the single switch that reverts that call.
+ */
+const PHONE_STRAIGHT_TO_FLAT = true;
+
 export type GateReason = 'no-webgl2' | 'touch-primary';
 
 /**
@@ -162,6 +168,28 @@ function styleTag(): HTMLStyleElement {
 export function runDeviceGate(): Promise<void> {
   const reason = detectGateReason();
   if (!reason) return Promise.resolve();
+
+  // A PHONE IS NOT ASKED. It is answered. (Owner direction 2026-08-27: "people
+  // click it on their phone and can't use it and give up".) The card this used
+  // to raise led with "Built for TVs and desktops" — the first sentence a
+  // stranger off a link read was that their device was the wrong one, and a
+  // share of them never reached the second. The zero-setup mandate says the
+  // hosted site IS the product and must just work, so a touch-primary visitor
+  // now lands in the mode their thumb can actually drive, stocked and
+  // browsable, with no screen in between. The 3D store is not hidden: it is
+  // one tap away under "3D Store Mode" in the flat store's menu, which is
+  // where a curious visitor looks anyway.
+  //
+  // A WebGL2-less browser still gets the card, because that one carries real
+  // information the visitor cannot otherwise get (their browser provably
+  // cannot run the 3D store) and offers the tour as consolation.
+  //
+  // Flip PHONE_STRAIGHT_TO_FLAT back to false to restore the old card.
+  if (reason === 'touch-primary' && PHONE_STRAIGHT_TO_FLAT) {
+    setSetting('bb_render_mode', 'flat');
+    try { localStorage.setItem(ANSWER_KEY, 'flat'); } catch { /* private mode */ }
+    return Promise.resolve();
+  }
 
   const { head, body, canStay } = COPY[reason];
   return new Promise<void>((resolve) => {

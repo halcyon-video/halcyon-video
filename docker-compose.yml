@@ -30,6 +30,20 @@ services:
       # this and echo back the name they were refused under.
       # HALCYON_ALLOWED_HOSTS: halcyon.example.com
 
+      # Hosting the store for other people? These wire Jellyseerr and RomM up
+      # for EVERY visitor, so a first-timer arrives in a stocked store without
+      # touching setup — and without being handed your API key. Read here, on
+      # the server, and never inlined into the bundle (that is what the VITE_*
+      # variables in .env.local do, and why they are the household path rather
+      # than the hosting one): visitors are told the ADDRESS, the credential is
+      # attached host-side by the built-in proxy, and only for the endpoints
+      # the store itself calls. HALCYON_SEERR_* / HALCYON_OVERSEERR_* work too.
+      # See README.md → "Running a store for other people".
+      # HALCYON_JELLYSEERR_URL: http://seerr.lan:5055
+      # HALCYON_JELLYSEERR_APIKEY: your_jellyseerr_api_key
+      # HALCYON_ROMM_URL: http://romm.lan:8080
+      # HALCYON_ROMM_APIKEY: username:password
+
     volumes:
       # The Remote Play "seed": log into the store from any browser once
       # and flip Settings → Connection → Remote Play ON — that donates
@@ -38,6 +52,10 @@ services:
       # instance of your real library. This volume keeps it across
       # container rebuilds.
       - halcyon-data:/data
+      # Brand drop-in customization (logo, pack): any files in public/user-assets
+      # on the host overlay onto the served app, so a logo change needs only a
+      # container restart, not a rebuild. See README.md → "Make it yours".
+      - ./public/user-assets:/app/dist/user-assets
       # Keep F8 feedback pins (in-app visual bug reports) on the host:
       # - ./feedback:/app/feedback
 

@@ -28,6 +28,9 @@ export interface MembershipLoginSession {
   /** Mirrors ProviderSession.serverAddress — the address that actually
    *  answered, when the provider fell through to a sibling connection. */
   serverAddress?: string;
+  /** Mirrors ProviderSession.raw — provider-specific extras (e.g. Plex's
+   *  isRelay flag, GH #128). Jellyfin sessions never populate this. */
+  raw?: Record<string, unknown>;
 }
 
 export interface OpenCardPickerOptions {

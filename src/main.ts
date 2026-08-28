@@ -103,6 +103,7 @@ import { brandString, loadBrandPack } from './brand-pack';
 import type { StoreScene } from './three-scene';
 import { InputManager } from './input';
 import type { InputCallbacks } from './input';
+import { installStoreTouchControls, isTouchInputActive, touchHUDText, touchMovieHUDText } from './store-touch';
 import { refreshHoldHints, setHoldCheckoutProgress, setHoldDismissProgress } from './hold-hints';
 import {
   setupRemotePlay, isRemoteInstance, isRemotelyDriven, reportRemoteFatal,
@@ -146,11 +147,13 @@ import {
 import { buildControlsHelpPanel, HELP_ROW_PREFIX } from './controls-help';
 import type { CandyRow } from './fixtures/period-fixtures';
 import { getCandyDeliveryAdapter } from './candy-delivery';
+import { loadOperatorDefaults } from './operator-defaults';
 import { isDemoMode } from './demo-mode';
 import { startScreensaverAnimation, stopScreensaverAnimation } from './screensaver';
 import { buildDemoDiscovery, makeSyntheticEpisodes, demoPoster } from './demo-library';
 import { EMPTY_STAFF_PICKS, loadStaffPicks, StaffPicks } from './staff-picks-loader';
 import { titleMatchKeys } from './staff-picks';
+import { initDemoPlayback, openDemoPlaybackOverlay, revealDemoPlaybackOverlay, closeDemoPlaybackOverlay } from './demo-playback';
 import {
   episodeLabel,
   markWatchedAndFindNext,
@@ -857,6 +860,12 @@ function updateMovieHUD(movie: Movie | null) {
   // BACK only — never advertise letter keys, clicks, or hold gestures here.
   const hint = document.getElementById('browse-hint');
   if (hint) {
+    if (isTouchInputActive()) {
+      hint.textContent = touchMovieHUDText(
+        !!isInspecting, !!movie.game, !!movie.discovery, !!movie.collectionGap,
+        !!movie.comingSoon, !!isRequestedDiscovery);
+      return;
+    }
     if (isInspecting) {
       if (movie.game) {
         hint.textContent = 'FLIP CASE  •  OK TO RENT & PLAY THIS GAME';
@@ -890,6 +899,14 @@ function updateMovieHUD(movie: Movie | null) {
 function updateHUDForMode(mode: string) {
   const hint = document.getElementById('browse-hint');
   if (!hint) return;
+
+  if (isTouchInputActive()) {
+    const touchText = touchHUDText(mode, !!storeScene?.canHoldToCheckout(), !!storeScene?.carryMode);
+    if (touchText !== null) {
+      hint.textContent = touchText;
+      return;
+    }
+  }
 
   // Remote-truthful copy (review §4.5): arrows/OK/BACK vocabulary only. The
   // checkout path advertised is the one a momentary remote can actually
@@ -968,6 +985,8 @@ function updateBrowseHUDVisibility() {
   refreshHoldCheckoutHint(); // piggyback on the same 200ms poll (cheap when unchanged)
   const locator = document.getElementById('browse-locator');
   const hint = document.getElementById('browse-hint');
+  // Only present on a touch-primary device (store-touch.ts) — absent everywhere else.
+  const touchControls = document.getElementById('store-touch-controls');
   if (!storeScene || !locator || !hint) return;
 
   const suppressed = ui.isAnyOverlayOpen || ui.isPlaybackActive || ui.isScreensaverActive
@@ -982,6 +1001,7 @@ function updateBrowseHUDVisibility() {
       browseHudVisible = false;
       locator.classList.remove('visible');
       hint.classList.remove('visible');
+      touchControls?.classList.remove('visible');
     }
     return;
   }
@@ -990,6 +1010,7 @@ function updateBrowseHUDVisibility() {
     browseHudVisible = true;
     locator.classList.add('visible');
     hint.classList.add('visible');
+    touchControls?.classList.add('visible');
   }
 
   const name = storeScene.getActiveAisleName();
@@ -3381,7 +3402,7 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
       logToConsole(`[Video] Demo mode: no media server to stream "${movie.title}" — the tape ejects.`, 'video');
       return;
     }
-    openDemoPlaybackOverlay(movie, startHidden);
+    openDemoPlaybackOverlay(movie.title, startHidden);
     return;
   }
 
@@ -3760,64 +3781,14 @@ let revealPendingHidden = false;
 let pendingHiddenMpvLaunch: (() => Promise<void>) | null = null;
 
 // ─── Demo playback block ─────────────────────────────────────────────────────
-// The public demo has no media server, so every play that isn't a rented tape
-// on the couch lands on a fullscreen PLAYBACK DISABLED card instead of a
-// stream (a couch tape just ejects — see launchVideoPlayback). It follows the
-// real player's lifecycle: honors startHidden until revealVideoPlayback() (so
-// the walk-to-the-exit play animation still runs over a live scene), pauses
-// rendering while up, and closes through the same Back/Power input paths and
-// return-to-entrance tail the real player's onClose uses. Open/closed state
-// rides on ui.isPlaybackActive — in demo mode the real player never opens.
-
-function ensureDemoPlaybackOverlay(): HTMLElement {
-  let el = document.getElementById('demo-playback-overlay');
-  if (!el) {
-    el = document.createElement('div');
-    el.id = 'demo-playback-overlay';
-    // Same layer as the real player overlay (above the exit-door whiteout).
-    el.style.cssText =
-      'position:fixed;inset:0;z-index:2000;background:#000;display:none;' +
-      'align-items:center;justify-content:center;text-align:center;';
-    el.innerHTML = `
-      <div>
-        <h1 style="font-family:${BB_ARCHIVO_BLACK},sans-serif;color:#ffa903;font-size:clamp(36px,6vw,84px);letter-spacing:0.06em;margin:0;">PLAYBACK DISABLED</h1>
-        <p style="color:#8fa3c8;font-family:'Courier New',monospace;font-size:clamp(13px,1.5vw,19px);letter-spacing:0.25em;margin:20px 0 0;">THIS PUBLIC DEMO HAS NO MEDIA SERVER</p>
-        <p style="color:#55607a;font-family:'Courier New',monospace;font-size:12px;letter-spacing:0.25em;margin:34px 0 0;">PRESS ESC — OR CLICK — TO RETURN TO THE STORE</p>
-      </div>`;
-    // Mouse-only demo visitors have no Back/Esc habit; any click dismisses.
-    el.addEventListener('click', () => closeDemoPlaybackOverlay());
-    document.body.appendChild(el);
-  }
-  return el;
-}
-
-function openDemoPlaybackOverlay(movie: Movie, startHidden: boolean) {
-  ensureDemoPlaybackOverlay();
-  ui.isPlaybackActive = true;
-  logToConsole(`[Video] Demo mode: playback of "${movie.title}" is disabled (no media server).`, 'video');
-  // Hidden launches are revealed by revealVideoPlayback() when the play
-  // animation finishes — exactly like the real player's startHidden open.
-  if (!startHidden) revealDemoPlaybackOverlay();
-}
-
-function revealDemoPlaybackOverlay() {
-  // Same yields as the real reveal: park the renderer behind the card.
-  storeScene?.pauseAmbientTvs();
-  storeScene?.pauseRendering();
-  ensureDemoPlaybackOverlay().style.display = 'flex';
-}
-
-function closeDemoPlaybackOverlay() {
-  ui.isPlaybackActive = false;
-  ensureDemoPlaybackOverlay().style.display = 'none';
-  // Mirror the real player's onClose tail: resume rendering and fade back in
-  // from white standing at the entrance, in library-select.
-  storeScene?.resumeRendering();
-  storeScene?.resumeAmbientTvs();
-  storeScene?.returnToEntrance();
-  updateMovieHUD(storeScene?.getSelectedMovie() || null);
-  logToConsole('[Video] Demo playback screen dismissed. Returned through the entrance.', 'video');
-}
+// The PLAYBACK DISABLED card lives in src/demo-playback.ts; main.ts owns only
+// the wiring it needs — the ui flags, the console, the live scene and the HUD.
+initDemoPlayback({
+  ui,
+  scene: () => storeScene,
+  log: logToConsole,
+  onClosed: () => updateMovieHUD(storeScene?.getSelectedMovie() || null),
+});
 
 /** Reveal the video player once the 3D transition animation finishes. */
 function revealVideoPlayback() {
@@ -4379,7 +4350,12 @@ async function main() {
     onHoldDownProgress: (p) => setHoldDismissProgress(p),
   };
 
-  new InputManager(inputCallbacks);
+  const inputManager = new InputManager(inputCallbacks);
+
+  // Touch layer for the 3D store (issue #126) — a no-op DOM-wise on anything
+  // but a touch-primary device. See src/store-touch.ts for why this calls
+  // `inputCallbacks` directly rather than synthesizing key events.
+  installStoreTouchControls(inputCallbacks, () => inputManager.poke());
 
   // Remote Play: stream the store to /remote.html viewers when the option is
   // on (Connection settings, or ?remote=1). The getter tracks storeScene
@@ -4574,6 +4550,14 @@ async function main() {
     await runDeviceGate();
   }
 
+  // What this server provides on its operator's behalf (GH #129), before
+  // anything reads a connection config: getRommConfig()/getJellyseerrConfig()
+  // fall back to these defaults, so a store that asked first would build its
+  // shelves as an unconfigured one. One short request, capped at 4s, and every
+  // failure mode — static host, Tauri, no operator config — resolves to "none"
+  // rather than throwing, so this can't hold up a boot it doesn't apply to.
+  await loadOperatorDefaults();
+
   // Check saved credentials and try connection in background (demo mode
   // skips the credential gate entirely and never shows the login overlay).
   if (isDemoMode) startDemoAndLoad();
@@ -4594,5 +4578,8 @@ if (document.readyState === 'loading') {
   openPowerMenu,
   switchMember,
   switchRenderMode,
+  // The flat store's header search button (flat-store.ts) — the touch path to
+  // an overlay that was previously only reachable through the "/" key.
+  openSearch,
 };
 

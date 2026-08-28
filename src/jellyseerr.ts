@@ -11,6 +11,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { Movie } from './jellyfin';
 import { isDemoMode } from './demo-mode';
 import { resolveSeerrConfig as resolveSeerr, type SeerrConfig } from './seerr-config';
+import { operatorDefault } from './operator-defaults';
 import { activeSuggestionWindow, titleInWindow, windowGteParam, windowLteParam } from './media-release-date';
 import {
   type StreamingServiceDef, type RawDiscoverItem,
@@ -67,8 +68,17 @@ export function getJellyseerrConfig(): JellyseerrConfig | null {
     overseerr_url: import.meta.env.VITE_OVERSEERR_URL,
     overseerr_apikey: import.meta.env.VITE_OVERSEERR_APIKEY,
   } : {};
-  return resolveSeerr((key) =>
+  const own = resolveSeerr((key) =>
     (typeof localStorage !== 'undefined' ? localStorage.getItem(key) : null) ?? env[key] ?? null);
+  if (own) return own;
+  // Third tier (GH #129): this server's operator configured a request server
+  // for everyone and kept the API key host-side, so there is a working
+  // Jellyseerr here even though this browser holds no credential for it.
+  // Only reached when the visitor has none of their own — resolveSeerr already
+  // demanded both halves, and someone who typed their own is left on theirs.
+  const operator = operatorDefault('jellyseerr');
+  if (operator) return { url: operator.url, apiKey: '', viaOperator: true };
+  return null;
 }
 
 // Fixtures that exist to surface recommendations — the shelf-lip "ASK FOR
@@ -124,7 +134,9 @@ async function jellyseerrRequest(
         method,
         headers: {
           'X-Proxy-Target': url,
-          'X-Api-Key': config.apiKey,
+          // Operator-managed: no X-Api-Key at all, and the proxy supplies the
+          // operator's (GH #129).
+          ...(config.viaOperator ? {} : { 'X-Api-Key': config.apiKey }),
           'Content-Type': 'application/json',
         },
         body: bodyStr,

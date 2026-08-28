@@ -20,6 +20,15 @@
 export interface SeerrConfig {
   url: string;
   apiKey: string;
+  /**
+   * Operator-managed (GH #129): the key lives on the SERVER and /dev-proxy
+   * attaches it host-side, so `apiKey` is empty here on purpose and the
+   * request must go out with NO X-Api-Key — an empty one reads to the proxy as
+   * a client credential and stops it substituting the real one. Never set by
+   * resolveSeerrConfig, which only ever resolves a credential this browser
+   * holds; jellyseerr.ts's getJellyseerrConfig adds this tier on top.
+   */
+  viaOperator?: boolean;
 }
 
 /** Preference order: canonical stored key first, then the aliases. */
