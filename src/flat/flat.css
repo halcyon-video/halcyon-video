@@ -1104,6 +1104,7 @@
   max-width: 320px;
   background: #ffffff;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.06);
+  box-sizing: border-box;
 }
 
 .bb-box-back__rating-symbol {
@@ -1118,9 +1119,13 @@
   justify-content: center;
   color: #0f172a;
   line-height: 1;
+  flex-shrink: 0;
 }
 
-.bb-box-back__rating-info { flex: 1; }
+.bb-box-back__rating-info {
+  flex: 1;
+  min-width: 0;
+}
 
 .bb-box-back__rating-header {
   font-size: 0.65rem;
@@ -1134,6 +1139,8 @@
   font-weight: 600;
   color: #1e293b;
   line-height: 1.25;
+  overflow-wrap: break-word;
+  word-break: normal;
 }
 
 .bb-box-back__barcode-sticker {
@@ -1738,6 +1745,148 @@
 .flat-menu-item.is-focused .flat-menu-item-icon {
   opacity: 1;
   color: var(--bb-secondary, #f2e8c9);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   RESPONSIVE / NARROW VIEWPORTS (Phone / Mobile)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@media (max-width: 700px) {
+  .flat-detail-container.bb-box-back {
+    position: relative;
+    width: 94%;
+    height: 88vh;
+    max-height: none;
+    border-width: 8px;
+    border-radius: 10px;
+  }
+
+  .bb-box-back__body {
+    padding-bottom: 74px; /* Clearance for sticky bottom action bar */
+  }
+
+  .flat-detail-left {
+    padding: 18px 14px;
+    gap: 14px;
+  }
+
+  .flat-detail-right {
+    padding: 18px 14px;
+    gap: 14px;
+  }
+
+  .flat-detail-title {
+    font-size: 1.7rem;
+    overflow-wrap: break-word;
+  }
+
+  .flat-detail-meta {
+    gap: 8px;
+    font-size: 0.85rem;
+  }
+
+  .flat-detail-overview {
+    font-size: 0.95rem;
+    line-height: 1.45;
+    overflow-wrap: break-word;
+  }
+
+  .flat-detail-ratings {
+    gap: 12px;
+    padding: 6px 10px;
+    /* At desk widths the pill is `align-self: flex-start`, so it sizes to its
+       content and is free to run wider than the column it sits in. At 390px it
+       did exactly that and the critic score hung off the right edge of the box
+       art (owner report 2026-08-27). Stretch it to the column and let the two
+       score groups wrap instead of overflowing. */
+    align-self: stretch;
+    flex-wrap: wrap;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  .flat-detail-credits {
+    gap: 6px 12px;
+    font-size: 0.85rem;
+  }
+
+  .flat-detail-credits-value {
+    overflow-wrap: break-word;
+  }
+
+  .bb-box-back__still-frame {
+    width: 100%;
+    max-width: 140px;
+  }
+
+  .bb-box-back__rating-card {
+    width: 100%;
+    max-width: 140px;
+    flex-direction: column;
+    text-align: center;
+    padding: 6px 8px;
+    gap: 6px;
+  }
+
+  .bb-box-back__rating-symbol {
+    min-width: 38px;
+    height: 38px;
+    font-size: 1.6rem;
+  }
+
+  .bb-box-back__rating-header {
+    font-size: 0.6rem;
+    margin-bottom: 2px;
+  }
+
+  .bb-box-back__rating-details {
+    font-size: 0.65rem;
+    line-height: 1.25;
+    overflow-wrap: break-word;
+    word-break: normal;
+  }
+
+  .bb-box-back__barcode-sticker {
+    width: 100%;
+    max-width: 130px;
+    padding: 4px 6px;
+  }
+
+  .bb-box-back__barcode-graphic {
+    height: 20px;
+  }
+
+  .flat-detail-right::after {
+    font-size: 0.6rem;
+    letter-spacing: 2px;
+    padding-top: 6px;
+    width: 100%;
+  }
+
+  .flat-detail-actions {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+    display: flex;
+    gap: 12px;
+    padding: 12px 16px;
+    background: rgba(248, 250, 252, 0.98);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-top: 2px dashed rgba(15, 23, 42, 0.15);
+    box-shadow: 0 -4px 16px rgba(15, 23, 42, 0.08);
+    z-index: 20;
+    margin: 0;
+    box-sizing: border-box;
+  }
+
+  .flat-detail-btn {
+    min-height: 44px;
+    padding: 10px 16px;
+    font-size: 1rem;
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════

@@ -113,6 +113,26 @@ export function bootFlatStore(
   tagline.innerHTML = `<span class="flat-total-access-blue">${brandString('flat-tagline-lead', 'HOME')}</span>`
     + ` <span class="flat-total-access-yellow">${brandString('flat-tagline-tail', 'CINEMA')}</span>`;
 
+  // SEARCH, as a thing you can touch. The overlay itself has existed all
+  // along, but the only way in was the bare "/" key — which a phone visitor
+  // has no way of knowing about and no keyboard to press (owner report
+  // 2026-08-27). It rides the header's existing menu-button styling on
+  // purpose: same shape, same tap target, no new CSS to keep in step.
+  const searchContainer = document.createElement('div');
+  searchContainer.className = 'flat-menu-container';
+  searchContainer.innerHTML = `
+    <button class="flat-menu-btn" id="btn-flat-search" aria-label="Search titles">
+      <svg class="flat-menu-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="11" cy="11" r="7"></circle>
+        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+      </svg>
+      <span>Search</span>
+    </button>
+  `;
+  searchContainer.querySelector('#btn-flat-search')?.addEventListener('click', () => {
+    (window as any).HTPC?.openSearch();
+  });
+
   const menuContainer = document.createElement('div');
   menuContainer.className = 'flat-menu-container';
   menuContainer.innerHTML = `
@@ -167,6 +187,7 @@ export function bootFlatStore(
   header.appendChild(logoContainer);
   header.appendChild(title);
   header.appendChild(tagline);
+  header.appendChild(searchContainer);
   header.appendChild(menuContainer);
 
   // ── Film-strip awning: backlit blue sign with sprocket holes,
