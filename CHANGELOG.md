@@ -5,6 +5,20 @@ All notable changes to Halcyon Video, generated from commit history by
 it on every version tag push. Deterministic and offline: no entry here was
 written by a model.
 
+## [v0.11.0] — 2026-08-28
+
+### CHANGELOG
+- V0.10.0
+- V0.9.3
+
+### General
+- Feat(touch): give the 3D store real touch controls (Closes [#126](https://github.com/halcyon-video/halcyon-video/issues/126))
+- Feat(operator): server-managed Jellyseerr/RomM credentials for hosted stores (Closes [#129](https://github.com/halcyon-video/halcyon-video/issues/129))
+- Fix(plex): give the sync stage timeouts, so a hang fails fast and named (Closes [#128](https://github.com/halcyon-video/halcyon-video/issues/128))
+- Fix(docker): brand drop-in overlay via bind mount for user-assets (Closes [#127](https://github.com/halcyon-video/halcyon-video/issues/127))
+- Fix(mobile): a phone visitor lands in a store they can actually use
+- Fix(announce): land the CHANGELOG on the master that exists, and never block the release
+
 ## [v0.10.0] — 2026-08-27
 
 ### General
