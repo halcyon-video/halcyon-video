@@ -5,6 +5,18 @@ All notable changes to Halcyon Video, generated from commit history by
 it on every version tag push. Deterministic and offline: no entry here was
 written by a model.
 
+## [v0.9.3] — 2026-08-26
+
+### Announce-fanout
+- A lightweight tag has no message — stop announcing its commit
+
+### CHANGELOG
+- V0.9.2
+
+### General
+- Fix(layout): surface niche genres as their own 3D sections instead of dumping them in GENERAL (Closes [#117](https://github.com/halcyon-video/halcyon-video/issues/117))
+- Fix(plex): prioritize LAN IP and forget account on server change (#120, #121)
+
 ## [v0.9.2] — 2026-08-25
 
 ### Android TV
