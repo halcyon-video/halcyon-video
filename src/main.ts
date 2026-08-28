@@ -146,6 +146,7 @@ import {
 import { buildControlsHelpPanel, HELP_ROW_PREFIX } from './controls-help';
 import type { CandyRow } from './fixtures/period-fixtures';
 import { getCandyDeliveryAdapter } from './candy-delivery';
+import { loadOperatorDefaults } from './operator-defaults';
 import { isDemoMode } from './demo-mode';
 import { startScreensaverAnimation, stopScreensaverAnimation } from './screensaver';
 import { buildDemoDiscovery, makeSyntheticEpisodes, demoPoster } from './demo-library';
@@ -4524,6 +4525,14 @@ async function main() {
   } else {
     await runDeviceGate();
   }
+
+  // What this server provides on its operator's behalf (GH #129), before
+  // anything reads a connection config: getRommConfig()/getJellyseerrConfig()
+  // fall back to these defaults, so a store that asked first would build its
+  // shelves as an unconfigured one. One short request, capped at 4s, and every
+  // failure mode — static host, Tauri, no operator config — resolves to "none"
+  // rather than throwing, so this can't hold up a boot it doesn't apply to.
+  await loadOperatorDefaults();
 
   // Check saved credentials and try connection in background (demo mode
   // skips the credential gate entirely and never shows the login overlay).

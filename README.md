@@ -677,6 +677,50 @@ name, a reverse proxy, a custom domain — needs that name in
 `.local` name and tailnet name already work). All the knobs are annotated in
 [`docker-compose.yml`](docker-compose.yml).
 
+### Running a store for other people
+
+Hosting Halcyon for friends, a household, or a small community? You can wire
+**Jellyseerr and RomM up once, for everyone**, so a first-time visitor lands in
+a stocked store without touching the setup terminal — and without you handing
+out your API keys.
+
+Set them on the **server**, not in the build:
+
+```sh
+HALCYON_ROMM_URL=http://romm.lan:8080  HALCYON_ROMM_APIKEY=user:password \
+HALCYON_JELLYSEERR_URL=http://seerr.lan:5055  HALCYON_JELLYSEERR_APIKEY=… \
+  npm run serve                    # or: docker run -e HALCYON_ROMM_URL=… …
+```
+
+(`HALCYON_SEERR_*` and `HALCYON_OVERSEERR_*` are accepted as aliases, same as
+the stored keys.)
+
+Visitors are told the service **address** and nothing else. The key stays in the
+server's environment: it is never inlined into the bundle, never written to a
+visitor's browser storage, and never attached to a request the browser can
+inspect — the built-in proxy adds it host-side on the way out, and only for the
+handful of endpoints the store itself calls (catalog reads, cover art, and
+"order it for me"; not user lists, not settings, not deletes, not request
+approvals). A visitor who enters their *own* address in Settings → Connection
+gets their own server instead; yours is a default, not a lock.
+
+**The two ways to do this expose very different things:**
+
+| | Where the key lives | Who can read it |
+|---|---|---|
+| `HALCYON_*` (recommended for hosting) | The server's environment | Only you |
+| `VITE_*` in `.env.local` | Baked into the built bundle | **Every visitor** — it's in the JavaScript they download |
+
+The `VITE_*` variables are the single-household path, and they still work:
+they now seed a visitor's connection settings on first boot whether or not
+`VITE_JELLYFIN_*` auto-login is also configured. Just don't reach for them on
+an instance strangers can open. Whichever is in force, the store says so in the
+boot console on every launch.
+
+Your media-server login (Jellyfin/Plex) is deliberately *not* covered by this —
+visitors sign into their own account, so the store shelves their libraries and
+their watch history. This is only about the shared, optional side services.
+
 **HTPC / kiosk:**
 
 ```sh

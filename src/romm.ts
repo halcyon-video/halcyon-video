@@ -20,12 +20,20 @@ import { invoke } from '@tauri-apps/api/core';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import { Movie } from './jellyfin';
 import { getSetting } from './settings';
+import { operatorDefault } from './operator-defaults';
 import { demoPoster } from './demo-library';
 import { isGamesOnly } from './games-only';
 
 export interface RommConfig {
   url: string;
   apiKey: string;
+  /**
+   * Operator-managed (GH #129): the key lives on the SERVER and /dev-proxy
+   * attaches it host-side, so `apiKey` is empty here on purpose and every
+   * request must go out with NO auth header — sending an empty one would look
+   * like a client credential and stop the proxy substituting the real one.
+   */
+  viaOperator?: boolean;
 }
 
 // Overall cap on how many games the section carries (see the ticket's texture
@@ -54,8 +62,14 @@ const FULL_LIBRARY_PAGE = 2000;
 export function getRommConfig(): RommConfig | null {
   const url = (typeof localStorage !== 'undefined' ? localStorage.getItem('romm_url') : null) || (typeof import.meta.env !== 'undefined' ? import.meta.env.VITE_ROMM_URL : null);
   const apiKey = (typeof localStorage !== 'undefined' ? localStorage.getItem('romm_apikey') : null) || (typeof import.meta.env !== 'undefined' ? import.meta.env.VITE_ROMM_APIKEY : null);
-  if (!url || !apiKey) return null;
-  return { url: url.replace(/\/$/, ''), apiKey };
+  if (url && apiKey) return { url: url.replace(/\/$/, ''), apiKey };
+  // Third tier (GH #129): this server's operator configured a Romm for
+  // everyone and kept the key host-side. Only consulted when the visitor has
+  // no complete config of their own — someone who typed their own address and
+  // key is pointed at THEIR server, not the operator's.
+  const operator = operatorDefault('romm');
+  if (operator && !url) return { url: operator.url, apiKey: '', viaOperator: true };
+  return null;
 }
 
 // Build the HTTP Authorization header for a Romm request. Romm's API accepts
@@ -111,7 +125,9 @@ async function rommRequest(
         method: 'GET',
         headers: {
           'X-Proxy-Target': url,
-          Authorization: authHeader(config),
+          // Operator-managed: no Authorization at all, and the proxy supplies
+          // the operator's (GH #129).
+          ...(config.viaOperator ? {} : { Authorization: authHeader(config) }),
           'Content-Type': 'application/json',
         },
         signal: controller.signal,
@@ -241,7 +257,11 @@ function coverUrl(config: RommConfig, rom: any, platformId?: number): string | u
   // The poster worker unwraps this marker into header-addressed same-origin
   // requests (poster-worker.ts) and falls back to `alt` if the primary 404s or
   // comes back as something that isn't an image.
-  const auth = primary.startsWith(config.url) ? `&auth=${encodeURIComponent(authHeader(config))}` : '';
+  // No `auth=` in operator-managed mode: the marker carries no credential and
+  // the proxy attaches the operator's (GH #129). The unwrappers already treat a
+  // missing `auth` as "send none" (poster-worker.ts, game-case-art.ts).
+  const auth = primary.startsWith(config.url) && !config.viaOperator
+    ? `&auth=${encodeURIComponent(authHeader(config))}` : '';
   const alt = fallback ? `&alt=${encodeURIComponent(fallback)}` : '';
   return `/dev-proxy?art=${encodeURIComponent(primary)}${auth}${alt}`;
 }
@@ -296,7 +316,8 @@ function gameArtUrls(config: RommConfig, rom: any, platformId?: number): GameArt
       : `${config.url}/assets/romm/resources/${raw}`;
     out[key] = hasTauri
       ? abs
-      : `/dev-proxy?art=${encodeURIComponent(abs)}&auth=${encodeURIComponent(authHeader(config))}`;
+      : `/dev-proxy?art=${encodeURIComponent(abs)}`
+        + (config.viaOperator ? '' : `&auth=${encodeURIComponent(authHeader(config))}`);
   }
   return out.back || out.spine || out.label ? out : undefined;
 }
