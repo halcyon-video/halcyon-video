@@ -467,3 +467,118 @@ test('fetchPlexServers: plain-IP local beats plex.direct local beats remote beat
     globalThis.fetch = originalFetch;
   }
 });
+
+// GH #131: Plex servers (or XML-to-JSON serializations) often return single objects
+// instead of arrays when a list has exactly 1 element (e.g. Directory, Metadata,
+// Genre, Role, Director, Guid, Media, Part, Stream, Rating, collections).
+test('single-object response shapes are parsed without crashing', async () => {
+  const singleItemServer = createServer((req, res) => {
+    const path = (req.url || '').split('?')[0];
+    let body: any = null;
+    if (path === '/library/sections') {
+      body = {
+        MediaContainer: {
+          size: 1,
+          Directory: { key: '10', type: 'movie', title: 'Single Movie Lib' },
+        },
+      };
+    } else if (path === '/library/sections/10/all') {
+      body = {
+        MediaContainer: {
+          size: 1,
+          Metadata: {
+            ratingKey: '100',
+            type: 'movie',
+            title: 'Sole Film',
+            year: 2021,
+            Media: {
+              id: 50,
+              width: 1920,
+              height: 1080,
+              Part: { id: 50, key: '/part/50.mp4', file: '/data/Sole Film.mp4', Stream: { streamType: 2, id: 1, codec: 'aac' } },
+            },
+            Genre: { tag: 'Drama' },
+            Director: { tag: 'Solo Director' },
+            Role: { tag: 'Solo Actor' },
+            Guid: { id: 'tmdb://999' },
+            Rating: { value: 8.5, type: 'critic' },
+          },
+        },
+      };
+    } else if (path === '/library/sections/10/collections') {
+      body = {
+        MediaContainer: {
+          size: 1,
+          Metadata: { ratingKey: '200', title: 'Single Collection' },
+        },
+      };
+    } else if (path === '/library/metadata/200/children') {
+      body = {
+        MediaContainer: {
+          size: 1,
+          Metadata: { ratingKey: '100' },
+        },
+      };
+    }
+    if (!body) { res.writeHead(404); res.end(); return; }
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(body));
+  });
+  await new Promise<void>((r) => singleItemServer.listen(0, '127.0.0.1', r));
+  const port = (singleItemServer.address() as any).port;
+  const srvBase = `http://127.0.0.1:${port}`;
+  try {
+    const list = await fetchPlexLibraryList(srvBase, 'tok');
+    assert.equal(list.length, 1);
+    assert.equal(list[0].name, 'Single Movie Lib');
+
+    const ticks: string[] = [];
+    const libs = await fetchPlexLibrariesAndMovies(srvBase, 'tok', (s) => ticks.push(s));
+    assert.equal(libs.length, 1);
+    assert.equal(libs[0].movies.length, 1);
+    const m = libs[0].movies[0];
+    assert.equal(m.title, 'Sole Film');
+    assert.equal(m.director, 'Solo Director');
+    assert.deepEqual(m.actors, ['Solo Actor']);
+    assert.deepEqual(m.genres, ['Drama']);
+    assert.equal(m.tmdbId, 999);
+    assert.equal(m.collectionName, 'Single Collection');
+    assert.ok(ticks.includes('page'), 'page progress ticks sent to keep watchdog alive');
+  } finally {
+    await new Promise<void>((r) => singleItemServer.close(() => r()));
+  }
+});
+
+test('HTTP errors during sync name the failing library/stage', async () => {
+  const errServer = createServer((req, res) => {
+    const path = (req.url || '').split('?')[0];
+    if (path === '/library/sections') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(SECTIONS));
+      return;
+    }
+    if (path === '/library/sections/1/all') {
+      res.writeHead(500, { 'Content-Type': 'text/plain' });
+      res.end('Internal error');
+      return;
+    }
+    res.writeHead(404);
+    res.end();
+  });
+  await new Promise<void>((r) => errServer.listen(0, '127.0.0.1', r));
+  const port = (errServer.address() as any).port;
+  const srvBase = `http://127.0.0.1:${port}`;
+  try {
+    await assert.rejects(
+      fetchPlexLibrariesAndMovies(srvBase, 'tok'),
+      (err: any) => {
+        assert.match(err.message, /The "Movies" library/);
+        assert.match(err.message, /500/);
+        return true;
+      }
+    );
+  } finally {
+    await new Promise<void>((r) => errServer.close(() => r()));
+  }
+});
+

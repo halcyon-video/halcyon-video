@@ -406,6 +406,11 @@ export function describePlexConnectFailure(attempts: PlexProbe[]): string {
   return `${first.message || `Could not reach ${hostLabel(first.url)}.`}${tail}`;
 }
 
+function toArray<T>(val: T | T[] | undefined | null): T[] {
+  if (!val) return [];
+  return Array.isArray(val) ? val : [val];
+}
+
 /**
  * `label` names what's being fetched ("the Movies library", "collections")
  * in plain words for the timeout message — the caller knows that, a bare URL
@@ -439,11 +444,19 @@ async function plexJson<T = any>(
     clearTimeout(timer);
   }
   if (!res.ok) {
-    throw new Error(`Plex HTTP error ${res.status} for ${redactToken(url)}`);
+    const target = init?.label ?? hostLabel(url);
+    if (res.status === 401 || res.status === 403) {
+      throw new Error(`${target} refused sign-in (HTTP ${res.status}). Link your Plex account again.`);
+    }
+    throw new Error(`Plex HTTP error ${res.status} for ${init?.label ? `${init.label} (${redactToken(url)})` : redactToken(url)}`);
   }
   const text = await res.text();
   if (!text) return {} as T;
-  return JSON.parse(text) as T;
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    throw new Error(`${init?.label ?? hostLabel(url)} returned an invalid response, not Plex JSON.`);
+  }
 }
 
 function redactToken(url: string): string {
@@ -577,10 +590,10 @@ export async function fetchPlexServers(accountToken: string): Promise<PlexServer
     `${PLEX_TV}/api/v2/resources?includeHttps=1&includeRelay=1`,
     accountToken
   );
-  return (Array.isArray(list) ? list : [])
+  return toArray(list)
     .filter((r) => typeof r?.provides === 'string' && r.provides.split(',').includes('server'))
     .map((r) => {
-      const conns = (r.connections || []) as any[];
+      const conns = toArray(r.connections);
       const ordered = [...conns].sort((a, b) => connectionRank(a) - connectionRank(b));
       return {
         name: r.name || 'Plex Media Server',
@@ -662,7 +675,7 @@ export function buildPlexImageUrl(
 // ─── Catalog ─────────────────────────────────────────────────────────────────
 
 function tmdbIdFrom(guids: any[] | undefined): number | undefined {
-  for (const g of guids || []) {
+  for (const g of toArray(guids)) {
     const m = /^tmdb:\/\/(\d+)$/.exec(String(g?.id ?? ''));
     if (m) return Number(m[1]);
   }
@@ -683,13 +696,13 @@ function tmdbIdFrom(guids: any[] | undefined): number | undefined {
  * scraped. The array is the fallback for an item that carries only it.
  */
 function ratingsFrom(item: any): { communityRating?: number; criticRating?: number } {
-  const arr: any[] = Array.isArray(item.Rating) ? item.Rating : [];
+  const arr: any[] = toArray(item.Rating);
   const critic = typeof item.rating === 'number'
     ? item.rating
-    : arr.find((r) => r.type === 'critic')?.value;
+    : arr.find((r) => r?.type === 'critic')?.value;
   const audience = typeof item.audienceRating === 'number'
     ? item.audienceRating
-    : arr.find((r) => r.type === 'audience')?.value;
+    : arr.find((r) => r?.type === 'audience')?.value;
   return {
     communityRating: typeof audience === 'number' ? audience : undefined,
     criticRating: typeof critic === 'number' ? Math.round(critic * 10) : undefined,
@@ -697,10 +710,10 @@ function ratingsFrom(item: any): { communityRating?: number; criticRating?: numb
 }
 
 function streamsFromPart(part: any): MediaStreamInfo[] | undefined {
-  const streams: any[] = part?.Stream;
-  if (!Array.isArray(streams)) return undefined;
+  const streams: any[] = toArray(part?.Stream);
+  if (!streams.length) return undefined;
   const out = streams
-    .filter((s) => s.streamType === 2 || s.streamType === 3)
+    .filter((s) => s && (s.streamType === 2 || s.streamType === 3))
     .map((s) => ({
       index: typeof s.index === 'number' ? s.index : Number(s.id),
       type: (s.streamType === 2 ? 'Audio' : 'Subtitle') as 'Audio' | 'Subtitle',
@@ -742,22 +755,22 @@ function qualityLabel(media: any): string {
 }
 
 function versionsFrom(item: any): MovieVersion[] | undefined {
-  const medias: any[] = Array.isArray(item.Media) ? item.Media : [];
+  const medias: any[] = toArray(item.Media);
   if (medias.length < 2) return undefined;
   return medias
     .map((m) => {
-      const part = m.Part?.[0];
-      const w = m.width ?? 0;
+      const part = toArray(m?.Part)[0];
+      const w = m?.width ?? 0;
       return {
         itemId: String(item.ratingKey),
-        mediaSourceId: String(m.id),
+        mediaSourceId: String(m?.id ?? ''),
         // A curator-entered edition name beats an inferred quality string —
         // this is what capabilities.namedEditions is about, and Jellyfin has
         // no equivalent field.
         label: item.editionTitle ? `${item.editionTitle} · ${qualityLabel(m)}` : qualityLabel(m),
-        is4k: w >= 3840 || String(m.videoResolution).toLowerCase() === '4k',
-        width: typeof m.width === 'number' ? m.width : undefined,
-        height: typeof m.height === 'number' ? m.height : undefined,
+        is4k: w >= 3840 || String(m?.videoResolution).toLowerCase() === '4k',
+        width: typeof m?.width === 'number' ? m.width : undefined,
+        height: typeof m?.height === 'number' ? m.height : undefined,
         localPath: part?.file || undefined,
         mediaStreams: streamsFromPart(part),
         mediaPlaybackInfo: playbackInfoFromMedia(m),
@@ -768,31 +781,35 @@ function versionsFrom(item: any): MovieVersion[] | undefined {
 
 /** One Plex metadata item → one shelvable Title. */
 function toMovie(server: string, token: string, item: any, libraryName: string): Movie {
-  const media = item.Media?.[0];
-  const part = media?.Part?.[0];
+  const medias = toArray(item.Media);
+  const media = medias[0];
+  const parts = toArray(media?.Part);
+  const part = parts[0];
   const durationMs = Number(item.duration ?? media?.duration ?? 0);
   const durationMin = Math.round(durationMs / 1000 / 60);
   const isSeries = item.type === 'show';
   const width = media?.width ?? 0;
-  const roles: any[] = Array.isArray(item.Role) ? item.Role : [];
+  const roles: any[] = toArray(item.Role);
+  const directors: any[] = toArray(item.Director);
+  const genres: any[] = toArray(item.Genre);
   const { communityRating, criticRating } = ratingsFrom(item);
 
   return {
-    id: String(item.ratingKey),
+    id: String(item.ratingKey ?? ''),
     title: item.title || 'Untitled',
-    year: item.year || 2000,
+    year: typeof item.year === 'number' ? item.year : 2000,
     premiereDate: item.originallyAvailableAt || undefined,
     duration: isSeries ? 'Series' : durationMin > 0 ? `${durationMin}m` : 'N/A',
     rating: item.contentRating || 'NR',
     overview: item.summary || 'No description available.',
-    director: item.Director?.[0]?.tag || 'Unknown Director',
-    actors: roles.slice(0, 5).map((r) => r.tag).filter(Boolean),
+    director: directors[0]?.tag || 'Unknown Director',
+    actors: roles.slice(0, 5).map((r) => r?.tag).filter(Boolean),
     // castPeople is deliberately absent: the LIST query's Role entries carry a
     // tag and nothing else — portraits live on the per-item metadata call, and
     // paying one round trip per title to decorate a wall is not a trade worth
     // making on a 5000-title library. Wall décor falls back to its no-portrait
     // path, exactly as it does for the demo catalog.
-    genres: (item.Genre || []).map((g: any) => g.tag).filter(Boolean),
+    genres: genres.map((g: any) => g?.tag).filter(Boolean),
     localPath: part?.file || '',
     posterUrl: buildPlexImageUrl(server, token, item.thumb, 400),
     backdropUrl: buildPlexImageUrl(server, token, item.art, 1280),
@@ -833,29 +850,35 @@ async function applyPlexCollections(
   token: string,
   sectionKey: string,
   byId: Map<string, Movie>,
-  timeoutMs?: number
+  timeoutMs?: number,
+  onProgress?: (stage: string) => void
 ): Promise<void> {
   const base = normalizePlexUrl(server);
   let collections: any[] = [];
   try {
     const res = await plexJson<any>(`${base}/library/sections/${sectionKey}/collections`, token, {
+      label: `Collections for section ${sectionKey}`,
       timeoutMs,
     });
-    collections = res?.MediaContainer?.Metadata ?? [];
+    collections = toArray(res?.MediaContainer?.Metadata);
   } catch {
     return; // a server without the endpoint simply has no collection endcaps
   }
   for (const col of collections) {
+    if (!col?.ratingKey) continue;
     try {
       const res = await plexJson<any>(
         `${base}/library/metadata/${col.ratingKey}/children`,
         token,
-        { timeoutMs }
+        { label: `Collection "${col.title ?? col.ratingKey}"`, timeoutMs: timeoutMs ?? 10_000 }
       );
-      for (const child of res?.MediaContainer?.Metadata ?? []) {
-        const movie = byId.get(String(child.ratingKey));
-        if (movie) movie.collectionName = col.title;
+      for (const child of toArray(res?.MediaContainer?.Metadata)) {
+        if (child?.ratingKey) {
+          const movie = byId.get(String(child.ratingKey));
+          if (movie && col.title) movie.collectionName = col.title;
+        }
       }
+      onProgress?.('page');
     } catch {
       // one unreadable collection must not lose the whole library
     }
@@ -896,7 +919,7 @@ export async function fetchPlexLibraryList(
     label: 'The library list',
     timeoutMs: opts?.timeoutMs,
   });
-  const sections: any[] = secRes?.MediaContainer?.Directory ?? [];
+  const sections: any[] = toArray(secRes?.MediaContainer?.Directory);
   return sections
     .filter((s) => s?.type === 'movie' || s?.type === 'show')
     .map((s) => ({ id: String(s.key), name: String(s.title ?? s.key) }));
@@ -917,29 +940,32 @@ export async function fetchPlexLibrariesAndMovies(
     label: 'The library list',
     timeoutMs: opts?.timeoutMs,
   });
-  const sections: any[] = secRes?.MediaContainer?.Directory ?? [];
+  const sections: any[] = toArray(secRes?.MediaContainer?.Directory);
 
   const libraries: Library[] = [];
   for (const section of sections) {
+    if (!section?.key) continue;
     const key = String(section.key);
     if (opts?.excludeLibraryIds?.has(key)) continue;
     // Photo and music sections have no shelf representation.
     if (section.type !== 'movie' && section.type !== 'show') continue;
 
-    onProgress?.(`Stocking ${section.title}`);
+    const sectionTitle = section.title || `Library ${key}`;
+    onProgress?.(`Stocking ${sectionTitle}`);
     const listRes = await plexJson<any>(
       `${base}/library/sections/${key}/all?includeGuids=1`,
       token,
-      { label: `The "${section.title}" library`, timeoutMs: opts?.timeoutMs }
+      { label: `The "${sectionTitle}" library`, timeoutMs: opts?.timeoutMs }
     );
-    const items: any[] = listRes?.MediaContainer?.Metadata ?? [];
-    const movies = items.map((it) => toMovie(server, token, it, section.title));
+    onProgress?.('page');
+    const items: any[] = toArray(listRes?.MediaContainer?.Metadata);
+    const movies = items.map((it) => toMovie(server, token, it, sectionTitle));
 
     const byId = new Map(movies.map((m) => [m.id, m]));
-    await applyPlexCollections(server, token, key, byId, opts?.timeoutMs);
+    await applyPlexCollections(server, token, key, byId, opts?.timeoutMs, onProgress);
 
     const genres = [...new Set(movies.flatMap((m) => m.genres))].sort();
-    libraries.push({ id: key, name: section.title, movies, genres });
+    libraries.push({ id: key, name: sectionTitle, movies, genres });
   }
   return libraries;
 }
@@ -948,6 +974,7 @@ export async function fetchPlexLibrariesAndMovies(
 
 function toEpisode(server: string, token: string, e: any): Episode {
   const durationMs = Number(e.duration ?? 0);
+  const parts = toArray(toArray(e.Media)[0]?.Part);
   return {
     id: String(e.ratingKey),
     seriesId: String(e.grandparentRatingKey ?? ''),
@@ -956,7 +983,7 @@ function toEpisode(server: string, token: string, e: any): Episode {
     episodeNumber: Number(e.index ?? 0),
     name: e.title || '',
     overview: e.summary || '',
-    path: e.Media?.[0]?.Part?.[0]?.file || '',
+    path: parts[0]?.file || '',
     runTimeTicks: durationMs ? durationMs * TICKS_PER_MS : undefined,
     resumePositionTicks: e.viewOffset ? e.viewOffset * TICKS_PER_MS : undefined,
     thumbUrl: buildPlexImageUrl(server, token, e.thumb, 400),
@@ -972,8 +999,10 @@ export async function fetchPlexSeriesEpisodes(
   seriesId: string
 ): Promise<Episode[]> {
   const base = normalizePlexUrl(server);
-  const res = await plexJson<any>(`${base}/library/metadata/${seriesId}/allLeaves`, token);
-  const eps: any[] = res?.MediaContainer?.Metadata ?? [];
+  const res = await plexJson<any>(`${base}/library/metadata/${seriesId}/allLeaves`, token, {
+    label: `Episodes for series ${seriesId}`,
+  });
+  const eps: any[] = toArray(res?.MediaContainer?.Metadata);
   return eps
     .map((e) => toEpisode(server, token, e))
     .sort((a, b) =>
@@ -1191,11 +1220,12 @@ export async function fetchPlexItemPlaybackInfo(
   try {
     const res = await plexJson<any>(
       `${normalizePlexUrl(server)}/library/metadata/${itemId}`,
-      token
+      token,
+      { label: `Playback metadata for item ${itemId}` }
     );
-    const item = res?.MediaContainer?.Metadata?.[0];
-    const media = item?.Media?.[0];
-    const part = media?.Part?.[0];
+    const item = toArray(res?.MediaContainer?.Metadata)[0];
+    const media = toArray(item?.Media)[0];
+    const part = toArray(media?.Part)[0];
     return {
       info: playbackInfoFromMedia(media),
       streams: streamsFromPart(part),

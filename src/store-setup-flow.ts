@@ -461,8 +461,9 @@ async function afterAuth(
     }
     showLibraryChoices();
   } catch (e: any) {
-    deps.log(`[Setup] Library list failed: ${e?.message ?? e}`);
-    screen = { ...initialHomeScreen(url), error: 'COULD NOT LIST LIBRARIES. RETRY.' };
+    const reason = String(e?.message ?? e);
+    deps.log(`[Setup] Library list failed: ${reason}`);
+    screen = { ...initialHomeScreen(url), error: wrapSetupError(reason || 'Could not list libraries. Retry.') };
     render();
   }
 }
@@ -571,8 +572,9 @@ async function runSync(): Promise<void> {
       render();
     });
   } catch (e: any) {
-    deps.log(`[Setup] Catalog sync failed: ${e?.message ?? e}`);
-    screen = { ...initialHomeScreen(url), error: 'CATALOG SYNC FAILED. TRY AGAIN.' };
+    const reason = String(e?.message ?? e);
+    deps.log(`[Setup] Catalog sync failed: ${reason}`);
+    screen = { ...initialHomeScreen(url), error: wrapSetupError(reason || 'Catalog sync failed. Try again.') };
     render();
     return;
   }
