@@ -272,6 +272,21 @@ function forgetEverythingAndStartOver(): void {
 }
 
 /**
+ * The blunt stall watchdog's error, shared by all three sync entry points
+ * (GH #128). By the time this fires, plexJson's/jellyfin's own per-request
+ * timeouts have already had their chance to fail with a specific cause — this
+ * is what's left for a stage that genuinely never returns anything at all, so
+ * it names what was in flight and what's worth checking, rather than the bare
+ * "No response from Plex for 45s" that gave a real report nothing to go on.
+ */
+function stallMessage(displayName: string, stallMs: number, lastStage: string): string {
+  return (
+    `No response from ${displayName} for ${stallMs / 1000}s (last step: ${lastStage}). ` +
+    `Check that the server is awake, not mid-scan, and reachable from this device.`
+  );
+}
+
+/**
  * Sync every connected server (GH #84) and say what happened.
  *
  * The one place all three boot paths get their catalog, so the multi-server
@@ -333,12 +348,16 @@ async function syncForSetup(
     if (stallTimer) clearTimeout(stallTimer);
     stallTimer = setTimeout(() => onStall?.(), LOGIN_STALL_MS);
   };
-  const stallPromise = new Promise<never>((_, reject) => {
-    onStall = () => reject(new Error(`No response from ${provider().displayName} for ${LOGIN_STALL_MS / 1000}s`));
-    armStall();
-  });
   let pages = 0;
   let lastStage = 'CONTACTING DISTRIBUTOR...';
+  const stallPromise = new Promise<never>((_, reject) => {
+    // Named cause, not a blank stall (GH #128): plexJson/jellyfin's own
+    // per-request timeouts now fail fast with a specific reason before this
+    // ever fires, so reaching here means the last stage itself never even
+    // returned an error — worth saying which one it was.
+    onStall = () => reject(new Error(stallMessage(provider().displayName, LOGIN_STALL_MS, lastStage)));
+    armStall();
+  });
   const onProgress = (stage: string) => {
     armStall();
     if (stage === 'page') pages++;
@@ -509,12 +528,14 @@ async function finishLoginAndLaunch(urlInput: string, session: MembershipLoginSe
   const LOGIN_STALL_MS = 45_000;
   let loginStallTimer: ReturnType<typeof setTimeout> | null = null;
   let onLoginStall: (() => void) | null = null;
-  const armLoginStall = () => {
+  let lastLoginStage = 'Contacting server';
+  const armLoginStall = (stage?: string) => {
+    if (stage && stage !== 'page') lastLoginStage = stage;
     if (loginStallTimer) clearTimeout(loginStallTimer);
     loginStallTimer = setTimeout(() => onLoginStall?.(), LOGIN_STALL_MS);
   };
   const loginTimeout = new Promise<never>((_, reject) => {
-    onLoginStall = () => reject(new Error(`No response from ${provider().displayName} for ${LOGIN_STALL_MS / 1000}s`));
+    onLoginStall = () => reject(new Error(stallMessage(provider().displayName, LOGIN_STALL_MS, lastLoginStage)));
     armLoginStall();
   });
   let libs: JellyfinLibrary[];
@@ -759,12 +780,14 @@ export async function checkCredentialsAndLoad() {
 
       let stallTimer: ReturnType<typeof setTimeout> | null = null;
       let onStall: (() => void) | null = null;
-      const armStall = () => {
+      let lastSyncStage = 'Contacting server';
+      const armStall = (stage?: string) => {
+        if (stage && stage !== 'page') lastSyncStage = stage;
         if (stallTimer) clearTimeout(stallTimer);
         stallTimer = setTimeout(() => onStall?.(), STALL_MS);
       };
       const stallPromise = new Promise<never>((_, reject) => {
-        onStall = () => reject(new Error(`No response from ${provider().displayName} for ${STALL_MS / 1000}s`));
+        onStall = () => reject(new Error(stallMessage(provider().displayName, STALL_MS, lastSyncStage)));
         armStall();
       });
 

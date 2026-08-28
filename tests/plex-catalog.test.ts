@@ -15,6 +15,7 @@ import {
   fetchPlexLibraryList,
   fetchPlexSeriesEpisodes,
   fetchPlexServers,
+  validatePlexToken,
   buildPlexImageUrl,
   buildPlexHlsStreamUrl,
   buildPlexDirectStreamUrl,
@@ -208,6 +209,53 @@ test('excludeLibraryIds skips a library at sync rather than hiding it after', as
     });
     assert.deepEqual(libs.map((l) => l.name), ['Movies']);
   });
+});
+
+// GH #128: the sync stage had NO request timeout at all — a hung request
+// (server accepts the connection, then answers nothing) hung the whole sync
+// forever, with only the boot flow's blunt 45s stall watchdog ever noticing,
+// and it couldn't say what stalled. Each sync-stage request now carries its
+// own budget and fails fast with a named cause instead.
+test('a library request that never answers fails fast, named, instead of hanging forever', async () => {
+  const hang = createServer((req, res) => {
+    const path = (req.url || '').split('?')[0];
+    if (path === '/library/sections') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(SECTIONS));
+      return;
+    }
+    // '/library/sections/1/all' (and everything else) — accept the
+    // connection, answer nothing. This is the reported hang, not a refusal.
+  });
+  await new Promise<void>((r) => hang.listen(0, '127.0.0.1', r));
+  const port = (hang.address() as any).port;
+  const hangBase = `http://127.0.0.1:${port}`;
+  try {
+    await assert.rejects(
+      fetchPlexLibrariesAndMovies(hangBase, 'tok', undefined, { timeoutMs: 150 }),
+      (err: any) => {
+        assert.match(err.message, /The "Movies" library did not answer within/);
+        return true;
+      }
+    );
+  } finally {
+    await new Promise<void>((r) => hang.close(() => r()));
+  }
+});
+
+test('validatePlexToken fails fast, named, against a server that never answers', async () => {
+  const hang = createServer(() => { /* accept, never respond */ });
+  await new Promise<void>((r) => hang.listen(0, '127.0.0.1', r));
+  const port = (hang.address() as any).port;
+  const hangBase = `http://127.0.0.1:${port}`;
+  try {
+    await assert.rejects(
+      validatePlexToken(hangBase, 'tok', { timeoutMs: 150 }),
+      /did not answer the sign-in check within/
+    );
+  } finally {
+    await new Promise<void>((r) => hang.close(() => r()));
+  }
 });
 
 // The setup terminal draws its "which libraries does this store carry?" rows
@@ -412,6 +460,9 @@ test('fetchPlexServers: plain-IP local beats plex.direct local beats remote beat
       'https://1-2-3-4.plex.tv:32400',
       'https://relay.plex.direct:32400',
     ]);
+    // GH #128: relay-ness has to survive past this call so the setup flow can
+    // warn about it — it's tracked per-connection, not folded into a bool.
+    assert.deepEqual(servers[0].relayConnections, ['https://relay.plex.direct:32400']);
   } finally {
     globalThis.fetch = originalFetch;
   }

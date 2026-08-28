@@ -398,6 +398,19 @@ async function afterAuth(
   if (session.serverAddress && session.serverAddress !== url) {
     deps.log(`[Setup] Connected on ${session.serverAddress} (${url} was not reachable from here).`);
     url = session.serverAddress;
+  } else {
+    // Always state the address in use (GH #128) — the setup log used to say
+    // nothing here at all when the typed address just worked, which is most
+    // connects, and left "which address did it actually use?" unanswerable
+    // from a bug report alone.
+    deps.log(`[Setup] Connected on ${url}.`);
+  }
+  if (session.raw?.isRelay) {
+    deps.log(
+      `[Setup] This connection is routed through Plex Relay, which answers ` +
+      `quickly but is far too slow to carry a real library sync (GH #128). ` +
+      `A direct LAN or plex.direct address works much better if one is reachable.`
+    );
   }
   pendingUrl = url;
   pendingSession = session;
