@@ -103,6 +103,7 @@ import { brandString, loadBrandPack } from './brand-pack';
 import type { StoreScene } from './three-scene';
 import { InputManager } from './input';
 import type { InputCallbacks } from './input';
+import { installStoreTouchControls, isTouchInputActive, touchHUDText, touchMovieHUDText } from './store-touch';
 import { refreshHoldHints, setHoldCheckoutProgress, setHoldDismissProgress } from './hold-hints';
 import {
   setupRemotePlay, isRemoteInstance, isRemotelyDriven, reportRemoteFatal,
@@ -859,6 +860,12 @@ function updateMovieHUD(movie: Movie | null) {
   // BACK only — never advertise letter keys, clicks, or hold gestures here.
   const hint = document.getElementById('browse-hint');
   if (hint) {
+    if (isTouchInputActive()) {
+      hint.textContent = touchMovieHUDText(
+        !!isInspecting, !!movie.game, !!movie.discovery, !!movie.collectionGap,
+        !!movie.comingSoon, !!isRequestedDiscovery);
+      return;
+    }
     if (isInspecting) {
       if (movie.game) {
         hint.textContent = 'FLIP CASE  •  OK TO RENT & PLAY THIS GAME';
@@ -892,6 +899,14 @@ function updateMovieHUD(movie: Movie | null) {
 function updateHUDForMode(mode: string) {
   const hint = document.getElementById('browse-hint');
   if (!hint) return;
+
+  if (isTouchInputActive()) {
+    const touchText = touchHUDText(mode, !!storeScene?.canHoldToCheckout(), !!storeScene?.carryMode);
+    if (touchText !== null) {
+      hint.textContent = touchText;
+      return;
+    }
+  }
 
   // Remote-truthful copy (review §4.5): arrows/OK/BACK vocabulary only. The
   // checkout path advertised is the one a momentary remote can actually
@@ -970,6 +985,8 @@ function updateBrowseHUDVisibility() {
   refreshHoldCheckoutHint(); // piggyback on the same 200ms poll (cheap when unchanged)
   const locator = document.getElementById('browse-locator');
   const hint = document.getElementById('browse-hint');
+  // Only present on a touch-primary device (store-touch.ts) — absent everywhere else.
+  const touchControls = document.getElementById('store-touch-controls');
   if (!storeScene || !locator || !hint) return;
 
   const suppressed = ui.isAnyOverlayOpen || ui.isPlaybackActive || ui.isScreensaverActive
@@ -984,6 +1001,7 @@ function updateBrowseHUDVisibility() {
       browseHudVisible = false;
       locator.classList.remove('visible');
       hint.classList.remove('visible');
+      touchControls?.classList.remove('visible');
     }
     return;
   }
@@ -992,6 +1010,7 @@ function updateBrowseHUDVisibility() {
     browseHudVisible = true;
     locator.classList.add('visible');
     hint.classList.add('visible');
+    touchControls?.classList.add('visible');
   }
 
   const name = storeScene.getActiveAisleName();
@@ -4331,7 +4350,12 @@ async function main() {
     onHoldDownProgress: (p) => setHoldDismissProgress(p),
   };
 
-  new InputManager(inputCallbacks);
+  const inputManager = new InputManager(inputCallbacks);
+
+  // Touch layer for the 3D store (issue #126) — a no-op DOM-wise on anything
+  // but a touch-primary device. See src/store-touch.ts for why this calls
+  // `inputCallbacks` directly rather than synthesizing key events.
+  installStoreTouchControls(inputCallbacks, () => inputManager.poke());
 
   // Remote Play: stream the store to /remote.html viewers when the option is
   // on (Connection settings, or ?remote=1). The getter tracks storeScene

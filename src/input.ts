@@ -610,6 +610,16 @@ export class InputManager {
     this.resetIdleTimer();
   }
 
+  // An input source that calls `callbacks` directly instead of going through
+  // this class's own keydown/gamepad listeners (store-touch.ts — issue #126)
+  // has no other way to reach the idle timer, the screensaver wake, or the
+  // gamepad poll-rate downshift: handleActivity() is private, and those three
+  // are the whole reason it exists rather than each caller poking onActivity
+  // itself. Same pipeline keyboard/mouse/gamepad already share.
+  public poke() {
+    this.handleActivity();
+  }
+
   // Clean up listeners
   public destroy() {
     this.stopGamepadPolling();
