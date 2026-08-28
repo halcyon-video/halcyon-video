@@ -414,6 +414,12 @@ wordmark centers itself on every genre board, and the brand propagates to the
 rental-case wraps, the checkout bag, the membership cards, the POS terminal,
 the works. No manifest, no settings, presence = active.
 
+**Docker:** If you're running via `docker compose`, the bind mount is already
+configured in `docker-compose.yml` — just drop your files into
+`public/user-assets/brand/` on the host and restart the container. A rebuild
+is not required. If you customized the compose file, see the
+[`docker-compose.yml`](docker-compose.yml) annotations for the brand mount.
+
 One level deeper, a **brand pack** (`public/user-assets/brands/<id>/` with a
 `brand.json`) controls everything individually: palette, display fonts, vector
 emblem paths, per-sign art, wrap prints, rendered strings. There's also a live

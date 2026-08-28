@@ -38,6 +38,10 @@ services:
       # instance of your real library. This volume keeps it across
       # container rebuilds.
       - halcyon-data:/data
+      # Brand drop-in customization (logo, pack): any files in public/user-assets
+      # on the host overlay onto the served app, so a logo change needs only a
+      # container restart, not a rebuild. See README.md → "Make it yours".
+      - ./public/user-assets:/app/dist/user-assets
       # Keep F8 feedback pins (in-app visual bug reports) on the host:
       # - ./feedback:/app/feedback
 

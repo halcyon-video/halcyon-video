@@ -131,6 +131,10 @@ That is the whole procedure. The folder is `brand/` — **singular**; `brands/`
 below is the multi-identity tier. On boot the store looks in it, and if it finds
 art it builds an identity out of it:
 
+**Running in Docker?** The `docker-compose.yml` bind mount makes
+`public/user-assets` writable at runtime, so your drop-in takes effect after a
+container restart with no rebuild — the same as a clone install.
+
 - **`logo.svg`** — the biggest shape in the file becomes the emblem's
   **outline**. That one silhouette then does every job the built-in emblem does:
   it fills the 2D emblem, it extrudes into the 3D sign over the storefront, and
