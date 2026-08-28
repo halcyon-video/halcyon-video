@@ -5,6 +5,14 @@ All notable changes to Halcyon Video, generated from commit history by
 it on every version tag push. Deterministic and offline: no entry here was
 written by a model.
 
+## [v0.11.1] — 2026-08-28
+
+### CHANGELOG
+- V0.11.0
+
+### General
+- Fix(plex): handle single-object responses and surface sync failures (Closes [#131](https://github.com/halcyon-video/halcyon-video/issues/131))
+
 ## [v0.11.0] — 2026-08-28
 
 ### CHANGELOG
