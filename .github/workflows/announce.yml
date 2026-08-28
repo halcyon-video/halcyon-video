@@ -181,17 +181,56 @@ jobs:
             echo "::warning::no screenshot available — announcements will be text-only"
           fi
 
+      # THIS STEP MUST NEVER BLOCK THE RELEASE (learned the hard way at v0.10.0).
+      # The checkout is detached at the TAG, but the entry belongs on master —
+      # and by the time this runs master has usually already moved PAST the tag:
+      # the release merge itself, and this very job's entry from the PREVIOUS
+      # release. Committing on the tag and pushing HEAD:master is therefore a
+      # non-fast-forward. It was rejected at v0.10.0, and because the step was
+      # fatal, everything after it was skipped — the GitHub Release and all four
+      # announcement channels — so a healthy release shipped silently and had to
+      # be published by hand.
+      #
+      # Two changes. First, land the entry on whatever master is RIGHT NOW:
+      # re-point HEAD at origin/master, rebuild the entry on top of THAT file,
+      # and stage only CHANGELOG.md. `reset --mixed` moves HEAD and the index
+      # while leaving the tag's working tree in place, so the generated notes
+      # body and the screenshot (both untracked) survive untouched and no other
+      # path can ever be swept into the commit. Three attempts, because another
+      # push can land between the fetch and ours; each retry re-fetches, which
+      # also discards the rejected commit. Second, `continue-on-error` — the
+      # changelog is a convenience, the Release is the deliverable, and losing
+      # the former must not cost the latter. A failure still shouts via
+      # ::warning:: rather than passing silently.
       - name: Commit the CHANGELOG.md entry to master
+        continue-on-error: true
         run: |
-          if git diff --quiet -- CHANGELOG.md; then
-            echo "CHANGELOG.md unchanged (entry already present), nothing to commit"
-            exit 0
-          fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add CHANGELOG.md
-          git commit -m "CHANGELOG: ${{ github.ref_name }}"
-          git push origin HEAD:master
+          for attempt in 1 2 3; do
+            git fetch --quiet origin master
+            git reset --quiet --mixed FETCH_HEAD
+            # Start from master's copy, not the tag's. A repo whose master has
+            # no CHANGELOG.md yet is the first-release case: leave none, and the
+            # generator creates it.
+            git checkout --quiet FETCH_HEAD -- CHANGELOG.md 2>/dev/null || rm -f CHANGELOG.md
+            node tools/release-notes.mjs \
+              --to "${{ github.ref_name }}" \
+              --repo "${{ github.repository }}" \
+              --changelog
+            if git diff --quiet -- CHANGELOG.md; then
+              echo "CHANGELOG.md unchanged (entry already on master), nothing to commit"
+              exit 0
+            fi
+            git add CHANGELOG.md
+            git commit --quiet -m "CHANGELOG: ${{ github.ref_name }}"
+            if git push origin HEAD:master; then
+              exit 0
+            fi
+            echo "::notice::master moved under us — re-fetching and retrying (attempt $attempt of 3)"
+          done
+          echo "::warning::could not land the CHANGELOG entry on master after 3 attempts — the Release and the announcements are unaffected, but master's CHANGELOG.md is missing ${{ github.ref_name }}"
+          exit 1
 
       - name: Cut the GitHub Release
         env:
