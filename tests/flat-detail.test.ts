@@ -24,10 +24,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer, type Server } from 'node:http';
-import type { Episode } from '../src/jellyfin.ts';
+import type { Episode, Movie } from '../src/jellyfin.ts';
 import { fetchFirstEpisodeOfSeries } from '../src/jellyfin.ts';
 import { fetchPlexFirstEpisodeOfSeries } from '../src/plex.ts';
-import { resolveEpisodePlaybackArgs } from '../src/flat/flat-playback.ts';
+import { resolveEpisodePlaybackArgs, resolveFlatDetailAction } from '../src/flat/flat-playback.ts';
 
 function mkEpisode(extra: Partial<Episode> = {}): Episode {
   return {
@@ -42,6 +42,23 @@ function mkEpisode(extra: Partial<Episode> = {}): Episode {
     ...extra,
   };
 }
+
+function mkMovie(extra: Partial<Movie> = {}): Movie {
+  return {
+    id: 'm-1',
+    title: 'The Matrix',
+    year: 1999,
+    duration: '136 min',
+    rating: 'R',
+    overview: 'A computer hacker learns the truth...',
+    director: 'The Wachowskis',
+    actors: ['Keanu Reeves'],
+    genres: ['Action', 'Sci-Fi'],
+    localPath: '/media/movies/The Matrix (1999).mkv',
+    ...extra,
+  };
+}
+
 
 // ── Layer 1: the pure function flat-detail.ts's playEpisode now calls ──────
 
@@ -114,3 +131,87 @@ test('Plex: asking for an episode-as-series (the GH #71 trap) resolves null, exa
     assert.equal(result, null);
   });
 });
+
+// ── Layer 3: resolveFlatDetailAction pure button resolution ─────────────────
+
+test('resolveFlatDetailAction: standard movie resolves to Play button', () => {
+  const m = mkMovie();
+  assert.deepEqual(resolveFlatDetailAction(m), {
+    kind: 'play',
+    text: 'Play',
+    icon: '▶',
+    disabled: false,
+  });
+});
+
+test('resolveFlatDetailAction: game resolves to Rent button', () => {
+  const m = mkMovie({ game: true, platform: 'SNES' });
+  assert.deepEqual(resolveFlatDetailAction(m), {
+    kind: 'game',
+    text: 'Rent',
+    icon: '🎮',
+    disabled: false,
+  });
+});
+
+test('resolveFlatDetailAction: unrequested discovery/collectionGap resolves to Request button', () => {
+  const gap = mkMovie({ collectionGap: true, tmdbId: 101 });
+  assert.deepEqual(resolveFlatDetailAction(gap, { isRequested: false }), {
+    kind: 'request',
+    text: 'Request',
+    icon: '✦',
+    disabled: false,
+  });
+
+  const disc = mkMovie({ discovery: true, tmdbId: 102 });
+  assert.deepEqual(resolveFlatDetailAction(disc, { isRequested: false }), {
+    kind: 'request',
+    text: 'Request',
+    icon: '✦',
+    disabled: false,
+  });
+});
+
+test('resolveFlatDetailAction: requested discovery/collectionGap resolves to disabled Requested/Coming Soon button', () => {
+  const gap = mkMovie({ collectionGap: true, tmdbId: 101 });
+  assert.deepEqual(resolveFlatDetailAction(gap, { isRequested: true }), {
+    kind: 'request',
+    text: 'Coming Soon',
+    icon: '✓',
+    disabled: true,
+  });
+
+  const disc = mkMovie({ discovery: true, tmdbId: 102 });
+  assert.deepEqual(resolveFlatDetailAction(disc, { isRequested: true }), {
+    kind: 'request',
+    text: 'Requested',
+    icon: '✓',
+    disabled: true,
+  });
+});
+
+test('resolveFlatDetailAction: comingSoon resolves to disabled Coming Soon button', () => {
+  const m = mkMovie({ comingSoon: true });
+  assert.deepEqual(resolveFlatDetailAction(m), {
+    kind: 'coming-soon',
+    text: 'Coming Soon',
+    icon: '⏱',
+    disabled: true,
+  });
+});
+
+test('resolveFlatDetailAction: streaming-service title resolves to Watch on <Service> button with link icon', () => {
+  const m = mkMovie({
+    streaming: true,
+    streamingServiceId: 'netflix',
+    streamingServiceName: 'NETFLIX',
+    streamingUrl: 'https://www.netflix.com/search?q=The%20Matrix',
+  });
+  assert.deepEqual(resolveFlatDetailAction(m), {
+    kind: 'streaming',
+    text: 'Watch on NETFLIX',
+    icon: '↗',
+    disabled: false,
+  });
+});
+

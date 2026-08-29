@@ -32,8 +32,50 @@
 // is the guard: it takes no server, no session, no provider, so a network
 // call — right target or wrong — cannot be smuggled back into it without a
 // reviewer noticing the new parameter.
-import type { Episode } from '../jellyfin.ts';
+import type { Episode, Movie } from '../jellyfin.ts';
 
 export function resolveEpisodePlaybackArgs(ep: Episode): { itemId: string; path: string } {
   return { itemId: ep.id, path: ep.path };
 }
+
+export interface FlatDetailAction {
+  kind: 'play' | 'game' | 'request' | 'coming-soon' | 'streaming';
+  text: string;
+  icon: string;
+  disabled: boolean;
+}
+
+/**
+ * Resolves the primary action button's kind, label, icon, and disabled state for
+ * the 2.5D flat detail overlay. Pure data logic, safe for bare `node --test`.
+ */
+export function resolveFlatDetailAction(
+  movie: Movie,
+  opts: { isRequested?: boolean } = {}
+): FlatDetailAction {
+  if (movie.game) {
+    return { kind: 'game', text: 'Rent', icon: '🎮', disabled: false };
+  }
+  if (movie.discovery || movie.collectionGap) {
+    const req = opts.isRequested ?? false;
+    return {
+      kind: 'request',
+      text: req ? (movie.collectionGap ? 'Coming Soon' : 'Requested') : 'Request',
+      icon: req ? '✓' : '✦',
+      disabled: req,
+    };
+  }
+  if (movie.comingSoon) {
+    return { kind: 'coming-soon', text: 'Coming Soon', icon: '⏱', disabled: true };
+  }
+  if (movie.streaming) {
+    return {
+      kind: 'streaming',
+      text: `Watch on ${movie.streamingServiceName || 'Service'}`,
+      icon: '↗',
+      disabled: false,
+    };
+  }
+  return { kind: 'play', text: 'Play', icon: '▶', disabled: false };
+}
+
