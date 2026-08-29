@@ -32,8 +32,47 @@
 // is the guard: it takes no server, no session, no provider, so a network
 // call — right target or wrong — cannot be smuggled back into it without a
 // reviewer noticing the new parameter.
-import type { Episode } from '../jellyfin.ts';
+import type { Episode, Movie } from '../jellyfin.ts';
 
 export function resolveEpisodePlaybackArgs(ep: Episode): { itemId: string; path: string } {
   return { itemId: ep.id, path: ep.path };
 }
+
+export interface FlatDetailButtonState {
+  text: string;
+  icon: string;
+  disabled: boolean;
+}
+
+/**
+ * Pure button state resolution for the 2.5D detail overlay (flat-detail.ts):
+ * games -> Rent (🎮)
+ * discovery/collectionGap -> Request / Requested / Coming Soon (✦ / ✓)
+ * streaming -> Watch on <SERVICE> (↗)
+ * comingSoon -> Coming Soon (⏱, disabled)
+ * library titles -> Play (▶)
+ */
+export function resolveDetailButtonState(movie: Partial<Movie>, isRequested = false): FlatDetailButtonState {
+  if (movie.game) {
+    return { text: 'Rent', icon: '🎮', disabled: false };
+  }
+  if (movie.discovery || movie.collectionGap) {
+    return {
+      text: isRequested ? (movie.collectionGap ? 'Coming Soon' : 'Requested') : 'Request',
+      icon: isRequested ? '✓' : '✦',
+      disabled: isRequested,
+    };
+  }
+  if (movie.streaming) {
+    return {
+      text: `Watch on ${movie.streamingServiceName || 'Streaming'}`,
+      icon: '↗',
+      disabled: false,
+    };
+  }
+  if (movie.comingSoon) {
+    return { text: 'Coming Soon', icon: '⏱', disabled: true };
+  }
+  return { text: 'Play', icon: '▶', disabled: false };
+}
+

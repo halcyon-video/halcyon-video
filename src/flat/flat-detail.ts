@@ -9,7 +9,7 @@ import { getActiveTheme } from '../themes';
 import { getActiveLogoSpec } from '../logo-spec';
 import { drawLogo } from '../logo-renderer';
 import { flatSignal } from './flat-lifecycle';
-import { resolveEpisodePlaybackArgs } from './flat-playback';
+import { resolveEpisodePlaybackArgs, resolveDetailButtonState } from './flat-playback';
 
 let launchVideoPlaybackFn: ((movie: Movie, overrideItemId?: string, overridePath?: string) => Promise<void>) | null = null;
 
@@ -150,22 +150,8 @@ export function openDetailsOverlay(
   // Determine button text/state
   const isRequested = (movie.discovery || movie.collectionGap) &&
     (movie.discoveryRequested || isDiscoveryRequested(movie.tmdbId));
-  let playBtnText = 'Play';
-  let playBtnDisabled = '';
-  let playBtnIcon = '▶';
-
-  if (movie.game) {
-    playBtnText = 'Rent';
-    playBtnIcon = '🎮';
-  } else if (movie.discovery || movie.collectionGap) {
-    playBtnText = isRequested ? (movie.collectionGap ? 'Coming Soon' : 'Requested') : 'Request';
-    playBtnIcon = isRequested ? '✓' : '✦';
-    playBtnDisabled = isRequested ? 'disabled' : '';
-  } else if (movie.comingSoon) {
-    playBtnText = 'Coming Soon';
-    playBtnIcon = '⏱';
-    playBtnDisabled = 'disabled';
-  }
+  const { text: playBtnText, icon: playBtnIcon, disabled: isBtnDisabled } = resolveDetailButtonState(movie, isRequested);
+  const playBtnDisabled = isBtnDisabled ? 'disabled' : '';
 
   // The clamshell lip's small embossed brand mark: the ACTIVE emblem, painted
   // from the LogoSpec onto an offscreen canvas (one-shot — flat mode is DOM,
@@ -191,7 +177,7 @@ export function openDetailsOverlay(
               <span class="flat-detail-badge-platform">${movie.platform}</span>
               <span class="flat-detail-meta-divider">|</span>
               <span class="flat-detail-meta-item">${movie.year}</span>
-            ` : movie.discovery ? `
+            ` : (movie.discovery || movie.streaming) ? `
               <span class="flat-detail-meta-item">${movie.year}</span>
             ` : `
               <span class="flat-detail-meta-item">${movie.year}</span>
@@ -210,7 +196,7 @@ export function openDetailsOverlay(
 
           <p class="flat-detail-overview">${movie.overview || 'No description available.'}</p>
 
-          ${(movie.game || movie.discovery) ? '' : `
+          ${(movie.game || movie.discovery || movie.streaming) ? '' : `
           <div class="flat-detail-credits">
             <div class="flat-detail-credits-label">Director</div>
             <div class="flat-detail-credits-value">${movie.director || 'Unknown'}</div>
@@ -433,6 +419,18 @@ export function openDetailsOverlay(
       } else {
         logSystemMessage(`[System] Failed to request "${movie.title}" (Jellyseerr unreachable or rejected the request).`);
       }
+    } else if (movie.streaming) {
+      if (movie.streamingUrl) {
+        logSystemMessage(`[System] Opening ${movie.streamingServiceName || 'the streaming service'} for "${movie.title}"...`);
+        try {
+          window.open(movie.streamingUrl, '_blank', 'noopener');
+        } catch {
+          logSystemMessage(`[System] Couldn't open the link for "${movie.title}" (popup blocked?).`);
+        }
+      } else {
+        logSystemMessage(`[System] No watch URL configured for "${movie.title}".`);
+      }
+      closeOverlay();
     } else {
       if (movie.isSeries) {
         if (episodesList.length > 0) {
