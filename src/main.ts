@@ -101,9 +101,10 @@ import { retailAudio } from './audio';
 import { BB_ARCHIVO_BLACK, bundledFontsReady } from './bundled-fonts';
 import { brandString, loadBrandPack } from './brand-pack';
 import type { StoreScene } from './three-scene';
-import { InputManager } from './input';
-import type { InputCallbacks } from './input';
+import { InputManager, type InputCallbacks } from './input';
 import { installStoreTouchControls, isTouchInputActive, touchHUDText, touchMovieHUDText } from './store-touch';
+import { triggerHostedWelcome, isWelcomeActive, dismissWelcome, welcomeHUDText } from './store-welcome';
+import { showClerkToast } from './carried-tapes';
 import { refreshHoldHints, setHoldCheckoutProgress, setHoldDismissProgress } from './hold-hints';
 import {
   setupRemotePlay, isRemoteInstance, isRemotelyDriven, reportRemoteFatal,
@@ -161,7 +162,6 @@ import {
   resolveMpvPrefArgs,
   playLocalWithMpv,
 } from './playback-flow';
-
 // ─── Application State ────────────────────────────────────────────────────────
 
 let librariesList: JellyfinLibrary[] = [];
@@ -372,7 +372,6 @@ async function loadDiscoveryMovies(): Promise<void> {
     discoveryMovies = [];
   }
 }
-
 
 /**
  * One boot-console line that always states where Jellyseerr stands. The
@@ -772,11 +771,8 @@ let settingsPendingGameRefetch = false;
 // picker instead of retry-looping against the new server.
 let settingsPendingJellyfinPassword: string | null = null;
 let settingsPendingAuthReset = false;
-
 let exitConfirmIndex = 1; // Default to "No, Return"
 const exitButtons = ['btn-confirm-exit', 'btn-confirm-cancel'];
-
-// Aisle indicator interval (tracked so it can be cleared on scene rebuild)
 let aisleIndicatorInterval: number | null = null;
 
 // Candy checkout state (T19). Focus index walks [candy rows..., Order btn,
@@ -798,7 +794,6 @@ let searchResultIndex = 0;
 // ─── UI Helpers ───────────────────────────────────────────────────────────────
 
 const MAX_LOG_ENTRIES = 200;
-
 // Ring buffer of recent log lines, attached to F8 feedback pins (saved as
 // log.txt next to the pin) so playback narration reaches disk even when the
 // on-screen log is hidden behind the video overlay.
@@ -848,10 +843,10 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 function updateMovieHUD(movie: Movie | null) {
-  if (!movie) return;
+  if (!movie || isWelcomeActive()) return;
 
-  const isInspecting = storeScene && storeScene.mode === 'inspect';
-  const isRequestedDiscovery = (movie.discovery || movie.collectionGap) &&
+  const isInspecting = storeScene?.mode === 'inspect';
+  const isRequestedDiscovery = typeof movie.tmdbId === 'number' &&
     (movie.discoveryRequested || isDiscoveryRequested(movie.tmdbId));
 
   // Update the floating bottom hint with movie-specific detail (e.g. "coming
@@ -899,6 +894,11 @@ function updateMovieHUD(movie: Movie | null) {
 function updateHUDForMode(mode: string) {
   const hint = document.getElementById('browse-hint');
   if (!hint) return;
+
+  if (isWelcomeActive()) {
+    hint.textContent = welcomeHUDText(isTouchInputActive());
+    return;
+  }
 
   if (isTouchInputActive()) {
     const touchText = touchHUDText(mode, !!storeScene?.canHoldToCheckout(), !!storeScene?.carryMode);
@@ -2989,6 +2989,19 @@ async function initializeStoreScene(preservePosterCache = false) {
       // You've just come in through the doors — ring the entry chime. (May stay
       // silent if the browser hasn't seen a user gesture yet; that's fine.)
       scene.playDoorChime();
+      triggerHostedWelcome({
+        isDemo: isDemoMode,
+        isTouch: isTouchInputActive(),
+        showToast: showClerkToast,
+        brandGreeting: brandString('clerk-welcome', 'Hey there! Welcome to Halcyon — take a look around, or come ask me if you need a recommendation!'),
+        onDismiss: () => {
+          if (!storeScene) return;
+          updateHUDForMode(storeScene.mode);
+          if (storeScene.mode === 'browse' || storeScene.mode === 'inspect') {
+            updateMovieHUD(storeScene.getSelectedMovie() || null);
+          }
+        },
+      });
     });
 
   } catch (err: any) {
@@ -3068,7 +3081,6 @@ async function waitForFontsAndInit() {
 // The whole boot/credentials flow lives in boot-flow.ts (extracted at the
 // line-budget ceiling, #41 prerequisite); main.ts hands it state setters and
 // loaders through initBootFlow() inside main() below.
-
 
 // ─── Power Action ─────────────────────────────────────────────────────────────
 
@@ -4259,6 +4271,7 @@ async function main() {
       openSearch();
     },
     onActivity: () => {
+      if (isWelcomeActive()) dismissWelcome();
       if (ui.isScreensaverActive) {
         ui.isScreensaverActive = false;
         document.getElementById('screensaver-overlay')!.classList.remove('visible');
