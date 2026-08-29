@@ -51,11 +51,19 @@ export function isWelcomeActive(): boolean {
 /**
  * Control hint text shown during the initial first-visit welcome period.
  * Gives the visitor an immediate, clear idea of what they can do.
+ *
+ * Only keys that answer RIGHT HERE belong in this line. Talking to the clerk
+ * is deliberately absent: 'e' is gated on ClerkInteraction's `near` check, so
+ * at the entrance -- which is exactly where this hint appears -- it does
+ * nothing. The store already teaches that key at the moment it works, via the
+ * proximity 'Press E to talk' prompt, and the greeting toast is the invitation
+ * to go find her. Teaching a key that ignores the visitor is worse than
+ * teaching none.
  */
 export function welcomeHUDText(isTouch: boolean): string {
   return isTouch
     ? 'SWIPE TO WALK THE AISLES  •  TAP ANY CASE TO EXAMINE'
-    : '◀ ▶ TO WALK THE AISLES  •  ENTER TO EXAMINE  •  E TO TALK TO CLERK';
+    : '◀ ▶ TO WALK THE AISLES  •  ENTER TO EXAMINE';
 }
 
 /**

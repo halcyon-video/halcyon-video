@@ -46,6 +46,10 @@ test('welcomeHUDText returns appropriate copy for touch vs keyboard', () => {
   const kbText = welcomeHUDText(false);
   assert.match(kbText, /WALK THE AISLES|ARROWS/, 'Keyboard hint should teach arrows/walking');
   assert.match(kbText, /ENTER/, 'Keyboard hint should teach ENTER');
+  // The boot hint must only promise keys that answer at the entrance. 'E'
+  // opens the clerk menu solely within her proximity radius, so advertising
+  // it here teaches a key that does nothing where the hint is shown.
+  assert.doesNotMatch(kbText, /CLERK/, 'Boot hint must not promise the proximity-gated clerk key');
 });
 
 test('triggerHostedWelcome requires demo mode', () => {
