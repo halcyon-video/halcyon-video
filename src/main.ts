@@ -138,13 +138,10 @@ import {
   EMBLEM_OPEN_ROW_KEY, isEmblemStudioOpen,
 } from './emblem-editor';
 import {
-  MEDIA_DATE_BUTTON_ID,
-  STREAMING_BUTTON_ID,
-  counterTerminalClose,
-  counterTerminalInput,
-  counterTerminalOpen,
-  initCounterTerminalFlow,
+  MEDIA_DATE_BUTTON_ID, STREAMING_BUTTON_ID,
+  counterTerminalClose, counterTerminalInput, counterTerminalOpen, initCounterTerminalFlow,
 } from './counter-terminal-flow';
+import { PROJECT_PAGE_BUTTON_ID, PROJECT_PAGE_URL } from './counter-terminal';
 import { buildControlsHelpPanel, HELP_ROW_PREFIX } from './controls-help';
 import type { CandyRow } from './fixtures/period-fixtures';
 import { getCandyDeliveryAdapter } from './candy-delivery';
@@ -694,10 +691,10 @@ const ui = {
 };
 
 let powerMenuIndex = 0;
-// The demo has no Jellyfin session to log out of and no app window to close —
-// those rows leave the keyboard-nav ring too (their DOM is hidden in main()).
-const powerButtons = ['btn-settings', 'btn-controls', 'btn-flat-mode', 'btn-suspend', 'btn-cec-toggle', 'btn-logout', 'btn-exit', 'btn-cancel']
-  .filter((id) => !(isDemoMode && (id === 'btn-logout' || id === 'btn-exit')));
+// Demo mode replaces the unusable logout/exit rows with the standing project route (#133).
+const powerButtons = isDemoMode
+  ? ['btn-settings', 'btn-controls', 'btn-flat-mode', 'btn-suspend', 'btn-cec-toggle', PROJECT_PAGE_BUTTON_ID, 'btn-cancel']
+  : ['btn-settings', 'btn-controls', 'btn-flat-mode', 'btn-suspend', 'btn-cec-toggle', 'btn-logout', 'btn-exit', 'btn-cancel'];
 
 // The single CEC row toggles the display: we track the last state WE commanded
 // (there's no CEC status read-back) and alternate standby/wake. If reality
@@ -3143,6 +3140,11 @@ async function executePowerMenuAction(btnId: string) {
       break;
     }
 
+    case PROJECT_PAGE_BUTTON_ID:
+      logToConsole('[System] Opening Halcyon project page on GitHub...', 'system');
+      try { window.open(PROJECT_PAGE_URL, '_blank', 'noopener'); } catch {}
+      return;
+
     case 'btn-logout':
       if (isDemoMode) break; // no session in the demo (button is hidden too)
       // #41: CHANGE SERVER / LOG OUT re-enters the empty store's NEW STORE
@@ -3921,13 +3923,11 @@ async function main() {
     openFeedbackPin();
   });
 
-  // Demo mode: the logout/exit power rows are meaningless without a session
-  // or an app window (see the powerButtons filter above for keyboard nav).
+  // Demo mode: hide logout/exit and reveal the standing project link route (#133).
   if (isDemoMode) {
-    for (const id of ['btn-logout', 'btn-exit']) {
-      const el = document.getElementById(id);
-      if (el) el.style.display = 'none';
-    }
+    for (const id of ['btn-logout', 'btn-exit']) document.getElementById(id)?.style.setProperty('display', 'none');
+    const projectBtn = document.getElementById(PROJECT_PAGE_BUTTON_ID);
+    if (projectBtn) projectBtn.style.display = '';
   }
 
   videoPlayer = new VideoPlayer();

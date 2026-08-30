@@ -35,7 +35,7 @@ test('idle screen keeps the default pitch', () => {
 });
 
 test('the full manager ring seats without clipping (#77)', () => {
-  const ids = Object.keys(COUNTER_TERMINAL_LABELS);
+  const ids = Object.keys(COUNTER_TERMINAL_LABELS).filter((id) => id !== 'btn-project');
   assert.equal(ids.length, 11); // full ring incl. the three CRT-only rows
   const { lines, cursorLine } = counterTerminalLines(ids, ids.length - 1);
   assert.equal(lines.length, 13); // 2 header rows + 11 buttons
@@ -48,13 +48,26 @@ test('the full manager ring seats without clipping (#77)', () => {
   assert.ok(BODY_TOP + (lines.length + 0.4) * lineH <= FOOT_TOP + 1e-6);
 });
 
+test('the demo manager ring seats without clipping (#133)', () => {
+  const ids = Object.keys(COUNTER_TERMINAL_LABELS).filter((id) => id !== 'btn-logout' && id !== 'btn-exit');
+  assert.equal(ids.length, 10); // demo ring: logout/exit replaced by project link
+  const { lines, cursorLine } = counterTerminalLines(ids, ids.length - 1);
+  assert.equal(lines.length, 12); // 2 header rows + 10 buttons
+  assert.equal(lines[lines.length - 1], '> RETURN TO STORE');
+  assert.equal(cursorLine, lines.length - 1);
+  const { lineH, maxLines } = fitTerminalPitch(lines.length, LINE_H, FONT_PX, BODY_SPAN);
+  assert.ok(maxLines >= lines.length, `only ${maxLines} of ${lines.length} rows fit`);
+  assert.ok(lineH >= FONT_PX, 'pitch fell below 1.0 leading');
+  assert.ok(BODY_TOP + (lines.length + 0.4) * lineH <= FOOT_TOP + 1e-6);
+});
+
 // #96 added STREAMING SERVICES and put the ring on the CRT's physical
 // ceiling: 13 lines seat only because fitTerminalPitch tightens to its
 // 1.0-leading floor, and the 14th does not fit at any pitch. This is the
 // tripwire for the next row someone adds — it must fail HERE, in CI, rather
 // than at the CRT where drawTerminal would clip it behind a MORE marker.
 test('the ring is at its ceiling: one more row would clip (#96)', () => {
-  const ids = Object.keys(COUNTER_TERMINAL_LABELS);
+  const ids = Object.keys(COUNTER_TERMINAL_LABELS).filter((id) => id !== 'btn-project');
   const { lines } = counterTerminalLines([...ids, 'btn-hypothetical'], 0);
   const { maxLines } = fitTerminalPitch(lines.length, LINE_H, FONT_PX, BODY_SPAN);
   assert.ok(

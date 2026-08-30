@@ -19,6 +19,9 @@ export function setBrandStringResolver(fn: BrandStringResolver): void {
   brandStringResolver = fn;
 }
 
+export const PROJECT_PAGE_BUTTON_ID = 'btn-project';
+export const PROJECT_PAGE_URL = 'https://github.com/halcyon-video/halcyon-video';
+
 // Short labels for the CRT. drawTerminal() in entrance/index.ts hard-clips each
 // line at 40 characters, and the "> " selection prefix eats two of them, so
 // every label here must stay within 38.
@@ -28,6 +31,8 @@ export const COUNTER_TERMINAL_LABELS: Record<string, string> = {
   'btn-flat-mode': 'SWITCH TO 2D MODE',
   'btn-suspend': 'SUSPEND SYSTEM (SLEEP)',
   'btn-cec-toggle': 'DISPLAY ON/OFF (CEC)',
+  // Standing route for the demo (#133): invites visitor to run their own store.
+  'btn-project': 'RUN ON YOUR OWN SERVER (GITHUB)',
   'btn-logout': 'CHANGE SERVER / LOG OUT',
   // Lazy: this object is built at module eval, long before the brand pack
   // has loaded, so the one branded row reads through a getter.
