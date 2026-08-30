@@ -170,13 +170,17 @@ export function scrubText(text: string, extraSensitive: string[] = []): string {
     return `[redacted].plex.direct${portMatch ? `:${portMatch[1]}` : ''}`;
   });
 
-  // 4. URLs with http:// or https:// (preserve port if present, redact host/IP)
-  out = out.replace(/https?:\/\/([^/\s:?'"()]+)(?::(\d+))?/gi, (_match, host, port) => {
+  // 4. URLs with http:// or https:// (preserve SCHEME and port, redact host/IP).
+  // The scheme is diagnostic and must survive: a Plex sync that fails over
+  // https is the certificate/secure-connection class of bug, and rewriting it
+  // to http hides exactly the clue this report exists to carry.
+  out = out.replace(/(https?):\/\/([^/\s:?'"()]+)(?::(\d+))?/gi, (_match, scheme, host, port) => {
     const portPart = port ? `:${port}` : '';
+    const s = scheme.toLowerCase();
     if (host.toLowerCase() === 'localhost' || host === '127.0.0.1' || host === '::1') {
-      return `http://localhost${portPart}`;
+      return `${s}://localhost${portPart}`;
     }
-    return `http://[redacted-host]${portPart}`;
+    return `${s}://[redacted-host]${portPart}`;
   });
 
   // 5. IPv4 addresses
