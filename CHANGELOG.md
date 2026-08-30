@@ -5,6 +5,26 @@ All notable changes to Halcyon Video, generated from commit history by
 it on every version tag push. Deterministic and offline: no entry here was
 written by a model.
 
+## [v0.12.0] — 2026-08-30
+
+### General
+- Chore(release): v0.12.0
+- Fix(gate): ask the phone again, now that the 3D store takes touch (Closes [#135](https://github.com/halcyon-video/halcyon-video/issues/135))
+- Feat(demo): diegetic explanatory card for games department rental (#134)
+- Feat(demo): turn playback card and counter terminal into project doorways (#133)
+- Fix(setup-report): keep the URL scheme through host redaction (Closes [#132](https://github.com/halcyon-video/halcyon-video/issues/132))
+- Give visitor a scrubbed copyable report when setup fails (#132)
+- Fix(welcome): drop the clerk key from the first-visit hint
+- Feat(welcome): diegetic first-visit greeting and control hint for hosted store (Closes [#130](https://github.com/halcyon-video/halcyon-video/issues/130))
+
+## [v0.11.1] — 2026-08-28
+
+### CHANGELOG
+- V0.11.0
+
+### General
+- Fix(plex): handle single-object responses and surface sync failures (Closes [#131](https://github.com/halcyon-video/halcyon-video/issues/131))
+
 ## [v0.11.0] — 2026-08-28
 
 ### CHANGELOG
