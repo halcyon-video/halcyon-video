@@ -582,3 +582,44 @@ test('HTTP errors during sync name the failing library/stage', async () => {
   }
 });
 
+test('Plex sync failure produces a scrubbed report with stage timings and server details', async () => {
+  const { initSetupReport, recordSetupServer, recordSetupLibraries, startSetupStage, endSetupStage, recordSetupFailure, getLastSetupReport } = await import('../src/setup-failure-report.ts');
+  initSetupReport('plex');
+  recordSetupServer({
+    product: 'Plex Media Server',
+    version: '1.40.1.8227',
+    isRelay: false,
+    address: 'https://192-168-1-100.abcdef123.plex.direct:32400',
+    username: 'test_user',
+  });
+  recordSetupLibraries([
+    { name: 'Movies', carried: true },
+    { name: 'TV Shows', carried: true },
+  ]);
+
+  startSetupStage('Plex link (PIN)');
+  endSetupStage('Plex link (PIN)', 'ok');
+
+  startSetupStage('Sync: Movies');
+  try {
+    throw new Error('The "Movies" library answered HTTP 500 while stocking items (token: plex_sec_tok_9988).');
+  } catch (err: any) {
+    recordSetupFailure(err, 'Sync: Movies');
+  }
+
+  const report = getLastSetupReport();
+  assert.match(report, /=== Halcyon Setup Failure Report ===/);
+  assert.match(report, /App: Halcyon 0\.11\.1/);
+  assert.match(report, /Server: Plex Media Server \(v1\.40\.1\.8227, relay: false\)/);
+  assert.match(report, /Libraries \(2 found, 2 carried\):/);
+  assert.match(report, /  - Movies, carried/);
+  assert.match(report, /  - TV Shows, carried/);
+  assert.match(report, /Failing stage: Sync: Movies/);
+  assert.match(report, /Error: The "Movies" library answered HTTP 500/);
+  assert.match(report, /Stage timings:/);
+  assert.match(report, /  - Plex link \(PIN\): \d+ms \(ok\)/);
+  assert.match(report, /  - Sync: Movies: \d+ms \(failed\)/);
+  assert.ok(!report.includes('test_user'), 'username must be redacted');
+  assert.ok(!report.includes('abcdef123.plex.direct'), 'plex direct domain must be redacted');
+});
+

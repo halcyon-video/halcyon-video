@@ -73,6 +73,16 @@ import {
   wrapSetupError,
   SETUP_PROVIDER_KINDS,
 } from './store-setup-screens';
+import {
+  initSetupReport,
+  recordSetupServer,
+  recordSetupLibraries,
+  startSetupStage,
+  endSetupStage,
+  recordSetupFailure,
+  copySetupReportToClipboard,
+  registerSensitiveString,
+} from './setup-failure-report';
 
 export interface SetupTerminalScene {
   setTerminalText(lines: string[] | null, cursorLine?: number): void;
@@ -172,6 +182,7 @@ function onTypedKey(e: KeyboardEvent): void {
 /** First-run entry: dock the camera and show NEW STORE SETUP. */
 export function openSetupTerminal(): void {
   if (!deps) return;
+  initSetupReport();
   openWith(initialHomeScreen(localStorage.getItem('jellyfin_url')));
   deps.log('[Setup] Opening day — NEW STORE SETUP is on the counter CRT.');
 }
@@ -184,6 +195,9 @@ export function openSetupTerminal(): void {
  */
 export function openSetupNotice(address: string, detail: string): void {
   if (!deps) return;
+  initSetupReport();
+  registerSensitiveString(address);
+  recordSetupFailure(detail, 'Connect');
   const row = screen.kind === 'notice' ? screen.row : 0;
   openWith({ kind: 'notice', address, detail: detail.toUpperCase(), row });
 }
@@ -213,7 +227,11 @@ export function closeSetupTerminal(opts?: { keepCamera?: boolean }): void {
 
 async function dial(address: string): Promise<void> {
   if (!deps) return;
+  initSetupReport('jellyfin');
+  registerSensitiveString(address);
+  startSetupStage('Looking up membership cards');
   const url = normalizeUrl(address.trim());
+  registerSensitiveString(url);
   // Remember the dialed server IMMEDIATELY, not at afterAuth(): both routes to
   // the CRT sign-in screen below (an empty card list, a refused one) skip
   // afterAuth entirely, and manualSignIn() reads pendingUrl. Without this it
@@ -229,6 +247,7 @@ async function dial(address: string): Promise<void> {
   } catch (e: any) {
     const msg = String(e?.message ?? e);
     deps.log(`[Setup] No membership card list from ${url}: ${msg}`);
+    recordSetupFailure(msg, 'Looking up membership cards');
     // A server that ANSWERED and refused the list (public users switched off,
     // a reverse proxy blocking /Users/Public) is perfectly usable — it just
     // can't fan the cards out. Sign in by name instead of dead-ending on the
@@ -241,6 +260,8 @@ async function dial(address: string): Promise<void> {
     render();
     return;
   }
+  endSetupStage('Looking up membership cards', 'ok');
+  recordSetupServer({ product: 'Jellyfin', address: url });
   if (users.length > 0) {
     deps.log(`[Setup] Found ${users.length} membership card(s) on ${url}.`);
     screen = { kind: 'members', count: users.length };
@@ -277,10 +298,14 @@ async function dial(address: string): Promise<void> {
  */
 async function dialPlex(address: string): Promise<void> {
   if (!deps) return;
+  initSetupReport('plex');
+  registerSensitiveString(address);
+  startSetupStage('Plex link (PIN)');
   // The PROVIDER's rule, not Jellyfin's: normalizeUrl forces http:// on a bare
   // address, which on a hosted HTTPS build is an address the browser refuses to
   // send and the person only ever sees as a timeout (#125).
   const typed = activeProvider().normalizeServerAddress(address.trim());
+  registerSensitiveString(typed);
   try {
     const pin = await createPlexPin();
     screen = { kind: 'plex-link', code: pin.code, step: 'WAITING FOR AUTHORIZATION...' };
@@ -294,21 +319,31 @@ async function dialPlex(address: string): Promise<void> {
       token = await pollPlexPin(pin.id);
     }
     if (!token) {
+      recordSetupFailure('That code expired. Try again.', 'Plex link (PIN)');
       screen = { kind: 'plex-link', code: pin.code, step: '', error: 'THAT CODE EXPIRED. TRY AGAIN.' };
       render();
       return;
     }
+    endSetupStage('Plex link (PIN)', 'ok');
     localStorage.setItem(PLEX_ACCOUNT_TOKEN_KEY, token);
     pendingPlexToken = token;
+    registerSensitiveString(token);
 
+    startSetupStage('Looking up servers');
     screen = { kind: 'dialing', address: typed || 'PLEX.TV', step: 'LOOKING UP YOUR SERVERS...' };
     render();
 
     let url = typed;
     if (!url || url === 'http://' || url === 'https://') {
       const servers = await fetchPlexServers(token);
+      for (const s of servers) {
+        registerSensitiveString(s.name);
+        registerSensitiveString(s.machineIdentifier);
+        for (const c of s.connections) registerSensitiveString(c);
+      }
       const offerable = servers.filter((s) => s.connections.length);
       if (!offerable.length) {
+        recordSetupFailure('No servers on that account. Type one.', 'Looking up servers');
         screen = { ...initialHomeScreen(address), row: 1,
           error: 'NO SERVERS ON THAT ACCOUNT. TYPE ONE.' };
         render();
@@ -321,6 +356,7 @@ async function dialPlex(address: string): Promise<void> {
       // was no way to say "both". Sharing makes this the normal case on Plex,
       // not an edge one.
       if (offerable.length > 1) {
+        endSetupStage('Looking up servers', 'ok');
         deps.log(`[Setup] Plex account supplied ${offerable.length} server(s) — pick which to stock from.`);
         screen = {
           kind: 'plex-servers',
@@ -341,16 +377,22 @@ async function dialPlex(address: string): Promise<void> {
       deps.log(`[Setup] Plex account supplied 1 server; using ${url}.`);
     }
 
+    endSetupStage('Looking up servers', 'ok');
     pendingUrl = url;
+    registerSensitiveString(url);
+    startSetupStage('Authenticating');
     const session = await activeProvider().authenticate(url, { accountToken: token });
+    endSetupStage('Authenticating', 'ok');
     await afterAuth(url, session as MembershipLoginSession);
   } catch (e: any) {
-    deps.log(`[Setup] Plex sign-in failed: ${e?.message ?? e}`);
+    const msg = String(e?.message ?? e);
+    deps.log(`[Setup] Plex sign-in failed: ${msg}`);
+    recordSetupFailure(msg);
     // The whole reason, wrapped — a connect that failed because the browser
     // refuses plain HTTP from an HTTPS page has to be able to SAY that (#125),
     // and 40 clipped characters of it said nothing.
     screen = { ...initialHomeScreen(address), row: 1,
-      error: wrapSetupError(String(e?.message ?? e)) };
+      error: wrapSetupError(msg) };
     render();
   }
 }
@@ -358,15 +400,17 @@ async function dialPlex(address: string): Promise<void> {
 async function manualSignIn(): Promise<void> {
   if (!deps || screen.kind !== 'manual-auth') return;
   const { username, password } = screen;
+  registerSensitiveString(username);
+  registerSensitiveString(password);
   const url = pendingUrl || normalizeUrl(localStorage.getItem('jellyfin_url') || '');
+  registerSensitiveString(url);
   if (!url) {
-    // Belt and braces for the bug the pendingUrl assignment in dial() fixes:
-    // never authenticate against an empty URL (which resolves to the app's own
-    // origin and fails forever) — send them back to type an address.
+    recordSetupFailure('Type the server address first.', 'Sign-in');
     screen = { ...initialHomeScreen(), row: 1, error: 'TYPE THE SERVER ADDRESS FIRST.' };
     render();
     return;
   }
+  startSetupStage(`Signing in as ${username}`);
   screen = { kind: 'dialing', address: url, step: `SIGNING IN ${username.toUpperCase().slice(0, 26)}...` };
   render();
   try {
@@ -374,9 +418,11 @@ async function manualSignIn(): Promise<void> {
       username: username.trim(),
       password,
     });
+    endSetupStage(`Signing in as ${username}`, 'ok');
     await afterAuth(url, session);
   } catch (e: any) {
     const msg = String(e?.message ?? e);
+    recordSetupFailure(msg, `Signing in as ${username}`);
     screen = {
       kind: 'manual-auth', row: 2, username, password: '',
       error: msg.includes('401') ? 'SIGN-IN REFUSED. CHECK NAME + PASSWORD.' : 'SIGN-IN FAILED. SERVER UNREACHABLE.',
@@ -405,6 +451,19 @@ async function afterAuth(
     // from a bug report alone.
     deps.log(`[Setup] Connected on ${url}.`);
   }
+  registerSensitiveString(url);
+  registerSensitiveString(session.serverAddress);
+  registerSensitiveString(session.accessToken);
+  registerSensitiveString(session.userId);
+  registerSensitiveString(session.userName);
+  recordSetupServer({
+    product: activeProvider().displayName,
+    version: session.raw?.serverVersion ? String(session.raw.serverVersion) : undefined,
+    isRelay: typeof session.raw?.isRelay === 'boolean' ? session.raw.isRelay : undefined,
+    address: url,
+    username: session.userName,
+  });
+
   if (session.raw?.isRelay) {
     deps.log(
       `[Setup] This connection is routed through Plex Relay, which answers ` +
@@ -436,14 +495,17 @@ async function afterAuth(
   // change from here is genuinely newer than the server's copy — which is what
   // makes the once-per-boot guard in hydrateStoreConfig correct rather than
   // merely convenient.
+  startSetupStage('Reading store settings');
   screen = { kind: 'dialing', address: url, step: 'READING YOUR STORE SETTINGS...' };
   render();
   const restored = await hydrateStoreConfig();
+  endSetupStage('Reading store settings', 'ok');
   if (restored.status === 'applied') {
     deps.log(`[Setup] Restored ${restored.written} store setting(s) from your account.`);
   } else if (restored.status === 'failed') {
     deps.log(`[Setup] No saved store settings read back: ${restored.error}`);
   }
+  startSetupStage('Listing libraries');
   screen = { kind: 'dialing', address: url, step: 'PULLING THE CATALOG LIST...' };
   render();
   try {
@@ -454,7 +516,10 @@ async function afterAuth(
     const libs = await activeProvider().listLibraries(url, session);
     rememberSourceLibraries(source, libs);
     rememberKnownLibraries(libs); // legacy single-server memory, kept in step
+    recordSetupLibraries(libs.map((l) => ({ name: l.name, type: (l as any).type, carried: isLibraryCarried(source.id, l.id) })));
+    endSetupStage('Listing libraries', 'ok');
     if (libs.length === 0) {
+      recordSetupFailure('The distributor lists no libraries.', 'Listing libraries');
       screen = { ...initialHomeScreen(url), error: 'THE DISTRIBUTOR LISTS NO LIBRARIES.' };
       render();
       return;
@@ -463,6 +528,7 @@ async function afterAuth(
   } catch (e: any) {
     const reason = String(e?.message ?? e);
     deps.log(`[Setup] Library list failed: ${reason}`);
+    recordSetupFailure(reason, 'Listing libraries');
     screen = { ...initialHomeScreen(url), error: wrapSetupError(reason || 'Could not list libraries. Retry.') };
     render();
   }
@@ -524,7 +590,9 @@ async function connectChosenPlexServers(rows: SetupServerRow[]): Promise<void> {
     screen = { kind: 'dialing', address: row.url, step: `SIGNING IN AT ${row.name.toUpperCase().slice(0, 22)}...` };
     render();
     try {
+      startSetupStage(`Connecting ${row.name}`);
       const session = await activeProvider().authenticate(row.url, { accountToken: token });
+      endSetupStage(`Connecting ${row.name}`, 'ok');
       // afterAuth registers the source and remembers its libraries; the last
       // one through also leaves the library checkboxes on screen.
       await afterAuth(row.url, session as MembershipLoginSession, { displayName: row.name });
@@ -533,10 +601,12 @@ async function connectChosenPlexServers(rows: SetupServerRow[]): Promise<void> {
       // One unreachable server must not sink the rest — a friend's box being
       // asleep is the ordinary condition, not a setup failure.
       lastError = String(e?.message ?? e);
+      endSetupStage(`Connecting ${row.name}`, 'failed', lastError);
       deps.log(`[Setup] Could not connect ${row.name}: ${lastError}`);
     }
   }
   if (!connected) {
+    recordSetupFailure(lastError || 'No server would connect.', 'Connect servers');
     screen = { ...initialHomeScreen(), row: 1,
       error: wrapSetupError(lastError || 'No server would connect.') };
     render();
@@ -564,16 +634,20 @@ async function runSync(): Promise<void> {
   if (!deps || !pendingSession) return;
   const url = pendingUrl;
   const session = pendingSession;
+  startSetupStage('Sync: Contacting distributor');
   screen = { kind: 'sync', stage: 'CONTACTING DISTRIBUTOR...', pages: 0 };
   render();
   try {
     await deps.callbacks.sync(url, session, (stage, pages) => {
+      startSetupStage(`Sync: ${stage}`);
       screen = { kind: 'sync', stage, pages };
       render();
     });
+    endSetupStage('Sync', 'ok');
   } catch (e: any) {
     const reason = String(e?.message ?? e);
     deps.log(`[Setup] Catalog sync failed: ${reason}`);
+    recordSetupFailure(reason);
     screen = { ...initialHomeScreen(url), error: wrapSetupError(reason || 'Catalog sync failed. Try again.') };
     render();
     return;
@@ -661,6 +735,11 @@ export async function setupTerminalInput(kind: SetupKey): Promise<void> {
     case 'change-server':
       deps.callbacks.changeServer();
       screen = initialHomeScreen(localStorage.getItem('jellyfin_url'));
+      render();
+      return;
+    case 'copy-report':
+      await copySetupReportToClipboard();
+      deps.log('[Setup] Failure report copied to clipboard.');
       render();
       return;
   }
