@@ -10,6 +10,7 @@ import { getActiveLogoSpec } from '../logo-spec';
 import { drawLogo } from '../logo-renderer';
 import { flatSignal } from './flat-lifecycle';
 import { resolveEpisodePlaybackArgs } from './flat-playback';
+import { openDemoPlaybackOverlay } from '../demo-playback';
 
 let launchVideoPlaybackFn: ((movie: Movie, overrideItemId?: string, overridePath?: string) => Promise<void>) | null = null;
 
@@ -397,13 +398,20 @@ export function openDetailsOverlay(
       if (result === 'launched') {
         retailAudio.playCheckoutChime();
         logSystemMessage(`[System] Launching "${movie.title}" in the emulator...`);
+        closeOverlay();
+      } else if (result === 'webplayer') {
+        retailAudio.playCheckoutChime();
+        logSystemMessage(`[System] "${movie.title}" is playing in the Romm browser emulator — check the new tab.`);
+        closeOverlay();
       } else if (result === 'browser') {
         retailAudio.playCheckoutChime();
-        logSystemMessage(`[System] "${movie.title}" is ready — take it to the counter to play (emulator launch is only available in the desktop app).`);
+        logSystemMessage(`[System] "${movie.title}" is ready — take it to the counter to play (no game server configured).`);
+        closeOverlay();
+        openDemoPlaybackOverlay(movie.title, false, 'game');
       } else {
         logSystemMessage(`[System] Couldn't launch "${movie.title}" — check the Romm launch command in settings.`);
+        closeOverlay();
       }
-      closeOverlay();
     } else if (movie.discovery || movie.collectionGap) {
       if (typeof movie.tmdbId !== 'number') return;
       logSystemMessage(`[System] Requesting "${movie.title}"...`);

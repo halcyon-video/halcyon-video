@@ -3219,12 +3219,9 @@ function handleGapDismiss() {
 
 // ─── T18: Renting a game -> launch the emulator ─────────────────────────────
 /**
- * The game-section equivalent of "checkout": renting a game shells out to the
- * configured emulator (Tauri only, via Tauri's argument-array spawn so the rom
- * path can never inject shell syntax), or — without one — opens the rom in
- * Romm's built-in browser emulator (EmulatorJS). Only mock/demo games with no
- * Romm server behind them fall back to the "take it to the counter" message.
- * Plays the checkout chime whenever the rental goes through. Never throws.
+ * Renting a game: launches configured emulator (Tauri), opens Romm browser player
+ * (EmulatorJS), or shows the demo explanatory card when no game server is configured.
+ * Plays checkout chime when rental goes through. Never throws.
  */
 async function handleGameLaunch(movie: Movie) {
   logToConsole(`[System] Renting "${movie.title}" (${movie.platform || 'game'})...`, 'system');
@@ -3237,7 +3234,8 @@ async function handleGameLaunch(movie: Movie) {
     logToConsole(`[System] "${movie.title}" is playing in the Romm browser emulator — check the new tab.`, 'system');
   } else if (result === 'browser') {
     retailAudio.playCheckoutChime();
-    logToConsole(`[System] "${movie.title}" is ready — take it to the counter to play (emulator launch is only available in the desktop app).`, 'system');
+    logToConsole(`[System] "${movie.title}" is ready — take it to the counter to play (no game server configured).`, 'system');
+    openDemoPlaybackOverlay(movie.title, false, 'game');
   } else {
     logToConsole(`[System] Couldn't launch "${movie.title}" — check the Romm launch command in settings.`, 'system');
   }
