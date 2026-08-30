@@ -19,7 +19,8 @@ export type SetupAction =
   | 'change-server' // notice: drop the saved server, back to a blank home
   | 'open-store'    // libraries: choices made, sync + stock
   | 'sign-in'       // manual-auth: authenticate the typed name/password
-  | 'back-home';    // manual-auth: abandon sign-in
+  | 'back-home'     // manual-auth: abandon sign-in
+  | 'copy-report';  // copy scrubbed failure report to clipboard
 
 /** The DISTRIBUTOR row's choices, in registry order. Display names here; the
  *  provider kinds they map to are SETUP_PROVIDER_KINDS below (the terminal is
@@ -37,7 +38,7 @@ export interface SetupLibraryRow {
   carried: boolean;
 }
 
-export type SetupHomeScreen = { kind: 'home'; row: number; provider: number; address: string; error?: string };
+export type SetupHomeScreen = { kind: 'home'; row: number; provider: number; address: string; error?: string; copied?: boolean };
 
 export type SetupScreen =
   | SetupHomeScreen
@@ -60,7 +61,7 @@ export type SetupScreen =
   | { kind: 'streaming'; rows: SetupLibraryRow[]; row: number; confirm?: string }
   | { kind: 'sync'; stage: string; pages: number }
   | { kind: 'arriving' }
-  | { kind: 'notice'; address: string; detail: string; row: number };
+  | { kind: 'notice'; address: string; detail: string; row: number; copied?: boolean };
 
 export function initialHomeScreen(savedAddress?: string | null): SetupHomeScreen {
   return { kind: 'home', row: 1, provider: 0, address: savedAddress || 'http://' };
@@ -70,8 +71,8 @@ export function initialHomeScreen(savedAddress?: string | null): SetupHomeScreen
 const HOME_ROWS = 4;
 // Manual-auth rows: 0 MEMBER NAME / 1 PASSWORD / 2 SIGN IN / 3 BACK
 const AUTH_ROWS = 4;
-// Notice rows: 0 RETRY NOW / 1 CHANGE SERVER / 2 TRY A DEMO STORE
-const NOTICE_ROWS = 3;
+// Notice rows: 0 RETRY NOW / 1 CHANGE SERVER / 2 TRY A DEMO STORE / 3 COPY REPORT
+const NOTICE_ROWS = 4;
 // The libraries/streaming checkbox screens window their rows into this many
 // visible lines (header + this + the confirm row budgets to ~10 total).
 const CHECKLIST_WINDOW = 6;
@@ -80,7 +81,7 @@ const CHECKLIST_WINDOW = 6;
 export function setupScreenChar(s: SetupScreen, ch: string): SetupScreen {
   if (ch.length !== 1) return s;
   if (s.kind === 'home' && s.row === 1 && ch !== ' ') {
-    return { ...s, address: s.address + ch, error: undefined };
+    return { ...s, address: s.address + ch, error: undefined, copied: undefined, row: Math.min(s.row, 3) };
   }
   if (s.kind === 'manual-auth' && s.row === 0) return { ...s, username: s.username + ch, error: undefined };
   if (s.kind === 'manual-auth' && s.row === 1) return { ...s, password: s.password + ch, error: undefined };
@@ -88,7 +89,7 @@ export function setupScreenChar(s: SetupScreen, ch: string): SetupScreen {
 }
 
 export function setupScreenBackspace(s: SetupScreen): SetupScreen {
-  if (s.kind === 'home' && s.row === 1) return { ...s, address: s.address.slice(0, -1), error: undefined };
+  if (s.kind === 'home' && s.row === 1) return { ...s, address: s.address.slice(0, -1), error: undefined, copied: undefined, row: Math.min(s.row, 3) };
   if (s.kind === 'manual-auth' && s.row === 0) return { ...s, username: s.username.slice(0, -1), error: undefined };
   if (s.kind === 'manual-auth' && s.row === 1) return { ...s, password: s.password.slice(0, -1), error: undefined };
   return s;
@@ -97,8 +98,9 @@ export function setupScreenBackspace(s: SetupScreen): SetupScreen {
 export function setupScreenKey(s: SetupScreen, key: SetupKey): { state: SetupScreen; action?: SetupAction } {
   switch (s.kind) {
     case 'home': {
+      const rowsCount = s.error ? 5 : HOME_ROWS;
       if (key === 'up' || key === 'down') {
-        const row = (s.row + (key === 'up' ? -1 : 1) + HOME_ROWS) % HOME_ROWS;
+        const row = (s.row + (key === 'up' ? -1 : 1) + rowsCount) % rowsCount;
         return { state: { ...s, row } };
       }
       if (key === 'ok') {
@@ -115,7 +117,9 @@ export function setupScreenKey(s: SetupScreen, key: SetupKey): { state: SetupScr
           }
           return { state: s, action: 'connect' };
         }
-        return { state: s, action: 'demo' };
+        if (s.row === 3) return { state: s, action: 'demo' };
+        if (s.row === 4) return { state: { ...s, copied: true }, action: 'copy-report' };
+        return { state: s };
       }
       // left/right on the DISTRIBUTOR row cycle providers (one today).
       if ((key === 'left' || key === 'right') && s.row === 0) {
@@ -189,7 +193,8 @@ export function setupScreenKey(s: SetupScreen, key: SetupKey): { state: SetupScr
       if (key === 'ok') {
         if (s.row === 0) return { state: s, action: 'retry' };
         if (s.row === 1) return { state: s, action: 'change-server' };
-        return { state: s, action: 'demo' };
+        if (s.row === 2) return { state: s, action: 'demo' };
+        if (s.row === 3) return { state: { ...s, copied: true }, action: 'copy-report' };
       }
       return { state: s };
     }
@@ -210,7 +215,7 @@ function sel(active: boolean, label: string): string {
 /** The widest line drawTerminal will show whole. */
 const TERMINAL_COLS = 40;
 /** Rows the home screen can give a failure once its intro copy steps aside:
- *  drawTerminal seats 12, the menu keeps 6 plus a spacer. */
+ *  drawTerminal seats 12, the menu keeps 7 (with COPY REPORT). */
 const HOME_ERROR_LINES = 5;
 
 /**
@@ -266,17 +271,22 @@ export function setupScreenLines(s: SetupScreen): { lines: string[]; cursorLine:
       // the screen is for, and the three rows it frees are what let the reason
       // reach its second sentence — the one saying what to do about it.
       const intro = s.error ? [] : ['BARE SHELVES, NO STOCK. PICK A', 'DISTRIBUTOR TO SUPPLY THIS STORE.', ''];
-      const lines = [
-        'NEW STORE SETUP — OPENING DAY',
-        '',
-        ...intro,
+      const menuRows = [
         sel(s.row === 0, `DISTRIBUTOR  ${provider}`),
         sel(s.row === 1, `ADDRESS      ${addr}`),
         sel(s.row === 2, 'CONNECT'),
         sel(s.row === 3, 'TRY A DEMO STORE'),
       ];
-      const menuTop = lines.length - HOME_ROWS;
-      if (s.error) lines.push('');
+      if (s.error) {
+        menuRows.push(sel(s.row === 4, s.copied ? 'REPORT COPIED' : 'COPY REPORT'));
+      }
+      const lines = [
+        'NEW STORE SETUP — OPENING DAY',
+        '',
+        ...intro,
+        ...menuRows,
+      ];
+      const menuTop = lines.length - menuRows.length;
       pushError(lines, s.error);
       return { lines, cursorLine: menuTop + s.row };
     }
@@ -409,6 +419,7 @@ export function setupScreenLines(s: SetupScreen): { lines: string[]; cursorLine:
         sel(s.row === 0, 'RETRY NOW'),
         sel(s.row === 1, 'CHANGE SERVER'),
         sel(s.row === 2, 'TRY A DEMO STORE'),
+        sel(s.row === 3, s.copied ? 'REPORT COPIED' : 'COPY REPORT'),
         '',
         'RETRYING QUIETLY IN THE BACKGROUND.',
       ];

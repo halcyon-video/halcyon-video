@@ -1,26 +1,32 @@
 // Device gate — the first thing a stranger's browser hits.
 //
-// Two devices reach the store and can't use it, and both used to fail silently:
+// Two devices reach the store and need a decision made for them:
 //
-//   1. A PHONE. The 3D store renders fine on a phone — it just has no input.
-//      Every control is a remote/arrow-key press (browse cursor, jump index,
-//      flip), and there is no touch handling anywhere in the app, so a visitor
-//      gets a beautiful room and a HUD reading "◀ ▶ PICK A SECTION" with
-//      nothing to press. ~40% of the launch-thread referral uniques came from
-//      the Reddit mobile app (issue #47), so this is the single most-hit dead
-//      end in the project.
+//   1. A PHONE. This used to be a dead end: every 3D control was a
+//      remote/arrow-key press (browse cursor, jump index, flip), there was no
+//      touch handling anywhere in the app, and a visitor got a beautiful room
+//      with nothing to press. ~40% of the launch-thread referral uniques came
+//      from the Reddit mobile app (issue #47), so this was the single
+//      most-hit dead end in the project. That's fixed now: store-touch.ts
+//      (issue #126) gives the 3D store real swipe-to-browse, tap-to-select,
+//      OK/BACK gestures, and the first-visit welcome hint already knows to
+//      show touch wording (store-welcome.ts, isTouchInputActive). A phone is
+//      no longer a device the 3D store can't serve — it's one this gate should
+//      let choose, honestly, instead of deciding for it.
 //
 //   2. A BROWSER WITHOUT WebGL2 — a VM, a locked-down work laptop, an old
 //      tablet, software rendering. StoreScene's constructor throws, main.ts
 //      catches it, logs "Falling back to 2D UI" to a console panel nobody has
-//      open, and hides the boot overlay. The result is a blank room.
+//      open, and hides the boot overlay. The result is a blank room. Nothing
+//      about touch controls changes this one: 3D provably cannot start here.
 //
-// Both have the same answer, and it already exists: 2.5D flat mode is built out
+// Both cases have a fallback that already exists: 2.5D flat mode is built out
 // of real DOM elements with click handlers (src/flat/), so a tap works, and it
-// needs no WebGL at all. This gate detects the two cases and offers that mode
-// instead of letting either fail. It is NOT a "sorry, come back on a desktop"
-// card — it is a door to the same library in the mode that device can actually
-// drive.
+// needs no WebGL at all. This gate detects the two cases and, where the 3D
+// store genuinely can't run, offers flat mode instead of letting the boot
+// fail. Where 3D CAN run (touch-primary), it presents both modes as real
+// options — this is not a "sorry, come back on a desktop" card, and it is not
+// a "here's your consolation prize" card either.
 //
 // Deliberately self-contained: its own <style>, no dependency on the 3D stack,
 // no dependency on styles.css having loaded. It runs on the paths where things
@@ -33,12 +39,6 @@ import { getSetting, setSetting } from './settings';
 /** Remembered answer, so a returning visitor is never asked twice. */
 const ANSWER_KEY = 'bb_device_gate';
 const TOUR_URL = 'https://youtu.be/TCkEpeL8Y3w';
-
-/**
- * Does a phone get walked straight into 2.5D instead of being asked? See the
- * note in runDeviceGate — this is the single switch that reverts that call.
- */
-const PHONE_STRAIGHT_TO_FLAT = true;
 
 export type GateReason = 'no-webgl2' | 'touch-primary';
 
@@ -86,21 +86,40 @@ export function detectGateReason(): GateReason | null {
   return null;
 }
 
-const COPY: Record<GateReason, { head: string; body: string; canStay: boolean }> = {
+interface GateAction {
+  label: string;
+  mode: 'flat' | '3d';
+}
+
+interface GateCopy {
+  head: string;
+  body: string;
+  /** The card's lead recommendation — styled `.dg-primary`. */
+  primary: GateAction;
+  /**
+   * A second real option, styled `.dg-secondary`. Omitted when there genuinely
+   * isn't one: no-webgl2's browser provably cannot run the 3D store, so flat
+   * is the only choice, not an alternative to a choice.
+   */
+  secondary?: GateAction;
+}
+
+const COPY: Record<GateReason, GateCopy> = {
   'touch-primary': {
-    head: 'Built for TVs and desktops',
-    body: 'The 3D store is walked with a remote or the arrow keys, so there’s '
-        + 'nothing here to tap. The 2D store is the same library, same shelves, '
-        + 'built to be touched.',
-    canStay: true,
+    head: 'Now walkable by touch',
+    body: 'Swipe to walk the aisles, tap a case to look closer, tap BACK to '
+        + 'step away — the 3D store has real touch controls now. Want '
+        + 'something simpler instead? The 2D store is the same library, '
+        + 'browsed with plain taps.',
+    primary: { label: 'Continue to the 3D store', mode: '3d' },
+    secondary: { label: 'Open the 2D store instead', mode: 'flat' },
   },
   'no-webgl2': {
     head: 'This browser can’t run the 3D store',
     body: 'Walking the aisles needs WebGL2, which this browser or graphics driver '
         + 'doesn’t offer. The 2D store is plain HTML — same library, and it '
         + 'needs none of it.',
-    // No point offering a 3D store that provably cannot start.
-    canStay: false,
+    primary: { label: 'Open the 2D store', mode: 'flat' },
   },
 };
 
@@ -169,29 +188,22 @@ export function runDeviceGate(): Promise<void> {
   const reason = detectGateReason();
   if (!reason) return Promise.resolve();
 
-  // A PHONE IS NOT ASKED. It is answered. (Owner direction 2026-08-27: "people
-  // click it on their phone and can't use it and give up".) The card this used
-  // to raise led with "Built for TVs and desktops" — the first sentence a
-  // stranger off a link read was that their device was the wrong one, and a
-  // share of them never reached the second. The zero-setup mandate says the
-  // hosted site IS the product and must just work, so a touch-primary visitor
-  // now lands in the mode their thumb can actually drive, stocked and
-  // browsable, with no screen in between. The 3D store is not hidden: it is
-  // one tap away under "3D Store Mode" in the flat store's menu, which is
-  // where a curious visitor looks anyway.
+  // Both reasons get the same real-choice card. A touch-primary visitor used
+  // to be walked straight into flat mode with no card at all (owner direction
+  // 2026-08-27, "people click it on their phone and can't use it and give
+  // up") — but that call predates store-touch.ts (issue #126) by one day, and
+  // deciding silently for a visitor whose device can now actually drive the
+  // 3D store is worse than the dead end it replaced: nobody who lands on a
+  // phone ever sees the 3D room, or the touch-specific first-visit welcome
+  // hint built for exactly this visitor (store-welcome.ts). So the card asks
+  // again, honestly worded, with 3D as the lead option and 2D offered as a
+  // real alternative rather than a correction.
   //
-  // A WebGL2-less browser still gets the card, because that one carries real
-  // information the visitor cannot otherwise get (their browser provably
-  // cannot run the 3D store) and offers the tour as consolation.
-  //
-  // Flip PHONE_STRAIGHT_TO_FLAT back to false to restore the old card.
-  if (reason === 'touch-primary' && PHONE_STRAIGHT_TO_FLAT) {
-    setSetting('bb_render_mode', 'flat');
-    try { localStorage.setItem(ANSWER_KEY, 'flat'); } catch { /* private mode */ }
-    return Promise.resolve();
-  }
-
-  const { head, body, canStay } = COPY[reason];
+  // A WebGL2-less browser gets the same card shape but no 3D option: that one
+  // carries real information the visitor cannot otherwise get (their browser
+  // provably cannot run the 3D store), so there is nothing to offer alongside
+  // 2D except the tour, as consolation.
+  const { head, body, primary, secondary } = COPY[reason];
   return new Promise<void>((resolve) => {
     const root = document.createElement('div');
     root.id = 'device-gate';
@@ -219,27 +231,32 @@ export function runDeviceGate(): Promise<void> {
       resolve();
     };
 
-    const openFlat = document.createElement('button');
-    openFlat.className = 'dg-primary';
-    openFlat.textContent = 'Open the 2D store';
-    openFlat.addEventListener('click', () => finish('flat'));
-    card.appendChild(openFlat);
+    const primaryBtn = document.createElement('button');
+    primaryBtn.className = 'dg-primary';
+    primaryBtn.textContent = primary.label;
+    primaryBtn.addEventListener('click', () => finish(primary.mode));
+    card.appendChild(primaryBtn);
+
+    // The second real option (touch-primary's 2D alternative) takes the
+    // dg-secondary billing when there is one; the tour link steps down to
+    // dg-tertiary so it doesn't compete with an actual choice. no-webgl2 has
+    // no secondary action, so the tour keeps the dg-secondary billing it
+    // always had there.
+    if (secondary) {
+      const secondaryBtn = document.createElement('button');
+      secondaryBtn.className = 'dg-secondary';
+      secondaryBtn.textContent = secondary.label;
+      secondaryBtn.addEventListener('click', () => finish(secondary.mode));
+      card.appendChild(secondaryBtn);
+    }
 
     const tour = document.createElement('a');
-    tour.className = 'dg-btn dg-secondary';
+    tour.className = `dg-btn ${secondary ? 'dg-tertiary' : 'dg-secondary'}`;
     tour.href = TOUR_URL;
     tour.target = '_blank';
     tour.rel = 'noopener noreferrer';
     tour.textContent = 'Watch the 45-second tour ▶';
     card.appendChild(tour);
-
-    if (canStay) {
-      const stay = document.createElement('button');
-      stay.className = 'dg-tertiary';
-      stay.textContent = 'Continue to the 3D store anyway';
-      stay.addEventListener('click', () => finish('3d'));
-      card.appendChild(stay);
-    }
 
     const foot = document.createElement('p');
     foot.className = 'dg-foot';

@@ -190,7 +190,7 @@ export class PlexProvider implements MediaSourceProvider {
       // ProviderSession.serverAddress. A caller that persists `server` instead
       // saves an address it has just been told does not work.
       serverAddress: reached.url,
-      raw: { accountToken, machineIdentifier: match?.machineIdentifier, isRelay },
+      raw: { accountToken, machineIdentifier: match?.machineIdentifier, isRelay, serverVersion: match?.productVersion || reached.version },
     };
     this.rememberConnection(reached.url, session);
     return session;

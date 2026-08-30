@@ -101,9 +101,10 @@ import { retailAudio } from './audio';
 import { BB_ARCHIVO_BLACK, bundledFontsReady } from './bundled-fonts';
 import { brandString, loadBrandPack } from './brand-pack';
 import type { StoreScene } from './three-scene';
-import { InputManager } from './input';
-import type { InputCallbacks } from './input';
+import { InputManager, type InputCallbacks } from './input';
 import { installStoreTouchControls, isTouchInputActive, touchHUDText, touchMovieHUDText } from './store-touch';
+import { triggerHostedWelcome, isWelcomeActive, dismissWelcome, welcomeHUDText } from './store-welcome';
+import { showClerkToast } from './carried-tapes';
 import { refreshHoldHints, setHoldCheckoutProgress, setHoldDismissProgress } from './hold-hints';
 import {
   setupRemotePlay, isRemoteInstance, isRemotelyDriven, reportRemoteFatal,
@@ -137,13 +138,10 @@ import {
   EMBLEM_OPEN_ROW_KEY, isEmblemStudioOpen,
 } from './emblem-editor';
 import {
-  MEDIA_DATE_BUTTON_ID,
-  STREAMING_BUTTON_ID,
-  counterTerminalClose,
-  counterTerminalInput,
-  counterTerminalOpen,
-  initCounterTerminalFlow,
+  MEDIA_DATE_BUTTON_ID, STREAMING_BUTTON_ID,
+  counterTerminalClose, counterTerminalInput, counterTerminalOpen, initCounterTerminalFlow,
 } from './counter-terminal-flow';
+import { PROJECT_PAGE_BUTTON_ID, PROJECT_PAGE_URL } from './counter-terminal';
 import { buildControlsHelpPanel, HELP_ROW_PREFIX } from './controls-help';
 import type { CandyRow } from './fixtures/period-fixtures';
 import { getCandyDeliveryAdapter } from './candy-delivery';
@@ -161,7 +159,6 @@ import {
   resolveMpvPrefArgs,
   playLocalWithMpv,
 } from './playback-flow';
-
 // ─── Application State ────────────────────────────────────────────────────────
 
 let librariesList: JellyfinLibrary[] = [];
@@ -372,7 +369,6 @@ async function loadDiscoveryMovies(): Promise<void> {
     discoveryMovies = [];
   }
 }
-
 
 /**
  * One boot-console line that always states where Jellyseerr stands. The
@@ -695,10 +691,10 @@ const ui = {
 };
 
 let powerMenuIndex = 0;
-// The demo has no Jellyfin session to log out of and no app window to close —
-// those rows leave the keyboard-nav ring too (their DOM is hidden in main()).
-const powerButtons = ['btn-settings', 'btn-controls', 'btn-flat-mode', 'btn-suspend', 'btn-cec-toggle', 'btn-logout', 'btn-exit', 'btn-cancel']
-  .filter((id) => !(isDemoMode && (id === 'btn-logout' || id === 'btn-exit')));
+// Demo mode replaces the unusable logout/exit rows with the standing project route (#133).
+const powerButtons = isDemoMode
+  ? ['btn-settings', 'btn-controls', 'btn-flat-mode', 'btn-suspend', 'btn-cec-toggle', PROJECT_PAGE_BUTTON_ID, 'btn-cancel']
+  : ['btn-settings', 'btn-controls', 'btn-flat-mode', 'btn-suspend', 'btn-cec-toggle', 'btn-logout', 'btn-exit', 'btn-cancel'];
 
 // The single CEC row toggles the display: we track the last state WE commanded
 // (there's no CEC status read-back) and alternate standby/wake. If reality
@@ -772,11 +768,8 @@ let settingsPendingGameRefetch = false;
 // picker instead of retry-looping against the new server.
 let settingsPendingJellyfinPassword: string | null = null;
 let settingsPendingAuthReset = false;
-
 let exitConfirmIndex = 1; // Default to "No, Return"
 const exitButtons = ['btn-confirm-exit', 'btn-confirm-cancel'];
-
-// Aisle indicator interval (tracked so it can be cleared on scene rebuild)
 let aisleIndicatorInterval: number | null = null;
 
 // Candy checkout state (T19). Focus index walks [candy rows..., Order btn,
@@ -798,7 +791,6 @@ let searchResultIndex = 0;
 // ─── UI Helpers ───────────────────────────────────────────────────────────────
 
 const MAX_LOG_ENTRIES = 200;
-
 // Ring buffer of recent log lines, attached to F8 feedback pins (saved as
 // log.txt next to the pin) so playback narration reaches disk even when the
 // on-screen log is hidden behind the video overlay.
@@ -848,10 +840,10 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 function updateMovieHUD(movie: Movie | null) {
-  if (!movie) return;
+  if (!movie || isWelcomeActive()) return;
 
-  const isInspecting = storeScene && storeScene.mode === 'inspect';
-  const isRequestedDiscovery = (movie.discovery || movie.collectionGap) &&
+  const isInspecting = storeScene?.mode === 'inspect';
+  const isRequestedDiscovery = typeof movie.tmdbId === 'number' &&
     (movie.discoveryRequested || isDiscoveryRequested(movie.tmdbId));
 
   // Update the floating bottom hint with movie-specific detail (e.g. "coming
@@ -899,6 +891,11 @@ function updateMovieHUD(movie: Movie | null) {
 function updateHUDForMode(mode: string) {
   const hint = document.getElementById('browse-hint');
   if (!hint) return;
+
+  if (isWelcomeActive()) {
+    hint.textContent = welcomeHUDText(isTouchInputActive());
+    return;
+  }
 
   if (isTouchInputActive()) {
     const touchText = touchHUDText(mode, !!storeScene?.canHoldToCheckout(), !!storeScene?.carryMode);
@@ -2989,6 +2986,19 @@ async function initializeStoreScene(preservePosterCache = false) {
       // You've just come in through the doors — ring the entry chime. (May stay
       // silent if the browser hasn't seen a user gesture yet; that's fine.)
       scene.playDoorChime();
+      triggerHostedWelcome({
+        isDemo: isDemoMode,
+        isTouch: isTouchInputActive(),
+        showToast: showClerkToast,
+        brandGreeting: brandString('clerk-welcome', 'Hey there! Welcome to Halcyon — take a look around, or come ask me if you need a recommendation!'),
+        onDismiss: () => {
+          if (!storeScene) return;
+          updateHUDForMode(storeScene.mode);
+          if (storeScene.mode === 'browse' || storeScene.mode === 'inspect') {
+            updateMovieHUD(storeScene.getSelectedMovie() || null);
+          }
+        },
+      });
     });
 
   } catch (err: any) {
@@ -3069,7 +3079,6 @@ async function waitForFontsAndInit() {
 // line-budget ceiling, #41 prerequisite); main.ts hands it state setters and
 // loaders through initBootFlow() inside main() below.
 
-
 // ─── Power Action ─────────────────────────────────────────────────────────────
 
 async function executePowerMenuAction(btnId: string) {
@@ -3130,6 +3139,11 @@ async function executePowerMenuAction(btnId: string) {
       }
       break;
     }
+
+    case PROJECT_PAGE_BUTTON_ID:
+      logToConsole('[System] Opening Halcyon project page on GitHub...', 'system');
+      try { window.open(PROJECT_PAGE_URL, '_blank', 'noopener'); } catch {}
+      return;
 
     case 'btn-logout':
       if (isDemoMode) break; // no session in the demo (button is hidden too)
@@ -3205,12 +3219,9 @@ function handleGapDismiss() {
 
 // ─── T18: Renting a game -> launch the emulator ─────────────────────────────
 /**
- * The game-section equivalent of "checkout": renting a game shells out to the
- * configured emulator (Tauri only, via Tauri's argument-array spawn so the rom
- * path can never inject shell syntax), or — without one — opens the rom in
- * Romm's built-in browser emulator (EmulatorJS). Only mock/demo games with no
- * Romm server behind them fall back to the "take it to the counter" message.
- * Plays the checkout chime whenever the rental goes through. Never throws.
+ * Renting a game: launches configured emulator (Tauri), opens Romm browser player
+ * (EmulatorJS), or shows the demo explanatory card when no game server is configured.
+ * Plays checkout chime when rental goes through. Never throws.
  */
 async function handleGameLaunch(movie: Movie) {
   logToConsole(`[System] Renting "${movie.title}" (${movie.platform || 'game'})...`, 'system');
@@ -3223,7 +3234,8 @@ async function handleGameLaunch(movie: Movie) {
     logToConsole(`[System] "${movie.title}" is playing in the Romm browser emulator — check the new tab.`, 'system');
   } else if (result === 'browser') {
     retailAudio.playCheckoutChime();
-    logToConsole(`[System] "${movie.title}" is ready — take it to the counter to play (emulator launch is only available in the desktop app).`, 'system');
+    logToConsole(`[System] "${movie.title}" is ready — take it to the counter to play (no game server configured).`, 'system');
+    openDemoPlaybackOverlay(movie.title, false, 'game');
   } else {
     logToConsole(`[System] Couldn't launch "${movie.title}" — check the Romm launch command in settings.`, 'system');
   }
@@ -3909,13 +3921,11 @@ async function main() {
     openFeedbackPin();
   });
 
-  // Demo mode: the logout/exit power rows are meaningless without a session
-  // or an app window (see the powerButtons filter above for keyboard nav).
+  // Demo mode: hide logout/exit and reveal the standing project link route (#133).
   if (isDemoMode) {
-    for (const id of ['btn-logout', 'btn-exit']) {
-      const el = document.getElementById(id);
-      if (el) el.style.display = 'none';
-    }
+    for (const id of ['btn-logout', 'btn-exit']) document.getElementById(id)?.style.setProperty('display', 'none');
+    const projectBtn = document.getElementById(PROJECT_PAGE_BUTTON_ID);
+    if (projectBtn) projectBtn.style.display = '';
   }
 
   videoPlayer = new VideoPlayer();
@@ -4259,6 +4269,7 @@ async function main() {
       openSearch();
     },
     onActivity: () => {
+      if (isWelcomeActive()) dismissWelcome();
       if (ui.isScreensaverActive) {
         ui.isScreensaverActive = false;
         document.getElementById('screensaver-overlay')!.classList.remove('visible');

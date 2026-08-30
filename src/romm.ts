@@ -791,7 +791,7 @@ function rommRomId(movie: Movie): number | null {
  *   2. Real Romm rom otherwise -> Romm's own in-browser EmulatorJS player, in
  *      a new tab (or the system browser under Tauri) ('webplayer').
  *   3. Neither (mock/demo games, no Romm) -> 'browser', and the caller shows
- *      the "take this to the counter" toast.
+ *      the demo explanatory card and counter line.
  * Returns 'error' on any failure. Never throws.
  */
 export async function launchGame(movie: Movie): Promise<LaunchResult> {

@@ -260,6 +260,7 @@ export interface PlexProbe {
   /** Plain words, written to be shown to the person unedited. */
   message?: string;
   machineIdentifier?: string;
+  version?: string;
 }
 
 // Ordered cause, then action, then why — because the 40-column CRT can only
@@ -337,8 +338,11 @@ export async function probePlexServer(
       };
     }
     let machineIdentifier: string | undefined;
+    let version: string | undefined;
     try {
-      machineIdentifier = JSON.parse(await res.text())?.MediaContainer?.machineIdentifier;
+      const container = JSON.parse(await res.text())?.MediaContainer;
+      machineIdentifier = container?.machineIdentifier;
+      version = container?.version;
     } catch {
       /* not JSON — handled as not-Plex below */
     }
@@ -348,7 +352,7 @@ export async function probePlexServer(
         message: `Something answered at ${hostLabel(url)}, but it is not a Plex server.`,
       };
     }
-    return { ok: true, url, machineIdentifier };
+    return { ok: true, url, machineIdentifier, version };
   } catch (e: any) {
     const timedOut = e?.name === 'AbortError';
     return {
@@ -543,6 +547,7 @@ export interface PlexServer {
   machineIdentifier: string;
   /** Server-specific token — NOT the account token. */
   accessToken: string;
+  productVersion?: string;
   /** Reachable base URLs, local ones first (a LAN address beats plex.direct). */
   connections: string[];
   /** The subset of `connections` that route through Plex Relay — a proxy
@@ -599,6 +604,7 @@ export async function fetchPlexServers(accountToken: string): Promise<PlexServer
         name: r.name || 'Plex Media Server',
         machineIdentifier: r.clientIdentifier,
         accessToken: r.accessToken,
+        productVersion: r.productVersion,
         connections: ordered.map((c) => String(c.uri || '')).filter(Boolean),
         relayConnections: ordered.filter((c) => !!c.relay).map((c) => String(c.uri || '')).filter(Boolean),
         owned: !!r.owned,

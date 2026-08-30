@@ -143,17 +143,44 @@ test('streaming: long lists window around the cursor and keep OPEN THE STORE las
   assert.match(ls[ls.length - 1], /OPEN THE STORE/);
 });
 
-test('notice: rows emit retry / change-server / demo', () => {
+test('notice: rows emit retry / change-server / demo / copy-report', () => {
   const base: SetupScreen = { kind: 'notice', address: 'http://tv:8096', detail: 'NO ANSWER', row: 0 };
   assert.equal(setupScreenKey(base, 'ok').action, 'retry');
   assert.equal(setupScreenKey({ ...base, row: 1 }, 'ok').action, 'change-server');
   assert.equal(setupScreenKey({ ...base, row: 2 }, 'ok').action, 'demo');
+  const copyRes = setupScreenKey({ ...base, row: 3 }, 'ok');
+  assert.equal(copyRes.action, 'copy-report');
+  assert.equal((copyRes.state as any).copied, true);
+  assert.match(lines(copyRes.state).join('\n'), /REPORT COPIED/);
+});
+
+test('home with error: offers COPY REPORT on row 4 and wraps navigation', () => {
+  let s: SetupScreen = { ...initialHomeScreen('http://tv:8096'), row: 3, error: 'CONNECTION FAILED.' };
+  assert.match(lines(s).join('\n'), /COPY REPORT/);
+  // down from row 3 goes to row 4 (COPY REPORT)
+  s = setupScreenKey(s, 'down').state;
+  assert.equal((s as any).row, 4);
+  const copyRes = setupScreenKey(s, 'ok');
+  assert.equal(copyRes.action, 'copy-report');
+  assert.equal((copyRes.state as any).copied, true);
+  assert.match(lines(copyRes.state).join('\n'), /REPORT COPIED/);
+
+  // down wraps to row 0
+  s = setupScreenKey(s, 'down').state;
+  assert.equal((s as any).row, 0);
+
+  // typing in address row clears error and copied
+  let typingScreen: SetupScreen = { ...initialHomeScreen('http://tv:8096'), row: 1, error: 'ERR', copied: true };
+  typingScreen = setupScreenChar(typingScreen, 'a');
+  assert.equal((typingScreen as any).error, undefined);
+  assert.equal((typingScreen as any).copied, undefined);
 });
 
 test('every screen honors the 40-column CRT clip', () => {
   const long = 'http://a-truly-unreasonably-long-hostname.example.com:8096/jellyfin';
   const screens: SetupScreen[] = [
     { ...initialHomeScreen(long), error: 'X'.repeat(60) },
+    { ...initialHomeScreen(long), error: 'X'.repeat(60), copied: true },
     { kind: 'dialing', address: long, step: 'S'.repeat(60) },
     { kind: 'members', count: 12 },
     { kind: 'manual-auth', row: 0, username: 'u'.repeat(60), password: 'p'.repeat(60) },
@@ -162,6 +189,7 @@ test('every screen honors the 40-column CRT clip', () => {
     { kind: 'sync', stage: 'S'.repeat(80), pages: 12345 },
     { kind: 'arriving' },
     { kind: 'notice', address: long, detail: 'D'.repeat(80), row: 0 },
+    { kind: 'notice', address: long, detail: 'D'.repeat(80), row: 3, copied: true },
   ];
   for (const s of screens) {
     for (const line of lines(s)) {
@@ -173,6 +201,7 @@ test('every screen honors the 40-column CRT clip', () => {
 test('cursorLine always points at a real line', () => {
   const screens: SetupScreen[] = [
     initialHomeScreen(),
+    { ...initialHomeScreen(), error: 'ERROR MESSAGE', row: 4 },
     { kind: 'dialing', address: 'http://tv', step: 'DIALING...' },
     { kind: 'members', count: 2 },
     { kind: 'manual-auth', row: 3, username: '', password: '' },
@@ -181,9 +210,11 @@ test('cursorLine always points at a real line', () => {
     { kind: 'sync', stage: 'SYNC', pages: 0 },
     { kind: 'arriving' },
     { kind: 'notice', address: 'http://tv', detail: 'NO ANSWER', row: 2 },
+    { kind: 'notice', address: 'http://tv', detail: 'NO ANSWER', row: 3, copied: true },
   ];
   for (const s of screens) {
     const { lines: ls, cursorLine } = setupScreenLines(s);
     assert.ok(cursorLine >= 0 && cursorLine < ls.length, `cursor ${cursorLine} outside ${ls.length} lines for ${s.kind}`);
   }
 });
+

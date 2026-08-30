@@ -151,6 +151,11 @@ const CSS = `
   border-color: var(--bb-yellow, #ffcc00); opacity: 0.92;
 }
 #store-touch-ok.st-pressed { background: #fff; }
+@keyframes st-pulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 204, 0, 0); }
+  50% { transform: scale(1.05); box-shadow: 0 0 12px 2px rgba(255, 204, 0, 0.45); }
+}
+.st-intro .st-btn { animation: st-pulse 1.8s ease-in-out 3; }
 /* #browse-hint (styles.css) sits bottom-center, nowrap, exactly where the OK
    button now lives — lift it clear and let it wrap. Phone viewports are
    narrower than the desktop line was ever sized for. */
