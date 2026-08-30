@@ -1546,8 +1546,9 @@ function updateSettingsCrtChrome() {
     const row = settingsRowEl(settingsIndex);
     // makeRow/makeTextRow put hints on dataset; the Store Brand rows built in
     // settings.ts still embed a (CSS-hidden) .settings-row-hint span instead.
-    let hint = (row?.dataset.hint || row?.querySelector('.settings-row-hint')?.textContent || '').trim();
-    if (hint.length > 62) hint = hint.slice(0, 59).trimEnd() + '…';
+    const hint = (row?.dataset.hint || row?.querySelector('.settings-row-hint')?.textContent || '').trim();
+    // No fixed char cap: .crt-footer-hint's own ellipsis clips to the REAL
+    // width beside the page chip, which a flat count guessed wrong both ways (#136).
     hintEl.textContent = hint || 'UP/DOWN SELECT • LEFT/RIGHT CHANGE • BACK RETURNS';
   }
 }

@@ -35,7 +35,7 @@ import { DEFAULT_LOGO_SPECS, getActiveLogoSpec } from './logo-spec';
 import {
   activeBrandPackId, brandPackSource, brandPackStatus, getBrandPack,
 } from './brand-pack';
-import { brandDropReport } from './brand-drop';
+import { brandDropReport, misplacedBrandArt } from './brand-drop';
 import type { LogoShape, LogoSpec } from './logo-spec';
 import { drawLogo, getLogoFontString } from './logo-renderer';
 import { activatePanelRow, SettingsRowKit } from './settings-rows';
@@ -412,28 +412,38 @@ function rentalModeHint(): string {
  * with no setting to look at, so the diagnostic is the only way to answer "did
  * it see my file, and what did it make of it?": which file, where the name came
  * from, whether the silhouette came through, what colours it sampled.
+ *
+ * Ordered LEAST-ESSENTIAL-LAST: the footer bar clips its real (viewport- and
+ * pagination-dependent) tail with an ellipsis rather than a fixed character
+ * count (see main.ts's updateSettingsCrtChrome), so whatever comes last here
+ * is what a narrow viewport loses first. Any notes lead — they're the honest
+ * "something's off" the row exists to surface (#136) — then the file and its
+ * silhouette outcome, then where the name came from, then colours, which are
+ * visible on the rendered emblem regardless.
  */
 function brandDropDiagnostic(): string {
   const drop = brandDropReport();
   if (!drop) {
-    return activeBrandPackId()
-      ? 'Not consulted: a Brand Pack is named, and an explicit pack wins over the drop folder.'
-      : 'Empty. Drop logo.svg or logo.png into public/user-assets/brand/ and reload — no setting needed.';
+    if (activeBrandPackId()) return 'Not consulted — a named Brand Pack wins over the drop folder.';
+    const stray = misplacedBrandArt();
+    if (stray) return `${stray} is in brands/ (packs only) — simple drops go in brand/.`;
+    return 'Create public/user-assets/brand/, drop logo.svg or .png, reload.';
   }
   if (brandPackSource() !== 'drop') {
-    return `${drop.file} found, but a Brand Pack is named and wins over it.`;
+    return `${drop.file} found, but a named Brand Pack wins over it.`;
   }
-  const shape = drop.silhouette === 'outline' ? 'outline traced from the vector'
-    : drop.silhouette === 'alpha-contour' ? 'silhouette traced from the image alpha'
-    : 'no silhouette — signs use a plain board';
+  const shape = drop.silhouette === 'outline' ? 'outline traced'
+    : drop.silhouette === 'alpha-contour' ? 'alpha traced'
+    : 'no silhouette — plain board';
   const inks = [drop.bodyColor && `body ${drop.bodyColor}`, drop.textColor && `letters ${drop.textColor}`]
     .filter(Boolean).join(', ');
   const bits = [
-    `${drop.file} (${shape}${drop.artLayers ? `, ${drop.artLayers} art layer${drop.artLayers === 1 ? '' : 's'}` : ''})`,
-    drop.nameFrom === 'default' ? 'name: store default' : `name "${drop.name}" from ${drop.nameFrom}`,
+    ...drop.notes,
+    `${drop.file}: ${shape}${drop.artLayers ? `, ${drop.artLayers} layer${drop.artLayers === 1 ? '' : 's'}` : ''}`,
+    drop.nameFrom === 'default' ? 'default name' : `name from ${drop.nameFrom}`,
     inks || 'no colours sampled',
   ];
-  return bits.join(' · ') + (drop.notes.length ? ` — ${drop.notes.join('; ')}` : '');
+  return bits.join(' · ');
 }
 
 /**
@@ -1515,7 +1525,7 @@ export function buildStoreBrandPanel(container: HTMLElement, hooks: BrandPanelHo
   // like a drop that never happened.
   kit.readout('drop', 'Dropped Logo', brandDropDiagnostic(), () => {
     const drop = brandDropReport();
-    if (!drop) return 'Empty';
+    if (!drop) return misplacedBrandArt() ? 'Wrong folder' : 'Empty';
     return brandPackSource() === 'drop' ? `${drop.file} — active` : `${drop.file} — overridden`;
   });
 

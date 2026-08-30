@@ -45,6 +45,10 @@ import type { BrandPackManifest } from './brand-pack';
 /** The folder, relative to public/user-assets/. */
 export const BRAND_DROP_DIR = 'brand';
 
+/** The Brand Pack tier's folder (brand-pack.ts) — same name, plural, wrong
+ *  tier for a bare logo file. See `misplaced` below. */
+const BRAND_PACKS_DIR = 'brands';
+
 /** Emblem files probed, in order. First one that loads wins. */
 const DROP_LOGO_FILES = ['logo.svg', 'logo.png', 'logo.webp', 'logo.jpg', 'logo.jpeg'];
 
@@ -72,6 +76,20 @@ let report: BrandDropReport | null = null;
 /** The last detection's report, or null when no drop was found. */
 export function brandDropReport(): BrandDropReport | null {
   return report;
+}
+
+/**
+ * A logo file sitting at the ROOT of brands/ (the multi-pack tier) instead of
+ * brand/ (the simple-drop tier) — same filename, wrong folder. That tier only
+ * ever reads brands/<pack-id>/brand.json for a name the user has to set
+ * (bb_brand_pack), so a bare brands/logo.png is invisible to the loader and
+ * gets no warning at all (owner report, issue #136). Populated by
+ * detectBrandDrop() only when the simple drop found nothing; null otherwise.
+ */
+let misplaced: string | null = null;
+
+export function misplacedBrandArt(): string | null {
+  return misplaced;
 }
 
 // ─── Small colour helpers ────────────────────────────────────────────────────
@@ -112,9 +130,9 @@ function colorDistance(a: [number, number, number], b: [number, number, number])
 
 // ─── Fetch helpers (a miss is the normal case and must stay silent) ──────────
 
-async function fetchDropText(assetUrlFor: (p: string) => string, file: string): Promise<string | null> {
+async function fetchDropText(assetUrlFor: (p: string) => string, path: string): Promise<string | null> {
   try {
-    const res = await fetch(assetUrlFor(`${BRAND_DROP_DIR}/${file}`));
+    const res = await fetch(assetUrlFor(path));
     if (!res.ok) return null;
     const text = await res.text();
     // A dev/preview server with an SPA fallback answers a missing file with
@@ -379,11 +397,12 @@ export async function detectBrandDrop(
   assetUrlFor: (p: string) => string,
 ): Promise<{ manifest: BrandPackManifest; report: BrandDropReport } | null> {
   report = null;
+  misplaced = null;
   if (typeof fetch === 'undefined') return null;
 
   // A brand.json in the drop folder means "this IS a pack" — hand it back
   // whole and synthesize nothing.
-  const manifestText = await fetchDropText(assetUrlFor, 'brand.json');
+  const manifestText = await fetchDropText(assetUrlFor, `${BRAND_DROP_DIR}/brand.json`);
   if (manifestText) {
     try {
       const parsed = JSON.parse(manifestText) as BrandPackManifest;
@@ -408,12 +427,22 @@ export async function detectBrandDrop(
   // every boot to learn that is not a thing to do to a store that opens in
   // under a second. brand.txt rides along in the same batch.
   const probes = DROP_LOGO_FILES.map((cand) => (cand.endsWith('.svg')
-    ? fetchDropText(assetUrlFor, cand).then((t) => (t && /<svg[\s>]/i.test(t) ? { cand, svg: t } : null))
+    ? fetchDropText(assetUrlFor, `${BRAND_DROP_DIR}/${cand}`).then((t) => (t && /<svg[\s>]/i.test(t) ? { cand, svg: t } : null))
     : loadImage(assetUrlFor(`${BRAND_DROP_DIR}/${cand}`)).then((i) => (i && i.width > 0 ? { cand, img: i } : null))));
-  const nameProbe = fetchDropText(assetUrlFor, 'brand.txt');
+  const nameProbe = fetchDropText(assetUrlFor, `${BRAND_DROP_DIR}/brand.txt`);
   const found = (await Promise.all(probes)).find((r) => r !== null) as
     { cand: string; svg?: string; img?: HTMLImageElement } | undefined;
-  if (!found) return null;
+  if (!found) {
+    // Same filenames, one folder over: brands/ (plural) is the Brand Pack
+    // tier and never even looks here without a bb_brand_pack id, so a bare
+    // brands/logo.png sits there unread. One extra batch of probes, paid only
+    // on the already-uncommon "nothing in brand/" path.
+    const strayProbes = DROP_LOGO_FILES.map((cand) => (cand.endsWith('.svg')
+      ? fetchDropText(assetUrlFor, `${BRAND_PACKS_DIR}/${cand}`).then((t) => (t && /<svg[\s>]/i.test(t) ? cand : null))
+      : loadImage(assetUrlFor(`${BRAND_PACKS_DIR}/${cand}`)).then((i) => (i && i.width > 0 ? cand : null))));
+    misplaced = (await Promise.all(strayProbes)).find((c) => c !== null) ?? null;
+    return null;
+  }
   const file: string = found.cand;
   const svgText: string | null = found.svg ?? null;
   const img: HTMLImageElement | null = found.img ?? null;
@@ -433,7 +462,7 @@ export async function detectBrandDrop(
     // stands. brand.txt is the one-line fix, and the diagnostic says so.
     name = '';
     nameFrom = 'default';
-    notes.push("no brand.txt — the store keeps its own name (one line in brand/brand.txt renames it)");
+    notes.push('no brand.txt — store keeps its own name (add one to rename).');
   }
 
   const logo: Partial<LogoSpec> = {};
@@ -500,7 +529,7 @@ export async function detectBrandDrop(
       logo.pathFit = 'contain';
       silhouette = 'alpha-contour';
     } else {
-      notes.push('no alpha to trace — signs and the 3D sign use a plain board carrier');
+      notes.push('no alpha to trace — signage uses a plain board.');
     }
     const inks = sampleImageColors(img);
     bodyColor = inks.body;
