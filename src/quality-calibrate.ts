@@ -36,6 +36,13 @@
 // throwaway WebGL2 context) in at all — same reason StoreScene itself is a
 // dynamic import there.
 //
+// Second caller (GH #138): boot-flow.ts's startDemoAndLoad() also awaits it,
+// EARLIER and only in 3D mode, to size the public demo's synthetic catalog to
+// what this GPU can actually carry instead of always building the fixed
+// ~2,000-title store. Safe to call twice in one boot — the cache-signature
+// check makes the second call (inside initializeStoreScene, moments later)
+// an instant no-op.
+//
 // three-scene.ts's own effectiveQuality line then reads readCalibratedQuality()
 // — synchronous, no benchmark — as the middle tier of a three-way waterfall:
 // explicit bb_quality, else a valid calibration, else the original regex
@@ -450,17 +457,25 @@ async function runBenchmark(gl: WebGL2RenderingContext): Promise<number | null> 
  * GPU name says software rendering (forced to 'low' with no benchmark, and
  * nothing is persisted so the regex fallback keeps governing every boot).
  * Never throws — any failure just leaves the regex fallback in charge.
+ *
+ * Returns the resolved tier (the SAME value three-scene.ts's own
+ * explicit-then-calibrated-then-regex waterfall will land on a moment later)
+ * so a second caller can act on it directly, or null when nothing conclusive
+ * was determined (no probe, harness, inconclusive benchmark) — in which case
+ * three-scene.ts still has its own regex-on-the-real-renderer fallback, a
+ * caller here does not.
  */
-export async function calibrateQualityIfNeeded(): Promise<void> {
-  if (typeof localStorage === 'undefined') return;
-  if (localStorage.getItem('bb_quality')) return; // explicit override always wins, skips calibration entirely
-  if (isHarnessActive()) return;
+export async function calibrateQualityIfNeeded(): Promise<QualityTier | null> {
+  if (typeof localStorage === 'undefined') return null;
+  const explicit = localStorage.getItem('bb_quality');
+  if (explicit) return isValidTier(explicit) ? explicit : null; // explicit override always wins, skips calibration entirely
+  if (isHarnessActive()) return null;
 
   try {
     const probe = openProbe();
     if (!probe) {
       console.log('[calibrate] no WebGL2 context available on the probe canvas — falling back to renderer-name detection');
-      return;
+      return null;
     }
     const { gl } = probe;
     const gpuName = detectGpuName(gl);
@@ -468,7 +483,7 @@ export async function calibrateQualityIfNeeded(): Promise<void> {
     if (SOFTWARE_RE.test(gpuName)) {
       console.log(`[calibrate] ${gpuName} — software rendering, skipping benchmark (regex fallback forces low)`);
       disposeProbe(probe);
-      return;
+      return 'low';
     }
 
     const sig = computeSig(gpuName);
@@ -477,7 +492,7 @@ export async function calibrateQualityIfNeeded(): Promise<void> {
       const ss = localStorage.getItem('bb_quality_ss') === '1';
       console.log(`[calibrate] ${gpuName} → ${cachedTier}${ss ? ' +supersample' : ''} (cached)`);
       disposeProbe(probe);
-      return;
+      return cachedTier;
     }
 
     const t0 = performance.now();
@@ -487,7 +502,7 @@ export async function calibrateQualityIfNeeded(): Promise<void> {
 
     if (score == null) {
       console.log(`[calibrate] ${gpuName} — benchmark inconclusive after ${elapsedMs.toFixed(0)}ms, falling back to renderer-name detection`);
-      return;
+      return null;
     }
 
     const integratedGL = INTEGRATED_RE.test(gpuName) && !INTEGRATED_EXCLUDE_RE.test(gpuName);
@@ -496,8 +511,10 @@ export async function calibrateQualityIfNeeded(): Promise<void> {
     localStorage.setItem('bb_quality_ss', supersample ? '1' : '0');
     localStorage.setItem('bb_quality_sig', sig);
     console.log(`[calibrate] ${score.toFixed(1)}ms median (${gpuName}) → ${tier}${supersample ? ' +supersample' : ''} (${elapsedMs.toFixed(0)}ms)`);
+    return tier;
   } catch (e) {
     console.log(`[calibrate] benchmark failed (${e instanceof Error ? e.message : e}) — falling back to renderer-name detection`);
+    return null;
   }
 }
 
