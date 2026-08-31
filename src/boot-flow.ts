@@ -166,6 +166,11 @@ export function maybeOpenSetupTerminal(): void {
   else openSetupTerminal();
 }
 
+/** Whether an opening-day setup terminal is queued for this reveal (#137: a shared-place link is meaningless over an empty store, and would fight the terminal for the camera). */
+export function isSetupPending(): boolean {
+  return pendingSetup !== null;
+}
+
 /**
  * CHANGE SERVER / LOG OUT (#41): the empty-store setup terminal is the
  * re-entry point, not the old DOM form. Flat mode (no 3D counter to dock to)

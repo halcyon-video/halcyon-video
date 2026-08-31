@@ -111,6 +111,10 @@ const HELP_SECTIONS: HelpSection[] = [
         hint: 'C check out carried tapes · R put one back · X not interested.',
       },
       {
+        id: 'shareplace', control: 'F9', action: 'Copy a link to this view',
+        hint: 'Opens right back here for whoever you send it to.',
+      },
+      {
         id: 'holds', control: 'Hold OK / hold ▼', action: 'Quick checkout / pass',
         hint: 'Keyboard & gamepad only — the remote taps instead.',
       },

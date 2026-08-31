@@ -80,7 +80,7 @@ import {
   startDemoAndLoad,
   checkCredentialsAndLoad,
   setupLoginHandlers,
-  maybeOpenSetupTerminal,
+  maybeOpenSetupTerminal, isSetupPending,
   logOutToOpeningDay,
   FORGET_SERVER_KEY, activateForgetServer,
 } from './boot-flow';
@@ -105,6 +105,7 @@ import { InputManager, type InputCallbacks } from './input';
 import { installStoreTouchControls, isTouchInputActive, touchHUDText, touchMovieHUDText } from './store-touch';
 import { triggerHostedWelcome, isWelcomeActive, dismissWelcome, welcomeHUDText } from './store-welcome';
 import { showClerkToast } from './carried-tapes';
+import { initSharedPlace } from './shared-place-ui';
 import { refreshHoldHints, setHoldCheckoutProgress, setHoldDismissProgress } from './hold-hints';
 import {
   setupRemotePlay, isRemoteInstance, isRemotelyDriven, reportRemoteFatal,
@@ -2980,6 +2981,7 @@ async function initializeStoreScene(preservePosterCache = false) {
       aisleIndicatorInterval = window.setInterval(updateBrowseHUDVisibility, 200);
 
       logToConsole('[System] All textures loaded. Store ready.', 'system');
+      initSharedPlace(scene, isSetupPending(), () => storeScene, () => ui.isLoginOpen || textEntryHasFocus(), showClerkToast);
       // Opening day (#41): dock the counter CRT's NEW STORE SETUP before the
       // overlay drops, so the player wakes already at the terminal.
       maybeOpenSetupTerminal();

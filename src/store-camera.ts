@@ -13,6 +13,7 @@ import { OVERVIEW_POS, OVERVIEW_PITCH_MIN, OVERVIEW_PITCH_MAX, INSPECT_FAN_X, IN
 import { BB_ARCHIVO_BLACK } from './bundled-fonts';
 import { getActiveLogoSpec } from './logo-spec';
 import { onBrandChange } from './brand-live';
+import { parseSharedPlace, type SharedPlace } from './shared-place';
 import type { StoreScene } from './three-scene';
 
 export function updateLookDownPresent(scene: StoreScene) {
@@ -802,4 +803,36 @@ export function teleportWalk(scene: StoreScene, x: number, z: number, yawDeg = 0
   scene.camera.rotation.x = scene.pitch;
   scene.camera.rotation.z = 0;
   scene.requestRender();
+}
+
+// Shared-place links (issue #137): the public two-parameter subset of the
+// harness's jump/teleport contract (see src/shared-place.ts). Captures the
+// CURRENT view as whichever shape reproduces it best -- inspecting a title
+// is shared by name (jumpToTitle survives a different store layout, e.g. a
+// visitor's own library), everything else by camera pose (teleportWalk) the
+// same way F8 feedback pins already do (StoreScene.captureFeedbackSnapshot).
+export function captureSharedPlace(scene: StoreScene): SharedPlace {
+  if (scene.mode === 'inspect') {
+    const movie = scene.getSelectedMovie();
+    if (movie) return { kind: 'title', title: movie.title, flip: scene.isFlipped };
+  }
+  const euler = new THREE.Euler().setFromQuaternion(scene.camera.quaternion, 'YXZ');
+  const pos = scene.camera.position;
+  return {
+    kind: 'walk',
+    x: pos.x,
+    z: pos.z,
+    yaw: (euler.y * 180) / Math.PI,
+    pitch: (euler.x * 180) / Math.PI,
+    y: pos.y,
+  };
+}
+
+/** Applies a `?title=`/`?walk=` link from the current URL at boot. Returns whether it found a place to go. */
+export function applySharedPlaceFromUrl(scene: StoreScene): boolean {
+  const place = parseSharedPlace();
+  if (!place) return false;
+  if (place.kind === 'title') return jumpToTitle(scene, place.title, { flip: place.flip });
+  teleportWalk(scene, place.x, place.z, place.yaw, place.pitch, place.y, false);
+  return true;
 }
