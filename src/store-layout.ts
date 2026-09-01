@@ -449,6 +449,17 @@ export const BACK_WALL_UNIT_IDX = 999;
  * three-scene.ts's shell derivation — that file is at its line budget and this
  * is exactly the kind of feature logic the budget exists to keep out of it.
  */
+/**
+ * Whole-section feature takeovers (super/double features, one title stamped
+ * across every tier and column of a wall section) belong to formats that HAVE
+ * a dedicated New Releases wall. A mom & pop store borrows its new releases
+ * from the ordinary library wall (GH #33), so a takeover would swallow the
+ * whole allotment: there a title faces out on ONE SHELF and no more.
+ */
+export function wallAllowsFeatureSections(): boolean {
+  return FORMAT.newReleasesWall;
+}
+
 export function newReleasesWallSpan(leftX: number, rightX: number): [left: number, right: number] {
   if (FORMAT.newReleasesWall) return [leftX, rightX];
   const unitLen = (MAX_SHELF_COLS - 1) * BOX_SPACING + 1.0;

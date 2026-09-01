@@ -57,7 +57,7 @@ import {
   StoreShellSpec,
   getStoreShellSpec,
   StorefrontSpec,
-  FixturePlacement, newReleasesWallSpan, newReleasesLeftWallCols,
+  FixturePlacement, newReleasesWallSpan, newReleasesLeftWallCols, wallAllowsFeatureSections,
 } from './store-layout';
 import { activeMediaCutoff } from './media-release-date';
 import { titleMatchKeys } from './staff-picks';
@@ -1330,8 +1330,8 @@ export class StoreScene {
     // double-feature consumes 2 of numWallSections, a super-feature 1 — so on
     // a small wall (2-3 sections) at most one double fits and a regular
     // section always survives.
-    const featureSectionBudget = (regularNewReleases.length > 0 || highRatedCandidates.length > 0)
-      ? Math.max(0, numWallSections - 1)
+    const featureSectionBudget = !wallAllowsFeatureSections() ? 0
+      : (regularNewReleases.length > 0 || highRatedCandidates.length > 0) ? Math.max(0, numWallSections - 1)
       : numWallSections;
     const numDoubleFeaturesToPlace = Math.min(
       doubleFeatureCandidates.length,
