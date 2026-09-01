@@ -94,9 +94,10 @@ export function updateCameraTarget(scene: StoreScene) {
   // below), so re-deriving the pose here always agrees with the index.
   if (scene.mode === 'overview') {
     // …except while the index previews a floor DISPLAY (Row 2), which walks
-    // the camera off the vantage to face the fixture. The index owns the
-    // targets then; re-deriving them would snap the camera home mid-preview.
-    if (scene.subNav && scene.subNav.row === 1) {
+    // the camera off the vantage to face the fixture — or while Row 1 looks
+    // down a mom-and-pop run (subNav.aisleCam). The index owns the targets
+    // then; re-deriving them would snap the camera home mid-preview.
+    if (scene.subNav && (scene.subNav.row === 1 || scene.subNav.aisleCam)) {
       scene.updateSelectionArrow();
       scene.triggerLibrarySelectUpdate(false);
       return;
