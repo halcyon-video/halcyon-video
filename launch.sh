@@ -62,10 +62,23 @@ done
 # never connects. Exposing the raw 192.168.x candidate lets them reach the
 # store directly. (The server's private-instance headless Chromes already pass
 # this — see tools/remote-play-server.mjs — this brings the shared kiosk in line.)
-# Keep the pre-rename profile dir if this boot already has one (a live kiosk
-# session must not lose its browser profile mid-cycle); fresh boots use the new name.
-BRAVE_DIR=/tmp/halcyon-brave
-[ -d /tmp/radiant-carson-brave ] && BRAVE_DIR=/tmp/radiant-carson-brave
+# The kiosk profile lives under ~/.local/share, NOT /tmp. /tmp on this box is
+# tmpfs (RAM), so a profile there evaporates on every reboot — and the profile
+# is where Chromium keeps localStorage, which is where the app keeps the media
+# server URL, the auth token and every bb_* setting. That is the "why is it
+# asking for my address and password again" bug: nothing was wrong with the
+# app, the browser it runs in was handed a brand-new profile each boot.
+# Migrate a live /tmp profile once so this change doesn't cost one more login.
+BRAVE_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/halcyon-brave"
+if [ ! -d "$BRAVE_DIR" ]; then
+  mkdir -p "$(dirname "$BRAVE_DIR")"
+  for legacy in /tmp/radiant-carson-brave /tmp/halcyon-brave; do
+    if [ -d "$legacy" ]; then
+      echo "Migrating kiosk browser profile from $legacy (tmpfs) to $BRAVE_DIR..."
+      cp -a "$legacy" "$BRAVE_DIR" && break
+    fi
+  done
+fi
 brave-browser --app=http://localhost:1420 --start-fullscreen --user-data-dir="$BRAVE_DIR" \
   --force-color-profile=srgb \
   --disable-features=WebRtcHideLocalIpsWithMdns
