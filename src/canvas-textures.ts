@@ -14,6 +14,8 @@ import {
 import agencyFontUrl from './assets/sairasemicondensed-medium.ttf';
 import { BB_ARCHIVO_BLACK, bundledFontsReady } from './bundled-fonts';
 import { createCategoryPlate1993Texture } from './fixtures/category-plate-1993';
+import { activeStoreFormat, isMomAndPop } from './store-format';
+
 
 // ─── Anisotropic-filtering budget ────────────────────────────────────────────
 // Grazing-angle surfaces (the carpet and walls receding toward the back wall,
@@ -401,6 +403,110 @@ function drawTicketSign(
 }
 
 /**
+ * Mom-and-pop hand-lettered section / endcap / wall sign (GH #140).
+ *
+ * Style 'card': A warm cream Bristol / card-stock placard with bold dark
+ * marker lettering and a subtle inked margin rule.
+ *
+ * Style 'wood': A stained wooden board with painted cream / off-white lettering.
+ */
+export function createHandLetteredSignTexture(
+  text: string,
+  subtitle?: string,
+  aspect = 2,
+  style: 'card' | 'wood' = 'card',
+): THREE.Texture {
+  const canvas = document.createElement('canvas');
+  canvas.width = 1024;
+  canvas.height = Math.max(96, Math.round(1024 / Math.max(0.25, aspect)));
+  const ctx = canvas.getContext('2d')!;
+
+  const paint = () => {
+    const W = canvas.width, H = canvas.height;
+    ctx.clearRect(0, 0, W, H);
+
+    if (style === 'wood') {
+      const format = activeStoreFormat();
+      ctx.fillStyle = format.shelfEndPanelHex ?? '#4a2c14';
+      ctx.fillRect(0, 0, W, H);
+
+      // Subtle painted inner rule
+      ctx.strokeStyle = 'rgba(245, 237, 214, 0.45)';
+      ctx.lineWidth = Math.max(2, Math.round(H * 0.025));
+      const inset = Math.round(H * 0.06);
+      ctx.strokeRect(inset, inset, W - 2 * inset, H - 2 * inset);
+
+      ctx.fillStyle = '#f8f2e2'; // Painted cream
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+      ctx.shadowBlur = H * 0.03;
+      ctx.shadowOffsetX = H * 0.005;
+      ctx.shadowOffsetY = H * 0.01;
+    } else {
+      // Warm manilla / cream card stock with marker ink
+      ctx.fillStyle = '#fbf5e6';
+      ctx.fillRect(0, 0, W, H);
+
+      // Subtle paper edge / inner marker rule
+      ctx.strokeStyle = 'rgba(60, 45, 35, 0.45)';
+      ctx.lineWidth = Math.max(2, Math.round(H * 0.02));
+      const inset = Math.round(H * 0.05);
+      ctx.strokeRect(inset, inset, W - 2 * inset, H - 2 * inset);
+
+      ctx.fillStyle = '#221912'; // Dark charcoal/sepia marker ink
+      ctx.shadowColor = 'rgba(40, 30, 20, 0.2)';
+      ctx.shadowBlur = H * 0.01;
+      ctx.shadowOffsetX = 0;
+      ctx.shadowOffsetY = H * 0.004;
+    }
+
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'alphabetic';
+
+    const fontName = `${BB_ARCHIVO_BLACK}, sans-serif`;
+    const usable = W * 0.84;
+    const fit = (label: string, targetPx: number): number => {
+      let size = Math.max(14, Math.round(targetPx));
+      ctx.font = `bold ${size}px ${fontName}`;
+      while (size > 14 && ctx.measureText(label).width > usable) {
+        size -= 2;
+        ctx.font = `bold ${size}px ${fontName}`;
+      }
+      return size;
+    };
+
+    const inner = H * 0.82;
+    if (subtitle) {
+      const TITLE = text.toUpperCase(), SUB = subtitle.toUpperCase();
+      const titleSize = fit(TITLE, inner * 0.48);
+      ctx.font = `bold ${titleSize}px ${fontName}`;
+      const titleAsc = ctx.measureText(TITLE).actualBoundingBoxAscent || titleSize * 0.72;
+      const subSize = fit(SUB, inner * 0.28);
+      ctx.font = `bold ${subSize}px ${fontName}`;
+      const subAsc = ctx.measureText(SUB).actualBoundingBoxAscent || subSize * 0.72;
+      const gap = H * 0.10;
+      const top = (H - (titleAsc + gap + subAsc)) / 2;
+
+      ctx.font = `bold ${titleSize}px ${fontName}`;
+      ctx.fillText(TITLE, W / 2, top + titleAsc);
+
+      ctx.font = `bold ${subSize}px ${fontName}`;
+      ctx.fillText(SUB, W / 2, top + titleAsc + gap + subAsc);
+    } else {
+      const TITLE = text.toUpperCase();
+      const size = fit(TITLE, inner * 0.60);
+      ctx.font = `bold ${size}px ${fontName}`;
+      const asc = ctx.measureText(TITLE).actualBoundingBoxAscent || size * 0.72;
+      ctx.fillText(TITLE, W / 2, (H + asc) / 2);
+    }
+  };
+  paint();
+
+  const tex = toSignTexture(canvas);
+  registerBrandRepaint(tex, paint);
+  return tex;
+}
+
+/**
  * A category / library TITLE sign: the 1990 ticket card (see the block above).
  *
  * `faceAspect` is the width:height of the 3D face this texture lands on, so the
@@ -426,6 +532,11 @@ export function createCategorySignTexture(
   // citations there). Other themes keep the muted rectangles + plain label.
   if (ribbon && dressing93Active()) {
     return createCategoryPlate1993Texture(categoryName, faceAspect);
+  }
+
+  // Mom-and-pop format signs in its own hand-lettered card idiom (GH #140).
+  if (!palette && isMomAndPop()) {
+    return createHandLetteredSignTexture(categoryName, undefined, faceAspect, 'card');
   }
 
   const canvas = document.createElement('canvas');
@@ -454,6 +565,7 @@ export function createCategorySignTexture(
   registerBrandRepaint(tex, paint);
   return tex;
 }
+
 
 /**
  * Collection sign for floor displays: the same 1024×256 card as

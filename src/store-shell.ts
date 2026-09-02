@@ -1620,22 +1620,17 @@ export function buildStore(scene: StoreScene) {
       side: THREE.DoubleSide
     });
 
-    // Poster plane matches the frame constants above (2:3 aspect ratio).
-    const posterMesh = new THREE.Mesh(new THREE.PlaneGeometry(posterW, posterH), posterMat);
-
-    // GH #5: the material is DoubleSide (issue #61 wanted it opaque from
-    // both sides, since the poster hangs mid-pane with nothing to hide),
-    // but DoubleSide draws the SAME uv on both faces — it doesn't mirror
-    // one of them. A plane's default front face (the one that reads
-    // correctly) pointed local +Z, which every caller's parent transform
-    // (frontWindow's rotation.y=PI, each side ribbon's inward yaw) turns
-    // into a normal aimed INTO the store. So the correct print always
-    // faced the sales floor and the parking lot got the mirrored back.
-    // A real poster faces the street: flip the plane 180 here so the
-    // front face's normal points the other way (outside, for every
-    // caller of this shared factory) and let the inside keep the
-    // DoubleSide fallback — a mirrored read, same as the reference
-    // footage shoots any poster through glass from the wrong side.
+    // GH #140: Window posters read forwards from inside the store across both
+    // formats. The mesh is rotated Math.PI with inverted UVs so the primary
+    // face points into the store with correct text orientation.
+    const posterGeo = new THREE.PlaneGeometry(posterW, posterH);
+    posterGeo.setAttribute('uv', new THREE.BufferAttribute(new Float32Array([
+      1, 1,
+      0, 1,
+      1, 0,
+      0, 0,
+    ]), 2));
+    const posterMesh = new THREE.Mesh(posterGeo, posterMat);
     posterMesh.rotation.y = Math.PI;
 
     // Center vertically in the GLAZED pane itself — knee wall top (2.0, the
@@ -1678,6 +1673,8 @@ export function buildStore(scene: StoreScene) {
       fallbackTex.colorSpace = THREE.SRGBColorSpace;
       posterMat.map = fallbackTex;
     }
+
+
 
     // (No suspension wires/clips — feedback/042: "don't need strings above
     // them". The framed lightbox reads as mounted, and the marquee-bulb ring
