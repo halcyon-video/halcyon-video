@@ -22,13 +22,26 @@ export type OutsideMode = 'day' | 'night' | 'sunset';
 // src/glass-reflection.ts.
 export const DAY_ENV_DISPLAY_GAIN = 1.42;
 
-// Sunset sky pool — CC0 8K equirect panos from Poly Haven (polyhaven.com),
-// downscaled to 4096x2048; one is rolled per visit (pin with bb_sunset_sky —
-// any filename substring). sunU is the measured horizontal fraction across
-// the image where the sun (or its below-horizon glow) sits; skyRotationY
-// solves the sky rotation so the photo's sun lands at the rolled sun azimuth
-// and the directional light agrees with the picture.
-const SUNSET_SKIES = [
+// Sky pools — CC0 8K equirect panos from Poly Haven (polyhaven.com),
+// downscaled to 4096x2048; every mode (day/sunset/night) rolls one per visit
+// from its own pool, pinned by filename substring (bb_day_sky / bb_sunset_sky
+// / bb_night_sky). sunU is the measured horizontal fraction across the image
+// where the sun (or its below-horizon glow) sits — present only on panos with
+// a discernible sun (every sunset, and the day panos where one is visible in
+// frame); skyRotationY solves the sky rotation so a photo carrying a sunU
+// lands its sun at the rolled sun azimuth and the directional light agrees
+// with the picture. Night's directional light runs at zero intensity (see
+// updateSkybox), so night panos carry no sunU — their rotation is just the
+// generic per-visit variance the overcast day panos also fall back to.
+interface SkyEntry {
+  file: string;
+  sunU?: number;
+}
+const DAY_SKIES: SkyEntry[] = [
+  { file: 'day/mall_parking_lot.jpg', sunU: 0.595 },
+  { file: 'day/park_parking.jpg', sunU: 0.595 },
+];
+const SUNSET_SKIES: SkyEntry[] = [
   { file: 'sunset/belfast_sunset_puresky.jpg', sunU: 0.697 },
   { file: 'sunset/evening_road_01_puresky.jpg', sunU: 0.675 },
   { file: 'sunset/industrial_sunset_puresky.jpg', sunU: 0.548 },
@@ -37,6 +50,11 @@ const SUNSET_SKIES = [
   { file: 'sunset/sunset_jhbcentral.jpg', sunU: 0.619 },
   { file: 'sunset/the_sky_is_on_fire.jpg', sunU: 0.686 },
   { file: 'sunset/venice_sunset.jpg', sunU: 0.612 },
+  { file: 'sunset/suburban_parking_area.jpg', sunU: 0.671 },
+];
+const NIGHT_SKIES: SkyEntry[] = [
+  { file: 'night/street_lamp.jpg' },
+  { file: 'night/hansaplatz.jpg' },
 ];
 // The sky dome the rotation solve maps onto is NOT centered on the store:
 // store-shell.ts builds it shifted toward the street (z=+120, radius 200), so
@@ -46,7 +64,7 @@ const SKY_SPHERE_OFFSET_Z = 120;
 const SKY_SPHERE_RADIUS = 200;
 // Global rotation trim on top of the per-pano solve, calibrated by pinning
 // bb_sun_azimuth=0 and checking the photo sun sits straight out the glass.
-const SUNSET_CAL = 0;
+const SKY_ROTATION_CAL = 0;
 
 export interface OutdoorLightingDeps {
   getScene: () => THREE.Scene;
@@ -107,12 +125,15 @@ export class OutdoorLightingRig {
   // hardcoded white so the async texture load lands with the same tint.
   private skyTint = new THREE.Color('#ffffff');
 
-  // This visit's pick from SUNSET_SKIES (rolled in rollSunPlacement).
+  // This visit's pick from each mode's pool (rolled in rollSunPlacement).
+  private daySkyIndex = 0;
   private sunsetSkyIndex = 0;
+  private nightSkyIndex = 0;
 
   private skyTextureLoader = new THREE.TextureLoader();
-  private skyTexDay: THREE.Texture | null = null;
-  private skyTexSunset = new Map<string, THREE.Texture>();
+  // Keyed by resolved asset URL, shared across every mode's pool — a pano is
+  // only ever fetched once per session even if its mode is revisited.
+  private skyTex = new Map<string, THREE.Texture>();
 
   // Baked-environment state (see bakeEnvironment): the PMREM currently installed
   // as scene.environment, the generator it came from, and whether the first bake
@@ -165,26 +186,38 @@ export class OutdoorLightingRig {
     if (this.outsideMode === 'sunset' && elOv === null) {
       this.sunElevation = THREE.MathUtils.degToRad(7 + Math.random() * 9);
     }
-    // Roll this visit's sunset sky; bb_sunset_sky (filename substring) pins it.
-    const skyOv = typeof localStorage !== 'undefined' ? localStorage.getItem('bb_sunset_sky') : null;
-    const pinned = skyOv ? SUNSET_SKIES.findIndex((s) => s.file.includes(skyOv)) : -1;
-    this.sunsetSkyIndex = pinned >= 0 ? pinned : Math.floor(Math.random() * SUNSET_SKIES.length);
+    // Roll this visit's sky pick for every mode's pool (cheap — only the
+    // active mode's pick is ever used); bb_day_sky / bb_sunset_sky /
+    // bb_night_sky (filename substring) pin one.
+    this.daySkyIndex = this.pickSkyIndex(DAY_SKIES, 'bb_day_sky');
+    this.sunsetSkyIndex = this.pickSkyIndex(SUNSET_SKIES, 'bb_sunset_sky');
+    this.nightSkyIndex = this.pickSkyIndex(NIGHT_SKIES, 'bb_night_sky');
   }
 
-  // Sky-sphere Y rotation for the current mode. Sunset solves for the rolled
-  // sun azimuth: find the sphere-azimuth phi whose SEEN azimuth (from the
-  // store, inside the street-offset dome) is the sun's, then rotate the pano's
-  // measured sun there. Day/night keep the original approximate bright-side
-  // tracking.
+  private pickSkyIndex(pool: SkyEntry[], settingKey: string): number {
+    const ov = typeof localStorage !== 'undefined' ? localStorage.getItem(settingKey) : null;
+    const pinned = ov ? pool.findIndex((s) => s.file.includes(ov)) : -1;
+    return pinned >= 0 ? pinned : Math.floor(Math.random() * pool.length);
+  }
+
+  // Sky-sphere Y rotation for the current mode. Whenever the active pano
+  // carries a measured sunU (every sunset, the day panos with a visible sun),
+  // solve for the rolled sun azimuth: find the sphere-azimuth phi whose SEEN
+  // azimuth (from the store, inside the street-offset dome) is the sun's,
+  // then rotate the pano's measured sun there. Panos with no sun to align
+  // (overcast day, every night pool entry) fall back to the original
+  // approximate bright-side tracking.
   private skyRotationY(): number {
-    if (this.outsideMode === 'sunset') {
+    const sky = this.outsideMode === 'sunset' ? SUNSET_SKIES[this.sunsetSkyIndex]
+      : this.outsideMode === 'day' ? DAY_SKIES[this.daySkyIndex]
+      : NIGHT_SKIES[this.nightSkyIndex];
+    if (sky.sunU !== undefined) {
       const psi = this.sunAzimuth;
       const phi = psi + Math.asin(THREE.MathUtils.clamp(
         (SKY_SPHERE_OFFSET_Z / SKY_SPHERE_RADIUS) * Math.sin(psi), -1, 1));
-      const sky = SUNSET_SKIES[this.sunsetSkyIndex];
       // Texture t is visible at geometric u = 1-t (repeat.x = -1), and sphere
       // azimuth of geometric u is 2*pi*(1-u) - pi/2 + rotation.
-      return phi + Math.PI / 2 + 2 * Math.PI * sky.sunU + SUNSET_CAL;
+      return phi + Math.PI / 2 + 2 * Math.PI * sky.sunU + SKY_ROTATION_CAL;
     }
     return Math.PI * 0.45 - (85 * Math.PI / 180) + this.sunAzimuth;
   }
@@ -236,8 +269,9 @@ export class OutdoorLightingRig {
     if (!this.skyMesh) return;
     const scene = this.deps.getScene();
 
-    // null = no pano for this mode (night is a solid black dome).
-    let texUrl: string | null = null;
+    // Every mode now rolls a pano from its own pool (see DAY_SKIES/
+    // SUNSET_SKIES/NIGHT_SKIES) — set below, per branch.
+    let texUrl = '';
     let sunColor = '#ffffff';
     let sunIntensity = 3.5;
     let hemisphereSky = '#dbe3f0';
@@ -250,7 +284,7 @@ export class OutdoorLightingRig {
     this.skyTint.set('#ffffff');
 
     if (this.outsideMode === 'day') {
-      texUrl = assetUrl('day_pano.jpg');
+      texUrl = assetUrl(DAY_SKIES[this.daySkyIndex].file);
       // The lower the rolled sun, the warmer it rakes through the glass, blending
       // to neutral daylight by ~42 deg. The low-sun hue is a per-visit roll
       // (sunWarmth) from soft gold to gentle amber.
@@ -298,8 +332,12 @@ export class OutdoorLightingRig {
       // and the sun/shadow contrast is untouched so the light rake keeps its mood.
       envIntensity = DAY_ENV_DISPLAY_GAIN;
     } else if (this.outsideMode === 'night') {
-      // No pano: the night sky is the solid near-black dome color set below —
-      // the view out the glass after dark is darkness and the lit lot signage.
+      // A lit night pano (streetlamp glow, lit shopfronts/windows) — the view
+      // out the glass after dark is a real street, not a void. It contributes
+      // no directional light (sunIntensity 0 below): the troffers captured in
+      // the environment bake are still the room's whole light source, so the
+      // pano only changes what's SEEN, not how the store is lit.
+      texUrl = assetUrl(NIGHT_SKIES[this.nightSkyIndex].file);
       sunColor = '#a0b0ff';
       sunIntensity = 0.0;
       hemisphereSky = '#040812';
@@ -365,31 +403,22 @@ export class OutdoorLightingRig {
         : this.outsideMode === 'sunset' ? '#c9a183' : '#a0b0d0');
     }
 
-    // Load or apply cached texture
-    let texture: THREE.Texture | null = null;
-    if (this.outsideMode === 'day' && this.skyTexDay) {
-      texture = this.skyTexDay;
-    } else if (this.outsideMode === 'sunset' && texUrl) {
-      texture = this.skyTexSunset.get(texUrl) ?? null;
-    }
+    // Load or apply cached texture — every mode's pool is keyed into the
+    // same cache by resolved URL (see skyTex).
+    const texture = this.skyTex.get(texUrl) ?? null;
 
     const applyTexture = (tex: THREE.Texture | null) => {
       if (this.skyMesh && this.skyMesh.material instanceof THREE.MeshBasicMaterial) {
         this.skyMesh.material.map = tex;
-        // White at noon / sunset; warm multiplied tint when the
-        // day sun rolled low (see skyTint above). No map at night — the dome
-        // keeps the near-black placeholder color set above.
+        // White at noon / sunset/night (the panos carry their own color);
+        // warm multiplied tint only when the day sun rolled low (see skyTint
+        // above).
         if (tex) this.skyMesh.material.color.copy(this.skyTint);
         this.skyMesh.material.needsUpdate = true;
       }
     };
 
-    if (!texUrl) {
-      // Mode without a pano (night): drop whatever the previous mode had
-      // mapped so the dome renders its solid color; the traverse + bake below
-      // fold the black sky into the environment as usual.
-      applyTexture(null);
-    } else if (texture) {
+    if (texture) {
       applyTexture(texture);
     } else {
       this.skyTextureLoader.load(
@@ -405,8 +434,7 @@ export class OutdoorLightingRig {
           loadedTex.wrapS = THREE.RepeatWrapping;
           loadedTex.repeat.x = -1; // Mirror for inside sphere rendering
 
-          if (this.outsideMode === 'day') this.skyTexDay = loadedTex;
-          else if (this.outsideMode === 'sunset' && texUrl) this.skyTexSunset.set(texUrl, loadedTex);
+          this.skyTex.set(texUrl, loadedTex);
 
           applyTexture(loadedTex);
           // Sky arrived after the light traverse below already ran, so the scene
@@ -572,9 +600,7 @@ export class OutdoorLightingRig {
     this.envRenderTarget = null;
     this.envPmremGen?.dispose();
     this.envPmremGen = null;
-    this.skyTexDay?.dispose();
-    this.skyTexDay = null;
-    this.skyTexSunset.forEach((t) => t.dispose());
-    this.skyTexSunset.clear();
+    this.skyTex.forEach((t) => t.dispose());
+    this.skyTex.clear();
   }
 }
