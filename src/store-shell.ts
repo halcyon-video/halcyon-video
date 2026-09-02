@@ -19,7 +19,7 @@ import { AmbientTvs } from './ambient-tvs';
 import { EntranceCheckout } from './entrance';
 import { buildWindowBays } from './entrance/windows';
 import { addGlassReflectionPane } from './glass-reflection';
-import { buildExteriorEnvironment, PARKING_STALLS } from './exterior-environment';
+import { buildExteriorEnvironment, PARKING_STALLS, lotWidth } from './exterior-environment';
 import { NR_WALL_SHELF_DEPTH, NR_WALL_CLEARANCE, NR_LEFT_UNIT_STANDOFF, WALL_SHELF_HEIGHTS, BOX_SPACING, SECTION_COLS, UNIT_SECTIONS, seededRandom01, getStorefrontSpec, vestibuleHalfWidth, posterBayIndices, entranceOpeningHalfWidth, mapWallSegmentUV, STORE_CENTER_X, FRONT_GLASS_Z } from './store-layout';
 import { buildFrontSoffit, frontSoffitLidPolygon, frontSoffitPolygon, frontSoffitY, pointInSoffit, soffitConnectHalf, soffitMirroredEdges, soffitTrofferCenters, tileOverlapsSoffit } from './ceiling-soffit';
 import { createFixture } from './fixture-registry';
@@ -491,8 +491,10 @@ export function buildStore(scene: StoreScene) {
   const LANE_DEPTH = PARKING_STALLS.rowFrontZ - FRONT_Z - LOT_APRON; // drive lane between the sidewalk and the stalls
   const LOT_D = LOT_APRON + LANE_DEPTH + STALL_DEPTH; // 47 ft beyond the glass
   // Odd multiple of STALL_W so stall boundaries land at x = centerX ± 4.5,
-  // ±13.5, ±22.5 … — the same phase PARKING_STALLS uses for the car row.
-  const LOT_W = storeWidth + 8 <= STALL_W * 7 ? STALL_W * 7 : STALL_W * 9;
+  // ±13.5, ±22.5 … — the same phase PARKING_STALLS uses for the car row (see
+  // lotWidth() in exterior-environment.ts, the single source of truth this
+  // also drives the road/curb bounds from).
+  const LOT_W = lotWidth(storeWidth);
   // One V-repeat spans the whole lot depth: stall side-lines only inside the
   // far stall band (canvas-bottom fractions), plain asphalt in the lane.
   const asphaltTex = createAsphaltTexture((LOT_APRON + LANE_DEPTH) / LOT_D, 0.97);
