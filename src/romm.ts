@@ -19,10 +19,12 @@
 import { invoke } from '@tauri-apps/api/core';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import { Movie } from './jellyfin';
-import { getSetting } from './settings';
 import { operatorDefault } from './operator-defaults';
-import { demoPoster } from './demo-library';
 import { isGamesOnly } from './games-only';
+import { isPlatformEnabled } from './game-platforms';
+import { fetchGamesFromSnapshot } from './games-snapshot';
+
+export { isPlatformEnabled };
 
 export interface RommConfig {
   url: string;
@@ -411,193 +413,8 @@ function romRelPath(rom: any): string {
  * fails, this logs a warning and continues (or returns []) so the rest of the
  * app is unaffected -- and nothing is fetched at all when unconfigured.
  */
-export function isPlatformEnabled(label: string): boolean {
-  const key = label.toLowerCase().replace(/\s+/g, '');
-  let settingKey = `bb_platform_${key}`;
-  if (key === 'snes' || key === 'supernintendo') settingKey = 'bb_platform_snes';
-  if (key === 'superfamicom' || key === 'sfam' || key === 'sfc') settingKey = 'bb_platform_sfam';
-  if (key === 'nes' || key === 'famicom' || key === 'nintendoentertainment') settingKey = 'bb_platform_nes';
-  if (key === 'n64' || key === 'nintendo64') settingKey = 'bb_platform_n64';
-  if (key === '3ds' || key === 'nintendo3ds') settingKey = 'bb_platform_3ds';
-  if (key === 'psp' || key === 'playstationportable') settingKey = 'bb_platform_psp';
-  if (key === 'nintendodsi' || key === 'dsi') settingKey = 'bb_platform_dsi';
-  if (key === 'nintendoswitch' || key === 'switch') settingKey = 'bb_platform_switch';
-  if (key === 'wiiu') settingKey = 'bb_platform_wiiu';
-  if (key === 'xbox') settingKey = 'bb_platform_xbox';
-  if (key === 'segasaturn' || key === 'saturn') settingKey = 'bb_platform_saturn';
-  if (key === 'genesis' || key === 'segagenesis' || key === 'megadrive') settingKey = 'bb_platform_genesis';
-  if (key === 'psx' || key === 'ps1' || key === 'playstation') settingKey = 'bb_platform_psx';
-  if (key === 'ps2' || key === 'playstation2') settingKey = 'bb_platform_ps2';
-  if (key === 'gamecube' || key === 'nintendogamecube') settingKey = 'bb_platform_gamecube';
-  if (key === 'dreamcast' || key === 'segadreamcast') settingKey = 'bb_platform_dreamcast';
-  if (key === 'gba' || key === 'gameboyadvance') settingKey = 'bb_platform_gba';
-  if (key === 'gbc' || key === 'gameboycolor') settingKey = 'bb_platform_gbc';
-  if (key === 'gb' || key === 'gameboy') settingKey = 'bb_platform_gb';
-  if (key === 'arcade' || key === 'mame' || key === 'neogeo') settingKey = 'bb_platform_arcade';
-  if (key === 'atari') settingKey = 'bb_platform_atari';
-
-  const val = getSetting<boolean>(settingKey);
-  return val === undefined ? false : val;
-}
-
 function generateMockGames(wholeLibrary = false): Movie[] {
-  const games: Movie[] = [];
-  const selectedPlatforms = [
-    { label: 'SNES', key: 'snes' },
-    { label: 'NES', key: 'nes' },
-    { label: 'NINTENDO 64', key: 'n64' },
-    { label: 'GENESIS', key: 'genesis' },
-    { label: 'PLAYSTATION', key: 'psx' },
-    { label: 'PLAYSTATION 2', key: 'ps2' },
-    { label: 'GAMECUBE', key: 'gamecube' },
-    { label: 'DREAMCAST', key: 'dreamcast' },
-    { label: 'GAME BOY ADVANCE', key: 'gba' },
-    { label: 'ARCADE', key: 'arcade' },
-    { label: 'ATARI', key: 'atari' }
-  ];
-
-  const mockData: Record<string, { title: string; year: number; rating?: number; overview?: string }[]> = {
-    snes: [
-      { title: 'Super Mario World', year: 1990, rating: 9.5, overview: 'Mario and Luigi go to Dinosaur Land to save Princess Toadstool.' },
-      { title: 'Chrono Trigger', year: 1995, rating: 9.8, overview: 'A young man is accidentally transported through time and must save the world.' },
-      { title: 'The Legend of Zelda: A Link to the Past', year: 1991, rating: 9.7, overview: 'Link must rescue the descendants of the Seven Sages to defeat Ganon.' },
-      { title: 'Super Metroid', year: 1994, rating: 9.7, overview: 'Samus Aran travels to planet Zebes to retrieve a stolen Metroid hatchling.' },
-      { title: 'Donkey Kong Country', year: 1994, rating: 9.1, overview: 'Donkey Kong and Diddy Kong search for their stolen banana hoard.' },
-      { title: 'Street Fighter II', year: 1992, rating: 9.0, overview: 'Fighters from around the world compete in a martial arts tournament.' },
-      { title: 'Final Fantasy VI', year: 1994, rating: 9.6, overview: 'A group of rebels opposes an empire that is trying to conquer the world using magic.' },
-      { title: 'Mega Man X', year: 1993, rating: 9.2, overview: 'Mega Man X must stop the Maverick reploids from destroying humanity.' },
-      { title: 'Super Mario Kart', year: 1992, rating: 8.8, overview: 'Mario and friends race go-karts in various tracks.' },
-      { title: 'Super Mario RPG', year: 1996, rating: 9.3, overview: 'Mario teams up with Bowser, Peach, Mallow, and Geno to save the Star Road.' },
-      { title: 'EarthBound', year: 1994, rating: 9.4, overview: 'Ness and his friends travel the world to defeat the alien entity Giygas.' },
-      { title: 'Super Castlevania IV', year: 1991, rating: 9.0, overview: 'Simon Belmont sets out to destroy Dracula once again.' },
-      { title: 'F-Zero', year: 1990, rating: 8.5, overview: 'High-speed futuristic racing across challenging tracks.' },
-      { title: 'Secret of Mana', year: 1993, rating: 9.0, overview: 'Three heroes fight to prevent an empire from reviving a flying fortress.' },
-      { title: 'Yoshi\'s Island', year: 1995, rating: 9.5, overview: 'Yoshi carries Baby Mario across hazardous environments to rescue Baby Luigi.' },
-      { title: 'Star Fox', year: 1993, rating: 8.8, overview: 'Fox McCloud and his team defend the Lylat system from Andross.' },
-      { title: 'Contra III: The Alien Wars', year: 1992, rating: 9.2, overview: 'Two soldiers fight off a massive alien invasion on Earth.' },
-      { title: 'Super Punch-Out!!', year: 1994, rating: 8.9, overview: 'Little Mac climbs the ranks of the WVBA to become champion.' },
-      { title: 'Final Fight', year: 1990, rating: 8.4, overview: 'Cody, Haggar, and Guy rescue Jessica from the Mad Gear gang.' },
-      { title: 'Harvest Moon', year: 1996, rating: 8.7, overview: 'A young boy restores his grandfather\'s abandoned farm.' }
-    ],
-    nes: [
-      { title: 'Super Mario Bros. 3', year: 1988, rating: 9.8, overview: 'Mario and Luigi travel across various worlds to defeat Bowser\'s Koopaling children.' },
-      { title: 'The Legend of Zelda', year: 1986, rating: 9.5, overview: 'Link gathers the eight fragments of the Triforce of Wisdom to rescue Princess Zelda.' },
-      { title: 'Metroid', year: 1986, rating: 9.0, overview: 'Samus Aran infiltrates planet Zebes to destroy Mother Brain.' },
-      { title: 'Mega Man 2', year: 1988, rating: 9.6, overview: 'Mega Man battles Dr. Wily and his eight new robot masters.' },
-      { title: 'Castlevania III: Dracula\'s Curse', year: 1989, rating: 9.1, overview: 'Trevor Belmont fights his way to Dracula\'s castle with the help of unique allies.' },
-      { title: 'Contra', year: 1987, rating: 9.4, overview: 'Two commandoes fight alien invaders in South America.' },
-      { title: 'Punch-Out!!', year: 1987, rating: 9.3, overview: 'Little Mac fights various colorful boxers to challenge Mike Tyson.' },
-      { title: 'Duck Hunt', year: 1984, rating: 8.0, overview: 'Shoot ducks and clay pigeons with the NES Zapper.' },
-      { title: 'Final Fantasy', year: 1987, rating: 8.9, overview: 'Four Light Warriors set out to restore light to the four elemental crystals.' },
-      { title: 'Super Mario Bros.', year: 1985, rating: 9.5, overview: 'Mario travels through the Mushroom Kingdom to rescue Princess Toadstool.' },
-      { title: 'Ninja Gaiden', year: 1988, rating: 9.0, overview: 'Ryu Hayabusa seeks revenge for his father\'s death.' },
-      { title: 'Bubble Bobble', year: 1986, rating: 8.8, overview: 'Two dragons bubble enemies to rescue their girlfriends.' },
-      { title: 'Castlevania', year: 1986, rating: 9.0, overview: 'Simon Belmont enters Dracula\'s castle to destroy the vampire lord.' },
-      { title: 'Zelda II: The Adventure of Link', year: 1987, rating: 8.2, overview: 'Link seeks the Triforce of Courage to wake Princess Zelda from a sleeping curse.' },
-      { title: 'Kirby\'s Adventure', year: 1993, rating: 9.2, overview: 'Kirby travels Dream Land to recover the pieces of the Star Rod.' },
-      { title: 'Excitebike', year: 1984, rating: 8.1, overview: 'Race motorbikes over obstacles and design your own tracks.' },
-      { title: 'Double Dragon', year: 1987, rating: 8.7, overview: 'Two martial artists rescue Billy\'s girlfriend from a gang.' },
-      { title: 'Mega Man 3', year: 1990, rating: 9.2, overview: 'Mega Man and his robot dog Rush gather elements to build a peace-keeping robot.' },
-      { title: 'Ghosts \'n Goblins', year: 1985, rating: 8.0, overview: 'Arthur fights demons to rescue Princess Prin Prin.' },
-      { title: 'Tecmo Bowl', year: 1987, rating: 8.6, overview: 'Classic gridiron American football action.' }
-    ],
-    n64: [
-      { title: 'Super Mario 64', year: 1996, rating: 9.8, overview: 'Mario enters worlds inside paintings to rescue Princess Peach.' },
-      { title: 'The Legend of Zelda: Ocarina of Time', year: 1998, rating: 9.9, overview: 'Link travels through time to stop Ganondorf from obtaining the Triforce.' },
-      { title: 'GoldenEye 007', year: 1997, rating: 9.6, overview: 'James Bond infiltrates various locations to stop a satellite weapon.' },
-      { title: 'Mario Kart 64', year: 1996, rating: 9.2, overview: 'Mario and friends race in 3D tracks with weapon items.' },
-      { title: 'Super Smash Bros.', year: 1999, rating: 9.1, overview: 'Nintendo characters battle each other in arena stages.' },
-      { title: 'Star Fox 64', year: 1997, rating: 9.3, overview: 'Fox McCloud pilots the Arwing to defend the Lylat system.' },
-      { title: 'Banjo-Kazooie', year: 1998, rating: 9.4, overview: 'A bear and a bird collect Jigsaws and musical notes to rescue Banjo\'s sister.' },
-      { title: 'Perfect Dark', year: 1999, rating: 9.5, overview: 'Joanna Dark investigates a conspiracy involving alien technology.' },
-      { title: 'The Legend of Zelda: Majora\'s Mask', year: 2000, rating: 9.7, overview: 'Link has three days to stop the Moon from crashing into Termina.' },
-      { title: 'Paper Mario', year: 2000, rating: 9.3, overview: 'Mario rescues the Star Spirits to defeat Bowser in a paper-craft world.' },
-      { title: 'F-Zero X', year: 1998, rating: 9.0, overview: 'High-speed futuristic racing with 30 pilots competing.' },
-      { title: 'Mario Party', year: 1998, rating: 8.5, overview: 'Board game with Mario characters and various minigames.' },
-      { title: 'Conker\'s Bad Fur Day', year: 2001, rating: 9.2, overview: 'A squirrel goes on a wild, mature-themed adventure to get home.' },
-      { title: 'Wave Race 64', year: 1996, rating: 8.9, overview: 'Jet ski racing with realistic water physics.' },
-      { title: 'Donkey Kong 64', year: 1999, rating: 8.8, overview: 'Collect bananas and rescue DK\'s friends in 3D worlds.' },
-      { title: 'Kirby 64: The Crystal Shards', year: 2000, rating: 8.7, overview: 'Kirby combines abilities to save Ripple Star.' },
-      { title: 'Pokemon Stadium', year: 1999, rating: 8.6, overview: 'Battle Pokemon in 3D arenas using imported game save files.' },
-      { title: 'Diddy Kong Racing', year: 1997, rating: 9.0, overview: 'Adventure racing in cars, planes, and hovercrafts.' }
-    ],
-    genesis: [
-      { title: 'Sonic the Hedgehog 2', year: 1992, rating: 9.4, overview: 'Sonic and Tails speed through zones to stop Dr. Robotnik\'s Death Egg.' },
-      { title: 'Streets of Rage 2', year: 1992, rating: 9.3, overview: 'Four heroes clean up the streets in a classic side-scrolling beat \'em up.' },
-      { title: 'Phantasy Star IV', year: 1993, rating: 9.5, overview: 'Chaz and friends battle an ancient evil across the Algo Star System.' },
-      { title: 'Gunstar Heroes', year: 1993, rating: 9.4, overview: 'High-octane run-and-gun action with combining weapon types.' },
-      { title: 'Shinobi III: Return of the Ninja Master', year: 1993, rating: 9.1, overview: 'Joe Musashi battles the Neo Zeed syndicate with ninja skills.' },
-      { title: 'Sonic & Knuckles', year: 1994, rating: 9.2, overview: 'Sonic and Knuckles team up (or split) to stop the Death Egg.' },
-      { title: 'Castlevania: Bloodlines', year: 1994, rating: 9.0, overview: 'John Morris and Eric Lecarde battle through WWI-era Europe.' },
-      { title: 'Mortal Kombat II', year: 1993, rating: 9.0, overview: 'Fighters battle in Outworld in the legendary martial arts tournament.' },
-      { title: 'Sonic the Hedgehog', year: 1991, rating: 9.1, overview: 'The blue hedgehog speeds to free animals from Dr. Robotnik.' },
-      { title: 'Beyond Oasis', year: 1994, rating: 8.9, overview: 'Prince Ali uses the Gold Armlet to summon spirits and stop evil.' },
-      { title: 'Monster World IV', year: 1994, rating: 9.0, overview: 'Aisha travels with her blue Pepelogoo to save elemental spirits.' },
-      { title: 'Streets of Rage', year: 1991, rating: 8.7, overview: 'Three ex-cops clean up a crime-ridden city.' },
-      { title: 'Earthworm Jim', year: 1994, rating: 8.9, overview: 'A worm in a super-suit battles bizarre enemies across space.' },
-      { title: 'Aladdin', year: 1993, rating: 9.0, overview: 'Classic Disney adaptation featuring hand-drawn animations.' },
-      { title: 'Ecco the Dolphin', year: 1992, rating: 8.5, overview: 'A dolphin travels through time and oceans to rescue his pod.' },
-      { title: 'Golden Axe', year: 1989, rating: 8.6, overview: 'Three warriors seek revenge against Death Adder.' },
-      { title: 'VectorMan', year: 1995, rating: 8.8, overview: 'An orb-bot cleans up Earth from toxic waste and rogue robots.' },
-      { title: 'Comix Zone', year: 1995, rating: 8.7, overview: 'A cartoonist is trapped inside his own post-apocalyptic comic book.' },
-      { title: 'Ristar', year: 1995, rating: 9.0, overview: 'A star stretches his arms to climb and defeat Kaiser Greedy.' },
-      { title: 'Landstalker', year: 1992, rating: 8.9, overview: 'Isometric action RPG following Nigel the treasure hunter.' }
-    ],
-    psx: [
-      { title: 'Final Fantasy VII', year: 1997, rating: 9.8, overview: 'Cloud Strife and AVALANCHE oppose the Shinra corporation and Sephiroth.' },
-      { title: 'Metal Gear Solid', year: 1998, rating: 9.8, overview: 'Solid Snake infiltrates Shadow Moses to stop the terrorist group FOXHOUND.' },
-      { title: 'Castlevania: Symphony of the Night', year: 1997, rating: 9.9, overview: 'Dracula\'s half-vampire son Alucard explores a shifting castle.' },
-      { title: 'Resident Evil 2', year: 1998, rating: 9.5, overview: 'Leon S. Kennedy and Claire Redfield fight zombies in Raccoon City.' },
-      { title: 'Crash Bandicoot: Warped', year: 1998, rating: 9.2, overview: 'Crash and Coco travel through time to gather crystals.' },
-      { title: 'Gran Turismo 2', year: 1999, rating: 9.3, overview: 'Comprehensive driving simulation with hundreds of cars.' },
-      { title: 'Silent Hill', year: 1999, rating: 9.4, overview: 'Harry Mason searches for his missing daughter in a fog-shrouded town.' },
-      { title: 'Chrono Cross', year: 2000, rating: 9.4, overview: 'Serge travels between parallel dimensions to uncover his past.' },
-      { title: 'Tekken 3', year: 1998, rating: 9.5, overview: 'Fighters battle in Ogre\'s tournament.' },
-      { title: 'Tony Hawk\'s Pro Skater 2', year: 2000, rating: 9.6, overview: 'Skateboards, combos, and a legendary punk soundtrack.' },
-      { title: 'Resident Evil', year: 1996, rating: 9.0, overview: 'S.T.A.R.S. members investigate a mysterious mansion.' },
-      { title: 'Tomb Raider', year: 1996, rating: 8.9, overview: 'Lara Croft searches for the Scion of Atlantis.' },
-      { title: 'Syphon Filter', year: 1999, rating: 8.8, overview: 'Gabe Logan tracks down a global biological weapon.' },
-      { title: 'Legacy of Kain: Soul Reaver', year: 1999, rating: 9.2, overview: 'Raziel seeks vengeance against his creator Kain.' },
-      { title: 'Final Fantasy VIII', year: 1999, rating: 9.1, overview: 'Squall Leonhart and SeeD mercenaries fight a sorceress.' },
-      { title: 'Spyro the Dragon', year: 1998, rating: 8.9, overview: 'A purple dragon rescues his fellow dragons.' },
-      { title: 'Resident Evil 3: Nemesis', year: 1999, rating: 9.0, overview: 'Jill Valentine escapes Raccoon City while pursued by Nemesis.' },
-      { title: 'Ape Escape', year: 1999, rating: 9.1, overview: 'Catch time-traveling monkeys.' },
-      { title: 'Final Fantasy IX', year: 2000, rating: 9.6, overview: 'Zidane Tribal kidnaps Princess Garnet.' },
-      { title: 'Xenogears', year: 1998, rating: 9.5, overview: 'Fei Fong Wong pilots gears in a philosophical sci-fi story.' }
-    ]
-  };
-
-  for (const plat of selectedPlatforms) {
-    // Games-only ignores the platform toggles for real Romm stock, so the
-    // no-server demo catalog has to do the same — otherwise a games-only demo
-    // boot with every toggle off would build a store with nothing in it.
-    if (wholeLibrary || isPlatformEnabled(plat.label)) {
-      const data = mockData[plat.key] || [];
-      for (let i = 0; i < data.length; i++) {
-        const item = data[i];
-        games.push({
-          id: `game_mock_${plat.key}_${i}`,
-          title: item.title,
-          year: item.year,
-          duration: 'N/A',
-          rating: 'NR',
-          overview: item.overview || 'No description available.',
-          director: 'Unknown',
-          actors: [],
-          genres: [],
-          localPath: '',
-          posterUrl: demoPoster(i),
-          game: true,
-          platform: plat.label,
-          launchPath: '',
-          communityRating: item.rating,
-          criticRating: item.rating ? item.rating * 10 : 0
-        });
-      }
-    }
-  }
-
-  return games;
+  return fetchGamesFromSnapshot(undefined, wholeLibrary);
 }
 
 /**

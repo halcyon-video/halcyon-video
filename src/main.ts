@@ -2798,35 +2798,29 @@ async function initializeStoreScene(preservePosterCache = false) {
         if (choice === 'order') await handleDiscoveryRequest(movie);
         else if (choice === 'dismiss') handleGapDismiss();
       } else if (action === 'launch' && movie) {
-        await handleGameLaunch(movie);
+        if (isDemoMode) scene.startPlayAnimation(() => { revealVideoPlayback(); });
+        await handleGameLaunch(movie, isDemoMode);
       } else if (action === 'streaming' && movie) {
         handleStreamingLaunch(movie);
       }
     };
 
-    // T22: checkout completed at the front counter — the carried titles'
-    // ids arrive here. The T23 rental handoff (bb_rental write + fade into
-    // the back room) runs inside StoreScene.finishCheckout, right after this
-    // event fires, so it works identically in the harness.
-    // Non-rental carry mode: checking out IS choosing tonight's movie, so
-    // start playback of the checked-out title immediately through the normal
-    // player path (launchVideoPlayback resolves a series to its selected/first
-    // episode exactly like every other play entry point).
+    // T22 checkout at the front counter: starts playback or reveals game demo beat.
     scene.onCheckoutComplete = (items) => {
       logToConsole(`[System] Checkout complete: ${items.length} title(s) rented (${items.join(', ')}).`, 'system');
-      if (scene.rentalMode || items.length === 0) return; // rental continues into the back room
-      // Source-aware (GH #84): `items` carries qualified ids, because a bare
-      // item id is ambiguous across servers — both boxes issue "1"/"m0", and
-      // first-match-wins played the OTHER server's film off the wrong address.
-      const movie = findTitleByCarryId(storeLibraries, items[0]);
+      if (scene.rentalMode || items.length === 0) return;
+      const movie = findTitleByCarryId(storeLibraries, items[0])
+        ?? storeGameMovies.find((g) => g.id === items[0]);
       if (!movie) {
         logToConsole(`[Video] Checked-out title ${items[0]} not found in any library — cannot start playback.`, 'video');
-        // The exit walk already carried the bag out under the whiteout —
-        // without a player to open over it, fade back in at the doors.
         scene.returnToEntrance();
         return;
       }
-      void launchVideoPlayback(movie);
+      if (movie.game) {
+        void handleGameLaunch(movie, false);
+      } else {
+        void launchVideoPlayback(movie);
+      }
     };
 
     // T22: carried-count changes retune the control hint (the route to the
@@ -3226,7 +3220,11 @@ function handleGapDismiss() {
  * (EmulatorJS), or shows the demo explanatory card when no game server is configured.
  * Plays checkout chime when rental goes through. Never throws.
  */
-async function handleGameLaunch(movie: Movie) {
+async function handleGameLaunch(movie: Movie, startHidden = false) {
+  if (isDemoMode) {
+    openDemoPlaybackOverlay(movie.title, startHidden, 'game');
+    return;
+  }
   logToConsole(`[System] Renting "${movie.title}" (${movie.platform || 'game'})...`, 'system');
   const result = await launchGame(movie);
   if (result === 'launched') {
@@ -3237,8 +3235,8 @@ async function handleGameLaunch(movie: Movie) {
     logToConsole(`[System] "${movie.title}" is playing in the Romm browser emulator — check the new tab.`, 'system');
   } else if (result === 'browser') {
     retailAudio.playCheckoutChime();
-    logToConsole(`[System] "${movie.title}" is ready — take it to the counter to play (no game server configured).`, 'system');
-    openDemoPlaybackOverlay(movie.title, false, 'game');
+    logToConsole(`[System] "${movie.title}" is ready (no game server configured).`, 'system');
+    openDemoPlaybackOverlay(movie.title, startHidden, 'game');
   } else {
     logToConsole(`[System] Couldn't launch "${movie.title}" — check the Romm launch command in settings.`, 'system');
   }

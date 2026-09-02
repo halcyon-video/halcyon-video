@@ -1,0 +1,309 @@
+{
+  "generatedAt": "2026-09-02T21:58:00.000Z",
+  "platforms": [
+    {
+      "id": "snes",
+      "label": "SNES",
+      "name": "Super Nintendo",
+      "titles": [
+        {
+          "title": "Super Mario World",
+          "year": 1990,
+          "rating": 9.5,
+          "overview": "Mario and Luigi journey across Dinosaur Land to rescue Princess Toadstool and the Yoshi eggs from Bowser and the Koopalings."
+        },
+        {
+          "title": "Chrono Trigger",
+          "year": 1995,
+          "rating": 9.8,
+          "overview": "A young man is accidentally transported through time and gathers legendary companions across millennia to avert a global catastrophe."
+        },
+        {
+          "title": "The Legend of Zelda: A Link to the Past",
+          "year": 1991,
+          "rating": 9.7,
+          "overview": "Link travels between the Light World and the Dark World to rescue the maidens and stop the sorcerer Agahnim and Ganon."
+        },
+        {
+          "title": "Super Metroid",
+          "year": 1994,
+          "rating": 9.7,
+          "overview": "Bounty hunter Samus Aran returns to the planet Zebes to recover the last Metroid hatchling from the Space Pirates."
+        },
+        {
+          "title": "Donkey Kong Country",
+          "year": 1994,
+          "rating": 9.1,
+          "overview": "Donkey Kong and Diddy Kong embark on a wild adventure through DK Island to recover their stolen banana hoard from King K. Rool."
+        },
+        {
+          "title": "Street Fighter II Turbo",
+          "year": 1993,
+          "rating": 9.2,
+          "overview": "World warriors gather to compete in the grand martial arts tournament with lightning-fast combat."
+        },
+        {
+          "title": "Final Fantasy VI",
+          "year": 1994,
+          "rating": 9.6,
+          "overview": "A rebel faction battles the Gestahlian Empire across a decaying world torn by magic, machinery, and Kefka's madness."
+        },
+        {
+          "title": "Mega Man X",
+          "year": 1993,
+          "rating": 9.2,
+          "overview": "Century-awakened android X must master his weapons and armor to defeat Sigma and the rogue Maverick reploids."
+        },
+        {
+          "title": "Super Mario Kart",
+          "year": 1992,
+          "rating": 8.8,
+          "overview": "Mushroom Kingdom racers hit the asphalt in the Mode 7 go-kart battle that launched a genre."
+        },
+        {
+          "title": "Super Mario RPG",
+          "year": 1996,
+          "rating": 9.3,
+          "overview": "Mario teams up with unexpected allies Bowser and Geno to recover the seven stars of the shattered Star Road."
+        }
+      ]
+    },
+    {
+      "id": "genesis",
+      "label": "GENESIS",
+      "name": "Sega Genesis",
+      "titles": [
+        {
+          "title": "Sonic the Hedgehog 2",
+          "year": 1992,
+          "rating": 9.4,
+          "overview": "Sonic and Miles 'Tails' Prower blaze across West Side Island to stop Dr. Robotnik's orbital Death Egg."
+        },
+        {
+          "title": "Streets of Rage 2",
+          "year": 1992,
+          "rating": 9.3,
+          "overview": "Four vigilantes hit the nocturnal city streets to free their friend Adam and shatter Mr. X's crime syndicate."
+        },
+        {
+          "title": "Phantasy Star IV",
+          "year": 1993,
+          "rating": 9.5,
+          "overview": "Hunter Chaz Ashley and his guild investigate planetary bioplant failures across the Algo solar system."
+        },
+        {
+          "title": "Gunstar Heroes",
+          "year": 1993,
+          "rating": 9.4,
+          "overview": "Red and Blue Gunstar battle imperial commanders in an explosive run-and-gun quest for the mystical power gems."
+        },
+        {
+          "title": "Shinobi III: Return of the Ninja Master",
+          "year": 1993,
+          "rating": 9.1,
+          "overview": "Master ninja Joe Musashi battles through techno-organic fortresses to strike down the resurrected Neo Zeed syndicate."
+        },
+        {
+          "title": "Sonic & Knuckles",
+          "year": 1994,
+          "rating": 9.2,
+          "overview": "Sonic investigates Angel Island's floating ruins while guardian Knuckles defends the Master Emerald from deception."
+        },
+        {
+          "title": "Castlevania: Bloodlines",
+          "year": 1994,
+          "rating": 9,
+          "overview": "John Morris and Eric Lecarde battle across First World War Europe to stop Elizabeth Bartley from resurrecting Dracula."
+        },
+        {
+          "title": "Mortal Kombat II",
+          "year": 1993,
+          "rating": 9,
+          "overview": "Earthrealm champions enter Shao Kahn's Outworld arena in a brutal sequel tournament."
+        },
+        {
+          "title": "Sonic the Hedgehog",
+          "year": 1991,
+          "rating": 9.1,
+          "overview": "The blue speedster sprints through South Island loops and corkscrews to liberate captive critters from Robotnik."
+        },
+        {
+          "title": "Beyond Oasis",
+          "year": 1994,
+          "rating": 8.9,
+          "overview": "Prince Ali wields the mythical Golden Armlet to summon elemental spirits against the bearer of the Silver Armlet."
+        },
+        {
+          "title": "Earthworm Jim",
+          "year": 1994,
+          "rating": 8.9,
+          "overview": "An ordinary earthworm in an ultra-high-tech space suit battles Psy-Crow to rescue Princess What's-Her-Name."
+        },
+        {
+          "title": "Golden Axe",
+          "year": 1989,
+          "rating": 8.6,
+          "overview": "Three fantasy warriors wield iron and elemental magic to avenge their homeland against the tyrant Death Adder."
+        }
+      ]
+    },
+    {
+      "id": "n64",
+      "label": "NINTENDO 64",
+      "name": "Nintendo 64",
+      "titles": [
+        {
+          "title": "Super Mario 64",
+          "year": 1996,
+          "rating": 9.8,
+          "overview": "Mario leaps through enchanted castle paintings into sprawling three-dimensional worlds to rescue Princess Peach."
+        },
+        {
+          "title": "The Legend of Zelda: Ocarina of Time",
+          "year": 1998,
+          "rating": 9.9,
+          "overview": "Link awakens from seven years in the Sacred Realm to liberate Hyrule's temples from the desert king Ganondorf."
+        },
+        {
+          "title": "GoldenEye 007",
+          "year": 1997,
+          "rating": 9.6,
+          "overview": "Secret Agent 007 infiltrates missile silos, chemical facilities, and Siberian snowfields to neutralize the GoldenEye satellite."
+        },
+        {
+          "title": "Mario Kart 64",
+          "year": 1996,
+          "rating": 9.2,
+          "overview": "Eight drivers drift around Toad's Turnpike, Yoshi Valley, and Rainbow Road with red shells and blue banana peels."
+        },
+        {
+          "title": "Super Smash Bros.",
+          "year": 1999,
+          "rating": 9.1,
+          "overview": "Nintendo icons duel on floating platforms, building launch damage until fighters blast off the screen."
+        },
+        {
+          "title": "Star Fox 64",
+          "year": 1997,
+          "rating": 9.3,
+          "overview": "Fox McCloud leads the Star Fox team in all-range Arwing combat to liberate the Lylat System from Andross."
+        },
+        {
+          "title": "Banjo-Kazooie",
+          "year": 1998,
+          "rating": 9.4,
+          "overview": "A honey bear and his breegull partner scour Gruntilda's lair collecting puzzle Jiggies and musical notes."
+        },
+        {
+          "title": "Perfect Dark",
+          "year": 1999,
+          "rating": 9.5,
+          "overview": "Carrington Institute operative Joanna Dark investigates dataDyne conspiracies and deep-space alien treaties."
+        },
+        {
+          "title": "The Legend of Zelda: Majora's Mask",
+          "year": 2000,
+          "rating": 9.7,
+          "overview": "With seventy-two hours until the lunar descent, Link plays the Song of Time to save the doomed land of Termina."
+        },
+        {
+          "title": "Paper Mario",
+          "year": 2000,
+          "rating": 9.3,
+          "overview": "A storybook Mushroom Kingdom comes alive as Mario rescues the seven Star Spirits from Bowser's Star Rod."
+        },
+        {
+          "title": "F-Zero X",
+          "year": 1998,
+          "rating": 9,
+          "overview": "Thirty anti-gravity hover machines race neck-and-neck at blistering supersonic speeds on corkscrew tracks."
+        },
+        {
+          "title": "Diddy Kong Racing",
+          "year": 1997,
+          "rating": 9,
+          "overview": "Timber the Tiger and his racing friends pilot cars, hovercraft, and planes to reclaim Timber's Island from Wizpig."
+        }
+      ]
+    },
+    {
+      "id": "psx",
+      "label": "PLAYSTATION",
+      "name": "PlayStation",
+      "titles": [
+        {
+          "title": "Final Fantasy VII",
+          "year": 1997,
+          "rating": 9.8,
+          "overview": "Mercenary Cloud Strife joins Avalanche in Midgar, only to be drawn into a planet-wide chase for the legendary soldier Sephiroth."
+        },
+        {
+          "title": "Metal Gear Solid",
+          "year": 1998,
+          "rating": 9.8,
+          "overview": "Solid Snake infiltrates a nuclear weapons disposal facility in Alaska to stop a terrorist cell led by Liquid Snake."
+        },
+        {
+          "title": "Castlevania: Symphony of the Night",
+          "year": 1997,
+          "rating": 9.9,
+          "overview": "Alucard explores the sprawling, morphing corridors of Dracula's castle to discover the secret of Richter Belmont's disappearance."
+        },
+        {
+          "title": "Resident Evil 2",
+          "year": 1998,
+          "rating": 9.5,
+          "overview": "Rookie cop Leon Kennedy and college student Claire Redfield battle biochemical horrors across infected Raccoon City."
+        },
+        {
+          "title": "Crash Bandicoot: Warped",
+          "year": 1998,
+          "rating": 9.2,
+          "overview": "Crash and Coco leap through the Time-Twister machine across prehistoric eras, medieval towers, and future cities."
+        },
+        {
+          "title": "Gran Turismo 2",
+          "year": 1999,
+          "rating": 9.3,
+          "overview": "The real driving simulator expands with hundreds of meticulously tuned vehicles and global licenses."
+        },
+        {
+          "title": "Silent Hill",
+          "year": 1999,
+          "rating": 9.4,
+          "overview": "Harry Mason wanders foggy streets and rusting, siren-blaring otherworlds in desperate search of his lost daughter."
+        },
+        {
+          "title": "Chrono Cross",
+          "year": 2000,
+          "rating": 9.4,
+          "overview": "Teenager Serge crosses into a parallel reality where he died ten years earlier, seeking the truth of two timelines."
+        },
+        {
+          "title": "Tekken 3",
+          "year": 1998,
+          "rating": 9.5,
+          "overview": "Martial artists gather for the King of Iron Fist Tournament 3 to draw out and vanquish the fighting god Ogre."
+        },
+        {
+          "title": "Tony Hawk's Pro Skater 2",
+          "year": 2000,
+          "rating": 9.6,
+          "overview": "Street and vert skating with custom parks, combo-linking manuals, and a definitive skate-punk soundtrack."
+        },
+        {
+          "title": "Tomb Raider",
+          "year": 1996,
+          "rating": 8.9,
+          "overview": "Archaeologist Lara Croft explores ancient tombs in Peru, Greece, and Egypt on the hunt for the Scion of Atlantis."
+        },
+        {
+          "title": "Final Fantasy IX",
+          "year": 2000,
+          "rating": 9.6,
+          "overview": "Thief Zidane Tribal kidnaps Princess Garnet and finds himself defending Gaia against the schemes of Kuja."
+        }
+      ]
+    }
+  ]
+}

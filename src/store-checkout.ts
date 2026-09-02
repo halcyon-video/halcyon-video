@@ -105,7 +105,8 @@ export function rehydrateCarried(scene: StoreScene): void {
     // Source-aware (GH #84): the stored id may be qualified, and a bare one
     // from an older build still resolves. findSlotKeyForMovie takes the BARE
     // id — the shelf slot is the server's own item.
-    const movie = findTitleByCarryId(scene.libraries, id);
+    const movie = findTitleByCarryId(scene.libraries, id)
+      ?? scene.gameMovies.find((g) => g.id === id);
     if (movie) carried.take(movie, scene.findSlotKeyForMovie(movie.id), null, now);
   }
   if (carried.count > 0) {
