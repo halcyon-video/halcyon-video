@@ -54,10 +54,33 @@ const SUNSET_SKIES: SkyEntry[] = [
   { file: 'sunset/modern_evening_street.jpg' },
   { file: 'sunset/evening_museum_courtyard.jpg' },
 ];
+// Both entries are photographed AFTER dark, not at blue hour — street_lamp was
+// dropped for exactly that reason (GH #146): it is a long-exposure twilight
+// shot, so its sky stays daylight-blue and its foliage stays chlorophyll-green
+// no matter how far the tint below takes it down. vignaioli_night replaces it
+// with a wet-paved Italian square under a black sky, which is the same
+// "lit shopfronts across the street" read hansaplatz gives.
 const NIGHT_SKIES: SkyEntry[] = [
-  { file: 'night/street_lamp.jpg' },
+  { file: 'night/vignaioli_night.jpg' },
   { file: 'night/hansaplatz.jpg' },
 ];
+// GH #146: night's panos are photographs exposed FOR THE CAMERA, and the sky
+// dome is an unlit MeshBasicMaterial — so they print through the renderer's
+// interior tone-mapping exposure (1.7, tuned for a fluorescent-lit rental
+// floor) at very nearly the brightness of the day pool. Measured sRGB means
+// before this tint: hansaplatz 0.30, vignaioli_night 0.23, day's
+// mall_parking_lot 0.48. The result read as a lit dusk, not a night street; a
+// multiplied tint on the sky mesh takes the whole pano down and cools it so the lamp
+// pools, sign glow and window spill read AGAINST the street instead of
+// competing with it.
+//
+// Written as a hex literal because that makes the number a PERCEPTUAL
+// multiplier: three.js converts it to linear (^2.2) before multiplying, so
+// #6a7488 dims the displayed pano to ~0.42 of its photographed brightness and
+// pulls a little blue in on the way. Bumped the same factor through the
+// sampled ground color (see resolveGroundColor) or the parking-lot blend ring
+// would sit three stops brighter than the street it fades into.
+const NIGHT_SKY_TINT = '#6a7488';
 // The sky dome the rotation solve maps onto is NOT centered on the store:
 // store-shell.ts builds it shifted toward the street (z=+120, radius 200), so
 // a point's sphere-azimuth and its seen-from-the-store azimuth differ
@@ -327,7 +350,10 @@ export class OutdoorLightingRig {
       gc = this.sampleGroundColor(tex);
       this.groundColorCache.set(texUrl, gc);
     }
-    this.groundColor.copy(gc);
+    // The ring fades the parking lot into the pano's ground AS DISPLAYED, and
+    // the pano is displayed through skyTint (night's dim, day's low-sun warm) —
+    // so the sampled color takes the same multiplier or the two don't meet.
+    this.groundColor.copy(gc).multiply(this.skyTint);
     this.groundColorListener?.(this.groundColor);
   }
 
@@ -404,6 +430,9 @@ export class OutdoorLightingRig {
       // the environment bake are still the room's whole light source, so the
       // pano only changes what's SEEN, not how the store is lit.
       texUrl = assetUrl(NIGHT_SKIES[this.nightSkyIndex].file);
+      // Dim + cool the photograph so it reads as night rather than dusk
+      // (see NIGHT_SKY_TINT).
+      this.skyTint.set(NIGHT_SKY_TINT);
       sunColor = '#a0b0ff';
       sunIntensity = 0.0;
       hemisphereSky = '#040812';
