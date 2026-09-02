@@ -15,6 +15,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { createLightPoolTexture, createSoftShadowTexture, createConcreteSidewalkTexture } from './canvas-textures';
+import { buildGroundBlend } from './ground-blend';
 import { tryLoadUserAssetTexture } from './user-assets';
 import { assetUrl } from './asset-url';
 import type { OutsideMode } from './outdoor-lighting';
@@ -23,6 +24,9 @@ import { STORE_CENTER_X, FRONT_GLASS_Z } from './store-layout';
 export interface ExteriorEnvironment {
   group: THREE.Group;
   setOutsideMode(mode: OutsideMode): void;
+  // GH #144: retarget the ground-blend ring's color to the active pano's
+  // sampled ground (see ground-blend.ts) — called live as panos load/change.
+  setGroundColor(color: THREE.Color): void;
   dispose(): void;
 }
 
@@ -296,6 +300,28 @@ export function buildExteriorEnvironment(scene: THREE.Scene, storeWidth: number)
   spill.position.set(centerX, 0.01, frontZ + sidewalkDepth * 0.4);
   group.add(spill);
 
+  // ─── Ground blend (issue #144): fades the shell-built parking lot's
+  // exposed left/right/far edges into whatever ground this pano shows there
+  // (grass, cobbles, tide pools, ...) instead of a hard cut against the
+  // photo. Bounds mirror the lot-sizing formula in the "Parking lot" section
+  // of store-shell.ts exactly (both read PARKING_STALLS), so the two can
+  // never drift apart. Starts at a neutral gray — setGroundColor (called by
+  // store-shell.ts right after this returns, then again on every pano
+  // change) retargets it to the real sampled color before any frame renders.
+  const lotHalfWidth = (storeWidth + 8 <= PARKING_STALLS.stallWidth * 7
+    ? PARKING_STALLS.stallWidth * 7 : PARKING_STALLS.stallWidth * 9) / 2;
+  const groundBlend = track(buildGroundBlend(group, {
+    minX: centerX - lotHalfWidth,
+    maxX: centerX + lotHalfWidth,
+    frontZ,
+    farZ: PARKING_STALLS.rowFrontZ + PARKING_STALLS.depth,
+    fadeWidth: 16,
+    initialColor: new THREE.Color(0x3a3a3a),
+  }));
+  function setGroundColor(color: THREE.Color) {
+    groundBlend.setColor(color);
+  }
+
   // ─── Mode reactions (no per-frame work; called on day/night flips) ─────
   function setOutsideMode(mode: OutsideMode) {
     const night = mode === 'night';
@@ -313,5 +339,5 @@ export function buildExteriorEnvironment(scene: THREE.Scene, storeWidth: number)
     scene.remove(group);
   }
 
-  return { group, setOutsideMode, dispose };
+  return { group, setOutsideMode, setGroundColor, dispose };
 }

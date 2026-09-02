@@ -137,6 +137,21 @@ export class OutdoorLightingRig {
   // only ever fetched once per session even if its mode is revisited.
   private skyTex = new Map<string, THREE.Texture>();
 
+  // GH #144: average color of the active pano's lowest band (the ground
+  // beneath the horizon) — consumed by the parking-lot ground-blend ring
+  // (ground-blend.ts) so its fade can target whatever ground the photo shows
+  // (grass, cobbles, tide pools, ...) instead of a fixed asphalt gray. Starts
+  // at a neutral asphalt-ish gray so the ring isn't a wrong color for the one
+  // frame before the first pano decodes. Cached per texture URL alongside
+  // skyTex so a revisited pano doesn't re-sample.
+  private groundColor = new THREE.Color(0x3a3a3a);
+  private groundColorCache = new Map<string, THREE.Color>();
+  // Set by the ground-blend ring (via setGroundColorListener) once it exists —
+  // a plain settable field rather than an OutdoorLightingDeps callback so
+  // wiring it up doesn't require touching StoreScene's constructor-time deps
+  // object, which is built before buildStore() (and the ring) ever runs.
+  private groundColorListener: ((color: THREE.Color) => void) | null = null;
+
   // Baked-environment state (see bakeEnvironment): the PMREM currently installed
   // as scene.environment, the generator it came from, and whether the first bake
   // has happened (guards re-bakes triggered by outside-mode changes during boot).
@@ -265,6 +280,55 @@ export class OutdoorLightingRig {
     // autoUpdate=false (see logoLight above).
     if (this.logoLight) this.logoLight.shadow.needsUpdate = true;
     this.updateSkybox(); // re-applies per-mode sun color/intensity and re-bakes the environment
+  }
+
+  // GH #144: current pano's sampled ground color — see groundColor above.
+  getGroundColor(): THREE.Color {
+    return this.groundColor;
+  }
+
+  // Notified with the resolved ground color on every pano load/swap — see
+  // groundColorListener above.
+  setGroundColorListener(fn: (color: THREE.Color) => void) {
+    this.groundColorListener = fn;
+  }
+
+  // Average color of the lowest ~6% of the equirect pano (the ground beneath
+  // the horizon). Downsamples through a tiny canvas rather than walking the
+  // full-resolution image — this only ever runs once per distinct pano.
+  private sampleGroundColor(tex: THREE.Texture): THREE.Color {
+    const fallback = new THREE.Color(0x3a3a3a);
+    const img = tex.image as { width?: number; height?: number } | undefined;
+    if (!img || !img.width || !img.height) return fallback;
+    const w = 32, h = 8;
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return fallback;
+    const bandH = Math.max(1, Math.round(img.height * 0.06));
+    ctx.drawImage(
+      img as CanvasImageSource, 0, img.height - bandH, img.width, bandH, 0, 0, w, h);
+    const { data } = ctx.getImageData(0, 0, w, h);
+    let r = 0, g = 0, b = 0, n = 0;
+    for (let i = 0; i < data.length; i += 4) { r += data[i]; g += data[i + 1]; b += data[i + 2]; n++; }
+    if (!n) return fallback;
+    // The canvas bytes are display-referred sRGB (matching what the un-tonemapped
+    // pano shows) — tell Color so it converts into the working (linear) space
+    // the same way a '#rrggbb' literal elsewhere in this file would.
+    return new THREE.Color().setRGB(r / n / 255, g / n / 255, b / n / 255, THREE.SRGBColorSpace);
+  }
+
+  // Resolve (sampling once, then caching) and apply the ground color for the
+  // pano at texUrl, notifying the ground-blend ring if the color actually changed.
+  private resolveGroundColor(texUrl: string, tex: THREE.Texture) {
+    let gc = this.groundColorCache.get(texUrl);
+    if (!gc) {
+      gc = this.sampleGroundColor(tex);
+      this.groundColorCache.set(texUrl, gc);
+    }
+    this.groundColor.copy(gc);
+    this.groundColorListener?.(this.groundColor);
   }
 
   updateSkybox() {
@@ -418,6 +482,7 @@ export class OutdoorLightingRig {
         if (tex) this.skyMesh.material.color.copy(this.skyTint);
         this.skyMesh.material.needsUpdate = true;
       }
+      if (tex) this.resolveGroundColor(texUrl, tex);
     };
 
     if (texture) {
