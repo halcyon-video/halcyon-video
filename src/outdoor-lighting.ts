@@ -45,12 +45,14 @@ const SUNSET_SKIES: SkyEntry[] = [
   { file: 'sunset/belfast_sunset_puresky.jpg', sunU: 0.697 },
   { file: 'sunset/evening_road_01_puresky.jpg', sunU: 0.675 },
   { file: 'sunset/industrial_sunset_puresky.jpg', sunU: 0.548 },
-  { file: 'sunset/kiara_1_dawn.jpg', sunU: 0.655 },
-  { file: 'sunset/rooitou_park.jpg', sunU: 0.616 },
-  { file: 'sunset/sunset_jhbcentral.jpg', sunU: 0.619 },
-  { file: 'sunset/the_sky_is_on_fire.jpg', sunU: 0.686 },
-  { file: 'sunset/venice_sunset.jpg', sunU: 0.612 },
   { file: 'sunset/suburban_parking_area.jpg', sunU: 0.671 },
+  { file: 'sunset/stuttgart_suburbs.jpg', sunU: 0.885 },
+  { file: 'sunset/twilight_sunset.jpg', sunU: 0.60 },
+  // No sunU: both are overcast/uniform dusk skies with no discernible sun disc
+  // or horizon glow (checked full-height crops) — falls back to the generic
+  // bright-side rotation, same as the night pool's entries.
+  { file: 'sunset/modern_evening_street.jpg' },
+  { file: 'sunset/evening_museum_courtyard.jpg' },
 ];
 const NIGHT_SKIES: SkyEntry[] = [
   { file: 'night/street_lamp.jpg' },
