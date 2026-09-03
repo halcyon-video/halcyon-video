@@ -5,6 +5,32 @@ All notable changes to Halcyon Video, generated from commit history by
 it on every version tag push. Deterministic and offline: no entry here was
 written by a model.
 
+## [v0.13.0] — 2026-09-02
+
+### CHANGELOG
+- V0.12.0
+- V0.11.1
+
+### Demo
+- Stock games aisle with bundled snapshot and fix checkout (#147)
+
+### General
+- Chore(release): v0.13.0
+- Disable undersampling when stationary and preserve inspect sharpness
+- Docs: add mom-and-pop endcap screenshot for #140
+- Fix mom-and-pop window posters, endcaps, and signage (#140) (Closes [#140](https://github.com/halcyon-video/halcyon-video/issues/140))
+- Fix(exterior): make Nighttime read as night, not as a lit dusk (Closes [#146](https://github.com/halcyon-video/halcyon-video/issues/146))
+- Fix(exterior): model the street the store fronts, not a grey fade ring (Closes [#145](https://github.com/halcyon-video/halcyon-video/issues/145))
+- Fix(exterior): ground the parking lot to the pano instead of floating on it (Closes [#144](https://github.com/halcyon-video/halcyon-video/issues/144))
+- Fix(exterior): prune the sunset sky pool down to street-plausible ground (Closes [#143](https://github.com/halcyon-video/halcyon-video/issues/143))
+- Feat(exterior): put the store on a street — CC0 skies for day, dusk and night (Closes [#142](https://github.com/halcyon-video/halcyon-video/issues/142))
+- Fix(mom & pop): a new release gets one shelf, never the whole wall section
+- Fix(kiosk): keep the browser profile off tmpfs so the store stays logged in
+- Fix(nav): the mom & pop jump index looks down the row it is hovering (Closes [#141](https://github.com/halcyon-video/halcyon-video/issues/141))
+- Feat(demo): size the public demo's catalog to the visitor's device (Closes [#138](https://github.com/halcyon-video/halcyon-video/issues/138))
+- Feat: shared links reopen the store where a screenshot was taken (Closes [#137](https://github.com/halcyon-video/halcyon-video/issues/137))
+- Fix(settings): footer hint sizes to its real width, and the brand-drop diagnostic fits it (Closes [#136](https://github.com/halcyon-video/halcyon-video/issues/136))
+
 ## [v0.12.0] — 2026-08-30
 
 ### General
