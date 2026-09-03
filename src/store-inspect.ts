@@ -258,12 +258,6 @@ export function selectAction(scene: StoreScene): 'inspect' | 'play' | 'request' 
     if (inspectedMovie?.streaming) {
       return 'streaming';
     }
-    // T18: a game title has no video to play -- renting it launches the
-    // configured emulator (Tauri) or shows a counter toast (browser). See
-    // main.ts's handleGameLaunch.
-    if (inspectedMovie?.game) {
-      return 'launch';
-    }
     if (inspectedMovie?.isSeries) {
       // The front (face 0) and neutral +X panel (face 1) turn to the episode
       // selector on the back (the deliberate "pick something" gesture). The
@@ -287,11 +281,17 @@ export function selectAction(scene: StoreScene): 'inspect' | 'play' | 'request' 
       return 'play';
     }
     // T22 play-flow guard: with carry mode on, the confirm in inspect view
-    // TAKES the tape (adds it to the carried stack) instead of playing it.
+    // TAKES the tape/case (adds it to the carried stack) instead of playing it.
     // Series boxsets keep their episode-driven instant-play flow.
     if (scene.carryMode) {
       scene.takeSelectedTape();
       return 'take';
+    }
+    // T18: a game title has no video to play -- renting it launches the
+    // configured emulator (Tauri) or shows a counter toast (browser). See
+    // main.ts's handleGameLaunch.
+    if (inspectedMovie?.game) {
+      return 'launch';
     }
     // Trigger media playback
     return 'play';

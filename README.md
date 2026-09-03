@@ -29,10 +29,10 @@ on a synthetic demo library. Or take the
 notes, and `#your-store`, which is for screenshots of yours wearing whatever
 livery you gave it. That last one is my favourite thing to get.
 
-> **Heads-up:** the demo boots the entire ~2,000-title store into your browser —
-> expect a few GB of memory and real GPU use, and prefer a plugged-in machine
-> over a laptop on battery. (It's built to live on a dedicated HTPC, where it
-> idles near zero; a leaner demo is on the list.)
+> **Heads-up:** the demo sizes its synthetic library to what your browser can
+> actually carry — a few hundred titles on a phone or a modest laptop, the
+> full ~2,000-title store on anything with real GPU headroom to spare. (It's
+> built to live on a dedicated HTPC, where it idles near zero.)
 
 ### The same library, four ways
 

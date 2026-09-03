@@ -2,10 +2,9 @@
 // (harness.html) and the public demo build (src/demo-mode.ts), so the 3D
 // store can be stocked and exercised without a Jellyfin/Romm server.
 import { Episode, JellyfinLibrary, Movie } from './jellyfin';
-import { isPlatformEnabled } from './romm';
-import { isGamesOnly } from './games-only';
 import { assetUrl } from './asset-url';
 import { getDismissedTitleIds } from './jellyseerr';
+import { fetchGamesFromSnapshot } from './games-snapshot.ts';
 
 const GENRES = ['Drama', 'Comedy', 'Horror', 'Sci-Fi', 'Action', 'Family', 'Foreign', 'Documentary', 'Anime'];
 
@@ -540,35 +539,9 @@ export function buildDemoDiscovery(count: number): Movie[] {
 }
 
 // Mocked-Romm stock -- the VIDEO GAMES section without a Romm server.
-// Synthesizes game "movies" across several platforms, matching romm.ts's
-// normalized Movie shape (game:true, platform, launchPath).
-const GAME_PLATFORMS = ['SNES', 'GENESIS', 'NINTENDO 64', 'PLAYSTATION', 'GAME BOY ADVANCE'];
-export function buildDemoGames(count: number): Movie[] {
-  const games: Movie[] = [];
-  for (let i = 0; i < count; i++) {
-    const platform = GAME_PLATFORMS[i % GAME_PLATFORMS.length];
-    games.push({
-      id: `game_${i}`,
-      title: `${platform.split(' ')[0]} Game ${Math.floor(i / GAME_PLATFORMS.length)}`,
-      year: 1991 + (i % 10),
-      duration: 'N/A',
-      rating: 'NR',
-      overview: 'Rental cartridge. Blow on it if you have to, but please don’t tell us about it.',
-      director: 'Unknown',
-      actors: [],
-      genres: [],
-      localPath: '',
-      posterUrl: demoPoster(i),
-      game: true,
-      platform,
-      launchPath: `/roms/${platform.toLowerCase()}/game_${i}.zip`,
-    });
-  }
-  // Games-only ignores the platform toggles (games-only.ts), so the synthetic
-  // catalog must too — otherwise a games-only harness/demo boot with the
-  // default toggles builds a store with no stock at all.
-  if (isGamesOnly()) return games;
-  return games.filter(g => isPlatformEnabled(g.platform || ''));
+// Stocks from the bundled snapshot with authentic titles and carton art (issue #147).
+export function buildDemoGames(count: number = 60): Movie[] {
+  return fetchGamesFromSnapshot(count);
 }
 
 /** Synthetic episodes for the series-boxset side panel (no Jellyfin server). */

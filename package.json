@@ -1,7 +1,7 @@
 {
   "name": "halcyon-video",
   "private": true,
-  "version": "0.12.0",
+  "version": "0.13.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -25,6 +25,7 @@
     "test:flatdetail": "node --experimental-strip-types --test tests/flat-detail.test.ts",
     "test:terminal": "node --experimental-strip-types --test tests/counter-terminal.test.ts",
     "test:streamingchoice": "node --experimental-strip-types --test tests/streaming-choice.test.ts",
+    "test:sharedplace": "node --experimental-strip-types --test tests/shared-place.test.ts",
     "tauri": "tauri"
   },
   "dependencies": {

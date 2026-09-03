@@ -166,6 +166,11 @@ export function maybeOpenSetupTerminal(): void {
   else openSetupTerminal();
 }
 
+/** Whether an opening-day setup terminal is queued for this reveal (#137: a shared-place link is meaningless over an empty store, and would fight the terminal for the camera). */
+export function isSetupPending(): boolean {
+  return pendingSetup !== null;
+}
+
 /**
  * CHANGE SERVER / LOG OUT (#41): the empty-store setup terminal is the
  * re-entry point, not the old DOM form. Flat mode (no 3D counter to dock to)
@@ -680,6 +685,60 @@ function abortBootToLogin(reason?: string) {
   }
 }
 
+// Movies-library title count fed to buildDemoLibraries() as its baseCount
+// (the other two synthetic libraries scale off it — see demo-library.ts).
+// FULL is today's fixed build (~2,000 titles total, unchanged for anyone an
+// actual constrained-device signal doesn't flag). LOW still clears every
+// collection/saga/promo-campaign slot demo-library.ts hand-places (their
+// highest indices top out at 76), so a visitor gated down to it still walks
+// a complete store, just a smaller one.
+const DEMO_BASE_COUNT_FULL = 900;
+const DEMO_BASE_COUNT_MEDIUM = 360; // ~800 titles total
+const DEMO_BASE_COUNT_LOW = 140; // ~300 titles total
+
+/**
+ * Sizes the public demo's synthetic catalog to what THIS visitor's device can
+ * actually carry (GH #138), instead of always building the same ~2,000-title
+ * store regardless of whether it landed on the owner's dev box or a phone on
+ * a cell connection — the scenario the README's own front-page heads-up used
+ * to warn about. Two independent signals, either enough on its own to shrink
+ * the catalog:
+ *  - a phone-shaped viewport (small + coarse-pointer + no hover — the exact
+ *    test device-gate.ts asks before offering flat 2D as an alternative; a
+ *    visitor who chose 3D anyway there is still on a phone) or
+ *    navigator.deviceMemory reporting <=4GB (Chrome/Android only, undefined
+ *    everywhere else — it only ever ADDS a signal, never removes one);
+ *  - the SAME measured GPU tier the real boot uses for render quality
+ *    (quality-calibrate.ts) — a weak/software GPU means less texture-array
+ *    headroom too, not just a lower render tier. Skipped entirely in flat
+ *    (2.5D) mode, which never touches WebGL (matches main.ts's own
+ *    dynamic-import-after-flat-early-return for this module).
+ * Anything inconclusive defaults to the full catalog — this only ever
+ * shrinks the store for a visitor a real signal flagged, never a downgrade
+ * for anyone else (see GH #138's non-goals).
+ */
+async function demoCatalogBaseCount(): Promise<number> {
+  const phoneShaped = typeof window !== 'undefined' && typeof window.matchMedia === 'function' &&
+    window.matchMedia('(pointer: coarse)').matches &&
+    window.matchMedia('(hover: none)').matches &&
+    Math.min(window.innerWidth, window.innerHeight) < 700;
+  const deviceMemory = (navigator as unknown as { deviceMemory?: number }).deviceMemory;
+  const lowMemory = typeof deviceMemory === 'number' && deviceMemory <= 4;
+  if (phoneShaped || lowMemory) {
+    console.log(`[demo] phone-shaped=${phoneShaped} deviceMemory=${deviceMemory ?? 'n/a'} — sizing catalog to ${DEMO_BASE_COUNT_LOW}`);
+    return DEMO_BASE_COUNT_LOW;
+  }
+
+  if (getSetting<string>('bb_render_mode') === 'flat') return DEMO_BASE_COUNT_FULL;
+  const { calibrateQualityIfNeeded } = await import('./quality-calibrate');
+  const tier = await calibrateQualityIfNeeded();
+  const baseCount = tier === 'low' ? DEMO_BASE_COUNT_LOW
+    : tier === 'medium' ? DEMO_BASE_COUNT_MEDIUM
+    : DEMO_BASE_COUNT_FULL;
+  console.log(`[demo] GPU quality tier=${tier ?? 'n/a'} — sizing catalog to ${baseCount}`);
+  return baseCount;
+}
+
 /**
  * Demo-mode boot (see src/demo-mode.ts): no credential gate, no Jellyfin
  * fetch, no login overlay ever — stock the store from the synthetic demo
@@ -698,8 +757,9 @@ export async function startDemoAndLoad() {
   // feature reads as missing to people who have only ever seen the demo. Opt in
   // on first boot only, so a visitor who switches it off keeps it off.
   if (!localStorage.getItem('bb_games_enabled')) localStorage.setItem('bb_games_enabled', '1');
-  deps.log('[System] Demo mode: stocking the store with a placeholder library (no media server).', 'system');
-  deps.setLibraries(buildDemoLibraries(900));
+  const baseCount = await demoCatalogBaseCount();
+  deps.log(`[System] Demo mode: stocking the store with a placeholder library (${baseCount === DEMO_BASE_COUNT_FULL ? 'full' : 'downsized for this device'}, no media server).`, 'system');
+  deps.setLibraries(buildDemoLibraries(baseCount));
   deps.setGames(buildDemoGames(60));
   // GH #86 zero-setup follow-up (owner ruling 2026-08-21): the demo's own
   // bb_streaming_services setting default is the full eight (settings.ts),

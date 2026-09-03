@@ -21,7 +21,9 @@ import {
 } from './fixtures/ticket-board-sign';
 import { createTrapezoidGeometry, splitTrapezoidGroups, createLibraryEndCapMaterial, markSignMesh } from './sign-builders';
 import { createFasciaBladeFactory, FASCIA_BLADE_H } from './fixtures/genre-fascia';
+import { ENDCAP_CORE_HEIGHT } from './fixtures/genre-endcap';
 import { dressing93Active } from './genre-colors';
+
 import { getActiveTheme } from './themes';
 import { CASE_WIDTH, CASE_HEIGHT } from './video-case';
 import type { ClaspPlacement } from './fixtures/shelf-clasp';
@@ -716,7 +718,8 @@ export function buildAisleShelving(deps: AisleShelvingDeps): void {
     // cap face reads as unfinished from the far side of the store. The 2000s
     // wire theme keeps its slatwall on the end away from the store centre.
     // isBlue still decides which cap carries the library label (userData.isFront).
-    if (unit.isLineFront && !deps.suppressFrontCapLineIds?.has(unit.lineId)) {
+    if (unit.isLineFront && (!deps.suppressFrontCapLineIds?.has(unit.lineId) || UNIT_FRAME_HEIGHT > ENDCAP_CORE_HEIGHT)) {
+
       // Front End Cap (built to UNIT_FRAME_HEIGHT, flush with the run top)
       const isBlue = isFrontCapFacingStore;
       const capMats = createLibraryEndCapMaterial(wireBlackFrame ? !isBlue : false);

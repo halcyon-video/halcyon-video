@@ -57,7 +57,7 @@ import {
   StoreShellSpec,
   getStoreShellSpec,
   StorefrontSpec,
-  FixturePlacement, newReleasesWallSpan, newReleasesLeftWallCols,
+  FixturePlacement, newReleasesWallSpan, newReleasesLeftWallCols, wallAllowsFeatureSections,
 } from './store-layout';
 import { activeMediaCutoff } from './media-release-date';
 import { titleMatchKeys } from './staff-picks';
@@ -1330,8 +1330,8 @@ export class StoreScene {
     // double-feature consumes 2 of numWallSections, a super-feature 1 — so on
     // a small wall (2-3 sections) at most one double fits and a regular
     // section always survives.
-    const featureSectionBudget = (regularNewReleases.length > 0 || highRatedCandidates.length > 0)
-      ? Math.max(0, numWallSections - 1)
+    const featureSectionBudget = !wallAllowsFeatureSections() ? 0
+      : (regularNewReleases.length > 0 || highRatedCandidates.length > 0) ? Math.max(0, numWallSections - 1)
       : numWallSections;
     const numDoubleFeaturesToPlace = Math.min(
       doubleFeatureCandidates.length,
@@ -4263,10 +4263,10 @@ export class StoreScene {
   // throttled ~24fps cadence, which would be misread as a slow GPU and
   // permanently pin resScale to the floor. IDLE resets/snaps to 1.0 in the
   // caller before this is ever reached.
-  private updateDynamicResolution(time: number, active: boolean) {
-    if (!active) {
-      // VIDEO tier: don't let its throttled pacing feed the window; just keep
-      // the clock from accumulating stale elapsed time across the gap.
+  private updateDynamicResolution(time: number, active: boolean, moving: boolean) {
+    if (!active || !moving) {
+      // VIDEO tier or stationary: don't let throttled or resting pacing feed the window;
+      // just keep the clock from accumulating stale elapsed time across the gap.
       this.resScaleFrames = 0;
       this.resScaleWindowStart = time;
       return;
@@ -4762,7 +4762,7 @@ export class StoreScene {
     // multi-hour lockout.
     // !clerkAsleep: while she sleeps her sim is paused, so a stride frozen at
     // WALKING must not pin ACTIVE (same hazard as the backroom gate above).
-    const clerkActive = !!this.clerk && !this.clerkAsleep && this.mode !== 'backroom' && this.clerk.isMoving() && this.clerk.isOnScreen();
+    const clerkActive = !!this.clerk && !this.clerkAsleep && this.mode !== 'backroom' && this.mode !== 'inspect' && this.clerk.isMoving() && this.clerk.isOnScreen();
     const arrowVisible = !!this.selectionArrow && this.selectionArrow.visible;
     // Snapshot before the decrement below: an interaction-wake frame (the
     // requestRender() burst any input handler fires) must always composite
@@ -4807,7 +4807,7 @@ export class StoreScene {
     // arrowBobAwake (computed above): on real GPUs too the arrow only holds
     // the VIDEO tier while input is recent — after 30s untouched the bob is
     // frozen, so the tier must be free to drop to IDLE.
-    const videoPlaying = !active && (
+    const videoPlaying = !active && this.mode !== 'inspect' && (
       (!!this.ambientTvs && this.ambientTvs.isPlaying()) ||
       (arrowVisible && arrowBobAwake && !this.softwareGL));
     // IDLE gate (IDLE_TIER_INPUT_MS): the tier may only drop to IDLE once 30s
@@ -4851,46 +4851,28 @@ export class StoreScene {
       this.lastSceneChangeTime = time;
     }
 
+    // Undersampling disabled when nothing is moving: snap resScale to full crispness.
+    const idleScale = this.softwareGL ? this.resScaleMin : StoreScene.RES_SCALE_MAX;
+    if (!cameraMoving && !sceneChanging && this.resScale !== idleScale) {
+      this.resScale = idleScale;
+      this.applyRenderResolution();
+      mustRenderThisFrame = true;
+    }
+
     // Persist an already-composited static frame instead of re-drawing it every
-    // stay-awake rAF. The skip condition is exactly what the IDLE tier trusts
-    // for hours (nothing is changing that didn't route through requestRender),
-    // applied sooner and WITHOUT the resScale snap — so the sharp settle frame
-    // stays on screen at zero GPU. This also drops sustained power while "idly
-    // browsing" below today's 30s-window re-render.
+    // stay-awake rAF. The sharp settle frame stays on screen at zero GPU.
     const staticPersist = !this.motionSharpDisabled &&
       !this.tierIsIdle && !videoPlaying && !sceneChanging && this.staticSettled;
 
-    // SETTLE REFINEMENT. Once the view has been quiet for QUALITY_SETTLE_MS —
-    // nothing moving, nothing animating — redraw the parked frame SUPERSAMPLED
-    // (see settleScale). It costs one heavy frame at a moment where a hitch is
-    // invisible (nothing is animating to stutter), and staticPersist then holds
-    // that properly antialiased still for free until something moves again.
-    // Deliberately NOT gated on !staticPersist: the whole point is to upgrade a
-    // frame we have already parked on, and the early-return below honours
-    // mustRenderThisFrame. The quiet window is what keeps it from firing between
-    // every browse-cursor keypress; VIDEO tier is excluded outright since those
-    // frames recomposite forever at ~24fps.
-    //
-    // No `settleSsFactor > 0` gate here (removed 2026-08-06): settleScale
-    // already falls back to sharpScale — the native-DISPLAY-resolution lift,
-    // NOT a supersample — whenever settleSsFactor is 0 (see its declaration
-    // comment above: "'0' disables and restores the old native-only settle").
-    // Gating settleRefine on settleSsFactor silently broke that promise, and
-    // it also zeroes for 'low' quality (never above-native, by design) — so a
-    // 'low'-tier HiDPI panel (buffer capped at CSS-pixel resolution, i.e.
-    // sub-native) never got the free native lift at rest and stayed
-    // permanently soft, even though nothing stops it from reaching sharpScale.
-    // `qualityScale < settleScale` alone is the correct "is there anything to
-    // gain" test for every tier — it's already false when there's nothing to
-    // lift to. softwareGL is excluded explicitly instead of riding along on
-    // the settleSsFactor gate: one SwiftShader composite is already seconds
-    // long, so it must never pay for a resize + extra draw just to sit at rest.
+    // SETTLE REFINEMENT: once quiet for QUALITY_SETTLE_MS, redraw parked frame SUPERSAMPLED.
+    // qualityScale < settleScale tests if there is anything to gain. softwareGL excluded.
     const settleRefine = !this.tierIsIdle && !videoPlaying && !this.softwareGL &&
       !sceneChanging && !cameraMoving && !this.motionSharpDisabled &&
       this.qualityScale < this.settleScale - 1e-3 &&
       (time - this.lastCameraMotionTime) >= StoreScene.QUALITY_SETTLE_MS &&
       (time - this.lastSceneChangeTime) >= StoreScene.QUALITY_SETTLE_MS;
     if (settleRefine) {
+      this.resScale = idleScale;
       this.qualityScale = this.settleScale;
       this.applyRenderResolution();
       mustRenderThisFrame = true; // buffer just cleared — repaint before present
@@ -4902,7 +4884,7 @@ export class StoreScene {
     if (!settleRefine && !staticPersist && !this.tierIsIdle && (sceneChanging || cameraMoving)) {
       const wantSharp = !this.softwareGL && !this.motionSharpDisabled &&
         this.motionScale > 1 &&
-        (cameraMoving || (time - this.lastCameraMotionTime) < StoreScene.QUALITY_SETTLE_MS);
+        (cameraMoving || this.mode === 'inspect' || (time - this.lastCameraMotionTime) < StoreScene.QUALITY_SETTLE_MS);
       const targetQuality = wantSharp ? this.motionScale : 1.0;
       if (this.qualityScale !== targetQuality) {
         this.qualityScale = targetQuality;
@@ -4974,9 +4956,11 @@ export class StoreScene {
       // full-screen quads — the store keeps its contact shadows while a ceiling
       // TV plays, at negligible cost. (It used to be disabled outright, which
       // meant AO silently vanished whenever you stood still with TVs playing.)
-      const videoScale = this.softwareGL ? this.resScaleMin : 0.85;
-      if (this.resScale !== videoScale) {
-        this.resScale = videoScale;
+      // Undersampling is totally disabled when the camera is static: don't force
+      // resScale down to 0.85 in VIDEO tier, which made parked still views blurry
+      // whenever ceiling TVs played. The partial composite path already isolates TV cost.
+      if (this.resScale !== idleScale) {
+        this.resScale = idleScale;
         this.applyRenderResolution();
         mustRenderThisFrame = true; // buffer just cleared — repaint before present
       }
@@ -5008,7 +4992,7 @@ export class StoreScene {
       this.resScaleGoodStreak = 0;
       this.resScaleWindowStart = time;
     } else {
-      this.updateDynamicResolution(time, active);
+      this.updateDynamicResolution(time, active, cameraMoving || sceneChanging);
     }
 
     // Rendering for real this frame (ACTIVE or VIDEO): advance the animated film

@@ -15,6 +15,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { createLightPoolTexture, createSoftShadowTexture, createConcreteSidewalkTexture } from './canvas-textures';
+import { buildExteriorRoad } from './exterior-road';
 import { tryLoadUserAssetTexture } from './user-assets';
 import { assetUrl } from './asset-url';
 import type { OutsideMode } from './outdoor-lighting';
@@ -23,6 +24,9 @@ import { STORE_CENTER_X, FRONT_GLASS_Z } from './store-layout';
 export interface ExteriorEnvironment {
   group: THREE.Group;
   setOutsideMode(mode: OutsideMode): void;
+  // GH #144: retarget the ground-blend ring's color to the active pano's
+  // sampled ground (see ground-blend.ts) — called live as panos load/change.
+  setGroundColor(color: THREE.Color): void;
   dispose(): void;
 }
 
@@ -48,6 +52,16 @@ export const PARKING_STALLS = {
   rowFrontZ: FRONT_GLASS_Z + LOT_APRON_FT + LOT_LANE_DEPTH_FT, // 44 — z where the stall row begins
   depth: 18.0, // ft — z-span (depth) of the stall row
 } as const;
+
+// Odd multiple of stallWidth so stall boundaries land at x = centerX ± 4.5,
+// ±13.5, ±22.5 … — the same phase PARKING_STALLS uses for the car row.
+// Shared by store-shell.ts's lot plane and the ground-blend/road bounds
+// below so none of the three can ever drift out of alignment.
+export function lotWidth(storeWidth: number): number {
+  return storeWidth + 8 <= PARKING_STALLS.stallWidth * 7
+    ? PARKING_STALLS.stallWidth * 7
+    : PARKING_STALLS.stallWidth * 9;
+}
 
 export function buildExteriorEnvironment(scene: THREE.Scene, storeWidth: number): ExteriorEnvironment {
   const group = new THREE.Group();
@@ -296,6 +310,30 @@ export function buildExteriorEnvironment(scene: THREE.Scene, storeWidth: number)
   spill.position.set(centerX, 0.01, frontZ + sidewalkDepth * 0.4);
   group.add(spill);
 
+  // ─── Street (issue #145): models a road across the lot's front/street-
+  // facing edge — asphalt lane, curb + gutter, dashed centerline — instead
+  // of the #144 grey alpha-fade ring, which read as fog/under-lighting
+  // rather than pavement. Curbs run the lot's other two exposed edges too;
+  // only a narrow seam fade (ground-blend.ts, via exterior-road.ts) covers
+  // spots still reading as a cut. Bounds mirror the lot-sizing formula in
+  // the "Parking lot" section of store-shell.ts exactly (both read
+  // lotWidth()/PARKING_STALLS), so the two can never drift apart. Starts at
+  // a neutral gray — setGroundColor (called by store-shell.ts right after
+  // this returns, then again on every pano change) retargets the seam fades
+  // to the real sampled color before any frame renders.
+  const lotHalfWidth = lotWidth(storeWidth) / 2;
+  const exteriorRoad = track(buildExteriorRoad(group, {
+    centerX,
+    minX: centerX - lotHalfWidth,
+    maxX: centerX + lotHalfWidth,
+    frontZ,
+    farZ: PARKING_STALLS.rowFrontZ + PARKING_STALLS.depth,
+    initialGroundColor: new THREE.Color(0x3a3a3a),
+  }));
+  function setGroundColor(color: THREE.Color) {
+    exteriorRoad.setGroundColor(color);
+  }
+
   // ─── Mode reactions (no per-frame work; called on day/night flips) ─────
   function setOutsideMode(mode: OutsideMode) {
     const night = mode === 'night';
@@ -313,5 +351,5 @@ export function buildExteriorEnvironment(scene: THREE.Scene, storeWidth: number)
     scene.remove(group);
   }
 
-  return { group, setOutsideMode, dispose };
+  return { group, setOutsideMode, setGroundColor, dispose };
 }

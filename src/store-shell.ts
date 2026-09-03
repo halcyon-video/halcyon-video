@@ -19,7 +19,7 @@ import { AmbientTvs } from './ambient-tvs';
 import { EntranceCheckout } from './entrance';
 import { buildWindowBays } from './entrance/windows';
 import { addGlassReflectionPane } from './glass-reflection';
-import { buildExteriorEnvironment, PARKING_STALLS } from './exterior-environment';
+import { buildExteriorEnvironment, PARKING_STALLS, lotWidth } from './exterior-environment';
 import { NR_WALL_SHELF_DEPTH, NR_WALL_CLEARANCE, NR_LEFT_UNIT_STANDOFF, WALL_SHELF_HEIGHTS, BOX_SPACING, SECTION_COLS, UNIT_SECTIONS, seededRandom01, getStorefrontSpec, vestibuleHalfWidth, posterBayIndices, entranceOpeningHalfWidth, mapWallSegmentUV, STORE_CENTER_X, FRONT_GLASS_Z } from './store-layout';
 import { buildFrontSoffit, frontSoffitLidPolygon, frontSoffitPolygon, frontSoffitY, pointInSoffit, soffitConnectHalf, soffitMirroredEdges, soffitTrofferCenters, tileOverlapsSoffit } from './ceiling-soffit';
 import { createFixture } from './fixture-registry';
@@ -491,8 +491,10 @@ export function buildStore(scene: StoreScene) {
   const LANE_DEPTH = PARKING_STALLS.rowFrontZ - FRONT_Z - LOT_APRON; // drive lane between the sidewalk and the stalls
   const LOT_D = LOT_APRON + LANE_DEPTH + STALL_DEPTH; // 47 ft beyond the glass
   // Odd multiple of STALL_W so stall boundaries land at x = centerX ± 4.5,
-  // ±13.5, ±22.5 … — the same phase PARKING_STALLS uses for the car row.
-  const LOT_W = storeWidth + 8 <= STALL_W * 7 ? STALL_W * 7 : STALL_W * 9;
+  // ±13.5, ±22.5 … — the same phase PARKING_STALLS uses for the car row (see
+  // lotWidth() in exterior-environment.ts, the single source of truth this
+  // also drives the road/curb bounds from).
+  const LOT_W = lotWidth(storeWidth);
   // One V-repeat spans the whole lot depth: stall side-lines only inside the
   // far stall band (canvas-bottom fractions), plain asphalt in the lane.
   const asphaltTex = createAsphaltTexture((LOT_APRON + LANE_DEPTH) / LOT_D, 0.97);
@@ -521,8 +523,16 @@ export function buildStore(scene: StoreScene) {
   // ─── T15: exterior environment dressing (sidewalk, lamps, cars, strip-mall
   // backdrop) — everything beyond the glass that only needs to exist for the
   // view outward. Synced to the current day/night mode immediately.
+  // Also builds the GH #144 ground-blend ring (see exterior-environment.ts)
+  // that fades the lot's exposed edges into whatever ground the current sky
+  // pano shows there — recolored live via the listener below as panos load.
   scene.exterior = buildExteriorEnvironment(scene.scene, storeWidth);
   scene.exterior.setOutsideMode(scene.outdoor.outsideMode);
+  scene.exterior.setGroundColor(scene.outdoor.getGroundColor());
+  scene.outdoor.setGroundColorListener((color) => {
+    scene.exterior?.setGroundColor(color);
+    scene.requestRender();
+  });
   dimEnvOutside(scene.exterior.group);
 
   // Initialize 3D wall signage textures and materials
@@ -1610,22 +1620,17 @@ export function buildStore(scene: StoreScene) {
       side: THREE.DoubleSide
     });
 
-    // Poster plane matches the frame constants above (2:3 aspect ratio).
-    const posterMesh = new THREE.Mesh(new THREE.PlaneGeometry(posterW, posterH), posterMat);
-
-    // GH #5: the material is DoubleSide (issue #61 wanted it opaque from
-    // both sides, since the poster hangs mid-pane with nothing to hide),
-    // but DoubleSide draws the SAME uv on both faces — it doesn't mirror
-    // one of them. A plane's default front face (the one that reads
-    // correctly) pointed local +Z, which every caller's parent transform
-    // (frontWindow's rotation.y=PI, each side ribbon's inward yaw) turns
-    // into a normal aimed INTO the store. So the correct print always
-    // faced the sales floor and the parking lot got the mirrored back.
-    // A real poster faces the street: flip the plane 180 here so the
-    // front face's normal points the other way (outside, for every
-    // caller of this shared factory) and let the inside keep the
-    // DoubleSide fallback — a mirrored read, same as the reference
-    // footage shoots any poster through glass from the wrong side.
+    // GH #140: Window posters read forwards from inside the store across both
+    // formats. The mesh is rotated Math.PI with inverted UVs so the primary
+    // face points into the store with correct text orientation.
+    const posterGeo = new THREE.PlaneGeometry(posterW, posterH);
+    posterGeo.setAttribute('uv', new THREE.BufferAttribute(new Float32Array([
+      1, 1,
+      0, 1,
+      1, 0,
+      0, 0,
+    ]), 2));
+    const posterMesh = new THREE.Mesh(posterGeo, posterMat);
     posterMesh.rotation.y = Math.PI;
 
     // Center vertically in the GLAZED pane itself — knee wall top (2.0, the
@@ -1668,6 +1673,8 @@ export function buildStore(scene: StoreScene) {
       fallbackTex.colorSpace = THREE.SRGBColorSpace;
       posterMat.map = fallbackTex;
     }
+
+
 
     // (No suspension wires/clips — feedback/042: "don't need strings above
     // them". The framed lightbox reads as mounted, and the marquee-bulb ring

@@ -14,7 +14,8 @@
 // whole rack is reachable without touching the nav code.
 import * as THREE from 'three';
 import { Movie } from '../jellyfin';
-import { FixturePlacement, BOX_SPACING, UNIT_DEPTH, UNIT_FRAME_HEIGHT, unitDepthAtHeight } from '../store-layout';
+import { FixturePlacement, BOX_SPACING, UNIT_DEPTH, unitDepthAtHeight } from '../store-layout';
+
 import { FixtureContext, SlottedFixture, FixtureSlot } from '../fixtures';
 import { Footprint } from '../layout-validator';
 import { markSignMesh, createTrapezoidGeometry } from '../sign-builders';
@@ -68,7 +69,12 @@ export function getRequestedTagTexture(): THREE.Texture {
 // unit's own end, so the whole fixture protrudes only a normal endcap's depth
 // (panel + shelf overhang ≈ 0.64 ft) into the walkway.
 export const ENDCAP_CORE_DEPTH = 0.14;
-export const ENDCAP_CORE_HEIGHT = UNIT_FRAME_HEIGHT;
+// GH #140: Standard endcap display height is 4.6 ft (matching corporate gondolas).
+// In tall shelving formats (mom-and-pop 8.2 ft), the 4.6 ft fixture stands against
+// the run's full-height end panel so the 3 display shelves fill the fixture
+// proportionately and the header sign sits at comfortable eye level (~5 ft).
+export const ENDCAP_CORE_HEIGHT = 4.6;
+
 
 // ─── The terminal silhouette ────────────────────────────────────────────────
 // An endcap does not sit BESIDE a run terminal, it REPLACES one: the run's own
@@ -406,9 +412,10 @@ export class GenreEndcap implements SlottedFixture {
     // Sized off the CROWN, not the base: the header is a topper sitting on the
     // carcass's top edge, and the carcass tapers (see ENDCAP_TOP_WIDTH), so a
     // card cut to the base width would overhang the crown it stands on.
+    const isWood = !!formatShelfWood();
     const signW = Math.min(ENDCAP_TOP_WIDTH, 2.0), signH = 0.55;
     this.signTex = createCategorySignTexture(this.title, undefined, false, signW / signH);
-    const signMat = new THREE.MeshStandardMaterial({ map: this.signTex, roughness: 0.6, metalness: 0.0 });
+    const signMat = new THREE.MeshStandardMaterial({ map: this.signTex, roughness: isWood ? 0.8 : 0.6, metalness: 0.0 });
     const sign = markSignMesh(
       new THREE.Mesh(new THREE.BoxGeometry(signW, signH, 0.06), signMat)
     );
@@ -418,13 +425,14 @@ export class GenreEndcap implements SlottedFixture {
     if (genreLabel) {
       const placW = Math.min(ENDCAP_TOP_WIDTH, 1.6), placH = 0.4;
       this.placardTex = createCategorySignTexture(genreLabel, undefined, false, placW / placH);
-      const placardMat = new THREE.MeshStandardMaterial({ map: this.placardTex, roughness: 0.6, metalness: 0.0 });
+      const placardMat = new THREE.MeshStandardMaterial({ map: this.placardTex, roughness: isWood ? 0.8 : 0.6, metalness: 0.0 });
       const placard = markSignMesh(
         new THREE.Mesh(new THREE.BoxGeometry(placW, placH, 0.05), placardMat)
       );
       placard.position.set(0, coreHeight + 0.18, coreDepth / 2 + 0.03);
       this.group.add(placard);
     }
+
   }
 
   update(_timeMs: number): void {

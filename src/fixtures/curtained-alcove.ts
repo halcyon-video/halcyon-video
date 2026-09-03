@@ -27,9 +27,10 @@ import * as THREE from 'three';
 import { FixtureContext, StoreFixture } from '../fixtures';
 import { FixturePlacement, STORE_CENTER_X } from '../store-layout';
 import { Footprint } from '../layout-validator';
-import { createSignTextTexture } from '../canvas-textures';
+import { createSignTextTexture, createHandLetteredSignTexture } from '../canvas-textures';
 import { formatShelfWood } from '../format-surfaces';
 import { themeTrimDarkHex } from '../themes';
+
 
 /** Default room size, feet. Deep enough to stand in, small enough to be a corner. */
 const ROOM_W = 7.5;
@@ -243,11 +244,18 @@ export class CurtainedAlcove implements StoreFixture {
     // The board faces INTO the store, i.e. along -side in X.
     const faceX = planeX - side * (WALL_T / 2 + 0.03);
     const yaw = side > 0 ? -Math.PI / 2 : Math.PI / 2;
+    const wood = formatShelfWood();
 
     const headerW = DOOR_W + 0.5;
-    const headerTex = createSignTextTexture('BACK ROOM', undefined, 'standard', headerW / HEADER_H);
+    const headerTex = wood
+      ? createHandLetteredSignTexture('BACK ROOM', undefined, headerW / HEADER_H, 'wood')
+      : createSignTextTexture('BACK ROOM', undefined, 'standard', headerW / HEADER_H);
     const headerGeo = new THREE.PlaneGeometry(headerW, HEADER_H);
-    const headerMat = new THREE.MeshStandardMaterial({ map: headerTex, roughness: 0.55, metalness: 0.02 });
+    const headerMat = new THREE.MeshStandardMaterial({
+      map: headerTex,
+      roughness: wood ? 0.8 : 0.55,
+      metalness: wood ? 0.0 : 0.02,
+    });
     this.disposables.push(headerGeo, headerMat, headerTex);
     const header = new THREE.Mesh(headerGeo, headerMat);
     header.position.set(faceX, DOOR_H + HEADER_H / 2 + 0.12, doorCenterZ);
@@ -256,10 +264,12 @@ export class CurtainedAlcove implements StoreFixture {
 
     // Trim rail under the board, in the theme's dark trim — the same detail the
     // mirror column's cap band uses, and the thing that stops a flat printed
-    // rectangle reading as a decal stuck on the wall.
+    // rectangle reading as a decal stuck on the wall. In wood format, matches the walnut end panel.
     const railGeo = new THREE.BoxGeometry(0.07, 0.09, headerW + 0.14);
     const railMat = new THREE.MeshStandardMaterial({
-      color: new THREE.Color(themeTrimDarkHex()), roughness: 0.42, metalness: 0.25,
+      color: new THREE.Color(wood ? wood.endPanelHex : themeTrimDarkHex()),
+      roughness: wood ? 0.75 : 0.42,
+      metalness: wood ? 0.05 : 0.25,
     });
     this.disposables.push(railGeo, railMat);
     const rail = new THREE.Mesh(railGeo, railMat);
@@ -274,15 +284,22 @@ export class CurtainedAlcove implements StoreFixture {
     // with a face wide enough to carry a sign. Offsetting the other way put the
     // placard past the front partition entirely, floating over the sales floor.
     const placW = 1.15, placH = 0.75;
-    const placTex = createSignTextTexture('18 & OVER', 'PLEASE ASK AT THE COUNTER', 'yellow', placW / placH);
+    const placTex = wood
+      ? createHandLetteredSignTexture('18 & OVER', 'PLEASE ASK AT THE COUNTER', placW / placH, 'card')
+      : createSignTextTexture('18 & OVER', 'PLEASE ASK AT THE COUNTER', 'yellow', placW / placH);
     const placGeo = new THREE.PlaneGeometry(placW, placH);
-    const placMat = new THREE.MeshStandardMaterial({ map: placTex, roughness: 0.6, metalness: 0.0 });
+    const placMat = new THREE.MeshStandardMaterial({
+      map: placTex,
+      roughness: wood ? 0.8 : 0.6,
+      metalness: 0.0,
+    });
     this.disposables.push(placGeo, placMat, placTex);
     const plac = new THREE.Mesh(placGeo, placMat);
     plac.position.set(faceX, 4.7, doorCenterZ - (DOOR_W / 2 + 0.62));
     plac.rotation.y = yaw;
     group.add(plac);
   }
+
 
   /**
    * Nothing moves in here. The curtain is deliberately static: the store idles

@@ -58,7 +58,8 @@ export function setRentalMode(scene: StoreScene, enabled: boolean): void {
 export function resolveRentalMovies(scene: StoreScene, ids: string[]): Movie[] {
   const movies: Movie[] = [];
   for (const id of ids) {
-    const m = findTitleByCarryId(scene.libraries, id);
+    const m = findTitleByCarryId(scene.libraries, id)
+      ?? scene.gameMovies.find((g) => g.id === id);
     if (m) movies.push(m);
   }
   return movies;

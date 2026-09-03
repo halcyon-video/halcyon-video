@@ -19,6 +19,8 @@
 import * as THREE from 'three';
 import { createCategorySignTexture } from '../canvas-textures';
 
+import { formatShelfWood } from '../format-surfaces';
+
 /** Card face in feet — the standard 14 x 8.5 in landscape print. */
 export const TICKET_BOARD_W = 14.0 / 12;
 export const TICKET_BOARD_H = 8.5 / 12;
@@ -32,13 +34,14 @@ export const TICKET_BOARD_ASPECT = 14 / 8.5;
  * label — one material serves every card printed with the same copy.
  */
 export function createTicketBoardLabelMaterial(label: string): THREE.MeshPhysicalMaterial {
+  const isWood = !!formatShelfWood();
   return new THREE.MeshPhysicalMaterial({
     map: createCategorySignTexture(label, undefined, false, TICKET_BOARD_ASPECT),
-    // Laminated print, not a mirror — 0.05 roughness made every signboard edge
-    // a near-mirror; big flat plastic panels have a satin sheen.
-    roughness: 0.35,
-    metalness: 0.05,
-    clearcoat: 1.0,
+    // Laminated print in corporate; matte card stock in mom-and-pop.
+    roughness: isWood ? 0.8 : 0.35,
+    metalness: isWood ? 0.0 : 0.05,
+    clearcoat: isWood ? 0.0 : 1.0,
     clearcoatRoughness: 0.15,
   });
 }
+
