@@ -5,6 +5,12 @@ All notable changes to Halcyon Video, generated from commit history by
 it on every version tag push. Deterministic and offline: no entry here was
 written by a model.
 
+## [v0.14.0] — 2026-09-04
+
+### General
+- Chore(release): v0.14.0
+- Full controller support over Remote Play via a host virtual gamepad
+
 ## [v0.13.0] — 2026-09-02
 
 ### CHANGELOG
