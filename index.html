@@ -20,6 +20,27 @@
     </script>
     <link rel="icon" type="image/svg+xml" href="/src/assets/halcyon-logo.svg" />
     <link rel="stylesheet" href="/src/styles.css" />
+
+    <!-- Social preview card (issue #148): one static card baked at build
+         time, so a shared link unfurls with a real store shot instead of a
+         bare URL. Absolute URLs on purpose -- Vite's base-path rewriting
+         only touches recognized asset attributes (script/link/img), not
+         meta content, and the card only makes sense for the one hosted
+         Pages URL these links actually get shared from. -->
+    <meta name="description" content="Your Jellyfin or Plex library, rebuilt as a walkable 1990s video rental store." />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Halcyon Video" />
+    <meta property="og:title" content="Halcyon Video" />
+    <meta property="og:description" content="Your Jellyfin or Plex library, rebuilt as a walkable 1990s video rental store." />
+    <meta property="og:url" content="https://halcyon-video.github.io/halcyon-video/" />
+    <meta property="og:image" content="https://halcyon-video.github.io/halcyon-video/social-preview.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Aisles of VHS cases under blue MOVIES signage inside the Halcyon Video store." />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Halcyon Video" />
+    <meta name="twitter:description" content="Your Jellyfin or Plex library, rebuilt as a walkable 1990s video rental store." />
+    <meta name="twitter:image" content="https://halcyon-video.github.io/halcyon-video/social-preview.jpg" />
     <script type="module" src="/src/main.ts"></script>
   </head>
 
