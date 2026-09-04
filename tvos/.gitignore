@@ -1,0 +1,11 @@
+# Everything Xcode and XcodeGen generate from project.yml. The spec is the
+# source of truth; none of this is.
+HalcyonRemote.xcodeproj/
+HalcyonRemote/Info.plist
+DerivedData/
+build/
+*.xcworkspace/
+*.xcuserstate
+xcuserdata/
+.swiftpm/
+Package.resolved
