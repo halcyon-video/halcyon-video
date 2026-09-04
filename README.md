@@ -510,6 +510,15 @@ support today means Fire TV and Android TV, with Apple TV next in line.
 Tracked in [#82](https://github.com/halcyon-video/halcyon-video/issues/82) —
 revisit if the platform ever grows a real web/WebRTC runtime.
 
+**Apple TV is scoped but not built** — tvOS forbids WebViews in App Store
+apps, so unlike the Fire TV/Android TV app above this needs a real native
+SwiftUI + WebRTC client rather than a wrapper, and needs an Apple Developer
+account plus a Mac with Xcode to build and sign, which this project doesn't
+have yet. The wire protocol it would speak is documented in
+[`docs/remote-play-protocol.md`](docs/remote-play-protocol.md) and the plan in
+[`tvos/README.md`](tvos/README.md). Tracked in
+[#81](https://github.com/halcyon-video/halcyon-video/issues/81).
+
 > **Private instances need a GPU on the server** — they render the real 3D
 > store, so the machine (or container) needs working hardware GL. In Docker
 > that means mapping one in: `devices: [/dev/dri:/dev/dri]`, or
