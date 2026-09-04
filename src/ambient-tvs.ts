@@ -20,6 +20,7 @@ import { getActiveTheme } from './themes';
 import { makeCurvedScreenGeometry, makeTubeOverlayMaterial, makeCrtTestCardTexture } from './crt-tube';
 import { makeCrtGlassMaterial } from './glass-reflection';
 import { tvPoolLibraryIds } from './library-settings';
+import { buildTvStreamablePool } from './ambient-tv-pool';
 import { TV_PATCH_LAYER } from './scene-shared';
 import { assetUrl } from './asset-url';
 import {
@@ -312,30 +313,9 @@ export class AmbientTvs implements StoreFixture {
     // store stopped carrying it) falls back the same way rather than going
     // dark. Same gate for live streaming and the test-card stand-in below.
     const chosen = tvPoolLibraryIds();
-    const allMovies: Movie[] = [];
-    const chosenMovies: Movie[] = [];
-    this.ctx.libraries.forEach(lib => lib.movies.forEach(m => {
-      // A library the user EXPLICITLY picked contributes everything it shelves,
-      // series containers included (#67). Dropping those before the library
-      // check meant a TV-Shows library contributed nothing whatever its toggle
-      // said — the first reporter had switched TV shows on and it could never
-      // have done anything. A series container isn't itself streamable, but it
-      // names an episode that is; openStream resolves one.
-      if (chosen.has(lib.id)) chosenMovies.push(m);
-      // The unselected default is still films only. That heuristic is what runs
-      // on every store that has never opened the drawer, and quietly putting
-      // television on their monitors is not this fix's to make.
-      if (m.isSeries) return;
-      allMovies.push(m);
-    }));
-    let pool: Movie[];
-    if (chosenMovies.length > 0) {
-      pool = chosenMovies;
+    const { pool, fromChosen } = buildTvStreamablePool(this.ctx.libraries, chosen);
+    if (fromChosen) {
       this.ctx.log(`[System] CRT TVs: drawing from ${chosen.size} selected library(ies).`, 'system');
-    } else {
-      const FAMILY_GENRES = new Set(['Family']);
-      pool = allMovies.filter(m => m.genres.some(g => FAMILY_GENRES.has(g)));
-      if (pool.length === 0) pool = allMovies;
     }
     (window as any).__tvPool = {
       selected: chosen.size,
