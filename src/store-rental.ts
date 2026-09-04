@@ -230,7 +230,7 @@ export function debugEnterBackRoom(scene: StoreScene, n: number): boolean {
   const ids: string[] = [];
   outer: for (const lib of scene.libraries) {
     for (const m of lib.movies) {
-      if (m.isSeries || m.comingSoon || m.discovery || m.game) continue;
+      if (m.isSeries || m.comingSoon || m.discovery || m.game || m.streaming || m.collectionGap) continue;
       if (!ids.includes(m.id)) ids.push(m.id);
       if (ids.length >= n) break outer;
     }
