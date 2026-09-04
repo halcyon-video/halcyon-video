@@ -496,8 +496,9 @@ function sendInput(msg: unknown) {
   // rubber band. Key REPEATS are droppable by definition (downs, ups and taps
   // are not); shedding them while the buffer is backed up turns a burst of
   // stale steps into none.
-  const m = msg as { t?: string; repeat?: boolean };
+  const m = msg as { t?: string; repeat?: boolean; droppable?: boolean };
   if (m.t === 'key' && m.repeat && dc!.bufferedAmount > 2048) return;
+  if (m.t === 'pad' && m.droppable && dc!.bufferedAmount > 2048) return;
   try { dc!.send(JSON.stringify(msg)); } catch { /* channel died mid-send */ }
 }
 
@@ -530,10 +531,11 @@ const tvControls = isTvViewer()
   : null;
 
 // A controller paired to THIS device (a TV especially — see remote-gamepad.ts)
-// forwards as ordinary key messages in every mode.
+// forwards its raw pad state; the host rebuilds a virtual pad from it so every
+// native controller action works remotely, including analog walk movement/look.
 installGamepadForwarding({
-  sendKey: (key, code, down, repeat) =>
-    sendInput({ t: 'key', et: down ? 'down' : 'up', key, code, repeat }),
+  sendPad: (axes, buttons, droppable) =>
+    sendInput({ t: 'pad', axes, buttons, droppable }),
   unmute,
 });
 
