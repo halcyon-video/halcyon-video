@@ -583,6 +583,7 @@ function dropViewer(id: string, sayBye: boolean): void {
   if (!v) return;
   viewers.delete(id);
   stats.viewers = viewers.size;
+  if (viewers.size === 0) clearVirtualPad(); // no one left to own the controller
   updateCapturePacer();
   try { v.pc.close(); } catch { /* already closed */ }
   if (sayBye) signalSend(id, 'bye');
@@ -622,11 +623,98 @@ function updateCapturePacer(): void {
 // window, clasp picking on the renderer canvas) — no parallel input API to
 // keep in sync.
 
+// ─── Virtual gamepad (a viewer's physical controller) ───────────────────────
+//
+// A controller paired to the VIEWER's device is polled viewer-side and its raw
+// standard-mapping state arrives here as {t:'pad'}. We surface it as a synthetic
+// entry in navigator.getGamepads() so the store's OWN pad readers consume it
+// exactly as a local pad, in every mode, with no parallel input path:
+//   InputManager.pollGamepad (menus/2D)  and  StoreScene walk-mode analog sticks.
+// The host machine itself has no pad, so this is the only way a remote viewer's
+// controller can drive movement/look or reach the action buttons.
+type VPad = Gamepad & { axes: number[]; buttons: GamepadButton[] };
+let virtualPad: VPad | null = null;
+let padPatched = false;
+
+function makeButton(pressed: boolean): GamepadButton {
+  return { pressed, touched: pressed, value: pressed ? 1 : 0 } as GamepadButton;
+}
+
+function ensurePadPatched(): void {
+  if (padPatched || typeof navigator === 'undefined' || !navigator.getGamepads) return;
+  padPatched = true;
+  const native = navigator.getGamepads.bind(navigator);
+  navigator.getGamepads = function patched(): (Gamepad | null)[] {
+    const real = native() as (Gamepad | null)[];
+    if (!virtualPad) return real;
+    const out = Array.from(real);
+    let placed = false;
+    for (let i = 0; i < out.length; i++) {
+      if (!out[i]) { out[i] = virtualPad; placed = true; break; } // take the first empty slot
+    }
+    if (!placed) out.push(virtualPad);
+    return out;
+  } as typeof navigator.getGamepads;
+}
+
+function updateVirtualPad(axes: number[], buttons: boolean[]): void {
+  ensurePadPatched();
+  const btns = buttons.map(makeButton);
+  if (!virtualPad) {
+    virtualPad = {
+      id: 'Remote Play Controller (standard)',
+      index: 0,
+      connected: true,
+      mapping: 'standard',
+      timestamp: performance.now(),
+      axes,
+      buttons: btns,
+      vibrationActuator: null,
+    } as unknown as VPad;
+    // Flips gamepadEverConnected true so InputManager/StoreScene start polling.
+    // Must carry the pad: InputManager's listener reads e.gamepad.id unguarded,
+    // so a bare Event throws there and polling never starts (a real GamepadEvent
+    // falls back to a plain Event only where the constructor is unavailable).
+    window.dispatchEvent(makeGamepadEvent('gamepadconnected', virtualPad));
+  } else {
+    virtualPad.axes = axes;
+    virtualPad.buttons = btns;
+    (virtualPad as { timestamp: number }).timestamp = performance.now();
+  }
+}
+
+function clearVirtualPad(): void {
+  if (!virtualPad) return;
+  const gone = virtualPad;
+  virtualPad = null;
+  // Tracker re-checks getGamepads (now virtual-pad-free) and clears its flag;
+  // InputManager reads e.gamepad only on connect, but carry it for symmetry.
+  window.dispatchEvent(makeGamepadEvent('gamepaddisconnected', gone));
+}
+
+// A real GamepadEvent where the runtime provides the constructor (all our
+// targets), falling back to a plain Event otherwise.
+function makeGamepadEvent(type: string, gamepad: Gamepad): Event {
+  try {
+    return new GamepadEvent(type, { gamepad });
+  } catch {
+    const ev = new Event(type);
+    (ev as unknown as { gamepad: Gamepad }).gamepad = gamepad;
+    return ev;
+  }
+}
+
 function applyInput(msg: any): void {
   const scene = getScene();
   if (!scene || !msg) return;
   stats.inputsApplied++;
   lastRemoteInputAt = Date.now(); // whoever acts next is acting for a viewer
+  if (msg.t === 'pad') {
+    const axes = Array.isArray(msg.axes) ? msg.axes.map((n: any) => Number(n) || 0) : [];
+    const buttons = Array.isArray(msg.buttons) ? msg.buttons.map((b: any) => !!b) : [];
+    updateVirtualPad(axes, buttons);
+    return;
+  }
   if (msg.t === 'key') {
     const type = msg.et === 'up' ? 'keyup' : 'keydown';
     window.dispatchEvent(new KeyboardEvent(type, {
