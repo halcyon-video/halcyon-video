@@ -1838,7 +1838,7 @@ class PosterLoadingQueue {
           // texSubImage3D calls) in a single frame. The queue tasks flip the
           // shader loaded-flags themselves once the pixels are really up.
           textureArrayManager.queueLowRes(renderer, item.movieId, finalLowRes);
-          if (item.priority >= 1) {
+          if (item.priority >= 1 || textureArrayManager.usesHighResOnly(item.movieId)) {
             textureArrayManager.queueHighRes(renderer, item.movieId, finalHighRes);
           }
         }
