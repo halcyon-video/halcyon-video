@@ -2110,6 +2110,16 @@ export class StoreScene {
       n8aoPass.configuration.gammaCorrection = false; // OutputPass later in the chain owns tone mapping/sRGB
       n8aoPass.configuration.aoRadius = 0.5;       // ft — same contact-shadow reach the GTAO pass was tuned to
       n8aoPass.configuration.distanceFalloff = 1.0;
+      // Transparency-aware AO OFF, and n8ao's per-frame auto-detection with
+      // it: the detector traverses the WHOLE scene graph every frame, and
+      // because this store is full of transparent materials it latches
+      // transparencyAware on, after which each frame also pays three more
+      // traversals, a scene-sized `new Map()`, two depth copies and TWO extra
+      // full scene submissions — measured at ~477 extra draw calls/frame.
+      // Both lines are needed: the config Proxy only latches auto-detect off
+      // on a value CHANGE, and transparencyAware is already false here.
+      n8aoPass.autoDetectTransparency = false;
+      n8aoPass.configuration.transparencyAware = false;
       n8aoPass.configuration.intensity = 1.4;      // soft occlusion (pow exponent) — 2.0 read too heavy against the reference's evenly-lit shelves; faded via the adapter below
       // Walk gating swaps source passes: while the feet move, AO is off and
       // the plain RenderPass takes over (EffectComposer skips disabled
