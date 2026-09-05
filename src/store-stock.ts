@@ -12,6 +12,7 @@ import { posterQueue, CASE_MEDIUM, CASE_HEIGHT, CASE_DEPTH, textureArrayManager,
 import { AISLE_SHELF_HEIGHTS, WALL_SHELF_HEIGHTS, LEAN_ANGLE, STAGGER_OFFSET, UNIT_SIDE_CAPACITY, BACK_WALL_UNIT_IDX, sideEntrySlot, COPY_X_JITTER_RANGE, EXTRA_COPY_DEPTH_STEP, extraCopiesCount, isUnstockedTitle, seededRandom01, MovieSlot } from './store-layout';
 import { validateCaseFit, type CaseFitPair } from './layout-validator';
 import { retailAudio } from './audio';
+import { clearPosterPrefetch } from './poster-prefetch';
 import {
   CASE_EULER_ORDER, sectionColSpan, SlotPos,
   tempPosition, tempRotation, tempQuaternion, tempScale, tempMatrix,
@@ -937,7 +938,15 @@ export function buildAllMovieBoxes(scene: StoreScene) {
   // interactive until every cover has settled (loaded or failed) rather than
   // revealing a wall of gray placeholder spines that fill in over time.
   const allSlots = Array.from(scene.slotsByPosition.values());
-  const total = allSlots.length;
+  // Streaming-service titles (GH #86) hotlink their art from a third-party
+  // CDN (image.tmdb.org) that is nobody's server here: it can be slow, proxied
+  // or blocked, and on the hosted demo it was the last ~3s of every boot's
+  // texture wait — 160 covers that queue behind the whole catalog and gate the
+  // reveal of aisles they aren't in. They still load (queued in the .then
+  // below, same priority) and paint in as they land; they just don't hold the
+  // door.
+  const gatedSlots = allSlots.filter(slot => !slot.movie.streaming);
+  const total = gatedSlots.length;
   let loaded = 0;
   // Nothing is interactive while this preload runs (the boot overlay is up), so
   // the queue should drain at burst rate rather than the polite 4-per-frame
@@ -947,16 +956,33 @@ export function buildAllMovieBoxes(scene: StoreScene) {
   // seconds. Self-clearing when the queue empties.
   beginRebuildDrain();
   scene.onTextureLoadProgress?.(0, total);
-  scene.texturesReadyPromise = Promise.all(allSlots.map(slot => new Promise<void>(resolve => {
+  // The runtime-program warm-up needs ONE decoded poster to build real hero
+  // materials, not all of them: run it as soon as the first few covers have
+  // landed, so its shader compiles (~1.2s on a cold cache) overlap the
+  // network/worker wait instead of adding to it right before the reveal.
+  const warmupAt = Math.min(total, 48);
+  scene.texturesReadyPromise = Promise.all(gatedSlots.map(slot => new Promise<void>(resolve => {
     slot.loadShelfDetails(0, () => {
       loaded++;
       scene.onTextureLoadProgress?.(loaded, total);
+      if (loaded === warmupAt) scene.warmupRuntimePrograms();
       resolve();
     });
   }))).then(() => {
     // Posters are in the pixel cache now, so the warm-up can build the real
     // hero materials (not placeholder fallbacks) — see the method's comment.
+    // (A no-op when the early trigger above already ran it.)
     scene.warmupRuntimePrograms();
+    // Whatever the boot prefetched and nobody consumed is not worth keeping.
+    clearPosterPrefetch();
+    // Media the store held back so it would not compete with the covers for
+    // bandwidth while the overlay was up (the ceiling TVs' bundled loop).
+    scene.ambientTvs?.releaseDeferredMedia();
+    // Now the third-party streaming covers: queued after the reveal rather
+    // than at the tail of the gated set, because on a home connection the
+    // gated tail and these were sharing one pipe — they paint in over the
+    // first seconds instead of stretching the wait for aisles they aren't in.
+    for (const slot of allSlots) if (slot.movie.streaming) slot.loadShelfDetails(0);
   });
 
   // T25 #26 (superseded): the per-rented-title gold filler group is gone —

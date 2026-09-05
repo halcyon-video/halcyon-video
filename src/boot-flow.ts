@@ -746,6 +746,11 @@ async function demoCatalogBaseCount(): Promise<number> {
  */
 export async function startDemoAndLoad() {
   if (!deps) return;
+  // Warm the 3D scene chunk while the GPU calibration below runs: the network
+  // is idle for that half second, and main.ts's own dynamic import of it
+  // would otherwise start only once the catalog is stocked. (Flat mode never
+  // needs it — same gate main.ts uses.)
+  if (getSetting<string>('bb_render_mode') !== 'flat') void import('./three-scene');
   // First visit defaults to daytime out the windows (the scene otherwise
   // rolls day/night 50/50 per boot); user-changeable in Store Look after.
   if (!localStorage.getItem('bb_outside')) localStorage.setItem('bb_outside', 'day');

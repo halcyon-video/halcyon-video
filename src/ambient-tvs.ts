@@ -271,6 +271,9 @@ export class AmbientTvs implements StoreFixture {
   private screenMeshes: THREE.Mesh[] = [];
   private pictureMat: THREE.Material | null = null;
   private video: HTMLVideoElement | null = null;
+  // Bundled-loop deferral (see playDemoLoop / releaseDeferredMedia).
+  private mediaReleased = false;
+  private deferredLoop: HTMLVideoElement | null = null;
   private videoTex: THREE.VideoTexture | null = null;
   // Last video time we uploaded, so we skip redundant GPU re-uploads of an
   // unchanged frame when the compositor runs above the video's frame rate.
@@ -917,12 +920,35 @@ export class AmbientTvs implements StoreFixture {
       this.hls.destroy();
       this.hls = null;
     }
+    // Held back until the store has revealed (releaseDeferredMedia, called
+    // off the boot's texture wait): the clip is ~1.9MB with preload=auto, and
+    // at construction time every cover in the store is still downloading
+    // behind the boot overlay — on a home connection it was streaming for the
+    // whole texture wait, competing with the posters the reveal was gated on,
+    // for screens nobody could see yet. After the reveal it starts at once;
+    // the #67 step-down from a dead stream (always post-reveal) is unchanged.
+    if (!this.mediaReleased) {
+      this.deferredLoop = video;
+      return;
+    }
     video.removeAttribute('src'); // drop any MediaSource blob hls.js attached
     video.loop = true;
     video.preload = 'auto';
     video.src = assetUrl(DEMO_LOOP_PATH);
     video.addEventListener('loadedmetadata', () => this.startPlayback(video), { once: true });
     video.load();
+  }
+
+  /**
+   * The store is on screen: start any media that was waiting for the covers
+   * to finish (see playDemoLoop). Idempotent; a later playDemoLoop runs
+   * immediately once this has been called.
+   */
+  public releaseDeferredMedia(): void {
+    this.mediaReleased = true;
+    const video = this.deferredLoop;
+    this.deferredLoop = null;
+    if (video && video === this.video) this.playDemoLoop(video);
   }
 
   // Build the two ceiling-hung TVs themselves (pole mounts, shells, screens,

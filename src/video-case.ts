@@ -11,6 +11,7 @@ import type { BrandPackWrapSpec } from './brand-pack';
 import { brandAssetUrl, brandString, getBrandPack } from './brand-pack';
 import type { DecodeMode } from './poster-worker';
 import { getRommConfig, authHeader } from './romm';
+import { prefetchPosterBytes, takePrefetchedPosterBytes, setSharedDecodeEnabled, sharedDecodeGet, sharedDecodePut } from './poster-prefetch';
 import { drawTechSpecsTable, TECH_SPECS_TABLE_H } from './tech-specs';
 import { stampCollectionGapSticker } from './case-corner-stickers';
 import { perfTrace, perfSlot } from './perf-trace';
@@ -78,6 +79,15 @@ async function fetchPosterBytes(url: string): Promise<ArrayBuffer | null> {
   // the marker here plain-GETs it, which the middleware answers 400 — one
   // guaranteed-failed request per game cover before the worker got it right.
   if (url.startsWith('/dev-proxy?')) return null;
+  // Bytes the boot already started downloading before the store build
+  // (poster-prefetch.ts) — a shared file the demo's titles all wear arrives
+  // once instead of once per title. A prefetch that failed drops its entry,
+  // so a null here means "never prefetched": fall through to the real fetch.
+  const prefetched = takePrefetchedPosterBytes(url);
+  if (prefetched) {
+    const bytes = await prefetched;
+    if (bytes) return bytes;
+  }
   const targetUrl = rewriteLocalhost(url);
   const rommConfig = getRommConfig();
   const isRommUrl = rommConfig && targetUrl.startsWith(rommConfig.url);
@@ -109,6 +119,35 @@ async function fetchPosterBytes(url: string): Promise<ArrayBuffer | null> {
     console.warn(`[fetchPosterBytes] Failed to fetch bytes for ${url}:`, err);
   }
   return null;
+}
+
+/**
+ * Start downloading these titles' covers now (see poster-prefetch.ts): called
+ * at the top of the StoreScene constructor so the bytes stream in during the
+ * synchronous store build instead of after it. Titles whose pixels are already
+ * decoded (a settings rebuild) are skipped — their bytes are never asked for.
+ */
+export function prefetchCoverBytes(movies: Iterable<Movie>): number {
+  const urls: string[] = [];
+  const rommConfig = getRommConfig();
+  let titles = 0;
+  for (const m of movies) {
+    if (!m.posterUrl || posterPixelCache.has(m.id)) continue;
+    titles++;
+    // Streaming-service art is third-party and does not gate the reveal
+    // (store-stock.ts loads it after) — fetching it early would only take
+    // bandwidth from the covers that do.
+    if (m.streaming) continue;
+    // Romm art needs the auth header + proxy dance fetchPosterBytes does; a
+    // plain prefetch of it would only 401.
+    if (rommConfig && rewriteLocalhost(m.posterUrl).startsWith(rommConfig.url)) continue;
+    urls.push(m.posterUrl);
+  }
+  // A catalog wearing far fewer poster files than it has titles (the demo's
+  // 42 across ~2,300) decodes each file once and copies (poster-prefetch.ts).
+  const unique = new Set(urls).size;
+  setSharedDecodeEnabled(titles >= 64 && unique * 2 < titles);
+  return prefetchPosterBytes(urls, rewriteLocalhost);
 }
 
 /**
@@ -1498,6 +1537,17 @@ class WorkerPool {
   // decision the shelf decode already made so the swap on pickup is a sharpen
   // in place rather than a reframe.
   public async decode(url: string, mode: DecodeMode, faceAspect?: number, scale?: number, forceLetterbox?: boolean): Promise<{ highResData: Uint8Array, lowResData: Uint8Array, leftmostColor: string, edgeBusy: boolean, bandEnergy: number }> {
+    // Titles sharing one poster file decode it once (see poster-prefetch.ts's
+    // shared-decode cache; a no-op unless the catalog was seen to share art).
+    const shareKey = `${url}|${mode}|${faceAspect ?? ''}|${scale ?? 1}|${forceLetterbox ?? ''}`;
+    const shared = sharedDecodeGet(shareKey);
+    if (shared) return shared;
+    const out = await this.decodeFresh(url, mode, faceAspect, scale, forceLetterbox);
+    sharedDecodePut(shareKey, out);
+    return out;
+  }
+
+  private async decodeFresh(url: string, mode: DecodeMode, faceAspect?: number, scale?: number, forceLetterbox?: boolean): Promise<{ highResData: Uint8Array, lowResData: Uint8Array, leftmostColor: string, edgeBusy: boolean, bandEnergy: number }> {
     // In the Tauri app, fetch the image bytes through the same host that proxies
     // metadata so box art loads wherever the catalog does — even when the saved
     // Jellyfin URL points at a host the webview can't reach directly (e.g.

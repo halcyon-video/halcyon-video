@@ -140,7 +140,9 @@ async function fetchAndPrep(slot: PropSlot): Promise<PropHandle | null> {
   const spec = PROP_SPECS[slot];
   const url = assetUrl('models/' + spec.file);
   try {
-    const res = await fetch(url);
+    // Low priority: a 2MB prop model is decoration, and at boot it shares the
+    // pipe with the cover art the reveal is gated on.
+    const res = await fetch(url, { priority: 'low' } as RequestInit);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const buf = await res.arrayBuffer();
     // Magic-byte sanity: a real GLB starts "glTF". A dev server can answer a

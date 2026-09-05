@@ -12,6 +12,7 @@ import {
   SERIES_DEPTH_MULT,
   posterPixelCache,
   textureArrayManager,
+  prefetchCoverBytes,
 } from './video-case';
 import { setSurfaceKtx2Renderer } from './surface-textures';
 import { pendingTextureUploads } from './poster-textures';
@@ -1077,6 +1078,9 @@ export class StoreScene {
     // when Romm isn't configured/reachable, so the VIDEO GAMES section never
     // builds and nothing is fetched.
     this.gameMovies = gameMovies;
+    // Start the cover downloads NOW, before the synchronous store build below
+    // holds the thread for seconds — see poster-prefetch.ts.
+    prefetchCoverBytes([...libraries.flatMap((l) => l.movies), ...gameMovies, ...comingSoonMovies, ...discoveryMovies]);
 
     // The request-suggestion pool is the fresh trending/popular fetch PLUS
     // anything already sitting in Jellyseerr's own pending-request queue

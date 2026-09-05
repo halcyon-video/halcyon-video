@@ -22,6 +22,7 @@
 import * as THREE from 'three';
 import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js';
 import { assetUrl } from './asset-url';
+import { whenCoverPrefetchIdle } from './poster-prefetch';
 
 const ktx2Loader = new KTX2Loader();
 ktx2Loader.setTranscoderPath(assetUrl('basis/'));
@@ -66,9 +67,36 @@ export function tryLoadShippedSurfaceKtx2(
   if (!ready) { onMiss(); return; }
   const ktx2RelPath = relPath.replace(/\.png$/, '.ktx2');
   const url = assetUrl(`textures/${ktx2RelPath}`);
+  // Fetched by hand, not through the loader's FileLoader, for two reasons
+  // that both come down to the boot: these fifteen files are ~17MB, more than
+  // everything else the store downloads together, and (a) they wait for the
+  // cover prefetch to drain (poster-prefetch.ts) because only the covers gate
+  // the reveal, (b) they go out at 'low' fetch priority so anything the boot
+  // still needs first is served first. Same parse path as loader.load().
+  whenCoverPrefetchIdle().then(() => fetch(url, { priority: 'low' } as RequestInit))
+    .then(async (res) => {
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const ct = res.headers.get('content-type') || '';
+      if (ct.includes('text/html')) throw new Error('not a KTX2 (HTML body)'); // SPA-fallback dev servers
+      return res.arrayBuffer();
+    })
+    .then((buffer) => parseKtx2(url, buffer, onLoad, srgb, onMiss))
+    .catch((err) => {
+      console.warn(`[surface-textures] KTX2 load failed for ${url}, falling back to PNG:`, err);
+      onMiss();
+    });
+}
+
+function parseKtx2(
+  url: string,
+  buffer: ArrayBuffer,
+  onLoad: (tex: THREE.Texture) => void,
+  srgb: boolean,
+  onMiss: () => void,
+): void {
   try {
-    ktx2Loader.load(
-      url,
+    ktx2Loader.parse(
+      buffer,
       (tex) => {
         // Force the exact colorSpace convention the PNG path uses (see
         // loadOne in user-assets.ts) instead of trusting the KTX2 file's own
@@ -87,16 +115,14 @@ export function tryLoadShippedSurfaceKtx2(
         tex.magFilter = THREE.LinearFilter;
         onLoad(tex);
       },
-      undefined,
       (err) => {
-        console.warn(`[surface-textures] KTX2 load failed for ${url}, falling back to PNG:`, err);
+        console.warn(`[surface-textures] KTX2 transcode failed for ${url}, falling back to PNG:`, err);
         onMiss();
       },
     );
   } catch (err) {
-    // Defensive: setSurfaceKtx2Renderer/`ready` should prevent ever reaching
-    // here, but a throw must never propagate out and blank a surface.
-    console.warn(`[surface-textures] KTX2Loader.load threw for ${url}, falling back to PNG:`, err);
+    // Defensive: a throw must never propagate out and blank a surface.
+    console.warn(`[surface-textures] KTX2Loader.parse threw for ${url}, falling back to PNG:`, err);
     onMiss();
   }
 }
