@@ -762,6 +762,23 @@ export class EntranceCheckout implements StoreFixture {
       z: nextSpine.z - Math.cos(nextSpine.rotY) * bandShift,
     };
 
+    // Half-square counter: the rental-policy snap frame goes on the BAND
+    // top too, at the front run's right end. Its 10 ft island (cx ± 5) has
+    // no clear stretch left on the right arm — terminal at cx + 3.5 with its
+    // printer, rewinder at cx + 2.5, phone at cx + 5.3 on the clerk side —
+    // and at cx + 4.4 on the spine the frame's inner third stood inside the
+    // CRT's case (visual sweep 2026-09-04). cx + 5.3 on the band sits 0.7 ft
+    // clear of the 1993 NEXT REGISTER tent (cx + 3.6) and mirrors the
+    // PLEASE REWIND tent's band spot on the left. The shield keeps its
+    // island spot: its 12 ft island has room past the terminal.
+    const rightOnBandX = cx + 5.3;
+    const rightBandSpine = getInnerCounterSpine(rightOnBandX);
+    const registerRightOnBand = {
+      x: rightOnBandX - Math.sin(rightBandSpine.rotY) * bandShift,
+      y: BAND_H + BAND_CAP,
+      z: rightBandSpine.z - Math.cos(rightBandSpine.rotY) * bandShift,
+    };
+
     // A sign anchor's `yaw` is the direction the PRINT faces — the same
     // convention MountSurface.place() returns and FixturePlacement.yaw uses,
     // so fixtures/signage.ts can drop a fixture on it with
@@ -792,12 +809,19 @@ export class EntranceCheckout implements StoreFixture {
         yaw: facing(middleAnchor.rotY),
         category: 'register'
       },
-      {
-        id: 'register-right',
-        pos: new THREE.Vector3(cx + rightSignOff, innerH + 0.12, rightAnchor.z),
-        yaw: facing(rightAnchor.rotY),
-        category: 'register'
-      }
+      sq
+        ? {
+            id: 'register-right',
+            pos: new THREE.Vector3(registerRightOnBand.x, registerRightOnBand.y, registerRightOnBand.z),
+            yaw: facing(rightBandSpine.rotY),
+            category: 'register'
+          }
+        : {
+            id: 'register-right',
+            pos: new THREE.Vector3(cx + rightSignOff, innerH + 0.12, rightAnchor.z),
+            yaw: facing(rightAnchor.rotY),
+            category: 'register'
+          }
     ];
   }
 
