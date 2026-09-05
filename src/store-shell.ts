@@ -31,6 +31,7 @@ import { resolveOverviewVantage } from './scene-shared';
 import { formatCarpetTextures, formatWallTextures, formatWallIsPrefinished, formatShelfWood } from './format-surfaces';
 import { validateLayout, Footprint } from './layout-validator';
 import { buildAisleShelving } from './shelving';
+import { ShelfModelBatch } from './shelf-model';
 import { buildCounterProps93 } from './fixtures/counter-props-93';
 import { buildStorefrontDressing93 } from './fixtures/storefront-dressing-93';
 import { buildStorefrontCampaignPoster, campaignBannerSpan } from './fixtures/storefront-campaign-poster';
@@ -2033,6 +2034,7 @@ export function buildStore(scene: StoreScene) {
   // Every run also hands itself to the topper builder after this loop, which
   // stands one "New Releases" ticket card on each of its sections (bb-1990
   // only — see fixtures/new-release-toppers.ts).
+  const shelfModels = new ShelfModelBatch();
   const nrTopperRuns: NrTopperRun[] = [];
   const buildShelfRun =(length: number, centerPos: THREE.Vector3, rotationY: number, globalColStart: number) => {
     const group = new THREE.Group();
@@ -2045,6 +2047,7 @@ export function buildStore(scene: StoreScene) {
       shelf.castShadow = true;
       group.add(shelf);
       scene.shelves.push(shelf);
+      shelfModels.add(shelf, [{ kind: 'deck', depth: depth - .044, length, yaw: Math.PI / 2, z: -.022 }]);
 
       const strip = new THREE.Mesh(new THREE.BoxGeometry(length, 0.03, 0.02), nrClaspMat);
       strip.position.set(0, yPos + 0.02, nrFrontZAt(yPos) + 0.01);
@@ -2053,6 +2056,7 @@ export function buildStore(scene: StoreScene) {
       strip.receiveShadow = true;
       group.add(strip);
       scene.shelves.push(strip);
+      shelfModels.add(strip, [{ kind: 'rail', depth: 0, length, yaw: -Math.PI / 2, y: -.032, z: -.028 }]);
 
       if (Math.abs(yPos - 4.7) < 0.01 && scene.promoSignMat && scene.promoSignRedMat) {
         const runCols = Math.floor((length - 1.0) / BOX_SPACING);
@@ -2201,6 +2205,7 @@ export function buildStore(scene: StoreScene) {
     if (typeof p.options?.lineId === 'number') endcapHostLineIds.add(p.options.lineId);
   }
   buildAisleShelving({
+    shelfModels,
     scene: scene.scene,
     plan: scene.plan,
     libraries: scene.libraries,
@@ -2224,6 +2229,10 @@ export function buildStore(scene: StoreScene) {
       ? (placement) => scene.shelfClasps.add(placement)
       : undefined,
     suppressFrontCapLineIds: endcapHostLineIds,
+  });
+  shelfModels.finish(() => {
+    scene.renderer.shadowMap.needsUpdate = true;
+    scene.requestRender();
   });
 
   // 4. (Mirrored Pillars removed)
