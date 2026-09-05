@@ -193,9 +193,13 @@ Swift file is most likely to be wrong, ordered by how likely and how annoying:
    presses never arrive, that is the first thing to check — and the fallback is
    SwiftUI's `onMoveCommand`/`onExitCommand`, which give no key-up events and
    would need the down/up pairing faked.
-6. **The MENU long press against App Review.** The design (trap MENU, long press
+6. **MENU, both ways.** The design (trap MENU on the store screen, long press
    for a screen where it behaves) is the same bargain every tvOS game makes, but
-   it has not been through review.
+   it has not been through review — and the closing half is untested too: the
+   app menu relies on `onExitCommand` firing once the press view has resigned
+   first responder. If MENU there quits the app instead of closing the menu,
+   the fix is to keep the press view as first responder and handle MENU in it
+   for both screens rather than handing the button back.
 7. **The local-network prompt.** `NSLocalNetworkUsageDescription` is set and
    `NSBonjourServices` is deliberately absent, since nothing here browses
    Bonjour. If a fresh install turns out to need a Bonjour browse to trigger the
