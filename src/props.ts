@@ -10,9 +10,8 @@
 //    seated so bbox.min.y === 0 (drop it at floor height and it sits flush).
 //    instantiate() hands out clones that SHARE the template's geometry and
 //    materials — repeated props (the ceiling TVs) cost one geometry upload.
-//  - The Sketchfab GLBs need an interactive (free-account) download, so they
-//    are dropped into public/models/ by hand — see
-//    public/models/ATTRIBUTION.md. Every consumer therefore has a
+//  - Original Blender decks and attributed downloaded props ship in
+//    public/models/ — see its ATTRIBUTION.md. Every consumer has a
 //    missing-file path: loadProp() resolves null (bad fetch OR bad magic
 //    bytes) and getPropOrFallback() substitutes a correctly-sized primitive
 //    so a fresh checkout never breaks.
@@ -25,7 +24,7 @@ import { assetUrl } from './asset-url';
 
 export type PropSlot = 'tv_ceiling' | 'tv_hero' | 'coffee_table' | 'vcr' | 'dvd_player' | 'balloon';
 
-// The face of a TV's picture tube in PROP-LOCAL space (the space of the group
+// The face of a TV tube or deck display in PROP-LOCAL space (the space of the group
 // returned by instantiate(), before you position/rotate it). Transform through
 // the placed instance's matrixWorld — screenRectWorld() below — to get the
 // world-space rect T23's video plane needs.
@@ -53,7 +52,7 @@ export interface PropHandle {
 
 export interface PropInstance {
   object: THREE.Group;
-  // true = real GLB; false = primitive stand-in (file not downloaded yet).
+  // true = real GLB; false = primitive stand-in (asset unavailable).
   real: boolean;
   size: THREE.Vector3;
   screenRect: PropScreenRect | null;
@@ -78,7 +77,7 @@ interface PropSpec {
   glassFrac: { x0: number; x1: number; y0: number; y1: number; inset: number } | null;
   // Primitive stand-in dimensions (w, h, d feet) + colour for the missing-file
   // path, sized per the ticket so T23 layout work holds up before downloads.
-  fallback: { w: number; h: number; d: number; color: number; screen?: { w: number; h: number; yOffset: number } };
+  fallback: { w: number; h: number; d: number; color: number; screen?: { w: number; h: number; yOffset: number; xOffset?: number } };
 }
 
 const SCREEN_MATCH_DEFAULT = /glass|screen|display|crt|ecran/i;
@@ -101,15 +100,17 @@ const PROP_SPECS: Record<PropSlot, PropSpec> = {
     file: 'coffee_table.glb', targetWidth: 3.5, yawFix: 0, screenMatch: null, glassFrac: null,
     fallback: { w: 3.5, h: 1.35, d: 1.8, color: 0x7a5636 },
   },
-  // "VCR Player" — twunnyphaiv, CC-BY 4.0. Deck ≈1.4ft wide.
+  // Original Halcyon Blender deck; named lens also anchors the live clock.
   vcr: {
-    file: 'vcr.glb', targetWidth: 1.4, yawFix: 0, screenMatch: null, glassFrac: null,
-    fallback: { w: 1.4, h: 0.32, d: 0.95, color: 0x1c1c1f },
+    file: 'vcr.glb', targetWidth: 1.4, yawFix: 0, screenMatch: /^DeckDisplay$/, glassFrac: null,
+    fallback: { w: 1.4, h: 0.32, d: 0.95, color: 0x1c1c1f,
+      screen: { w: 0.45, h: 0.07, xOffset: -0.28, yOffset: -0.054 } },
   },
-  // "Basic Silver DVD Player" — rhcreations, CC-BY 4.0.
+  // Original Halcyon silver deck, sharing the same screen/ownership contract.
   dvd_player: {
-    file: 'dvd_player.glb', targetWidth: 1.4, yawFix: 0, screenMatch: null, glassFrac: null,
-    fallback: { w: 1.4, h: 0.18, d: 0.85, color: 0xc3c6cb },
+    file: 'dvd_player.glb', targetWidth: 1.4, yawFix: 0, screenMatch: /^DeckDisplay$/, glassFrac: null,
+    fallback: { w: 1.4, h: 0.18, d: 0.85, color: 0xc3c6cb,
+      screen: { w: 0.245, h: 0.05, xOffset: -0.36, yOffset: 0.015 } },
   },
   // "Balloon" — Poly by Google, CC-BY 3.0. Single 11-inch latex balloon with
   // knot + curly string below; consumers tint per instance (counter-props-93).
@@ -352,9 +353,9 @@ function makeFallback(slot: PropSlot): PropInstance {
       new THREE.MeshStandardMaterial({ color: 0x0b0e14, roughness: 0.15, metalness: 0.1 }),
     );
     glass.rotation.y = Math.PI; // face -Z like the prepped GLBs
-    glass.position.set(0, cy, -fallback.d / 2 - 0.005);
+    glass.position.set(s.xOffset ?? 0, cy, -fallback.d / 2 - 0.005);
     group.add(glass);
-    screenRect = makeScreenRect(0, cy, -fallback.d / 2 - 0.005, s.w, s.h);
+    screenRect = makeScreenRect(s.xOffset ?? 0, cy, -fallback.d / 2 - 0.005, s.w, s.h);
   }
   return {
     object: group,
