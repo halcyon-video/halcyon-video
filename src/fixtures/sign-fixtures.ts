@@ -68,20 +68,39 @@ export function acrylicTentSign(texture: THREE.Texture, width: number, height: n
   const centerY = (height / 2) * cosA;
   const zOffset = (height / 2) * sinA;
 
-  // 1. Paper inserts (double sided)
+  // 1. Paper inserts. Each leaf is ONE plane: its outward face carries the
+  // print and its inward face is blank cardstock. The old DoubleSide print
+  // showed the SAME map on both faces, so the far leaf's inner side (visible
+  // through the tent's open ends from any oblique customer angle) read as a
+  // mirrored "ЯƎ" ghost beside the real text (visual sweep 2026-09-04). The
+  // blank inner face is a second mesh on the same geometry and transform
+  // with the opposite `side`, so the cull test picks exactly one of the pair
+  // per pixel and the two can never z-fight. The front leaf's outward face is
+  // its FRONT (normal +z, toward the customer); the back leaf is placed
+  // unflipped, so ITS outward face is the plane's BACK — hence the mirrored
+  // twin texture there, which reads forward again once seen from behind.
   const paperMatFront = new THREE.MeshStandardMaterial({
     map: texture,
     roughness: 0.8,
     metalness: 0.1,
-    side: THREE.DoubleSide
+    side: THREE.FrontSide
   });
 
   const paperMatBack = new THREE.MeshStandardMaterial({
     map: getBackTexture(texture),
     roughness: 0.8,
     metalness: 0.1,
-    side: THREE.DoubleSide
+    side: THREE.BackSide
   });
+
+  const cardstockFront = new THREE.MeshStandardMaterial({
+    color: 0xf1ede2,
+    roughness: 0.9,
+    metalness: 0.0,
+    side: THREE.FrontSide
+  });
+  const cardstockBack = cardstockFront.clone();
+  cardstockBack.side = THREE.BackSide;
 
   const paperGeo = new THREE.PlaneGeometry(width, height);
 
@@ -100,6 +119,12 @@ export function acrylicTentSign(texture: THREE.Texture, width: number, height: n
   paperFront.castShadow = true;
   paperFront.receiveShadow = true;
   group.add(paperFront);
+  // Its blank inner face (the plane's back), same transform.
+  const paperFrontInner = new THREE.Mesh(paperGeo, cardstockBack);
+  paperFrontInner.position.copy(paperFront.position);
+  paperFrontInner.rotation.copy(paperFront.rotation);
+  paperFrontInner.receiveShadow = true;
+  group.add(paperFrontInner);
 
   const paperBack = new THREE.Mesh(paperGeo, paperMatBack);
   paperBack.position.set(0, centerY, -zOffset);
@@ -107,6 +132,12 @@ export function acrylicTentSign(texture: THREE.Texture, width: number, height: n
   paperBack.castShadow = true;
   paperBack.receiveShadow = true;
   group.add(paperBack);
+  // Its blank inner face (the plane's front), same transform.
+  const paperBackInner = new THREE.Mesh(paperGeo, cardstockFront);
+  paperBackInner.position.copy(paperBack.position);
+  paperBackInner.rotation.copy(paperBack.rotation);
+  paperBackInner.receiveShadow = true;
+  group.add(paperBackInner);
 
   // 2. Clear acrylic outer sheets (folded A-frame)
   // #99: no `transmission` (see four-sided-display.ts's comment) -- these tent
