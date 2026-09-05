@@ -548,9 +548,16 @@ export function counterAnchoredPlacements(
         yaw: 0
       },
       {
+        // On the front band top, left of centre. 6.9, not 8.6: the
+        // 'register-left' PLEASE REWIND tent stands on this same band top at
+        // cx - 1.8 = 9.2 (entrance/index.ts registerLeftOnBand), and at 8.6
+        // the 2.2 ft tray (7.5..9.7) swallowed the tent whole (visual sweep
+        // 2026-09-04). 6.9 puts the tray at 5.8..8.0 — 0.75 ft short of the
+        // tent and still 0.5 ft clear of the bag's wait spot at the band's
+        // left end (store-checkout.ts WAIT_DX/DZ off the island rest spot).
         id: 'tape-cleaner-display-counter',
         kind: 'tape-cleaner-display',
-        position: { x: 8.6, z: -2.85 }, // on the front band top, left of centre
+        position: { x: 6.9, z: -2.85 },
         yaw: Math.PI, // labels toward the store side (-z)
         options: { count: 10 }
       },
