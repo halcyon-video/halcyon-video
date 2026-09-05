@@ -19,6 +19,7 @@ import { seededRandom01 } from '../store-layout';
 import { markSignMesh } from '../sign-builders';
 import { loadProp } from '../props';
 import { BB_ARCHIVO_BLACK } from '../bundled-fonts';
+import { buildImpactPrinter93 } from './impact-printer-93';
 
 const texCache = new Map<string, THREE.CanvasTexture>();
 
@@ -129,7 +130,7 @@ export function buildCounterProps93(scene: StoreScene): void {
   // the rewinder's lid (user report: "the register display is sitting inside
   // the tape rewinder?"). The right arm has no clear stretch left: the
   // register-middle snap frame owns 12.8, the rewinder 13.9, the rental
-  // terminal 15.0 and the receipt printer 15.3.
+  // terminal 15.0 and phone 16.3. The printer now sits nearer the centre.
   {
     const a = entrance.getCounterTopAnchor(cx - 1.5)!;
     const poleH = 0.95;
@@ -237,32 +238,11 @@ export function buildCounterProps93(scene: StoreScene): void {
 
   // 4. Dot-matrix printer with fanfold paper, back of the inner counter.
   {
-    const a = entrance.getCounterTopAnchor(cx + 4.3)!;
-    const body = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.3, 0.6), matte(0xd9cdb2, 0.6));
-    body.position.set(a.x, a.y + 0.15, a.z);
-    body.rotation.y = a.rotY;
-    body.castShadow = true;
-    body.receiveShadow = true;
-    group.add(body);
-    const lid = new THREE.Mesh(new THREE.BoxGeometry(0.86, 0.03, 0.3), matte(0xbfb49a, 0.4));
-    lid.position.set(a.x, a.y + 0.31, a.z);
-    lid.rotation.y = a.rotY;
-    group.add(lid);
-    // Sheet rising out of the platen, leaning back.
-    const paperMat = new THREE.MeshStandardMaterial({ map: fanfoldTex(), roughness: 0.9, metalness: 0, side: THREE.DoubleSide });
-    const sheet = new THREE.Mesh(new THREE.PlaneGeometry(0.62, 0.5), paperMat);
-    sheet.position.set(a.x, a.y + 0.52, a.z).add(normal(a.rotY).multiplyScalar(-0.12));
-    sheet.rotation.y = a.rotY;
-    sheet.rotation.x = -0.35;
-    markSignMesh(sheet); // printed sheet: must darken with the counter under it
-    group.add(sheet);
-    // Fanfold stack feeding it from behind.
-    const stack = new THREE.Mesh(new THREE.BoxGeometry(0.66, 0.16, 0.5), matte(0xfbfaf4, 0.85));
-    stack.position.set(a.x, a.y + 0.08, a.z).add(normal(a.rotY).multiplyScalar(-0.5));
-    stack.rotation.y = a.rotY;
-    stack.castShadow = true;
-    stack.receiveShadow = true;
-    group.add(stack);
+    // The clear centre stretch between the VFD (-1.5) and rewinder (+2.9)
+    // supports this on both island lengths. The old +4.3 location pushed
+    // the printer through the rental CRT's casing.
+    const a = entrance.getCounterTopAnchorAt(.9)!;
+    buildImpactPrinter93(scene, group, a, fanfoldTex());
 
     // Beige corded desk phone beside the station — every register in the
     // footage keeps one. It sits on the CLERK side of the counter spine:

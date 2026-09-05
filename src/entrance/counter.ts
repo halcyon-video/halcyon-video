@@ -14,6 +14,7 @@ import { getActiveTheme } from '../themes';
 import { createShelfTextures } from '../canvas-textures';
 import { Footprint } from '../layout-validator';
 import { deskGroundPlan, DeskGroundPlan, DESK_LENGTH, DESK_DEPTH } from './desk-plan';
+import { installCounterModel } from './counter-model';
 
 // A spot the clerk can stand at, with the world heading she should face while
 // standing there (heading convention: atan2(dirX, dirZ), see clerk.ts).
@@ -137,7 +138,7 @@ function counterTopMaterial(kind: StorefrontSpec['counterTop'], counterWhite: TH
 
 export function buildCheckoutCounter(
   ctx: FixtureContext,
-  group: THREE.Group,
+  parent: THREE.Group,
   cx: number,
   backZ: number,
   spec: Pick<StorefrontSpec, 'counterStyle' | 'counterTop' | 'counterShape' | 'entryStyle' | 'doorWidth'>,
@@ -145,6 +146,11 @@ export function buildCheckoutCounter(
   // side WALL, and the wall moves with the store's size (see desk-plan.ts).
   storeWidth: number,
 ): CounterBuildResult {
+  // These simple solids are the collision rig and immediate loading fallback.
+  // Visible joinery comes from the editable Blender model once it is loaded.
+  const group = new THREE.Group();
+  group.name = 'checkout-counter-fallback';
+  parent.add(group);
   const rounded = spec.counterStyle === 'rounded-2000s';
   // 'usquare': a half-square of roughly the shield's size — three straight
   // band runs with square corners (two sides + a flat store-facing front),
@@ -658,6 +664,12 @@ export function buildCheckoutCounter(
     nx: nVec.x, nz: nVec.y,
     facingYaw: deskPlan ? deskPlan.facingYaw : Math.PI,
   };
+
+  installCounterModel(ctx, parent, group, spec.counterShape, rounded,
+    deskFront
+      ? { x: deskFront.x, z: deskFront.y, yaw: Math.atan2(-windU.y, windU.x) }
+      : { x: cx, z: backZ, yaw: 0 },
+    { body: counterWhite, top: counterTopBlue, inlay: counterStripe, worktop: innerTopMat });
 
   return {
     deskApexZ, cx, innerH, innerDepth: innerD, getInnerCounterSpine,

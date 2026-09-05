@@ -195,7 +195,7 @@ export class BackRoom {
     this.buildTapes(movies, tableTopY);
     this.buildDueNote(tableTopY);
     this.buildTableContactShadows(tableTopY);
-    this.buildVcrClock();
+    this.buildVcrClock(deck);
     this.redrawClocks(true);
   }
 
@@ -487,6 +487,12 @@ export class BackRoom {
     this.group.add(deckG);
     // Insert-beat landing point: just in front of the deck's face, local coords.
     this.vcrMouth.set(0, 0.66 + deck.size.y * 0.55, standZ + 0.12 + deck.size.z / 2 + 0.35);
+    const mouth = deck.object.getObjectByName('DeckMediaMouth');
+    if (mouth) {
+      mouth.getWorldPosition(this.vcrMouth);
+      this.group.worldToLocal(this.vcrMouth);
+      this.vcrMouth.z += 0.35;
+    }
   }
 
   private buildScreenPlane(rect: PropScreenRect): void {
@@ -796,7 +802,9 @@ export class BackRoom {
     this.notePrintFar = note.localToWorld(new THREE.Vector3(0, 0.36 * (H / W) * 0.40, 0));
   }
 
-  private buildVcrClock(): void {
+  private buildVcrClock(deck: PropInstance): void {
+    const rect = deck.screenRect;
+    if (!rect) return;
     const canvas = document.createElement('canvas');
     canvas.width = 192;
     canvas.height = 48;
@@ -805,12 +813,15 @@ export class BackRoom {
     tex.colorSpace = THREE.SRGBColorSpace;
     this.vcrClock = { canvas, ctx, tex };
     const face = new THREE.Mesh(
-      new THREE.PlaneGeometry(0.62, 0.155),
+      new THREE.PlaneGeometry(rect.width * 0.94, rect.height * 0.88),
       new THREE.MeshBasicMaterial({ map: tex }),
     );
-    // On the deck's face, just under the tape mouth.
-    face.position.set(0.28, this.vcrMouth.y - 0.12, this.vcrMouth.z - 0.28);
-    this.addOwned(face);
+    // Prop-local lens bounds follow either deck and its fallback. Keeping the
+    // clock under the instance also carries the stand's position and yaw.
+    face.name = 'deck-live-clock';
+    face.rotation.y = Math.PI;
+    face.position.copy(rect.center).addScaledVector(rect.normal, 0.0008);
+    this.addOwned(face, deck.object);
   }
 
   // Redraw the VCR display (dev-timer countdown, else digital real time).

@@ -7,6 +7,7 @@
 // movie boxes bake their resting transforms from the plan, not from these
 // meshes, so any structure that respects the plan's dimensions works.
 import * as THREE from 'three';
+import { ShelfModelBatch, type ShelfPart } from './shelf-model';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { JellyfinLibrary } from './jellyfin';
 import {
@@ -140,6 +141,7 @@ export interface GondolaMaterials {
 
 export interface AisleShelvingDeps {
   scene: THREE.Scene;
+  shelfModels: ShelfModelBatch;
   plan: StorePlan;
   libraries: JellyfinLibrary[];
   materials: GondolaMaterials;
@@ -316,6 +318,8 @@ export function buildAisleShelving(deps: AisleShelvingDeps): void {
   // instead of allocating per-part clones.
   const wireBlackFrame = theme.shelving.frame === 'wire-black';
   const wireFrame = wireBlackFrame && !!materials.wireShelf;
+  const modeledSpineMat = wireFrame ? deps.shelfModels.own(materials.shelf.clone()) : materials.shelf;
+  if (wireFrame) modeledSpineMat.color.set(0xeadcbc);
   const wireMats = new Map<string, THREE.MeshStandardMaterial>();
   const getWireMat = (rx: number, ry: number): THREE.MeshStandardMaterial => {
     const key = `${rx.toFixed(2)}_${ry.toFixed(2)}`;
@@ -370,6 +374,9 @@ export function buildAisleShelving(deps: AisleShelvingDeps): void {
     // Same-material structure parts collect here and merge into one mesh per
     // material at the end of the unit (see the #118 note above).
     const structureParts: THREE.BufferGeometry[] = []; // materials.shelf
+    const deckParts: THREE.BufferGeometry[] = [];
+    const deckModels: ShelfPart[] = [];
+    const railModels: ShelfPart[] = [];
     const stripParts: THREE.BufferGeometry[] = [];     // materials.strip
 
     // Draw horizontal shelves (solid boards or wire mesh depending on theme)
@@ -386,8 +393,10 @@ export function buildAisleShelving(deps: AisleShelvingDeps): void {
         shelf.castShadow = true;
         aisleParent.add(shelf);
         deps.addCollider(shelf);
+        deps.shelfModels.add(shelf, [{ kind: 'wire', depth: shelfDepth, length: shelfLength }], materials.strip);
       } else {
-        stamp(structureParts, getBoxTemplate(shelfDepth, 0.04, shelfLength), xCenter, yPos, zCenter);
+        stamp(deckParts, getBoxTemplate(shelfDepth, 0.04, shelfLength), xCenter, yPos, zCenter);
+        deckModels.push({ kind: 'deck', depth: shelfDepth - .088, length: shelfLength, x: xCenter, y: yPos, z: zCenter });
       }
 
       // Pricing strips along the left and right lips. Inset from the shelf edge
@@ -414,6 +423,11 @@ export function buildAisleShelving(deps: AisleShelvingDeps): void {
       const stripOffset = shelfDepth / 2 - stripW / 2 + STRIP_EPS;
       stamp(stripParts, stripTemplate, xCenter - stripOffset, stripY, zCenter);
       stamp(stripParts, stripTemplate, xCenter + stripOffset, stripY, zCenter);
+      for (const side of [-1, 1]) railModels.push({
+        kind: 'rail', depth: 0, length: shelfLength - .012,
+        x: xCenter + side * (shelfDepth / 2 - .018), y: yPos - .012,
+        z: zCenter, yaw: side < 0 ? Math.PI : 0,
+      });
 
     });
 
@@ -426,6 +440,7 @@ export function buildAisleShelving(deps: AisleShelvingDeps): void {
         div.castShadow = true;
         aisleParent.add(div);
         deps.addCollider(div);
+        deps.shelfModels.add(div, [{ kind: 'wire', depth: .8, length: UNIT_FRAME_HEIGHT, pitch: Math.PI / 2, panel: true }], materials.strip);
       } else {
         stamp(structureParts, dividerTemplate, xCenter, frameCenterY, zDiv);
       }
@@ -465,6 +480,7 @@ export function buildAisleShelving(deps: AisleShelvingDeps): void {
       backingWall.castShadow = true;
       aisleParent.add(backingWall);
       deps.addCollider(backingWall);
+      deps.shelfModels.add(backingWall, [{ kind: 'slat', depth: .5, length: shelfLength - .04, height: UNIT_FRAME_HEIGHT }], modeledSpineMat);
     } else {
       stamp(structureParts, getBoxTemplate(0.5, UNIT_FRAME_HEIGHT, shelfLength - 0.04), xCenter, frameCenterY, zCenter);
     }
@@ -685,10 +701,19 @@ export function buildAisleShelving(deps: AisleShelvingDeps): void {
       aisleParent.add(structure);
       deps.addCollider(structure);
     }
+    if (deckParts.length) {
+      const decks = new THREE.Mesh(mergeGeometries(deckParts), materials.shelf);
+      decks.castShadow = decks.receiveShadow = true;
+      aisleParent.add(decks);
+      deps.addCollider(decks);
+      deps.shelfModels.add(decks, deckModels);
+      deckParts.forEach(g => g.dispose());
+    }
     const strips = new THREE.Mesh(mergeGeometries(stripParts), materials.strip);
     strips.receiveShadow = true;
     aisleParent.add(strips);
     deps.addCollider(strips);
+    deps.shelfModels.add(strips, railModels);
 
     // Skeuomorphic End Caps. A run is a chain of units joined short-end to
     // short-end, so caps only belong at the TWO true ends of the chain: the blue
