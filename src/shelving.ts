@@ -320,9 +320,6 @@ export function buildAisleShelving(deps: AisleShelvingDeps): void {
   const wireFrame = wireBlackFrame && !!materials.wireShelf;
   const modeledSpineMat = wireFrame ? deps.shelfModels.own(materials.shelf.clone()) : materials.shelf;
   if (wireFrame) modeledSpineMat.color.set(0xeadcbc);
-  const carcassMat = theme.id === 'bb-1993'
-    ? deps.shelfModels.own(materials.shelf.clone()) : materials.shelf;
-  if (theme.id === 'bb-1993') carcassMat.color.set(theme.palette.primary);
   const wireMats = new Map<string, THREE.MeshStandardMaterial>();
   const getWireMat = (rx: number, ry: number): THREE.MeshStandardMaterial => {
     const key = `${rx.toFixed(2)}_${ry.toFixed(2)}`;
@@ -723,7 +720,8 @@ export function buildAisleShelving(deps: AisleShelvingDeps): void {
       structure.castShadow = true;
       aisleParent.add(structure);
       deps.addCollider(structure);
-      deps.shelfModels.add(structure, structureModels, carcassMat);
+      // The modeled back and uprights keep the same pale laminate as their fallback.
+      deps.shelfModels.add(structure, structureModels, materials.shelf);
       structureParts.forEach(g => g.dispose());
     }
     if (deckParts.length) {
