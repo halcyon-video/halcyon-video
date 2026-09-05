@@ -1,5 +1,12 @@
 # 3D Model Attribution
 
+The six `checkout-counter-*.glb` variants are original Halcyon millwork, covered
+by the repository's license. Editable Blender source and the reproducible
+mesh-authoring script live in `tools/models/checkout-counter.blend` and
+`tools/models/checkout-counter.py`. They contain no downloaded geometry,
+textures, or chain trademarks. See `docs/checkout-counter-model.md` for the
+construction and placement contract.
+
 Downloaded from [Poly Pizza](https://poly.pizza) and [Sketchfab](https://sketchfab.com),
 used for the store's prop dressing.
 
@@ -26,4 +33,3 @@ bytes are `glTF` and keep textures ≤ 2048px. (The originally vetted free TVs �
 Zgon's "Old Television from 90's" and LiuMeowMeow's "TV Sony Trinitron", both
 CC-BY 4.0 — remain vetted alternates
 if the user-supplied TV ever needs replacing.)
-
