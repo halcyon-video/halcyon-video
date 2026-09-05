@@ -2695,6 +2695,12 @@ export class StoreScene {
     const ambientIntensity = this.selectedSky ? this.selectedSky.hemisphereIntensity : 0.09;
     const ambient = new THREE.HemisphereLight(ambientSky, ambientGround, ambientIntensity);
     this.scene.add(ambient);
+    // Low-frequency interior bounce, reflected up from floor and fixtures.
+    // Unlike material emission this obeys normals, albedo and light intensity.
+    const interiorBounce = new THREE.HemisphereLight(0x000000, 0xc5cbd6, 1.25);
+    interiorBounce.name = 'interior-diffuse-bounce';
+    interiorBounce.userData.interiorBounce = true;
+    this.scene.add(interiorBounce);
 
     // The single real light: warm daylight raking in from the front/left windows.
     // It supplies the scene's direction and casts every shadow in the room. With

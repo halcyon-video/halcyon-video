@@ -216,17 +216,14 @@ export function buildCategoryPlate1993(
   const yApex = yTop - h;
 
   // DoubleSide: the body must read SOLID from every angle — a culled end
-  // cap reads as a hole straight through the sign (owner report). Emissive
-  // terms make the whole body read lit from within; the faces use their own
-  // art as the emissive map so the painted vignette shapes the glow.
+  // cap reads as a hole straight through the sign. Printed faces receive
+  // the same scene lighting as the solid body.
   const solidMat = new THREE.MeshStandardMaterial({
     color: family, roughness: 0.6, metalness: 0.0, side: THREE.DoubleSide,
-    emissive: new THREE.Color(family), emissiveIntensity: 0.30,
   });
   const faceMat = (tex: THREE.Texture) =>
     new THREE.MeshStandardMaterial({
       map: tex, roughness: 0.6, metalness: 0.0,
-      emissive: new THREE.Color('#ffffff'), emissiveMap: tex, emissiveIntensity: 0.55,
     });
 
   // Sloped faces: front (+z at top) and back, meeting at the bottom edge.

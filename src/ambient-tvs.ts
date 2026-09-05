@@ -1,3 +1,4 @@
+import { selfLit } from './material-lighting';
 // Ceiling-hung CRT TVs playing an ambient movie streamed from the store's media
 // server, with HRTF positional audio. Self-contained fixture: owns its <video>
 // element, HLS pipeline, VideoTexture, and AudioContext, and tears them all down
@@ -982,7 +983,7 @@ export class AmbientTvs implements StoreFixture {
     this.bezelMat = bezelMat;
     const poleMat = new THREE.MeshStandardMaterial({ color: 0x505050, roughness: 0.35, metalness: 0.88 });
     const screenMat = screenTex
-      ? new THREE.MeshBasicMaterial({ map: screenTex })
+      ? selfLit(new THREE.MeshBasicMaterial({ map: screenTex }), 'light-source')
       : makeDeadTubeMaterial();
     // Kept so goDeadGlass can retire the picture later: whether a source turns
     // out to be playable is not knowable at build time.

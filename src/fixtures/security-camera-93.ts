@@ -1,3 +1,4 @@
+import { selfLit } from '../material-lighting';
 // The store's security camera — the 1993 footage has a beige camera watching
 // the floor from up high, and our library-select mode has always been the
 // "security cam" view. This prop closes the loop: a camera body hangs from
@@ -49,7 +50,7 @@ export function buildSecurityCamera93(scene: StoreScene, mountYAt?: (x: number, 
   // the env bake from treating it as a lamp.
   const led = new THREE.Mesh(
     new THREE.SphereGeometry(0.02, 8, 8),
-    new THREE.MeshStandardMaterial({ color: 0x300000, emissive: 0xdd2222, emissiveIntensity: 1.2 })
+    selfLit(new THREE.MeshStandardMaterial({ color: 0x300000, emissive: 0xdd2222, emissiveIntensity: 1.2 }), 'light-source')
   );
   led.position.set(-0.1, 0.14, 0);
   led.userData.bakeEmissiveOff = true;

@@ -1,3 +1,4 @@
+import { selfLit } from '../material-lighting';
 // T06 — period fixtures & props: candy display, previously-viewed bin, tape
 // rewinder, tape-cleaner display. All primitive-geometry + canvas-texture,
 // registered via fixture-registry.ts and placed through
@@ -580,9 +581,9 @@ export class TapeRewinder implements StoreFixture {
     });
 
     // ── Amber power light on the FRONT face ───────────────────────────────
-    const ledMat = new THREE.MeshStandardMaterial({
+    const ledMat = selfLit(new THREE.MeshStandardMaterial({
       color: 0xffb020, emissive: 0xff8a00, emissiveIntensity: 1.5, roughness: 0.4,
-    });
+    }), 'light-source');
     const ledGeo = new THREE.SphereGeometry(0.014, 12, 10);
     const led = new THREE.Mesh(ledGeo, ledMat);
     led.position.set(RW_W / 2 - 0.14, RW_BLUE_H + RW_BASE_H * 0.4, RW_D / 2 + 0.006);

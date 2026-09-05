@@ -58,6 +58,26 @@ sweep('Wire', [(math.cos(a*math.tau/8)*.008, math.sin(a*math.tau/8)*.008)
 sweep('Slat', [(-.25,-.125),(.25,-.125),(.25,.072),(.213,.072),
                (.213,.105),(.25,.105),(.25,.125),(-.25,.125),
                (-.25,.105),(-.213,.105),(-.213,.072),(-.25,.072)])
+# Structural carcass components: finished laminate panel with a recessed toe,
+# eased edges and a fitted central spine. Nominal height five feet.
+panel=sweep('Upright', [(-.94,0),(.94,0),(.94,.20),(1.08,.20),
+    (.70,4.994),(.694,5),(-.694,5),(-.70,4.994),(-1.08,.20),(-.94,.20)], .04)
+# Bevel every sheet edge, including the cut underside of the toe notch.
+bpy.context.view_layer.objects.active=panel
+bevel=panel.modifiers.new('Finished panel edges','BEVEL');bevel.width=.006;bevel.segments=2
+bpy.ops.object.modifier_apply(modifier=bevel.name)
+sweep('Spine', [(-.25,.20),(.25,.20),(.25,4.994),(.244,5),(-.244,5),(-.25,4.994)])
+cap=sweep('EndPanel', [(-1.074,0),(1.074,0),(1.08,.006),(1.08,.20),
+    (.70,4.994),(.694,5),(-.694,5),(-.70,4.994),(-1.08,.20),(-1.08,.006)], .10)
+bpy.context.view_layer.objects.active=cap
+bevel=cap.modifiers.new('Finished cap edges','BEVEL');bevel.width=.008;bevel.segments=3
+bpy.ops.object.modifier_apply(modifier=bevel.name)
+# Steel C-standard, closed thin-wall profile rather than a solid dark bar.
+standard=sweep('Standard', [(-.07,-.045),(.07,-.045),(.07,.045),(.042,.045),
+    (.042,.032),(.056,.032),(.056,-.031),(-.056,-.031),(-.056,.032),(-.042,.032),(-.042,.045),(-.07,.045)])
+# Formed steel foot with a rolled top edge. Runs across the aisle depth.
+sweep('Foot', [(-.5,0),(.5,0),(.5,.10),(.46,.15),(-.46,.15),(-.5,.10)],.14)
+
 # Editable source spreads parts out so their individual construction is visible.
 for i,obj in enumerate(bpy.context.scene.objects):
     obj.location.x=i*1.5

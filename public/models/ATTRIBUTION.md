@@ -33,3 +33,16 @@ live display contract.
 The originally vetted free TVs — Zgon's "Old Television from 90's" and
 LiuMeowMeow's "TV Sony Trinitron", both CC-BY 4.0 — remain vetted alternates
 if the user-supplied TV ever needs replacing.
+
+The `rental-terminal.glb`, `ceiling-television.glb` and
+`screening-television.glb` models are original Halcyon Blender meshes under this
+repository's license. They replace the active downloaded CRT slots; the older
+files and their attributions remain for existing consumers and reference.
+Editable source and the reproducible script are `tools/models/store-crts.blend`
+and `tools/models/store-crts.py`. Their embedded roughness map is generated
+original material grain, not downloaded imagery. See
+`docs/store-remodel-models.md` for dimensions, materials and integration.
+
+The expanded `shelf-components.glb` and corresponding Blender source/script are
+original Halcyon construction under this repository's license, including the
+laminate carcass profiles, end panels, steel standards and formed feet.

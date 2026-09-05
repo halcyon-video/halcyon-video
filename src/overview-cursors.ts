@@ -1,3 +1,4 @@
+import { selfLit } from './material-lighting';
 // T21 — floating labeled shelf cursors for the entrance-overview browsing mode.
 //
 // One billboarded chevron marker + signboard label per LIBRARY (plus New
@@ -167,7 +168,7 @@ export class OverviewCursors {
     shape.closePath();
     this.chevronGeo = new THREE.ExtrudeGeometry(shape, { depth: 0.14, bevelEnabled: false });
     this.chevronGeo.translate(0, 0, -0.07); // centre the extrusion
-    this.chevronMat = new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false });
+    this.chevronMat = selfLit(new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false }), 'overlay');
     this.chevrons = new THREE.InstancedMesh(this.chevronGeo, this.chevronMat, Math.max(1, targets.length));
     this.chevrons.frustumCulled = false; // instance matrices bob; a dozen quads is cheaper than re-bounding
     this.group.add(this.chevrons);
@@ -186,14 +187,14 @@ export class OverviewCursors {
       tex.colorSpace = THREE.SRGBColorSpace;
       tex.anisotropy = 4;
       registerBrandRepaint(tex, paint);
-      const mat = new THREE.MeshBasicMaterial({
+      const mat = selfLit(new THREE.MeshBasicMaterial({
         map: tex,
         transparent: true,
         opacity: 0.8,
         side: THREE.DoubleSide,
         toneMapped: false,
         depthWrite: false,
-      });
+      }), 'overlay');
       const mesh = new THREE.Mesh(this.labelGeo, mat);
       mesh.position.set(t.x, this.labelY(i), t.z);
       mesh.scale.setScalar(LABEL_W);

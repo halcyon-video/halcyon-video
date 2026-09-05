@@ -5,7 +5,7 @@
 // hard-edged rectangle pasted onto the photo, since every pano now carries
 // real ground running out to the horizon (see GH #142).
 //
-// One flat, unlit quad covers the lot's whole surrounding footprint, textured
+// One flat, lit quad covers the lot's whole surrounding footprint, textured
 // with a canvas-baked field using a rectangle-distance falloff (Euclidean,
 // not Chebyshev, so the two outer corners round off instead of mitering into
 // a visible notch): alpha runs 1 at/inside the lot's own boundary down to 0
@@ -117,16 +117,17 @@ export function buildGroundBlend(parent: THREE.Object3D, opts: GroundBlendOption
   tex.flipY = false;
   tex.needsUpdate = true;
 
-  const material = new THREE.MeshBasicMaterial({
+  const material = new THREE.MeshStandardMaterial({
     map: tex,
     transparent: true,
     depthWrite: false,
     fog: false,
-    toneMapped: false, // matches the sky pano's own un-tonemapped display
-    side: THREE.DoubleSide, // a flat unlit quad — cull direction isn't worth tracking
+    roughness: 1, // surrounding terrain responds to the same light as the lot
+    side: THREE.DoubleSide, // a flat ground quad — cull direction isn't worth tracking
   });
   const mesh = new THREE.Mesh(geo, material);
   mesh.name = 'groundBlend';
+  mesh.receiveShadow = true;
   parent.add(mesh);
 
   return {

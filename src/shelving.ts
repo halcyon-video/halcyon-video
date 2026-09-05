@@ -320,6 +320,9 @@ export function buildAisleShelving(deps: AisleShelvingDeps): void {
   const wireFrame = wireBlackFrame && !!materials.wireShelf;
   const modeledSpineMat = wireFrame ? deps.shelfModels.own(materials.shelf.clone()) : materials.shelf;
   if (wireFrame) modeledSpineMat.color.set(0xeadcbc);
+  const carcassMat = theme.id === 'bb-1993'
+    ? deps.shelfModels.own(materials.shelf.clone()) : materials.shelf;
+  if (theme.id === 'bb-1993') carcassMat.color.set(theme.palette.primary);
   const wireMats = new Map<string, THREE.MeshStandardMaterial>();
   const getWireMat = (rx: number, ry: number): THREE.MeshStandardMaterial => {
     const key = `${rx.toFixed(2)}_${ry.toFixed(2)}`;
@@ -365,6 +368,8 @@ export function buildAisleShelving(deps: AisleShelvingDeps): void {
     const unitZCenter = plan.aisleZCenter(unit);
     // Spin this island in place about its own (xCenter, zCenter) by its arrangement yaw.
     const aisleParent = makeAisleGroup(unit.yaw, unit.xCenter, unitZCenter);
+    aisleParent.name = `gondola-unit:${unit.libraryIdx}:${unit.unitIdxInLibrary}`;
+    aisleParent.userData.gondolaLine = unit.lineId;
     const cols = unit.cols;
     const shelfLength = (cols - 1) * BOX_SPACING + 1.0; // 0.5 ft margin on each end
 
@@ -374,6 +379,7 @@ export function buildAisleShelving(deps: AisleShelvingDeps): void {
     // Same-material structure parts collect here and merge into one mesh per
     // material at the end of the unit (see the #118 note above).
     const structureParts: THREE.BufferGeometry[] = []; // materials.shelf
+    const structureModels: ShelfPart[] = [];
     const deckParts: THREE.BufferGeometry[] = [];
     const deckModels: ShelfPart[] = [];
     const railModels: ShelfPart[] = [];
@@ -440,9 +446,11 @@ export function buildAisleShelving(deps: AisleShelvingDeps): void {
         div.castShadow = true;
         aisleParent.add(div);
         deps.addCollider(div);
-        deps.shelfModels.add(div, [{ kind: 'wire', depth: .8, length: UNIT_FRAME_HEIGHT, pitch: Math.PI / 2, panel: true }], materials.strip);
+        deps.shelfModels.add(div, [{ kind: 'standard', depth: .14, length: .09, height: UNIT_FRAME_HEIGHT, y: -frameCenterY }, { kind: 'foot', depth: UNIT_DEPTH - .12, length: .14, y: -frameCenterY }], materials.strip);
       } else {
         stamp(structureParts, dividerTemplate, xCenter, frameCenterY, zDiv);
+        structureModels.push({ kind: 'upright', depth: UNIT_DEPTH - .05, topDepth: frameTopDepth - .05,
+          height: UNIT_FRAME_HEIGHT, length: .04, x: xCenter, z: zDiv });
       }
     };
 
@@ -454,6 +462,19 @@ export function buildAisleShelving(deps: AisleShelvingDeps): void {
     // Divider where conjoined/contiguous shelf units meet (at the back of the unit if not the end of the line)
     if (!unit.isLineBack) {
       addDivider(FIELD_Z_FRONT + unit.zPos - shelfLength);
+    }
+
+    if (wireFrame) {
+      for (const z of [FIELD_Z_FRONT + unit.zPos - .06, FIELD_Z_FRONT + unit.zPos - shelfLength + .06]) {
+        const support = new THREE.Mesh(getBoxTemplate(.14, UNIT_FRAME_HEIGHT, .09), materials.strip);
+        support.position.set(xCenter, frameCenterY, z);
+        support.castShadow = support.receiveShadow = true;
+        aisleParent.add(support);
+        deps.shelfModels.add(support, [
+          { kind: 'standard', depth: .14, length: .09, height: UNIT_FRAME_HEIGHT, y: -frameCenterY },
+          { kind: 'foot', depth: UNIT_DEPTH - .12, length: .14, y: -frameCenterY },
+        ], materials.strip);
+      }
     }
 
     // Solid backing wall in the center (divider along Z). The wire theme gets
@@ -483,6 +504,8 @@ export function buildAisleShelving(deps: AisleShelvingDeps): void {
       deps.shelfModels.add(backingWall, [{ kind: 'slat', depth: .5, length: shelfLength - .04, height: UNIT_FRAME_HEIGHT }], modeledSpineMat);
     } else {
       stamp(structureParts, getBoxTemplate(0.5, UNIT_FRAME_HEIGHT, shelfLength - 0.04), xCenter, frameCenterY, zCenter);
+      structureModels.push({ kind: 'spine', depth: .5, length: shelfLength - .04,
+        height: UNIT_FRAME_HEIGHT, x: xCenter, z: zCenter });
     }
 
     // Section toppers. Each 6-column section carries the classic
@@ -700,6 +723,8 @@ export function buildAisleShelving(deps: AisleShelvingDeps): void {
       structure.castShadow = true;
       aisleParent.add(structure);
       deps.addCollider(structure);
+      deps.shelfModels.add(structure, structureModels, carcassMat);
+      structureParts.forEach(g => g.dispose());
     }
     if (deckParts.length) {
       const decks = new THREE.Mesh(mergeGeometries(deckParts), materials.shelf);
@@ -762,6 +787,8 @@ export function buildAisleShelving(deps: AisleShelvingDeps): void {
       aisleParent.add(leftCap);
       deps.addCollider(leftCap);
       deps.registerEndCap(leftCap);
+      deps.shelfModels.add(leftCap, [{ kind: 'cap', depth: UNIT_DEPTH, topDepth: capTopDepth,
+        height: UNIT_FRAME_HEIGHT, length: .1, y: -frameCenterY }], capMats, true);
     }
 
     if (unit.isLineBack) {
@@ -782,6 +809,8 @@ export function buildAisleShelving(deps: AisleShelvingDeps): void {
       aisleParent.add(rightCap);
       deps.addCollider(rightCap);
       deps.registerEndCap(rightCap);
+      deps.shelfModels.add(rightCap, [{ kind: 'cap', depth: UNIT_DEPTH, topDepth: capTopDepth,
+        height: UNIT_FRAME_HEIGHT, length: .1, y: -frameCenterY }], capMats, true);
     }
   });
 }

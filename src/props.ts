@@ -1,3 +1,4 @@
+import { selfLit } from './material-lighting';
 // T24 — Prop asset registry: real GLB models for the CRT/VCR-era set dressing
 // (ceiling ambient TVs, back-room hero TV, coffee table, VCR, DVD player).
 //
@@ -80,19 +81,17 @@ interface PropSpec {
   fallback: { w: number; h: number; d: number; color: number; screen?: { w: number; h: number; yOffset: number; xOffset?: number } };
 }
 
-const SCREEN_MATCH_DEFAULT = /glass|screen|display|crt|ecran/i;
-
 const PROP_SPECS: Record<PropSlot, PropSpec> = {
-  // "Old Television from 90's" — Zgon, CC-BY 4.0 (separate Glass material slot).
+  // Original Blender cabinet; explicit tube/glass names supply exact screen bounds.
   tv_ceiling: {
-    file: 'tv_ceiling.glb', targetWidth: 2.6, yawFix: 0, screenMatch: SCREEN_MATCH_DEFAULT,
-    glassFrac: { x0: 0.10, x1: 0.90, y0: 0.14, y1: 0.90, inset: -0.02 },
+    file: 'ceiling-television.glb', targetWidth: 2.6, yawFix: 0, screenMatch: /^mat1[67]$/,
+    glassFrac: null,
     fallback: { w: 2.6, h: 2.2, d: 2.2, color: 0xb8bcc0, screen: { w: 2.1, h: 1.575, yOffset: 0 } },
   },
-  // "TV Sony Trinitron" — LiuMeowMeow, CC-BY 4.0. ≈2.2ft wide per ticket.
+  // Original screening-room cabinet, fitted to the established stand width.
   tv_hero: {
-    file: 'tv_hero.glb', targetWidth: 2.2, yawFix: 0, screenMatch: SCREEN_MATCH_DEFAULT,
-    glassFrac: { x0: 0.10, x1: 0.90, y0: 0.14, y1: 0.90, inset: -0.02 },
+    file: 'screening-television.glb', targetWidth: 2.2, yawFix: 0, screenMatch: /^mat1[67]$/,
+    glassFrac: null,
     fallback: { w: 2.2, h: 1.85, d: 1.9, color: 0x2b2b30, screen: { w: 1.75, h: 1.3, yOffset: 0.12 } },
   },
   // "Table Coffee Glass" — Kenney, CC0 (committed).
@@ -191,6 +190,11 @@ function prepTemplate(slot: PropSlot, spec: PropSpec, model: THREE.Object3D): Pr
     if (!mesh.isMesh) return;
     mesh.castShadow = true;
     mesh.receiveShadow = true;
+    if (slot === 'vcr' || slot === 'dvd_player') {
+      for (const m of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
+        if (m.name === 'DeckPowerLamp') selfLit(m, 'light-source');
+      }
+    }
     if (spec.screenMatch) {
       const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
       const isScreen = spec.screenMatch.test(mesh.name) ||

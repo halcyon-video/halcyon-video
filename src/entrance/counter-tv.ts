@@ -1,3 +1,4 @@
+import { selfLit } from '../material-lighting';
 // Small set on a wall-style bracket behind the checkout counter (GH #110): the
 // "something to watch" a format without ceiling headroom for AmbientTvs still
 // gets (StoreFormatSpec.counterTv — see that field's doc comment for why the
@@ -62,7 +63,7 @@ export function buildCounterTv(
 
   const bulge = 0.04;
   const screenTex = makeCrtTestCardTexture();
-  const screenMat = new THREE.MeshBasicMaterial({ map: screenTex, toneMapped: false });
+  const screenMat = selfLit(new THREE.MeshBasicMaterial({ map: screenTex, toneMapped: false }), 'light-source');
   const screen = new THREE.Mesh(makeCurvedScreenGeometry(screenW, screenH, bulge), screenMat);
   screen.position.z = bodyD / 2 + 0.03;
   tvG.add(screen);

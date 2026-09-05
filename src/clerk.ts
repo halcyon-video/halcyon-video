@@ -1,3 +1,4 @@
+import { selfLit } from './material-lighting';
 import * as THREE from 'three';
 import { ClerkInteraction, type ClerkInteractionHooks, type ClerkSuggestion } from './clerk-interaction';
 import type { Movie } from './jellyfin';
@@ -94,7 +95,7 @@ export interface ClerkCounterSpots {
 export class StoreClerk {
   public group: THREE.Group;
 
-  private sprite!: THREE.Sprite;
+  private sprite!: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshStandardMaterial>;
   private spriteTex!: THREE.Texture;
   private shadowMesh!: THREE.Mesh;
   private shadowMat!: THREE.MeshBasicMaterial; // blob shadow — fades with the sprite
@@ -279,7 +280,7 @@ export class StoreClerk {
   public setFade(f: number) {
     if (f === this.fade) return;
     this.fade = f;
-    const mat = this.sprite.material as THREE.SpriteMaterial;
+    const mat = this.sprite.material as THREE.MeshStandardMaterial;
     mat.opacity = f;
     mat.alphaTest = Math.max(0.01, 0.5 * f);
     this.shadowMat.opacity = 0.34 * f;
@@ -417,7 +418,7 @@ export class StoreClerk {
   private buildSprite() {
     // Grounding shadow blob (a billboard can't cast a real shadow).
     const shadowTex = this.buildShadowTexture();
-    this.shadowMat = new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, opacity: 0.34, depthWrite: false });
+    this.shadowMat = selfLit(new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, opacity: 0.34, depthWrite: false }), 'shadow');
     this.shadowMesh = new THREE.Mesh(new THREE.PlaneGeometry(2.3, 1.3), this.shadowMat);
     this.shadowMesh.rotation.x = -Math.PI / 2;
     this.shadowMesh.position.y = 0.02;
@@ -428,12 +429,21 @@ export class StoreClerk {
     this.spriteTex.repeat.set(1 / ATLAS_COLS, 1 / ATLAS_ROWS);
     this.spriteTex.center.set(0, 0);
 
-    this.sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+    this.sprite = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshStandardMaterial({
       map: this.spriteTex,
       transparent: true,
       alphaTest: 0.5,
+      roughness: 1, metalness: 0,
       depthWrite: true,
     }));
+    // Retain camera-facing atlas animation while receiving the store's light.
+    // SpriteMaterial bypasses lighting, making the clerk bright in shadow.
+    this.sprite.name = 'lit-clerk-billboard';
+    this.sprite.receiveShadow = true;
+    this.sprite.onBeforeRender = (_renderer, _scene, camera) => {
+      camera.getWorldQuaternion(this.sprite.quaternion);
+      this.sprite.updateMatrixWorld(true); // renderer derives modelView after this hook
+    };
     this.sprite.scale.set(SPRITE_WIDTH, SPRITE_HEIGHT, 1);
     this.sprite.position.y = SPRITE_HEIGHT / 2;
     this.sprite.renderOrder = 2;
@@ -521,7 +531,7 @@ export class StoreClerk {
       tex.center.copy(this.spriteTex.center);
       const old = this.spriteTex;
       this.spriteTex = tex;
-      const mat = this.sprite.material as THREE.SpriteMaterial;
+      const mat = this.sprite.material as THREE.MeshStandardMaterial;
       mat.map = tex;
       mat.needsUpdate = true;
       old.dispose();

@@ -1,3 +1,4 @@
+import { selfLit } from './material-lighting';
 // Front-of-store dropped ceilings — the cash-wrap soffit and the vestibule cap.
 //
 // Real video stores never ran the open tile deck straight out to the storefront.
@@ -325,18 +326,13 @@ export function buildFrontSoffit(params: FrontSoffitParams): FrontSoffitResult {
     softwareGL, reflectorSize, plainWhite,
   } = params;
 
-  // bb-2000: an all-white soffit body (no reflective ceiling-tile deck). The
-  // underside faces DOWN into shadow, so a plain white would read grey — a soft
-  // self-emissive lifts it to a lit-drywall white (the way a can-lit soffit
-  // actually looks) without blowing past the bloom threshold.
+  // Painted drywall receives interior bounce and retains its surface texture.
   const whiteBodyMat = plainWhite
     ? new THREE.MeshStandardMaterial({
         // Toned off the pure-white blowout to a warm off-white that reads at the
         // same value as the ceiling panels (was 0xf3f2ee + emissive 0.5).
         color: 0xe6e3da, roughness: 0.95, metalness: 0.0,
-        // Just enough self-lift to keep the shaded underside from going grey; a
-        // subtle bump off the ceiling-tile texture gives it drywall tooth.
-        emissive: new THREE.Color(0xece9df), emissiveIntensity: 0.09,
+        // Ceiling texture supplies a subtle drywall tooth.
         bumpMap: (tileMaterial && (tileMaterial as THREE.MeshStandardMaterial).map) || null,
         bumpScale: 0.25,
       })
@@ -489,7 +485,7 @@ export function buildFrontSoffit(params: FrontSoffitParams): FrontSoffitResult {
       pos.needsUpdate = true;
       bandGeo.computeVertexNormals();
     }
-    // bb-2000: a plain white drop band (self-lit like the body), not chrome.
+    // bb-2000: a plain white drop band (lit like the body), not chrome.
     const bandMesh = new THREE.Mesh(bandGeo, whiteBodyMat ?? chromeMat);
     // Local +Z maps to world -Y under this rotation, so the extrusion hangs
     // DOWN from the ceiling through exactly `drop`.
@@ -558,10 +554,10 @@ export function buildFrontSoffit(params: FrontSoffitParams): FrontSoffitResult {
     const trimGeo = new THREE.RingGeometry(canR, canR + 0.09, 28);
     const lightGeo = new THREE.CircleGeometry(canR, 28);
     const trimMat = new THREE.MeshStandardMaterial({ color: 0x2b2b2b, roughness: 0.7, metalness: 0.15 });
-    const canMat = new THREE.MeshStandardMaterial({
+    const canMat = selfLit(new THREE.MeshStandardMaterial({
       color: 0xffffff, emissive: new THREE.Color(0xfff3df), emissiveIntensity: 2.2,
       roughness: 1.0, metalness: 0.0,
-    });
+    }), 'light-source');
     // A can fits only where the whole disc (± margin) stays inside the soffit.
     const fits = (x: number, z: number) =>
       pointInSoffit(x, z, poly) &&

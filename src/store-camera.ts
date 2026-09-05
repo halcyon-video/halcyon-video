@@ -1,3 +1,4 @@
+import { selfLit } from './material-lighting';
 // Browse-camera targeting & selection presentation — extracted from
 // StoreScene (three-scene.ts keeps one-line delegating stubs): the big
 // per-mode camera retarget (updateCameraTarget), the look-down fixture
@@ -532,7 +533,7 @@ export function createSelectionArrow(scene: StoreScene) {
   // Downward-pointing marker in the theme's brand gold, hovering over the unit.
   const coneGeo = new THREE.ConeGeometry(0.85, 1.7, 4);
   const arrowPalette = getActiveTheme().palette;
-  const coneMat = new THREE.MeshStandardMaterial({
+  const coneMat = selfLit(new THREE.MeshStandardMaterial({
     color: new THREE.Color(arrowPalette.secondary),
     emissive: new THREE.Color(arrowPalette.secondary),
     emissiveIntensity: 0.45,
@@ -542,7 +543,7 @@ export function createSelectionArrow(scene: StoreScene) {
     // — drawn last (renderOrder below) with the depth test off.
     depthTest: false,
     depthWrite: false,
-  });
+  }), 'overlay');
   const cone = new THREE.Mesh(coneGeo, coneMat);
   cone.rotation.x = Math.PI;       // apex points down (-Y), at the unit
   cone.rotation.y = Math.PI / 4;   // diamond facing the camera
@@ -561,14 +562,14 @@ export function createSelectionArrow(scene: StoreScene) {
   const labelW = 7.0;
   const labelH = labelW * (canvas.height / canvas.width);
   const labelGeo = new THREE.PlaneGeometry(labelW, labelH);
-  const labelMat = new THREE.MeshBasicMaterial({
+  const labelMat = selfLit(new THREE.MeshBasicMaterial({
     map: tex,
     transparent: true,
     side: THREE.DoubleSide,
     toneMapped: false,
     depthWrite: false,
     depthTest: false, // overlay UI, same as the cone — never hidden behind geometry
-  });
+  }), 'overlay');
   const labelMesh = new THREE.Mesh(labelGeo, labelMat);
   labelMesh.position.y = 1.7 + 0.25 + labelH / 2; // sit just above the marker base
   labelMesh.renderOrder = 9999; // after the cone so the plaque wins where they overlap

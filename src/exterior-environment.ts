@@ -1,3 +1,4 @@
+import { selfLit } from './material-lighting';
 // T15 exterior/environment pass: everything beyond the storefront glass that
 // exists purely to be *seen* through it — sidewalk/curb, street furniture,
 // street lamps with fake light pools, a handful of parked cars, and a
@@ -158,14 +159,14 @@ export function buildExteriorEnvironment(scene: THREE.Scene, storeWidth: number)
   // "Fake" per the ticket: no real THREE.Light, just an emissive head plus a
   // radial-gradient decal on the asphalt. Intensity/opacity swap with mode.
   const poleMat = track(new THREE.MeshStandardMaterial({ color: '#3a3d40', roughness: 0.6, metalness: 0.5 }));
-  const lampHeadMat = track(new THREE.MeshStandardMaterial({
+  const lampHeadMat = track(selfLit(new THREE.MeshStandardMaterial({
     color: '#fff3d6', emissive: new THREE.Color('#ffdca0'), emissiveIntensity: 0.05, roughness: 0.4,
-  }));
+  }), 'light-source'));
   const poolTex = track(createLightPoolTexture('#ffdca0'));
-  const poolMat = track(new THREE.MeshBasicMaterial({
+  const poolMat = track(selfLit(new THREE.MeshBasicMaterial({
     map: poolTex, transparent: true, opacity: 0.04, blending: THREE.AdditiveBlending,
     depthWrite: false, fog: false,
-  }));
+  }), 'light-spill'));
 
   // Lamps stand on the stall boundary lines at the far edge of the one-row
   // lot (issue #58): lot asphalt ends at frontZ + 47, stall lines every 9 ft
@@ -216,10 +217,10 @@ export function buildExteriorEnvironment(scene: THREE.Scene, storeWidth: number)
   // cars floating (they had castShadow off), and at night the sun is off
   // entirely. A draped dark blob grounds them in both modes for ~zero cost.
   const carShadowTex = track(createSoftShadowTexture());
-  const carShadowMat = track(new THREE.MeshBasicMaterial({
+  const carShadowMat = track(selfLit(new THREE.MeshBasicMaterial({
     map: carShadowTex, transparent: true, opacity: 0.55,
     depthWrite: false, fog: false,
-  }));
+  }), 'shadow'));
 
   carOffsets.forEach((dx, i) => {
     const stall = new THREE.Group();
@@ -295,10 +296,10 @@ export function buildExteriorEnvironment(scene: THREE.Scene, storeWidth: number)
 
   // ─── Storefront light spill: baked warm decal on the sidewalk at night ──
   const spillTex = track(createLightPoolTexture('#ffe6b0'));
-  const spillMat = new THREE.MeshBasicMaterial({
+  const spillMat = selfLit(new THREE.MeshBasicMaterial({
     map: spillTex, transparent: true, opacity: 0.0, blending: THREE.AdditiveBlending,
     depthWrite: false, fog: false,
-  });
+  }), 'light-spill');
   track(spillMat);
   const spill = new THREE.Mesh(new THREE.PlaneGeometry(storeWidth + 4, sidewalkDepth * 1.6), spillMat);
   spill.rotation.x = -Math.PI / 2;

@@ -1,3 +1,4 @@
+import { selfLit } from './material-lighting';
 // Curved-CRT-tube-glass illusion kit, shared by every IN-SCENE screen: the
 // ceiling-hung ambient TVs (+ the bb-2000 wall bank), the clerk-desk terminal
 // CRTs (search + manager terminal), and the back-room hero TV. One illusion
@@ -141,11 +142,11 @@ export function getTubeOverlayTexture(): THREE.CanvasTexture {
 // sharing the cached texture. Same program variant as the ambient TVs'
 // original scanline overlay — covered by the existing boot warm-up.
 export function makeTubeOverlayMaterial(): THREE.MeshBasicMaterial {
-  return new THREE.MeshBasicMaterial({
+  return selfLit(new THREE.MeshBasicMaterial({
     map: getTubeOverlayTexture(),
     transparent: true,
     depthWrite: false,
-  });
+  }), 'light-source');
 }
 
 // ── Harness/dev test card ─────────────────────────────────────────────────────
