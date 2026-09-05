@@ -718,8 +718,19 @@ export class EntranceCheckout implements StoreFixture {
     }
 
     const rightSignOff = sq ? 4.4 : 5.4;
+    // The membership snap frame sits 0.8 ft up the island's right arm from
+    // the apex (was 1.8). At 1.8 it stood on the same bearing as the tip
+    // jar's sign holder on the band in front of it (store-fixtures-config.ts,
+    // 3.4 ft along the band), so from where a customer stands facing the
+    // apex the TIPS card covered the frame's outer half (visual sweep
+    // 2026-09-04). The holder can't move instead: outward it lands on the
+    // 1993 NEXT REGISTER tent's band spot (cx + 3.6), inward it only slides
+    // further in front of the frame. 0.8 clears the holder's bearing by a
+    // margin on both counter shapes and stays clear of the LED pole display
+    // (1.5 ft down the LEFT arm) and the rewinder (cx + 2.9 on this arm).
+    const middleSignOff = 0.8;
     const leftAnchor = getInnerCounterSpine(cx - 1.8);
-    const middleAnchor = getInnerCounterSpine(cx + 1.8);
+    const middleAnchor = getInnerCounterSpine(cx + middleSignOff);
     const rightAnchor = getInnerCounterSpine(cx + rightSignOff);
 
     // #37: the "Please Rewind" tent sign belongs on the BLUE band-top rim of
@@ -777,7 +788,7 @@ export class EntranceCheckout implements StoreFixture {
       },
       {
         id: 'register-middle',
-        pos: new THREE.Vector3(cx + 1.8, innerH + 0.12, middleAnchor.z),
+        pos: new THREE.Vector3(cx + middleSignOff, innerH + 0.12, middleAnchor.z),
         yaw: facing(middleAnchor.rotY),
         category: 'register'
       },
