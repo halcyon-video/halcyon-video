@@ -5,6 +5,21 @@ All notable changes to Halcyon Video, generated from commit history by
 it on every version tag push. Deterministic and offline: no entry here was
 written by a model.
 
+## [v0.15.0] — 2026-09-04
+
+### CHANGELOG
+- V0.14.0
+- V0.13.0
+
+### General
+- Chore(release): v0.15.0
+- Model shelf decks, price channels, wire racks and slat backing in Blender
+- Build original VCR and DVD decks with aligned live displays (Closes [#212](https://github.com/halcyon-video/halcyon-video/issues/212), [#213](https://github.com/halcyon-video/halcyon-video/issues/213))
+- Support local impact printer models and clear the register casing
+- Replace checkout counter visuals with authored Blender millwork
+- Document the Remote Play wire protocol and scope the Apple TV client (issue #81)
+- Bake an OG/Twitter card so shared links unfurl as a real store shot (Closes [#148](https://github.com/halcyon-video/halcyon-video/issues/148))
+
 ## [v0.14.0] — 2026-09-04
 
 ### General
