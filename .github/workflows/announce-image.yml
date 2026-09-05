@@ -1,0 +1,59 @@
+# Manually post a single committed screenshot to Discord #announcements.
+#
+# The release announcer (announce.yml) attaches a screenshot only when this
+# checkout carries the shooter (tools/shot.mjs) or a docs/releases/<tag>.jpg
+# was committed before the tag — a public CI checkout has neither, so a
+# release whose picture wasn't pre-committed goes out as text-only. This
+# workflow is the after-the-fact fix: point it at any brand-free image already
+# committed to the repo and it fans that one image out to Discord as a
+# follow-up embed, using the same tool and the same DISCORD_WEBHOOK_URL secret
+# the release path uses. It never cuts a release and never touches master.
+#
+# It is workflow_dispatch only — nothing triggers it automatically.
+name: Announce an image to Discord
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Version tag to title the post (e.g. v0.15.0)
+        required: true
+        type: string
+      screenshot:
+        description: Repo-relative path to a committed, brand-free image
+        required: true
+        type: string
+      blurb:
+        description: One-line caption (falls back to the tag message if empty)
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  announce-image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # announce-fanout.mjs is pure node stdlib (fetch/Blob/FormData), so no
+      # dependency install is needed. It fails soft if the webhook secret is
+      # unset, exactly as the release path does.
+      - name: Announce → Discord
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          if [ ! -f "${{ inputs.screenshot }}" ]; then
+            echo "::error::screenshot not found in checkout: ${{ inputs.screenshot }}"
+            exit 1
+          fi
+          node tools/announce-fanout.mjs discord \
+            --tag "${{ inputs.tag }}" \
+            --screenshot "${{ inputs.screenshot }}" \
+            --repo "${{ github.repository }}" \
+            ${{ inputs.blurb && format('--blurb {0}', toJSON(inputs.blurb)) || '' }}
