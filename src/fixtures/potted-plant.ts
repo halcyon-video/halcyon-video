@@ -3,9 +3,11 @@
 // thriving in front window light, trailing off the wooden checkout desk, or
 // softening the shelf runs and back-room corridor.
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { FixturePlacement } from '../store-layout';
 import { FixtureContext, StoreFixture } from '../fixtures';
 import { Footprint } from '../layout-validator';
+import { installFicus, FicusInstall } from '../ficus-model';
 
 export type PlantVariant = 'floor-palm' | 'tall-ficus' | 'snake-plant' | 'pothos';
 
@@ -138,6 +140,8 @@ export class PottedPlant implements StoreFixture {
   private group: THREE.Group | null = null;
   private disposables: Disposable[] = [];
   private footprint: Footprint | null = null;
+  private disposed = false;
+  private ficusInstall: FicusInstall | null = null;
 
   constructor(placement: FixturePlacement, ctx: FixtureContext) {
     this.placement = placement;
@@ -196,10 +200,53 @@ export class PottedPlant implements StoreFixture {
   }
 
   /**
-   * Builds a tall, stately ficus / rubber tree (~6.0 ft tall) with branching woody
-   * trunk and lush clustered canopy.
+   * Builds a tall, stately ficus / rubber tree (~6.0 ft tall). The Blender-
+   * authored kit (tools/models/potted-plant.py, src/ficus-model.ts) loads
+   * asynchronously and replaces the procedural fallback in place; a missing
+   * or failed load leaves the fallback as the permanent, fully-formed plant.
    */
   private buildTallFicus(group: THREE.Group): number {
+    const fallback = new THREE.Group();
+    group.add(fallback);
+    const potDiameter = this.buildTallFicusFallback(fallback);
+
+    this.ficusInstall = installFicus(this.placement.id, (pieces) => {
+      if (this.disposed) return;
+      const potMat = new THREE.MeshStandardMaterial({ color: 0xba5e36, roughness: 0.82, metalness: 0.04 });
+      const soilMat = new THREE.MeshStandardMaterial({ color: 0x221711, roughness: 0.95 });
+      const barkMat = new THREE.MeshStandardMaterial({ color: 0x4e3827, roughness: 0.85, metalness: 0.02 });
+      const leafMat = new THREE.MeshStandardMaterial({
+        map: ficusLeafTex(), roughness: 0.78, metalness: 0.0, side: THREE.DoubleSide,
+      });
+      this.disposables.push({ mat: potMat }, { mat: soilMat }, { mat: barkMat }, { mat: leafMat });
+
+      const addMerged = (parts: THREE.BufferGeometry[], mat: THREE.Material) => {
+        const merged = mergeGeometries(parts);
+        parts.forEach((g) => g.dispose());
+        if (!merged) return;
+        this.disposables.push({ geo: merged });
+        const mesh = new THREE.Mesh(merged, mat);
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+        group.add(mesh);
+      };
+      addMerged(pieces.pot, potMat);
+      addMerged(pieces.soil, soilMat);
+      addMerged(pieces.bark, barkMat);
+      addMerged(pieces.leaf, leafMat);
+
+      // The fallback's pot mesh stays registered as the collision proxy
+      // (this.ctx.addCollider references it directly, unaffected by
+      // visibility); only its visuals are superseded.
+      fallback.visible = false;
+      this.ctx.requestShadowRefresh();
+    });
+
+    return potDiameter;
+  }
+
+  /** Procedural placeholder ficus, shown immediately and kept as the fallback. */
+  private buildTallFicusFallback(group: THREE.Group): number {
     const rTop = 0.64;
     const rBot = 0.50;
     const potH = 1.40;
@@ -764,6 +811,9 @@ export class PottedPlant implements StoreFixture {
   }
 
   dispose(): void {
+    this.disposed = true;
+    this.ficusInstall?.cancel();
+    this.ficusInstall = null;
     if (this.group) {
       this.ctx.scene.remove(this.group);
       this.group = null;
