@@ -70,6 +70,12 @@ message and stop retrying).
 A first client doesn't need to support private instances — connecting to the
 shared kiosk (`hostPeer = "host"`) is enough to prove the loop end to end.
 
+There is also a `POST /__remote/instance/beat`, and it is **not a viewer's**:
+the hosting page inside each private instance beats it every 20s with its own
+live viewer count, and the server's reaper reads it as "is this instance
+alive, and is anyone watching". A viewer that beat it would be answering a
+question it is not being asked.
+
 ## 2. Handshake sequence
 
 1. Generate `peerId`.
@@ -172,8 +178,31 @@ exists only to forward the Android TV remote's D-pad and BACK keys into the
 WebView as synthetic DOM `KeyboardEvent`s, because a WebView does not hand
 those to the page on its own (see that README's "Notes for whoever touches
 this next"). **tvOS forbids WebViews in App Store apps**, which is why issue
-#81 calls for a real native implementation of everything in this document
+#81 called for a real native implementation of everything in this document
 rather than another wrapper. `src/remote-tv.ts`'s `KEY_MAP` (media-remote
 keys → the table above) is the reference for how an existing TV-remote
 mapping was built in JS; a Siri Remote mapping is the tvOS equivalent, done
 in Swift instead, since there is no page to run it in.
+
+## 7. Second implementation: the Apple TV client
+
+[`tvos/`](../tvos/README.md) is that native client, and the second thing this
+document has ever been implemented against — which makes it the useful
+cross-check on whether the document is complete. Read alongside a section
+here, `SignalingClient.swift` is §1, `RemoteSession.swift` is §2 (a port of
+`main()`/`session()` in the browser viewer, status wording included),
+`PeerConnectionManager.swift` is §3 and §4, and `SiriRemoteInput.swift` is §5.
+
+Two things it had to work out that §5 does not say, because a browser gets
+them for free:
+
+- **Key repeat is the client's job on a platform without one.** A browser
+  hands the viewer an OS autorepeat while a key is held; tvOS delivers one
+  press event for a held D-pad edge and nothing more. A client on such a
+  platform has to generate its own repeats — and must set `repeat: true` on
+  them, or the backpressure rule in §4 has nothing to shed during a stall.
+- **A remote's "back" button usually belongs to the platform first.** The
+  Android TV client wrestles it out of the browser's history; the tvOS client
+  takes it through the first responder and gives it back on its own settings
+  screen. Whatever the mechanism, `Escape` only reaches the store if the
+  client claims the button before the platform spends it.
