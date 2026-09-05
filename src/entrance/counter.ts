@@ -419,7 +419,14 @@ export function buildCheckoutCounter(
     : usquare
     ? [
         [0, 0.01, uSideLen - 2.9],   // left side, back piece (z 8.4..5.5)
-        [0, 5.1, 0.01],              // left side, front piece (z 3.3..-3.6)
+        // Front piece (z 3.3..-3.6): its front end is a REAL corner shared
+        // with the front run, so it mitres there like the right side's does
+        // (trimB 0, not a 0.01 pseudo-trim). A square cut here left this
+        // piece's stripe-channel filler ending on the plane z = zFront +
+        // STRIPE_RECESS — exactly the front run's inlay face — and the two
+        // z-fought as a blue sawtooth chewing 1.4 ft into the cream stripe
+        // from the corner (visual sweep 2026-09-04, present day and night).
+        [0, 5.1, 0],
         [1, 0, 0],                   // front run
         [2, 0, 0.01],                // right side
       ]
