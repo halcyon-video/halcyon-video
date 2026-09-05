@@ -14,7 +14,6 @@ import {
   textureArrayManager,
 } from './video-case';
 import { setSurfaceKtx2Renderer } from './surface-textures';
-import { pendingTextureUploads } from './poster-textures';
 import { keyboardOwnedByControl } from './text-entry-focus';
 // @ts-ignore
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
@@ -133,7 +132,9 @@ import { RentalRecord, loadRentalRecord, clearRentalRecord, isLockedOut, formatU
 import { perfTrace, perfSlot } from './perf-trace';
 import { ShelfClasps, type ClaspTarget } from './fixtures/shelf-clasp';
 import { requestMovie } from './jellyseerr';
-import { displayHz, computeFpsCap, computeScalerTargetFps } from './display-hz';
+import { displayHz, computeFpsCap } from './display-hz';
+import * as resolution from './store-resolution';
+import { RES_SCALE_MAX } from './store-resolution';
 import { type LibraryIndex } from './recommend-why';
 import type { ClerkSuggestion } from './clerk-interaction';
 
@@ -191,13 +192,6 @@ function matrixAlmostEquals(a: THREE.Matrix4, b: THREE.Matrix4, eps = 1e-6): boo
   return true;
 }
 
-// Rounds to 2dp to keep repeated +/- 0.05 steps (issue #27's dynamic
-// resolution scale) from drifting off the 0.70/0.75/.../1.00 ladder due to
-// binary floating point (e.g. 0.7 + 0.05 !== 0.75 bit-for-bit).
-function round2(n: number): number {
-  return Math.round(n * 100) / 100;
-}
-
 export class StoreScene {
   public container: HTMLDivElement;
   public renderer!: THREE.WebGLRenderer;
@@ -246,7 +240,7 @@ export class StoreScene {
   // quality cap (which stays as the upper bound). Bounds chosen so FXAA + film
   // grain hide the softening: text on signage stays readable, if barely, at
   // the floor.
-  private resScale = 1.0;
+  public resScale = 1.0;
   // Motion-gated sharpness, applied ON TOP of resScale in applyRenderResolution().
   // qualityScale is 1.0 (today's capped ~1440p budget) for static/dwelling frames
   // and rises to sharpScale — the factor that lifts that budget up to native
@@ -336,12 +330,10 @@ export class StoreScene {
   private get activeFrameInterval(): number {
     return Math.max(0, 1000 / this.targetFps - 0.5 * (1000 / displayHz()));
   }
-  private get resScaleMin(): number {
+  public get resScaleMin(): number {
     if (this.softwareGL) return 0.4;
     return this.effectiveQuality === 'high' ? 0.7 : 0.5;
   }
-  private static readonly RES_SCALE_MAX = 1.0;
-  private static readonly RES_SCALE_STEP = 0.05;
   // Settle supersample: how many times the MOVING frame's pixel count the one
   // parked frame is drawn at. 2 = 1.41x linear, the classic 2xSS — measurably
   // cleaner on shelf rails / ceiling grid in a 4K A/B, and self-scaling (a
@@ -368,9 +360,13 @@ export class StoreScene {
   // #24's render-on-demand). VIDEO-tier frames are deliberately throttled to
   // ~24fps and IDLE frames render nothing, so mixing either into this window
   // would misread throttling as a slow GPU and needlessly downscale.
-  private resScaleFrames = 0;
-  private resScaleWindowStart = performance.now();
-  private resScaleGoodStreak = 0; // consecutive good-fps seconds before stepping up (avoids oscillation)
+  public resScaleFrames = 0;
+  public resScaleWindowStart = performance.now();
+  public resScaleGoodStreak = 0; // consecutive good-fps seconds before stepping up (avoids oscillation)
+  // Longest frame in the in-flight scaler window, and the previous window
+  // frame's timestamp that measures it (see store-resolution.ts).
+  public resScaleWorstMs = 0;
+  public resScalePrevTime = 0;
 
   // Scene components
   public meshes: THREE.Object3D[] = []; // Track all added meshes (including instanced ones) for disposal
@@ -937,6 +933,10 @@ export class StoreScene {
   // outlast the ~250ms AO fade-in that keeps rendering after a stop, so the
   // persisted still is never the last, lower-res fade frame.
   private static readonly QUALITY_SETTLE_MS = 400;
+  // How long the elevated (motion) pixel budget must go unused before it is
+  // given back — see the downshift hysteresis in animate(). Comfortably longer
+  // than the gap between two browse steps, comfortably shorter than a dwell.
+  private static readonly QUALITY_DOWNSHIFT_MS = 1500;
   private static readonly CLERK_FADE_S = 0.35; // clerk sleep/wake fade (seconds)
   // Clerk sleep state (see the pre-tier clerk block in animate()).
   private clerkAsleep = false;
@@ -2534,7 +2534,7 @@ export class StoreScene {
     // buffer depend on how slow that particular boot happened to be. Product
     // code never calls this; the IDLE branch is the real recovery path.
     (window as any).debugResetResScale = () => {
-      this.resScale = StoreScene.RES_SCALE_MAX;
+      this.resScale = RES_SCALE_MAX;
       this.applyRenderResolution();
       this.requestRender();
     };
@@ -2558,7 +2558,7 @@ export class StoreScene {
   // Called on init, on window resize, and whenever resScale steps. Renderer
   // pixelRatio (the quality-tier cap) is untouched here — only the buffer
   // dimensions scale, so ratio and size are never multiplied together.
-  private applyRenderResolution() {
+  public applyRenderResolution() {
     const clientWidth = this.container.clientWidth || window.innerWidth || 1280;
     const clientHeight = this.container.clientHeight || window.innerHeight || 720;
     // Recompute sharpScale here (cheap) so it's always current for the panel we
@@ -4274,70 +4274,8 @@ export class StoreScene {
   // permanently pin resScale to the floor. IDLE resets/snaps to 1.0 in the
   // caller before this is ever reached.
   private updateDynamicResolution(time: number, active: boolean, moving: boolean) {
-    if (!active || !moving) {
-      // VIDEO tier or stationary: don't let throttled or resting pacing feed the window;
-      // just keep the clock from accumulating stale elapsed time across the gap.
-      this.resScaleFrames = 0;
-      this.resScaleWindowStart = time;
-      return;
-    }
-    // Texture uploads are not a GPU verdict. The boot wave (and any streaming
-    // burst) hands this window frames pinned at 0.2-30fps by decode + upload
-    // work whose cost has nothing to do with how many pixels we are shading —
-    // the scaler read that as "slow GPU" and walked resolution down to the 0.70
-    // floor on a machine that then held a locked 60. It only climbs back at
-    // 0.05 per two good seconds, and cannot climb at all in the VIDEO tier
-    // (the early return above), so one boot could soften the store for the rest
-    // of the session. Skip the window entirely while the queue is draining.
-    if (pendingTextureUploads() > 0) {
-      this.resScaleFrames = 0;
-      this.resScaleGoodStreak = 0;
-      this.resScaleWindowStart = time;
-      return;
-    }
-    this.resScaleFrames++;
-    const elapsed = time - this.resScaleWindowStart;
-    if (elapsed < 1000) return;
-
-    const fps = (this.resScaleFrames * 1000) / elapsed;
-    // Thresholds scale with the display: the classic 50/58 pair was 60Hz
-    // tuning (0.83×/0.97× of target); a 120Hz display gets 100/116. Measured
-    // on the RX 9070 XT: motion-frame cost is mostly pixel-independent (AO
-    // recompute + draw-call submission), so a tighter band just parks scale
-    // at the floor for no fps — 0.83× is the right down-threshold here too.
-    //
-    // Bounded by SCALER_TARGET_FPS_CAP: that same pixel-independence means a
-    // GPU short of the panel's refresh cannot buy the difference with
-    // resolution, so scaling the thresholds all the way up with an uncapped
-    // 144/165Hz display parks resScale at the floor permanently. See
-    // computeScalerTargetFps.
-    const scalerTarget = computeScalerTargetFps(this.targetFps);
-    const downAt = scalerTarget * 0.83;
-    const upAt = scalerTarget * 0.97;
-    if (fps < downAt && this.resScale > this.resScaleMin) {
-      this.resScale = Math.max(this.resScaleMin, round2(this.resScale - StoreScene.RES_SCALE_STEP));
-      this.resScaleGoodStreak = 0;
-      this.applyRenderResolution();
-      console.log(`[resScale] ${fps.toFixed(1)}fps < ${downAt.toFixed(0)} — down to ${this.resScale}`);
-    } else if (fps > upAt && this.resScale < StoreScene.RES_SCALE_MAX) {
-      this.resScaleGoodStreak++;
-      // Require fps to hold above the up-threshold for 2 consecutive seconds
-      // before stepping up, so a single lucky frame doesn't cause up/down
-      // oscillation at the edge.
-      if (this.resScaleGoodStreak >= 2) {
-        this.resScale = Math.min(StoreScene.RES_SCALE_MAX, round2(this.resScale + StoreScene.RES_SCALE_STEP));
-        this.resScaleGoodStreak = 0;
-        this.applyRenderResolution();
-        console.log(`[resScale] ${fps.toFixed(1)}fps > ${upAt.toFixed(0)} — up to ${this.resScale}`);
-      }
-    } else {
-      this.resScaleGoodStreak = 0;
-    }
-
-    this.resScaleFrames = 0;
-    this.resScaleWindowStart = time;
+    return resolution.updateDynamicResolution(this, time, active, moving);
   }
-
   // Render-on-demand wake signal (issue #24): force the composer to run for the
   // next few frames. Call this from any code path that changes what's on screen
   // outside animate()'s own bookkeeping — input handlers, mode/settings changes,
@@ -4862,7 +4800,7 @@ export class StoreScene {
     }
 
     // Undersampling disabled when nothing is moving: snap resScale to full crispness.
-    const idleScale = this.softwareGL ? this.resScaleMin : StoreScene.RES_SCALE_MAX;
+    const idleScale = this.softwareGL ? this.resScaleMin : RES_SCALE_MAX;
     if (!cameraMoving && !sceneChanging && this.resScale !== idleScale) {
       this.resScale = idleScale;
       this.applyRenderResolution();
@@ -4896,7 +4834,28 @@ export class StoreScene {
         this.motionScale > 1 &&
         (cameraMoving || this.mode === 'inspect' || (time - this.lastCameraMotionTime) < StoreScene.QUALITY_SETTLE_MS);
       const targetQuality = wantSharp ? this.motionScale : 1.0;
-      if (this.qualityScale !== targetQuality) {
+      // DOWNSHIFT HYSTERESIS. Every change here reallocates the drawing buffer
+      // and every pass's render targets — 19-20 texImage2D calls, measured at
+      // 30-38ms of main-thread time at --full — so a downshift the next
+      // keypress immediately undoes costs two hitches to save nothing.
+      //
+      // That is exactly what browsing produced. `wantSharp` goes false
+      // QUALITY_SETTLE_MS after the camera lerp converges, but the case-pop
+      // settle keeps `sceneChanging` true past that, so a shelf-flip session
+      // downshifted at ~410ms and upshifted again on the next shelf move:
+      // measured six full down/up pairs — twelve reallocations — in one 60-step
+      // browse, with the view never actually parking in between.
+      //
+      // Upshifts stay immediate (the first moving frame is the one that must be
+      // sharp). Downshifts wait for the elevated budget to have gone unused for
+      // QUALITY_DOWNSHIFT_MS, which is longer than any gap between two browse
+      // steps and far shorter than a dwell. Nothing is lost by holding it: a
+      // view that truly settles is composited ONCE and then persisted at zero
+      // GPU (see staticPersist), so the frames this defers are a handful of
+      // animating ones, at the same budget the motion just ahead of them paid.
+      const holdDownshift = targetQuality < this.qualityScale &&
+        (time - this.lastCameraMotionTime) < StoreScene.QUALITY_DOWNSHIFT_MS;
+      if (this.qualityScale !== targetQuality && !holdDownshift) {
         this.qualityScale = targetQuality;
         this.applyRenderResolution();
         mustRenderThisFrame = true; // buffer just cleared — repaint before present
@@ -4906,9 +4865,7 @@ export class StoreScene {
     if (staticPersist && !mustRenderThisFrame) {
       // Reset the ACTIVE-only fps window (as the IDLE branch does) so these
       // skipped frames aren't misread as a slow GPU and don't downscale.
-      this.resScaleFrames = 0;
-      this.resScaleGoodStreak = 0;
-      this.resScaleWindowStart = time;
+      resolution.resetScalerWindow(this, time);
       return;
     }
 
@@ -4945,12 +4902,10 @@ export class StoreScene {
         this.aoFadeT = 1;
         this.aoPass.blendIntensity = 1;
       }
-      this.resScaleFrames = 0;
-      this.resScaleGoodStreak = 0;
-      this.resScaleWindowStart = time;
+      resolution.resetScalerWindow(this, time);
       // Software GL never snaps up for the parked frame — one full-res
       // SwiftShader composite costs multiple seconds.
-      const idleScale = this.softwareGL ? this.resScaleMin : StoreScene.RES_SCALE_MAX;
+      const idleScale = this.softwareGL ? this.resScaleMin : RES_SCALE_MAX;
       if (this.resScale !== idleScale) {
         this.resScale = idleScale;
         this.applyRenderResolution();
@@ -4998,9 +4953,7 @@ export class StoreScene {
     // Reset the window instead (same treatment the persist/idle branches give
     // their skipped frames).
     if (settleRefine) {
-      this.resScaleFrames = 0;
-      this.resScaleGoodStreak = 0;
-      this.resScaleWindowStart = time;
+      resolution.resetScalerWindow(this, time);
     } else {
       this.updateDynamicResolution(time, active, cameraMoving || sceneChanging);
     }
