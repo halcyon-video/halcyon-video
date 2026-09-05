@@ -81,6 +81,7 @@ test('corporate preset reproduces the pre-format literals exactly', () => {
   assert.equal(corporate.browseStandoff, 3.8);
   assert.equal(corporate.keyLightSpacingScale, 1.0);
   assert.equal(corporate.keyLightIntensityScale, 1.0);
+  assert.equal(corporate.plants, false);
 });
 
 test('store-layout exports still carry the corporate literals', () => {
@@ -187,6 +188,11 @@ test('the back room has floor to stand on', () => {
   );
   // The corporate box has no such room, so it keeps the plain 8 ft back margin.
   assert.equal(corporate.curtainedSection, false);
+});
+
+test('mom-and-pop mode enables indoor houseplants', () => {
+  assert.equal(momAndPop.plants, true);
+  assert.equal(corporate.plants, false);
 });
 
 test('mom-and-pop is a small store that grows deep, not wide', () => {

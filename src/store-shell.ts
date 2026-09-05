@@ -25,7 +25,7 @@ import { buildFrontSoffit, frontSoffitLidPolygon, frontSoffitPolygon, frontSoffi
 import { createFixture } from './fixture-registry';
 import { CandyDisplay } from './fixtures/period-fixtures';
 import { TipJar } from './fixtures/tip-jar';
-import { DEFAULT_FIXTURE_PLACEMENTS, gameSectionPlacements, counterAnchoredPlacements, promoStandPlacements, admitFixturePlacements, curtainedAlcovePlacements } from './store-fixtures-config';
+import { DEFAULT_FIXTURE_PLACEMENTS, gameSectionPlacements, counterAnchoredPlacements, promoStandPlacements, admitFixturePlacements, curtainedAlcovePlacements, momAndPopPlantPlacements } from './store-fixtures-config';
 import { activeStoreFormat } from './store-format';
 import { resolveOverviewVantage } from './scene-shared';
 import { formatCarpetTextures, formatWallTextures, formatWallIsPrefinished, formatShelfWood } from './format-surfaces';
@@ -2264,6 +2264,8 @@ export function buildStore(scene: StoreScene) {
     ...collectionEndcaps,
     // The back room, on the formats that have one (GH #33).
     ...(activeStoreFormat().curtainedSection ? curtainedAlcovePlacements() : []),
+    // Potted plants in mom-and-pop mode
+    ...(activeStoreFormat().plants ? momAndPopPlantPlacements(scene.getStoreWidth(), scene.backWallZ, scene.plan.openLineFrontEnds()) : []),
   ], {
     floorDisplays: activeStoreFormat().floorDisplays,
     counterShape: scene.storefrontSpec.counterShape,

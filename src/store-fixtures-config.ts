@@ -1,5 +1,5 @@
 import { FixturePlacement, BOX_SPACING, STORE_CENTER_X } from './store-layout';
-import type { CounterShape } from './store-format';
+import { activeStoreFormat, type CounterShape } from './store-format';
 import { registerFixtureKind } from './fixture-registry';
 import { StructureFootprint } from './fixtures/period-fixtures';
 import { PV_DRAPE_TABLE_POP_KIT } from './fixtures/pv-drape-table';
@@ -429,6 +429,66 @@ export function curtainedAlcovePlacements(): FixturePlacement[] {
 }
 
 /**
+ * Potted plants for mom-and-pop mode (StoreFormatSpec.plants).
+ * Authentic houseplants placed where independent video stores kept them:
+ * catching sun by the storefront windows, tucked into the desk corner,
+ * and beside the back-room beaded curtain.
+ */
+export function momAndPopPlantPlacements(
+  storeWidth: number,
+  backWallZ: number,
+  _openEnds: { worldX: number; frontLocalZ: number }[] = [],
+): FixturePlacement[] {
+  const wallX = STORE_CENTER_X - storeWidth / 2;
+  const outerRightX = STORE_CENTER_X + storeWidth / 2;
+  const innerAlcoveX = outerRightX - 7.5;
+  const alcoveFrontZ = backWallZ + 5.0;
+
+  return [
+    // Tall floor palm by the front window right of the door, basking in daylight
+    {
+      id: 'plant-front-window',
+      kind: 'potted-plant',
+      position: { x: STORE_CENTER_X + 4.5, z: 13.6 },
+      yaw: 0.4,
+      options: { variant: 'floor-palm' }
+    },
+    // Upright snake plant in the front-left corner beside the side window & desk
+    {
+      id: 'plant-desk-corner',
+      kind: 'potted-plant',
+      position: { x: wallX + 1.8, z: 13.6 },
+      yaw: -0.6,
+      options: { variant: 'snake-plant' }
+    },
+    // Floor palm softening the return corner beside the back room beaded curtain
+    {
+      id: 'plant-alcove',
+      kind: 'potted-plant',
+      position: { x: innerAlcoveX - 1.4, z: alcoveFrontZ + 0.8 },
+      yaw: -0.85,
+      options: { variant: 'floor-palm', frondScale: 0.72, fanSpan: Math.PI * 1.1 }
+    },
+    // Tall ficus tree on the front-left corner of the center shelf
+    {
+      id: 'plant-shelves-left',
+      kind: 'potted-plant',
+      position: { x: 8.6, z: 1.65 },
+      yaw: 0.6,
+      options: { variant: 'tall-ficus' }
+    },
+    // Tall ficus tree on the front-right corner of the center shelf
+    {
+      id: 'plant-shelves-right',
+      kind: 'potted-plant',
+      position: { x: 13.4, z: 1.65 },
+      yaw: -0.6,
+      options: { variant: 'tall-ficus' }
+    },
+  ];
+}
+
+/**
  * Drop the fixtures the active store format has no room (or no surface) for.
  *
  * Applied once to the ASSEMBLED placement list in buildStore, rather than at
@@ -495,6 +555,16 @@ export function counterAnchoredPlacements(
         yaw: plan.facingYaw, // card toward the customer side
         options: { surfaceY: 2.82 }
       },
+      ...(activeStoreFormat().plants ? [{
+        id: 'counter-desk-plant',
+        kind: 'potted-plant',
+        position: {
+          x: plan.cx + plan.ux * -2.55 - plan.nx * 0.15,
+          z: plan.cz + plan.uz * -2.55 - plan.nz * 0.15,
+        },
+        yaw: plan.facingYaw,
+        options: { variant: 'pothos', surfaceY: 2.82 }
+      }] : []),
     ];
   }
   if (counterShape === 'usquare') {

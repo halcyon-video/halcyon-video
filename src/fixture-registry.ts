@@ -17,6 +17,7 @@ import { ComingSoonLetterboard } from './fixtures/coming-soon-letterboard';
 import { TipJar } from './fixtures/tip-jar';
 import { MirrorColumn } from './fixtures/mirror-column';
 import { CurtainedAlcove } from './fixtures/curtained-alcove';
+import { PottedPlant } from './fixtures/potted-plant';
 
 export interface PlacedFixture extends StoreFixture {
   placement: FixturePlacement;
@@ -64,3 +65,4 @@ registerFixtureKind('coming-soon-letterboard', (placement, ctx) => new ComingSoo
 registerFixtureKind('tip-jar', (placement, ctx) => new TipJar(placement, ctx));
 registerFixtureKind('mirror-column', (placement, ctx) => new MirrorColumn(placement, ctx));
 registerFixtureKind('curtained-alcove', (placement, ctx) => new CurtainedAlcove(placement, ctx));
+registerFixtureKind('potted-plant', (placement, ctx) => new PottedPlant(placement, ctx));
