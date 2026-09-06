@@ -34,6 +34,19 @@ user-assets/
                        # while that theme is active
 ```
 
+## Counter equipment models
+
+`fixtures/impact-printer-1993/model.glb` replaces the small procedural impact
+printer on counters that enable the period equipment set. The active brand
+pack's copy takes precedence over this flat path. Missing or invalid files leave
+the built-in printer visible. Reload the store after installing a model.
+
+Author in feet, Y up, with the origin under the feet and the controls facing +Z.
+Keep the body within approximately 0.9 × 0.6 feet and 0.3 feet high; the current
+placement allows paper rising to 0.76 feet and stock extending 0.74 feet behind
+the origin. Include UVs and materials in the GLB. Blender source, generation
+scripts, and reference notes may live alongside the export in this ignored folder.
+
 ## signs/ — drop-in sign art (no code)
 
 Every sign the store builds (`buildSignage` in `src/fixtures/signage.ts`)

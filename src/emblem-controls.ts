@@ -14,13 +14,10 @@
 // built in the order a person works: pick a layer, change the layer, then the
 // emblem as a whole.
 //
-// NOTHING HERE IS HIDDEN BY KIND. A row that doesn't apply to the selected
-// shape (Text on a star, Waist on a rectangle) goes INERT and stays where it
-// is. On the old drawer page that was a pagination constraint; here it is the
-// point — "what can this shape do" should be answerable by looking, and a
-// vocabulary that rearranges itself as you select things is not.
+// Only applicable properties are shown. The studio's remote ring skips inert
+// rows, so a shape never asks the owner to step through text-only controls.
 import {
-  cloneEmblemDoc, defaultEmblemLayer, emblemDocActive, emptyEmblemDoc,
+  defaultEmblemLayer, emblemDocActive, emptyEmblemDoc,
   EMBLEM_KIND_SPECS, EMBLEM_KINDS, EMBLEM_STARTERS, moveEmblemLayer, newLayerId,
 } from './emblem-doc';
 import type { EmblemInk, EmblemLayerKind, EmblemRole } from './emblem-doc';
@@ -30,7 +27,7 @@ import {
 import { getActiveLogoSpec } from './logo-spec';
 import { SettingsRowKit, setRowEnabled, setRowLabel } from './settings-rows';
 import type { RangeSpec } from './settings-rows';
-import { brandFontChoices } from './brand-fonts';
+import { brandFontOptions } from './brand-fonts';
 import type { EmblemSession } from './emblem-session';
 
 /** Where each group of rows lands. Three panels, one kit, one focus ring. */
@@ -61,9 +58,9 @@ const ROLE_OPTIONS = [
 ];
 
 const INK_OPTIONS = [
-  { id: 'body', label: 'Brand Body' },
-  { id: 'text', label: 'Brand Text' },
-  { id: 'border', label: 'Brand Trim' },
+  { id: 'body', label: 'Brand background' },
+  { id: 'text', label: 'Brand lettering' },
+  { id: 'border', label: 'Brand outline' },
   { id: 'custom', label: 'Custom…' },
 ];
 
@@ -90,12 +87,6 @@ export function buildEmblemControls(
 ): EmblemControls {
   const layer = () => session.layer();
   const kindSpec = () => EMBLEM_KIND_SPECS[layer()?.kind ?? 'rect'];
-
-  // The last composition something threw away — Clear Emblem, or a Start From
-  // that replaced it — so Left on the Clear row can put it back for as long as
-  // the studio is open. Losing a logo you spent an hour on to one press of OK,
-  // with no way back, is not a thing this store should do.
-  let replaced: ReturnType<typeof cloneEmblemDoc> | null = null;
 
   /** A structural change: rebuild the stack list, re-read every control, save. */
   const restructure = () => {
@@ -127,7 +118,7 @@ export function buildEmblemControls(
     'newkind', 'New Shape', 'What the Add Shape row below will drop on the pile.',
     EMBLEM_KINDS.map((k) => ({ id: k, label: EMBLEM_KIND_SPECS[k].label })),
     () => pendingKind,
-    (v) => { pendingKind = v as EmblemLayerKind; },
+    (v) => { pendingKind = v as EmblemLayerKind; }, false,
   );
 
   const addLayer = () => {
@@ -143,15 +134,11 @@ export function buildEmblemControls(
     session.selected = session.doc.layers.length - 1;
     restructure();
   };
-  kit.action(
-    'add', 'Add Shape',
-    'Drops a new layer of the chosen shape on top of the pile and selects it.',
-    'Enter', addLayer,
-  );
+  kit.confirmAction('add', 'Add shape', 'OK adds the chosen shape as a new layer.', addLayer);
 
   kit.action(
     'order', 'Move In Stack',
-    'Right brings the selected layer forward, Left sends it back. Later layers print over earlier ones.',
+    'Right brings this layer forward; Left sends it back.',
     '‹ back · fwd ›',
     () => { session.selected = moveEmblemLayer(session.doc, session.selected, 1); restructure(); },
     () => { session.selected = moveEmblemLayer(session.doc, session.selected, -1); restructure(); },
@@ -172,10 +159,8 @@ export function buildEmblemControls(
     session.selected = Math.max(0, session.selected - 1);
     restructure();
   };
-  kit.action(
-    'dup', 'Duplicate / Delete', 'Enter copies the selected layer, Left deletes it.',
-    'Enter · ‹ delete', duplicateLayer, deleteLayer,
-  );
+  kit.confirmAction('dup', 'Duplicate layer', 'OK copies the selected layer.', duplicateLayer);
+  kit.confirmAction('delete', 'Delete layer', 'OK removes this layer. Undo edit brings it back.', deleteLayer);
 
   // ── The selected layer ─────────────────────────────────────────────────────
   kit.into(targets.props);
@@ -230,7 +215,7 @@ export function buildEmblemControls(
   );
 
   const colorRow = kit.color(
-    'color', 'Custom Colour', 'Used when Ink is set to Custom.',
+    'color', 'Custom colour', 'Left or Right chooses a named ink. Click the swatch for an exact colour.',
     () => layer()?.color ?? '#ffffff',
     (v) => { const sel = layer(); if (sel) sel.color = v; },
   );
@@ -243,7 +228,7 @@ export function buildEmblemControls(
 
   const fontRow = kit.select(
     'font', 'Font', 'Typeface for a text layer.',
-    () => brandFontChoices().map((f) => ({ id: f, label: f })),
+    brandFontOptions,
     () => layer()?.fontFamily ?? 'Archivo Black',
     (v) => { const sel = layer(); if (sel) sel.fontFamily = v; },
   );
@@ -256,7 +241,7 @@ export function buildEmblemControls(
     SIZE, pct, () => layer()?.w ?? 0.5, (v) => { const s = layer(); if (s) s.w = v; });
   const heightRow = kit.slider('h', 'Height', 'Layer height, as a share of the canvas. Or pull a corner handle.',
     SIZE, pct, () => layer()?.h ?? 0.5, (v) => { const s = layer(); if (s) s.h = v; });
-  kit.slider('rot', 'Rotation', 'Turn the layer about its own centre. Or turn the stem above it.',
+  kit.slider('rot', 'Rotation', 'Left or Right turns this layer. You can also drag its rotation handle.',
     { min: -180, max: 180, step: 1, navStep: 5 }, (v) => `${Math.round(v)}°`,
     () => layer()?.rot ?? 0, (v) => { const s = layer(); if (s) s.rot = v; });
   kit.slider('alpha', 'Opacity', 'How much of what is underneath shows through.',
@@ -295,7 +280,7 @@ export function buildEmblemControls(
     { min: -20, max: 20, step: 0.5, navStep: 1 }, (v) => `${(Math.round(v * 10) / 10)}°`,
     () => session.doc.tilt, (v) => { session.doc.tilt = v; });
   kit.toggle('wordmark', 'Store Name On It',
-    'Print the store name over the emblem, fitted to the largest rectangle that sits inside your shape. Turn it off if your own text layers carry the name.',
+    'Fit your store name inside the shape. Off uses only your own text layers.',
     () => session.doc.wordmark, (v) => { session.doc.wordmark = v; });
   kit.toggle('enabled', 'Use This Emblem',
     'Off keeps everything you built but puts the store back on its normal brand.',
@@ -304,20 +289,16 @@ export function buildEmblemControls(
   // ── Whole-composition actions ──────────────────────────────────────────────
   kit.into(targets.actions);
 
-  // Stepping this row replaces the whole composition, so it stashes what it
-  // replaced — Clear Emblem's Left is the one undo on this page and it covers
-  // both ways of losing your work.
-  kit.strip(
-    'starters', 'Start From',
-    'A few layers to take apart. REPLACES what you have (Clear Emblem’s Left undoes it). Left/Right cycles.',
-    EMBLEM_STARTERS.map((s) => s.label),
-    (i) => {
-      if (session.doc.layers.length) replaced = cloneEmblemDoc(session.doc);
-      session.doc = EMBLEM_STARTERS[i].doc();
-      session.selected = Math.max(0, session.doc.layers.length - 1);
-      restructure();
-    },
-  );
+  let starter = '0';
+  kit.select('starters', 'Starting shape', 'Browse with Left or Right. Apply below when ready.',
+    EMBLEM_STARTERS.map((s, i) => ({ id: String(i), label: s.label })),
+    () => starter, (v) => { starter = v; }, false);
+  kit.confirmAction('use-starter', 'Use starting shape', 'OK replaces the composition. Undo edit restores it.', () => {
+    session.doc = EMBLEM_STARTERS[Number(starter)].doc();
+    session.selected = Math.max(0, session.doc.layers.length - 1);
+    restructure();
+  });
+  kit.confirmAction('undo', 'Undo edit', 'Restore the previous edit, including a drag, deletion or replaced composition.', () => session.undo());
 
   // The previous export's object URL, revoked when the next one replaces it —
   // revoking immediately after the click can pull the file out from under the
@@ -347,33 +328,24 @@ export function buildEmblemControls(
     },
   );
 
-  kit.action(
-    'clear', 'Clear Emblem',
-    'Throws the whole composition away and puts the store back on its normal brand. Left puts back whatever was last replaced or cleared, while this page is open.',
-    'Enter · ‹ undo',
-    () => {
-      if (!session.doc.layers.length) return;
-      replaced = cloneEmblemDoc(session.doc);
-      session.doc = emptyEmblemDoc();
-      session.selected = 0;
-      restructure();
-    },
-    () => {
-      if (!replaced) return;
-      session.doc = replaced;
-      replaced = null;
-      session.selected = Math.max(0, session.doc.layers.length - 1);
-      restructure();
-    },
-  );
+  kit.confirmAction('clear', 'Clear emblem', 'OK removes every layer. Undo edit restores your composition.', () => {
+    if (!session.doc.layers.length) return;
+    session.doc = emptyEmblemDoc();
+    session.selected = 0;
+    restructure();
+  });
 
   /**
-   * Retitle and grey the rows whose meaning follows the selected kind. Rows go
-   * inert rather than disappearing — see the module header.
+   * Retitle applicable properties; inert rows leave the studio focus ring.
    */
   function syncEnablement(): void {
     const sel = layer();
     const isText = sel?.kind === 'text';
+    for (const row of targets.props.querySelectorAll<HTMLElement>('.settings-row')) setRowEnabled(row, !!sel);
+    for (const id of ['order', 'dup', 'delete']) {
+      const row = targets.layerOps.querySelector<HTMLElement>(`[id$="/${id}"]`);
+      if (row) setRowEnabled(row, !!sel);
+    }
     for (const row of [shapeRow, roleRow, inkRow, widthRow, heightRow]) setRowEnabled(row, !!sel);
     setRowEnabled(colorRow, !!sel && sel.ink === 'custom');
     setRowEnabled(textRow, isText);

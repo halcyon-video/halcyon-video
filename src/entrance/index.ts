@@ -1,3 +1,5 @@
+import { disposeDetachedModel } from '../model-resources';
+import { selfLit } from '../material-lighting';
 // Front entrance vestibule + walk-in checkout desk, modelled on the classic
 // Entrance airlock. Self-contained fixture: owns the glazed chamber, the
 // shield-pentagon counter, the desk CRT rental terminals (whose screen doubles
@@ -446,7 +448,6 @@ export class EntranceCheckout implements StoreFixture {
         const ventTex = createHvacVentTexture();
         const ventMat = new THREE.MeshStandardMaterial({
           map: ventTex, roughness: 0.5, metalness: 0.06,
-          emissive: 0xffffff, emissiveMap: ventTex, emissiveIntensity: 0.15,
         });
         const ventW = Math.min(boxDepth * 0.6, 2.0);
         const ventH = ventW / 2; // matches the texture's 256x128 (2:1) aspect
@@ -718,8 +719,19 @@ export class EntranceCheckout implements StoreFixture {
     }
 
     const rightSignOff = sq ? 4.4 : 5.4;
+    // The membership snap frame sits 0.8 ft up the island's right arm from
+    // the apex (was 1.8). At 1.8 it stood on the same bearing as the tip
+    // jar's sign holder on the band in front of it (store-fixtures-config.ts,
+    // 3.4 ft along the band), so from where a customer stands facing the
+    // apex the TIPS card covered the frame's outer half (visual sweep
+    // 2026-09-04). The holder can't move instead: outward it lands on the
+    // 1993 NEXT REGISTER tent's band spot (cx + 3.6), inward it only slides
+    // further in front of the frame. 0.8 clears the holder's bearing by a
+    // margin on both counter shapes and stays clear of the LED pole display
+    // (1.5 ft down the LEFT arm) and the rewinder (cx + 2.9 on this arm).
+    const middleSignOff = 0.8;
     const leftAnchor = getInnerCounterSpine(cx - 1.8);
-    const middleAnchor = getInnerCounterSpine(cx + 1.8);
+    const middleAnchor = getInnerCounterSpine(cx + middleSignOff);
     const rightAnchor = getInnerCounterSpine(cx + rightSignOff);
 
     // #37: the "Please Rewind" tent sign belongs on the BLUE band-top rim of
@@ -751,6 +763,23 @@ export class EntranceCheckout implements StoreFixture {
       z: nextSpine.z - Math.cos(nextSpine.rotY) * bandShift,
     };
 
+    // Half-square counter: the rental-policy snap frame goes on the BAND
+    // top too, at the front run's right end. Its 10 ft island (cx ± 5) has
+    // no clear stretch left on the right arm — terminal at cx + 3.5 with its
+    // printer, rewinder at cx + 2.5, phone at cx + 5.3 on the clerk side —
+    // and at cx + 4.4 on the spine the frame's inner third stood inside the
+    // CRT's case (visual sweep 2026-09-04). cx + 5.3 on the band sits 0.7 ft
+    // clear of the 1993 NEXT REGISTER tent (cx + 3.6) and mirrors the
+    // PLEASE REWIND tent's band spot on the left. The shield keeps its
+    // island spot: its 12 ft island has room past the terminal.
+    const rightOnBandX = cx + 5.3;
+    const rightBandSpine = getInnerCounterSpine(rightOnBandX);
+    const registerRightOnBand = {
+      x: rightOnBandX - Math.sin(rightBandSpine.rotY) * bandShift,
+      y: BAND_H + BAND_CAP,
+      z: rightBandSpine.z - Math.cos(rightBandSpine.rotY) * bandShift,
+    };
+
     // A sign anchor's `yaw` is the direction the PRINT faces — the same
     // convention MountSurface.place() returns and FixturePlacement.yaw uses,
     // so fixtures/signage.ts can drop a fixture on it with
@@ -777,16 +806,23 @@ export class EntranceCheckout implements StoreFixture {
       },
       {
         id: 'register-middle',
-        pos: new THREE.Vector3(cx + 1.8, innerH + 0.12, middleAnchor.z),
+        pos: new THREE.Vector3(cx + middleSignOff, innerH + 0.12, middleAnchor.z),
         yaw: facing(middleAnchor.rotY),
         category: 'register'
       },
-      {
-        id: 'register-right',
-        pos: new THREE.Vector3(cx + rightSignOff, innerH + 0.12, rightAnchor.z),
-        yaw: facing(rightAnchor.rotY),
-        category: 'register'
-      }
+      sq
+        ? {
+            id: 'register-right',
+            pos: new THREE.Vector3(registerRightOnBand.x, registerRightOnBand.y, registerRightOnBand.z),
+            yaw: facing(rightBandSpine.rotY),
+            category: 'register'
+          }
+        : {
+            id: 'register-right',
+            pos: new THREE.Vector3(cx + rightSignOff, innerH + 0.12, rightAnchor.z),
+            yaw: facing(rightAnchor.rotY),
+            category: 'register'
+          }
     ];
   }
 
@@ -825,7 +861,7 @@ export class EntranceCheckout implements StoreFixture {
     this.terminalTex = tex;
     this.drawTerminal();
 
-    const screenMat = new THREE.MeshBasicMaterial({ map: tex, toneMapped: false });
+    const screenMat = selfLit(new THREE.MeshBasicMaterial({ map: tex, toneMapped: false }), 'light-source');
     const beige = new THREE.MeshStandardMaterial({ color: 0xd9cdb2, roughness: 0.62, metalness: 0.03 });
     const beigeDark = new THREE.MeshStandardMaterial({ color: 0xc4b89e, roughness: 0.68, metalness: 0.03 });
     // Dark tube face for the model's own screen primitives — beige-tinting
@@ -886,10 +922,14 @@ export class EntranceCheckout implements StoreFixture {
       this.searchStationRotY = stations[0].rotY;
     }
 
+    let retired = false;
+    tex.addEventListener('dispose', () => { retired = true; });
     const MON_H = 1.55;
     loader.load(assetUrl('models/crt_monitor.glb'), (gltf) => {
+      if (retired) { disposeDetachedModel(gltf.scene); return; }
       stationGroups.forEach((g, idx) => {
         const monitor = gltf.scene.clone(true);
+        monitor.name = 'rental-terminal-model';
         // Identify the model's screen primitives by their authored material
         // names BEFORE tintBeige clobbers every material: 'mat16' is the glass
         // pane (frontmost — the real bezel opening), 'mat17' the recessed tube
@@ -987,8 +1027,16 @@ export class EntranceCheckout implements StoreFixture {
         g.add(screen);
         if (idx === 0) this.searchScreenMesh = screen; // this one doubles as the search terminal
       });
+      const sourceMaterials = new Set<THREE.Material>();
+      gltf.scene.traverse(o => {
+        if (o instanceof THREE.Mesh) {
+          (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => sourceMaterials.add(m));
+        }
+      });
+      sourceMaterials.forEach(m => m.dispose());
       this.ctx.requestShadowRefresh();
     }, undefined, () => {
+      if (retired) return;
       // Model unavailable (offline) — box-monitor fallback so the desk still works.
       stationGroups.forEach((g, idx) => {
         const body = new THREE.Mesh(new THREE.BoxGeometry(1.3, 1.1, 1.2), beige);
@@ -1007,6 +1055,7 @@ export class EntranceCheckout implements StoreFixture {
     });
 
     loader.load(assetUrl('models/keyboard.glb'), (gltf) => {
+      if (retired) { disposeDetachedModel(gltf.scene); return; }
       // Key-panel material: a darker putty than the shell so the recessed
       // key field / numpad still read as such at desk distance — the flat
       // tintBeige pass turned the whole model into a featureless wedge

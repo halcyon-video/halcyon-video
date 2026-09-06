@@ -552,7 +552,7 @@ export class OutdoorLightingRig {
     // Update lights dynamically
     const headlight = this.deps.getHeadlight();
     scene.traverse((child) => {
-      if (child instanceof THREE.HemisphereLight) {
+      if (child instanceof THREE.HemisphereLight && !child.userData.interiorBounce) {
         child.color.set(hemisphereSky);
         child.groundColor.set(hemisphereGround);
         child.intensity = hemisphereIntensity;

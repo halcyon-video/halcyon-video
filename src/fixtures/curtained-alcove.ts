@@ -1,3 +1,4 @@
+import { selfLit } from '../material-lighting';
 // THE BACK ROOM — a small partitioned alcove in the back corner of the store,
 // its doorway hung with a beaded curtain.
 //
@@ -157,12 +158,12 @@ export class CurtainedAlcove implements StoreFixture {
     //    scene, nothing per-frame: the store's render-on-demand loop must be
     //    able to idle at zero cost with this room on screen.
     const bulbGeo = new THREE.SphereGeometry(0.16, 10, 8);
-    const bulbMat = new THREE.MeshStandardMaterial({
+    const bulbMat = selfLit(new THREE.MeshStandardMaterial({
       color: 0xfff0d0,
       emissive: new THREE.Color(0xffe2ab),
       emissiveIntensity: 1.4,
       roughness: 0.4,
-    });
+    }), 'light-source');
     this.disposables.push(bulbGeo, bulbMat);
     const bulb = new THREE.Mesh(bulbGeo, bulbMat);
     bulb.position.set(cx, ceilingY - 0.6, cz);
@@ -202,8 +203,6 @@ export class CurtainedAlcove implements StoreFixture {
       color: 0xb07434,
       roughness: 0.28,
       metalness: 0.12,
-      emissive: new THREE.Color(0x2a1608),
-      emissiveIntensity: 0.5,
     });
     this.disposables.push(geo, mat);
 

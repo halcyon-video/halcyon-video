@@ -153,6 +153,7 @@ import { buildDemoDiscovery, makeSyntheticEpisodes, demoPoster } from './demo-li
 import { EMPTY_STAFF_PICKS, loadStaffPicks, StaffPicks } from './staff-picks-loader';
 import { titleMatchKeys } from './staff-picks';
 import { initDemoPlayback, openDemoPlaybackOverlay, revealDemoPlaybackOverlay, closeDemoPlaybackOverlay } from './demo-playback';
+import { installAttractMode, isAttractActive } from './attract-mode';
 import {
   episodeLabel,
   markWatchedAndFindNext,
@@ -992,7 +993,7 @@ function updateBrowseHUDVisibility() {
     // The sub-nav jump index (▼ at the bottom shelf row) owns the bottom of
     // the screen and the arrow keys while it's up — same treatment as any
     // other overlay, but it's scene-driven so `ui.*` doesn't track it.
-    || storeScene.isSubNavOpen();
+    || storeScene.isSubNavOpen() || isAttractActive();
 
   if (suppressed) {
     if (browseHudVisible !== false) {
@@ -2996,6 +2997,7 @@ async function initializeStoreScene(preservePosterCache = false) {
           }
         },
       });
+      installAttractMode(scene, () => !shortcutsAllowed()); // #273: idle showreel; any input breaks it
     });
 
   } catch (err: any) {
@@ -4074,12 +4076,12 @@ async function main() {
       if (ui.isSetupOpen) { await setupTerminalInput('ok'); return; }
 
       if (ui.isEmblemStudioOpen) {
-        emblemStudioActivate(1);
+        emblemStudioActivate(0);
         return;
       }
 
       if (ui.isSettingsDrawerOpen) {
-        activateSelectedSetting(1);
+        activateSelectedSetting(settingsRowKeys[settingsIndex]?.startsWith(BRAND_ROW_PREFIX) ? 0 : 1);
         return;
       }
 

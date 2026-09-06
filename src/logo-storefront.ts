@@ -1,3 +1,4 @@
+import { selfLit } from './material-lighting';
 // Phase B1 of the LogoSpec system: the storefront sign in TRUE 3D. Two modes
 // beyond the classic flat layered quads:
 //
@@ -205,7 +206,7 @@ function buildExtrudedEmblem(spec: LogoSpec, anchor: FacadeLogoAnchor): Storefro
     uv.setXY(i, pos.getX(i) / logoW + 0.5, pos.getY(i) / logoH + 0.5);
   }
 
-  const capMat = new THREE.MeshStandardMaterial({
+  const capMat = selfLit(new THREE.MeshStandardMaterial({
     map: faceTex,
     emissiveMap: glowTex,
     emissive: new THREE.Color(0xffffff),
@@ -215,15 +216,12 @@ function buildExtrudedEmblem(spec: LogoSpec, anchor: FacadeLogoAnchor): Storefro
     // the emissive lettering is what actually sells the night read.
     roughness: 0.2,
     metalness: 0.3,
-  });
+  }), 'light-source');
   const sideMat = new THREE.MeshStandardMaterial({
     color: new THREE.Color(spec.borderColor),
     roughness: 0.3,
     metalness: 0.55,
-    // The old stepped gold layers all self-glowed; give the real returns a
-    // modest version of that so the sign edge still reads lit at night.
-    emissive: new THREE.Color(spec.borderColor),
-    emissiveIntensity: 0.4,
+    // Metal returns reflect the exterior lighting; only the face is illuminated.
   });
 
   // ExtrudeGeometry group 0 = front+back caps, group 1 = side walls.
@@ -410,19 +408,17 @@ function buildFreestandingLetters(spec: LogoSpec, anchor: FacadeLogoAnchor): Sto
   // Front/back caps: the brand's letter color, self-lit like the flat sign's
   // wordmark board (same emissive treatment at night). Returns/sides: the
   // border color, with the modest edge glow the sign trims always had.
-  const faceMat = new THREE.MeshStandardMaterial({
+  const faceMat = selfLit(new THREE.MeshStandardMaterial({
     color: new THREE.Color(spec.textColor),
     emissive: new THREE.Color(spec.textColor),
     emissiveIntensity: EMISSIVE_INTENSITY,
     roughness: 0.25,
     metalness: 0.2,
-  });
+  }), 'light-source');
   const sideMat = new THREE.MeshStandardMaterial({
     color: new THREE.Color(spec.borderColor),
     roughness: 0.3,
     metalness: 0.55,
-    emissive: new THREE.Color(spec.borderColor),
-    emissiveIntensity: 0.4,
   });
 
   const disposables: { dispose(): void }[] = [faceMat, sideMat];

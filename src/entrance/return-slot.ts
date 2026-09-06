@@ -341,7 +341,7 @@ export class ReturnSlot {
     // Fixed painted sheen on top: a whisper of ceiling-bank light off the top
     // edge and a thin bright line where the sheet is sawn. Additive, so it can
     // only ADD light — no amount of it can wash the blue back out.
-    const glossMat = new THREE.MeshBasicMaterial({
+    const glossMat = new THREE.MeshStandardMaterial({
       map: glossTex, transparent: true, blending: THREE.AdditiveBlending,
       depthWrite: false, opacity: 0.85,
     });

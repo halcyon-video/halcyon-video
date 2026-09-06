@@ -61,7 +61,7 @@ export type SetupScreen =
   | { kind: 'streaming'; rows: SetupLibraryRow[]; row: number; confirm?: string }
   | { kind: 'sync'; stage: string; pages: number }
   | { kind: 'arriving' }
-  | { kind: 'notice'; address: string; detail: string; row: number; copied?: boolean };
+  | { kind: 'notice'; title?: string; address: string; detail: string; row: number; copied?: boolean };
 
 export function initialHomeScreen(savedAddress?: string | null): SetupHomeScreen {
   return { kind: 'home', row: 1, provider: 0, address: savedAddress || 'http://' };
@@ -412,7 +412,7 @@ export function setupScreenLines(s: SetupScreen): { lines: string[]; cursorLine:
       };
     case 'notice': {
       const lines = [
-        'DISTRIBUTOR NOT ANSWERING',
+        s.title ?? 'DISTRIBUTOR NOT ANSWERING',
         clipTail(s.address, 40),
         s.detail.slice(0, 40),
         '',

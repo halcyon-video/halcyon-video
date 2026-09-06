@@ -107,7 +107,7 @@ export function buildExteriorRoad(parent: THREE.Object3D, opts: ExteriorRoadOpti
   // ─── Dashed centerline, one instanced box per dash spanning the road's
   // full width so it runs off both sides rather than stopping mid-frame.
   const dashGeo = track(new THREE.BoxGeometry(DASH_LENGTH, DASH_HEIGHT, DASH_WIDTH));
-  const dashMat = track(new THREE.MeshBasicMaterial({ color: CENTERLINE_COLOR, fog: false }));
+  const dashMat = track(new THREE.MeshStandardMaterial({ color: CENTERLINE_COLOR, fog: false }));
   const pitch = DASH_LENGTH + DASH_GAP;
   const dashCount = Math.max(1, Math.ceil(roadWidth / pitch));
   const dashMesh = new THREE.InstancedMesh(dashGeo, dashMat, dashCount);

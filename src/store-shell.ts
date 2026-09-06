@@ -1,3 +1,4 @@
+import { selfLit, auditStoreMaterials } from './material-lighting';
 // Store shell builder — the room and its exterior, extracted from StoreScene
 // (three-scene.ts keeps one-line delegating stubs): sky dome + facade + parking
 // lot + storefront logo (buildStore), storefront glazing sections
@@ -25,12 +26,13 @@ import { buildFrontSoffit, frontSoffitLidPolygon, frontSoffitPolygon, frontSoffi
 import { createFixture } from './fixture-registry';
 import { CandyDisplay } from './fixtures/period-fixtures';
 import { TipJar } from './fixtures/tip-jar';
-import { DEFAULT_FIXTURE_PLACEMENTS, gameSectionPlacements, counterAnchoredPlacements, promoStandPlacements, admitFixturePlacements, curtainedAlcovePlacements } from './store-fixtures-config';
+import { DEFAULT_FIXTURE_PLACEMENTS, gameSectionPlacements, counterAnchoredPlacements, promoStandPlacements, admitFixturePlacements, curtainedAlcovePlacements, momAndPopPlantPlacements } from './store-fixtures-config';
 import { activeStoreFormat } from './store-format';
 import { resolveOverviewVantage } from './scene-shared';
 import { formatCarpetTextures, formatWallTextures, formatWallIsPrefinished, formatShelfWood } from './format-surfaces';
 import { validateLayout, Footprint } from './layout-validator';
 import { buildAisleShelving } from './shelving';
+import { ShelfModelBatch } from './shelf-model';
 import { buildCounterProps93 } from './fixtures/counter-props-93';
 import { buildStorefrontDressing93 } from './fixtures/storefront-dressing-93';
 import { buildStorefrontCampaignPoster, campaignBannerSpan } from './fixtures/storefront-campaign-poster';
@@ -313,7 +315,7 @@ export function buildStore(scene: StoreScene) {
   // toneMapped: false — the panos are display-referred JPGs (already "tone mapped"
   // by the camera that shot them); running them through AgX a second time is what
   // made the sky read washed-out gray. Render them as authored.
-  const skyMat = new THREE.MeshBasicMaterial({ side: THREE.BackSide, fog: false, toneMapped: false });
+  const skyMat = selfLit(new THREE.MeshBasicMaterial({ side: THREE.BackSide, fog: false, toneMapped: false }), 'sky');
   const sky = new THREE.Mesh(skyGeo, skyMat);
 
   // Shift the center of the skybox sphere towards the front of the store/street (+Z)
@@ -569,7 +571,7 @@ export function buildStore(scene: StoreScene) {
           colorFactor = 0.3 + (0.25 * i) / (numBodyLayers - 2);
         }
 
-        entranceLogoBodyMaterials.push(new THREE.MeshStandardMaterial({
+        entranceLogoBodyMaterials.push(selfLit(new THREE.MeshStandardMaterial({
           map: scene.nrLogoBodyTex,
           transparent: true,
           alphaTest: 0.35,
@@ -580,7 +582,7 @@ export function buildStore(scene: StoreScene) {
           emissive: isFront ? new THREE.Color(0x020825) : new THREE.Color(0x000000),
           emissiveIntensity: 1.0,
           side: THREE.FrontSide
-        }));
+        }), 'light-source'));
       }
 
       const entranceLogoYellowMaterials: THREE.MeshStandardMaterial[] = [];
@@ -594,7 +596,7 @@ export function buildStore(scene: StoreScene) {
           colorFactor = 0.4 + (0.3 * i) / (numYellowLayers - 2);
         }
 
-        entranceLogoYellowMaterials.push(new THREE.MeshStandardMaterial({
+        entranceLogoYellowMaterials.push(selfLit(new THREE.MeshStandardMaterial({
           map: scene.entranceLogoYellowTex,
           transparent: true,
           alphaTest: 0.35,
@@ -605,7 +607,7 @@ export function buildStore(scene: StoreScene) {
           emissive: new THREE.Color(0xffaa00).multiplyScalar(colorFactor),
           emissiveIntensity: 3.5, // strong glow for bloom
           side: THREE.FrontSide
-        }));
+        }), 'light-source'));
       }
 
       // Build the 3D double-layered ticket logo
@@ -688,56 +690,8 @@ export function buildStore(scene: StoreScene) {
   const TILE_X = 5.0;  // tile module width, across the store (ft) — long axis
   const TILE_Z = 2.5;  // tile module depth, into the store (ft) — short axis
 
-  // NOTHING in the lighting model reaches a downward-facing surface, and the
-  // entire ceiling is downward-facing. The hemisphere light hands a -Y normal
-  // its GROUND colour (#1c1408 at 0.09 — a tint, not energy); the baked
-  // environment's lower hemisphere is dark navy carpet; and the recessed
-  // troffers are coplanar with everything else up here, so they contribute
-  // ~nothing either (cos(89°) ≈ 0). Left alone, every ceiling surface renders
-  // near-black with a brown cast — tiles, T-bar rails and HVAC diffusers
-  // alike, whatever base colour they were authored with.
-  //
-  // So stand in for the room bounce a single-probe IBL can't deliver. Pass the
-  // surface's own map so the emissive is MODULATED by it rather than being a
-  // flat glow: a uniform wash over this much screen area is the "CG ceiling"
-  // tell, and it's what drove the tile plane's value down to 0.12 (i.e. to
-  // black) before this existed.
-  //
-  // bakeEmissiveOff is the load-bearing part: this is light the ceiling should
-  // RECEIVE, so it must never feed bakeEnvironment(). Letting the capture
-  // re-emit it manufactures energy from nothing, and since the ceiling is the
-  // largest surface in the store it then rivals the troffers as a light source
-  // — measured at +47% on the whole room. Suppressed, these values move only
-  // the ceiling and never the room's light budget, which is what makes them
-  // free to retune by eye.
-  const ceilingBounce = (
-    mat: THREE.MeshStandardMaterial,
-    intensity: number,
-    map: THREE.Texture | null,
-  ) => {
-    mat.emissive = new THREE.Color(0xf4f6fa);
-    if (map) mat.emissiveMap = map;
-    mat.emissiveIntensity = intensity;
-    mat.userData.bakeEmissiveOff = true;
-    // Grazing falloff. A flat emissive keeps FULL brightness at any view
-    // angle, so from the pulled-back entrance overview — where the ceiling
-    // fills the top third of the frame at a shallow angle — the whole field
-    // fused into one glowing white plane (user: "ceiling way too bright in
-    // the cursor view at the entrance"). A real tile field dims sharply
-    // toward the horizon: T-bar rails self-shadow the tiles and the pile of
-    // near-parallel surfaces reflects less energy your way. Scale the
-    // stand-in by cos(view angle) so overhead tiles keep their tuned level
-    // while the far field rolls off to a quarter of it.
-    mat.onBeforeCompile = (shader) => {
-      shader.fragmentShader = shader.fragmentShader.replace(
-        '#include <emissivemap_fragment>',
-        `#include <emissivemap_fragment>
-        totalEmissiveRadiance *= 0.25 + 0.75 * saturate( dot( normal, normalize( vViewPosition ) ) );`,
-      );
-    };
-    return mat;
-  };
-
+  // Ceiling, trim and diffusers receive the room's diffuse bounce light.
+  // Their albedo/normal/roughness maps remain ordinary PBR surface inputs.
   const ceilTex = createCeilingTileTexture();
   ceilTex.repeat.set(storeWidth / TILE_X, floorCeilLen / TILE_Z);
 
@@ -760,7 +714,7 @@ export function buildStore(scene: StoreScene) {
   // The plain tile field is a LIT surface, not a light — pulled to 0.24 so the
   // troffer lens panels (HDR 1.55) are unambiguously the fixtures. The map is
   // what keeps this dim value from flattening.
-  ceilingBounce(ceilMat, 0.24, ceilTex);
+
   const ceiling = new THREE.Mesh(ceilGeo, ceilMat);
   ceiling.position.set(STORE_CENTER_X, ceilingY, sideWallZ);
   ceiling.rotation.x = Math.PI / 2; // Facing down
@@ -796,7 +750,7 @@ export function buildStore(scene: StoreScene) {
   // beneath them.
   scene.troffers = [];
   const trofferLensTex = createTrofferLensTexture();
-  const trofferMat = new THREE.MeshStandardMaterial({
+  const trofferMat = selfLit(new THREE.MeshStandardMaterial({
     color: 0xffffff,
     // Prismatic-lens pattern on both channels: hot bands over the tubes and
     // a dot lattice, so the panel reads as a fixture, not a glowing quad.
@@ -818,7 +772,7 @@ export function buildStore(scene: StoreScene) {
     emissiveIntensity: 1.55,
     roughness: 0.4,
     metalness: 0.0
-  });
+  }), 'light-source');
   // The T-bar grid itself: the rail that borders EVERY module (plain tiles,
   // troffers and diffusers all hang their face inside one of these), so it
   // draws the whole visible lattice of the ceiling.
@@ -839,7 +793,7 @@ export function buildStore(scene: StoreScene) {
   // grid stays legible instead of dissolving into the field. Tracks the tile
   // rebalance (was 0.42) — kept just below the plane's 0.24 so the lattice
   // still reads without the whole grid glowing.
-  ceilingBounce(trofferFrameMat, 0.2, null);
+
   // Plain (unlit) acoustic panel — same recessed T-bar module as a troffer,
   // but a flat matte tile instead of an emissive diffuser. Shares the
   // troffer's frame material/geometry (same metal trim), just a different
@@ -857,7 +811,7 @@ export function buildStore(scene: StoreScene) {
   // lit mineral fibre rather than storm-grey or lightbox. 0.5 tipped into
   // lightbox (out-glowed the merchandise); 0.24 sits on the lit-fibre side and
   // lets the troffers be the only true emitters.
-  ceilingBounce(panelMat, 0.24, acousticPanelTex);
+
   const trofferPanelGeo = new THREE.BoxGeometry(TILE_X - 0.12, 0.04, TILE_Z - 0.12);
   const trofferFrameGeo = new THREE.BoxGeometry(TILE_X, 0.06, TILE_Z);
   const plainPanelGeo = new THREE.BoxGeometry(TILE_X - 0.12, 0.02, TILE_Z - 0.12);
@@ -1004,9 +958,8 @@ export function buildStore(scene: StoreScene) {
       // the slots — the louver rows then floated on bare tile and shimmered
       // like z-fighting (feedback/045). Modulated by the vent map so the
       // slots stay dark; far too dim to register as a lamp in the bake.
-      emissive: 0xffffff, emissiveMap: ventTex, emissiveIntensity: 0.22,
     });
-    ceilingBounce(ventMat, 0.42, ventTex);
+
     const ventFrameMesh = new THREE.InstancedMesh(trofferFrameGeo, trofferFrameMat, ventSpots.length);
     const ventFaceMesh = new THREE.InstancedMesh(trofferPanelGeo, ventMat, ventSpots.length);
     ventFrameMesh.instanceMatrix.setUsage(THREE.StaticDrawUsage);
@@ -1222,7 +1175,7 @@ export function buildStore(scene: StoreScene) {
       color: 0xf4f4f0, map: soffitTex, roughness: 0.92, metalness: 0.0,
       bumpMap: soffitTex, bumpScale: 0.01,
     });
-    ceilingBounce(soffitMat, 0.24, soffitTex);
+
 
     // Same derivation as the ceiling-frame mirror below (see the long note on
     // F8 pin 028 there): track the drawing buffer's size AND shape, cap by
@@ -1616,9 +1569,9 @@ export function buildStore(scene: StoreScene) {
 
     // 1. Poster Mesh — fully opaque (issue #61): these are printed posters,
     // not translucent film, so nothing behind them should show through.
-    const posterMat = new THREE.MeshBasicMaterial({
+    const posterMat = selfLit(new THREE.MeshBasicMaterial({
       side: THREE.DoubleSide
-    });
+    }), 'window-poster');
 
     // GH #140: Window posters read forwards from inside the store across both
     // formats. The mesh is rotated Math.PI with inverted UVs so the primary
@@ -2033,6 +1986,7 @@ export function buildStore(scene: StoreScene) {
   // Every run also hands itself to the topper builder after this loop, which
   // stands one "New Releases" ticket card on each of its sections (bb-1990
   // only — see fixtures/new-release-toppers.ts).
+  const shelfModels = new ShelfModelBatch();
   const nrTopperRuns: NrTopperRun[] = [];
   const buildShelfRun =(length: number, centerPos: THREE.Vector3, rotationY: number, globalColStart: number) => {
     const group = new THREE.Group();
@@ -2045,6 +1999,7 @@ export function buildStore(scene: StoreScene) {
       shelf.castShadow = true;
       group.add(shelf);
       scene.shelves.push(shelf);
+      shelfModels.add(shelf, [{ kind: 'deck', depth: depth - .044, length, yaw: Math.PI / 2, z: -.022 }]);
 
       const strip = new THREE.Mesh(new THREE.BoxGeometry(length, 0.03, 0.02), nrClaspMat);
       strip.position.set(0, yPos + 0.02, nrFrontZAt(yPos) + 0.01);
@@ -2053,6 +2008,7 @@ export function buildStore(scene: StoreScene) {
       strip.receiveShadow = true;
       group.add(strip);
       scene.shelves.push(strip);
+      shelfModels.add(strip, [{ kind: 'rail', depth: 0, length, yaw: -Math.PI / 2, y: -.032, z: -.028 }]);
 
       if (Math.abs(yPos - 4.7) < 0.01 && scene.promoSignMat && scene.promoSignRedMat) {
         const runCols = Math.floor((length - 1.0) / BOX_SPACING);
@@ -2201,6 +2157,7 @@ export function buildStore(scene: StoreScene) {
     if (typeof p.options?.lineId === 'number') endcapHostLineIds.add(p.options.lineId);
   }
   buildAisleShelving({
+    shelfModels,
     scene: scene.scene,
     plan: scene.plan,
     libraries: scene.libraries,
@@ -2224,6 +2181,10 @@ export function buildStore(scene: StoreScene) {
       ? (placement) => scene.shelfClasps.add(placement)
       : undefined,
     suppressFrontCapLineIds: endcapHostLineIds,
+  });
+  shelfModels.finish(() => {
+    scene.renderer.shadowMap.needsUpdate = true;
+    scene.requestRender();
   });
 
   // 4. (Mirrored Pillars removed)
@@ -2255,6 +2216,8 @@ export function buildStore(scene: StoreScene) {
     ...collectionEndcaps,
     // The back room, on the formats that have one (GH #33).
     ...(activeStoreFormat().curtainedSection ? curtainedAlcovePlacements() : []),
+    // Potted plants in mom-and-pop mode
+    ...(activeStoreFormat().plants ? momAndPopPlantPlacements(scene.getStoreWidth(), scene.backWallZ, scene.plan.openLineFrontEnds()) : []),
   ], {
     floorDisplays: activeStoreFormat().floorDisplays,
     counterShape: scene.storefrontSpec.counterShape,
@@ -2599,37 +2562,39 @@ export function buildStore(scene: StoreScene) {
   const signageSlots: SignSlot[] = [
     ...ceilingSlots,
     ...scene.entrance.getSignAnchors(),
-    {
-      id: 'wall-newrelease-back-left',
-      category: 'wall-newrelease',
-      pos: new THREE.Vector3((scene.nrBackLeftX + scene.stepX) / 2, 9.4, backWallZ),
-      yaw: 0,
-      length: scene.stepX - scene.nrBackLeftX,
-      localZ: 0.08,
-      fit: true // bounded left by the window-corner sliver, right by the step jut
-    },
-    {
-      id: 'wall-newrelease-back-right',
-      category: 'wall-newrelease',
-      pos: new THREE.Vector3((scene.stepX + scene.nrBackRightEdgeX) / 2, 9.4, stepWallZ),
-      yaw: 0,
-      length: scene.nrBackRightEdgeX - scene.stepX,
-      localZ: 0.08,
-      fit: true // short stepped-front run bounded by the corner jut and right wall
-    },
-    {
-      // #41 back-wall coverage: the connector wall of the stepped corner
-      // (runs in Z at stepX, faces -X — same face its shelf run uses) had
-      // shelving but no sign band. Same slot mechanics as the other two
-      // back-wall runs; short length takes the fitted single-sign fallback.
-      id: 'wall-newrelease-back-step',
-      category: 'wall-newrelease',
-      pos: new THREE.Vector3(scene.stepX, 9.4, midStepZ),
-      yaw: -Math.PI / 2,
-      length: scene.stepDepth,
-      localZ: 0.08,
-      fit: true // bounded by the two corners of the notch
-    },
+    ...(activeStoreFormat().newReleasesWall ? [
+      {
+        id: 'wall-newrelease-back-left',
+        category: 'wall-newrelease',
+        pos: new THREE.Vector3((scene.nrBackLeftX + scene.stepX) / 2, 9.4, backWallZ),
+        yaw: 0,
+        length: scene.stepX - scene.nrBackLeftX,
+        localZ: 0.08,
+        fit: true // bounded left by the window-corner sliver, right by the step jut
+      },
+      {
+        id: 'wall-newrelease-back-right',
+        category: 'wall-newrelease',
+        pos: new THREE.Vector3((scene.stepX + scene.nrBackRightEdgeX) / 2, 9.4, stepWallZ),
+        yaw: 0,
+        length: scene.nrBackRightEdgeX - scene.stepX,
+        localZ: 0.08,
+        fit: true // short stepped-front run bounded by the corner jut and right wall
+      },
+      {
+        // #41 back-wall coverage: the connector wall of the stepped corner
+        // (runs in Z at stepX, faces -X — same face its shelf run uses) had
+        // shelving but no sign band. Same slot mechanics as the other two
+        // back-wall runs; short length takes the fitted single-sign fallback.
+        id: 'wall-newrelease-back-step',
+        category: 'wall-newrelease',
+        pos: new THREE.Vector3(scene.stepX, 9.4, midStepZ),
+        yaw: -Math.PI / 2,
+        length: scene.stepDepth,
+        localZ: 0.08,
+        fit: true // bounded by the two corners of the notch
+      },
+    ] : []),
     // The LEFT-wall run — the start of the New Releases ribbon. Position/
     // extent line up with the actual left-wall shelving (adaptive column
     // count, same X/Z/rotation used for its movie-box placement). No slot
@@ -2754,6 +2719,10 @@ export function buildStore(scene: StoreScene) {
   // and only on the faces the room's lights miss, so it is easy to ship
   // without noticing (it took a user report on the bargain bins and the floor
   // collection displays). Warn loudly rather than silently glow.
+  if (import.meta.env.DEV) {
+    const report = auditStoreMaterials(scene.scene);
+    if (report.problems.length) console.warn('[materials]', report.problems);
+  }
   const signProblems = auditSignMeshes(scene.scene);
   if (signProblems.length) {
     console.warn(`[signage] ${signProblems.length} sign(s) will read as self-lit:\n  ${signProblems.join('\n  ')}`);
@@ -3073,10 +3042,10 @@ export function buildCeilingFrame(scene: StoreScene, storeWidth: number, backWal
   gCtx.fillRect(0, 0, 8, 128);
   const glowTex = new THREE.CanvasTexture(glowCanvas);
   glowTex.colorSpace = THREE.SRGBColorSpace;
-  const glowMat = new THREE.MeshBasicMaterial({
+  const glowMat = selfLit(new THREE.MeshBasicMaterial({
     map: glowTex, transparent: true, blending: THREE.AdditiveBlending,
     depthWrite: false, fog: false, side: THREE.FrontSide, toneMapped: false
-  });
+  }), 'light-spill');
   const glowH = 2.2;                 // warm spill reaches ~2.2 ft down the wall (less diffuse)
   const glowTopY = ceilY - drop;     // top of the glow sits at the cornice underside
   const glowCenterY = glowTopY - glowH / 2;
@@ -3249,13 +3218,13 @@ export function buildMarqueeBulbs(scene: StoreScene, storeWidth: number, backWal
   if (spots.length === 0) return;
 
   const bulbGeo = new THREE.SphereGeometry(bulbRadius, 8, 6);
-  const bulbMat = new THREE.MeshStandardMaterial({
+  const bulbMat = selfLit(new THREE.MeshStandardMaterial({
     color: 0x20140a,
     emissive: new THREE.Color(0xffd9a0),
     emissiveIntensity: 3.2, // above the bloom threshold (2.0) so lit bulbs actually glow
     roughness: 0.4,
     metalness: 0.0,
-  });
+  }), 'light-source');
   // Patch in emissive * instanceColor: vanilla three.js only multiplies the
   // diffuse color by instanceColor, which would be invisible on a material
   // this emissive-dominant. vColor is the varying three.js already declares

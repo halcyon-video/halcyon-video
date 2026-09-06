@@ -1,3 +1,4 @@
+import { selfLit } from './material-lighting';
 // T23 — The rental-mode "home" pocket: where you spend the lockout after
 // checking out. Built as a DETACHED POCKET far outside the store shell
 // (x +200) so it can never be seen from browsing and never perturbs the
@@ -195,7 +196,7 @@ export class BackRoom {
     this.buildTapes(movies, tableTopY);
     this.buildDueNote(tableTopY);
     this.buildTableContactShadows(tableTopY);
-    this.buildVcrClock();
+    this.buildVcrClock(deck);
     this.redrawClocks(true);
   }
 
@@ -218,9 +219,9 @@ export class BackRoom {
 
   // ── Backdrop ────────────────────────────────────────────────────────────────
   // The room shell is gone; the set sits in front of a studio-style cyc: one
-  // large unlit vertical plane (the backdrop image) meeting a flat floor whose
+  // large lit vertical plane (the backdrop image) meeting a flat floor whose
   // colour matches the backdrop's bottom edge, so the seam reads as a soft
-  // horizon. Both are MeshBasicMaterial — they render at their authored
+  // horizon. Both use physical materials — they render under the room lighting with their authored
   // colours regardless of the light rig, and the future photo backdrop won't
   // be tinted by it either.
 
@@ -271,7 +272,7 @@ export class BackRoom {
     // sweeps through most of the gradient instead of only its pale bottom.
     const backdrop = new THREE.Mesh(
       new THREE.PlaneGeometry(120, 30),
-      new THREE.MeshBasicMaterial({ map: this.createBackdropTexture() }),
+      new THREE.MeshStandardMaterial({ map: this.createBackdropTexture(), roughness: 1 }),
     );
     backdrop.position.set(0, 15, -16); // bottom edge exactly at y=0
     this.addOwned(backdrop);
@@ -280,7 +281,7 @@ export class BackRoom {
     // floats over void, and its colour continues the backdrop's bottom band.
     const floor = new THREE.Mesh(
       new THREE.CircleGeometry(60, 40),
-      new THREE.MeshBasicMaterial({ color: BackRoom.BACKDROP_FLOOR_COLOR }),
+      new THREE.MeshStandardMaterial({ color: BackRoom.BACKDROP_FLOOR_COLOR, roughness: 1 }),
     );
     floor.rotation.x = -Math.PI / 2;
     floor.position.y = 0;
@@ -295,7 +296,7 @@ export class BackRoom {
     // the props sit ON the floor instead of hovering over flat colour.
     const shadow = new THREE.Mesh(
       new THREE.CircleGeometry(1, 32),
-      new THREE.MeshBasicMaterial({ map: softShadowTexture(0.42, 0.22), transparent: true, depthWrite: false }),
+      selfLit(new THREE.MeshBasicMaterial({ map: softShadowTexture(0.42, 0.22), transparent: true, depthWrite: false }), 'shadow'),
     );
     shadow.rotation.x = -Math.PI / 2;
     shadow.position.set(0, 0.01, -2.0); // spans the table (z≈0.9) and TV stand (z≈-5.3)
@@ -325,7 +326,7 @@ export class BackRoom {
     // not a whole furniture cluster on a dim floor.
     const pile = new THREE.Mesh(
       new THREE.CircleGeometry(1, 24),
-      new THREE.MeshBasicMaterial({ map: softShadowTexture(0.5, 0.26), transparent: true, depthWrite: false }),
+      selfLit(new THREE.MeshBasicMaterial({ map: softShadowTexture(0.5, 0.26), transparent: true, depthWrite: false }), 'shadow'),
     );
     pile.rotation.x = -Math.PI / 2;
     // OFFSET, not centred. A blob centred under the stack is almost entirely
@@ -345,7 +346,7 @@ export class BackRoom {
     // obviously wrong than no shadow at all.
     const slip = new THREE.Mesh(
       new THREE.PlaneGeometry(1, 1),
-      new THREE.MeshBasicMaterial({ map: softShadowTexture(0.3, 0.13), transparent: true, depthWrite: false }),
+      selfLit(new THREE.MeshBasicMaterial({ map: softShadowTexture(0.3, 0.13), transparent: true, depthWrite: false }), 'shadow'),
     );
     slip.rotation.order = 'YXZ';
     slip.rotation.x = -Math.PI / 2;
@@ -362,7 +363,7 @@ export class BackRoom {
     // shoulder-height reading light (so an inspected cover held at the eye
     // point is legible), and the video-gated TV glow. All distance-capped
     // well inside the pocket, no shadows. The backdrop/floor are unlit
-    // (MeshBasicMaterial) — these lights only shape the kept props.
+    // (physical materials) — these lights shape the backdrop and kept props.
     const key = new THREE.PointLight(0xffd9a8, 16, 26, 1.7);
     key.position.set(-5.5, 6.0, 2.4);
     this.group.add(key);
@@ -487,6 +488,12 @@ export class BackRoom {
     this.group.add(deckG);
     // Insert-beat landing point: just in front of the deck's face, local coords.
     this.vcrMouth.set(0, 0.66 + deck.size.y * 0.55, standZ + 0.12 + deck.size.z / 2 + 0.35);
+    const mouth = deck.object.getObjectByName('DeckMediaMouth');
+    if (mouth) {
+      mouth.getWorldPosition(this.vcrMouth);
+      this.group.worldToLocal(this.vcrMouth);
+      this.vcrMouth.z += 0.35;
+    }
   }
 
   private buildScreenPlane(rect: PropScreenRect): void {
@@ -497,7 +504,7 @@ export class BackRoom {
     // picture, static tube overlay (rounded corners/vignette/sheen/scanlines,
     // crt-tube.ts), then the env-reflecting glass pane outermost.
     const bulge = Math.min(rect.width, rect.height) * 0.03;
-    this.screenMat = new THREE.MeshBasicMaterial({ color: 0x05070d });
+    this.screenMat = selfLit(new THREE.MeshBasicMaterial({ color: 0x05070d }), 'light-source');
     const plane = new THREE.Mesh(makeCurvedScreenGeometry(rect.width, rect.height, bulge), this.screenMat);
     const fwd = rect.normal.clone().normalize();
     const right = new THREE.Vector3().crossVectors(new THREE.Vector3(0, 1, 0), fwd).normalize();
@@ -796,7 +803,9 @@ export class BackRoom {
     this.notePrintFar = note.localToWorld(new THREE.Vector3(0, 0.36 * (H / W) * 0.40, 0));
   }
 
-  private buildVcrClock(): void {
+  private buildVcrClock(deck: PropInstance): void {
+    const rect = deck.screenRect;
+    if (!rect) return;
     const canvas = document.createElement('canvas');
     canvas.width = 192;
     canvas.height = 48;
@@ -805,12 +814,15 @@ export class BackRoom {
     tex.colorSpace = THREE.SRGBColorSpace;
     this.vcrClock = { canvas, ctx, tex };
     const face = new THREE.Mesh(
-      new THREE.PlaneGeometry(0.62, 0.155),
-      new THREE.MeshBasicMaterial({ map: tex }),
+      new THREE.PlaneGeometry(rect.width * 0.94, rect.height * 0.88),
+      selfLit(new THREE.MeshBasicMaterial({ map: tex }), 'light-source'),
     );
-    // On the deck's face, just under the tape mouth.
-    face.position.set(0.28, this.vcrMouth.y - 0.12, this.vcrMouth.z - 0.28);
-    this.addOwned(face);
+    // Prop-local lens bounds follow either deck and its fallback. Keeping the
+    // clock under the instance also carries the stand's position and yaw.
+    face.name = 'deck-live-clock';
+    face.rotation.y = Math.PI;
+    face.position.copy(rect.center).addScaledVector(rect.normal, 0.0008);
+    this.addOwned(face, deck.object);
   }
 
   // Redraw the VCR display (dev-timer countdown, else digital real time).

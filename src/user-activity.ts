@@ -13,8 +13,20 @@
 
 let lastUserActivity = performance.now(); // boot counts as activity
 
+// Synchronous "a human just touched a control" listeners (attract-mode.ts
+// breaks its tour here, BEFORE the key's own handler runs, so the waking key
+// lands in the restored mode). Kept tiny on purpose: the per-frame reader
+// below stays a plain number compare.
+const listeners = new Set<() => void>();
+
+export function onUserActivity(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => { listeners.delete(listener); };
+}
+
 export function markUserActivity(): void {
   lastUserActivity = performance.now();
+  for (const listener of listeners) listener();
 }
 
 export function getLastUserActivity(): number {

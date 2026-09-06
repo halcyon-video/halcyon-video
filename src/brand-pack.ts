@@ -141,7 +141,7 @@ export function activeBrandPackId(): string | null {
 
 /** The loaded manifest, or null — the sync accessor every consumer uses. */
 export function getBrandPack(): BrandPackManifest | null {
-  return pack && packApplies() ? pack : null;
+  return readSetting('bb_brand_builtin') !== '1' && pack && packApplies() ? pack : null;
 }
 
 /** Load state for the SERVICE MODE diagnostic line. */
@@ -357,13 +357,14 @@ function loadBrandDrop(): Promise<BrandPackManifest | null> {
   return detectBrandDrop((p) => assetUrl(`user-assets/${p}`))
     .then((found) => {
       if (!found) { status = 'none'; return null; }
+      const dropDir = found.dir ?? BRAND_DROP_DIR;
       const problems = validateBrandManifest(found.manifest);
       if (problems.length) {
-        console.warn(`[brand-drop] ${BRAND_DROP_DIR}/ produced an invalid manifest — ignoring:\n  ` + problems.join('\n  '));
+        console.warn(`[brand-drop] ${dropDir}/ produced an invalid manifest — ignoring:\n  ` + problems.join('\n  '));
         status = 'failed';
         return null;
       }
-      return adopt(found.manifest, BRAND_DROP_DIR, 'drop');
+      return adopt(found.manifest, dropDir, 'drop');
     })
     .catch((e) => {
       console.warn('[brand-drop] could not read user-assets/brand/ — using the built-in brand:', e);

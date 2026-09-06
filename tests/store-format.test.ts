@@ -81,6 +81,7 @@ test('corporate preset reproduces the pre-format literals exactly', () => {
   assert.equal(corporate.browseStandoff, 3.8);
   assert.equal(corporate.keyLightSpacingScale, 1.0);
   assert.equal(corporate.keyLightIntensityScale, 1.0);
+  assert.equal(corporate.plants, false);
 });
 
 test('store-layout exports still carry the corporate literals', () => {
@@ -189,6 +190,11 @@ test('the back room has floor to stand on', () => {
   assert.equal(corporate.curtainedSection, false);
 });
 
+test('mom-and-pop mode enables indoor houseplants', () => {
+  assert.equal(momAndPop.plants, true);
+  assert.equal(corporate.plants, false);
+});
+
 test('mom-and-pop is a small store that grows deep, not wide', () => {
   assert.ok(momAndPop.widthCap < corporate.widthCap / 2, 'it must never become a warehouse');
   assert.ok(momAndPop.depthToWidthRatio > corporate.depthToWidthRatio, 'it should run deep and narrow');
@@ -294,3 +300,11 @@ test('a mom-and-pop unit face holds more than a chain one, in the same footprint
   assert.equal(face(momAndPop) % SECTION_COLS, 0);
   assert.equal(MAX_SHELF_COLS, SECTION_COLS * activeStoreFormat().unitSections);
 });
+
+test('newReleasesWallSpan spans entire wall for corporate format', async () => {
+  const { newReleasesWallSpan } = await import('../src/store-layout.ts');
+  const [l, r] = newReleasesWallSpan(0.5, 25.0);
+  assert.equal(l, 0.5);
+  assert.equal(r, 25.0);
+});
+
