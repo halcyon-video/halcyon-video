@@ -358,7 +358,7 @@ export function buildFrontSoffit(params: FrontSoffitParams): FrontSoffitResult {
   });
   // Painted closure board on the vestibule side — a plain drywall return, not
   // tile (a BoxGeometry would squash the tile map's 0..1 UVs anyway).
-  const capMat = new THREE.MeshStandardMaterial({
+  const capMat = whiteBodyMat ?? new THREE.MeshStandardMaterial({
     color: 0xe9e9e4, roughness: 0.88, metalness: 0.0,
   });
 
@@ -465,26 +465,11 @@ export function buildFrontSoffit(params: FrontSoffitParams): FrontSoffitResult {
     const bandShape = new THREE.Shape();
     wound.forEach((p, i) => (i === 0 ? bandShape.moveTo(p.x, p.z) : bandShape.lineTo(p.x, p.z)));
     bandShape.closePath();
-    const bandGeo = new THREE.ExtrudeGeometry(bandShape, { depth: corniceDrop, bevelEnabled: false });
-    if (plainWhite) {
-      // bb-2000: taper the fascia to a carafe/funnel — full footprint where it
-      // meets the ceiling, drawn in to a much smaller bottom lip — instead of a
-      // straight-sided box whose bottom edge read as too wide. Pull each vertex
-      // toward the ring centroid in proportion to how far down the drop it sits.
-      let cx = 0, cy = 0;
-      for (const p of wound) { cx += p.x; cy += p.z; }
-      cx /= wound.length; cy /= wound.length;
-      const pos = bandGeo.getAttribute('position');
-      const BOTTOM_SCALE = 0.45; // bottom lip footprint vs. the top
-      for (let i = 0; i < pos.count; i++) {
-        const t = corniceDrop > 0 ? pos.getZ(i) / corniceDrop : 0; // 0 top → 1 bottom
-        const s = 1 - (1 - BOTTOM_SCALE) * t;
-        pos.setX(i, cx + (pos.getX(i) - cx) * s);
-        pos.setY(i, cy + (pos.getY(i) - cy) * s);
-      }
-      pos.needsUpdate = true;
-      bandGeo.computeVertexNormals();
-    }
+    // In bb-2000 there is no proud mirror hanging below the dropped lid; the fascia
+    // drops exactly to the lid underside (ceilingY - soffitY = FRONT_SOFFIT_DROP)
+    // meeting the slab and flank return boards flush, with no gaps into the plenum.
+    const dropH = plainWhite ? (ceilingY - soffitY) : corniceDrop;
+    const bandGeo = new THREE.ExtrudeGeometry(bandShape, { depth: dropH, bevelEnabled: false });
     // bb-2000: a plain white drop band (lit like the body), not chrome.
     const bandMesh = new THREE.Mesh(bandGeo, whiteBodyMat ?? chromeMat);
     // Local +Z maps to world -Y under this rotation, so the extrusion hangs

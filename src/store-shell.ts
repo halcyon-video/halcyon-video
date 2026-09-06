@@ -2562,37 +2562,39 @@ export function buildStore(scene: StoreScene) {
   const signageSlots: SignSlot[] = [
     ...ceilingSlots,
     ...scene.entrance.getSignAnchors(),
-    {
-      id: 'wall-newrelease-back-left',
-      category: 'wall-newrelease',
-      pos: new THREE.Vector3((scene.nrBackLeftX + scene.stepX) / 2, 9.4, backWallZ),
-      yaw: 0,
-      length: scene.stepX - scene.nrBackLeftX,
-      localZ: 0.08,
-      fit: true // bounded left by the window-corner sliver, right by the step jut
-    },
-    {
-      id: 'wall-newrelease-back-right',
-      category: 'wall-newrelease',
-      pos: new THREE.Vector3((scene.stepX + scene.nrBackRightEdgeX) / 2, 9.4, stepWallZ),
-      yaw: 0,
-      length: scene.nrBackRightEdgeX - scene.stepX,
-      localZ: 0.08,
-      fit: true // short stepped-front run bounded by the corner jut and right wall
-    },
-    {
-      // #41 back-wall coverage: the connector wall of the stepped corner
-      // (runs in Z at stepX, faces -X — same face its shelf run uses) had
-      // shelving but no sign band. Same slot mechanics as the other two
-      // back-wall runs; short length takes the fitted single-sign fallback.
-      id: 'wall-newrelease-back-step',
-      category: 'wall-newrelease',
-      pos: new THREE.Vector3(scene.stepX, 9.4, midStepZ),
-      yaw: -Math.PI / 2,
-      length: scene.stepDepth,
-      localZ: 0.08,
-      fit: true // bounded by the two corners of the notch
-    },
+    ...(activeStoreFormat().newReleasesWall ? [
+      {
+        id: 'wall-newrelease-back-left',
+        category: 'wall-newrelease',
+        pos: new THREE.Vector3((scene.nrBackLeftX + scene.stepX) / 2, 9.4, backWallZ),
+        yaw: 0,
+        length: scene.stepX - scene.nrBackLeftX,
+        localZ: 0.08,
+        fit: true // bounded left by the window-corner sliver, right by the step jut
+      },
+      {
+        id: 'wall-newrelease-back-right',
+        category: 'wall-newrelease',
+        pos: new THREE.Vector3((scene.stepX + scene.nrBackRightEdgeX) / 2, 9.4, stepWallZ),
+        yaw: 0,
+        length: scene.nrBackRightEdgeX - scene.stepX,
+        localZ: 0.08,
+        fit: true // short stepped-front run bounded by the corner jut and right wall
+      },
+      {
+        // #41 back-wall coverage: the connector wall of the stepped corner
+        // (runs in Z at stepX, faces -X — same face its shelf run uses) had
+        // shelving but no sign band. Same slot mechanics as the other two
+        // back-wall runs; short length takes the fitted single-sign fallback.
+        id: 'wall-newrelease-back-step',
+        category: 'wall-newrelease',
+        pos: new THREE.Vector3(scene.stepX, 9.4, midStepZ),
+        yaw: -Math.PI / 2,
+        length: scene.stepDepth,
+        localZ: 0.08,
+        fit: true // bounded by the two corners of the notch
+      },
+    ] : []),
     // The LEFT-wall run — the start of the New Releases ribbon. Position/
     // extent line up with the actual left-wall shelving (adaptive column
     // count, same X/Z/rotation used for its movie-box placement). No slot

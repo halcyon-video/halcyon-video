@@ -462,9 +462,10 @@ export function wallAllowsFeatureSections(): boolean {
 
 export function newReleasesWallSpan(leftX: number, rightX: number): [left: number, right: number] {
   if (FORMAT.newReleasesWall) return [leftX, rightX];
-  const unitLen = (MAX_SHELF_COLS - 1) * BOX_SPACING + 1.0;
-  const runW = Math.min(Math.max(0, FORMAT.newReleasesRuns) * unitLen, rightX - leftX);
-  const midX = (leftX + rightX) / 2;
+  const effectiveRightX = FORMAT.curtainedSection ? (rightX - 7.5 - 0.5) : rightX;
+  const unitLen = SECTION_COLS * BOX_SPACING;
+  const runW = Math.min(Math.max(0, FORMAT.newReleasesRuns) * unitLen + 1.0, effectiveRightX - leftX);
+  const midX = (leftX + effectiveRightX) / 2;
   return [midX - runW / 2, midX + runW / 2];
 }
 
