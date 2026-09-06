@@ -70,7 +70,6 @@ import { StoreTheme } from './themes';
 import {
   CASE_EULER_ORDER,
   NewReleasesSection,
-  sectionColSpan,
   tempPosition,
   tempRotation,
   tempQuaternion,
@@ -93,6 +92,7 @@ import {
   updatedMeshes,
   CLERK_SLEEP_INPUT_MS,
 } from './scene-shared';
+import { nrBaysForRuns, planNrBays } from './store-nr-bays';
 import * as shell from './store-shell';
 import * as stock from './store-stock';
 import * as checkout from './store-checkout';
@@ -1297,7 +1297,11 @@ export class StoreScene {
       return b.title.localeCompare(a.title);
     });
 
-    const numWallSections = Math.ceil(this.nrTotalCols / SECTION_COLS);
+    // Sections ARE the physical bays (store-nr-bays.ts): cut per wall run the
+    // way the divider panels are, so no title ever spans a divider or the
+    // corner. A trailing partial bay is its own narrower section.
+    const nrBays = nrBaysForRuns([this.nrLeftWallCols, this.nrBackWallColsRun1, this.nrBackWallColsRun2, this.nrBackWallColsRun3]);
+    const numWallSections = nrBays.length;
     // A regular wall section faces ONE title out across its whole 6-column row,
     // so the wall wants one candidate per ROW, not per column. Those two counts
     // only coincided while a section happened to be as tall as it is wide
@@ -1338,22 +1342,25 @@ export class StoreScene {
     const featureSectionBudget = !wallAllowsFeatureSections() ? 0
       : (regularNewReleases.length > 0 || highRatedCandidates.length > 0) ? Math.max(0, numWallSections - 1)
       : numWallSections;
-    const numDoubleFeaturesToPlace = Math.min(
+    // Geometry has the last word on how many doubles fit: each needs two
+    // FULL bays side by side on ONE run (never across the corner).
+    const numDoubleFeaturesToPlace = planNrBays(nrBays, Math.min(
       doubleFeatureCandidates.length,
       Math.floor(featureSectionBudget / 2)
-    );
+    ), 0).doubleStarts.length;
     const placedDoubleIds = new Set(
       doubleFeatureCandidates.slice(0, numDoubleFeaturesToPlace).map(m => m.id)
     );
     // Double-qualified titles that didn't fit the budget still meet the
     // single-section bar, so they compete for the super-feature slots.
     const singleFeatureCandidates = superFeatureNewReleases.filter(m => !placedDoubleIds.has(m.id));
-    const numSuperFeaturesToPlace = Math.min(
+    const bayPlan = planNrBays(nrBays, numDoubleFeaturesToPlace, Math.min(
       singleFeatureCandidates.length,
       featureSectionBudget - numDoubleFeaturesToPlace * 2
-    );
+    ));
+    const numSuperFeaturesToPlace = bayPlan.superBays.length;
 
-    const numRegularSections = numWallSections - numDoubleFeaturesToPlace * 2 - numSuperFeaturesToPlace;
+    const numRegularSections = bayPlan.regularBays.length;
     const numRegularRows = numRegularSections * WALL_SHELF_HEIGHTS.length; // one faced-out title per wall tier
 
     const regularMoviesList = [
@@ -1386,40 +1393,38 @@ export class StoreScene {
 
     this.nrSections = [];
     this.nrSuppressedDividerCols.clear();
-    // 1. Create double-feature sections first (one movie spans TWO adjacent
-    //    sections — 12 columns, every tier — as a single doubled-width
-    //    display). F8-008: the shelf DIVIDER between the two halves is KEPT
-    //    (the hit still spans both sections, but the physical divider panel
-    //    stays intact per the user's request). We therefore no longer add the
-    //    interior boundary to nrSuppressedDividerCols — the set stays empty and
-    //    its consumer guards become no-ops.
-    for (let i = 0; i < numDoubleFeaturesToPlace; i++) {
-      this.nrSections.push({
-        type: 'double-feature',
-        movie: doubleFeatureCandidates[i]
-      });
-    }
-    // 2. Create super-feature sections (one movie takes all 6 columns and every tier of a section)
-    for (let i = 0; i < numSuperFeaturesToPlace; i++) {
-      this.nrSections.push({
-        type: 'super-feature',
-        movie: singleFeatureCandidates[i]
-      });
-    }
-    // 3. Create regular sections (one movie per shelf tier, each occupying all
-    //    6 columns of that row — the multi-copy run the real walls ran)
+    // Sections go in RIBBON order, each pinned to its bay's global column
+    // range. A double-feature spans two whole adjacent bays of one run as a
+    // single doubled-width display — F8-008: the shelf DIVIDER between its
+    // halves is KEPT (the hit spans both bays, the physical panel stays), so
+    // nrSuppressedDividerCols stays empty and its consumer guards are no-ops.
+    // A super-feature takes every tier of one full bay; a regular section
+    // faces one title per shelf tier across its bay's columns (six copies —
+    // fewer on a trailing partial bay, never spilling into the next).
+    const doubleAt = new Map(bayPlan.doubleStarts.map((b, i) => [b, i]));
+    const superAt = new Map(bayPlan.superBays.map((b, i) => [b, i]));
     let regMovieIdx = 0;
-    for (let s = 0; s < numRegularSections; s++) {
-      const moviesForSection: Movie[] = [];
-      for (let r = 0; r < WALL_SHELF_HEIGHTS.length; r++) {
-        if (regMovieIdx < regularMoviesToPlace.length) {
-          moviesForSection.push(regularMoviesToPlace[regMovieIdx++]);
+    for (let b = 0; b < nrBays.length; b++) {
+      const bay = nrBays[b];
+      const dbl = doubleAt.get(b);
+      const sup = superAt.get(b);
+      if (dbl !== undefined) {
+        this.nrSections.push({ type: 'double-feature', movie: doubleFeatureCandidates[dbl],
+          startCol: bay.startCol, endCol: nrBays[b + 1].endCol });
+        b++;
+      } else if (sup !== undefined) {
+        this.nrSections.push({ type: 'super-feature', movie: singleFeatureCandidates[sup],
+          startCol: bay.startCol, endCol: bay.endCol });
+      } else {
+        const moviesForSection: Movie[] = [];
+        for (let r = 0; r < WALL_SHELF_HEIGHTS.length; r++) {
+          if (regMovieIdx < regularMoviesToPlace.length) {
+            moviesForSection.push(regularMoviesToPlace[regMovieIdx++]);
+          }
         }
+        this.nrSections.push({ type: 'regular', movies: moviesForSection,
+          startCol: bay.startCol, endCol: bay.endCol });
       }
-      this.nrSections.push({
-        type: 'regular',
-        movies: moviesForSection
-      });
     }
 
     // Keep these arrays populated for storefront posters and other features
@@ -1710,16 +1715,14 @@ export class StoreScene {
   // stays one continuous display.
   /**
    * The [startCol, endCol] of the New Releases section containing `col`, or
-   * null when the ribbon has no sections yet. Walks the same running column
-   * cursor the placement pass uses, since a double-feature spans two sections'
-   * worth of columns and a fixed secIdx*SECTION_COLS would drift past it.
+   * null when no section covers it. Sections carry their own bay-pinned
+   * ranges (store-nr-bays.ts), so this is a plain lookup.
    */
   public nrSectionRangeForCol(col: number): { startCol: number; endCol: number } | null {
-    let startCol = 0;
     for (const section of this.nrSections) {
-      const endCol = Math.min(this.nrTotalCols - 1, startCol + sectionColSpan(section) - 1);
-      if (col >= startCol && col <= endCol) return { startCol, endCol };
-      startCol += sectionColSpan(section);
+      if (col >= section.startCol && col <= section.endCol) {
+        return { startCol: section.startCol, endCol: section.endCol };
+      }
     }
     return null;
   }
