@@ -802,6 +802,21 @@ export function registerCoreSettings(): void {
     hint: 'A card and a cup by the register, linking the project’s Ko-fi.',
   });
 
+  // #273: the attract-mode tour — a slow on-rails camera dolly over the store
+  // after a few idle seconds, broken by any input (attract-mode.ts). ON for
+  // the hosted demo, where the landing page is a showreel; OFF on a real
+  // HTPC, where an idle screen means someone stepped away. `?attract=1|0`
+  // overrides it for one page load (the release-clip source).
+  registerSetting({
+    key: 'bb_attract_mode',
+    label: 'Attract-mode tour when idle',
+    kind: 'toggle',
+    group: 'Store Look',
+    default: isDemoMode,
+    applyMode: 'live',
+    hint: 'A slow camera dolly through the store after a few idle seconds. Any key brings you back.',
+  });
+
   // T22: carried tapes + front-counter checkout. Default OFF until T23 ships
   // rental mode — when off, the instant play-from-the-shelf flow is untouched.
   registerSetting({
