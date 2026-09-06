@@ -397,6 +397,7 @@ export class StoreScene {
   // eye height, so harness shots can stand anywhere (e.g. far outside the
   // storefront to frame the whole facade). Cleared by any manual walk toggle.
   public walkFreecam = false;
+  public attractTour = false; // attract-mode.ts is driving the walk camera: HUD down, counts as motion
   public walkKeys = {
     w: false,
     a: false,
@@ -4796,7 +4797,7 @@ export class StoreScene {
     // when dwelling; zero GPU when left alone. On a window already at native
     // (sharpScale === 1) none of this changes anything.
     const cameraMoving =
-      walkKeyHeld || cameraLerping ||
+      walkKeyHeld || cameraLerping || this.attractTour ||
       (this.isWalkAroundMode && (time - this.lastWalkLookTime) < 150) ||
       (this.isWalkAroundMode && this.bobAmount > 0);
     if (cameraMoving) this.lastCameraMotionTime = time;
