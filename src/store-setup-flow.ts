@@ -193,13 +193,13 @@ export function openSetupTerminal(): void {
  * Safe to call again while open — a failed background retry just updates the
  * detail line.
  */
-export function openSetupNotice(address: string, detail: string): void {
+export function openSetupNotice(address: string, detail: string, title?: string): void {
   if (!deps) return;
   initSetupReport();
   registerSensitiveString(address);
   recordSetupFailure(detail, 'Connect');
   const row = screen.kind === 'notice' ? screen.row : 0;
-  openWith({ kind: 'notice', address, detail: detail.toUpperCase(), row });
+  openWith({ kind: 'notice', title, address, detail: detail.toUpperCase(), row });
 }
 
 function openWith(s: SetupScreen): void {

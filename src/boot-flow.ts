@@ -94,7 +94,7 @@ let deps: BootFlowDeps | null = null;
 // Opening-day (#41) plumbing: what the setup terminal should show once the
 // empty scene has revealed, and hooks into the auto-retry loop below so the
 // notice screen's RETRY NOW / CHANGE SERVER rows can drive it.
-let pendingSetup: { notice?: { address: string; detail: string } } | null = null;
+let pendingSetup: { notice?: { title?: string; address: string; detail: string } } | null = null;
 let retryNowHook: (() => void) | null = null;
 let cancelRetryHook: (() => void) | null = null;
 
@@ -141,7 +141,7 @@ export function initBootFlow(d: BootFlowDeps): void {
  * queue the setup terminal to dock once the scene reveals (#41). Serves both
  * the true first run and the unreachable-server failure state.
  */
-export function enterOpeningDay(opts?: { notice?: { address: string; detail: string } }): void {
+export function enterOpeningDay(opts?: { notice?: { title?: string; address: string; detail: string } }): void {
   if (!deps) return;
   pendingSetup = { notice: opts?.notice };
   deps.setLibraries([]);
@@ -162,7 +162,7 @@ export function maybeOpenSetupTerminal(): void {
   if (!pendingSetup) return;
   const p = pendingSetup;
   pendingSetup = null;
-  if (p.notice) openSetupNotice(p.notice.address, p.notice.detail);
+  if (p.notice) openSetupNotice(p.notice.address, p.notice.detail, p.notice.title);
   else openSetupTerminal();
 }
 
@@ -896,17 +896,37 @@ export async function checkCredentialsAndLoad() {
 
   let escaped = false;
   let retryTimeoutId: any = null;
+  let noticeShown = false; // the setup-terminal notice (#41), docked once
 
-  // Any keypress or click on the boot screen skips auto-connect and goes to login.
+  // Any keypress or click on the boot screen skips the wait. In the 3D store
+  // that means the same place every other setup moment lives: the counter
+  // CRT, docked over the empty store with a "paused by you" notice whose
+  // RETRY NOW / CHANGE SERVER / DEMO rows are the ways forward — the
+  // in-flight attempt keeps running underneath, exactly like the failure
+  // notice, and still opens the store if it lands. Jumping to the old DOM
+  // login form / fanned card picker predates the terminal and read as a
+  // different app bolted onto the boot. Flat mode has no counter to dock to
+  // and keeps the classic form.
   const bootEscape = (e: Event) => {
     if (e.type === 'keydown' && (e as KeyboardEvent).key === 'Tab') return; // ignore tab
+    document.removeEventListener('keydown', bootEscape);
+    document.removeEventListener('click', bootEscape);
+    if (getSetting<string>('bb_render_mode') !== 'flat' && jellyfinUrl) {
+      noticeShown = true;
+      enterOpeningDay({
+        notice: {
+          title: 'CONNECTION PAUSED BY YOU',
+          address: jellyfinUrl,
+          detail: 'You skipped the wait. Where to next?',
+        },
+      });
+      return;
+    }
     escaped = true;
     if (retryTimeoutId) {
       clearTimeout(retryTimeoutId);
       retryTimeoutId = null;
     }
-    document.removeEventListener('keydown', bootEscape);
-    document.removeEventListener('click', bootEscape);
     hideBootOverlay();
     showLoginOrCards();
   };
@@ -938,7 +958,6 @@ export async function checkCredentialsAndLoad() {
     const STALL_MS = 45_000;
     let currentDelay = 10_000; // starts at 10s
     const MAX_DELAY = 5 * 60 * 1000; // 5min cap
-    let noticeShown = false; // the empty-store failure notice (#41), once
 
     const attemptSync = async () => {
       if (escaped) return;
