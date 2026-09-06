@@ -12,6 +12,7 @@ import { maybeServeClerkSkeleton } from './clerk-skeleton';
 import { BOX_SPACING, UNIT_DEPTH, UNIT_SECTIONS } from './store-layout';
 import { getActiveTheme } from './themes';
 import { tryLoadUserAssetTexture } from './user-assets';
+import { loadRenderedClerkAtlas } from './clerk-rendered-atlas';
 
 /**
  * StoreClerk — a Doom-style directional 2D billboard clerk.
@@ -23,9 +24,9 @@ import { tryLoadUserAssetTexture } from './user-assets';
  * to face the camera (THREE.Sprite); only the *drawn view* changes.
  *
  * The character art (a stylized female retail clerk: brunette bob, house polo +
- * nametag, khakis, black sneakers) is generated procedurally on a canvas — see
- * `src/clerk-art.ts`, which owns the whole sprite sheet: the two-bone limb rig,
- * per-part shading, silhouette outlining and the painted face. This class owns
+ * nametag, khakis, black sneakers) is rendered from an original Blender model.
+ * `src/clerk-art.ts` retains the grid contract and emergency procedural art;
+ * `src/clerk-rendered-atlas.ts` colors the rendered uniform. This class owns
  * only her behavior (navigation, stocking/idle/chat state) and the runtime
  * view-picking that pages the atlas.
  *
@@ -507,7 +508,7 @@ export class StoreClerk {
 
   /**
    * Custom sprite-sheet drop-in (public/user-assets/README.md "clerk/"): the
-   * procedural atlas above is the shipped fallback; a user-installed sheet —
+   * Blender atlas is the shipped default; a user-installed sheet —
    * same 16x5 grid, any resolution — replaces the art without touching the
    * rig, roaming or animation timing. The active theme's variant beats
    * default.png, and an installed brand pack's copy beats both (the overlay
@@ -536,10 +537,16 @@ export class StoreClerk {
       mat.needsUpdate = true;
       old.dispose();
     };
+    const loadShipped = () => {
+      if (this.disposed) return;
+      void loadRenderedClerkAtlas().then(swap).catch((error) => {
+        if (!this.disposed) console.warn('Using procedural clerk fallback.', error);
+      });
+    };
     tryLoadUserAssetTexture(`clerk/${getActiveTheme().id}.png`, swap, {
       onMiss: () => {
         if (this.disposed) return;
-        tryLoadUserAssetTexture('clerk/default.png', swap);
+        tryLoadUserAssetTexture('clerk/default.png', swap, { onMiss: loadShipped });
       },
     });
   }
