@@ -132,8 +132,9 @@ def family(key,w,h,d,screenw,screenh,cy,base):
  report[key]={'feet':[w,h,d],'screen':[screenw,screenh,cy],'bytes':file.stat().st_size,'parts':len(exports.objects),'triangles':sum(sum(len(p.vertices)-2 for p in o.data.polygons) for o in exports.objects)}
  for o in list(exports.objects):bpy.data.objects.remove(o,do_unlink=True)
  bpy.data.collections.remove(exports)
- for o in col.objects:o.location.x += {'rental-terminal':-3.3,'ceiling-television':0,'screening-television':3.3}[key]
-family('rental-terminal',1.48,1.55,1.34,1.075,.806,.90,.21)
+ for o in col.objects:o.location.x += {'ceiling-television':0,'screening-television':3.3}[key]
+# The rental terminal family that used to export from here was superseded by
+# tools/models/counter-terminal.py (the register's live model).
 family('ceiling-television',2.6,2.12,2.08,2.12,1.59,1.19,.07)
 family('screening-television',2.2,1.86,1.85,1.78,1.335,1.04,.08)
 bpy.context.scene.unit_settings.system='IMPERIAL';bpy.context.scene.unit_settings.scale_length=.3048

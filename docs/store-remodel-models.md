@@ -6,27 +6,31 @@ owner photographs. No third-party geometry or imagery enters the new models.
 
 ## Active CRTs
 
-The store uses the original `crt_monitor.glb`, `tv_ceiling.glb` and
-`tv_hero.glb` assets again. The September remodel's cabinet replacements
-were withdrawn after owner review. The register retains its original beige
-finish, curved glass, inset menu safe area and 1.3-foot camera distance;
-the televisions retain their original screen crops and curved live overlays.
-Late-load disposal guards and lighting classification remain in place.
+The register uses the authored `rental-terminal.glb` and
+`rental-keyboard.glb` from `tools/models/counter-terminal.py`: they keep the
+approved silhouette of the downloads they replaced and add molded detail,
+baked occlusion and ABS grain — see `docs/counter-terminal-model.md`. The
+ceiling and screening sets still use the original `tv_ceiling.glb` and
+`tv_hero.glb`; the September remodel's television cabinets were withdrawn
+after owner review. The register retains its beige finish, curved glass,
+inset menu safe area and 1.3-foot camera distance; the televisions retain
+their original screen crops and curved live overlays. Late-load disposal
+guards and lighting classification remain in place.
 
 ## Inactive CRT family
 
 The following authored variants remain available as editable source assets,
 but are not selected by the store or prop registry.
 
-`tools/models/store-crts.py` reproduces the three exports and the editable
-`tools/models/store-crts.blend`. Source collections retain the individual
+`tools/models/store-crts.py` reproduces the two television exports and the
+editable `tools/models/store-crts.blend` (its earlier `rental-terminal`
+family was superseded by `counter-terminal.py` and no longer exports). Source collections retain the individual
 moldings, cabinet halves, assembly seam, keys, speaker slots, side cooling
 banks, rear service plate, connectors and support feet. Only the disposable
 export copies are merged by material.
 
 | Export | Nominal width × height × depth, feet | Tube width × height | Tube center Y |
 |---|---|---|---|
-| rental-terminal.glb | 1.48 × 1.55 × 1.34 | 1.075 × 0.806 | 0.90 |
 | ceiling-television.glb | 2.60 × 2.12 × 2.08 | 2.120 × 1.590 | 1.19 |
 | screening-television.glb | 2.20 × 1.86 × 1.85 | 1.780 × 1.335 | 1.04 |
 
@@ -40,8 +44,9 @@ curved surfaces. Closed authored parts are checked for manifold edges.
 
 Coordinates are feet, bottom Y=0, forward -Z, centered on X. Blender authors
 (x, -store Z, store Y) and exports Y-up. `mat16` identifies glass and `mat17`
-the tube independently. These names retain the rental-terminal contract and
-replace the old guessed television crop rectangles with measured surfaces.
+the tube independently (the register loader still accepts those names beside
+its authored `CrtGlass` / `CrtTube` roles); they replace the old guessed
+television crop rectangles with measured surfaces.
 Only live tube layers emit; ABS, rear metal, foot rubber and glass reflections
 use physical materials. Terminal body finishes remain replaceable without
 discarding the molded surface map.

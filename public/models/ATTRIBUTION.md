@@ -12,8 +12,6 @@ used for the store's prop dressing.
 
 | File | Model | Author | License |
 |---|---|---|---|
-| `crt_monitor.glb` | [CRT Monitor](https://poly.pizza/m/8jVB0zIXKCv) | Jarlan Perez | [CC-BY 3.0](https://creativecommons.org/licenses/by/3.0/) |
-| `keyboard.glb` | [Computer Keyboard](https://poly.pizza/m/vsqTUPFSw6) | Kenney | CC0 |
 | `retro_tv.glb` | [Retro TV](https://poly.pizza/m/2tfjTOK1Lh4) | Alex Safayan | [CC-BY 3.0](https://creativecommons.org/licenses/by/3.0/) |
 | `car_sedan.glb` | [Car](https://poly.pizza/m/Cz6yDaUcM9) | Quaternius | CC0 |
 | `car_hatchback.glb` | [Car Hatchback](https://poly.pizza/m/BG0KAhmGDt) | Kay Lousberg | CC0 |
@@ -34,12 +32,21 @@ The originally vetted free TVs — Zgon's "Old Television from 90's" and
 LiuMeowMeow's "TV Sony Trinitron", both CC-BY 4.0 — remain vetted alternates
 if the user-supplied TV ever needs replacing.
 
-The `rental-terminal.glb`, `ceiling-television.glb` and
-`screening-television.glb` models are original Halcyon Blender meshes under this
-repository's license. They replace the active downloaded CRT slots; the older
-files and their attributions remain for existing consumers and reference.
-Editable source and the reproducible script are `tools/models/store-crts.blend`
-and `tools/models/store-crts.py`. Their embedded roughness map is generated
+The `rental-terminal.glb` and `rental-keyboard.glb` register models are
+original Halcyon Blender meshes under this repository's license, authored by
+`tools/models/counter-terminal.py` (editable `tools/models/counter-terminal.blend`).
+They replaced the downloaded `crt_monitor.glb` ("CRT Monitor" by Jarlan Perez,
+CC-BY 3.0, poly.pizza/m/8jVB0zIXKCv) and `keyboard.glb` ("Computer Keyboard" by
+Kenney, CC0): the monitor's overall proportions were measured from that CC-BY
+model so the approved silhouette carried over, but no geometry, UVs or imagery
+from either download is in the new files, and their embedded occlusion and
+grain maps are generated. See `docs/counter-terminal-model.md`.
+
+The `ceiling-television.glb` and `screening-television.glb` models are original
+Halcyon Blender meshes under this repository's license (an earlier
+`rental-terminal.glb` from the same script was superseded by the register
+models above). Editable source and the reproducible script are
+`tools/models/store-crts.blend` and `tools/models/store-crts.py`. Their embedded roughness map is generated
 original material grain, not downloaded imagery. See
 `docs/store-remodel-models.md` for dimensions, materials and integration.
 
