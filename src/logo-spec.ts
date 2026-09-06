@@ -278,19 +278,14 @@ export function getActiveLogoSpec(theme?: StoreTheme, compose = true): LogoSpec 
   }
   const packLogo = getBrandPack()?.logo;
   if (packLogo) base = mergeLogoSpec(base, packLogo);
-  const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('bb_logo') : null;
-  if (raw) {
-    try {
-      const parsed = JSON.parse(raw) as Partial<LogoSpec>;
-      // An explicit built-in background replaces imported artwork as well.
-      if (parsed.shape && parsed.shape !== 'path' && parsed.shape !== 'image') {
-        base = { ...base, pathD: undefined, imageSrc: undefined, wordmarkPathD: undefined,
-          artLayers: undefined, emblem: undefined };
-      }
-      base = mergeLogoSpec(base, parsed);
-    } catch (e) {
-      console.error('Failed to parse bb_logo spec, using theme default:', e);
+  const parsed = getUserLogoEdits();
+  if (parsed) {
+    // An explicit built-in background replaces imported artwork as well.
+    if (parsed.shape && parsed.shape !== 'path' && parsed.shape !== 'image') {
+      base = { ...base, pathD: undefined, imageSrc: undefined, wordmarkPathD: undefined,
+        artLayers: undefined, emblem: undefined };
     }
+    base = mergeLogoSpec(base, parsed);
   }
   // The emblem editor's document is stored on its own (bb_emblem) rather than
   // inside bb_logo: it is a whole composition, not a field diff, and keeping
@@ -305,4 +300,34 @@ export function getActiveLogoSpec(theme?: StoreTheme, compose = true): LogoSpec 
   // comes back byte-identical, so the hot path still returns the shared
   // default object verbatim.
   return applyEmblemToSpec(base.tornEdge ? { ...base, tornEdge: false } : base);
+}
+
+/**
+ * The owner's own edits from the Store Brand panel (bb_logo): the field diff
+ * against whatever base the panel was showing, or null when nothing has been
+ * changed by hand. Shared with themes.ts, which needs to know which COLOURS
+ * were set by the owner — those outrank an installed pack's palette in
+ * getActiveTheme, where the composed spec alone can't say who set what.
+ */
+export function getUserLogoEdits(): Partial<LogoSpec> | null {
+  const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('bb_logo') : null;
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? (parsed as Partial<LogoSpec>) : null;
+  } catch (e) {
+    console.error('Failed to parse bb_logo spec, using theme default:', e);
+    return null;
+  }
+}
+
+/**
+ * A stable identity for a composed spec, for caches that bake it into pixels
+ * (the procedural case wraps in logo-wrap.ts). Brand edits no longer reload
+ * the page — the settings drawer rebuilds the scene in place — so a "one per
+ * boot" cache has to key on the spec itself or it keeps printing the brand
+ * the store booted with.
+ */
+export function logoSpecCacheKey(spec: LogoSpec): string {
+  return JSON.stringify(spec);
 }

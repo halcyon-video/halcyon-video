@@ -25,7 +25,7 @@
 // per frame. Pure 2D canvas: no three.js.
 import type { CaseMedium } from './video-case';
 import type { LogoSpec } from './logo-spec';
-import { HALCYON_TRIM, HALCYON_CREAM, HALCYON_BLUE, HALCYON_INK } from './logo-spec';
+import { HALCYON_TRIM, HALCYON_CREAM, HALCYON_BLUE, HALCYON_INK, logoSpecCacheKey } from './logo-spec';
 import { drawLogo, getLogoFontString } from './logo-renderer';
 import { brandString } from './brand-pack';
 import { bundledFontsReady } from './bundled-fonts';
@@ -242,13 +242,20 @@ export function customWrapLabel(spec: LogoSpec, kind: 'custom' | 'custom-ticket'
   return `${brand} — blue rental wrap`;
 }
 
-// One canvas per (kind, medium) per boot. The spec can't change under us
-// mid-boot (brand edits persist to localStorage and reload, like theme /
-// medium changes), so kind+medium is a sufficient key.
+// One canvas per (kind, medium) per BRAND. Brand edits used to reload the
+// page, so kind+medium was a sufficient key; the settings drawer now rebuilds
+// the scene in place, and a cache that ignored the spec kept printing the
+// brand the store booted with on every case. The spec is part of the key, and
+// a kind keeps only its latest print — one brand at a time, no pile-up while
+// a colour picker is dragged.
 const wrapCache = new Map<string, HTMLCanvasElement>();
-function cachedWrap(key: string, build: () => HTMLCanvasElement): HTMLCanvasElement {
+function cachedWrap(kind: string, spec: LogoSpec, build: () => HTMLCanvasElement): HTMLCanvasElement {
+  const key = `${kind}|${logoSpecCacheKey(spec)}`;
   let c = wrapCache.get(key);
   if (!c) {
+    for (const stale of wrapCache.keys()) {
+      if (stale.startsWith(`${kind}|`)) wrapCache.delete(stale);
+    }
     c = build();
     wrapCache.set(key, c);
   }
@@ -283,19 +290,19 @@ export function ensureWrapFontsLoaded(spec: LogoSpec, cb: () => void): void {
 
 /** The 'custom' cream-template wrap (typed-metadata compatible). */
 export function buildCustomTemplateWrap(spec: LogoSpec, medium: CaseMedium): HTMLCanvasElement {
-  return cachedWrap(`custom-${medium}`, () => drawTemplateWrap(spec, medium));
+  return cachedWrap(`custom-${medium}`, spec, () => drawTemplateWrap(spec, medium));
 }
 
 /** The 'custom-ticket' all-emblem wrap (plain — no metadata anywhere). */
 export function buildCustomTicketWrap(spec: LogoSpec, medium: CaseMedium): HTMLCanvasElement {
-  return cachedWrap(`custom-ticket-${medium}`, () => drawTicketWrap(spec, medium));
+  return cachedWrap(`custom-ticket-${medium}`, spec, () => drawTicketWrap(spec, medium));
 }
 
 /** The DVD-only 'blue' wrap: the VHS 'Standard Version' design (cream stock,
  *  full-bleed blue panel, gold-rule frame) redrawn on the DVD wrap's own fold
  *  geometry. Typed-metadata compatible (video-case.ts's drawDvdBlueOverlays). */
 export function buildDvdBlueTemplateWrap(spec: LogoSpec): HTMLCanvasElement {
-  return cachedWrap('custom-dvd-blue', () => drawDvdBlueTemplateWrap(spec));
+  return cachedWrap('custom-dvd-blue', spec, () => drawDvdBlueTemplateWrap(spec));
 }
 
 // ─── The cream/white TEMPLATE wrap ───────────────────────────────────────────
