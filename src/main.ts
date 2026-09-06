@@ -4074,12 +4074,12 @@ async function main() {
       if (ui.isSetupOpen) { await setupTerminalInput('ok'); return; }
 
       if (ui.isEmblemStudioOpen) {
-        emblemStudioActivate(1);
+        emblemStudioActivate(0);
         return;
       }
 
       if (ui.isSettingsDrawerOpen) {
-        activateSelectedSetting(1);
+        activateSelectedSetting(settingsRowKeys[settingsIndex]?.startsWith(BRAND_ROW_PREFIX) ? 0 : 1);
         return;
       }
 

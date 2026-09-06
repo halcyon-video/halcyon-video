@@ -35,7 +35,7 @@
 // live through refreshBrand(); the SHAPE of the sign is geometry rather than a
 // texture, so that lands on the close rebuild, the same way a theme change does.
 import {
-  cloneEmblemDoc, emptyEmblemDoc, EMBLEM_KIND_SPECS, moveEmblemLayer,
+  cloneEmblemDoc, EMBLEM_STARTERS, EMBLEM_KIND_SPECS, moveEmblemLayer,
 } from './emblem-doc';
 import type { EmblemDoc, EmblemLayer } from './emblem-doc';
 import {
@@ -89,12 +89,14 @@ export function buildEmblemEditorRow(
   kit: SettingsRowKit,
   hooks: { onDirty?: () => void; onRefreshPage?: () => void } = {},
 ): HTMLElement {
-  const doc = getActiveLogoSpec().emblem;
-  const active = doc && doc.enabled && doc.layers.length > 0;
+  const label = () => {
+    const doc = getActiveLogoSpec().emblem;
+    return doc?.enabled && doc.layers.length ? `${doc.layers.length} layers ›` : 'Open ›';
+  };
   return kit.action(
     'emblem', 'Emblem Editor',
-    'Build a logo out of layered shapes, ovals, stars and type, on its own wide surface. The shape you make becomes the shape of the store’s signs.',
-    active ? `${doc!.layers.length} layers ›` : 'Open ›',
+    'Shape your logo with layers. Every edit works with arrows and OK.',
+    label,
     () => openEmblemStudio({ onDirty: hooks.onDirty, onClose: hooks.onRefreshPage }),
   );
 }
@@ -125,15 +127,16 @@ const STUDIO_MARKUP = `
     <div class="emblem-studio-body">
       <div class="emblem-studio-grid">
         <section class="emblem-col emblem-col-stage">
-          <div class="emblem-panel-title">Design — drag to move, handles to size, stem to rotate</div>
+          <div class="emblem-panel-title">Design preview</div>
           <div class="emblem-stage" id="emblem-studio-stage"></div>
           <div class="emblem-panel-title">On the store's sign</div>
           <canvas class="emblem-sign-canvas" id="emblem-studio-sign"></canvas>
         </section>
+        <div class="emblem-tools">
         <section class="emblem-col emblem-col-layers">
           <div class="emblem-panel-title">Layers — top first</div>
           <div class="settings-row emblem-stack-row">
-            <span class="settings-row-hint">Which layer the properties edit. Left/Right steps the pile; or click an entry, or click the shape itself.</span>
+            <span class="settings-row-hint">Left or Right selects a layer. Down moves to its controls.</span>
             <div class="emblem-stack" id="emblem-studio-stack"></div>
           </div>
           <div class="emblem-rows" id="emblem-studio-layer-ops"></div>
@@ -148,12 +151,13 @@ const STUDIO_MARKUP = `
           <div class="emblem-panel-title">Whole composition</div>
           <div class="emblem-rows" id="emblem-studio-actions"></div>
         </section>
+        </div>
       </div>
       <p class="crt-status emblem-studio-status" id="emblem-studio-status"></p>
     </div>
     <footer class="crt-footer">
       <span class="crt-footer-hint" id="emblem-studio-hint"></span>
-      <span class="crt-footer-page">&#9650;&#9660; Focus &nbsp;&#8226;&nbsp; &#9668;&#9658; Adjust &nbsp;&#8226;&nbsp; Back closes</span>
+      <span class="crt-footer-page">&#9650;&#9660; Focus &nbsp;&#8226;&nbsp; &#9668;&#9658; Adjust &nbsp;&#8226;&nbsp; OK Select &nbsp;&#8226;&nbsp; Back Done</span>
     </footer>
   </div>`;
 
@@ -188,6 +192,9 @@ interface StudioState {
   rowKeys: string[];
   index: number;
   lastSaved: string;
+  lastDoc: EmblemDoc;
+  history: EmblemDoc[];
+  restoring: boolean;
   resizeObserver: ResizeObserver | null;
   redrawPending: number;
 }
@@ -207,11 +214,14 @@ export function isEmblemStudioOpen(): boolean {
 export function openEmblemStudio(hooks: EmblemStudioHooks = {}): void {
   if (studio) return;
   const overlay = studioOverlay();
+  const brand = overlay.querySelector('#emblem-studio-brand');
+  if (brand) brand.textContent = brandString('app-titlebar-brand', 'HALCYON VIDEO');
 
   // Cloned: loadEmblemDoc memoizes and hands every caller the same object, and
   // this one gets mutated on every keystroke and every pointer sample.
   const saved = loadEmblemDoc();
-  const working: EmblemDoc = saved ? cloneEmblemDoc(saved) : emptyEmblemDoc();
+  const working: EmblemDoc = saved ? cloneEmblemDoc(saved)
+    : getActiveLogoSpec().emblem ? cloneEmblemDoc(getActiveLogoSpec().emblem!) : EMBLEM_STARTERS[0].doc();
 
   const stageEl = requireEl('emblem-studio-stage');
   const stackEl = requireEl('emblem-studio-stack');
@@ -243,6 +253,15 @@ export function openEmblemStudio(hooks: EmblemStudioHooks = {}): void {
       s.controls.syncEnablement();
       renderStack();
       requestRedraw();
+    },
+    undo() {
+      const s = studio;
+      const prior = s?.history.pop();
+      if (!s || !prior) return;
+      s.restoring = true;
+      s.session.doc = prior;
+      s.session.restructure();
+      s.restoring = false;
     },
     preview() { requestRedraw(); },
     commit() { commit(); },
@@ -289,7 +308,10 @@ export function openEmblemStudio(hooks: EmblemStudioHooks = {}): void {
     hintEl: document.getElementById('emblem-studio-hint'),
     rowKeys,
     index: 0,
-    lastSaved: JSON.stringify(loadEmblemDoc()),
+    lastSaved: JSON.stringify(working),
+    lastDoc: cloneEmblemDoc(working),
+    history: [],
+    restoring: false,
     resizeObserver: null,
     redrawPending: 0,
   };
@@ -338,7 +360,7 @@ export function openEmblemStudio(hooks: EmblemStudioHooks = {}): void {
   (window as unknown as Record<string, unknown>).__emblemStudio = {
     doc: () => studio?.session.doc ?? null,
     selected: () => studio?.session.selected ?? -1,
-    rows: () => studio?.rowKeys.slice() ?? [],
+    rows: () => studio?.rowKeys.filter((key) => !studioRowEl(key)?.classList.contains('settings-row-inert')) ?? [],
     focused: () => studio?.rowKeys[studio.index] ?? null,
     probe: () => studio?.design.probe() ?? null,
   };
@@ -386,7 +408,7 @@ function redraw(): void {
 
 /** The active brand with the WORKING doc folded in, outline fields and all. */
 function previewSpec(s: StudioState) {
-  return applyEmblemToSpec({ ...getActiveLogoSpec(), emblem: s.session.doc });
+  return applyEmblemToSpec({ ...getActiveLogoSpec(undefined, false), emblem: s.session.doc });
 }
 
 /**
@@ -419,6 +441,11 @@ function commit(): void {
   requestRedraw();
   const next = JSON.stringify(s.session.doc);
   if (next === s.lastSaved) return;
+  if (!s.restoring) {
+    s.history.push(cloneEmblemDoc(s.lastDoc));
+    if (s.history.length > 40) s.history.shift();
+  }
+  s.lastDoc = cloneEmblemDoc(s.session.doc);
   // An emblem with no layers is not an emblem: clear the key rather than leave
   // an empty document behind for the brand chain to resolve.
   saveEmblemDoc(s.session.doc.layers.length ? s.session.doc : null);
@@ -447,7 +474,7 @@ function buildStackRow(): void {
   s.stackRow.tabIndex = -1;
   s.rowKeys.push(STACK_KEY);
   const index = s.rowKeys.length - 1;
-  s.stackRow.addEventListener('pointerenter', () => setStudioSelection(index));
+  s.stackRow.onpointermove = () => { if (studio?.index !== index) setStudioSelection(index); };
 }
 
 /** Step the selection through the stack — the stack row's ◄► behaviour. */
@@ -527,11 +554,13 @@ function stackOpButton(glyph: string, title: string, index: number, op: 'up' | '
   btn.className = 'emblem-stack-op';
   btn.textContent = glyph;
   btn.title = title;
+  btn.setAttribute('aria-label', title);
   btn.addEventListener('click', (e) => {
     e.stopPropagation();
     const s = studio;
     if (!s) return;
     const doc = s.session.doc;
+    const selectedId = s.session.layer()?.id;
     if (op === 'delete') {
       doc.layers.splice(index, 1);
       s.session.selected = Math.max(0, Math.min(s.session.selected, doc.layers.length - 1));
@@ -542,6 +571,8 @@ function stackOpButton(glyph: string, title: string, index: number, op: 'up' | '
       const moved = moveEmblemLayer(doc, index, op === 'up' ? 1 : -1);
       if (wasSelected) s.session.selected = moved;
     }
+    const retained = doc.layers.findIndex((layer) => layer.id === selectedId);
+    if (retained >= 0) s.session.selected = retained;
     s.session.restructure();
   });
   return btn;
@@ -562,11 +593,11 @@ function buildDoneRow(container: HTMLElement): void {
       <span class="settings-row-hint">Close the editor. Everything here saves as you go.</span>
     </span>
     <span class="settings-row-leader" aria-hidden="true"></span>
-    <span class="settings-row-value">Enter</span>
+    <span class="settings-row-value">OK</span>
   `;
   s.rowKeys.push(DONE_KEY);
   const index = s.rowKeys.length - 1;
-  row.addEventListener('pointerenter', () => setStudioSelection(index));
+  row.addEventListener('pointermove', () => { if (studio?.index !== index) setStudioSelection(index); });
   row.addEventListener('click', () => closeEmblemStudio());
   container.appendChild(row);
 }
@@ -581,6 +612,10 @@ function setStudioSelection(index: number): void {
   const s = studio;
   if (!s || !s.rowKeys.length) return;
   s.index = ((index % s.rowKeys.length) + s.rowKeys.length) % s.rowKeys.length;
+  if (s.hintEl) {
+    const el = studioRowEl(s.rowKeys[s.index]);
+    s.hintEl.textContent = el?.querySelector('.settings-row-hint')?.textContent?.trim() ?? '';
+  }
   s.rowKeys.forEach((key, i) => {
     const el = studioRowEl(key);
     if (!el) return;
@@ -592,10 +627,7 @@ function setStudioSelection(index: number): void {
       el.classList.remove('selected');
     }
   });
-  if (s.hintEl) {
-    const el = studioRowEl(s.rowKeys[s.index]);
-    s.hintEl.textContent = el?.querySelector('.settings-row-hint')?.textContent?.trim() ?? '';
-  }
+
 }
 
 /**
@@ -618,6 +650,8 @@ function onStudioKeydown(e: KeyboardEvent): void {
   const el = document.activeElement as HTMLElement | null;
   if (!el || el === document.body || !s.overlay.contains(el)) return;
   if (!/^(INPUT|SELECT|TEXTAREA)$/.test(el.tagName)) return;
+  // Text rows own Escape-to-cancel and Backspace-to-delete.
+  if (el instanceof HTMLInputElement && el.type === 'text') return;
   e.preventDefault();
   e.stopPropagation();
   el.blur();
@@ -627,17 +661,24 @@ function onStudioKeydown(e: KeyboardEvent): void {
 /** ▲▼ — walk the ring. */
 export function emblemStudioMove(delta: number): void {
   if (!studio) return;
-  setStudioSelection(studio.index + delta);
+  const s = studio;
+  for (let step = 1; step <= s.rowKeys.length; step++) {
+    const index = (s.index + delta * step + s.rowKeys.length) % s.rowKeys.length;
+    if (!studioRowEl(s.rowKeys[index])?.classList.contains('settings-row-inert')) {
+      setStudioSelection(index);
+      return;
+    }
+  }
 }
 
-/** ◄ ► OK — adjust or run the focused control. `dir` is +1 or -1. */
+/** Arrows adjust (-1/+1); OK (0) also runs deliberate actions. */
 export function emblemStudioActivate(dir: number): void {
   const s = studio;
   if (!s) return;
   const key = s.rowKeys[s.index];
-  if (key === STACK_KEY) { stepStack(dir); return; }
+  if (key === STACK_KEY) { stepStack(dir || 1); return; }
   if (key === DONE_KEY) {
-    if (dir > 0) closeEmblemStudio();
+    if (dir === 0) closeEmblemStudio();
     return;
   }
   s.kit.dispatch(key, dir);

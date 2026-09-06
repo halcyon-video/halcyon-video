@@ -33,4 +33,6 @@ export interface EmblemSession {
   commit(): void;
   /** Add / delete / reorder / replace: re-read every control, then commit. */
   restructure(): void;
+  /** Restore the preceding committed edit, including pointer gestures. */
+  undo(): void;
 }

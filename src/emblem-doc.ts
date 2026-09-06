@@ -538,6 +538,14 @@ export interface EmblemStarter { label: string; doc: () => EmblemDoc }
 
 export const EMBLEM_STARTERS: EmblemStarter[] = [
   {
+    label: 'House Board',
+    doc: () => ({ ...emptyEmblemDoc(), aspect: 2.4, tilt: 4, layers: [
+      layer('rect', { w: 1, h: 1, detail: 0, ink: 'body' }),
+      layer('rect', { w: 0.94, h: 0.86, detail: 0, ink: 'border', role: 'ink' }),
+      layer('rect', { w: 0.92, h: 0.82, detail: 0, ink: 'body', role: 'ink' }),
+    ] }),
+  },
+  {
     label: 'Blank',
     doc: () => emptyEmblemDoc(),
   },
@@ -568,15 +576,13 @@ export const EMBLEM_STARTERS: EmblemStarter[] = [
     }),
   },
   {
-    label: 'Ticket Plate',
+    label: 'Soft Plaque',
     doc: () => ({
       ...emptyEmblemDoc(),
       aspect: 3,
       tilt: 4,
       layers: [
         layer('rect', { cx: 0.5, cy: 0.5, w: 1, h: 0.86, detail: 0.12, ink: 'body' }),
-        layer('ellipse', { cx: 0.06, cy: 0.5, w: 0.09, h: 0.3, role: 'hole' }),
-        layer('ellipse', { cx: 0.94, cy: 0.5, w: 0.09, h: 0.3, role: 'hole' }),
         layer('rect', { cx: 0.5, cy: 0.5, w: 0.93, h: 0.72, detail: 0.1, ink: 'border', role: 'ink' }),
         layer('rect', { cx: 0.5, cy: 0.5, w: 0.9, h: 0.66, detail: 0.1, ink: 'body', role: 'ink' }),
       ],

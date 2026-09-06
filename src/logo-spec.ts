@@ -260,7 +260,7 @@ function mergeLogoSpec(base: LogoSpec, partial: Partial<LogoSpec>): LogoSpec {
  * Returns the theme's shared default object verbatim on the no-override hot
  * path — treat the result as immutable.
  */
-export function getActiveLogoSpec(theme?: StoreTheme): LogoSpec {
+export function getActiveLogoSpec(theme?: StoreTheme, compose = true): LogoSpec {
   let base: LogoSpec | undefined = theme?.brand.logo;
   if (!base) {
     const savedTheme = typeof localStorage !== 'undefined' ? localStorage.getItem('bb_theme') : null;
@@ -282,13 +282,10 @@ export function getActiveLogoSpec(theme?: StoreTheme): LogoSpec {
   if (raw) {
     try {
       const parsed = JSON.parse(raw) as Partial<LogoSpec>;
-      // If a brand pack or drop provides custom artwork (imageSrc or pathD),
-      // a generic shape override in bb_logo (e.g. 'rect') that lacks its own
-      // artwork must not wipe out the brand pack's art.
-      if (packLogo?.imageSrc && !parsed.imageSrc && parsed.shape && parsed.shape !== 'image') {
-        delete parsed.shape;
-      } else if (packLogo?.pathD && !parsed.pathD && !parsed.imageSrc && parsed.shape && parsed.shape !== 'path') {
-        delete parsed.shape;
+      // An explicit built-in background replaces imported artwork as well.
+      if (parsed.shape && parsed.shape !== 'path' && parsed.shape !== 'image') {
+        base = { ...base, pathD: undefined, imageSrc: undefined, wordmarkPathD: undefined,
+          artLayers: undefined, emblem: undefined };
       }
       base = mergeLogoSpec(base, parsed);
     } catch (e) {
@@ -300,10 +297,12 @@ export function getActiveLogoSpec(theme?: StoreTheme): LogoSpec {
   // it separate means the two editors can't clobber each other's save. It sits
   // LAST in the chain for the same reason every other tier does — the thing
   // the user built here wins over the thing a pack shipped.
+  // Editors change the authored fields, never the outline derived from a composition.
+  if (!compose) return base.tornEdge ? { ...base, tornEdge: false } : base;
   const savedEmblem = loadEmblemDoc();
   if (savedEmblem) base = { ...base, emblem: savedEmblem };
   // Derive the outline fields from whichever emblem survived. A no-emblem spec
   // comes back byte-identical, so the hot path still returns the shared
   // default object verbatim.
-  return applyEmblemToSpec(base);
+  return applyEmblemToSpec(base.tornEdge ? { ...base, tornEdge: false } : base);
 }
