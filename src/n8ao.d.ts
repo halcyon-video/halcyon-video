@@ -30,6 +30,13 @@ declare module 'n8ao' {
   export class N8AOPass extends Pass {
     constructor(scene: Scene, camera: Camera, width?: number, height?: number);
     configuration: N8AOConfiguration;
+    /**
+     * When true (the package default) the pass runs a full scene.traverse()
+     * every frame to auto-set `configuration.transparencyAware`. Setting the
+     * config flag alone does NOT clear this — the Proxy only latches on a
+     * value CHANGE — so both are assigned at construction.
+     */
+    autoDetectTransparency: boolean;
     /** Beauty (pre-AO scene draw) target, with its own depth texture. */
     beautyRenderTarget: WebGLRenderTarget;
     setQualityMode(
