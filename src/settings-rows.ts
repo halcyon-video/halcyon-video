@@ -192,9 +192,12 @@ export class SettingsRowKit {
     const syncOptions = () => {
       element.innerHTML = '';
       const opts = (typeof options === 'function' ? options() : options).slice();
-      // Keep an off-menu current value (e.g. a theme's own serif font stack)
+      // Keep an off-menu current value (e.g. a theme's own serif font stack or custom shape)
       // selectable rather than silently misreporting it as the first option.
-      if (!opts.some((o) => o.id === get())) opts.unshift({ id: get(), label: 'Theme Font' });
+      if (!opts.some((o) => o.id === get())) {
+        const fallbackLabel = id.includes('font') ? 'Theme Font' : id.includes('shape') ? 'Custom Shape' : 'Custom';
+        opts.unshift({ id: get(), label: fallbackLabel });
+      }
       for (const o of opts) {
         const opt = document.createElement('option');
         opt.value = o.id;

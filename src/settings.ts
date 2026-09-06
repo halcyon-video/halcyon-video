@@ -40,6 +40,8 @@ import type { LogoShape, LogoSpec } from './logo-spec';
 import { drawLogo, getLogoFontString } from './logo-renderer';
 import { activatePanelRow, SettingsRowKit } from './settings-rows';
 import { buildEmblemEditorRow } from './emblem-editor';
+import { emblemDocActive } from './emblem-doc';
+import { loadEmblemDoc } from './emblem-render';
 import { brandFontChoices } from './brand-fonts';
 import { buildControlsHelpPanel } from './controls-help';
 import { registerStoreFormatSetting } from './store-format-setting';
@@ -426,11 +428,19 @@ function brandDropDiagnostic(): string {
   if (!drop) {
     if (activeBrandPackId()) return 'Not consulted — a named Brand Pack wins over the drop folder.';
     const stray = misplacedBrandArt();
-    if (stray) return `${stray} is in brands/ (packs only) — simple drops go in brand/.`;
-    return 'Create public/user-assets/brand/, drop logo.svg or .png, reload.';
+    if (stray) return `${stray} is in brands/ (packs only) — simple drops go in user-assets/brand/.`;
+    return 'Create user-assets/brand/, drop logo.png or logo.svg, reload.';
   }
-  if (brandPackSource() !== 'drop') {
+  if (activeBrandPackId()) {
     return `${drop.file} found, but a named Brand Pack wins over it.`;
+  }
+  const emblemDoc = loadEmblemDoc();
+  if (emblemDoc && emblemDocActive(emblemDoc)) {
+    return `${drop.file} found, but Emblem Studio composition is active — clear it in Emblem Studio to use this drop.`;
+  }
+  const rawLogo = typeof localStorage !== 'undefined' ? localStorage.getItem('bb_logo') : null;
+  if (rawLogo) {
+    return `${drop.file} found, but custom brand edits are active — select Theme Default preset to reset to this drop.`;
   }
   const shape = drop.silhouette === 'outline' ? 'outline traced'
     : drop.silhouette === 'alpha-contour' ? 'alpha traced'
@@ -1341,6 +1351,8 @@ const BRAND_SHAPES: { id: LogoShape; label: string }[] = [
   { id: 'triangle', label: 'Triangle' },
   { id: 'half-circle', label: 'Half Circle' },
   { id: 'shield', label: 'Shield' },
+  { id: 'image', label: 'Dropped Image' },
+  { id: 'path', label: 'Dropped Outline' },
   { id: 'none', label: 'None (text only)' },
 ];
 
@@ -1441,7 +1453,9 @@ export function buildStoreBrandPanel(container: HTMLElement, hooks: BrandPanelHo
   brandRowActivate.clear();
 
   const themeId = resolveThemeId(getSetting<string>('bb_theme'));
-  const baseSpec = DEFAULT_LOGO_SPECS[themeId] ?? DEFAULT_LOGO_SPECS['bb-1990'];
+  const themeBase = DEFAULT_LOGO_SPECS[themeId] ?? DEFAULT_LOGO_SPECS['bb-1990'];
+  const packLogo = getBrandPack()?.logo;
+  const baseSpec = packLogo ? mergeLogoPartial(themeBase, packLogo) : themeBase;
   let working = cloneLogoSpec(getActiveLogoSpec());
   let lastSaved = typeof localStorage !== 'undefined' ? localStorage.getItem('bb_logo') : null;
 
@@ -1526,6 +1540,10 @@ export function buildStoreBrandPanel(container: HTMLElement, hooks: BrandPanelHo
   kit.readout('drop', 'Dropped Logo', brandDropDiagnostic(), () => {
     const drop = brandDropReport();
     if (!drop) return misplacedBrandArt() ? 'Wrong folder' : 'Empty';
+    if (activeBrandPackId()) return `${drop.file} — pack active`;
+    const doc = loadEmblemDoc();
+    if (doc && emblemDocActive(doc)) return `${drop.file} — overridden by emblem`;
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('bb_logo')) return `${drop.file} — overridden by settings`;
     return brandPackSource() === 'drop' ? `${drop.file} — active` : `${drop.file} — overridden`;
   });
 

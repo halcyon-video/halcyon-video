@@ -1,5 +1,5 @@
 import type { LogoSpec } from './logo-spec';
-import { getBrandPack } from './brand-pack';
+import { getBrandPack, brandAssetUrl } from './brand-pack';
 import {
   DEFAULT_LOGO_SPECS, getActiveLogoSpec,
   HALCYON_BLUE, HALCYON_TRIM, HALCYON_ACCENT, HALCYON_BLUE_LIT,
@@ -393,4 +393,60 @@ export function applyThemeCssVars(theme: StoreTheme): void {
   style.setProperty('--font-body', "'Outfit', sans-serif");
   style.setProperty('--font-mono', "'Share Tech Mono', monospace");
   style.setProperty('--font-display', "'Archivo Black', sans-serif");
+
+  // Keep the shared in-DOM SVG ticket logo in step with the active brand
+  syncTicketLogo(theme);
+}
+
+/**
+ * Synchronize the in-DOM <g id="bb-ticket-logo"> SVG def (used by boot screen,
+ * login overlay, genre menu, and screensaver) with the active brand spec.
+ */
+export function syncTicketLogo(theme: StoreTheme): void {
+  if (typeof document === 'undefined') return;
+  const g = document.getElementById('bb-ticket-logo');
+  if (!g) return;
+  const spec = getActiveLogoSpec(theme);
+  const primary = theme.palette.primary;
+  const border = spec.borderColor;
+  const knockout = spec.textColor;
+
+  if (spec.shape === 'image' && spec.imageSrc) {
+    const src = brandAssetUrl(spec.imageSrc);
+    if (src) {
+      g.innerHTML = `<image href="${src}" x="20" y="40" width="600" height="320" preserveAspectRatio="xMidYMid meet"/>`;
+      return;
+    }
+  }
+
+  if (spec.shape === 'path' && spec.pathD) {
+    let inner = `<path d="${spec.pathD}" fill="${spec.bodyColor}"/>`;
+    if (spec.artLayers?.length) {
+      for (const layer of spec.artLayers) {
+        const col = layer.color ?? (layer.paint === 'body' ? spec.bodyColor : layer.paint === 'border' ? border : knockout);
+        if (layer.stroke) {
+          inner += `<path d="${layer.d}" fill="none" stroke="${col}" stroke-width="${layer.strokeWidth ?? 5}"/>`;
+        } else {
+          inner += `<path d="${layer.d}" fill="${col}"/>`;
+        }
+      }
+    }
+    if (spec.mainText) {
+      inner += `<text class="bb-logo-text" x="320" y="212" text-anchor="middle" font-family="'Archivo Black',sans-serif" font-size="92" fill="${knockout}">${spec.mainText}</text>`;
+      if (spec.subText) {
+        inner += `<text class="bb-logo-text" x="566" y="286" text-anchor="end" font-family="'Archivo Black',sans-serif" font-size="40" fill="${knockout}">${spec.subText}</text>`;
+      }
+    }
+    g.innerHTML = inner;
+    return;
+  }
+
+  const main = spec.mainText || 'HALCYON';
+  const sub = spec.subText || '';
+  g.innerHTML = `
+    <rect class="bb-logo-ticket" x="20" y="60" width="600" height="280" rx="34" fill="${primary}"/>
+    <rect class="bb-logo-border" x="48" y="88" width="544" height="224" rx="22" fill="none" stroke="${border}" stroke-width="7"/>
+    <text class="bb-logo-text" x="320" y="${sub ? '212' : '230'}" text-anchor="middle" font-family="'Archivo Black',sans-serif" font-size="92" fill="${knockout}">${main}</text>
+    ${sub ? `<text class="bb-logo-text" x="566" y="286" text-anchor="end" font-family="'Archivo Black',sans-serif" font-size="40" fill="${knockout}">${sub}</text>` : ''}
+  `;
 }

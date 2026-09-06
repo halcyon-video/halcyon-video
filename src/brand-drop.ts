@@ -42,18 +42,30 @@
 import type { LogoArtLayer, LogoSpec } from './logo-spec';
 import type { BrandPackManifest } from './brand-pack';
 
-/** The folder, relative to public/user-assets/. */
+/** The folder candidates, relative to public/user-assets/. */
+export const BRAND_DROP_DIRS = ['brand', 'BRAND', 'Brand'] as const;
 export const BRAND_DROP_DIR = 'brand';
 
 /** The Brand Pack tier's folder (brand-pack.ts) — same name, plural, wrong
  *  tier for a bare logo file. See `misplaced` below. */
 const BRAND_PACKS_DIR = 'brands';
 
-/** Emblem files probed, in order. First one that loads wins. */
-const DROP_LOGO_FILES = ['logo.svg', 'logo.png', 'logo.webp', 'logo.jpg', 'logo.jpeg'];
+/** Emblem files probed, in order. Case-insensitive variants included for Linux/Docker filesystems. */
+const DROP_LOGO_FILES = [
+  'logo.svg', 'LOGO.SVG', 'Logo.svg',
+  'logo.png', 'LOGO.PNG', 'Logo.png', 'logo.PNG',
+  'logo.webp', 'LOGO.WEBP', 'Logo.webp',
+  'logo.jpg', 'LOGO.JPG', 'Logo.jpg',
+  'logo.jpeg', 'LOGO.JPEG', 'Logo.jpeg',
+];
+
+const DROP_NAME_FILES = ['brand.txt', 'BRAND.TXT', 'Brand.txt'];
+const DROP_MANIFEST_FILES = ['brand.json', 'BRAND.JSON'];
 
 /** What the detector found, for the settings/service diagnostics. */
 export interface BrandDropReport {
+  /** The folder where the file was found, e.g. 'brand' or 'BRAND'. */
+  dir?: string;
   /** The file the identity was synthesized from, e.g. 'logo.svg'. */
   file: string;
   kind: 'svg' | 'image' | 'manifest';
@@ -224,6 +236,7 @@ function sampleSvgShapes(svgText: string): SampledShape[] {
  * then Douglas-Peucker to a manageable point count.
  */
 function traceAlphaContour(img: HTMLImageElement): { d: string; w: number; h: number } | null {
+  if (typeof document === 'undefined') return null;
   const long = Math.max(img.width, img.height);
   if (!long) return null;
   const s = Math.min(1, 160 / long);
@@ -322,6 +335,7 @@ function simplify(pts: { x: number; y: number }[], tol: number): { x: number; y:
 
 /** Dominant + highest-contrast colours of an image's opaque pixels. */
 function sampleImageColors(img: HTMLImageElement): { body: string | null; text: string | null } {
+  if (typeof document === 'undefined') return { body: null, text: null };
   const long = Math.max(img.width, img.height);
   const s = Math.min(1, 96 / (long || 1));
   const w = Math.max(1, Math.round(img.width * s));
@@ -395,30 +409,35 @@ function titleCase(s: string): string {
  */
 export async function detectBrandDrop(
   assetUrlFor: (p: string) => string,
-): Promise<{ manifest: BrandPackManifest; report: BrandDropReport } | null> {
+): Promise<{ manifest: BrandPackManifest; report: BrandDropReport; dir?: string } | null> {
   report = null;
   misplaced = null;
   if (typeof fetch === 'undefined') return null;
 
   // A brand.json in the drop folder means "this IS a pack" — hand it back
   // whole and synthesize nothing.
-  const manifestText = await fetchDropText(assetUrlFor, `${BRAND_DROP_DIR}/brand.json`);
-  if (manifestText) {
-    try {
-      const parsed = JSON.parse(manifestText) as BrandPackManifest;
-      const rep: BrandDropReport = {
-        file: 'brand.json', kind: 'manifest',
-        name: parsed.displayName ?? parsed.name ?? 'brand',
-        nameFrom: 'default', bodyColor: null, textColor: null,
-        silhouette: parsed.logo?.pathD ? 'outline' : 'carrier',
-        artLayers: parsed.logo?.artLayers?.length ?? 0,
-        notes: ['full manifest — nothing synthesized'],
-      };
-      report = rep;
-      return { manifest: parsed, report: rep };
-    } catch {
-      // Fall through to the art probe: a broken brand.json shouldn't hide a
-      // perfectly good logo.svg sitting beside it.
+  for (const dir of BRAND_DROP_DIRS) {
+    for (const manifestFile of DROP_MANIFEST_FILES) {
+      const manifestText = await fetchDropText(assetUrlFor, `${dir}/${manifestFile}`);
+      if (manifestText) {
+        try {
+          const parsed = JSON.parse(manifestText) as BrandPackManifest;
+          const rep: BrandDropReport = {
+            dir,
+            file: manifestFile, kind: 'manifest',
+            name: parsed.displayName ?? parsed.name ?? 'brand',
+            nameFrom: 'default', bodyColor: null, textColor: null,
+            silhouette: parsed.logo?.pathD ? 'outline' : 'carrier',
+            artLayers: parsed.logo?.artLayers?.length ?? 0,
+            notes: ['full manifest — nothing synthesized'],
+          };
+          report = rep;
+          return { manifest: parsed, report: rep, dir };
+        } catch {
+          // Fall through to the art probe: a broken brand.json shouldn't hide a
+          // perfectly good logo.svg sitting beside it.
+        }
+      }
     }
   }
 
@@ -426,29 +445,44 @@ export async function detectBrandDrop(
   // case is that none of them exist, and paying five sequential round trips on
   // every boot to learn that is not a thing to do to a store that opens in
   // under a second. brand.txt rides along in the same batch.
-  const probes = DROP_LOGO_FILES.map((cand) => (cand.endsWith('.svg')
-    ? fetchDropText(assetUrlFor, `${BRAND_DROP_DIR}/${cand}`).then((t) => (t && /<svg[\s>]/i.test(t) ? { cand, svg: t } : null))
-    : loadImage(assetUrlFor(`${BRAND_DROP_DIR}/${cand}`)).then((i) => (i && i.width > 0 ? { cand, img: i } : null))));
-  const nameProbe = fetchDropText(assetUrlFor, `${BRAND_DROP_DIR}/brand.txt`);
-  const found = (await Promise.all(probes)).find((r) => r !== null) as
-    { cand: string; svg?: string; img?: HTMLImageElement } | undefined;
+  const probes: Promise<{ dir: string; cand: string; svg?: string; img?: HTMLImageElement } | null>[] = [];
+  for (const dir of BRAND_DROP_DIRS) {
+    for (const cand of DROP_LOGO_FILES) {
+      probes.push(
+        cand.toLowerCase().endsWith('.svg')
+          ? fetchDropText(assetUrlFor, `${dir}/${cand}`).then((t) => (t && /<svg[\s>]/i.test(t) ? { dir, cand, svg: t } : null))
+          : loadImage(assetUrlFor(`${dir}/${cand}`)).then((i) => (i && i.width > 0 ? { dir, cand, img: i } : null))
+      );
+    }
+  }
+
+  const nameProbes: Promise<string | null>[] = [];
+  for (const dir of BRAND_DROP_DIRS) {
+    for (const nameCand of DROP_NAME_FILES) {
+      nameProbes.push(fetchDropText(assetUrlFor, `${dir}/${nameCand}`));
+    }
+  }
+
+  const found = (await Promise.all(probes)).find((r) => r !== null);
   if (!found) {
     // Same filenames, one folder over: brands/ (plural) is the Brand Pack
     // tier and never even looks here without a bb_brand_pack id, so a bare
     // brands/logo.png sits there unread. One extra batch of probes, paid only
     // on the already-uncommon "nothing in brand/" path.
-    const strayProbes = DROP_LOGO_FILES.map((cand) => (cand.endsWith('.svg')
+    const strayProbes = DROP_LOGO_FILES.map((cand) => (cand.toLowerCase().endsWith('.svg')
       ? fetchDropText(assetUrlFor, `${BRAND_PACKS_DIR}/${cand}`).then((t) => (t && /<svg[\s>]/i.test(t) ? cand : null))
       : loadImage(assetUrlFor(`${BRAND_PACKS_DIR}/${cand}`)).then((i) => (i && i.width > 0 ? cand : null))));
     misplaced = (await Promise.all(strayProbes)).find((c) => c !== null) ?? null;
     return null;
   }
+  const dir: string = found.dir;
   const file: string = found.cand;
   const svgText: string | null = found.svg ?? null;
   const img: HTMLImageElement | null = found.img ?? null;
 
   const notes: string[] = [];
-  const nameText = await nameProbe;
+  const nameResults = await Promise.all(nameProbes);
+  const nameText = nameResults.find((t) => typeof t === 'string' && t.trim().length > 0) ?? null;
   const savedMain = readSavedMainText();
   const base = file.replace(/\.[^.]+$/, '');
   let name: string;
@@ -542,6 +576,10 @@ export async function detectBrandDrop(
     const split = splitBrandName(name);
     logo.mainText = split.main;
     if (split.sub !== undefined) logo.subText = split.sub;
+  } else if (!name) {
+    // Custom drop with no brand.txt: do not stamp the store's default "HALCYON VIDEO" over the mark
+    logo.mainText = '';
+    logo.subText = '';
   }
 
   const manifest: BrandPackManifest = {
@@ -563,11 +601,12 @@ export async function detectBrandDrop(
   };
 
   const rep: BrandDropReport = {
+    dir,
     file, kind: svgText ? 'svg' : 'image', name: name || '(store default)', nameFrom,
     bodyColor, textColor, silhouette, artLayers, notes,
   };
   report = rep;
-  return { manifest, report: rep };
+  return { manifest, report: rep, dir };
 }
 
 /**

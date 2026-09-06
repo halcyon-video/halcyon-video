@@ -281,7 +281,16 @@ export function getActiveLogoSpec(theme?: StoreTheme): LogoSpec {
   const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('bb_logo') : null;
   if (raw) {
     try {
-      base = mergeLogoSpec(base, JSON.parse(raw) as Partial<LogoSpec>);
+      const parsed = JSON.parse(raw) as Partial<LogoSpec>;
+      // If a brand pack or drop provides custom artwork (imageSrc or pathD),
+      // a generic shape override in bb_logo (e.g. 'rect') that lacks its own
+      // artwork must not wipe out the brand pack's art.
+      if (packLogo?.imageSrc && !parsed.imageSrc && parsed.shape && parsed.shape !== 'image') {
+        delete parsed.shape;
+      } else if (packLogo?.pathD && !parsed.pathD && !parsed.imageSrc && parsed.shape && parsed.shape !== 'path') {
+        delete parsed.shape;
+      }
+      base = mergeLogoSpec(base, parsed);
     } catch (e) {
       console.error('Failed to parse bb_logo spec, using theme default:', e);
     }
