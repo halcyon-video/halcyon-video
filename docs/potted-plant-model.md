@@ -5,9 +5,9 @@ now loads a Blender-authored construction kit — a thick-walled lathed planter,
 a tapered multi-stem trunk, two curved branch profiles and two creased leaf
 blades — and stamps it into a branching tree with credible attachment,
 per-instance growth variety, and a fraction of the previous draw calls. The
-other three plant variants (`floor-palm`, `snake-plant`, `pothos`) are
-unchanged procedural geometry, out of scope for this model (separate work
-orders).
+other plant variants `floor-palm` and `snake-plant` are unchanged procedural
+geometry, out of scope for this model (separate work orders); `pothos` has
+since had its own kit — see `docs/pothos-model.md`.
 
 Blender source: `tools/models/potted-plant.py`. Rebuild with
 `blender -b -t 2 --python tools/models/potted-plant.py`. Runtime kit:

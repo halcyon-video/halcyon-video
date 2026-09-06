@@ -8,6 +8,7 @@ import { FixturePlacement } from '../store-layout';
 import { FixtureContext, StoreFixture } from '../fixtures';
 import { Footprint } from '../layout-validator';
 import { installFicus, FicusInstall } from '../ficus-model';
+import { installPothos, PothosInstall } from '../pothos-model';
 
 export type PlantVariant = 'floor-palm' | 'tall-ficus' | 'snake-plant' | 'pothos';
 
@@ -76,28 +77,88 @@ function snakePlantTex(): THREE.CanvasTexture {
   });
 }
 
-/** Pothos leaf texture: rich emerald green with creamy golden-yellow marbling. */
+/**
+ * Golden-pothos leaf texture. UV convention (both the Blender blade in
+ * tools/models/pothos.py and createHeartLeafGeometry): u runs edge-to-edge
+ * with the midrib at 0.5, v runs base-to-tip — and CanvasTexture flips Y, so
+ * the tip is the TOP of this canvas and the base the bottom.
+ *
+ * Variegation is painted as irregular splashes ALIGNED WITH THE VEINS, which
+ * is how the cultivar actually marbles; scattering round blobs at random
+ * angles reads as spots on a sick plant rather than as gold pothos.
+ */
 function pothosLeafTex(): THREE.CanvasTexture {
   return cachedTex('plant:pothos', 256, 256, (ctx, w, h) => {
-    ctx.fillStyle = '#246b2f';
+    let seed = 0x2f6d3a1b;
+    const rnd = () => {
+      seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+      return seed / 4294967296;
+    };
+    // Vein bearing at height y: veins leave the midrib and sweep toward the
+    // tip, more steeply the closer to the tip they are.
+    const veinAngle = (y: number, side: number) => side * (0.95 - 0.45 * (1 - y / h));
+
+    const base = ctx.createLinearGradient(0, h, 0, 0);
+    base.addColorStop(0, '#1d5626');
+    base.addColorStop(0.55, '#256c31');
+    base.addColorStop(1, '#2c7a36');
+    ctx.fillStyle = base;
     ctx.fillRect(0, 0, w, h);
 
-    ctx.fillStyle = '#b7dc5e';
-    for (let i = 0; i < 18; i++) {
-      const rx = (Math.sin(i * 3.7) * 0.5 + 0.5) * w;
-      const ry = (Math.cos(i * 5.3) * 0.5 + 0.5) * h;
-      const rw = 12 + (i % 5) * 8;
-      const rh = 8 + (i % 4) * 6;
-      ctx.beginPath();
-      ctx.ellipse(rx, ry, rw, rh, (i * 0.4), 0, Math.PI * 2);
-      ctx.fill();
+    // Lateral veins, drawn before the variegation so the marbling reads as
+    // sitting in the leaf surface rather than printed on top of it.
+    ctx.strokeStyle = 'rgba(146, 196, 96, 0.35)';
+    ctx.lineWidth = 2;
+    for (let y = h - 22; y > 18; y -= 17) {
+      for (const side of [-1, 1]) {
+        const a = veinAngle(y, side);
+        ctx.beginPath();
+        ctx.moveTo(w / 2, y);
+        ctx.quadraticCurveTo(w / 2 + side * w * 0.24, y - Math.tan(a) * w * 0.16,
+                             w / 2 + side * w * 0.5, y - Math.tan(a) * w * 0.36);
+        ctx.stroke();
+      }
     }
 
-    ctx.strokeStyle = '#8bbd45';
+    // Variegation: streaks stretched along the local vein bearing, in a few
+    // clustered patches, plus a couple of broad sectors near one margin.
+    const splash = (cx: number, cy: number, len: number, thick: number, fill: string) => {
+      const side = cx < w / 2 ? -1 : 1;
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(-veinAngle(cy, side) * side + (side < 0 ? Math.PI : 0));
+      ctx.fillStyle = fill;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, len, thick, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    };
+    const TONES = ['rgba(214, 222, 137, 0.9)', 'rgba(166, 201, 96, 0.85)', 'rgba(120, 172, 74, 0.75)'];
+    for (let cluster = 0; cluster < 4; cluster++) {
+      const cx = w * (0.18 + rnd() * 0.64);
+      const cy = h * (0.14 + rnd() * 0.70);
+      const tone = TONES[Math.floor(rnd() * TONES.length)];
+      for (let i = 0; i < 4; i++) {
+        splash(cx + (rnd() - 0.5) * 30, cy + (rnd() - 0.5) * 26,
+               9 + rnd() * 16, 3 + rnd() * 4, tone);
+      }
+    }
+    splash(w * 0.21, h * 0.44, 26, 10, 'rgba(214, 222, 137, 0.7)');
+    splash(w * 0.80, h * 0.68, 22, 8, 'rgba(166, 201, 96, 0.7)');
+
+    // Midrib last: a pale rib with a thin shadow on one flank, so the crease
+    // in the geometry lands on a rib in the artwork instead of beside one.
+    ctx.strokeStyle = 'rgba(30, 74, 34, 0.55)';
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    ctx.moveTo(w / 2 + 3, h);
+    ctx.lineTo(w / 2 + 3, 6);
+    ctx.stroke();
+    ctx.strokeStyle = '#8fc25a';
     ctx.lineWidth = 4;
     ctx.beginPath();
     ctx.moveTo(w / 2, h);
-    ctx.quadraticCurveTo(w / 2 + 5, h / 2, w / 2, 0);
+    ctx.quadraticCurveTo(w / 2 + 4, h / 2, w / 2, 4);
     ctx.stroke();
   });
 }
@@ -142,6 +203,7 @@ export class PottedPlant implements StoreFixture {
   private footprint: Footprint | null = null;
   private disposed = false;
   private ficusInstall: FicusInstall | null = null;
+  private pothosInstall: PothosInstall | null = null;
 
   constructor(placement: FixturePlacement, ctx: FixtureContext) {
     this.placement = placement;
@@ -681,8 +743,51 @@ export class PottedPlant implements StoreFixture {
     return geo;
   }
 
-  /** Builds a trailing pothos plant for countertops or desks. Returns pot diameter. */
+  /**
+   * Builds a trailing pothos for countertops and desks (~0.9 ft across). The
+   * Blender-authored kit (tools/models/pothos.py, src/pothos-model.ts) loads
+   * asynchronously and replaces the procedural fallback in place; a missing or
+   * failed load leaves the fallback as the permanent, fully-formed plant.
+   */
   private buildPothos(group: THREE.Group): number {
+    const fallback = new THREE.Group();
+    group.add(fallback);
+    const potDiameter = this.buildPothosFallback(fallback);
+
+    this.pothosInstall = installPothos(this.placement.id, (pieces) => {
+      if (this.disposed) return;
+      const potMat = new THREE.MeshStandardMaterial({ color: 0xbd6238, roughness: 0.78, metalness: 0.02 });
+      const soilMat = new THREE.MeshStandardMaterial({ color: 0x221711, roughness: 0.95 });
+      const stemMat = new THREE.MeshStandardMaterial({ color: 0x44732f, roughness: 0.62 });
+      const leafMat = new THREE.MeshStandardMaterial({
+        map: pothosLeafTex(), roughness: 0.38, metalness: 0.04, side: THREE.DoubleSide,
+      });
+      this.disposables.push({ mat: potMat }, { mat: soilMat }, { mat: stemMat }, { mat: leafMat });
+
+      const addMerged = (parts: THREE.BufferGeometry[], mat: THREE.Material) => {
+        const merged = mergeGeometries(parts);
+        parts.forEach((g) => g.dispose());
+        if (!merged) return;
+        this.disposables.push({ geo: merged });
+        const mesh = new THREE.Mesh(merged, mat);
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+        group.add(mesh);
+      };
+      addMerged(pieces.pot, potMat);
+      addMerged(pieces.soil, soilMat);
+      addMerged(pieces.stem, stemMat);
+      addMerged(pieces.leaf, leafMat);
+
+      fallback.visible = false;
+      this.ctx.requestShadowRefresh();
+    });
+
+    return potDiameter;
+  }
+
+  /** Procedural placeholder pothos, shown immediately and kept as the fallback. */
+  private buildPothosFallback(group: THREE.Group): number {
     const rTop = 0.32;
     const rBot = 0.24;
     const potH = 0.48;
@@ -814,6 +919,8 @@ export class PottedPlant implements StoreFixture {
     this.disposed = true;
     this.ficusInstall?.cancel();
     this.ficusInstall = null;
+    this.pothosInstall?.cancel();
+    this.pothosInstall = null;
     if (this.group) {
       this.ctx.scene.remove(this.group);
       this.group = null;
