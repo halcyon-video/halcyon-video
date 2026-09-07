@@ -9,6 +9,8 @@ import { FixtureContext, StoreFixture } from '../fixtures';
 import { Footprint } from '../layout-validator';
 import { installFicus, FicusInstall } from '../ficus-model';
 import { installPothos, PothosInstall } from '../pothos-model';
+import { installFloorPalm, FloorPalmInstall } from '../floor-palm-model';
+import { installSnakePlant, SnakePlantInstall } from '../snake-plant-model';
 
 export type PlantVariant = 'floor-palm' | 'tall-ficus' | 'snake-plant' | 'pothos';
 
@@ -204,6 +206,8 @@ export class PottedPlant implements StoreFixture {
   private disposed = false;
   private ficusInstall: FicusInstall | null = null;
   private pothosInstall: PothosInstall | null = null;
+  private floorPalmInstall: FloorPalmInstall | null = null;
+  private snakePlantInstall: SnakePlantInstall | null = null;
 
   constructor(placement: FixturePlacement, ctx: FixtureContext) {
     this.placement = placement;
@@ -486,8 +490,51 @@ export class PottedPlant implements StoreFixture {
     return geo;
   }
 
-  /** Builds a tall floor palm (~5.6 ft tall) in a terracotta pot. Returns pot diameter. */
+  /**
+   * Builds a tall floor palm (~5.6 ft tall). The authored component kit keeps
+   * both existing placement options while replacing the broad procedural cards
+   * with curved rachides and individually attached pinnae.
+   */
   private buildFloorPalm(group: THREE.Group): number {
+    const fallback = new THREE.Group();
+    group.add(fallback);
+    const potDiameter = this.buildFloorPalmFallback(fallback);
+    const frondScale = this.opt<number>('frondScale', 1.0);
+    const fanSpan = this.opt<number>('fanSpan', Math.PI * 2);
+
+    this.floorPalmInstall = installFloorPalm(this.placement.id, { frondScale, fanSpan }, (pieces) => {
+      if (this.disposed) return;
+      const potMat = new THREE.MeshStandardMaterial({ color: 0xbf633b, roughness: 0.82, metalness: 0.04 });
+      const soilMat = new THREE.MeshStandardMaterial({ color: 0x221711, roughness: 0.95 });
+      const stemMat = new THREE.MeshStandardMaterial({ color: 0x1e461a, roughness: 0.62 });
+      const leafMat = new THREE.MeshStandardMaterial({
+        color: 0x2f6b32, roughness: 0.48, metalness: 0.02, side: THREE.DoubleSide,
+      });
+      this.disposables.push({ mat: potMat }, { mat: soilMat }, { mat: stemMat }, { mat: leafMat });
+
+      const addMerged = (parts: THREE.BufferGeometry[], mat: THREE.Material) => {
+        const merged = mergeGeometries(parts);
+        parts.forEach((geometry) => geometry.dispose());
+        if (!merged) return;
+        this.disposables.push({ geo: merged });
+        const mesh = new THREE.Mesh(merged, mat);
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+        group.add(mesh);
+      };
+      addMerged(pieces.pot, potMat);
+      addMerged(pieces.soil, soilMat);
+      addMerged(pieces.stem, stemMat);
+      addMerged(pieces.leaf, leafMat);
+      fallback.visible = false;
+      this.ctx.requestShadowRefresh();
+    });
+
+    return potDiameter;
+  }
+
+  /** Procedural floor-palm placeholder and persistent collision proxy. */
+  private buildFloorPalmFallback(group: THREE.Group): number {
     const rTop = 0.62;
     const rBot = 0.46;
     const potH = 1.30;
@@ -632,8 +679,43 @@ export class PottedPlant implements StoreFixture {
     return geo;
   }
 
-  /** Builds an upright Sansevieria (snake plant) in a glazed ceramic pot. Returns pot diameter. */
+  /** Builds the authored upright Sansevieria in its glazed ceramic planter. */
   private buildSnakePlant(group: THREE.Group): number {
+    const fallback = new THREE.Group();
+    group.add(fallback);
+    const potDiameter = this.buildSnakePlantFallback(fallback);
+
+    this.snakePlantInstall = installSnakePlant(this.placement.id, (pieces) => {
+      if (this.disposed) return;
+      const potMat = new THREE.MeshStandardMaterial({ color: 0xded8cb, roughness: 0.28, metalness: 0.08 });
+      const soilMat = new THREE.MeshStandardMaterial({ color: 0x221711, roughness: 0.95 });
+      const leafMat = new THREE.MeshStandardMaterial({
+        map: snakePlantTex(), roughness: 0.42, metalness: 0.05, side: THREE.DoubleSide,
+      });
+      this.disposables.push({ mat: potMat }, { mat: soilMat }, { mat: leafMat });
+
+      const addMerged = (parts: THREE.BufferGeometry[], mat: THREE.Material) => {
+        const merged = mergeGeometries(parts);
+        parts.forEach((geometry) => geometry.dispose());
+        if (!merged) return;
+        this.disposables.push({ geo: merged });
+        const mesh = new THREE.Mesh(merged, mat);
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+        group.add(mesh);
+      };
+      addMerged(pieces.pot, potMat);
+      addMerged(pieces.soil, soilMat);
+      addMerged(pieces.leaf, leafMat);
+      fallback.visible = false;
+      this.ctx.requestShadowRefresh();
+    });
+
+    return potDiameter;
+  }
+
+  /** Procedural snake-plant placeholder and persistent collision proxy. */
+  private buildSnakePlantFallback(group: THREE.Group): number {
     const rTop = 0.48;
     const rBot = 0.40;
     const potH = 1.0;
@@ -921,6 +1003,10 @@ export class PottedPlant implements StoreFixture {
     this.ficusInstall = null;
     this.pothosInstall?.cancel();
     this.pothosInstall = null;
+    this.floorPalmInstall?.cancel();
+    this.floorPalmInstall = null;
+    this.snakePlantInstall?.cancel();
+    this.snakePlantInstall = null;
     if (this.group) {
       this.ctx.scene.remove(this.group);
       this.group = null;
