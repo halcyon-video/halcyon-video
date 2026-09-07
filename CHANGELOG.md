@@ -5,6 +5,14 @@ All notable changes to Halcyon Video, generated from commit history by
 it on every version tag push. Deterministic and offline: no entry here was
 written by a model.
 
+## [v0.16.1] — 2026-09-07
+
+### CHANGELOG
+- V0.16.0
+
+### Store Brand
+- Preserve custom logos and sign depth after restart
+
 ## [v0.16.0] — 2026-09-07
 
 ### Campaign signs
