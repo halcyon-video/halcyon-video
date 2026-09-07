@@ -64,6 +64,8 @@ export class SettingsSurface {
     const overlay = document.getElementById('settings-drawer-overlay');
     overlay?.classList.toggle('terminal-settings', !!this.dock && page !== 'Store Brand');
     overlay?.classList.toggle('compact-settings', !this.dock && page !== 'Store Brand');
+    overlay?.classList.toggle('visual-settings', page === 'Store Brand');
+    overlay?.querySelector('.crt-body > .settings-brand-preview')?.remove();
   }
 
   /** Release the camera before the caller resumes the menu or rebuilds. */
@@ -78,6 +80,11 @@ export class SettingsSurface {
     this.keys = keys;
     this.index = index;
     if (!document.getElementById('settings-drawer-overlay')?.classList.contains('visible')) return;
+    // Keep the live image beside the scrolling controls so every edit can be
+    // judged without returning to the top of the form.
+    const groups = document.getElementById('settings-groups');
+    const preview = groups?.querySelector('.settings-brand-preview');
+    if (this.page === 'Store Brand' && preview) groups?.parentElement?.insertBefore(preview, groups);
     const row = this.row(index);
     // A continuous full-height list: scroll only when the selected option
     // actually leaves the viewport. No fixed row counts or mostly empty pages.

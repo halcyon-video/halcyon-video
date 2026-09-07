@@ -886,6 +886,28 @@ html, body {
 }
 .compact-settings .crt-body { width: calc(100% - 48px); }
 
+.visual-settings .crt-body {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.8fr) minmax(0, 1.7fr);
+  grid-template-rows: minmax(0, 1fr) auto auto auto;
+  column-gap: 28px;
+  width: min(1680px, calc(100% - 88px));
+}
+.visual-settings #settings-groups { grid-column: 2; grid-row: 1; }
+.visual-settings .settings-brand-preview {
+  grid-column: 1;
+  grid-row: 1 / -1;
+  align-self: start;
+  padding: 0;
+}
+.visual-settings .settings-more-line { grid-column: 2; grid-row: 2; }
+.visual-settings #settings-status { grid-column: 2; grid-row: 3; }
+.visual-settings #btn-settings-close { grid-column: 2; grid-row: 4; }
+@media (max-width: 900px) {
+  .visual-settings .crt-body { display: flex; width: calc(100% - 40px); gap: 8px; }
+  .visual-settings .settings-brand-preview { align-self: stretch; }
+}
+
 #settings-groups {
   flex: 1 1 0;
   min-height: 0;
