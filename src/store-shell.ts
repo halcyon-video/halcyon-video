@@ -40,6 +40,7 @@ import { buildSecurityCamera93 } from './fixtures/security-camera-93';
 import { isEndcapKind } from './fixtures/genre-endcap';
 import { collectionEndcapPlacements } from './fixtures/collection-endcap';
 import { buildMembershipOvalHanger } from './fixtures/membership-oval-hanger';
+import { buildRentingBetterHangers } from './fixtures/renting-better-hanger';
 import { buildJoinTodayRewardsRisers } from './fixtures/join-today-rewards-riser';
 import { buildSummerSequelsShelfStrips } from './fixtures/summer-sequels-shelf-strip';
 import { buildGameRentals2For10Signs } from './fixtures/game-rentals-2for10-signs';
@@ -2672,7 +2673,7 @@ export function buildStore(scene: StoreScene) {
   buildSecurityCamera93(scene, (px, pz) =>
     pointInSoffit(px, pz, soffitPoly) ? frontSoffitY(ceilingY) : ceilingY);
 
-  // 2012 MEMBERSHIP SERVICES die-cut oval over the checkout counter (see
+  // MEMBERSHIP SERVICES die-cut oval over the counter's entrance wing (see
   // fixtures/membership-oval-hanger.ts) — same soffit-aware hang height, and
   // the same overhead-programme gate as the ceiling-nav signs: a corporate
   // membership kit on two monofilaments is the definition of chain overhead
@@ -2680,8 +2681,13 @@ export function buildStore(scene: StoreScene) {
   // bolted to the ceiling is store hardware rather than dressing, and the
   // library-select vantage is borrowed from it.
   if (activeStoreFormat().overheadSignage) {
-    buildMembershipOvalHanger(scene, (px, pz) =>
-      pointInSoffit(px, pz, soffitPoly) ? frontSoffitY(ceilingY) : ceilingY);
+    const hangCeilingAt = (px: number, pz: number) =>
+      pointInSoffit(px, pz, soffitPoly) ? frontSoffitY(ceilingY) : ceilingY;
+    buildMembershipOvalHanger(scene, hangCeilingAt);
+    // RENTING IS BETTER THAN EVER ceiling cards over the front end of the two
+    // shelf rows flanking the centre walkway (see fixtures/renting-better-hanger.ts)
+    // — 2010 kit only, never over open floor, same soffit-aware tie-off.
+    buildRentingBetterHangers(scene, hangCeilingAt);
   }
 
   // (The 2006 MOVIES IN THE MIDDLE / 99c two-tier hanger was wired over the

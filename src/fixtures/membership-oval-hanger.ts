@@ -24,9 +24,19 @@
 import * as THREE from 'three';
 import type { StoreScene } from '../three-scene';
 import { markSignMesh } from '../sign-builders';
-import { popKitVisible } from '../pop-period';
-import { tryLoadUserAssetTexture } from '../user-assets';
+import { campaignKit2010Visible } from '../pop-period';
 import { BB_ARCHIVO_BLACK } from '../bundled-fonts';
+import { cachedSignArt, resolveSignArt, type SignArtSpec } from './bundled-sign-art';
+import membershipOvalArt from '../assets/signage/membership-services-oval.png';
+
+// The finished render, committed (owner ruling 2026-09-06: no chain mark on
+// it, so it ships as first conceived); a user-asset drop still overrides it.
+const ART: SignArtSpec = {
+  bundled: membershipOvalArt,
+  userAsset: 'fixtures/membership-services-oval/front.png',
+  // The render's own inks: blue field, gold arrow and headline, white copy.
+  inks: { primary: '#3c4dc7', secondary: '#f7d443', text: '#f5f5f7' },
+};
 
 // ── Measured spec, in the measurement record's own L UNITS ──────────────────
 // L = the ellipse's major axis = the sign's 40 in width; origin = ellipse
@@ -71,12 +81,11 @@ const QUAD_CENTER_V = (FRAME_V0 + FRAME_V1) / 2;
 // foot of head clearance under the lowest ink — while the ellipse top (8.87 ft)
 // stays well under the cash-wrap soffit at 11.5 ft, leaving a believable ~2.8 ft
 // of monofilament rather than a sign glued to the lid.
-const OVAL_CENTER_Y = 8.2;
+const OVAL_CENTER_Y = 7.5;
+const OVAL_YAW = 0.35;        // ~20 deg toward the customer side of the wing
 
 // Loaded user art survives signage rebuilds (clearActiveSignage disposes
 // materials and geometries, not maps) and is only fetched once per session.
-let userTex: THREE.Texture | null = null;
-let userTexMissing = false;
 
 // ── Brand-free procedural fallback ──────────────────────────────────────────
 // Same die-cut discipline as generate.html: the canvas starts TRANSPARENT and
@@ -179,29 +188,37 @@ export function buildMembershipOvalHanger(
   scene: StoreScene,
   ceilingYAt?: (x: number, z: number) => number,
 ): void {
-  if (!popKitVisible(2012, 2013)) return;
+  if (!campaignKit2010Visible()) return;
 
-  // OVER OPEN FLOOR, not over the register — owner correction against the
-  // reference (photo 11347352413): the employee hangs it standing on open
-  // floor with the register zone and its COMING ATTRACTIONS wall far in the
-  // background. The sign marks the WAY to membership services, so it hangs
-  // over the walkway a few feet store-side of the counter apex, on the
-  // centreline — from the sales floor you see the oval overhead with the
-  // counter behind it, the reference's composition. Nothing else hangs here:
-  // the suspended lightboxes are parented to the front glass at z=15, the
-  // ceiling-nav genre signs sit out over the aisle runs deeper in, and the
-  // counter soffit ends at the apex. Derived from the live apex so it tracks
-  // the counter as the vestibule depth changes.
-  const x = 11.0;
-  const z = scene.deskApexZ() - 5.0;
+  // OVER THE MEMBERSHIP-SERVICES STATION (owner ask 2026-09-06): "membership
+  // services would hang over wherever somebody helps with membership
+  // services, which right now is the entrance side of the front counter."
+  // That is the +X wing of the shield counter — the first stretch of counter
+  // a shopper meets after the vestibule's side door. The spot is derived from
+  // the live vestibule box so it tracks the counter with the door width: over
+  // the wing's counter top, a little back from the customer edge, at the
+  // wing's half-way point. The oval is yawed a fifth of a turn toward the
+  // customer side so it reads from the wing AND from the entrance door, and
+  // its reverse still reads from the sales floor. (The earlier placement —
+  // the walkway centreline a few feet past the apex, the reference photo's
+  // composition — stays as the fallback for a store with no vestibule to
+  // anchor to.)
+  const vest = scene.entrance?.getVestibuleInfo() ?? null;
+  const x = vest ? vest.cx + 7.4 : 11.0;
+  const z = vest ? vest.backZ - 3.6 : scene.deskApexZ() - 5.0;
+  const yaw = vest ? OVAL_YAW : 0;
 
   const group = new THREE.Group();
   group.name = 'membership-oval-hanger';
   scene.scene.add(group);
   scene.activeSignageObjects.push(group);
+  // The group carries the placement and the yaw; faces and filaments below
+  // are laid out in its frame, so the whole hanger turns as one.
+  group.position.set(x, 0, z);
+  group.rotation.y = yaw;
 
   const mat = new THREE.MeshStandardMaterial({
-    map: userTex ?? fallbackTexture(),
+    map: cachedSignArt(ART) ?? fallbackTexture(),
     // Die-cut alpha: without an alpha cut the transparent field renders as an
     // opaque black rectangle around the oval. A HARD cut (alphaTest 0.5, no
     // `transparent`) rather than the 0.05 + transparent it shipped with —
@@ -243,7 +260,7 @@ export function buildMembershipOvalHanger(
   for (const dz of [0.006, -0.006]) {
     const face = new THREE.Mesh(geo, mat);
     face.name = dz > 0 ? 'membership-oval-front-entrance' : 'membership-oval-back-salesfloor';
-    face.position.set(x, y, z + dz);
+    face.position.set(0, y, dz);
     if (dz < 0) face.rotation.y = Math.PI;
     markSignMesh(face); // no castShadow: an alpha-cut card throws its full
     group.add(face);    // rectangle's silhouette without a custom depth material
@@ -256,21 +273,17 @@ export function buildMembershipOvalHanger(
     color: 0x14141a, roughness: 0.4, metalness: 0.0, transparent: true, opacity: 0.35,
   });
   for (const h of HOLES) {
-    const holeX = x + h.u * L_FT;
+    const holeX = h.u * L_FT;
     const holeY = OVAL_CENTER_Y - h.v * L_FT; // +v is DOWN in the sign's frame
     const len = Math.max(0.05, anchorY - holeY);
     const line = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.01, len, 4), lineMat);
-    line.position.set(holeX, holeY + len / 2, z);
+    line.position.set(holeX, holeY + len / 2, 0);
     group.add(line);
   }
 
-  if (!userTex && !userTexMissing) {
-    tryLoadUserAssetTexture('fixtures/membership-services-oval/front.png', (tex) => {
-      tex.anisotropy = 8;
-      userTex = tex; // cache across rebuilds; teardown never disposes maps
-      mat.map = tex; // harmless if this build was already torn down
-      mat.needsUpdate = true;
-      scene.requestRender();
-    }, { onMiss: () => { userTexMissing = true; } });
-  }
+  resolveSignArt(ART, (tex) => {
+    mat.map = tex; // harmless if this build was already torn down
+    mat.needsUpdate = true;
+    scene.requestRender();
+  });
 }
