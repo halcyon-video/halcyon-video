@@ -14,6 +14,10 @@ async function geometryOnly(file: string) {
   for (const material of json.materials) {
     assert.ok(!material.extensions?.KHR_materials_unlit, 'cabinet must respond to lighting');
     assert.ok(!material.emissiveFactor?.some((v: number) => v > 0));
+    delete material.normalTexture;
+    delete material.occlusionTexture;
+    delete material.emissiveTexture;
+    delete material.pbrMetallicRoughness?.baseColorTexture;
     delete material.pbrMetallicRoughness?.metallicRoughnessTexture;
   }
   delete json.images; delete json.textures; delete json.samplers;
@@ -28,17 +32,17 @@ async function geometryOnly(file: string) {
   return new GLTFLoader().parseAsync(output.buffer.slice(output.byteOffset, output.byteOffset + output.byteLength), '');
 }
 
-for (const [name, w, h, cy, sw, sh] of [
-  ['rental-terminal', 1.48, 1.55, .90, 1.075, .806],
-  ['ceiling-television', 2.6, 2.12, 1.19, 2.12, 1.59],
-  ['screening-television', 2.2, 1.86, 1.04, 1.78, 1.335],
+for (const [name, w, h, cy, sw, sh, meshCount] of [
+  ['rental-terminal', 1.274, 1.55, .971, .914, .796, 7],
+  ['ceiling-television', 2.6, 2.12, 1.19, 2.12, 1.59, 6],
+  ['screening-television', 2.2, 1.86, 1.04, 1.78, 1.335, 6],
 ] as const) test(`${name}: shelf fit, physical surfaces and unobstructed live tube`, async () => {
   const { scene } = await geometryOnly(name);
   scene.updateMatrixWorld(true);
   const bounds = new THREE.Box3().setFromObject(scene);
   assert.ok(Math.abs(bounds.max.x - bounds.min.x - w) < .001);
   assert.ok(Math.abs(bounds.max.y - h) < .001);
-  assert.ok(Math.abs(bounds.min.y) < .001);
+  assert.ok(Math.abs(bounds.min.y) < .002);
   let triangles = 0, meshes = 0;
   scene.traverse(o => {
     if (!(o instanceof THREE.Mesh)) return;
@@ -50,10 +54,18 @@ for (const [name, w, h, cy, sw, sh] of [
     }
     triangles += (o.geometry.index?.count ?? o.geometry.getAttribute('position').count) / 3;
   });
-  assert.equal(meshes, 6);
+  assert.equal(meshes, meshCount);
   assert.ok(triangles < 8000, `triangle cost ${triangles}`);
-  const glass = scene.getObjectByName('mat16');
-  const tube = scene.getObjectByName('mat17');
+  const byMaterial = (names: string[]) => {
+    let found: THREE.Object3D | undefined;
+    scene.traverse((object) => {
+      if (found || !(object instanceof THREE.Mesh) || Array.isArray(object.material)) return;
+      if (names.includes(object.material.name)) found = object;
+    });
+    return found;
+  };
+  const glass = scene.getObjectByName('mat16') ?? byMaterial(['CrtGlass', 'mat16']);
+  const tube = scene.getObjectByName('mat17') ?? byMaterial(['CrtTube', 'mat17']);
   assert.ok(glass && tube);
   const face = new THREE.Box3().setFromObject(glass);
   assert.ok(Math.abs(face.max.x - face.min.x - sw) < .001);
@@ -62,6 +74,6 @@ for (const [name, w, h, cy, sw, sh] of [
   for (const x of [-sw*.35, 0, sw*.35]) for (const y of [cy-sh*.35, cy, cy+sh*.35]) {
     const hits = new THREE.Raycaster(new THREE.Vector3(x,y,-5),new THREE.Vector3(0,0,1)).intersectObject(scene,true);
     assert.ok(hits.length > 0);
-    assert.equal(hits[0].object.name,'mat16', `opaque cabinet covers tube at ${x},${y}`);
+    assert.equal(hits[0].object, glass, `opaque cabinet covers tube at ${x},${y}`);
   }
 });

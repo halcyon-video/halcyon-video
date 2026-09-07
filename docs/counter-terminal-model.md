@@ -48,13 +48,16 @@ runtime can retint a role without discarding the maps.
 | `CableRubber` | both power cords | baked AO, grain normal |
 | `CrtTube` | tube face (replaced at runtime by the screen material) | — |
 | `CrtGlass` | pillow glass (replaced at runtime by the glass-reflection material) | — |
-| `PowerLed` | power / lock LEDs | emissive |
+| `PowerLed` | power / lock LEDs | baked AO; runtime adds live emission |
 | `KeyboardShell`, `KeyCaps`, `KeyCapsDark` | keyboard | baked AO, grain normal |
 
-Ambient occlusion is baked in Cycles (monitor 1024², keyboard 512²) with
+Ambient occlusion is baked in Cycles (monitor 512², keyboard 256²) with
 every other object hidden from the renderer — the editable originals sit on
-top of the export copies, and would otherwise blacken the bake. The 256² ABS
+top of the export copies, and would otherwise blacken the bake. The 128² ABS
 grain normal map is generated noise, tiled through `KHR_texture_transform`.
+Its effective surface frequency is
+set by the material mapping, so the smaller source retains the same molded
+finish while keeping the monitor under its 500 KB shipping gate.
 
 ## Coordinates and runtime contract
 
@@ -78,8 +81,8 @@ materials and maps when the entrance group is removed.
 
 | Export | Bytes | Triangles | Primitives | Textures |
 |---|---|---|---|---|
-| `rental-terminal.glb` | 797,480 | 5,468 | 7 | AO 1024² + grain 256² |
-| `rental-keyboard.glb` | 920,320 | 16,244 | 6 | AO 512² + grain 256² |
+| `rental-terminal.glb` | 379,812 | 5,468 | 7 | AO 512² + grain 128² |
+| `rental-keyboard.glb` | 663,828 | 16,244 | 6 | AO 256² + grain 128² |
 
 Two stations clone each model; geometry and textures are shared.
 

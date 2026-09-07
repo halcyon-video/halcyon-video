@@ -38,7 +38,7 @@ BLEND = ROOT / 'tools' / 'models' / 'counter-terminal.blend'
 
 # ---------------------------------------------------------------- materials
 
-def grain_image(size=256, seed=7):
+def grain_image(size=128, seed=7):
     """Tiling molded-ABS grain as a tangent-space normal map (periodic FFT noise)."""
     rng = np.random.default_rng(seed)
     white = rng.standard_normal((size, size))
@@ -531,6 +531,17 @@ def build_keyboard(col, M):
 
 # ---------------------------------------------------------------- export copy
 
+def unwrap_object(ob):
+    bpy.ops.object.select_all(action='DESELECT')
+    ob.select_set(True)
+    bpy.context.view_layer.objects.active = ob
+    bpy.ops.object.mode_set(mode='EDIT')
+    bpy.ops.mesh.select_all(action='SELECT')
+    bpy.ops.uv.smart_project(angle_limit=math.radians(66), island_margin=0.004,
+                             correct_aspect=True, scale_to_bounds=False)
+    bpy.ops.object.mode_set(mode='OBJECT')
+
+
 def export_copy(parts, name, col):
     """Join copies of the parts (bevel applied) into one object, unwrap it."""
     bpy.ops.object.select_all(action='DESELECT')
@@ -554,11 +565,7 @@ def export_copy(parts, name, col):
     ob = bpy.context.view_layer.objects.active
     ob.name = name
     ob.data.name = name
-    bpy.ops.object.mode_set(mode='EDIT')
-    bpy.ops.mesh.select_all(action='SELECT')
-    bpy.ops.uv.smart_project(angle_limit=math.radians(66), island_margin=0.004,
-                             correct_aspect=True, scale_to_bounds=False)
-    bpy.ops.object.mode_set(mode='OBJECT')
+    unwrap_object(ob)
     return ob
 
 
@@ -619,14 +626,19 @@ def export_glb(objects, path):
 
 def main():
     bpy.ops.wm.read_factory_settings(use_empty=True)
+    bpy.context.preferences.filepaths.save_version = 0
     scene = bpy.context.scene
     scene.unit_settings.system = 'IMPERIAL'
     scene.unit_settings.scale_length = 0.3048
     scene.unit_settings.length_unit = 'FEET'
 
     grain = grain_image()
-    ao_term = bake_image('terminal_ao', 1024)
-    ao_kb = bake_image('keyboard_ao', 512)
+    # These maps tile or carry broad crevice shading; the former 1024/512 AO
+    # pair and 256 grain map spent more bytes than the geometry and broke the
+    # model's 500 KB shipping gate without adding visible detail at counter
+    # distance. Half-resolution maps retain their full material roles.
+    ao_term = bake_image('terminal_ao', 512)
+    ao_kb = bake_image('keyboard_ao', 256)
 
     M = {
         'CabinetABS': material('CabinetABS', (0.72, 0.64, 0.47), rough=0.52, ao=ao_term, grain=grain),
@@ -635,7 +647,10 @@ def main():
         'CableRubber': material('CableRubber', (0.035, 0.034, 0.036), rough=0.72, ao=ao_term, grain=grain),
         'CrtTube': material('CrtTube', (0.012, 0.012, 0.014), rough=0.35, ao=ao_term),
         'CrtGlass': material('CrtGlass', (0.1, 0.11, 0.12), rough=0.05, alpha=0.25),
-        'PowerLed': material('PowerLed', (0.2, 0.9, 0.3), rough=0.4, emit=(0.15, 1.0, 0.25), ao=ao_term),
+        # The runtime supplies the live LED emission and tags it as a light
+        # source. Keep the shipped material physical/non-emissive so a model
+        # viewed outside that integration does not smuggle in self-lighting.
+        'PowerLed': material('PowerLed', (0.2, 0.9, 0.3), rough=0.4, ao=ao_term),
         'KeyboardShell': material('KeyboardShell', (0.60, 0.54, 0.41), rough=0.55, ao=ao_kb, grain=grain,
                                   grain_scale=30),
         'KeyCaps': material('KeyCaps', (0.70, 0.64, 0.49), rough=0.45, ao=ao_kb, grain=grain, grain_scale=30,
@@ -658,6 +673,7 @@ def main():
     glass_ex.data = glass.data.copy()
     glass_ex.name = 'TerminalGlass'
     col_export.objects.link(glass_ex)
+    unwrap_object(glass_ex)
     kb = export_copy(kb_parts, 'KeyboardExport', col_export)
 
     bake_ao(term, ao_term)
