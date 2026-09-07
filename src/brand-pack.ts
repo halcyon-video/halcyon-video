@@ -141,7 +141,7 @@ export function activeBrandPackId(): string | null {
 
 /** The loaded manifest, or null — the sync accessor every consumer uses. */
 export function getBrandPack(): BrandPackManifest | null {
-  return pack && packApplies() ? pack : null;
+  return readSetting('bb_brand_builtin') !== '1' && pack && packApplies() ? pack : null;
 }
 
 /** Load state for the SERVICE MODE diagnostic line. */

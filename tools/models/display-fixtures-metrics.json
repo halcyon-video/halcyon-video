@@ -1,0 +1,102 @@
+{
+  "genre-endcap-tapered": {
+    "triangles": 4344,
+    "vertices": 2196,
+    "material_roles": [
+      "DisplayBody",
+      "DisplayHardware",
+      "DisplayShelf",
+      "DisplayTrim"
+    ],
+    "bytes": 278116,
+    "bounds_blender": [
+      [
+        -1.08,
+        1.08
+      ],
+      [
+        -0.56899,
+        0.07
+      ],
+      [
+        0.0,
+        4.6
+      ]
+    ]
+  },
+  "genre-endcap-straight": {
+    "triangles": 4344,
+    "vertices": 2196,
+    "material_roles": [
+      "DisplayBody",
+      "DisplayHardware",
+      "DisplayShelf",
+      "DisplayTrim"
+    ],
+    "bytes": 275560,
+    "bounds_blender": [
+      [
+        -1.08,
+        1.08
+      ],
+      [
+        -0.56899,
+        0.07
+      ],
+      [
+        0.0,
+        4.6
+      ]
+    ]
+  },
+  "bargain-tub": {
+    "triangles": 1304,
+    "vertices": 664,
+    "material_roles": [
+      "DisplayBed",
+      "DisplayBody",
+      "DisplayHardware",
+      "DisplayTrim"
+    ],
+    "bytes": 90696,
+    "bounds_blender": [
+      [
+        -1.5,
+        1.5
+      ],
+      [
+        -1.5,
+        1.5
+      ],
+      [
+        0.0,
+        2.7
+      ]
+    ]
+  },
+  "four-sided-merchandiser": {
+    "triangles": 6320,
+    "vertices": 3264,
+    "material_roles": [
+      "DisplayBody",
+      "DisplayHardware",
+      "DisplayShelf",
+      "DisplayTrim"
+    ],
+    "bytes": 440876,
+    "bounds_blender": [
+      [
+        -1.49726,
+        1.49726
+      ],
+      [
+        -1.49726,
+        1.49726
+      ],
+      [
+        0.02,
+        4.0
+      ]
+    ]
+  }
+}

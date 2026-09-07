@@ -328,6 +328,8 @@ export interface StoreFormatSpec {
   counterTv: boolean;
   /** The curtained-off back section behind a beaded curtain. */
   curtainedSection: boolean;
+  /** Potted indoor houseplants (front window palms, desk pothos, snake plants). */
+  plants: boolean;
   /**
    * The mirrored chrome cornice ring around the top of the sales floor
    * (store-shell.ts buildCeilingFrame) — and, with it, the marquee bulb chase
@@ -458,6 +460,7 @@ const CORPORATE: StoreFormatSpec = {
   ceilingTvs: true,
   counterTv: false,
   curtainedSection: false,
+  plants: false,
   ceilingMirror: true,
   overheadSignage: true,
   counterDressing: true,
@@ -572,6 +575,7 @@ const MOM_AND_POP: StoreFormatSpec = {
   // should still have a television.
   counterTv: true,
   curtainedSection: true,
+  plants: true,
   ceilingMirror: false,
   overheadSignage: false,
   counterDressing: false,

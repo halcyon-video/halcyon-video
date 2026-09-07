@@ -23,6 +23,8 @@
 // routes to whichever panel is currently built — the drawer regenerates its DOM
 // on every page change, so exactly one is live at a time.
 
+import { HALCYON_BLUE, HALCYON_CREAM } from './logo-spec';
+
 export interface RowKitHooks {
   /** Add a row to the drawer's flat nav list; returns its selection index. */
   registerRow?: (key: string) => number;
@@ -42,7 +44,7 @@ export interface RowKitOpts {
   commit: () => void;
 }
 
-export interface RowOption { id: string; label: string }
+export interface RowOption { id: string; label: string; fontFamily?: string }
 
 export interface RangeSpec { min: number; max: number; step: number; navStep: number }
 
@@ -64,6 +66,7 @@ export class SettingsRowKit {
    */
   private target: HTMLElement;
   private readonly activate = new Map<string, (dir: number) => void>();
+  private readonly okOnly = new Set<string>();
   private readonly syncFns: (() => void)[] = [];
 
   constructor(opts: RowKitOpts) {
@@ -90,8 +93,12 @@ export class SettingsRowKit {
     for (const fn of this.syncFns) fn();
   }
 
+  /** -1/+1 are arrows; 0 is OK. Pointer actions call their handler directly. */
   dispatch(key: string, dir: number): void {
-    this.activate.get(key)?.(dir);
+    const row = document.getElementById(`setting-row-${key}`);
+    if (row?.classList.contains('settings-row-inert')) return;
+    if (this.okOnly.has(key) && dir !== 0) return;
+    this.activate.get(key)?.(dir || 1);
   }
 
   private register(id: string, row: HTMLElement, activate: (dir: number) => void): void {
@@ -99,8 +106,8 @@ export class SettingsRowKit {
     row.id = `setting-row-${key}`;
     this.activate.set(key, activate);
     const index = this.opts.hooks?.registerRow ? this.opts.hooks.registerRow(key) : -1;
-    row.addEventListener('pointerenter', () => {
-      if (index >= 0) this.opts.hooks?.selectRow?.(index);
+    row.addEventListener('pointermove', () => {
+      if (index >= 0 && !row.classList.contains('selected')) this.opts.hooks?.selectRow?.(index);
     });
   }
 
@@ -164,14 +171,16 @@ export class SettingsRowKit {
    * that instead — the drawer's idiom for "do it" / "undo it" on one line.
    */
   action(
-    id: string, label: string, hint: string, valueText: string,
+    id: string, label: string, hint: string, valueText: string | (() => string),
     onActivate: () => void, onBack?: () => void,
   ): HTMLElement {
     const value = document.createElement('span');
     value.className = 'settings-row-value';
-    value.textContent = valueText;
+    const sync = () => { value.textContent = typeof valueText === 'function' ? valueText() : valueText; };
+    sync();
+    this.syncFns.push(sync);
     const activate = (dir: number) => {
-      if (dir < 0 && onBack) onBack();
+      if (dir < 0) onBack?.();
       else onActivate();
     };
     const row = this.rowShell(id, label, hint, activate, 'button');
@@ -180,15 +189,25 @@ export class SettingsRowKit {
     return row;
   }
 
+  /** A deliberate action: arrows never run it; OK or a click does. */
+  confirmAction(
+    id: string, label: string, hint: string, onActivate: () => void,
+  ): HTMLElement {
+    const row = this.action(id, label, hint, 'OK', onActivate);
+    this.okOnly.add(this.opts.prefix + id);
+    return row;
+  }
+
   /** Dropdown row. Left/Right step the option list; a real <select> for mice. */
   select(
     id: string, label: string, hint: string,
     options: RowOption[] | (() => RowOption[]),
-    get: () => string, set: (v: string) => void,
+    get: () => string, set: (v: string) => void, persist = true,
   ): HTMLElement {
     const element = document.createElement('select');
     element.className = 'settings-row-select';
     element.id = `setting-input-${this.opts.prefix}${id}`;
+    element.setAttribute('aria-label', label);
     const syncOptions = () => {
       element.innerHTML = '';
       const opts = (typeof options === 'function' ? options() : options).slice();
@@ -202,14 +221,17 @@ export class SettingsRowKit {
         const opt = document.createElement('option');
         opt.value = o.id;
         opt.textContent = o.label;
+        if (o.fontFamily) opt.style.fontFamily = o.fontFamily;
         element.appendChild(opt);
       }
       element.value = get();
+      element.style.fontFamily = opts.find((o) => o.id === get())?.fontFamily ?? '';
     };
     syncOptions();
     element.addEventListener('change', () => {
       set(element.value);
-      this.opts.commit();
+      syncOptions();
+      if (persist) this.opts.commit();
     });
     element.addEventListener('click', (e) => e.stopPropagation());
     const activate = (dir: number) => {
@@ -217,7 +239,8 @@ export class SettingsRowKit {
       const next = (idx + dir + element.options.length) % element.options.length;
       element.value = element.options[next].value;
       set(element.value);
-      this.opts.commit();
+      syncOptions();
+      if (persist) this.opts.commit();
     };
     const row = this.rowShell(id, label, hint, activate);
     row.appendChild(element);
@@ -254,16 +277,17 @@ export class SettingsRowKit {
     hex.className = 'brand-color-hex';
     const input = document.createElement('input');
     input.type = 'color';
+    input.setAttribute('aria-label', `${label}: custom colour`);
     input.id = `setting-input-${this.opts.prefix}${id}`;
     const sync = () => {
       input.value = toHexColor(get());
-      hex.textContent = input.value;
+      hex.textContent = COLOUR_SWATCHES.find((c) => c.id === input.value)?.label ?? 'Custom';
     };
     sync();
     // Live preview while scrubbing the picker; persist on close (change).
     input.addEventListener('input', () => {
       set(input.value);
-      hex.textContent = input.value;
+      hex.textContent = COLOUR_SWATCHES.find((c) => c.id === input.value)?.label ?? 'Custom';
       this.opts.preview();
     });
     input.addEventListener('change', () => {
@@ -273,13 +297,19 @@ export class SettingsRowKit {
     input.addEventListener('click', (e) => e.stopPropagation());
     wrap.appendChild(hex);
     wrap.appendChild(input);
-    // Enter/Right opens the native picker, like activating a text row focuses
-    // its input.
-    const activate = () => input.click();
+    // Remote arrows browse named inks without opening an OS colour dialog.
+    // A pointer can still click the swatch for an exact custom colour.
+    const activate = (dir: number) => {
+      const idx = COLOUR_SWATCHES.findIndex((c) => c.id === toHexColor(get()));
+      const next = (idx + dir + COLOUR_SWATCHES.length) % COLOUR_SWATCHES.length;
+      set(COLOUR_SWATCHES[next].id);
+      sync();
+      this.opts.commit();
+    };
     const row = this.rowShell(id, label, hint, activate);
     row.appendChild(wrap);
     row.addEventListener('click', (e) => {
-      if (e.target !== input) activate();
+      if (e.target !== input) activate(1);
     });
     this.syncFns.push(sync);
     return row;
@@ -293,6 +323,7 @@ export class SettingsRowKit {
   ): HTMLElement {
     const input = document.createElement('input');
     input.type = 'text';
+    input.setAttribute('aria-label', label);
     input.className = 'settings-row-input';
     input.id = `setting-input-${this.opts.prefix}${id}`;
     input.autocomplete = 'off';
@@ -363,6 +394,7 @@ export class SettingsRowKit {
     wrap.className = 'brand-range-wrap';
     const input = document.createElement('input');
     input.type = 'range';
+    input.setAttribute('aria-label', label);
     input.id = `setting-input-${this.opts.prefix}${id}`;
     const readout = document.createElement('span');
     readout.className = 'brand-range-value';
@@ -458,10 +490,21 @@ export function setRowLabel(row: HTMLElement, label: string): void {
  */
 export function setRowEnabled(row: HTMLElement, enabled: boolean): void {
   row.classList.toggle('settings-row-inert', !enabled);
+  row.setAttribute('aria-disabled', String(!enabled));
+  if (row instanceof HTMLButtonElement) row.disabled = !enabled;
   for (const el of row.querySelectorAll('input, select, button')) {
     (el as HTMLInputElement).disabled = !enabled;
   }
 }
+
+const COLOUR_SWATCHES = [
+  { id: HALCYON_BLUE, label: 'House blue' }, { id: HALCYON_CREAM, label: 'House white' },
+  { id: '#ffffff', label: 'White' }, { id: '#17263e', label: 'Midnight' },
+  { id: '#234c40', label: 'Evergreen' }, { id: '#782f40', label: 'Burgundy' },
+  { id: '#b65e3c', label: 'Terracotta' }, { id: '#d6b77a', label: 'Sand' },
+  { id: '#71a6b3', label: 'Sea glass' }, { id: '#727889', label: 'Slate' },
+  { id: '#302e35', label: 'Charcoal' }, { id: '#111111', label: 'Black' },
+];
 
 let scratchCtx: CanvasRenderingContext2D | null = null;
 

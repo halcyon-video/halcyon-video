@@ -18,7 +18,7 @@
 // started) because the emblem composer's text layers need the same answer, and
 // two copies of this map is precisely the trap described above with a second
 // place to forget.
-import { BB_ANTON, BB_ARCHIVO_BLACK, BB_BEBAS, BB_OUTFIT } from './bundled-fonts';
+import { BB_ANTON, BB_ARCHIVO_BLACK, BB_BEBAS, BB_OUTFIT, BB_BRUSH, BB_ORBITRON } from './bundled-fonts';
 import { brandPackFontFamily, brandPackFontFamilies } from './brand-pack';
 
 const BUNDLED_BRAND_FAMILY: Record<string, string> = {
@@ -26,6 +26,8 @@ const BUNDLED_BRAND_FAMILY: Record<string, string> = {
   'Archivo Black': BB_ARCHIVO_BLACK,
   'Bebas Neue': BB_BEBAS,
   Outfit: BB_OUTFIT,
+  Yellowtail: BB_BRUSH,
+  Orbitron: BB_ORBITRON,
 };
 
 /**
@@ -43,11 +45,11 @@ export function brandFontFamilyCss(name: string): string {
 }
 
 /**
- * Display names the brand editors offer. All four are BUNDLED and mapped onto
+ * Display names the brand editors offer. All six are BUNDLED and mapped onto
  * their shipped files above; adding a name here without adding it to the map
  * is the silent-substitution bug this module exists to stop.
  */
-const BRAND_FONTS = ['Archivo Black', 'Bebas Neue', 'Outfit', 'Anton'];
+const BRAND_FONTS = ['Archivo Black', 'Outfit', 'Bebas Neue', 'Anton', 'Yellowtail', 'Orbitron'];
 
 /**
  * The picker's families: the built-ins plus whatever the installed brand pack
@@ -56,4 +58,15 @@ const BRAND_FONTS = ['Archivo Black', 'Bebas Neue', 'Outfit', 'Anton'];
  */
 export function brandFontChoices(): string[] {
   return [...BRAND_FONTS, ...brandPackFontFamilies()];
+}
+
+/** The family paints its own sample in both editors; every face works offline. */
+export function brandFontOptions() {
+  const style: Record<string, string> = {
+    'Archivo Black': 'House', Outfit: 'Modern', 'Bebas Neue': 'Cinema',
+    Anton: 'Bold', Yellowtail: 'Script', Orbitron: 'Arcade',
+  };
+  return brandFontChoices().map((f) => ({
+    id: f, label: style[f] ? `${style[f]} · ${f}` : f, fontFamily: brandFontFamilyCss(f),
+  }));
 }

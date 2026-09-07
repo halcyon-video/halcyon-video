@@ -62,6 +62,8 @@ export interface CounterTerminalDeps {
   buttons: string[];
   /** Dispatch a menu row — main.ts's executePowerMenuAction. */
   execute: (btnId: string) => Promise<void>;
+  /** Hand settings the dock without moving the camera. */
+  openSettings: () => void;
   keyClick: () => void;
   log: (msg: string) => void;
   /** Rebuild the store scene (pin changes take effect at the build funnel). */
@@ -273,6 +275,12 @@ export async function counterTerminalInput(kind: MediaDateKey): Promise<void> {
       if (btnId === STREAMING_BUTTON_ID) {
         deps.keyClick();
         enterStreamingScreen();
+        return;
+      }
+      if (btnId === 'btn-settings') {
+        deps.keyClick();
+        deps.ui.isCounterTerminalOpen = false;
+        deps.openSettings();
         return;
       }
       // Close first: several actions (settings drawer, logout) take over the

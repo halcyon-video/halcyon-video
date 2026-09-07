@@ -57,3 +57,11 @@ export function popKitVisible(startYear: number, endYear: number): boolean {
   const vintage = FABRIC_VINTAGE[getActiveTheme().id] ?? Infinity;
   return vintage <= year;
 }
+
+// The 2010 campaign kit — the MEMBERSHIP SERVICES oval over the counter's
+// entrance wing and the RENTING IS BETTER THAN EVER cards over the shelf rows —
+// hangs in the Halcyon 2010 store and nowhere else (owner ruling 2026-09-06),
+// so it keys off the fabric itself rather than the pop period.
+export function campaignKit2010Visible(): boolean {
+  return getActiveTheme().id === 'bb-2010';
+}

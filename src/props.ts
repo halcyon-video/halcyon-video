@@ -1,3 +1,4 @@
+import { selfLit } from './material-lighting';
 // T24 — Prop asset registry: real GLB models for the CRT/VCR-era set dressing
 // (ceiling ambient TVs, back-room hero TV, coffee table, VCR, DVD player).
 //
@@ -141,7 +142,9 @@ async function fetchAndPrep(slot: PropSlot): Promise<PropHandle | null> {
   const spec = PROP_SPECS[slot];
   const url = assetUrl('models/' + spec.file);
   try {
-    const res = await fetch(url);
+    // Low priority: a 2MB prop model is decoration, and at boot it shares the
+    // pipe with the cover art the reveal is gated on.
+    const res = await fetch(url, { priority: 'low' } as RequestInit);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const buf = await res.arrayBuffer();
     // Magic-byte sanity: a real GLB starts "glTF". A dev server can answer a
@@ -191,6 +194,11 @@ function prepTemplate(slot: PropSlot, spec: PropSpec, model: THREE.Object3D): Pr
     if (!mesh.isMesh) return;
     mesh.castShadow = true;
     mesh.receiveShadow = true;
+    if (slot === 'vcr' || slot === 'dvd_player') {
+      for (const m of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
+        if (m.name === 'DeckPowerLamp') selfLit(m, 'light-source');
+      }
+    }
     if (spec.screenMatch) {
       const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
       const isScreen = spec.screenMatch.test(mesh.name) ||

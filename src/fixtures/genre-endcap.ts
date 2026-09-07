@@ -13,6 +13,7 @@
 // fixture path assumes 3 columns (see StoreScene.updateColsCount), so the
 // whole rack is reachable without touching the nav code.
 import * as THREE from 'three';
+import { installDisplayModel } from './display-model';
 import { Movie } from '../jellyfin';
 import { FixturePlacement, BOX_SPACING, UNIT_DEPTH, unitDepthAtHeight } from '../store-layout';
 
@@ -272,6 +273,7 @@ export class GenreEndcap implements SlottedFixture {
   /** Set only when a footer plinth with a dressed front was built. */
   protected footerTex: THREE.Texture | null = null;
   private movies: Movie[] = [];
+  private disposeModel: (() => void) | null = null;
   private dismissedIds = new Set<string>();
   private requestedTagMeshes = new Map<string, THREE.Mesh>();
 
@@ -295,6 +297,8 @@ export class GenreEndcap implements SlottedFixture {
     this.group.position.set(this.placement.position.x, 0, this.placement.position.z);
     this.group.rotation.y = this.placement.yaw;
 
+    const furniture = new THREE.Group();
+    this.group.add(furniture);
     const coreMat = this.coreMaterial(palette.primary);
     const core = new THREE.Mesh(
       getEndcapCoreGeometry(coreWidth, ENDCAP_TOP_WIDTH, coreHeight, coreDepth),
@@ -303,7 +307,7 @@ export class GenreEndcap implements SlottedFixture {
     core.position.set(0, coreHeight / 2, 0);
     core.castShadow = true;
     core.receiveShadow = true;
-    this.group.add(core);
+    furniture.add(core);
 
     // Brand-gold kick stripe along the base, same read as the shelving strips.
     const stripeMat = new THREE.MeshStandardMaterial({
@@ -316,7 +320,7 @@ export class GenreEndcap implements SlottedFixture {
       stripeMat
     );
     stripe.position.set(0, 0.09, 0);
-    this.group.add(stripe);
+    furniture.add(stripe);
 
     // The endcap FOOTER plinth — the low base box the 80s stores ran under
     // their aisle-end displays (owner attestation 2026-07-30: "i see that
@@ -352,7 +356,7 @@ export class GenreEndcap implements SlottedFixture {
       shelf.position.set(0, yPos, coreDepth / 2 + SHELF_DEPTH / 2);
       shelf.rotation.x = ROTATION_X;
       shelf.castShadow = true;
-      this.group!.add(shelf);
+      furniture.add(shelf);
     });
 
     this.buildHeader(coreWidth, coreHeight, coreDepth);
@@ -366,6 +370,9 @@ export class GenreEndcap implements SlottedFixture {
     this.ctx.scene.add(this.group);
     this.ctx.addCollider(this.group);
     this.ctx.requestShadowRefresh();
+    this.disposeModel = installDisplayModel(this.ctx, this.group, furniture,
+      `models/genre-endcap-${ENDCAP_TOP_WIDTH < ENDCAP_WIDTH ? 'tapered' : 'straight'}.glb`,
+      { DisplayBody: coreMat, DisplayShelf: shelfMat, DisplayTrim: stripeMat });
   }
 
   /**
@@ -440,6 +447,8 @@ export class GenreEndcap implements SlottedFixture {
   }
 
   dispose(): void {
+    this.disposeModel?.();
+    this.disposeModel = null;
     this.disposeHeader();
     if (this.group) {
       this.ctx.scene.remove(this.group);

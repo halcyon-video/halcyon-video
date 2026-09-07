@@ -58,6 +58,9 @@ function isReachable(el: HTMLElement): boolean {
   if (el.getClientRects().length === 0) return false; // display:none, detached, zero-box
   const cs = getComputedStyle(el);
   if (cs.visibility === 'hidden' || cs.visibility === 'collapse') return false;
+  // Desk settings paint this focused input onto the CRT. The backing form
+  // deliberately has no pointer hits, but an open terminal still owns typing.
+  if (el.closest('#settings-drawer-overlay.visible.terminal-settings')) return true;
   if (cs.pointerEvents === 'none') return false;       // its overlay is down
   return true;
 }

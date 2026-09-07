@@ -12,9 +12,9 @@ import {
   SERIES_DEPTH_MULT,
   posterPixelCache,
   textureArrayManager,
+  prefetchCoverBytes,
 } from './video-case';
 import { setSurfaceKtx2Renderer } from './surface-textures';
-import { pendingTextureUploads } from './poster-textures';
 import { keyboardOwnedByControl } from './text-entry-focus';
 // @ts-ignore
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
@@ -70,7 +70,6 @@ import { StoreTheme } from './themes';
 import {
   CASE_EULER_ORDER,
   NewReleasesSection,
-  sectionColSpan,
   tempPosition,
   tempRotation,
   tempQuaternion,
@@ -93,6 +92,7 @@ import {
   updatedMeshes,
   CLERK_SLEEP_INPUT_MS,
 } from './scene-shared';
+import { nrBaysForRuns, planNrBays } from './store-nr-bays';
 import * as shell from './store-shell';
 import * as stock from './store-stock';
 import * as checkout from './store-checkout';
@@ -133,7 +133,9 @@ import { RentalRecord, loadRentalRecord, clearRentalRecord, isLockedOut, formatU
 import { perfTrace, perfSlot } from './perf-trace';
 import { ShelfClasps, type ClaspTarget } from './fixtures/shelf-clasp';
 import { requestMovie } from './jellyseerr';
-import { displayHz, computeFpsCap, computeScalerTargetFps } from './display-hz';
+import { displayHz, computeFpsCap } from './display-hz';
+import * as resolution from './store-resolution';
+import { RES_SCALE_MAX } from './store-resolution';
 import { type LibraryIndex } from './recommend-why';
 import type { ClerkSuggestion } from './clerk-interaction';
 
@@ -191,13 +193,6 @@ function matrixAlmostEquals(a: THREE.Matrix4, b: THREE.Matrix4, eps = 1e-6): boo
   return true;
 }
 
-// Rounds to 2dp to keep repeated +/- 0.05 steps (issue #27's dynamic
-// resolution scale) from drifting off the 0.70/0.75/.../1.00 ladder due to
-// binary floating point (e.g. 0.7 + 0.05 !== 0.75 bit-for-bit).
-function round2(n: number): number {
-  return Math.round(n * 100) / 100;
-}
-
 export class StoreScene {
   public container: HTMLDivElement;
   public renderer!: THREE.WebGLRenderer;
@@ -246,7 +241,7 @@ export class StoreScene {
   // quality cap (which stays as the upper bound). Bounds chosen so FXAA + film
   // grain hide the softening: text on signage stays readable, if barely, at
   // the floor.
-  private resScale = 1.0;
+  public resScale = 1.0;
   // Motion-gated sharpness, applied ON TOP of resScale in applyRenderResolution().
   // qualityScale is 1.0 (today's capped ~1440p budget) for static/dwelling frames
   // and rises to sharpScale — the factor that lifts that budget up to native
@@ -336,12 +331,10 @@ export class StoreScene {
   private get activeFrameInterval(): number {
     return Math.max(0, 1000 / this.targetFps - 0.5 * (1000 / displayHz()));
   }
-  private get resScaleMin(): number {
+  public get resScaleMin(): number {
     if (this.softwareGL) return 0.4;
     return this.effectiveQuality === 'high' ? 0.7 : 0.5;
   }
-  private static readonly RES_SCALE_MAX = 1.0;
-  private static readonly RES_SCALE_STEP = 0.05;
   // Settle supersample: how many times the MOVING frame's pixel count the one
   // parked frame is drawn at. 2 = 1.41x linear, the classic 2xSS — measurably
   // cleaner on shelf rails / ceiling grid in a 4K A/B, and self-scaling (a
@@ -368,9 +361,13 @@ export class StoreScene {
   // #24's render-on-demand). VIDEO-tier frames are deliberately throttled to
   // ~24fps and IDLE frames render nothing, so mixing either into this window
   // would misread throttling as a slow GPU and needlessly downscale.
-  private resScaleFrames = 0;
-  private resScaleWindowStart = performance.now();
-  private resScaleGoodStreak = 0; // consecutive good-fps seconds before stepping up (avoids oscillation)
+  public resScaleFrames = 0;
+  public resScaleWindowStart = performance.now();
+  public resScaleGoodStreak = 0; // consecutive good-fps seconds before stepping up (avoids oscillation)
+  // Longest frame in the in-flight scaler window, and the previous window
+  // frame's timestamp that measures it (see store-resolution.ts).
+  public resScaleWorstMs = 0;
+  public resScalePrevTime = 0;
 
   // Scene components
   public meshes: THREE.Object3D[] = []; // Track all added meshes (including instanced ones) for disposal
@@ -401,6 +398,7 @@ export class StoreScene {
   // eye height, so harness shots can stand anywhere (e.g. far outside the
   // storefront to frame the whole facade). Cleared by any manual walk toggle.
   public walkFreecam = false;
+  public attractTour = false; // attract-mode.ts is driving the walk camera: HUD down, counts as motion
   public walkKeys = {
     w: false,
     a: false,
@@ -937,6 +935,10 @@ export class StoreScene {
   // outlast the ~250ms AO fade-in that keeps rendering after a stop, so the
   // persisted still is never the last, lower-res fade frame.
   private static readonly QUALITY_SETTLE_MS = 400;
+  // How long the elevated (motion) pixel budget must go unused before it is
+  // given back — see the downshift hysteresis in animate(). Comfortably longer
+  // than the gap between two browse steps, comfortably shorter than a dwell.
+  private static readonly QUALITY_DOWNSHIFT_MS = 1500;
   private static readonly CLERK_FADE_S = 0.35; // clerk sleep/wake fade (seconds)
   // Clerk sleep state (see the pre-tier clerk block in animate()).
   private clerkAsleep = false;
@@ -1077,6 +1079,9 @@ export class StoreScene {
     // when Romm isn't configured/reachable, so the VIDEO GAMES section never
     // builds and nothing is fetched.
     this.gameMovies = gameMovies;
+    // Start the cover downloads NOW, before the synchronous store build below
+    // holds the thread for seconds — see poster-prefetch.ts.
+    prefetchCoverBytes([...libraries.flatMap((l) => l.movies), ...gameMovies, ...comingSoonMovies, ...discoveryMovies]);
 
     // The request-suggestion pool is the fresh trending/popular fetch PLUS
     // anything already sitting in Jellyseerr's own pending-request queue
@@ -1292,7 +1297,11 @@ export class StoreScene {
       return b.title.localeCompare(a.title);
     });
 
-    const numWallSections = Math.ceil(this.nrTotalCols / SECTION_COLS);
+    // Sections ARE the physical bays (store-nr-bays.ts): cut per wall run the
+    // way the divider panels are, so no title ever spans a divider or the
+    // corner. A trailing partial bay is its own narrower section.
+    const nrBays = nrBaysForRuns([this.nrLeftWallCols, this.nrBackWallColsRun1, this.nrBackWallColsRun2, this.nrBackWallColsRun3]);
+    const numWallSections = nrBays.length;
     // A regular wall section faces ONE title out across its whole 6-column row,
     // so the wall wants one candidate per ROW, not per column. Those two counts
     // only coincided while a section happened to be as tall as it is wide
@@ -1333,22 +1342,25 @@ export class StoreScene {
     const featureSectionBudget = !wallAllowsFeatureSections() ? 0
       : (regularNewReleases.length > 0 || highRatedCandidates.length > 0) ? Math.max(0, numWallSections - 1)
       : numWallSections;
-    const numDoubleFeaturesToPlace = Math.min(
+    // Geometry has the last word on how many doubles fit: each needs two
+    // FULL bays side by side on ONE run (never across the corner).
+    const numDoubleFeaturesToPlace = planNrBays(nrBays, Math.min(
       doubleFeatureCandidates.length,
       Math.floor(featureSectionBudget / 2)
-    );
+    ), 0).doubleStarts.length;
     const placedDoubleIds = new Set(
       doubleFeatureCandidates.slice(0, numDoubleFeaturesToPlace).map(m => m.id)
     );
     // Double-qualified titles that didn't fit the budget still meet the
     // single-section bar, so they compete for the super-feature slots.
     const singleFeatureCandidates = superFeatureNewReleases.filter(m => !placedDoubleIds.has(m.id));
-    const numSuperFeaturesToPlace = Math.min(
+    const bayPlan = planNrBays(nrBays, numDoubleFeaturesToPlace, Math.min(
       singleFeatureCandidates.length,
       featureSectionBudget - numDoubleFeaturesToPlace * 2
-    );
+    ));
+    const numSuperFeaturesToPlace = bayPlan.superBays.length;
 
-    const numRegularSections = numWallSections - numDoubleFeaturesToPlace * 2 - numSuperFeaturesToPlace;
+    const numRegularSections = bayPlan.regularBays.length;
     const numRegularRows = numRegularSections * WALL_SHELF_HEIGHTS.length; // one faced-out title per wall tier
 
     const regularMoviesList = [
@@ -1381,40 +1393,38 @@ export class StoreScene {
 
     this.nrSections = [];
     this.nrSuppressedDividerCols.clear();
-    // 1. Create double-feature sections first (one movie spans TWO adjacent
-    //    sections — 12 columns, every tier — as a single doubled-width
-    //    display). F8-008: the shelf DIVIDER between the two halves is KEPT
-    //    (the hit still spans both sections, but the physical divider panel
-    //    stays intact per the user's request). We therefore no longer add the
-    //    interior boundary to nrSuppressedDividerCols — the set stays empty and
-    //    its consumer guards become no-ops.
-    for (let i = 0; i < numDoubleFeaturesToPlace; i++) {
-      this.nrSections.push({
-        type: 'double-feature',
-        movie: doubleFeatureCandidates[i]
-      });
-    }
-    // 2. Create super-feature sections (one movie takes all 6 columns and every tier of a section)
-    for (let i = 0; i < numSuperFeaturesToPlace; i++) {
-      this.nrSections.push({
-        type: 'super-feature',
-        movie: singleFeatureCandidates[i]
-      });
-    }
-    // 3. Create regular sections (one movie per shelf tier, each occupying all
-    //    6 columns of that row — the multi-copy run the real walls ran)
+    // Sections go in RIBBON order, each pinned to its bay's global column
+    // range. A double-feature spans two whole adjacent bays of one run as a
+    // single doubled-width display — F8-008: the shelf DIVIDER between its
+    // halves is KEPT (the hit spans both bays, the physical panel stays), so
+    // nrSuppressedDividerCols stays empty and its consumer guards are no-ops.
+    // A super-feature takes every tier of one full bay; a regular section
+    // faces one title per shelf tier across its bay's columns (six copies —
+    // fewer on a trailing partial bay, never spilling into the next).
+    const doubleAt = new Map(bayPlan.doubleStarts.map((b, i) => [b, i]));
+    const superAt = new Map(bayPlan.superBays.map((b, i) => [b, i]));
     let regMovieIdx = 0;
-    for (let s = 0; s < numRegularSections; s++) {
-      const moviesForSection: Movie[] = [];
-      for (let r = 0; r < WALL_SHELF_HEIGHTS.length; r++) {
-        if (regMovieIdx < regularMoviesToPlace.length) {
-          moviesForSection.push(regularMoviesToPlace[regMovieIdx++]);
+    for (let b = 0; b < nrBays.length; b++) {
+      const bay = nrBays[b];
+      const dbl = doubleAt.get(b);
+      const sup = superAt.get(b);
+      if (dbl !== undefined) {
+        this.nrSections.push({ type: 'double-feature', movie: doubleFeatureCandidates[dbl],
+          startCol: bay.startCol, endCol: nrBays[b + 1].endCol });
+        b++;
+      } else if (sup !== undefined) {
+        this.nrSections.push({ type: 'super-feature', movie: singleFeatureCandidates[sup],
+          startCol: bay.startCol, endCol: bay.endCol });
+      } else {
+        const moviesForSection: Movie[] = [];
+        for (let r = 0; r < WALL_SHELF_HEIGHTS.length; r++) {
+          if (regMovieIdx < regularMoviesToPlace.length) {
+            moviesForSection.push(regularMoviesToPlace[regMovieIdx++]);
+          }
         }
+        this.nrSections.push({ type: 'regular', movies: moviesForSection,
+          startCol: bay.startCol, endCol: bay.endCol });
       }
-      this.nrSections.push({
-        type: 'regular',
-        movies: moviesForSection
-      });
     }
 
     // Keep these arrays populated for storefront posters and other features
@@ -1705,16 +1715,14 @@ export class StoreScene {
   // stays one continuous display.
   /**
    * The [startCol, endCol] of the New Releases section containing `col`, or
-   * null when the ribbon has no sections yet. Walks the same running column
-   * cursor the placement pass uses, since a double-feature spans two sections'
-   * worth of columns and a fixed secIdx*SECTION_COLS would drift past it.
+   * null when no section covers it. Sections carry their own bay-pinned
+   * ranges (store-nr-bays.ts), so this is a plain lookup.
    */
   public nrSectionRangeForCol(col: number): { startCol: number; endCol: number } | null {
-    let startCol = 0;
     for (const section of this.nrSections) {
-      const endCol = Math.min(this.nrTotalCols - 1, startCol + sectionColSpan(section) - 1);
-      if (col >= startCol && col <= endCol) return { startCol, endCol };
-      startCol += sectionColSpan(section);
+      if (col >= section.startCol && col <= section.endCol) {
+        return { startCol: section.startCol, endCol: section.endCol };
+      }
     }
     return null;
   }
@@ -2110,6 +2118,16 @@ export class StoreScene {
       n8aoPass.configuration.gammaCorrection = false; // OutputPass later in the chain owns tone mapping/sRGB
       n8aoPass.configuration.aoRadius = 0.5;       // ft — same contact-shadow reach the GTAO pass was tuned to
       n8aoPass.configuration.distanceFalloff = 1.0;
+      // Transparency-aware AO OFF, and n8ao's per-frame auto-detection with
+      // it: the detector traverses the WHOLE scene graph every frame, and
+      // because this store is full of transparent materials it latches
+      // transparencyAware on, after which each frame also pays three more
+      // traversals, a scene-sized `new Map()`, two depth copies and TWO extra
+      // full scene submissions — measured at ~477 extra draw calls/frame.
+      // Both lines are needed: the config Proxy only latches auto-detect off
+      // on a value CHANGE, and transparencyAware is already false here.
+      n8aoPass.autoDetectTransparency = false;
+      n8aoPass.configuration.transparencyAware = false;
       n8aoPass.configuration.intensity = 1.4;      // soft occlusion (pow exponent) — 2.0 read too heavy against the reference's evenly-lit shelves; faded via the adapter below
       // Walk gating swaps source passes: while the feet move, AO is off and
       // the plain RenderPass takes over (EffectComposer skips disabled
@@ -2524,7 +2542,7 @@ export class StoreScene {
     // buffer depend on how slow that particular boot happened to be. Product
     // code never calls this; the IDLE branch is the real recovery path.
     (window as any).debugResetResScale = () => {
-      this.resScale = StoreScene.RES_SCALE_MAX;
+      this.resScale = RES_SCALE_MAX;
       this.applyRenderResolution();
       this.requestRender();
     };
@@ -2548,7 +2566,7 @@ export class StoreScene {
   // Called on init, on window resize, and whenever resScale steps. Renderer
   // pixelRatio (the quality-tier cap) is untouched here — only the buffer
   // dimensions scale, so ratio and size are never multiplied together.
-  private applyRenderResolution() {
+  public applyRenderResolution() {
     const clientWidth = this.container.clientWidth || window.innerWidth || 1280;
     const clientHeight = this.container.clientHeight || window.innerHeight || 720;
     // Recompute sharpScale here (cheap) so it's always current for the panel we
@@ -2695,6 +2713,12 @@ export class StoreScene {
     const ambientIntensity = this.selectedSky ? this.selectedSky.hemisphereIntensity : 0.09;
     const ambient = new THREE.HemisphereLight(ambientSky, ambientGround, ambientIntensity);
     this.scene.add(ambient);
+    // Low-frequency interior bounce, reflected up from floor and fixtures.
+    // Unlike material emission this obeys normals, albedo and light intensity.
+    const interiorBounce = new THREE.HemisphereLight(0x000000, 0xc5cbd6, 1.25);
+    interiorBounce.name = 'interior-diffuse-bounce';
+    interiorBounce.userData.interiorBounce = true;
+    this.scene.add(interiorBounce);
 
     // The single real light: warm daylight raking in from the front/left windows.
     // It supplies the scene's direction and casts every shadow in the room. With
@@ -4264,70 +4288,8 @@ export class StoreScene {
   // permanently pin resScale to the floor. IDLE resets/snaps to 1.0 in the
   // caller before this is ever reached.
   private updateDynamicResolution(time: number, active: boolean, moving: boolean) {
-    if (!active || !moving) {
-      // VIDEO tier or stationary: don't let throttled or resting pacing feed the window;
-      // just keep the clock from accumulating stale elapsed time across the gap.
-      this.resScaleFrames = 0;
-      this.resScaleWindowStart = time;
-      return;
-    }
-    // Texture uploads are not a GPU verdict. The boot wave (and any streaming
-    // burst) hands this window frames pinned at 0.2-30fps by decode + upload
-    // work whose cost has nothing to do with how many pixels we are shading —
-    // the scaler read that as "slow GPU" and walked resolution down to the 0.70
-    // floor on a machine that then held a locked 60. It only climbs back at
-    // 0.05 per two good seconds, and cannot climb at all in the VIDEO tier
-    // (the early return above), so one boot could soften the store for the rest
-    // of the session. Skip the window entirely while the queue is draining.
-    if (pendingTextureUploads() > 0) {
-      this.resScaleFrames = 0;
-      this.resScaleGoodStreak = 0;
-      this.resScaleWindowStart = time;
-      return;
-    }
-    this.resScaleFrames++;
-    const elapsed = time - this.resScaleWindowStart;
-    if (elapsed < 1000) return;
-
-    const fps = (this.resScaleFrames * 1000) / elapsed;
-    // Thresholds scale with the display: the classic 50/58 pair was 60Hz
-    // tuning (0.83×/0.97× of target); a 120Hz display gets 100/116. Measured
-    // on the RX 9070 XT: motion-frame cost is mostly pixel-independent (AO
-    // recompute + draw-call submission), so a tighter band just parks scale
-    // at the floor for no fps — 0.83× is the right down-threshold here too.
-    //
-    // Bounded by SCALER_TARGET_FPS_CAP: that same pixel-independence means a
-    // GPU short of the panel's refresh cannot buy the difference with
-    // resolution, so scaling the thresholds all the way up with an uncapped
-    // 144/165Hz display parks resScale at the floor permanently. See
-    // computeScalerTargetFps.
-    const scalerTarget = computeScalerTargetFps(this.targetFps);
-    const downAt = scalerTarget * 0.83;
-    const upAt = scalerTarget * 0.97;
-    if (fps < downAt && this.resScale > this.resScaleMin) {
-      this.resScale = Math.max(this.resScaleMin, round2(this.resScale - StoreScene.RES_SCALE_STEP));
-      this.resScaleGoodStreak = 0;
-      this.applyRenderResolution();
-      console.log(`[resScale] ${fps.toFixed(1)}fps < ${downAt.toFixed(0)} — down to ${this.resScale}`);
-    } else if (fps > upAt && this.resScale < StoreScene.RES_SCALE_MAX) {
-      this.resScaleGoodStreak++;
-      // Require fps to hold above the up-threshold for 2 consecutive seconds
-      // before stepping up, so a single lucky frame doesn't cause up/down
-      // oscillation at the edge.
-      if (this.resScaleGoodStreak >= 2) {
-        this.resScale = Math.min(StoreScene.RES_SCALE_MAX, round2(this.resScale + StoreScene.RES_SCALE_STEP));
-        this.resScaleGoodStreak = 0;
-        this.applyRenderResolution();
-        console.log(`[resScale] ${fps.toFixed(1)}fps > ${upAt.toFixed(0)} — up to ${this.resScale}`);
-      }
-    } else {
-      this.resScaleGoodStreak = 0;
-    }
-
-    this.resScaleFrames = 0;
-    this.resScaleWindowStart = time;
+    return resolution.updateDynamicResolution(this, time, active, moving);
   }
-
   // Render-on-demand wake signal (issue #24): force the composer to run for the
   // next few frames. Call this from any code path that changes what's on screen
   // outside animate()'s own bookkeeping — input handlers, mode/settings changes,
@@ -4842,7 +4804,7 @@ export class StoreScene {
     // when dwelling; zero GPU when left alone. On a window already at native
     // (sharpScale === 1) none of this changes anything.
     const cameraMoving =
-      walkKeyHeld || cameraLerping ||
+      walkKeyHeld || cameraLerping || this.attractTour ||
       (this.isWalkAroundMode && (time - this.lastWalkLookTime) < 150) ||
       (this.isWalkAroundMode && this.bobAmount > 0);
     if (cameraMoving) this.lastCameraMotionTime = time;
@@ -4852,7 +4814,7 @@ export class StoreScene {
     }
 
     // Undersampling disabled when nothing is moving: snap resScale to full crispness.
-    const idleScale = this.softwareGL ? this.resScaleMin : StoreScene.RES_SCALE_MAX;
+    const idleScale = this.softwareGL ? this.resScaleMin : RES_SCALE_MAX;
     if (!cameraMoving && !sceneChanging && this.resScale !== idleScale) {
       this.resScale = idleScale;
       this.applyRenderResolution();
@@ -4886,7 +4848,28 @@ export class StoreScene {
         this.motionScale > 1 &&
         (cameraMoving || this.mode === 'inspect' || (time - this.lastCameraMotionTime) < StoreScene.QUALITY_SETTLE_MS);
       const targetQuality = wantSharp ? this.motionScale : 1.0;
-      if (this.qualityScale !== targetQuality) {
+      // DOWNSHIFT HYSTERESIS. Every change here reallocates the drawing buffer
+      // and every pass's render targets — 19-20 texImage2D calls, measured at
+      // 30-38ms of main-thread time at --full — so a downshift the next
+      // keypress immediately undoes costs two hitches to save nothing.
+      //
+      // That is exactly what browsing produced. `wantSharp` goes false
+      // QUALITY_SETTLE_MS after the camera lerp converges, but the case-pop
+      // settle keeps `sceneChanging` true past that, so a shelf-flip session
+      // downshifted at ~410ms and upshifted again on the next shelf move:
+      // measured six full down/up pairs — twelve reallocations — in one 60-step
+      // browse, with the view never actually parking in between.
+      //
+      // Upshifts stay immediate (the first moving frame is the one that must be
+      // sharp). Downshifts wait for the elevated budget to have gone unused for
+      // QUALITY_DOWNSHIFT_MS, which is longer than any gap between two browse
+      // steps and far shorter than a dwell. Nothing is lost by holding it: a
+      // view that truly settles is composited ONCE and then persisted at zero
+      // GPU (see staticPersist), so the frames this defers are a handful of
+      // animating ones, at the same budget the motion just ahead of them paid.
+      const holdDownshift = targetQuality < this.qualityScale &&
+        (time - this.lastCameraMotionTime) < StoreScene.QUALITY_DOWNSHIFT_MS;
+      if (this.qualityScale !== targetQuality && !holdDownshift) {
         this.qualityScale = targetQuality;
         this.applyRenderResolution();
         mustRenderThisFrame = true; // buffer just cleared — repaint before present
@@ -4896,9 +4879,7 @@ export class StoreScene {
     if (staticPersist && !mustRenderThisFrame) {
       // Reset the ACTIVE-only fps window (as the IDLE branch does) so these
       // skipped frames aren't misread as a slow GPU and don't downscale.
-      this.resScaleFrames = 0;
-      this.resScaleGoodStreak = 0;
-      this.resScaleWindowStart = time;
+      resolution.resetScalerWindow(this, time);
       return;
     }
 
@@ -4935,12 +4916,10 @@ export class StoreScene {
         this.aoFadeT = 1;
         this.aoPass.blendIntensity = 1;
       }
-      this.resScaleFrames = 0;
-      this.resScaleGoodStreak = 0;
-      this.resScaleWindowStart = time;
+      resolution.resetScalerWindow(this, time);
       // Software GL never snaps up for the parked frame — one full-res
       // SwiftShader composite costs multiple seconds.
-      const idleScale = this.softwareGL ? this.resScaleMin : StoreScene.RES_SCALE_MAX;
+      const idleScale = this.softwareGL ? this.resScaleMin : RES_SCALE_MAX;
       if (this.resScale !== idleScale) {
         this.resScale = idleScale;
         this.applyRenderResolution();
@@ -4988,9 +4967,7 @@ export class StoreScene {
     // Reset the window instead (same treatment the persist/idle branches give
     // their skipped frames).
     if (settleRefine) {
-      this.resScaleFrames = 0;
-      this.resScaleGoodStreak = 0;
-      this.resScaleWindowStart = time;
+      resolution.resetScalerWindow(this, time);
     } else {
       this.updateDynamicResolution(time, active, cameraMoving || sceneChanging);
     }

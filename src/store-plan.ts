@@ -744,47 +744,10 @@ export class StorePlan {
       return runs;
     };
 
-    const canFitAll = (currentRuns: { fx: number; fz: number; cap: number }[]) => {
-      let tempQi = 0;
-      for (const run of currentRuns) {
-        if (tempQi >= slice.length) break;
-        let take = 0;
-        let lastLib = -1;
-        let uniqueLibs = 0;
-        while (tempQi + take < slice.length && take < run.cap) {
-          const itemLib = slice[tempQi + take].lib;
-          if (itemLib !== lastLib) {
-            if (uniqueLibs >= 2) {
-              break;
-            }
-            lastLib = itemLib;
-            uniqueLibs++;
-          }
-          take++;
-        }
-        tempQi += take;
-      }
-      return tempQi >= slice.length;
-    };
-
-    // Deepen the field until the hatched runs can hold the whole slice.
-    let Zb = Zf - Math.max(12, slice.length * 2);
-    let runs = runsFor(Zb);
-    let guard = 0;
-    while (!canFitAll(runs) && guard++ < 400) {
-      Zb -= L;
-      runs = runsFor(Zb);
-    }
-
-    let qi = 0;
-    for (const run of runs) {
-      if (qi >= slice.length) break;
-      // Every chunk poured from THIS run is one physical straight row split
-      // only by the maxRunUnits/RUN_BREAK_GAP bookkeeping below — tag them
-      // all with the run's starting lineId so the walk-order pass can later
-      // recognise the split and treat them as one line (see rowGroupId on
-      // ShelvingUnit).
-      const rowGroupId = lineId;
+    // How many queue items a run takes starting at queue index qi: up to its
+    // capacity, and never more than two libraries' worth (a run is shared by
+    // at most the library that runs out on it and the one that starts there).
+    const takeFrom = (run: { cap: number }, qi: number): number => {
       let take = 0;
       let lastLib = -1;
       let uniqueLibs = 0;
@@ -799,6 +762,59 @@ export class StorePlan {
         }
         take++;
       }
+      return take;
+    };
+    // Pour the queue through the runs in order; returns how many runs it
+    // touched and where the queue stopped.
+    const pourInto = (currentRuns: { cap: number }[]): { used: number; qi: number } => {
+      let tempQi = 0;
+      let used = 0;
+      for (const run of currentRuns) {
+        if (tempQi >= slice.length) break;
+        tempQi += takeFrom(run, tempQi);
+        used++;
+      }
+      return { used, qi: tempQi };
+    };
+    const canFitAll = (currentRuns: { cap: number }[]) => pourInto(currentRuns).qi >= slice.length;
+
+    // Deepen the field until the hatched runs can hold the whole slice.
+    let Zb = Zf - Math.max(12, slice.length * 2);
+    let runs = runsFor(Zb);
+    let guard = 0;
+    while (!canFitAll(runs) && guard++ < 400) {
+      Zb -= L;
+      runs = runsFor(Zb);
+    }
+
+    // The centre-out sort decides WHICH runs a single-field store stocks, so
+    // the smallest store still puts its one run down the middle. But pouring
+    // in that order scatters the queue across the floor — centre, then one
+    // right, then one LEFT, then two right... — so a library that spills off
+    // one run continues on the far side of the store, and its browse walk
+    // has to cross the whole floor to follow it. Once the run SET is fixed,
+    // pour it in floor order (left to right) so every library's units sit on
+    // contiguous, adjacent runs. The two-libraries-per-run rule can break the
+    // queue at different points in the new order, so re-check the fit and
+    // widen the set by the next centre-out run until it holds everything.
+    if (FORMAT.singleField) {
+      let used = pourInto(runs).used;
+      const inFloorOrder = (n: number) => runs.slice(0, n).sort((a, b) => a.fx - b.fx);
+      let chosen = inFloorOrder(used);
+      while (!canFitAll(chosen) && used < runs.length) chosen = inFloorOrder(++used);
+      runs = chosen;
+    }
+
+    let qi = 0;
+    for (const run of runs) {
+      if (qi >= slice.length) break;
+      // Every chunk poured from THIS run is one physical straight row split
+      // only by the maxRunUnits/RUN_BREAK_GAP bookkeeping below — tag them
+      // all with the run's starting lineId so the walk-order pass can later
+      // recognise the split and treat them as one line (see rowGroupId on
+      // ShelvingUnit).
+      const rowGroupId = lineId;
+      const take = takeFrom(run, qi);
       const fzScaled = this.scaleZ(run.fz);
       const chunks = Math.ceil(take / this.maxRunUnits);
       for (let m = 0; m < take; m++) {

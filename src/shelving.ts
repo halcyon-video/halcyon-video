@@ -16,7 +16,7 @@ import {
   UNIT_DEPTH, UNIT_SIDE_CAPACITY, UNIT_FRAME_HEIGHT, unitDepthAtHeight,
 } from './store-layout';
 import { StorePlan } from './store-plan';
-import { createFlushTopperLabelTexture, createArchedTopperLabelTexture, BB2000_PLAQUE_RED } from './canvas-textures';
+import { createFlushTopperLabelTexture, paintFlushTopperLabel, createArchedTopperLabelTexture, BB2000_PLAQUE_RED } from './canvas-textures';
 import {
   createTicketBoardLabelMaterial, TICKET_BOARD_W, TICKET_BOARD_H, TICKET_BOARD_T,
 } from './fixtures/ticket-board-sign';
@@ -26,6 +26,7 @@ import { ENDCAP_CORE_HEIGHT } from './fixtures/genre-endcap';
 import { dressing93Active } from './genre-colors';
 
 import { getActiveTheme } from './themes';
+import { onBrandChange, registerBrandRepaint } from './brand-live';
 import { CASE_WIDTH, CASE_HEIGHT } from './video-case';
 import type { ClaspPlacement } from './fixtures/shelf-clasp';
 
@@ -228,13 +229,19 @@ export function buildAisleShelving(deps: AisleShelvingDeps): void {
   const getFlushLabelMat = (label: string): THREE.MeshStandardMaterial => {
     let mat = flushLabelMats.get(label);
     if (!mat) {
+      const map = archedTopper
+        ? createArchedTopperLabelTexture(label)
+        : createFlushTopperLabelTexture(label, theme);
       mat = new THREE.MeshStandardMaterial({
-        map: archedTopper
-          ? createArchedTopperLabelTexture(label)
-          : createFlushTopperLabelTexture(label, theme),
+        map,
         roughness: archedTopper ? 0.55 : 0.4,
         metalness: 0.05
       });
+      // The banner is the brand's primary: repaint in place on a Store Brand
+      // edit (brand-live.ts) instead of waiting for the drawer-close rebuild.
+      if (!archedTopper) {
+        registerBrandRepaint(map, () => paintFlushTopperLabel(map.image as HTMLCanvasElement, label));
+      }
       flushLabelMats.set(label, mat);
     }
     return mat;
@@ -246,6 +253,9 @@ export function buildAisleShelving(deps: AisleShelvingDeps): void {
     roughness: archedTopper ? 0.55 : 0.4,
     metalness: 0.05
   });
+  if (!archedTopper) {
+    onBrandChange(() => { flushSideMat.color.set(getActiveTheme().palette.primary); });
+  }
   // Plaque height (ft). The 2000 arched plaque is measured off the boxes it
   // sits over (footage/user: 0.6 of a box's height); 2010's banner runs a touch
   // shorter than HV's (the full 0.62 read too tall against that theme's
@@ -365,6 +375,8 @@ export function buildAisleShelving(deps: AisleShelvingDeps): void {
     const unitZCenter = plan.aisleZCenter(unit);
     // Spin this island in place about its own (xCenter, zCenter) by its arrangement yaw.
     const aisleParent = makeAisleGroup(unit.yaw, unit.xCenter, unitZCenter);
+    aisleParent.name = `gondola-unit:${unit.libraryIdx}:${unit.unitIdxInLibrary}`;
+    aisleParent.userData.gondolaLine = unit.lineId;
     const cols = unit.cols;
     const shelfLength = (cols - 1) * BOX_SPACING + 1.0; // 0.5 ft margin on each end
 
@@ -374,6 +386,7 @@ export function buildAisleShelving(deps: AisleShelvingDeps): void {
     // Same-material structure parts collect here and merge into one mesh per
     // material at the end of the unit (see the #118 note above).
     const structureParts: THREE.BufferGeometry[] = []; // materials.shelf
+    const structureModels: ShelfPart[] = [];
     const deckParts: THREE.BufferGeometry[] = [];
     const deckModels: ShelfPart[] = [];
     const railModels: ShelfPart[] = [];
@@ -440,9 +453,11 @@ export function buildAisleShelving(deps: AisleShelvingDeps): void {
         div.castShadow = true;
         aisleParent.add(div);
         deps.addCollider(div);
-        deps.shelfModels.add(div, [{ kind: 'wire', depth: .8, length: UNIT_FRAME_HEIGHT, pitch: Math.PI / 2, panel: true }], materials.strip);
+        deps.shelfModels.add(div, [{ kind: 'standard', depth: .14, length: .09, height: UNIT_FRAME_HEIGHT, y: -frameCenterY }, { kind: 'foot', depth: UNIT_DEPTH - .12, length: .14, y: -frameCenterY }], materials.strip);
       } else {
         stamp(structureParts, dividerTemplate, xCenter, frameCenterY, zDiv);
+        structureModels.push({ kind: 'upright', depth: UNIT_DEPTH - .05, topDepth: frameTopDepth - .05,
+          height: UNIT_FRAME_HEIGHT, length: .04, x: xCenter, z: zDiv });
       }
     };
 
@@ -454,6 +469,19 @@ export function buildAisleShelving(deps: AisleShelvingDeps): void {
     // Divider where conjoined/contiguous shelf units meet (at the back of the unit if not the end of the line)
     if (!unit.isLineBack) {
       addDivider(FIELD_Z_FRONT + unit.zPos - shelfLength);
+    }
+
+    if (wireFrame) {
+      for (const z of [FIELD_Z_FRONT + unit.zPos - .06, FIELD_Z_FRONT + unit.zPos - shelfLength + .06]) {
+        const support = new THREE.Mesh(getBoxTemplate(.14, UNIT_FRAME_HEIGHT, .09), materials.strip);
+        support.position.set(xCenter, frameCenterY, z);
+        support.castShadow = support.receiveShadow = true;
+        aisleParent.add(support);
+        deps.shelfModels.add(support, [
+          { kind: 'standard', depth: .14, length: .09, height: UNIT_FRAME_HEIGHT, y: -frameCenterY },
+          { kind: 'foot', depth: UNIT_DEPTH - .12, length: .14, y: -frameCenterY },
+        ], materials.strip);
+      }
     }
 
     // Solid backing wall in the center (divider along Z). The wire theme gets
@@ -483,6 +511,8 @@ export function buildAisleShelving(deps: AisleShelvingDeps): void {
       deps.shelfModels.add(backingWall, [{ kind: 'slat', depth: .5, length: shelfLength - .04, height: UNIT_FRAME_HEIGHT }], modeledSpineMat);
     } else {
       stamp(structureParts, getBoxTemplate(0.5, UNIT_FRAME_HEIGHT, shelfLength - 0.04), xCenter, frameCenterY, zCenter);
+      structureModels.push({ kind: 'spine', depth: .5, length: shelfLength - .04,
+        height: UNIT_FRAME_HEIGHT, x: xCenter, z: zCenter });
     }
 
     // Section toppers. Each 6-column section carries the classic
@@ -700,6 +730,9 @@ export function buildAisleShelving(deps: AisleShelvingDeps): void {
       structure.castShadow = true;
       aisleParent.add(structure);
       deps.addCollider(structure);
+      // The modeled back and uprights keep the same pale laminate as their fallback.
+      deps.shelfModels.add(structure, structureModels, materials.shelf);
+      structureParts.forEach(g => g.dispose());
     }
     if (deckParts.length) {
       const decks = new THREE.Mesh(mergeGeometries(deckParts), materials.shelf);
@@ -762,6 +795,8 @@ export function buildAisleShelving(deps: AisleShelvingDeps): void {
       aisleParent.add(leftCap);
       deps.addCollider(leftCap);
       deps.registerEndCap(leftCap);
+      deps.shelfModels.add(leftCap, [{ kind: 'cap', depth: UNIT_DEPTH, topDepth: capTopDepth,
+        height: UNIT_FRAME_HEIGHT, length: .1, y: -frameCenterY }], capMats, true);
     }
 
     if (unit.isLineBack) {
@@ -782,6 +817,8 @@ export function buildAisleShelving(deps: AisleShelvingDeps): void {
       aisleParent.add(rightCap);
       deps.addCollider(rightCap);
       deps.registerEndCap(rightCap);
+      deps.shelfModels.add(rightCap, [{ kind: 'cap', depth: UNIT_DEPTH, topDepth: capTopDepth,
+        height: UNIT_FRAME_HEIGHT, length: .1, y: -frameCenterY }], capMats, true);
     }
   });
 }

@@ -1,3 +1,4 @@
+import { selfLit } from '../material-lighting';
 // 1993 checkout-counter dressing, straight from the store footage: the
 // customer-facing VFD pole display, a cluster of latex balloons tied to the
 // band, a dot-matrix receipt printer with fanfold paper, and the "RENT A GAME
@@ -150,7 +151,7 @@ export function buildCounterProps93(scene: StoreScene): void {
     group.add(head);
     const screen = new THREE.Mesh(
       new THREE.PlaneGeometry(0.98, 0.29),
-      new THREE.MeshBasicMaterial({ map: vfdTex(), toneMapped: false })
+      selfLit(new THREE.MeshBasicMaterial({ map: vfdTex(), toneMapped: false }), 'light-source')
     );
     // Sit just proud of the head's customer face.
     screen.position.set(a.x, a.y + poleH + 0.19, a.z).add(normal(faceYaw).multiplyScalar(0.085));

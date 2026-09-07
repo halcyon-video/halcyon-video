@@ -260,17 +260,12 @@ export function constrainWalkPosition(scene: StoreScene, oldX: number, oldZ: num
 }
 
 export function updateWalkHUD(scene: StoreScene) {
-  const hud = document.getElementById('walk-hud');
-  if (hud) {
-    if (scene.isWalkAroundMode) {
-      hud.classList.add('visible');
-    } else {
-      hud.classList.remove('visible');
-    }
-  }
+  // The attract-mode tour (#273) rides walk mode but is a showreel, not a
+  // walk: no key legend, no aim dot.
+  const on = scene.isWalkAroundMode && !scene.attractTour;
+  document.getElementById('walk-hud')?.classList.toggle('visible', on);
   // Aim dot for click-to-pick-up (the pointer-locked cursor is invisible).
-  document.getElementById('walk-crosshair')
-    ?.classList.toggle('visible', scene.isWalkAroundMode);
+  document.getElementById('walk-crosshair')?.classList.toggle('visible', on);
 }
 
 export function toggleWalkAround(scene: StoreScene) {

@@ -1,4 +1,5 @@
 import type { LogoSpec } from './logo-spec';
+import { getUserLogoEdits } from './logo-spec';
 import { getBrandPack, brandAssetUrl } from './brand-pack';
 import {
   DEFAULT_LOGO_SPECS, getActiveLogoSpec,
@@ -254,6 +255,44 @@ Pick<StoreTheme['palette'], 'primary' | 'secondary' | 'accent' | 'counterTop'> |
   };
 }
 
+type UserLivery = Partial<Pick<StoreTheme['palette'], 'primary' | 'secondary' | 'accent' | 'counterTop'>>;
+
+/**
+ * The subset of the livery the OWNER set by hand in the Store Brand panel.
+ * liveryFromLogo reads the composed spec, which can't tell a colour the owner
+ * chose from one a brand drop sampled off its logo — and a pack's declared
+ * palette must outrank the sampled kind while the owner's own edit must
+ * outrank the pack. So getActiveTheme spreads this last, and it carries only
+ * the fields bb_logo actually holds: an edit to the background colour moves
+ * primary (and the counter top with it), an edit to the outline moves
+ * secondary and accent — the same mapping liveryFromLogo uses.
+ */
+function userLiveryFromEdits(): UserLivery | null {
+  const edits = getUserLogoEdits();
+  if (!edits) return null;
+  const out: UserLivery = {};
+  if (edits.bodyColor) {
+    out.primary = edits.bodyColor;
+    out.counterTop = scaleHex(edits.bodyColor, COUNTER_TOP_LIFT);
+  }
+  if (edits.borderColor) {
+    out.secondary = edits.borderColor;
+    out.accent = edits.borderColor;
+  }
+  return out.primary || out.secondary ? out : null;
+}
+
+/**
+ * Store Look → Carpet Colour: the theme/format's own floor colour, or one of
+ * the two brand colours. Resolved by format-surfaces.ts formatCarpetHex, which
+ * every floor builder reads.
+ */
+export type CarpetColorChoice = 'auto' | 'primary' | 'secondary';
+export function carpetColorChoice(): CarpetColorChoice {
+  const v = typeof localStorage !== 'undefined' ? localStorage.getItem('bb_carpet_color') : null;
+  return v === 'primary' || v === 'secondary' ? v : 'auto';
+}
+
 /**
  * The theme every surface reads, with the active brand merged over it: the
  * livery inferred from the emblem, then any palette entries an installed pack
@@ -273,8 +312,13 @@ export function getActiveTheme(): StoreTheme {
   }
   const pack = getBrandPack();
   const livery = liveryFromLogo(base);
+  // Without a pack the livery already IS the owner's edits (it reads the
+  // composed spec), so the hand-set subset only matters when a pack's palette
+  // would otherwise sit on top of it.
+  const userLivery = pack ? userLiveryFromEdits() : null;
   if (!pack && !livery) return base;
-  const key = `${base.id}|${pack?.id ?? '-'}|${livery ? `${livery.primary}${livery.secondary}` : '-'}`;
+  const key = `${base.id}|${pack?.id ?? '-'}|${livery ? `${livery.primary}${livery.secondary}` : '-'}` +
+    `|${userLivery ? `${userLivery.primary ?? '-'}${userLivery.secondary ?? '-'}` : '-'}`;
   let merged = mergedThemeCache.get(key);
   if (!merged) {
     merged = {
@@ -285,11 +329,15 @@ export function getActiveTheme(): StoreTheme {
       // — "a brand.json is how you say the room changes too"). Then that era's
       // deviations, since a chain that spans decades repaints, and without the
       // last spread every era would wear the one the pack was authored in.
+      // And LAST of all, the colours the owner set by hand in the Store Brand
+      // panel: a pack's palette is the room's default, not a lock on it, and
+      // the shelves have to follow the picker (see userLiveryFromEdits).
       palette: {
         ...base.palette,
         ...(livery ?? {}),
         ...(pack?.palette ?? {}),
         ...(pack?.themes?.[base.id]?.palette ?? {}),
+        ...(userLivery ?? {}),
       },
       brand: {
         ...base.brand,

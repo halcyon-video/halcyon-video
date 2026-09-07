@@ -705,8 +705,9 @@ html, body {
   letter-spacing: 0.12em;
   text-transform: uppercase;
   text-align: center;
-  min-height: 32px;
-  padding: 8px 14px 0;
+  min-height: 0;
+  padding: 4px 14px 0;
+  flex: 0 0 auto;
 }
 
 /* Small CRT panel (exit confirm, pickers, candy checkout): same tokens,
@@ -864,14 +865,62 @@ html, body {
   transition: opacity 0.3s ease;
 }
 
+/* Keep the existing form focusable for typing and assistive technology
+   while its text is rendered on the physical CRT. It owns no pointer hits. */
+#settings-drawer-overlay.terminal-settings,
+#settings-drawer-overlay.terminal-settings * {
+  opacity: 0;
+  pointer-events: none !important;
+  transition: none;
+}
+
+.settings-more-line:empty { display: none; }
+#settings-status, #btn-settings-close { flex: 0 0 auto; }
+
+/* The flat store has no desk to dock to. Its ordinary settings use a
+   compact form; the brand and emblem editors retain the full viewport. */
+#settings-drawer-overlay.compact-settings { background: rgba(0, 0, 0, 0.7); }
+.compact-settings .settings-card {
+  width: min(1060px, calc(100vw - 40px));
+  height: min(720px, calc(100vh - 80px));
+}
+.compact-settings .crt-body { width: calc(100% - 48px); }
+
+.visual-settings .crt-body {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.8fr) minmax(0, 1.7fr);
+  grid-template-rows: minmax(0, 1fr) auto auto auto;
+  column-gap: 28px;
+  width: min(1680px, calc(100% - 88px));
+}
+.visual-settings #settings-groups { grid-column: 2; grid-row: 1; }
+.visual-settings .settings-brand-preview {
+  grid-column: 1;
+  grid-row: 1 / -1;
+  align-self: start;
+  padding: 0;
+}
+.visual-settings .settings-more-line { grid-column: 2; grid-row: 2; }
+.visual-settings #settings-status { grid-column: 2; grid-row: 3; }
+.visual-settings #btn-settings-close { grid-column: 2; grid-row: 4; }
+@media (max-width: 900px) {
+  .visual-settings .crt-body { display: flex; width: calc(100% - 40px); gap: 8px; }
+  .visual-settings .settings-brand-preview { align-self: stretch; }
+}
+
 #settings-groups {
+  flex: 1 1 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 2px;
-  overflow: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-color: var(--crt-dim) var(--crt-black);
 }
 
 .settings-group {
+  flex: 0 0 auto;
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -889,6 +938,7 @@ html, body {
 }
 
 .settings-row {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   background: transparent;
@@ -1024,7 +1074,9 @@ html, body {
 
 .brand-preview-canvas {
   display: block;
-  width: min(100%, 780px);
+  width: min(100%, 620px);
+  max-height: 19vh;
+  object-fit: contain;
   margin: 0 auto;
   height: auto;
   border-radius: 0;
@@ -1194,31 +1246,6 @@ html, body {
 .settings-row.selected .brand-range-value {
   color: var(--crt-ink);
   text-shadow: none;
-}
-
-/* W3 option thumbnails: a pre-grabbed snapshot of the row's CURRENT value
-   (public/setting-thumbs/<key>--<value>.png, built by
-   tools/gen_setting_thumbs.mjs). Sits between the label block and the value;
-   swapped in place as the value cycles. A missing PNG hides itself (the img's
-   error handler adds .thumb-missing), leaving the row exactly as before. */
-.settings-row-thumb {
-  flex: 0 0 auto;
-  width: 96px;
-  height: 54px;
-  object-fit: cover;
-  border-radius: 0;
-  border: 1px solid rgba(255, 204, 0, 0.35);
-  background: #000;
-  pointer-events: none;
-  margin-right: 12px;
-}
-
-.settings-row.selected .settings-row-thumb {
-  border-color: rgba(0, 10, 28, 0.65);
-}
-
-.settings-row-thumb.thumb-missing {
-  display: none;
 }
 
 /* W3 Custom Wrap block (Store Brand page): per-medium drop-in wrap uploads. */
@@ -3104,13 +3131,15 @@ html, body {
   flex: 1 1 auto;
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1.45fr) minmax(255px, 0.68fr) minmax(340px, 0.98fr) minmax(265px, 0.8fr);
+  grid-template-columns: minmax(0, 1.15fr) minmax(300px, 0.9fr) minmax(370px, 1.15fr) minmax(310px, 1fr);
   gap: 16px;
   /* stretch, NOT start: the design stage has to take the height it is given —
      a canvas that only fills the top third of the screen is exactly the cramp
      this surface exists to undo. */
   align-items: stretch;
 }
+
+.emblem-tools { display: contents; }
 
 .emblem-col {
   display: flex;
@@ -3222,6 +3251,7 @@ html, body {
 }
 
 .emblem-stack-item {
+  min-height: 44px;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -3280,6 +3310,8 @@ html, body {
 }
 
 .emblem-stack-op {
+  min-width: 28px;
+  min-height: 30px;
   background: transparent;
   border: 1px solid rgba(255, 204, 0, 0.4);
   border-radius: 0;
@@ -3305,9 +3337,20 @@ html, body {
    studio scales the whole row vocabulary down together — label, value, leader
    and embedded controls — rather than letting any one of them clip. */
 .emblem-studio .settings-row {
-  font-size: 16px;
-  padding: 4px 8px;
+  font-size: 20px;
+  min-height: 44px;
+  flex-shrink: 0;
+  padding: 7px 10px;
 }
+
+.emblem-studio .settings-row-inert { display: none; }
+.emblem-studio .settings-row.selected { outline: 2px solid var(--crt-gold); outline-offset: -2px; }
+.emblem-studio .settings-row-leader { display: none; }
+.emblem-studio .settings-row-main { margin-right: 10px; }
+.emblem-studio .emblem-stack-row { padding: 6px; }
+.emblem-studio .crt-footer-hint { white-space: normal; }
+.emblem-studio .settings-row-select { text-transform: none; }
+
 
 /* Labels WRAP here rather than ellipsing. In a 260px column the drawer's
    nowrap-and-clip rule turns "Move In Stack" into "MOVE IN S…", which is a
@@ -3336,7 +3379,7 @@ html, body {
 .emblem-studio .settings-row-value,
 .emblem-studio .brand-range-value,
 .emblem-studio .brand-color-hex {
-  font-size: 15px;
+  font-size: 19px;
 }
 
 .emblem-studio .brand-range-value {
@@ -3345,10 +3388,11 @@ html, body {
 
 .emblem-studio .settings-row-select,
 .emblem-studio .settings-row-input {
-  font-size: 15px;
-  padding: 3px 6px;
-  min-width: 92px;
-  flex: 0 1 46%;
+  font-size: 19px;
+  padding: 5px 6px;
+  min-width: 110px;
+  max-width: 60%;
+  flex: 0 1 58%;
 }
 
 .emblem-studio .brand-range-wrap {
@@ -3382,15 +3426,21 @@ html, body {
    columns. DOM order is untouched, so the remote's focus ring still walks the
    surface in the same order it reads. */
 @media (max-width: 1560px) {
-  .emblem-studio-grid {
-    grid-template-columns: minmax(0, 1.25fr) minmax(210px, 0.6fr) minmax(300px, 0.9fr);
-  }
-
-  .emblem-col-stage {
-    grid-row: span 2;
-  }
-
-  .emblem-col-meta {
-    grid-column: 2 / span 2;
-  }
+  .emblem-studio-grid { grid-template-columns: minmax(280px, 0.85fr) minmax(420px, 1.15fr); }
+  .emblem-tools { display: block; overflow: hidden auto; padding: 3px 8px; scrollbar-width: thin; }
+  .emblem-tools .emblem-col { margin-bottom: 20px; }
+  .emblem-tools .emblem-rows { overflow: visible; }
+  .emblem-stage { min-height: 160px; }
+  .emblem-studio .settings-row { min-height: 48px; font-size: 22px; }
+  .emblem-studio .settings-row-select, .emblem-studio .settings-row-input { font-size: 21px; }
+  .emblem-studio .crt-footer-page { font-size: 16px; }
+}
+@media (max-width: 760px) {
+  .emblem-studio-grid { grid-template-columns: minmax(0, 1fr); overflow-y: auto; }
+  .emblem-col-stage { min-height: 280px; }
+  .emblem-tools { overflow: visible; }
+  .emblem-stage { min-height: 170px; }
+  .emblem-sign-canvas { max-height: 100px; }
+  .emblem-studio .settings-row { font-size: 18px; }
+  .emblem-studio .crt-footer-page { display: none; }
 }

@@ -125,16 +125,11 @@ export class ShelfClasps {
     // already blue, so a blue glow on it is close to invisible — the first
     // version of this was, and read as the highlight being broken. Amber is
     // also the colour of the key prompt, so the plaque and the prompt agree.
-    // The emissive is a highlight, not a light source, so meshes wearing it
-    // set bakeEmissiveOff and the environment bake doesn't treat the plaque as
-    // a lamp and lift the whole store's light level.
+    // A warm reflected tint marks focus without turning the card into a lamp.
     this.hotFaceMaterial = this.faceMaterial.clone();
-    this.hotFaceMaterial.emissive = new THREE.Color(0xffb300);
-    this.hotFaceMaterial.emissiveIntensity = 0.9;
+    this.hotFaceMaterial.color.set(0xffd54a);
     this.hotEdgeMaterial = this.edgeMaterial.clone();
     this.hotEdgeMaterial.color = new THREE.Color(0xffd54a);
-    this.hotEdgeMaterial.emissive = new THREE.Color(0xffb300);
-    this.hotEdgeMaterial.emissiveIntensity = 0.9;
   }
 
   /** BoxGeometry material order is +X,-X,+Y,-Y,+Z,-Z; the print is on +X. */
@@ -155,11 +150,9 @@ export class ShelfClasps {
     if (this.focused !== mesh) {
       if (this.focused) {
         this.focused.material = this.materials(false);
-        this.focused.userData.bakeEmissiveOff = false;
       }
       if (mesh) {
         mesh.material = this.materials(true);
-        mesh.userData.bakeEmissiveOff = true;
       }
       this.focused = mesh;
     }

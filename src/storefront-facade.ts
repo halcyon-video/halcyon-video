@@ -1,3 +1,4 @@
+import { selfLit } from './material-lighting';
 // Photo-matched exterior facade: the classic
 // early-90s freestanding video-store prototype building. Rust-red running-bond
 // brick walls with a dark-capped flat parapet, one house-color glazed-tile
@@ -356,14 +357,14 @@ export function buildStorefrontFacade(params: FacadeBuildParams): StorefrontFaca
       tex.anisotropy = 4;
       return tex;
     };
-    const exitFaceMat = new THREE.MeshStandardMaterial({
+    const exitFaceMat = selfLit(new THREE.MeshStandardMaterial({
       map: drawExitFace('#f2f4f1', '#cf142b'),          // white acrylic face, safety-red lettering
       emissive: 0xffffff,
       emissiveMap: drawExitFace('#000000', '#ff3b30'),  // only the letters glow (backlit red)
       emissiveIntensity: 2.0,                            // reads as self-luminous, not printed
       roughness: 0.55,
       metalness: 0.0,
-    });
+    }), 'light-source');
     addBox(0.12, SIGN_H + 0.06, SIGN_W + 0.08, rightEdgeX - 0.16, DOOR_H + 0.75, doorZ, frameMat, false); // housing
     const exitFace = new THREE.Mesh(new THREE.PlaneGeometry(SIGN_W, SIGN_H), exitFaceMat);
     exitFace.position.set(rightEdgeX - 0.225, DOOR_H + 0.75, doorZ);

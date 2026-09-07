@@ -1,3 +1,4 @@
+import { selfLit } from './material-lighting';
 import * as THREE from 'three';
 import { ClerkInteraction, type ClerkInteractionHooks, type ClerkSuggestion } from './clerk-interaction';
 import type { Movie } from './jellyfin';
@@ -11,6 +12,7 @@ import { maybeServeClerkSkeleton } from './clerk-skeleton';
 import { BOX_SPACING, UNIT_DEPTH, UNIT_SECTIONS } from './store-layout';
 import { getActiveTheme } from './themes';
 import { tryLoadUserAssetTexture } from './user-assets';
+import { loadRenderedClerkAtlas } from './clerk-rendered-atlas';
 
 /**
  * StoreClerk — a Doom-style directional 2D billboard clerk.
@@ -22,9 +24,9 @@ import { tryLoadUserAssetTexture } from './user-assets';
  * to face the camera (THREE.Sprite); only the *drawn view* changes.
  *
  * The character art (a stylized female retail clerk: brunette bob, house polo +
- * nametag, khakis, black sneakers) is generated procedurally on a canvas — see
- * `src/clerk-art.ts`, which owns the whole sprite sheet: the two-bone limb rig,
- * per-part shading, silhouette outlining and the painted face. This class owns
+ * nametag, khakis, black sneakers) is rendered from an original Blender model.
+ * `src/clerk-art.ts` retains the grid contract and emergency procedural art;
+ * `src/clerk-rendered-atlas.ts` colors the rendered uniform. This class owns
  * only her behavior (navigation, stocking/idle/chat state) and the runtime
  * view-picking that pages the atlas.
  *
@@ -94,7 +96,7 @@ export interface ClerkCounterSpots {
 export class StoreClerk {
   public group: THREE.Group;
 
-  private sprite!: THREE.Sprite;
+  private sprite!: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshStandardMaterial>;
   private spriteTex!: THREE.Texture;
   private shadowMesh!: THREE.Mesh;
   private shadowMat!: THREE.MeshBasicMaterial; // blob shadow — fades with the sprite
@@ -279,7 +281,7 @@ export class StoreClerk {
   public setFade(f: number) {
     if (f === this.fade) return;
     this.fade = f;
-    const mat = this.sprite.material as THREE.SpriteMaterial;
+    const mat = this.sprite.material as THREE.MeshStandardMaterial;
     mat.opacity = f;
     mat.alphaTest = Math.max(0.01, 0.5 * f);
     this.shadowMat.opacity = 0.34 * f;
@@ -417,7 +419,7 @@ export class StoreClerk {
   private buildSprite() {
     // Grounding shadow blob (a billboard can't cast a real shadow).
     const shadowTex = this.buildShadowTexture();
-    this.shadowMat = new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, opacity: 0.34, depthWrite: false });
+    this.shadowMat = selfLit(new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, opacity: 0.34, depthWrite: false }), 'shadow');
     this.shadowMesh = new THREE.Mesh(new THREE.PlaneGeometry(2.3, 1.3), this.shadowMat);
     this.shadowMesh.rotation.x = -Math.PI / 2;
     this.shadowMesh.position.y = 0.02;
@@ -428,12 +430,21 @@ export class StoreClerk {
     this.spriteTex.repeat.set(1 / ATLAS_COLS, 1 / ATLAS_ROWS);
     this.spriteTex.center.set(0, 0);
 
-    this.sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+    this.sprite = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshStandardMaterial({
       map: this.spriteTex,
       transparent: true,
       alphaTest: 0.5,
+      roughness: 1, metalness: 0,
       depthWrite: true,
     }));
+    // Retain camera-facing atlas animation while receiving the store's light.
+    // SpriteMaterial bypasses lighting, making the clerk bright in shadow.
+    this.sprite.name = 'lit-clerk-billboard';
+    this.sprite.receiveShadow = true;
+    this.sprite.onBeforeRender = (_renderer, _scene, camera) => {
+      camera.getWorldQuaternion(this.sprite.quaternion);
+      this.sprite.updateMatrixWorld(true); // renderer derives modelView after this hook
+    };
     this.sprite.scale.set(SPRITE_WIDTH, SPRITE_HEIGHT, 1);
     this.sprite.position.y = SPRITE_HEIGHT / 2;
     this.sprite.renderOrder = 2;
@@ -497,7 +508,7 @@ export class StoreClerk {
 
   /**
    * Custom sprite-sheet drop-in (public/user-assets/README.md "clerk/"): the
-   * procedural atlas above is the shipped fallback; a user-installed sheet —
+   * Blender atlas is the shipped default; a user-installed sheet —
    * same 16x5 grid, any resolution — replaces the art without touching the
    * rig, roaming or animation timing. The active theme's variant beats
    * default.png, and an installed brand pack's copy beats both (the overlay
@@ -521,15 +532,21 @@ export class StoreClerk {
       tex.center.copy(this.spriteTex.center);
       const old = this.spriteTex;
       this.spriteTex = tex;
-      const mat = this.sprite.material as THREE.SpriteMaterial;
+      const mat = this.sprite.material as THREE.MeshStandardMaterial;
       mat.map = tex;
       mat.needsUpdate = true;
       old.dispose();
     };
+    const loadShipped = () => {
+      if (this.disposed) return;
+      void loadRenderedClerkAtlas().then(swap).catch((error) => {
+        if (!this.disposed) console.warn('Using procedural clerk fallback.', error);
+      });
+    };
     tryLoadUserAssetTexture(`clerk/${getActiveTheme().id}.png`, swap, {
       onMiss: () => {
         if (this.disposed) return;
-        tryLoadUserAssetTexture('clerk/default.png', swap);
+        tryLoadUserAssetTexture('clerk/default.png', swap, { onMiss: loadShipped });
       },
     });
   }

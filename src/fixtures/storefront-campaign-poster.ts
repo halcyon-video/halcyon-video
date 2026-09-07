@@ -27,7 +27,17 @@ import type { StoreScene } from '../three-scene';
 import { vestibuleHalfWidth, getStorefrontSpec, FRONT_WINDOW_CORNER_MARGIN } from '../store-layout';
 import { markSignMesh } from '../sign-builders';
 import { popKitVisible } from '../pop-period';
-import { tryLoadUserAssetTexture } from '../user-assets';
+import { cachedSignArt, resolveSignArt, type SignArtSpec } from './bundled-sign-art';
+import lateFeesPosterArt from '../assets/signage/late-fees-window-poster.png';
+
+// The finished render, committed (owner ruling 2026-09-06: no chain mark on
+// it, so it ships as first conceived); a user-asset drop still overrides it.
+const ART: SignArtSpec = {
+  bundled: lateFeesPosterArt,
+  userAsset: 'fixtures/late-fees-window-poster/front.png',
+  // The render's own inks: gold field, blue band and headline, white copy.
+  inks: { primary: '#2544ae', secondary: '#ffc710', text: '#fdfefe' },
+};
 
 // Measured physical size (NOTES.md): 78 x 47.8 in.
 const POSTER_W_FT = 78 / 12;
@@ -35,8 +45,6 @@ const POSTER_H_FT = 47.8 / 12;
 
 // Loaded user art survives signage rebuilds (clearActiveSignage disposes
 // materials, not maps) and is only fetched once per session.
-let userTex: THREE.Texture | null = null;
-let userTexMissing = false;
 
 // Generic fallback: the measured band layout (band 0.347..0.838 of H, caps
 // per NOTES.md) with brand-free copy — believable at parking-lot distance,
@@ -97,25 +105,33 @@ export function buildStorefrontCampaignPoster(scene: StoreScene): void {
   scene.activeSignageObjects.push(group);
 
   const mat = new THREE.MeshStandardMaterial({
-    map: userTex ?? fallbackTexture(),
+    map: cachedSignArt(ART) ?? fallbackTexture(),
     roughness: 0.45, // gloss poster paper (NOTES.md substrate), not the 93 matte stock
     metalness: 0.0,
-    side: THREE.DoubleSide,
+    side: THREE.FrontSide, // the printed face looks OUT through the glass
   });
-  const poster = new THREE.Mesh(new THREE.PlaneGeometry(POSTER_W_FT, POSTER_H_FT), mat);
+  const geo = new THREE.PlaneGeometry(POSTER_W_FT, POSTER_H_FT);
+  const px = (span.x0 + span.x1) / 2;
   // Top edge just under the 9 ft glass head — where the reference photo
   // hangs it in the pane.
-  poster.position.set((span.x0 + span.x1) / 2, 8.5 - POSTER_H_FT / 2, 15.0 - 0.07);
+  const py = 8.5 - POSTER_H_FT / 2;
+  const poster = new THREE.Mesh(geo, mat);
+  poster.position.set(px, py, 15.0 - 0.07);
   markSignMesh(poster);
   group.add(poster);
+  // From the sales floor a window poster is a sheet stuck to the glass: its
+  // plain paper back, not its copy read backwards. Print side out, paper in.
+  const back = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
+    color: 0xf3efe6, roughness: 0.9, metalness: 0.0, side: THREE.FrontSide,
+  }));
+  back.position.set(px, py, 15.0 - 0.07 - 0.006);
+  back.rotation.y = Math.PI;
+  markSignMesh(back);
+  group.add(back);
 
-  if (!userTex && !userTexMissing) {
-    tryLoadUserAssetTexture('fixtures/late-fees-window-poster/front.png', (tex) => {
-      tex.anisotropy = 8;
-      userTex = tex; // cache across rebuilds; teardown never disposes maps
-      mat.map = tex; // harmless if this build was already torn down
-      mat.needsUpdate = true;
-      scene.requestRender();
-    }, { onMiss: () => { userTexMissing = true; } });
-  }
+  resolveSignArt(ART, (tex) => {
+    mat.map = tex; // harmless if this build was already torn down
+    mat.needsUpdate = true;
+    scene.requestRender();
+  });
 }

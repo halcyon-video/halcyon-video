@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import { installDisplayModel } from './display-model';
+import { localFloorDisplayProfile, type FloorDisplayProfile } from './floor-display-profile';
 import { Movie } from '../jellyfin';
 import { FixturePlacement, BOX_SPACING, FLOOR_FIXTURE_MAX_Z } from '../store-layout';
 import { FixtureContext, SlottedFixture, FixtureSlot } from '../fixtures';
@@ -37,6 +39,8 @@ export class FourSidedDisplay implements SlottedFixture {
   // Bumped on every build(); async sign-art callbacks from a previous build
   // check it so they don't repaint textures dispose() already released.
   private buildGeneration = 0;
+  private profile: FloorDisplayProfile | null = null;
+  private disposeModel: (() => void) | null = null;
   // Resolved once and memoized — getFootprint() and getSlots() must agree with
   // build() about whether this stand exists at all. null = no viable campaign,
   // so the stand builds nothing rather than standing half-stocked.
@@ -68,7 +72,8 @@ export class FourSidedDisplay implements SlottedFixture {
         heights.push(1.5 + i * 0.9);
       }
     }
-    this.shelfHeights = heights;
+    this.profile = (options.footprintSize == null || options.footprintSize === 2) ? localFloorDisplayProfile(placement.id) : null;
+    this.shelfHeights = this.profile?.shelfHeights ?? heights;
     this.capacity = 4 * this.shelfHeights.length * 3; // 4 sides, N shelves, 3 columns per shelf
   }
 
@@ -80,11 +85,14 @@ export class FourSidedDisplay implements SlottedFixture {
     const footprintSize = options.footprintSize as number || 2.0;
     const coreWidth = footprintSize;
     const coreDepth = footprintSize;
-    const coreHeight = 4.0;
+    const coreHeight = this.profile?.coreHeight ?? 4.0;
 
     this.group = new THREE.Group();
     this.group.position.set(this.placement.position.x, floorY, this.placement.position.z);
     this.group.rotation.y = this.placement.yaw;
+
+    const furniture = new THREE.Group();
+    this.group.add(furniture);
 
     // Materials
     // #99: no `transmission` here -- it forces a full extra opaque-scene render
@@ -115,31 +123,36 @@ export class FourSidedDisplay implements SlottedFixture {
     acrylicMat.userData.envGainTarget = 0.76;
 
     // Store-brand core: theme primary, satin finish.
+    if (this.profile?.dark) acrylicMat.dispose();
+
     const coreMat = new THREE.MeshStandardMaterial({
-      color: new THREE.Color(theme.palette.primary),
+      color: new THREE.Color(this.profile?.dark ? themeTrimDarkHex(theme) : theme.palette.primary),
       roughness: 0.4,
       metalness: 0.05
     });
 
     // Central brand-blue rectangular core
-    const coreGeo = new THREE.BoxGeometry(coreWidth, coreHeight, coreDepth);
+    const fallbackCoreSize = this.profile
+      ? Math.min(coreWidth, 2 * (Math.min(...this.profile.shelfCenters) + Math.sin(this.profile.lean) * (CASE_HEIGHT + .05) - CASE_DEPTH))
+      : coreWidth;
+    const coreGeo = new THREE.BoxGeometry(fallbackCoreSize, coreHeight, fallbackCoreSize);
     const core = new THREE.Mesh(coreGeo, coreMat);
     core.position.set(0, coreHeight / 2, 0);
     core.castShadow = true;
     core.receiveShadow = true;
-    this.group.add(core);
+    furniture.add(core);
 
     // Store-brand dressing: a gold accent band ringing the core under the
     // topper signs (echoes the checkout band's safety stripe) and a dark
     // trim plinth at the floor so the core doesn't dead-end into the carpet.
     const bandMat = new THREE.MeshStandardMaterial({
-      color: new THREE.Color(theme.palette.secondary), roughness: 0.45, metalness: 0.05
+      color: new THREE.Color(this.profile?.dark ? themeTrimDarkHex(theme) : theme.palette.secondary), roughness: 0.45, metalness: 0.05
     });
-    const band = new THREE.Mesh(new THREE.BoxGeometry(coreWidth + 0.03, 0.14, coreDepth + 0.03), bandMat);
+    const band = new THREE.Mesh(new THREE.BoxGeometry(fallbackCoreSize + 0.03, 0.14, fallbackCoreSize + 0.03), bandMat);
     band.position.set(0, coreHeight - 0.28, 0);
     band.castShadow = false;
     band.receiveShadow = true;
-    this.group.add(band);
+    furniture.add(band);
     const plinthMat = new THREE.MeshStandardMaterial({
       color: new THREE.Color(themeTrimDarkHex(theme)), roughness: 0.7, metalness: 0.05
     });
@@ -147,19 +160,19 @@ export class FourSidedDisplay implements SlottedFixture {
     plinth.position.set(0, 0.11, 0);
     plinth.castShadow = false;
     plinth.receiveShadow = true;
-    this.group.add(plinth);
+    furniture.add(plinth);
 
     // Shelves
     const shelfWidth = coreWidth - 0.2;
     const shelfDepth = 0.5;
     const displayShelfGeo = new THREE.BoxGeometry(shelfWidth, 0.02, shelfDepth);
-    const rotationX = -0.25;
+    const rotationX = this.profile?.lean ?? -0.25;
 
     const createSideShelves = () => {
       const group = new THREE.Group();
-      this.shelfHeights.forEach(yPos => {
-        const shelf = new THREE.Mesh(displayShelfGeo, acrylicMat);
-        shelf.position.set(0, yPos, coreDepth / 2 + shelfDepth / 2);
+      this.shelfHeights.forEach((yPos, row) => {
+        const shelf = new THREE.Mesh(displayShelfGeo, this.profile?.dark ? plinthMat : acrylicMat);
+        shelf.position.set(0, yPos, this.profile?.shelfCenters[row] ?? coreDepth / 2 + shelfDepth / 2);
         shelf.rotation.x = rotationX;
         group.add(shelf);
       });
@@ -167,19 +180,19 @@ export class FourSidedDisplay implements SlottedFixture {
     };
 
     const frontShelves = createSideShelves();
-    this.group.add(frontShelves);
+    furniture.add(frontShelves);
 
     const rightShelves = createSideShelves();
     rightShelves.rotation.y = Math.PI / 2;
-    this.group.add(rightShelves);
+    furniture.add(rightShelves);
 
     const backShelves = createSideShelves();
     backShelves.rotation.y = Math.PI;
-    this.group.add(backShelves);
+    furniture.add(backShelves);
 
     const leftShelves = createSideShelves();
     leftShelves.rotation.y = -Math.PI / 2;
-    this.group.add(leftShelves);
+    furniture.add(leftShelves);
 
     // Per-face header: the campaign's label for that face (faces 0..3 =
     // front/right/back/left, matching getSlots()'s side order), on the 1993
@@ -199,7 +212,7 @@ export class FourSidedDisplay implements SlottedFixture {
       [0, -faceOffset, Math.PI],       // back   (-Z)
       [-faceOffset, 0, -Math.PI / 2],  // left   (-X)
     ];
-    facePlacements.forEach(([x, z, rotY], faceIdx) => {
+    if (this.profile?.topper !== false) facePlacements.forEach(([x, z, rotY], faceIdx) => {
       const label = this.faceLabels[faceIdx] || this.genre;
       if (!label) return;
       const topper = this.topperFactory!.build(label, coreWidth);
@@ -211,6 +224,12 @@ export class FourSidedDisplay implements SlottedFixture {
     this.ctx.scene.add(this.group);
     this.ctx.addCollider(this.group);
     this.ctx.requestShadowRefresh();
+    // Arbitrary custom shelf configurations retain the procedural fallback.
+    if (this.profile || (footprintSize === 2 && this.shelfHeights.join(',') === '1.5,2.4,3.3')) {
+      this.disposeModel = installDisplayModel(this.ctx, this.group, furniture,
+        this.profile?.model ?? 'models/four-sided-merchandiser.glb',
+        { DisplayBody: coreMat, DisplayShelf: this.profile?.dark ? plinthMat : acrylicMat, DisplayTrim: bandMat, DisplayHardware: plinthMat });
+    }
   }
 
   update(_timeMs: number): void {
@@ -218,6 +237,8 @@ export class FourSidedDisplay implements SlottedFixture {
   }
 
   dispose(): void {
+    this.disposeModel?.();
+    this.disposeModel = null;
     this.buildGeneration++; // orphan any in-flight art callbacks
     if (this.group) {
       this.ctx.scene.remove(this.group);
@@ -269,7 +290,7 @@ export class FourSidedDisplay implements SlottedFixture {
     if (!this.ensureCampaign()) return slots;
     const xPosBase = this.placement.position.x;
     const zPosBase = this.placement.position.z;
-    const rotationX = -0.25;
+    const rotationX = this.profile?.lean ?? -0.25;
     const options = this.placement.options || {};
     const footprintSize = options.footprintSize as number || 2.0;
     const coreDepth = footprintSize;
@@ -304,7 +325,7 @@ export class FourSidedDisplay implements SlottedFixture {
           // col 0 is the viewer's LEFT: with (1 - col) the first title of each
           // row landed on the right, so a top-down fill still read right-to-left.
           const localX = (col - 1) * BOX_SPACING;
-          const localZ = baseLocalZ + (boxHeight / 2 + 0.02) * Math.sin(rotationX);
+          const localZ = (this.profile?.shelfCenters[shelfIdx] ?? baseLocalZ) + (boxHeight / 2 + 0.02) * Math.sin(rotationX);
           const localY = shelfY + (boxHeight / 2 + 0.02) * Math.cos(rotationX);
 
           const xPos = xPosBase + localX * Math.cos(angle) + localZ * Math.sin(angle);

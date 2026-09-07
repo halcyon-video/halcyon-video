@@ -27,7 +27,6 @@ export const PROJECT_PAGE_URL = 'https://github.com/halcyon-video/halcyon-video'
 // every label here must stay within 38.
 export const COUNTER_TERMINAL_LABELS: Record<string, string> = {
   'btn-settings': 'STORE SETTINGS',
-  'btn-controls': 'CONTROLS & HELP',
   'btn-flat-mode': 'SWITCH TO 2D MODE',
   'btn-suspend': 'SUSPEND SYSTEM (SLEEP)',
   'btn-cec-toggle': 'DISPLAY ON/OFF (CEC)',
@@ -43,14 +42,18 @@ export const COUNTER_TERMINAL_LABELS: Record<string, string> = {
   // remote-driven route to the choice — the settings drawer's row is a typed
   // comma list, which is not a thing anyone does from a couch.
   'btn-streaming': 'STREAMING SERVICES (PICK APPS)',
-  // CRT-only row (not in the glass power menu): the diegetic door into the
-  // SERVICE MODE settings page — the staff knobs hidden from the couch tree.
-  'btn-service': 'MANAGER OVERRIDE (STAFF ONLY)',
   // CRT-only row (#42): opens the BIOS-style date sub-screen that pins the
   // catalog to a rolling point in time (counter-terminal-flow.ts).
   'btn-media-date': 'MEDIA RELEASE DATE (PIN CATALOG)',
   'btn-cancel': 'RETURN TO STORE',
 };
+
+/** The home screen omits Help (inside Settings) and the retired staff page. */
+export function counterTerminalRows(powerRows: string[]): string[] {
+  const rows = powerRows.filter((id) => id !== 'btn-controls' && id !== 'btn-service');
+  rows.splice(rows.indexOf('btn-cancel'), 0, 'btn-streaming', 'btn-media-date');
+  return rows;
+}
 
 // Body lines the header sits above (drawTerminal draws its own
 // "<BRAND> RENTAL SYSTEM" banner), plus where to park the blinking cursor.
@@ -60,7 +63,7 @@ export function counterTerminalLines(ids: string[], selectedIndex: number): {
   lines: string[];
   cursorLine: number;
 } {
-  const lines = ['MANAGER TERMINAL — SYSTEM CONTROL', ''];
+  const lines = ['STORE TERMINAL — SYSTEM CONTROL', ''];
   ids.forEach((id, idx) => {
     lines.push(`${idx === selectedIndex ? '>' : ' '} ${COUNTER_TERMINAL_LABELS[id] ?? id}`);
   });

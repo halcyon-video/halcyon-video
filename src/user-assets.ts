@@ -10,6 +10,16 @@ import { assetUrl } from './asset-url';
 import { brandPackDir } from './brand-pack';
 import { tryLoadShippedSurfaceKtx2 } from './surface-textures';
 
+// The HOSTED build (VITE_DEMO=1 baked at build time — the GitHub Pages
+// deploy, see deploy-demo.yml) is built from the public repo, whose
+// public/user-assets/ tree is git-ignored: every drop-in probe it could make
+// is a guaranteed 404. On a home connection that was ~70 requests (signs,
+// surfaces, brand) per boot, each a 404 page, all sharing the pipe with the
+// covers the reveal waits on. Build-time flag on purpose, NOT the runtime
+// `?demo=1` switch (demo-mode.ts), so a local run with drop-ins installed
+// still sees them in demo mode.
+const HOSTED_BUILD = typeof import.meta.env !== 'undefined' && import.meta.env.VITE_DEMO === '1';
+
 // One load attempt at an exact public/-relative path.
 function loadOne(
   urlPath: string,
@@ -60,6 +70,8 @@ export function tryLoadUserAssetTexture(
     : relPath.startsWith('surfaces/')
       ? () => loadOne(`textures/${relPath}`, onLoad, srgb, () => opts.onMiss?.())
       : () => opts.onMiss?.();
+  // The hosted build has no user-assets tree to probe (see HOSTED_BUILD).
+  if (HOSTED_BUILD) { miss(); return; }
   // An installed brand pack owns the same tree one level down: its copy of an
   // asset wins, and anything it doesn't ship falls through to the flat path,
   // so a pack is a partial overlay rather than an all-or-nothing swap.

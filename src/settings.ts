@@ -41,8 +41,8 @@ import { drawLogo, getLogoFontString } from './logo-renderer';
 import { activatePanelRow, SettingsRowKit } from './settings-rows';
 import { buildEmblemEditorRow } from './emblem-editor';
 import { emblemDocActive } from './emblem-doc';
-import { loadEmblemDoc } from './emblem-render';
-import { brandFontChoices } from './brand-fonts';
+import { loadEmblemDoc, saveEmblemDoc, applyEmblemToSpec } from './emblem-render';
+import { brandFontOptions } from './brand-fonts';
 import { buildControlsHelpPanel } from './controls-help';
 import { registerStoreFormatSetting } from './store-format-setting';
 import { STORE_FORMATS, STORE_FORMAT_KEY } from './store-format';
@@ -96,12 +96,7 @@ export interface SettingDef<T = unknown> {
    * era-follow so the pick can actually stick).
    */
   onChange?: (value: unknown) => string | void;
-  /**
-   * Service/developer knob: registered so the registry documents the key and
-   * live-apply still works, but never rendered on the couch-facing drawer
-   * pages. All hidden rows appear together on the SERVICE MODE page, entered
-   * via the counter CRT's MANAGER OVERRIDE row (review §4.3).
-   */
+  /** Internal compatibility key; not shown in the settings menu. */
   hidden?: boolean;
   /**
    * Couch sub-page this row lives on. Rows sharing a subpage collapse into a
@@ -158,15 +153,6 @@ export function subpagesInGroup(group: SettingGroup): string[] {
     if (!names.includes(d.subpage)) names.push(d.subpage);
   }
   return names;
-}
-
-/**
- * The SERVICE MODE roster: every `hidden:true` registration, in order. The
- * service page deliberately ignores both `hidden` and `visibleWhen` — staff
- * see every knob, gated or not.
- */
-export function serviceSettings(): SettingDef[] {
-  return allSettings().filter((d) => d.hidden);
 }
 
 /** Groups that currently have at least one visible setting, in a fixed order. */
@@ -252,81 +238,6 @@ export function resolveHint(def: SettingDef): string | undefined {
   return typeof def.hint === 'function' ? def.hint() : def.hint;
 }
 
-// ─── Option thumbnails (W3) ──────────────────────────────────────────────────
-//
-// Pre-grabbed PNG snapshots of every visually-distinct option value, generated
-// by tools/gen_setting_thumbs.mjs into public/setting-thumbs/<key>--<value>.png
-// and committed. Rows for the keys below show a small preview beside the value
-// that swaps as the value cycles. Anything without a PNG on disk (free-text,
-// the user's own uploaded wrap, a value added before its thumb was regenerated)
-// falls back gracefully: the <img> hides itself on load error.
-
-const THUMBED_SETTINGS = new Set([
-  'bb_theme',
-  'bb_medium',
-  'bb_case_art',
-  'bb_cover_vhs',
-  'bb_cover_dvd',
-  'bb_arrangement',
-  'bb_outside',
-  'bb_ceiling',
-  'bb_corner',
-  'bb_walldecor',
-  'bb_marquee_bulbs',
-  'bb_storefront',
-  'bb_render_mode',
-  'bb_quality',
-]);
-
-/** Thumb PNG url for a (key, value id) pair, or null if the key isn't thumbed. */
-export function settingThumbSrc(key: string, valueId: string): string | null {
-  if (!THUMBED_SETTINGS.has(key)) return null;
-  // Same base-URL resolution as assetUrl (inlined to keep this module's
-  // imports scene-free): works at '/' and under a subpath deploy.
-  return `${import.meta.env.BASE_URL}setting-thumbs/${encodeURIComponent(key)}--${encodeURIComponent(valueId)}.png`;
-}
-
-/** The value id a thumb filename uses for the CURRENT value (toggles → on/off). */
-function currentThumbValueId(key: string): string {
-  const def = registry.get(key);
-  if (def?.kind === 'toggle') return getSetting<boolean>(key) ? 'on' : 'off';
-  return String(getSetting(key));
-}
-
-/**
- * Build the preview <img> for a drawer row, already pointed at the current
- * value's thumb — or null when the setting has no thumbs at all (callers skip
- * the element entirely). Lazy-loaded so opening the drawer doesn't fetch
- * dozens of images; a missing PNG hides itself via the error handler.
- */
-export function createSettingThumb(key: string): HTMLImageElement | null {
-  const src = settingThumbSrc(key, currentThumbValueId(key));
-  if (!src) return null;
-  const img = document.createElement('img');
-  img.className = 'settings-row-thumb';
-  img.id = `setting-thumb-${key}`;
-  img.alt = '';
-  img.loading = 'lazy';
-  img.decoding = 'async';
-  img.draggable = false;
-  img.addEventListener('error', () => img.classList.add('thumb-missing'));
-  img.src = src;
-  return img;
-}
-
-/** Re-point a row's thumb at the (possibly new) current value. */
-export function refreshSettingThumb(key: string): void {
-  const img = document.getElementById(`setting-thumb-${key}`) as HTMLImageElement | null;
-  if (!img) return;
-  const src = settingThumbSrc(key, currentThumbValueId(key));
-  if (!src) return;
-  const abs = new URL(src, location.href).href;
-  if (img.src !== abs) {
-    img.classList.remove('thumb-missing'); // retry: the new value may have a PNG
-    img.src = src;
-  }
-}
-
 // ─── Core registrations ─────────────────────────────────────────────────────
 //
 // Every existing localStorage key the app already used, now declared in one
@@ -347,6 +258,7 @@ export function registerCoverVariantSettings(): void {
     if (variants.length < 2) continue;
     registerSetting({
       key: `bb_cover_${medium}`,
+      subpage: 'Movie Cases',
       label: `${medium.toUpperCase()} Rental Cover`,
       kind: 'cycle',
       group: 'Store Look',
@@ -364,7 +276,7 @@ export function registerCoverVariantSettings(): void {
 }
 
 /**
- * One line describing the brand pack's actual state — what the SERVICE MODE
+ * One line describing the brand pack's actual state — what the brand pack
  * row reports and what the Store Brand page's status row is built from.
  * "Asked for a pack and did not get one" is the case worth naming: a misspelt
  * directory renders exactly like no pack at all.
@@ -496,7 +408,7 @@ export function registerCoreSettings(): void {
   // evaluation — see store-format.ts's header); this row DRIVES it via
   // onChange, and a small reconciliation at the bottom of registerCoreSettings
   // keeps the two keys in lockstep for stores that set either one by hand
-  // (harness --set, old installs, the service-mode row).
+  // (harness --set, old installs).
   registerSetting({
     key: 'bb_theme',
     label: 'Store Theme',
@@ -531,11 +443,7 @@ export function registerCoreSettings(): void {
   });
 
   // Store Brand -------------------------------------------------------------
-  // The group's couch page is the logo editor (buildStoreBrandPanel), which
-  // renders INSTEAD of this group's registry rows — so this registration shows
-  // up on the SERVICE MODE page, which is the right home for it anyway: it
-  // takes a typed directory name and it changes the whole store's identity.
-  // The editor page carries a read-only status row mirroring it.
+  // Brand pack selection lives with the logo editor and its preview.
   registerSetting({
     key: 'bb_brand_pack',
     label: 'Brand Pack',
@@ -546,11 +454,10 @@ export function registerCoreSettings(): void {
     // store builds (src/brand-pack.ts) — a rebuild would repaint textures
     // around a pack that was never loaded.
     applyMode: 'reload',
-    // Live getter, not a fixed string: this row's hint IS the service-mode
+    // Live getter, not a fixed string: this row's hint IS the brand
     // diagnostic (the drawer's footer bar prints the selected row's hint), and
     // a pack that failed to load is otherwise indistinguishable from no pack.
     get hint() { return brandPackDiagnostic(); },
-    hidden: true,
   });
 
   // Studio-spotlight floor stands used to pick from a fixed curated list
@@ -576,6 +483,7 @@ export function registerCoreSettings(): void {
     label: 'Media Format',
     kind: 'cycle',
     group: 'Store Look',
+    subpage: 'Movie Cases',
     values: [
       { id: 'dvd', label: 'DVD' },
       { id: 'vhs', label: 'VHS' },
@@ -590,6 +498,7 @@ export function registerCoreSettings(): void {
     label: 'Rental Case Art',
     kind: 'cycle',
     group: 'Store Look',
+    subpage: 'Movie Cases',
     values: [
       { id: 'auto', label: 'Auto' },
       { id: 'vhs', label: 'VHS Box' },
@@ -602,7 +511,6 @@ export function registerCoreSettings(): void {
     // video-case.ts), so only a full reinit picks up a forced art change.
     applyMode: 'reload',
     hint: 'Force the VHS/DVD rental box design. Auto follows format.',
-    hidden: true, // service knob: dev override, Auto already follows Media Format
   });
 
   // Swappable rental-cover scans (COVER_VARIANTS in video-case.ts), one
@@ -612,13 +520,11 @@ export function registerCoreSettings(): void {
   // and its row lights up here with no further wiring).
   registerCoverVariantSettings();
 
-  // The store FORMAT comes first on the Store Look page: it decides the shape of
-  // the room, and several rows below it (Shelf Arrangement, Corner Step) are
-  // things a given format may not offer at all. See store-format-setting.ts.
+  // Keep the legacy format key registered; Store Theme is its only UI.
   registerStoreFormatSetting();
   // Reconcile bb_theme and bb_store_format at boot (see the Store Theme row's
   // header comment): either key can be set alone by hand (harness --set, an
-  // install predating the merged row, the service-mode format row) — whenever
+  // install predating the merged row, legacy format preferences) — whenever
   // ONE of them says mom-and-pop, both do. Runs after the row registrations so
   // the drawer renders the reconciled truth on first open. The page already
   // BUILT from the pre-reconcile bb_store_format, which is unchanged for every
@@ -656,7 +562,7 @@ export function registerCoreSettings(): void {
   }
   registerSetting({
     key: 'bb_outside',
-    label: 'Environment',
+    label: 'Time of Day',
     kind: 'cycle',
     group: 'Store Look',
     values: [
@@ -729,6 +635,22 @@ export function registerCoreSettings(): void {
   });
 
   registerSetting({
+    key: 'bb_carpet_color',
+    label: 'Carpet Colour',
+    kind: 'cycle',
+    group: 'Store Look',
+    values: [
+      { id: 'auto', label: 'Theme Default' },
+      { id: 'primary', label: 'Brand Primary' },
+      { id: 'secondary', label: 'Brand Secondary' },
+    ],
+    default: 'auto',
+    applyMode: 'rebuild-scene',
+    hint: 'Floor dye. Theme Default follows the era; Brand Primary is the Store Brand background colour, Brand Secondary its outline colour.',
+    subpage: 'Building & Storefront',
+  });
+
+  registerSetting({
     key: 'bb_marquee_bulbs',
     label: 'Marquee Bulbs',
     kind: 'toggle',
@@ -744,6 +666,7 @@ export function registerCoreSettings(): void {
     label: 'Marquee Animation',
     kind: 'cycle',
     group: 'Store Look',
+    subpage: 'Building & Storefront',
     values: [
       { id: 'off', label: 'Unlit' },
       { id: 'steady', label: 'Steady' },
@@ -753,7 +676,6 @@ export function registerCoreSettings(): void {
     applyMode: 'live',
     apply: (value, scene) => scene.setMarqueeAnimMode(value as 'off' | 'steady' | 'chase'),
     hint: 'Chase never wakes the idle renderer by itself.',
-    hidden: true, // service knob: render-scheduling behavior, not decor
   });
 
   registerSetting({
@@ -780,11 +702,11 @@ export function registerCoreSettings(): void {
     label: 'Start at entrance overview',
     kind: 'toggle',
     group: 'Store Look',
+    subpage: 'Browsing & Rentals',
     default: true,
     applyMode: 'live',
     apply: (value, scene) => scene.setOverviewStart(!!value),
     hint: 'Start inside the doors on the jump index. Off = cam view.',
-    hidden: true, // service knob: navigation-flow experiment (T21)
   });
 
   // The tip jar on the counter (src/fixtures/tip-jar.ts). ON by default and
@@ -802,6 +724,21 @@ export function registerCoreSettings(): void {
     hint: 'A card and a cup by the register, linking the project’s Ko-fi.',
   });
 
+  // #273: the attract-mode tour — a slow on-rails camera dolly over the store
+  // after a few idle seconds, broken by any input (attract-mode.ts). ON for
+  // the hosted demo, where the landing page is a showreel; OFF on a real
+  // HTPC, where an idle screen means someone stepped away. `?attract=1|0`
+  // overrides it for one page load (the release-clip source).
+  registerSetting({
+    key: 'bb_attract_mode',
+    label: 'Attract-mode tour when idle',
+    kind: 'toggle',
+    group: 'Store Look',
+    default: isDemoMode,
+    applyMode: 'live',
+    hint: 'A slow camera dolly through the store after a few idle seconds. Any key brings you back.',
+  });
+
   // T22: carried tapes + front-counter checkout. Default OFF until T23 ships
   // rental mode — when off, the instant play-from-the-shelf flow is untouched.
   registerSetting({
@@ -809,6 +746,7 @@ export function registerCoreSettings(): void {
     label: 'Carry & checkout',
     kind: 'toggle',
     group: 'Store Look',
+    subpage: 'Browsing & Rentals',
     default: false,
     applyMode: 'live',
     apply: (value, scene) => scene.setCarryMode(!!value),
@@ -822,6 +760,7 @@ export function registerCoreSettings(): void {
     label: 'Rental mode (real lockout)',
     kind: 'toggle',
     group: 'Store Look',
+    subpage: 'Browsing & Rentals',
     default: false,
     applyMode: 'live',
     apply: (value, scene) => scene.setRentalMode(!!value),
@@ -839,10 +778,10 @@ export function registerCoreSettings(): void {
     label: 'Rental dev timer (5 min)',
     kind: 'toggle',
     group: 'Store Look',
+    subpage: 'Browsing & Rentals',
     default: false,
     applyMode: 'live',
     hint: '5-minute lockout for testing. Applies to the NEXT checkout.',
-    hidden: true, // service knob: dev timer for exercising the rental loop
     visibleWhen: () => getSetting<boolean>('bb_rental_mode'),
   });
 
@@ -888,6 +827,7 @@ export function registerCoreSettings(): void {
     label: 'Color Response',
     kind: 'cycle',
     group: 'Store Look',
+    subpage: 'Color & Lighting',
     values: [
       { id: 'neutral', label: 'True Color (PBR Neutral)' },
       { id: 'agx', label: 'Filmic (AgX)' },
@@ -895,7 +835,6 @@ export function registerCoreSettings(): void {
     default: 'neutral',
     applyMode: 'rebuild-scene',
     hint: 'True Color keeps art as printed; Filmic softens highlights.',
-    hidden: true, // service knob: tone-mapping engine choice
   });
 
   // Color warmth (store-grade.ts): a display-space white-balance lean toward
@@ -909,6 +848,7 @@ export function registerCoreSettings(): void {
     label: 'Color Warmth',
     kind: 'cycle',
     group: 'Store Look',
+    subpage: 'Color & Lighting',
     values: [
       { id: '0', label: 'Neutral' },
       { id: '0.18', label: 'Subtle' },
@@ -919,7 +859,6 @@ export function registerCoreSettings(): void {
     applyMode: 'live',
     apply: (value, scene) => scene.setGradeWarmth(parseFloat(String(value))),
     hint: 'Warm leans tungsten, like 90s film. Neutral is pure white.',
-    hidden: true, // service knob: grade-pass sweep parameter
   });
 
   // Optional nostalgia film LUT (store-grade.ts): a procedural 33³ 3D-LUT in
@@ -931,11 +870,11 @@ export function registerCoreSettings(): void {
     label: 'Film Look (LUT)',
     kind: 'toggle',
     group: 'Store Look',
+    subpage: 'Color & Lighting',
     default: false,
     applyMode: 'live',
     apply: (value, scene) => scene.setGradeLut(!!value),
     hint: 'Film-look grade: floated blacks, amber midtones. Free.',
-    hidden: true, // service knob: film-emulation LUT experiment
   });
 
   // Performance --------------------------------------------------------------
@@ -1159,7 +1098,6 @@ export function registerCoreSettings(): void {
     applyMode: 'live',
     apply: (value) => setRemotePlayEnabled(!!value),
     hint: 'Streams the store to any browser at /remote.html. Connecting queries a public STUN server.',
-    hidden: true, // service knob: dev/preview-server streaming feature
   });
 
   // Romm connection fields only make sense once the Video Games section itself
@@ -1346,43 +1284,26 @@ export function activateBrandRow(key: string, dir: number): void {
 }
 
 const BRAND_SHAPES: { id: LogoShape; label: string }[] = [
-  { id: 'rect', label: 'Rectangle' },
-  { id: 'rounded-rect', label: 'Rounded Rect' },
-  { id: 'triangle', label: 'Triangle' },
-  { id: 'half-circle', label: 'Half Circle' },
+  { id: 'rect', label: 'House board' },
+  { id: 'rounded-rect', label: 'Soft corners' },
+  { id: 'oval', label: 'Oval badge' },
+  { id: 'circle', label: 'Roundel' },
+  { id: 'half-circle', label: 'Arch' },
   { id: 'shield', label: 'Shield' },
-  { id: 'image', label: 'Dropped Image' },
-  { id: 'path', label: 'Dropped Outline' },
-  { id: 'none', label: 'None (text only)' },
+  { id: 'triangle', label: 'Triangle' },
+  { id: 'none', label: 'Lettering only' },
 ];
 
 const BRAND_SUB_QUICKS = ['VIDEO', 'VIDEOS', 'ENTERTAINMENT'];
 
-// Fictional-brand presets: each fills the WHOLE form (every editable field), so
-// applying one is a complete identity, not a partial tweak. 'Theme default'
-// (spec: null) clears the override entirely. These are invented stores — the
-// committed tree ships no recreation of a real chain (that is what a brand pack
-// in public/user-assets/brands/ is for).
-const BRAND_PRESETS: { label: string; spec: Partial<LogoSpec> | null }[] = [
-  { label: 'Theme Default', spec: null },
-  {
-    label: 'Megahit Video',
-    spec: {
-      shape: 'rect', tornEdge: true, bodyColor: '#7a1f1f', textColor: '#ffffff',
-      borderColor: '#d9a441', innerBorder: true, mainText: 'MEGAHIT', subText: 'VIDEO',
-      bandText: '', taglineText: '', fontFamily: 'Archivo Black', fontStyle: 'normal',
-      textTilt: 6, textOverflow: false, storefront: { mode: 'emblem', extrudeDepth: 0 },
-    },
-  },
-  {
-    label: 'Reel Time',
-    spec: {
-      shape: 'half-circle', tornEdge: false, bodyColor: '#1e4d2b', textColor: '#f5eeda',
-      borderColor: '#f5eeda', innerBorder: true, mainText: 'REEL TIME', subText: 'ENTERTAINMENT',
-      bandText: '', taglineText: '', fontFamily: 'Bebas Neue', fontStyle: 'normal',
-      textTilt: 0, textOverflow: false, storefront: { mode: 'emblem', extrudeDepth: 0 },
-    },
-  },
+// Looks change the design, never the owner's store name. The house is canon;
+// the alternatives pair a legible face with a restrained two-ink palette.
+const BRAND_PRESETS: { label: string; spec: Partial<LogoSpec> }[] = [
+  { label: 'House blue & white', spec: {} },
+  { label: 'Midnight cinema', spec: { shape: 'rounded-rect', bodyColor: '#17263e', textColor: '#ffffff', borderColor: '#ffffff', fontFamily: 'Bebas Neue', textTilt: 0 } },
+  { label: 'Evergreen club', spec: { shape: 'oval', bodyColor: '#234c40', textColor: '#f2e8c9', borderColor: '#f2e8c9', fontFamily: 'Outfit', textTilt: 0 } },
+  { label: 'Burgundy picturehouse', spec: { shape: 'rect', bodyColor: '#782f40', textColor: '#f2e8c9', borderColor: '#f2e8c9', fontFamily: 'Anton', textTilt: 0 } },
+  { label: 'Paper & ink', spec: { shape: 'rounded-rect', bodyColor: '#f2e8c9', textColor: '#17263e', borderColor: '#17263e', fontFamily: 'Outfit', textTilt: 0 } },
 ];
 
 // Flat (non-nested) LogoSpec fields the editor can change, for diffing.
@@ -1434,7 +1355,7 @@ function logoSpecDiff(spec: LogoSpec, base: LogoSpec): Partial<LogoSpec> | null 
  * there was another branch in it.)
  */
 export function buildCustomSettingsPage(
-  page: SettingGroup | 'Service' | 'Controls' | null,
+  page: SettingGroup | 'Controls' | null,
   container: HTMLElement,
   hooks: BrandPanelHooks,
 ): page is 'Store Brand' | 'Controls' {
@@ -1455,8 +1376,8 @@ export function buildStoreBrandPanel(container: HTMLElement, hooks: BrandPanelHo
   const themeId = resolveThemeId(getSetting<string>('bb_theme'));
   const themeBase = DEFAULT_LOGO_SPECS[themeId] ?? DEFAULT_LOGO_SPECS['bb-1990'];
   const packLogo = getBrandPack()?.logo;
-  const baseSpec = packLogo ? mergeLogoPartial(themeBase, packLogo) : themeBase;
-  let working = cloneLogoSpec(getActiveLogoSpec());
+  let baseSpec = packLogo ? mergeLogoPartial(themeBase, packLogo) : themeBase;
+  let working = cloneLogoSpec(getActiveLogoSpec(undefined, false));
   let lastSaved = typeof localStorage !== 'undefined' ? localStorage.getItem('bb_logo') : null;
 
   // ── Live preview (event-driven redraws only — no rAF, no polling) ─────────
@@ -1464,13 +1385,14 @@ export function buildStoreBrandPanel(container: HTMLElement, hooks: BrandPanelHo
   previewRow.className = 'settings-row settings-brand-preview';
   const previewCanvas = document.createElement('canvas');
   previewCanvas.width = 960;
-  previewCanvas.height = 460;
+  previewCanvas.height = 260;
   previewCanvas.className = 'brand-preview-canvas';
   previewRow.appendChild(previewCanvas);
   container.appendChild(previewRow);
 
   // Redraw again once a newly-selected font family finishes loading (a
   // one-shot promise per font string — event-driven, not a poll).
+  previewCanvas.setAttribute('aria-label', 'Live store logo preview');
   const loadedFonts = new Set<string>();
   const ensurePreviewFont = () => {
     const fontStr = getLogoFontString(working, 90);
@@ -1490,16 +1412,16 @@ export function buildStoreBrandPanel(container: HTMLElement, hooks: BrandPanelHo
     grad.addColorStop(1, '#0c0f14');
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, W, H);
-    drawLogo(ctx, working, { x: W * 0.05, y: H * 0.05, w: W * 0.9, h: H * 0.9 });
+    drawLogo(ctx, applyEmblemToSpec({ ...working, emblem: loadEmblemDoc() ?? working.emblem }), { x: W * 0.05, y: H * 0.05, w: W * 0.9, h: H * 0.9 });
     ensurePreviewFont();
   };
 
   /** Persist the diff; only an actual change dirties the drawer session. */
-  const commit = () => {
+  const commit = (force = false) => {
     const diff = logoSpecDiff(working, baseSpec);
     const next = diff ? JSON.stringify(diff) : null;
     redrawPreview();
-    if (next === lastSaved) return;
+    if (!force && next === lastSaved) return;
     if (typeof localStorage !== 'undefined') {
       if (next) localStorage.setItem('bb_logo', next);
       else localStorage.removeItem('bb_logo');
@@ -1525,78 +1447,86 @@ export function buildStoreBrandPanel(container: HTMLElement, hooks: BrandPanelHo
     prefix: BRAND_ROW_PREFIX,
     hooks,
     preview: redrawPreview,
-    commit: () => {
-      presets?.setActive(-1);
-      commit();
-    },
+    commit: () => commit(),
   });
 
-  // ── Dropped logo (read-only) ───────────────────────────────────────────────
-  // The simple-drop tier has NO setting by design — you put a file in a folder
-  // and reload. Which makes this row the only place the store can answer "did
-  // it see my logo, and what did it make of it?". A drop that produced no
-  // silhouette, or sampled one ink instead of two, looks from the couch exactly
-  // like a drop that never happened.
-  kit.readout('drop', 'Dropped Logo', brandDropDiagnostic(), () => {
-    const drop = brandDropReport();
-    if (!drop) return misplacedBrandArt() ? 'Wrong folder' : 'Empty';
-    if (activeBrandPackId()) return `${drop.file} — pack active`;
-    const doc = loadEmblemDoc();
-    if (doc && emblemDocActive(doc)) return `${drop.file} — overridden by emblem`;
-    if (typeof localStorage !== 'undefined' && localStorage.getItem('bb_logo')) return `${drop.file} — overridden by settings`;
-    return brandPackSource() === 'drop' ? `${drop.file} — active` : `${drop.file} — overridden`;
+  const snapshot = () => ({
+    logo: localStorage.getItem('bb_logo'), emblem: loadEmblemDoc(),
+    builtin: localStorage.getItem('bb_brand_builtin'),
+  });
+  let previous: ReturnType<typeof snapshot> | null = null;
+  const useHouseBase = () => {
+    const hadPack = !!getBrandPack();
+    localStorage.setItem('bb_brand_builtin', '1');
+    saveEmblemDoc(null);
+    baseSpec = themeBase;
+    if (hadPack) hooks.onNeedsReload?.();
+  };
+  let pendingLook = '0';
+  kit.select('presets', 'Starting look', 'Choose a look with Left or Right, then use the row below to apply it.',
+    BRAND_PRESETS.map((p, i) => ({ id: String(i), label: p.label })),
+    () => pendingLook, (v) => { pendingLook = v; }, false);
+  kit.confirmAction('apply-look', 'Use this look', 'OK applies the chosen colours, font and background. Your store name stays yours.', () => {
+    previous = snapshot();
+    const { mainText, subText, bandText, taglineText } = working;
+    useHouseBase();
+    working = mergeLogoPartial(themeBase, { ...BRAND_PRESETS[Number(pendingLook)].spec, mainText, subText, bandText, taglineText });
+    kit.syncAll();
+    commit(true);
   });
 
-  // ── Brand pack status (read-only) ──────────────────────────────────────────
-  // Diagnostic, not a control: the id is typed on the SERVICE MODE page
-  // (bb_brand_pack) because it names a directory. What belongs HERE is the
-  // answer to "is the pack I installed actually dressing this store?", which
-  // is otherwise invisible — a misspelt id looks exactly like no pack at all.
-  kit.readout('pack', 'Brand Pack', brandPackDiagnostic(), () => {
-    const id = activeBrandPackId();
-    const pack = getBrandPack();
-    const status = brandPackStatus();
-    if (!id) return 'None';
-    if (status === 'loaded') return `${pack?.displayName ?? pack?.name ?? id} (${id})`;
-    if (status === 'failed') return `${id} — FAILED`;
-    return `${id} — not installed`;
-  });
-
-  // ── Emblem editor ──────────────────────────────────────────────────────────
-  // The build-your-own tier: layered primitive shapes flattened into the brand.
-  // It gets its own SURFACE rather than more rows here — it carries a design
-  // canvas and a stack of per-layer controls, and a live emblem overrides the
-  // Emblem Shape row below, so the two want separating. The row itself is built
-  // by the studio (#111), because opening it is all this page knows about it.
-  buildEmblemEditorRow(kit, hooks);
-
-  // ── Preset strip ───────────────────────────────────────────────────────────
-  const presets = kit.strip(
-    'presets', 'Presets', 'Theme Default clears your edits. Left/Right cycles.',
-    BRAND_PRESETS.map((p) => p.label),
-    (i) => {
-      const preset = BRAND_PRESETS[i];
-      working = preset.spec ? mergeLogoPartial(baseSpec, preset.spec) : cloneLogoSpec(baseSpec);
+  kit.select('shape', 'Emblem background', 'Left or Right changes the sign shape. Replaces a custom emblem; lettering and colours stay.',
+    BRAND_SHAPES, () => {
+      const doc = loadEmblemDoc() ?? working.emblem;
+      return doc && emblemDocActive(doc) ? 'path' : working.shape;
+    }, (v) => {
+      previous = snapshot();
+      saveEmblemDoc(null);
+      working = { ...working, shape: v as LogoShape, tornEdge: false, emblem: undefined,
+        pathD: undefined, imageSrc: undefined, artLayers: undefined, wordmarkPathD: undefined };
       kit.syncAll();
-      commit();
-    },
-  );
+      commit(true);
+    });
+  kit.select('font', 'Lettering', 'Left or Right previews each face. All six fonts work offline.',
+    brandFontOptions, () => working.fontFamily, (v) => { working.fontFamily = v; });
+  buildEmblemEditorRow(kit, hooks);
+  kit.confirmAction('reset', 'Reset to Halcyon', 'OK restores our blue, white and original logo. Undo brings your design back.', () => {
+    previous = snapshot();
+    useHouseBase();
+    working = cloneLogoSpec(themeBase);
+    pendingLook = '0';
+    kit.syncAll();
+    commit(true);
+  });
+  kit.confirmAction('undo', 'Undo design replacement', 'Restore the design from before the last look, background or reset.', () => {
+    if (!previous) return;
+    const restore = previous;
+    previous = snapshot();
+    for (const [key, value] of [['bb_logo', restore.logo], ['bb_brand_builtin', restore.builtin]]) {
+      if (value === null) localStorage.removeItem(key!); else localStorage.setItem(key!, value!);
+    }
+    saveEmblemDoc(restore.emblem);
+    baseSpec = getBrandPack()?.logo ? mergeLogoPartial(themeBase, getBrandPack()!.logo!) : themeBase;
+    working = cloneLogoSpec(getActiveLogoSpec(undefined, false));
+    lastSaved = localStorage.getItem('bb_logo');
+    kit.syncAll();
+    redrawPreview();
+    applyThemeCssVars(getActiveTheme());
+    refreshBrand();
+    hooks.onDirty?.();
+    if (restore.builtin !== previous.builtin) hooks.onNeedsReload?.();
+  });
 
-  // ── The form ───────────────────────────────────────────────────────────────
-  kit.select('shape', 'Emblem Shape', 'The badge behind the wordmark.',
-    BRAND_SHAPES, () => working.shape, (v) => { working.shape = v as LogoShape; });
-
-  kit.toggle('torn', 'Torn Edge', 'Rip the emblem’s right edge, ticket-stub style.',
-    () => working.tornEdge, (v) => { working.tornEdge = v; });
-
-  kit.color('body', 'Body Color', 'Emblem fill.',
+  kit.color('body', 'Background colour', 'Left or Right chooses a named ink. Click the swatch for a custom colour.',
     () => working.bodyColor, (v) => { working.bodyColor = v; });
-  kit.color('text', 'Text Color', 'Wordmark lettering.',
+  kit.color('text', 'Lettering colour', 'Left or Right chooses a named ink.',
     () => working.textColor, (v) => { working.textColor = v; });
-  kit.color('border', 'Border Color', 'Inner pinstripe and 3D sign sides.',
+  kit.color('border', 'Outline colour', 'Left or Right chooses a named ink for the outline and sign sides.',
     () => working.borderColor, (v) => { working.borderColor = v; });
+  kit.toggle('outline', 'Inset outline', 'A fine border inside the emblem background.',
+    () => working.innerBorder, (v) => { working.innerBorder = v; });
 
-  kit.text('main', 'Main Text', 'The big wordmark.',
+  kit.text('main', 'Store name', 'OK edits the name; OK again finishes.',
     () => working.mainText, (v) => { working.mainText = v; });
 
   // Sub text quick-picks (datalist) — the classic "…VIDEO" suffixes.
@@ -1618,11 +1548,7 @@ export function buildStoreBrandPanel(container: HTMLElement, hooks: BrandPanelHo
   kit.text('tagline', 'Tagline', 'Banner under the emblem.',
     () => working.taglineText, (v) => { working.taglineText = v; });
 
-  kit.select('font', 'Font', 'Wordmark typeface.',
-    () => brandFontChoices().map((f) => ({ id: f, label: f })),
-    () => working.fontFamily, (v) => { working.fontFamily = v; });
-
-  kit.slider('tilt', 'Text Tilt', 'Classic video-store lean ≈ 4–10°.',
+  kit.slider('tilt', 'Lettering angle', 'Left or Right adjusts the angle. Zero keeps the name level.',
     { min: 0, max: 20, step: 0.5, navStep: 1 },
     (v) => `${(Math.round(v * 10) / 10).toString()}°`,
     () => working.textTilt, (v) => { working.textTilt = v; });
@@ -1637,6 +1563,26 @@ export function buildStoreBrandPanel(container: HTMLElement, hooks: BrandPanelHo
   kit.slider('sfdepth', 'Sign Extrusion', '3D depth of the storefront sign. 0 = flat.',
     { min: 0, max: 1.5, step: 0.05, navStep: 0.1 }, (v) => `${v.toFixed(2)} ft`,
     () => working.storefront.extrudeDepth, (v) => { working.storefront.extrudeDepth = v; });
+
+  if (activeBrandPackId() || brandDropReport() || misplacedBrandArt()) {
+    kit.readout('pack', 'Installed artwork', 'Your installed artwork is kept when you return to the house brand.',
+      () => localStorage.getItem('bb_brand_builtin') === '1' ? 'House brand in use' : getBrandPack()?.displayName ?? 'Custom artwork');
+    kit.confirmAction('installed', 'Use installed artwork', 'Return to your installed logo and colours. Reopens the store when you leave this menu.', () => {
+      previous = snapshot();
+      localStorage.removeItem('bb_brand_builtin');
+      localStorage.removeItem('bb_logo');
+      saveEmblemDoc(null);
+      working = cloneLogoSpec(getActiveLogoSpec(undefined, false));
+      baseSpec = getBrandPack()?.logo ? mergeLogoPartial(themeBase, getBrandPack()!.logo!) : themeBase;
+      lastSaved = null;
+      kit.syncAll();
+      redrawPreview();
+      applyThemeCssVars(getActiveTheme());
+      refreshBrand();
+      hooks.onDirty?.();
+      hooks.onNeedsReload?.();
+    });
+  }
 
   // ── Custom Wrap (W3): drop-in full box-wrap image, one per medium ─────────
   // For original cases procedural art can't recreate (e.g. a real 2003 DVD
@@ -1790,18 +1736,10 @@ export function buildStoreBrandPanel(container: HTMLElement, hooks: BrandPanelHo
 
 // ─── Harness drawer preview (W3, tools/shot.mjs --state settings) ────────────
 //
-// harness.html has no app DOM, so the screenshot harness builds the drawer
-// shell itself and renders a group's rows through here — the same markup
-// main.ts's generateSettingsDrawer produces (label/hint/value + option thumb),
-// minus interactivity, so `--state settings --title "Store Look"` shows the
-// real thumbnail rows. `--title Service` renders the SERVICE MODE roster
-// (every hidden row) the same way. `"<group>/<subpage>"` renders a sub-page.
-// Returns how many rows carry a thumb (checkpoint gate).
-export function buildSettingsGroupPreview(container: HTMLElement, group: SettingGroup | 'Service' | `${SettingGroup}/${string}`): number {
-  let thumbed = 0;
-  const defs = group === 'Service'
-    ? serviceSettings()
-    : group.includes('/')
+// Render the ordinary text choices for the screenshot harness.
+// A group/subpage path selects the same rows used by the live settings menu.
+export function buildSettingsGroupPreview(container: HTMLElement, group: SettingGroup | `${SettingGroup}/${string}`): number {
+  const defs = group.includes('/')
       ? settingsInSubpage(group.split('/')[0] as SettingGroup, group.split('/')[1])
       : settingsInGroup(group as SettingGroup);
   for (const def of defs) {
@@ -1819,13 +1757,7 @@ export function buildSettingsGroupPreview(container: HTMLElement, group: Setting
       <span class="settings-row-leader" aria-hidden="true"></span>
       <span class="settings-row-value" id="setting-value-${def.key}">${currentValueLabel(def.key)}</span>
     `;
-    const thumb = createSettingThumb(def.key);
-    if (thumb) {
-      thumb.loading = 'eager'; // screenshots must not race lazy loading
-      row.insertBefore(thumb, row.querySelector('.settings-row-value'));
-      thumbed++;
-    }
     container.appendChild(row);
   }
-  return thumbed;
+  return 0;
 }

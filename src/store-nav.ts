@@ -71,6 +71,32 @@ export function lineStartUnit(_scene: StoreScene, libUnits: ShelvingUnit[], line
   return libUnits.filter(u => u.lineId === lineId)[0];
 }
 
+/**
+ * The screen-order first unit of a physical ROW. fillField() may pour one
+ * straight row as several lineId CHUNKS (capped at maxRunUnits, a
+ * RUN_BREAK_GAP apart) and planRuns() numbers the whole row continuously, so
+ * the browse snake reads a row by its rowGroupId: the front face all the way
+ * down, round the deep end, the back face all the way back. Keying the walk
+ * on lineId instead cut every long row into separate loops with a whole-row
+ * camera leap between them — the mom-and-pop "camera jumps all over the
+ * place" bug, since that format's long narrow rows are always several chunks.
+ */
+export function rowStartUnit(libUnits: ShelvingUnit[], rowGroupId: number): ShelvingUnit {
+  return libUnits.filter(u => u.rowGroupId === rowGroupId)[0];
+}
+
+/**
+ * The genre endcap standing in the cross-aisle gap between two chunks of one
+ * row, if one was built there: caps mount on a chunk's isLineFront unit, and
+ * the deeper chunk (the higher lineId) is the one whose mouth opens onto the
+ * gap. Crossing the gap along the front face steps onto it, same as walking
+ * off a row's entrance end steps onto the row's mouth cap.
+ */
+function gapEndcapBetween(scene: StoreScene, a: ShelvingUnit, b: ShelvingUnit): SceneFixture | null {
+  if (a.lineId === b.lineId) return null;
+  return genreEndcapForLine(scene, Math.max(a.lineId, b.lineId));
+}
+
 type SceneFixture = StoreScene['slottedFixtures'][number];
 
 /** The genre endcap standing at this line's entrance end, if one was built. */
@@ -108,16 +134,22 @@ function exitGenreEndcapToShelf(scene: StoreScene, fixture: SceneFixture, exitTo
 
   scene.selectedShelf = AISLE_SHELF_HEIGHTS.length - 1;
   if (exitTo === 'prevBack') {
-    const prevLineUnits = libUnits.filter(
-      (u) => u.lineId !== lineId && u.unitIdxInLibrary < lineFirst.unitIdxInLibrary
-    );
-    if (prevLineUnits.length === 0) return false;
-    const prevFirst = lineStartUnit(scene, libUnits, prevLineUnits[prevLineUnits.length - 1].lineId);
+    const prevUnit = libUnits[lineFirst.unitIdxInLibrary - 1];
+    if (!prevUnit) return false;
     scene.selectedUnitSource = 'shelving';
     scene.selectedFixtureId = null;
     scene.selectedLibraryIdx = libraryIdx;
-    scene.selectedUnitIdx = prevFirst.unitIdxInLibrary;
-    scene.selectedSide = 'back';
+    if (prevUnit.rowGroupId === lineFirst.rowGroupId) {
+      // A cap standing in a cross-aisle gap MID-row: Left off it continues
+      // along the same row's front face, onto the previous chunk's last unit.
+      scene.selectedUnitIdx = prevUnit.unitIdxInLibrary;
+      scene.selectedSide = 'front';
+    } else {
+      // A row's mouth cap: Left continues to the previous ROW's back face,
+      // whose reading end is that row's first unit.
+      scene.selectedUnitIdx = rowStartUnit(libUnits, prevUnit.rowGroupId).unitIdxInLibrary;
+      scene.selectedSide = 'back';
+    }
     scene.updateColsCount();
     scene.selectedCol = scene.colsCount - 1;
     scene.cameraWindowMinCol = Math.max(0, scene.colsCount - BROWSE_WINDOW_SIZE);
@@ -306,9 +338,15 @@ export function moveLeftInternal(scene: StoreScene) {
         // always the previous unit.
         const prevUnit = libUnits[scene.selectedUnitIdx - 1];
 
-        // Check if there is a previous unit on the same line/run
-        if (prevUnit && prevUnit.lineId === currentUnit.lineId) {
-          // Transition to the front side of the previous unit in the same line/row
+        // Check if there is a previous unit on the same physical row (a row
+        // may span several lineId chunks — see rowStartUnit).
+        if (prevUnit && prevUnit.rowGroupId === currentUnit.rowGroupId) {
+          const gapCap = gapEndcapBetween(scene, prevUnit, currentUnit);
+          if (gapCap) {
+            enterGenreEndcapFromShelf(scene, gapCap, 'left');
+            return;
+          }
+          // Transition to the front side of the previous unit in the same row
           scene.selectedUnitIdx = prevUnit.unitIdxInLibrary;
           scene.selectedSide = 'front';
           scene.updateColsCount();
@@ -331,10 +369,8 @@ export function moveLeftInternal(scene: StoreScene) {
           // The back face reads its units in REVERSE index order, so the
           // reading end is the line's FIRST unit, at its last (screen-right)
           // column.
-          const prevLineUnits = libUnits.filter(u => u.lineId !== currentUnit.lineId && u.unitIdxInLibrary < currentUnit.unitIdxInLibrary);
-          if (prevLineUnits.length > 0) {
-            const prevLineId = prevLineUnits[prevLineUnits.length - 1].lineId;
-            const prevLineFirstUnit = scene.lineStartUnit(libUnits, prevLineId);
+          if (prevUnit) {
+            const prevLineFirstUnit = rowStartUnit(libUnits, prevUnit.rowGroupId);
 
             scene.selectedUnitIdx = prevLineFirstUnit.unitIdxInLibrary;
             scene.selectedSide = 'back';
@@ -362,8 +398,8 @@ export function moveLeftInternal(scene: StoreScene) {
         // neighbor is the NEXT unit (entered at its screen-right end).
         const nextUnit = libUnits[scene.selectedUnitIdx + 1];
 
-        // Check if there is a next unit on the same line/run
-        if (nextUnit && nextUnit.lineId === currentUnit.lineId) {
+        // Check if there is a next unit on the same physical row
+        if (nextUnit && nextUnit.rowGroupId === currentUnit.rowGroupId) {
           scene.selectedUnitIdx = nextUnit.unitIdxInLibrary;
           scene.selectedSide = 'back';
           scene.updateColsCount();
@@ -457,9 +493,15 @@ export function moveRightInternal(scene: StoreScene) {
         // always the next unit.
         const nextUnit = libUnits[scene.selectedUnitIdx + 1];
 
-        // Check if there is a next unit on the same line/run
-        if (nextUnit && nextUnit.lineId === currentUnit.lineId) {
-          // Transition to the front side of the next unit in the same row/line
+        // Check if there is a next unit on the same physical row (a row may
+        // span several lineId chunks — see rowStartUnit).
+        if (nextUnit && nextUnit.rowGroupId === currentUnit.rowGroupId) {
+          const gapCap = gapEndcapBetween(scene, currentUnit, nextUnit);
+          if (gapCap) {
+            enterGenreEndcapFromShelf(scene, gapCap, 'right');
+            return;
+          }
+          // Transition to the front side of the next unit in the same row
           scene.selectedUnitIdx = nextUnit.unitIdxInLibrary;
           scene.selectedSide = 'front';
           scene.selectedCol = 0;
@@ -486,10 +528,16 @@ export function moveRightInternal(scene: StoreScene) {
             scene.updateCameraTarget();
           } else {
             // No movies on this line's back side, transition to the next line/row
-            const nextLineUnit = libUnits.find(u => u.lineId !== currentUnit.lineId && u.unitIdxInLibrary > currentUnit.unitIdxInLibrary);
-            if (nextLineUnit) {
-              // Transition to the front side of the next line's screen-order start unit
-              scene.selectedUnitIdx = scene.lineStartUnit(libUnits, nextLineUnit.lineId).unitIdxInLibrary;
+            const nextRowUnit = libUnits.find(u => u.rowGroupId !== currentUnit.rowGroupId && u.unitIdxInLibrary > currentUnit.unitIdxInLibrary);
+            if (nextRowUnit) {
+              const nextRowFirst = rowStartUnit(libUnits, nextRowUnit.rowGroupId);
+              const mouthCap = genreEndcapForLine(scene, nextRowFirst.lineId);
+              if (mouthCap) {
+                enterGenreEndcapFromShelf(scene, mouthCap, 'right');
+                return;
+              }
+              // Transition to the front side of the next row's screen-order start unit
+              scene.selectedUnitIdx = nextRowFirst.unitIdxInLibrary;
               scene.selectedSide = 'front';
               scene.selectedCol = 0;
               scene.cameraWindowMinCol = 0;
@@ -515,8 +563,8 @@ export function moveRightInternal(scene: StoreScene) {
         // screen-right neighbor is the PREVIOUS unit (entered at col 0).
         const prevUnit = libUnits[scene.selectedUnitIdx - 1];
 
-        // Check if there is a previous unit on the same line/run
-        if (prevUnit && prevUnit.lineId === currentUnit.lineId) {
+        // Check if there is a previous unit on the same physical row
+        if (prevUnit && prevUnit.rowGroupId === currentUnit.rowGroupId) {
           scene.selectedUnitIdx = prevUnit.unitIdxInLibrary;
           scene.selectedSide = 'back';
           scene.updateColsCount();
@@ -529,15 +577,16 @@ export function moveRightInternal(scene: StoreScene) {
           // front side if the library has one — via the NEXT line's genre
           // endcap when it has one (that endcap is inserted in this exact
           // edge; see exitGenreEndcapToShelf).
-          const nextLineUnit = libUnits.find(u => u.lineId !== currentUnit.lineId && u.unitIdxInLibrary > currentUnit.unitIdxInLibrary);
-          if (nextLineUnit) {
-            const mouthCap = genreEndcapForLine(scene, nextLineUnit.lineId);
+          const nextRowUnit = libUnits.find(u => u.rowGroupId !== currentUnit.rowGroupId && u.unitIdxInLibrary > currentUnit.unitIdxInLibrary);
+          if (nextRowUnit) {
+            const nextRowFirst = rowStartUnit(libUnits, nextRowUnit.rowGroupId);
+            const mouthCap = genreEndcapForLine(scene, nextRowFirst.lineId);
             if (mouthCap) {
               enterGenreEndcapFromShelf(scene, mouthCap, 'right');
               return;
             }
-            // Transition to the front side of the next line's screen-order start unit
-            scene.selectedUnitIdx = scene.lineStartUnit(libUnits, nextLineUnit.lineId).unitIdxInLibrary;
+            // Transition to the front side of the next row's screen-order start unit
+            scene.selectedUnitIdx = nextRowFirst.unitIdxInLibrary;
             scene.selectedSide = 'front';
             scene.selectedCol = 0;
             scene.cameraWindowMinCol = 0;

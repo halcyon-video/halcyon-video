@@ -4,7 +4,7 @@
 // use only — every consumer fully writes a temp before reading it back.
 import * as THREE from 'three';
 import { Movie } from './jellyfin';
-import { SECTION_COLS, STORE_CENTER_X } from './store-layout';
+import { STORE_CENTER_X } from './store-layout';
 import { perfSlot } from './perf-trace';
 
 // Euler order for every movie-case transform (slot instances, hero cases, the
@@ -22,13 +22,18 @@ export interface NewReleasesSection {
   type: 'super-feature' | 'double-feature' | 'regular';
   movie?: Movie;
   movies?: Movie[];
+  /** First GLOBAL ribbon column: the section's physical bay (store-nr-bays.ts). */
+  startCol: number;
+  /** Last GLOBAL ribbon column (inclusive): its bay's end, or the second bay's end for a double-feature. */
+  endCol: number;
 }
 
 // Column span of a New Releases wall section: a double-feature (critics AND
-// audience both love it) spans two adjacent 6-column sections as one display;
-// everything else spans one.
+// audience both love it) spans two whole adjacent bays as one display; a
+// trailing partial bay is narrower than SECTION_COLS. Sections are pinned to
+// their bays, so the span is simply the range they carry.
 export function sectionColSpan(s: NewReleasesSection): number {
-  return s.type === 'double-feature' ? SECTION_COLS * 2 : SECTION_COLS;
+  return s.endCol - s.startCol + 1;
 }
 
 export interface SlotPos {

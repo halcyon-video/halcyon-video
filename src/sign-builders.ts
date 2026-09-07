@@ -2,6 +2,7 @@
 // meshes, the trapezoid cross-section used by the freestanding units, and the
 // endcap materials. Stateless — callers position the returned objects.
 import * as THREE from 'three';
+import { registerBrandRepaint } from './brand-live';
 import { getActiveTheme } from './themes';
 import { formatShelfWood } from './format-surfaces';
 
@@ -448,10 +449,15 @@ export function createLibraryEndCapMaterial(isBack: boolean = false): THREE.Mesh
   // Background colour: the house colour on a chain's painted end panel, the
   // format's own darker stain where the cap is a piece of timber. Both are
   // DATA (theme palette / format preset) — signage rule 2 either way.
-  ctx.fillStyle = wood ? wood.endPanelHex : theme.palette.primary;
-  ctx.fillRect(0, 0, 1024, 2048);
+  const paintPanel = () => {
+    ctx.fillStyle = wood ? wood.endPanelHex : getActiveTheme().palette.primary;
+    ctx.fillRect(0, 0, 1024, 2048);
+  };
+  paintPanel();
 
   const tex = new THREE.CanvasTexture(canvas);
+  // A painted panel follows the Store Brand panel live (brand-live.ts).
+  if (!wood) registerBrandRepaint(tex, paintPanel);
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.minFilter = THREE.LinearMipmapLinearFilter;
   tex.magFilter = THREE.LinearFilter;
