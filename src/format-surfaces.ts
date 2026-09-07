@@ -14,7 +14,7 @@
 // special case threaded through the shell build.
 import * as THREE from 'three';
 import { aniso, stampTiled, heightToNormalTexture, createCarpetTextures, createWallTextures } from './canvas-textures';
-import { getActiveTheme } from './themes';
+import { getActiveTheme, carpetColorChoice } from './themes';
 import { activeStoreFormat } from './store-format';
 
 export interface SurfaceTextureSet {
@@ -408,7 +408,15 @@ export function formatShelfWood(): { hex: string; endPanelHex: string; textures:
  */
 export function formatCarpetHex(): string {
   const f = activeStoreFormat();
-  return f.carpetHex ?? getActiveTheme().palette.carpet;
+  const theme = getActiveTheme();
+  // The owner's own choice (Store Look → Carpet Colour) dyes the floor in a
+  // brand colour on every format; only Theme Default defers to the format's
+  // colour, then the theme's. Both brand colours come off the active theme,
+  // so a Store Brand edit moves the floor with the shelves.
+  const choice = carpetColorChoice();
+  if (choice === 'primary') return theme.palette.primary;
+  if (choice === 'secondary') return theme.palette.secondary;
+  return f.carpetHex ?? theme.palette.carpet;
 }
 
 /** The colour the active format's walls are finished in. See formatCarpetHex. */
@@ -421,7 +429,7 @@ export function formatWallHex(): string {
 export function formatCarpetTextures(): SurfaceTextureSet {
   const f = activeStoreFormat();
   if (f.carpet === 'shag') return createShagCarpetTextures(formatCarpetHex());
-  return createCarpetTextures();
+  return createCarpetTextures({ ...getActiveTheme().palette, carpet: formatCarpetHex() });
 }
 
 /** Wall finish for the active format. */

@@ -729,6 +729,22 @@ export function registerCoreSettings(): void {
   });
 
   registerSetting({
+    key: 'bb_carpet_color',
+    label: 'Carpet Colour',
+    kind: 'cycle',
+    group: 'Store Look',
+    values: [
+      { id: 'auto', label: 'Theme Default' },
+      { id: 'primary', label: 'Brand Primary' },
+      { id: 'secondary', label: 'Brand Secondary' },
+    ],
+    default: 'auto',
+    applyMode: 'rebuild-scene',
+    hint: 'Floor dye. Theme Default follows the era; Brand Primary is the Store Brand background colour, Brand Secondary its outline colour.',
+    subpage: 'Building & Storefront',
+  });
+
+  registerSetting({
     key: 'bb_marquee_bulbs',
     label: 'Marquee Bulbs',
     kind: 'toggle',

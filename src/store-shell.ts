@@ -29,7 +29,8 @@ import { TipJar } from './fixtures/tip-jar';
 import { DEFAULT_FIXTURE_PLACEMENTS, gameSectionPlacements, counterAnchoredPlacements, promoStandPlacements, admitFixturePlacements, curtainedAlcovePlacements, momAndPopPlantPlacements } from './store-fixtures-config';
 import { activeStoreFormat } from './store-format';
 import { resolveOverviewVantage } from './scene-shared';
-import { formatCarpetTextures, formatWallTextures, formatWallIsPrefinished, formatShelfWood } from './format-surfaces';
+import { formatCarpetTextures, formatCarpetHex, formatWallTextures, formatWallIsPrefinished, formatShelfWood } from './format-surfaces';
+import { onBrandChange } from './brand-live';
 import { validateLayout, Footprint } from './layout-validator';
 import { buildAisleShelving } from './shelving';
 import { ShelfModelBatch } from './shelf-model';
@@ -1271,9 +1272,15 @@ export function buildStore(scene: StoreScene) {
       // such image; see the allowKtx2 note in tryLoadUserAssetTexture.)
       if (neutral) {
         configureCarpetMap(neutral);
-        floorMat.color.set(theme.palette.carpet);
+        floorMat.color.set(formatCarpetHex());
         floorMat.map = neutral;
         tex.dispose();
+        // A brand-dyed floor (Carpet Colour → Brand Primary/Secondary) follows
+        // the Store Brand panel live, like the toppers and end panels.
+        onBrandChange(() => {
+          floorMat.color.set(formatCarpetHex());
+          scene.requestRender?.();
+        });
       } else {
         floorMat.map = tex;
       }
@@ -1911,6 +1918,10 @@ export function buildStore(scene: StoreScene) {
     roughness: shelfWood ? 0.6 : 0.35,
     metalness: shelfWood ? 0.0 : 0.05,
   });
+  // A painted panel follows the Store Brand panel live; timber keeps its stain.
+  if (!shelfWood) {
+    onBrandChange(() => { sharedAisleSignSideMat.color.set(getActiveTheme().palette.primary); });
+  }
 
   const wireShelfMat = new THREE.MeshStandardMaterial({
     map: createWireMeshTexture(),

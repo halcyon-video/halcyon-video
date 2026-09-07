@@ -657,7 +657,16 @@ export function createFlushTopperLabelTexture(label: string, theme = getActiveTh
   const canvas = document.createElement('canvas');
   canvas.width = 512; // matches the half-section plaque's ~2.8:1 face aspect
   canvas.height = 192;
+  paintFlushTopperLabel(canvas, label, theme);
+  return toSignTexture(canvas);
+}
+
+/** The flush topper's face, paintable in place — shelving.ts registers it with brand-live so a Store Brand edit repaints the banner without a rebuild. */
+export function paintFlushTopperLabel(canvas: HTMLCanvasElement, label: string, theme = getActiveTheme()): void {
   const ctx = canvas.getContext('2d')!;
+  ctx.shadowColor = 'transparent';
+  ctx.shadowBlur = 0;
+  ctx.shadowOffsetY = 0;
 
   ctx.fillStyle = theme.palette.primary; // theme's existing sign background color
   ctx.fillRect(0, 0, 512, 192);
@@ -679,8 +688,6 @@ export function createFlushTopperLabelTexture(label: string, theme = getActiveTh
   ctx.shadowBlur = 6;
   ctx.shadowOffsetY = 3;
   ctx.fillText(text, 256, 96 + 8); // slight down-shift optically centers the display face
-
-  return toSignTexture(canvas);
 }
 
 // ── 2000-era "ACTION"-style arched genre plaque (bb-2000 theme) ─────────────

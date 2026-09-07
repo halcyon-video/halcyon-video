@@ -16,7 +16,7 @@ import {
   UNIT_DEPTH, UNIT_SIDE_CAPACITY, UNIT_FRAME_HEIGHT, unitDepthAtHeight,
 } from './store-layout';
 import { StorePlan } from './store-plan';
-import { createFlushTopperLabelTexture, createArchedTopperLabelTexture, BB2000_PLAQUE_RED } from './canvas-textures';
+import { createFlushTopperLabelTexture, paintFlushTopperLabel, createArchedTopperLabelTexture, BB2000_PLAQUE_RED } from './canvas-textures';
 import {
   createTicketBoardLabelMaterial, TICKET_BOARD_W, TICKET_BOARD_H, TICKET_BOARD_T,
 } from './fixtures/ticket-board-sign';
@@ -26,6 +26,7 @@ import { ENDCAP_CORE_HEIGHT } from './fixtures/genre-endcap';
 import { dressing93Active } from './genre-colors';
 
 import { getActiveTheme } from './themes';
+import { onBrandChange, registerBrandRepaint } from './brand-live';
 import { CASE_WIDTH, CASE_HEIGHT } from './video-case';
 import type { ClaspPlacement } from './fixtures/shelf-clasp';
 
@@ -228,13 +229,19 @@ export function buildAisleShelving(deps: AisleShelvingDeps): void {
   const getFlushLabelMat = (label: string): THREE.MeshStandardMaterial => {
     let mat = flushLabelMats.get(label);
     if (!mat) {
+      const map = archedTopper
+        ? createArchedTopperLabelTexture(label)
+        : createFlushTopperLabelTexture(label, theme);
       mat = new THREE.MeshStandardMaterial({
-        map: archedTopper
-          ? createArchedTopperLabelTexture(label)
-          : createFlushTopperLabelTexture(label, theme),
+        map,
         roughness: archedTopper ? 0.55 : 0.4,
         metalness: 0.05
       });
+      // The banner is the brand's primary: repaint in place on a Store Brand
+      // edit (brand-live.ts) instead of waiting for the drawer-close rebuild.
+      if (!archedTopper) {
+        registerBrandRepaint(map, () => paintFlushTopperLabel(map.image as HTMLCanvasElement, label));
+      }
       flushLabelMats.set(label, mat);
     }
     return mat;
@@ -246,6 +253,9 @@ export function buildAisleShelving(deps: AisleShelvingDeps): void {
     roughness: archedTopper ? 0.55 : 0.4,
     metalness: 0.05
   });
+  if (!archedTopper) {
+    onBrandChange(() => { flushSideMat.color.set(getActiveTheme().palette.primary); });
+  }
   // Plaque height (ft). The 2000 arched plaque is measured off the boxes it
   // sits over (footage/user: 0.6 of a box's height); 2010's banner runs a touch
   // shorter than HV's (the full 0.62 read too tall against that theme's

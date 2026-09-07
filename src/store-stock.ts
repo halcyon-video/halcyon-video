@@ -14,7 +14,7 @@ import { validateCaseFit, type CaseFitPair } from './layout-validator';
 import { retailAudio } from './audio';
 import { clearPosterPrefetch } from './poster-prefetch';
 import {
-  CASE_EULER_ORDER, sectionColSpan, SlotPos,
+  CASE_EULER_ORDER, SlotPos,
   tempPosition, tempRotation, tempQuaternion, tempScale, tempMatrix,
   AO_MASK_LAYER,
 } from './scene-shared';
@@ -288,13 +288,11 @@ export function buildAllMovieBoxes(scene: StoreScene) {
   const isBackWallMovieAnimated = (movie: Movie) =>
     CASE_MEDIUM === 'vhs' && movie.libraryName === 'Animated Movies';
   const backWallPlacements: { movie: Movie; slotPos: SlotPos }[] = [];
-  // Sections have variable width now (a double-feature spans 2 sections'
-  // worth of columns), so walk a running column cursor instead of secIdx*6.
-  let sectionStartCol = 0;
+  // Every section is pinned to its physical bay's column range (a double-
+  // feature to two whole adjacent bays of one run — store-nr-bays.ts), so a
+  // title never runs past a divider panel or around the corner.
   scene.nrSections.forEach((section) => {
-    const startCol = sectionStartCol;
-    const endCol = Math.min(scene.nrTotalCols - 1, sectionStartCol + sectionColSpan(section) - 1);
-    sectionStartCol += sectionColSpan(section);
+    const { startCol, endCol } = section;
 
     if ((section.type === 'super-feature' || section.type === 'double-feature') && section.movie) {
       // Feature: one movie fills every column and every row of its section

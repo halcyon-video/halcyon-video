@@ -5,7 +5,7 @@ import { loadGameFaceTexture, isTwoFlapSpine, jewelSpineComposite, uprightSpine 
 import { isJewelCasePlatform, JEWEL_FAT_DEPTH_IN } from './jewel-case';
 import { getReviewSnippetForMovie } from './review-snippets';
 import { getActiveTheme } from './themes';
-import { getActiveLogoSpec } from './logo-spec';
+import { getActiveLogoSpec, logoSpecCacheKey } from './logo-spec';
 import { buildCustomTemplateWrap, buildCustomTicketWrap, buildDvdBlueTemplateWrap, customWrapLabel, ensureWrapFontsLoaded } from './logo-wrap';
 import type { BrandPackWrapSpec } from './brand-pack';
 import { brandAssetUrl, brandString, getBrandPack } from './brand-pack';
@@ -779,6 +779,12 @@ const customDimsRentalGeometriesAnimated = new Map<string, THREE.BufferGeometry>
 // and there is nothing cached yet anyway.
 let caseMediumInitialized = false;
 
+// The brand the case art was last generated for. The procedural wraps, the
+// corner stickers and the spine prints all bake the LogoSpec into per-title
+// textures, and those survive a rebuild — so a Store Brand edit has to
+// invalidate them the same way a medium change does (see initCaseMedium).
+let caseBrandKey = '';
+
 export function initCaseMedium() {
   const prevMedium = CASE_MEDIUM;
   const prevArtMedium = effectiveArtMedium();
@@ -855,11 +861,16 @@ export function initCaseMedium() {
   // from the medium's box scan, letterbox-cropped poster fronts, and the
   // shared generic scan textures. Dispose/redraw them so the rebuild-scene
   // path regenerates for the new medium instead of showing stale art.
+  // A Store Brand edit changes the same pixels a cover-variant change does:
+  // the drawer-close rebuild would otherwise reuse per-title materials
+  // printed with the previous brand's wrap, stickers and spine.
+  const brandKey = logoSpecCacheKey(wrapLogoSpec());
   if (
     caseMediumInitialized &&
     (CASE_MEDIUM !== prevMedium ||
       effectiveArtMedium() !== prevArtMedium ||
-      activeCoverVariant(effectiveArtMedium()).url !== prevCoverUrl)
+      activeCoverVariant(effectiveArtMedium()).url !== prevCoverUrl ||
+      brandKey !== caseBrandKey)
   ) {
     disposeMediumScopedCaches();
     // The shared/global material singletons survive the swap with their
@@ -867,6 +878,7 @@ export function initCaseMedium() {
     // vs shell) for the new medium in place. See refreshCaseFinishes.
     refreshCaseFinishes();
   }
+  caseBrandKey = brandKey;
   caseMediumInitialized = true;
 }
 
