@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { installDisplayModel } from './display-model';
 import { Movie } from '../jellyfin';
 import { FixturePlacement, seededRandom01, FLOOR_FIXTURE_MAX_Z } from '../store-layout';
 import { FixtureContext, SlottedFixture, FixtureSlot } from '../fixtures';
@@ -65,6 +66,7 @@ export class BargainBin implements SlottedFixture {
   // False until build() actually puts a tub on the floor — see build()'s
   // no-stock bail and getFootprint().
   private built = false;
+  private disposeModel: (() => void) | null = null;
 
   constructor(placement: FixturePlacement, ctx: FixtureContext) {
     this.placement = placement;
@@ -120,6 +122,9 @@ export class BargainBin implements SlottedFixture {
     group.rotation.y = this.placement.yaw;
     this.group = group;
 
+    const furniture = new THREE.Group();
+    group.add(furniture);
+
     // ── Tub body: theme-primary molded plastic ──────────────────────────────
     // Same tapered square-tub trick as PreviouslyViewedBin (4-sided cylinder,
     // flats to the cardinal axes), OPEN-ENDED so the jumble inside shows.
@@ -141,7 +146,7 @@ export class BargainBin implements SlottedFixture {
     bin.position.y = height / 2;
     bin.castShadow = true;
     bin.receiveShadow = true;
-    group.add(bin);
+    furniture.add(bin);
 
     // Trim (theme secondary): a bumper rail proud of the top rim, a matching
     // kick band at the floor, and a chamfered lip closing the rim's raw top
@@ -163,7 +168,7 @@ export class BargainBin implements SlottedFixture {
     rim.position.y = height - rimH / 2;
     rim.castShadow = true;
     rim.receiveShadow = true;
-    group.add(rim);
+    furniture.add(rim);
 
     // Subtle top bevel: an inward chamfer ring sitting on the rail, so the
     // rim reads as a rounded plastic lip instead of a knife edge.
@@ -172,7 +177,7 @@ export class BargainBin implements SlottedFixture {
     this.disposables.push(lipGeo);
     const lip = new THREE.Mesh(lipGeo, trimMat);
     lip.position.y = height + 0.035;
-    group.add(lip);
+    furniture.add(lip);
 
     const kickH = 0.32;
     const kickGeo = new THREE.CylinderGeometry(wallRAt(kickH) + 0.04, botR + 0.04, kickH, 4, 1, true);
@@ -181,7 +186,7 @@ export class BargainBin implements SlottedFixture {
     const kick = new THREE.Mesh(kickGeo, trimMat);
     kick.position.y = kickH / 2;
     kick.receiveShadow = true;
-    group.add(kick);
+    furniture.add(kick);
 
     // False floor just under the jumble so sightlines between cases end on a
     // dark product bed, not the store carpet below.
@@ -191,7 +196,7 @@ export class BargainBin implements SlottedFixture {
     const bed = new THREE.Mesh(bedGeo, bedMat);
     bed.rotation.x = -Math.PI / 2;
     bed.position.y = height - 0.72;
-    group.add(bed);
+    furniture.add(bed);
 
     // "BARGAIN BIN" card on all four faces — the tubs are approached from
     // any direction on the open floor.
@@ -259,6 +264,9 @@ export class BargainBin implements SlottedFixture {
     this.ctx.addCollider(bin);
     this.ctx.requestShadowRefresh();
     this.built = true;
+    this.disposeModel = installDisplayModel(this.ctx, group, furniture, 'models/bargain-tub.glb',
+      { DisplayBody: mat, DisplayTrim: trimMat, DisplayBed: bedMat },
+      new THREE.Vector3(sideFt / 3, height / 2.7, sideFt / 3));
   }
 
   // The lowest-audience-score titles across all libraries. Slots duplicate
@@ -413,6 +421,9 @@ export class BargainBin implements SlottedFixture {
   }
 
   dispose(): void {
+    this.disposeModel?.();
+    this.disposeModel = null;
+    this.built = false;
     if (this.group) {
       this.ctx.scene.remove(this.group);
       this.group = null;

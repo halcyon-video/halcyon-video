@@ -53,3 +53,11 @@ original material grain, not downloaded imagery. See
 The expanded `shelf-components.glb` and corresponding Blender source/script are
 original Halcyon construction under this repository's license, including the
 laminate carcass profiles, end panels, steel standards and formed feet.
+
+The `genre-endcap-tapered.glb`, `genre-endcap-straight.glb`,
+`four-sided-merchandiser.glb` and `bargain-tub.glb` fixtures are original
+Halcyon Blender meshes under this repository's license. Each has an editable
+same-named `.blend` in `tools/models/`; `tools/models/display-fixtures.py`
+reproduces all four. No downloaded geometry, photographs, embedded textures
+or chain marks are included. See `docs/display-fixture-models.md` for the
+construction, stock anchors, named finish roles and measured resource costs.
