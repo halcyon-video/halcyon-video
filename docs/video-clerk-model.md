@@ -26,6 +26,15 @@ authoring; the source does not claim to be an animation-ready skinned rig.
 Every modeled surface has UVs for later painting. The runtime delivery format
 is PNG sprites, not a live animated 3D mesh.
 
+Forward working poses explicitly pronate both wrists: typing and low/middle
+stocking show palms down with the thumbs facing one another, rather than
+rotating the neutral palm-forward hands upward. A small wrist pitch keeps the
+fingers readable instead of presenting two flat palm ends to the camera. Cheek
+warmth and freckles follow the face surface rather than hovering in front of
+it. The bob uses a closer, flatter crown, two broad locks per side and subdued
+rough highlights instead of the former spherical shell plus eight glossy rope
+locks.
+
 ## Stable scene contract
 
 Blender units are feet, Z is up, and the character faces -Y. Her origin is at

@@ -35,8 +35,8 @@ def material(name, color, rough=.6, metallic=0):
     return m
 
 skin = material('Warm peach skin', (.64, .345, .205), .66)
-hair = material('Chestnut bob', (.065, .024, .012), .4)
-hair_light = material('Caramel hair ribbons', (.14, .059, .024), .43)
+hair = material('Chestnut bob', (.075, .031, .018), .62)
+hair_light = material('Soft chestnut highlights', (.105, .046, .025), .66)
 hair_dark = material('Hair part and lashes', (.024, .009, .006), .6)
 polo = material('Uniform - replaceable livery', (.7, .7, .7), .82)
 khaki = material('Sand cotton twill', (.39, .28, .16), .86)
@@ -48,6 +48,7 @@ iris = material('Hazel iris', (.19, .085, .025), .4)
 pupil = material('Pupil', (.009, .005, .003), .25)
 lip = material('Muted rose lips', (.36, .092, .071), .72)
 blush = material('Cheek warmth', (.63, .255, .175), .85)
+nail = material('Natural fingernails', (.76, .49, .36), .76)
 gold = material('Brass fastenings', (.48, .30, .075), .4, .65)
 belt = material('Brown leather belt', (.061, .027, .014), .65)
 case_mat = material('Midnight video case', (.021, .041, .047), .55)
@@ -186,9 +187,12 @@ for s in [-1,1]:
     line('Outer eyelash',[(s*.24,-.262,.25),(s*.282,-.238,.27)],.012,hair_dark,head)
     line('Expressive eyebrow',[(s*.064,-.248,.365),(s*.14,-.269,.392),
          (s*.22,-.252,.382),(s*.27,-.225,.35)],.021,hair,head)
-    ellipsoid('Soft cheek',(s*.258,-.234,.035),(.040,.008,.021),blush,head)
+    # Sit the warmth on the cheek surface.  The old centre was almost half an
+    # inch in front of the face, which made the mark detach in three-quarter
+    # and profile frames instead of reading as skin colour.
+    ellipsoid('Soft cheek',(s*.258,-.194,.035),(.040,.006,.021),blush,head)
     for k in range(3):
-        ellipsoid('Freckle',(s*(.211+k*.03),-.26+k*.009,.082+(k%2)*.015),(.006,.007,.005),hair_light,head,n=12,m=8)
+        ellipsoid('Freckle',(s*(.211+k*.03),-.218+k*.021,.082+(k%2)*.015),(.006,.005,.005),hair_light,head,n=12,m=8)
 # Soft bridge and a rounded nose tip with two restrained nostril marks.
 ellipsoid('Nose bridge',(0,-.276,.10),(.044,.050,.105),skin,head)
 ellipsoid('Nose tip',(0,-.319,.045),(.063,.045,.046),skin,head)
@@ -197,7 +201,10 @@ line('Friendly smile',[(-.116,-.241,-.116),(-.065,-.268,-.15),(0,-.28,-.159),(.0
 line('Lower lip',[(-.063,-.262,-.174),(0,-.273,-.184),(.063,-.262,-.174)],.012,lip,head)
 mouth_open=ellipsoid('Speaking mouth',(0,-.277,-.15),(.07,.015,.039),lip,head)
 
-# A bob built as a continuous cap with a shaped face opening and turned-under hem.
+# A bob built as a continuous cap with a shaped face opening and turned-under
+# hem.  Keep the crown close to the skull and slightly flatter at the rear: the
+# first pass used an almost spherical shell plus eight rope-like side locks,
+# which read as a glossy helmet at sprite scale.
 verts=[]; faces=[]; hn=64; hm=18
 for j in range(hm+1):
     t=j/hm
@@ -206,11 +213,11 @@ for j in range(hm+1):
         front=max(0,-math.sin(a))
         edge=2.48-1.25*(front**.40)
         theta=.003+t*edge
-        x=.43*math.sin(theta)*math.cos(a)
-        y=.045+.345*math.sin(theta)*math.sin(a)
-        z=.25+.50*math.cos(theta)
+        x=.405*math.sin(theta)*math.cos(a)
+        y=.035+.315*math.sin(theta)*math.sin(a)
+        z=.245+.475*math.cos(theta)
         # Bob length on the sides and rear; open face and nape remain shaped.
-        z-=.19*(t**5)*(1-front**.4)
+        z-=.17*(t**5)*(1-front**.4)
         verts.append((x,y,z))
 for j in range(hm):
     for k in range(hn):
@@ -218,17 +225,17 @@ for j in range(hm):
 cap=mesh('Sculpted bob cap',verts,faces,hair,head,2)
 solid=cap.modifiers.new('Hair volume','SOLIDIFY');solid.thickness=.04
 # Broad tapered locks follow the scalp and tuck under, with deliberate parting.
-for i in range(6):
+for i in range(4):
     shift=i*.054
     pts=[(.15+shift*.12,-.06,.717),(.07-shift*.30,-.235,.63),
          (-.08-shift*.55,-.324,.50),(-.23-shift*.37,-.30,.365),(-.315-shift*.12,-.23,.24)]
-    tube('Side swept fringe',pts,[(.024,.018),(.065,.03),(.073,.04),(.055,.032),(.008,.009)],hair if i%2 else hair_light,head,12)
+    tube('Side swept fringe',pts,[(.018,.014),(.046,.024),(.052,.030),(.038,.026),(.006,.007)],hair if i%3 else hair_light,head,12)
 for s in [-1,1]:
-    for i in range(4):
-        y=-.12+i*.10
-        tube('Bob side lock',[(s*.31,y,.56),(s*.42,y-.015,.35),(s*.447,y-.005,.05),
-             (s*.423,y+.012,-.235),(s*.345,y+.018,-.31)],
-             [(.024,.035),(.043,.055),(.045,.055),(.045,.05),(.012,.018)],hair if i%3 else hair_light,head)
+    for i in range(2):
+        y=-.13+i*.16
+        tube('Bob side lock',[(s*.30,y,.54),(s*.398,y-.012,.34),(s*.418,y,.06),
+             (s*.398,y+.014,-.20),(s*.335,y+.022,-.285)],
+             [(.018,.026),(.034,.044),(.037,.047),(.034,.042),(.009,.013)],hair if i else hair_light,head)
 line('Hair part',[(.13,.025,.742),(.16,-.085,.70),(.19,-.18,.62)],.009,hair_dark,head)
 
 # Named joint pivots make all poses editable. Each clothed limb is a single
@@ -253,6 +260,9 @@ for s in [-1,1]:
         x=(k-1.5)*.044
         tube('Relaxed finger',[(x,-.005,-.075),(x,-.02,-.16),(x,-.033,-.205+(abs(k-1.5))*.018)],
              [.031,.027,.018],skin,hand,10)
+        # Dorsal nail marks make palm orientation readable in the tiny atlas:
+        # hidden from a palm-forward idle, visible on top after pronation.
+        ellipsoid('Fingernail',(x,.030,-.174+(abs(k-1.5))*.010),(.018,.007,.026),nail,hand,n=12,m=8)
     tube('Thumb',[(s*.063,-.014,.045),(s*.12,-.02,-.018),(s*.119,-.05,-.085)],
          [.045,.036,.023],skin,hand)
     foot=empty(('Left' if s<0 else 'Right')+' shoe',(0,0,0),root)
@@ -298,7 +308,14 @@ def pose(anim='idle', f=0):
         rr=[.127,.13,.13,.126,.116,.108,.102,.102,.103,.099,.083,.067,.06]
         arm=limb_geometry('Continuous arm',arm_start,elbow,wrist,rr,skin);limbs.append(arm)
         hand.location=wrist
-        hand.rotation_euler.x=-(angle+bend)
+        wrist_pitch = .45 if anim == 'type' else (.20 if anim in ['stockMid','stockLow'] else 0)
+        hand.rotation_euler.x=-(angle+bend)+wrist_pitch
+        # The neutral hand is authored palm-forward with the thumb outside.
+        # When both forearms swing forward to type or shelve a low/mid case,
+        # pronate them: palms face down and the thumbs face one another.  The
+        # old pose merely tipped the neutral hand through 90 degrees, leaving
+        # both palms and thumbs visibly upside-down.
+        hand.rotation_euler.z=math.pi if anim in ['type','stockMid','stockLow'] else 0
         hip=Vector((s*.215,.018,2.49-crouch+bob))
         foot=next(o for side,o in feet if side==s)
         forward=stride*s
@@ -372,6 +389,7 @@ def render(path):
     bpy.ops.render.render(write_still=True)
 
 def save_source():
+    bpy.context.preferences.filepaths.save_version=0
     # Every surface gets a useful non-overlapping UV layout for later painting.
     for o in list(bpy.context.scene.objects):
         if o.type!='MESH':continue
@@ -400,6 +418,10 @@ if '--preview' in args:
     render(OUT/'preview-front.png')
     root.rotation_euler.z=math.pi/4
     render(OUT/'preview-quarter.png')
+elif '--preview-type' in args:
+    scene.render.resolution_x=512;scene.render.resolution_y=768;scene.cycles.samples=32
+    pose('type', 0)
+    render(OUT/'preview-type.png')
 elif '--render' in args:
     dirs=['front','frontSide','side','backSide','back']
     anims=[('idle',2),('walk',4),('stockHigh',2),('stockMid',2),('stockLow',2),('talk',2),('type',2)]
