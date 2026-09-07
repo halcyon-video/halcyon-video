@@ -5,6 +5,53 @@ All notable changes to Halcyon Video, generated from commit history by
 it on every version tag push. Deterministic and offline: no entry here was
 written by a model.
 
+## [v0.16.0] — 2026-09-07
+
+### Campaign signs
+- RENTING IS BETTER THAN EVER cards and MEMBERSHIP SERVICES oval, theme-inked, 2010 kit only
+
+### CHANGELOG
+- V0.15.0
+
+### Half-square counter
+- Stand the rental-policy frame on the band top
+- Move the tape-cleaner tray off the PLEASE REWIND tent
+
+### WIP
+- Hosted demo boot, cut the click-to-walkable wait (UNVERIFIED, do not merge as-is)
+
+### General
+- Model display fixtures with fitted Blender construction (Closes [#161](https://github.com/halcyon-video/halcyon-video/issues/161), [#164](https://github.com/halcyon-video/halcyon-video/issues/164), [#165](https://github.com/halcyon-video/halcyon-video/issues/165))
+- Restore the counter terminal model gate (Closes [#175](https://github.com/halcyon-video/halcyon-video/issues/175), [#176](https://github.com/halcyon-video/halcyon-video/issues/176))
+- Replace procedural floor palm and snake plant (Closes [#270](https://github.com/halcyon-video/halcyon-video/issues/270), [#271](https://github.com/halcyon-video/halcyon-video/issues/271))
+- Refine the clerk's hands, cheeks and bob
+- Keep brand previews beside the full-height option list
+- Keep store settings on the counter terminal
+- Store Brand colours drive shelves, case emblems and a new Carpet Colour option
+- Pin New Releases sections to the wall's physical bays
+- Author the counter terminal CRT and keyboard as molded, lit Blender models (Closes [#175](https://github.com/halcyon-video/halcyon-video/issues/175), [#176](https://github.com/halcyon-video/halcyon-video/issues/176))
+- Replace the procedural clerk with original Blender-rendered sprites
+- Boot escape docks the counter CRT instead of the old login form
+- Refine store branding and emblem editing for remote controls
+- Add an attract-mode auto-tour of the store for the hosted demo (Closes [#273](https://github.com/halcyon-video/halcyon-video/issues/273))
+- Model the countertop pothos and planter in Blender (Closes [#272](https://github.com/halcyon-video/halcyon-video/issues/272))
+- Fix(brand): support case-insensitive drop probing and fix logo override precedence
+- Bb-2000: flush front-soffit fascia, and new-release wall slots only where the format has that wall
+- Fix(brand): support case-insensitive drop probing and fix logo override precedence
+- Restore approved CRTs and white freestanding shelf backs
+- Remodel aisle carcasses and CRTs with lit store materials (Closes [#152](https://github.com/halcyon-video/halcyon-video/issues/152), [#153](https://github.com/halcyon-video/halcyon-video/issues/153), [#175](https://github.com/halcyon-video/halcyon-video/issues/175), [#207](https://github.com/halcyon-video/halcyon-video/issues/207), [#211](https://github.com/halcyon-video/halcyon-video/issues/211))
+- Model the tall ficus and planter in Blender (Closes [#269](https://github.com/halcyon-video/halcyon-video/issues/269))
+- Add potted plants to mom-and-pop stores
+- Walk mom-and-pop rows as one loop and keep each library on adjacent runs
+- Ci: register manual Discord image-announce workflow on default branch
+- Ci: add manual workflow to post a committed image to Discord
+- Docs(screenshots): add VCR + DVD deck hero for v0.15.0
+- Mitre the half-square counter's left-front corner so the stripe stops z-fighting
+- Stop the resolution scalers thrashing every render target
+- Move the membership snap frame off the tip jar's sightline
+- Give acrylic tent cards blank inner faces so the far leaf no longer shows mirrored print
+- Stop N8AO re-rendering every transparent object twice a frame
+
 ## [v0.15.0] — 2026-09-04
 
 ### CHANGELOG
