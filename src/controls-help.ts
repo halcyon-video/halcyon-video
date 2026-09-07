@@ -78,8 +78,8 @@ const HELP_SECTIONS: HelpSection[] = [
         hint: 'Back up to the store view, point at CHECKOUT, press OK.',
       },
       {
-        id: 'terminal', control: '◀ at the register', action: 'Manager terminal',
-        hint: 'The clerk’s CRT menu: settings, 2D mode, service, power.',
+        id: 'terminal', control: '◀ at the register', action: 'Store terminal',
+        hint: 'The clerk’s CRT menu: settings, streaming apps, date, power.',
       },
       {
         id: 'clerkcounter', control: '▲ at the register', action: 'Talk to the clerk',

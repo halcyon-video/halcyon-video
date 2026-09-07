@@ -705,8 +705,9 @@ html, body {
   letter-spacing: 0.12em;
   text-transform: uppercase;
   text-align: center;
-  min-height: 32px;
-  padding: 8px 14px 0;
+  min-height: 0;
+  padding: 4px 14px 0;
+  flex: 0 0 auto;
 }
 
 /* Small CRT panel (exit confirm, pickers, candy checkout): same tokens,
@@ -864,14 +865,40 @@ html, body {
   transition: opacity 0.3s ease;
 }
 
+/* Keep the existing form focusable for typing and assistive technology
+   while its text is rendered on the physical CRT. It owns no pointer hits. */
+#settings-drawer-overlay.terminal-settings,
+#settings-drawer-overlay.terminal-settings * {
+  opacity: 0;
+  pointer-events: none !important;
+  transition: none;
+}
+
+.settings-more-line:empty { display: none; }
+#settings-status, #btn-settings-close { flex: 0 0 auto; }
+
+/* The flat store has no desk to dock to. Its ordinary settings use a
+   compact form; the brand and emblem editors retain the full viewport. */
+#settings-drawer-overlay.compact-settings { background: rgba(0, 0, 0, 0.7); }
+.compact-settings .settings-card {
+  width: min(1060px, calc(100vw - 40px));
+  height: min(720px, calc(100vh - 80px));
+}
+.compact-settings .crt-body { width: calc(100% - 48px); }
+
 #settings-groups {
+  flex: 1 1 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 2px;
-  overflow: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-color: var(--crt-dim) var(--crt-black);
 }
 
 .settings-group {
+  flex: 0 0 auto;
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -889,6 +916,7 @@ html, body {
 }
 
 .settings-row {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   background: transparent;
@@ -1196,31 +1224,6 @@ html, body {
 .settings-row.selected .brand-range-value {
   color: var(--crt-ink);
   text-shadow: none;
-}
-
-/* W3 option thumbnails: a pre-grabbed snapshot of the row's CURRENT value
-   (public/setting-thumbs/<key>--<value>.png, built by
-   tools/gen_setting_thumbs.mjs). Sits between the label block and the value;
-   swapped in place as the value cycles. A missing PNG hides itself (the img's
-   error handler adds .thumb-missing), leaving the row exactly as before. */
-.settings-row-thumb {
-  flex: 0 0 auto;
-  width: 96px;
-  height: 54px;
-  object-fit: cover;
-  border-radius: 0;
-  border: 1px solid rgba(255, 204, 0, 0.35);
-  background: #000;
-  pointer-events: none;
-  margin-right: 12px;
-}
-
-.settings-row.selected .settings-row-thumb {
-  border-color: rgba(0, 10, 28, 0.65);
-}
-
-.settings-row-thumb.thumb-missing {
-  display: none;
 }
 
 /* W3 Custom Wrap block (Store Brand page): per-medium drop-in wrap uploads. */

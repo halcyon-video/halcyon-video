@@ -1232,7 +1232,7 @@ export class EntranceCheckout implements StoreFixture {
       'READY.',
       '',
       'PRESS / TO SEARCH CATALOG',
-      'AT COUNTER: LEFT = MANAGER MENU',
+      'AT COUNTER: LEFT = STORE TERMINAL',
       ...posterShortfallLines(textureArrayManager.shortfall, textureArrayManager.layerBudget),
       '',
       '>',

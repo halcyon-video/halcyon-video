@@ -117,8 +117,8 @@ import { VideoPlayer } from './video-player';
 import {
   registerCoreSettings,
   allSettings,
+  settingsInGroup,
   settingsInSubpage,
-  serviceSettings,
   visibleGroups,
   getSetting,
   setSetting,
@@ -130,8 +130,6 @@ import {
   activateBrandRow,
   BRAND_ROW_PREFIX,
   SETTINGS_SUBPAGE_PREFIX,
-  createSettingThumb,
-  refreshSettingThumb,
 } from './settings';
 import type { SettingDef, SettingGroup } from './settings';
 import {
@@ -139,10 +137,10 @@ import {
   EMBLEM_OPEN_ROW_KEY, isEmblemStudioOpen,
 } from './emblem-editor';
 import {
-  MEDIA_DATE_BUTTON_ID, STREAMING_BUTTON_ID,
   counterTerminalClose, counterTerminalInput, counterTerminalOpen, initCounterTerminalFlow,
 } from './counter-terminal-flow';
-import { PROJECT_PAGE_BUTTON_ID, PROJECT_PAGE_URL } from './counter-terminal';
+import { PROJECT_PAGE_BUTTON_ID, PROJECT_PAGE_URL, counterTerminalRows } from './counter-terminal';
+import { SettingsSurface } from './settings-surface';
 import { buildControlsHelpPanel, HELP_ROW_PREFIX } from './controls-help';
 import type { CandyRow } from './fixtures/period-fixtures';
 import { getCandyDeliveryAdapter } from './candy-delivery';
@@ -704,23 +702,8 @@ const powerButtons = isDemoMode
 // commands are idempotent no-ops when the display is already in that state.
 let cecDisplayAssumedOn = true;
 
-// The counter CRT carries extra rows the glass power menu doesn't:
-// MANAGER OVERRIDE, the diegetic (and only couch-reachable) entry into the
-// SERVICE MODE settings page (review §4.3), MEDIA RELEASE DATE (#42), the
-// catalog-pin sub-screen, and STREAMING SERVICES (#96), the re-entry into the
-// opening-day picker for a store that was already stocked when it shipped.
-// Inserted just above RETURN TO STORE so the safe exit stays last.
-//
-// This ring is now at the CRT's physical ceiling: 11 rows + 2 header lines is
-// 13, which drawTerminal seats only by tightening to its 1.0-leading floor
-// (fitTerminalPitch, #77). A 12th row does not fit and would be clipped with a
-// MORE marker — tests/counter-terminal.test.ts fails first, on purpose. A new
-// row from here on wants a sub-screen to live under, not a slot in this list.
-const COUNTER_TERMINAL_ALL_ROWS = (() => {
-  const ids = [...powerButtons];
-  ids.splice(ids.indexOf('btn-cancel'), 0, STREAMING_BUTTON_ID, MEDIA_DATE_BUTTON_ID, 'btn-service');
-  return ids;
-})();
+// Help lives in Store Settings; the terminal keeps only distinct actions.
+const COUNTER_TERMINAL_ALL_ROWS = counterTerminalRows(powerButtons);
 // The row list the CRT is actually drawing. counter-terminal-flow.ts holds this
 // array BY REFERENCE and re-reads it on every render, so rewriting its contents
 // in place is how the menu changes shape between openings.
@@ -942,7 +925,7 @@ function updateHUDForMode(mode: string) {
     case 'checkout':
       // The Left press is the manager terminal's front door — say so here,
       // standing at the very counter it lives on (UX pass 2026-08).
-      text = 'OK TO CHECK OUT  •  ◀ MANAGER TERMINAL  •  BACK TO BROWSE';
+      text = 'OK TO CHECK OUT  •  ◀ STORE TERMINAL  •  BACK TO BROWSE';
       break;
     case 'backroom':
       // T23: home with the rentals. Arrows pick a tape, OK reads/plays it,
@@ -1103,7 +1086,7 @@ function closePowerMenu() {
 // StoreScene.enterSearchMode) with the options rendered in amber phosphor.
 //
 // Rows are the SAME `powerButtons` ids the overlay uses (plus the CRT-only
-// MANAGER OVERRIDE and MEDIA RELEASE DATE rows — see counterTerminalButtons)
+// STREAMING SERVICES and MEDIA RELEASE DATE rows — see counterTerminalButtons)
 // and dispatch through the same executePowerMenuAction(), so the two views can
 // never drift out of sync. The controller itself (menu state + the #42 date
 // sub-screen) lives in counter-terminal-flow.ts; this is its one wiring point.
@@ -1112,6 +1095,7 @@ initCounterTerminalFlow({
   ui,
   buttons: counterTerminalButtons,
   execute: (btnId) => executePowerMenuAction(btnId),
+  openSettings: () => openSettingsDrawer(null, true),
   keyClick: () => retailAudio.playKeyClick(),
   log: (msg) => logToConsole(msg, 'system'),
   rebuild: () => rebuildStoreScene(),
@@ -1138,13 +1122,11 @@ const SETTINGS_GROUP_PREFIX = '__group__:';
 // one row per settings group, and one sub-page per group. Keeping each area
 // (store layout vs. game platforms vs. connection...) on its own page stops
 // the drawer from being a single overwhelming scroll of every setting.
-// 'Service' is the staff-only page listing every `hidden:true` registration —
-// it has no row on the index and is reached only through the counter CRT's
-// MANAGER OVERRIDE row (review §4.3). Groups can also nest one level of
-// sub-pages (settingsSubpage, e.g. Video Games → Platforms).
+// Groups can nest sub-pages, such as Video Games → Platforms.
 // 'Controls' is the Controls & Help reference page (src/controls-help.ts) —
 // inert rows, no registry entries, same nav machinery.
-let settingsPage: SettingGroup | 'Service' | 'Controls' | null = null;
+let settingsPage: SettingGroup | 'Controls' | null = null;
+const settingsSurface = new SettingsSurface();
 let settingsSubpage: string | null = null;
 
 /** One-line blurbs under each category row on the index page. */
@@ -1159,6 +1141,9 @@ const GROUP_HINTS: Record<SettingGroup, string> = {
 
 /** One-line blurbs under each sub-page's "›" row on its group page. */
 const SUBPAGE_HINTS: Record<string, string> = {
+  'Movie Cases': 'Media format, rental case art, and cover designs.',
+  'Color & Lighting': 'Color response, warmth, and film look.',
+  'Browsing & Rentals': 'Entrance view and rental behavior.',
   'Building & Storefront': 'Ceiling, corner step, walls, bulbs, storefront style.',
   'Platforms': 'Which consoles get a section on the Video Games shelf.',
   'Store Libraries': 'Which server libraries this store carries as aisles.',
@@ -1169,14 +1154,15 @@ const SUBPAGE_HINTS: Record<string, string> = {
 function generateSettingsDrawer() {
   const groupsEl = document.getElementById('settings-groups');
   if (!groupsEl) return;
+  settingsSurface.setPage(settingsPage);
   groupsEl.innerHTML = '';
+  groupsEl.scrollTop = 0;
   settingsRowKeys = [];
 
   const titleEl = document.querySelector('#settings-drawer-overlay .settings-title');
   if (titleEl) {
     titleEl.textContent =
-      settingsPage === 'Service' ? 'SERVICE MODE — STAFF ONLY'
-        : settingsPage === 'Controls' ? 'CONTROLS & HELP'
+      settingsPage === 'Controls' ? 'CONTROLS & HELP'
           : settingsSubpage ? settingsSubpage.toUpperCase()
             : settingsPage ? settingsPage.toUpperCase()
               : 'STORE SETTINGS';
@@ -1197,11 +1183,6 @@ function generateSettingsDrawer() {
       <span class="settings-row-leader" aria-hidden="true"></span>
       <span class="settings-row-value"${valueId ? ` id="${valueId}"` : ''}>${value}</span>
     `;
-    // W3 option thumbnails: rows for visual settings show a pre-grabbed
-    // snapshot of the CURRENT value beside the value label (lazy-loaded;
-    // missing PNG = the img hides itself). Swapped by refreshSettingThumb.
-    const thumbEl = createSettingThumb(key);
-    if (thumbEl) row.insertBefore(thumbEl, row.querySelector('.settings-row-value'));
     const rowIndex = settingsRowKeys.length;
     row.addEventListener('click', () => {
       setSettingsSelection(rowIndex);
@@ -1299,22 +1280,9 @@ function generateSettingsDrawer() {
       groupsEl.appendChild(accountGroupEl);
     }
 
-    // Advanced (UX pass 2026-08): SERVICE MODE used to be reachable only via
-    // the counter CRT's MANAGER OVERRIDE row — a door nothing on screen ever
-    // advertised. The CRT entry stays the diegetic path; this row is its
-    // findable twin on the couch tree.
-    const serviceGroupEl = document.createElement('div');
-    serviceGroupEl.className = 'settings-group';
-    const serviceTitleEl = document.createElement('div');
-    serviceTitleEl.className = 'settings-group-title';
-    serviceTitleEl.textContent = 'Advanced';
-    serviceGroupEl.appendChild(serviceTitleEl);
-    serviceGroupEl.appendChild(makeRow(
-      SETTINGS_GROUP_PREFIX + 'Service', 'Service Mode (Manager Override)',
-      'Staff overrides and diagnostics — also on the counter CRT.', '›'));
-    groupsEl.appendChild(serviceGroupEl);
+
   } else {
-    // One group's settings (or a sub-page / the service page), headed by a
+    // One group's settings (or a sub-page), headed by a
     // Back row.
     const groupEl = document.createElement('div');
     groupEl.className = 'settings-group';
@@ -1327,6 +1295,7 @@ function generateSettingsDrawer() {
       }
     };
     if (settingsPage === 'Store Brand') {
+      for (const def of settingsInGroup('Store Brand')) appendDefRow(def);
       // Custom LogoSpec editor page (live preview, presets, pickers/sliders) —
       // built by settings.ts; its rows join settingsRowKeys / the selection
       // flow here, and activateSetting() delegates back via activateBrandRow.
@@ -1358,11 +1327,6 @@ function generateSettingsDrawer() {
         },
         selectRow: (idx) => setSettingsSelection(idx),
       });
-    } else if (settingsPage === 'Service') {
-      // SERVICE MODE — STAFF ONLY: every `hidden:true` registration, exactly
-      // the knobs kept off the couch tree. Reachable via the counter CRT's
-      // MANAGER OVERRIDE row and the index's Advanced row.
-      for (const def of serviceSettings()) appendDefRow(def);
     } else if (settingsPage === 'Controls') {
       // Controls & Help: inert reference rows (src/controls-help.ts).
       buildControlsHelpPanel(groupEl, {
@@ -1402,157 +1366,14 @@ function generateSettingsDrawer() {
     // Property assignment (not addEventListener): the drawer regenerates on
     // every page change and the fixed close button must not stack listeners.
     const closeIndex = settingsRowKeys.length - 1;
-    closeBtn.dataset.hint = 'Save your choices and return to the store.';
+    closeBtn.dataset.hint = 'Apply your choices and return to the store.';
     closeBtn.onclick = () => closeSettingsDrawer();
     closeBtn.onpointerenter = () => setSettingsSelection(closeIndex);
-  }
-
-  // Fresh DOM, nothing paged out yet — measure and pack the pages now.
-  computeSettingsPagination();
-}
-
-// ─── Drawer CRT chrome: paging + footer bar (review §4.4) ────────────────────
-//
-// The CRT page never scrolls: rows pack into pages and the gold footer bar
-// carries "PAGE n/m" plus the SELECTED row's hint as one line. Purely
-// presentational — selection still wraps through every row in order (Up/Down),
-// and the visible page simply follows the selection.
-//
-// Pages are packed by MEASURED height (UX pass 2026-08), not a fixed row
-// count: the old 8-row pages clipped their last row behind the body's
-// overflow:hidden whenever section titles added height — options that were
-// simply invisible, with nothing saying so. Measurement happens once per
-// drawer build (computeSettingsPagination below), and the body carries an
-// explicit "▼ CONT'D — N MORE" line whenever options continue past the fold.
-
-let settingsCrtPage = 0;
-// Cached per drawer build: every .settings-group child → its page, the page
-// of each focusable row (by settingsRowKeys index), and the page count.
-let settingsItemPages = new Map<HTMLElement, number>();
-let settingsRowPages: number[] = [];
-let settingsPageCount = 1;
-
-function settingsRowEl(index: number): HTMLElement | null {
-  const key = settingsRowKeys[index];
-  if (key === undefined) return null;
-  return document.getElementById(key === SETTINGS_CLOSE_KEY ? 'btn-settings-close' : `setting-row-${key}`);
-}
-
-/**
- * Pack the freshly-generated drawer DOM into pages by measured height. Runs
- * once per generateSettingsDrawer — the DOM is fresh (nothing crt-page-hidden
- * yet) so offsetHeight is real, and the overlay's closed state is only
- * visibility:hidden, which still lays out. Furniture (group titles, spec
- * paragraphs) attaches to the row BELOW it so headings never orphan onto the
- * end of a page; the Store Brand preview canvas is pinned on every page and
- * its height is simply subtracted from each page's budget.
- */
-function computeSettingsPagination() {
-  settingsItemPages = new Map();
-  settingsRowPages = [];
-  settingsPageCount = 1;
-  settingsCrtPage = 0;
-  const groupsEl = document.getElementById('settings-groups');
-  const bodyEl = document.querySelector<HTMLElement>('#settings-drawer-overlay .crt-body');
-  if (!groupsEl || !bodyEl) return;
-
-  const GAP = 2; // #settings-groups / .settings-group flex gap
-  // offsetHeight misses margins — and group titles carry a 14px top margin,
-  // which is exactly the kind of unmeasured height that used to clip rows.
-  const outerH = (el: HTMLElement | null): number => {
-    if (!el) return 0;
-    const s = getComputedStyle(el);
-    const m = (v: string) => (Number.isFinite(parseFloat(v)) ? parseFloat(v) : 0);
-    return el.offsetHeight + m(s.marginTop) + m(s.marginBottom);
-  };
-
-  const statusH = outerH(document.getElementById('settings-status'));
-  const closeH = outerH(document.getElementById('btn-settings-close'));
-  const moreH = outerH(document.getElementById('settings-more-line')) || 40;
-  const bodyStyle = getComputedStyle(bodyEl);
-  let avail = bodyEl.clientHeight
-    - parseFloat(bodyStyle.paddingTop) - parseFloat(bodyStyle.paddingBottom)
-    - statusH - closeH - moreH - 12; // small slack for the status line's gap
-
-  const items = Array.from(groupsEl.querySelectorAll<HTMLElement>('.settings-group > *'));
-  let page = 0;
-  let used = 0;
-  let pending: HTMLElement[] = []; // furniture waiting to join its row's page
-  let pendingH = 0;
-  for (const el of items) {
-    if (el.classList.contains('settings-brand-preview')) {
-      avail -= outerH(el) + GAP; // pinned: costs every page its height
-      continue;
-    }
-    const h = outerH(el) + GAP;
-    if (!el.classList.contains('settings-row')) {
-      pending.push(el);
-      pendingH += h;
-      continue;
-    }
-    if (used > 0 && used + pendingH + h > avail) {
-      page++;
-      used = 0;
-    }
-    for (const p of pending) settingsItemPages.set(p, page);
-    settingsItemPages.set(el, page);
-    used += pendingH + h;
-    pending = [];
-    pendingH = 0;
-  }
-  for (const p of pending) settingsItemPages.set(p, page); // trailing furniture
-  settingsPageCount = page + 1;
-
-  // Focusable-row index → page (the close button is pinned, not pageable).
-  for (let i = 0; i < settingsRowKeys.length - 1; i++) {
-    const el = settingsRowEl(i);
-    settingsRowPages.push((el && settingsItemPages.get(el)) ?? 0);
   }
 }
 
 function updateSettingsCrtChrome() {
-  const pages = settingsPageCount;
-  const pageable = settingsRowKeys.length - 1;
-  if (settingsIndex < pageable) settingsCrtPage = settingsRowPages[settingsIndex] ?? 0;
-  settingsCrtPage = Math.min(settingsCrtPage, pages - 1);
-  const groupsEl = document.getElementById('settings-groups');
-  if (groupsEl) {
-    for (const el of Array.from(groupsEl.querySelectorAll<HTMLElement>('.settings-group > *'))) {
-      if (el.classList.contains('settings-brand-preview')) continue; // pinned
-      const p = settingsItemPages.get(el);
-      el.classList.toggle('crt-page-hidden', p !== undefined && p !== settingsCrtPage);
-    }
-  }
-
-  const pageEl = document.getElementById('settings-footer-page');
-  if (pageEl) {
-    pageEl.textContent = pages > 1
-      ? `PAGE ${settingsCrtPage + 1}/${pages} ${settingsCrtPage > 0 ? '▲' : ''}${settingsCrtPage < pages - 1 ? '▼' : ''}`.trimEnd()
-      : '';
-  }
-
-  // The fold line: how many actual options (focusable rows) sit past the
-  // bottom of this page — the affordance the footer chip alone never was.
-  const moreEl = document.getElementById('settings-more-line');
-  if (moreEl) {
-    const below = settingsRowPages.filter((p) => p > settingsCrtPage).length;
-    const above = settingsRowPages.filter((p) => p < settingsCrtPage).length;
-    moreEl.textContent =
-      below > 0 ? `▼ CONT'D — ${below} MORE OPTION${below === 1 ? '' : 'S'} BELOW`
-        : above > 0 ? `▲ ${above} MORE OPTION${above === 1 ? '' : 'S'} ABOVE`
-          : '';
-  }
-
-  const hintEl = document.getElementById('settings-footer-hint');
-  if (hintEl) {
-    const row = settingsRowEl(settingsIndex);
-    // makeRow/makeTextRow put hints on dataset; the Store Brand rows built in
-    // settings.ts still embed a (CSS-hidden) .settings-row-hint span instead.
-    const hint = (row?.dataset.hint || row?.querySelector('.settings-row-hint')?.textContent || '').trim();
-    // No fixed char cap: .crt-footer-hint's own ellipsis clips to the REAL
-    // width beside the page chip, which a flat count guessed wrong both ways (#136).
-    hintEl.textContent = hint || 'UP/DOWN SELECT • LEFT/RIGHT CHANGE • BACK RETURNS';
-  }
+  settingsSurface.update(settingsRowKeys, settingsIndex);
 }
 
 /** Refresh every row's displayed value from the registry / live scene state. */
@@ -1562,20 +1383,16 @@ function refreshSettingsValues() {
   if (storeScene) {
     setSetting('bb_outside', storeScene.getOutsideMode());
   }
-  // No hidden-flag skip here: hidden defs render on the SERVICE MODE page,
-  // and rows that aren't on the current page simply have no element to update.
+  // Rows outside the current page have no element to update.
   for (const def of allSettings()) {
     const el = document.getElementById(`setting-value-${def.key}`);
     if (el) el.textContent = currentValueLabel(def.key);
-    refreshSettingThumb(def.key);
   }
 }
 
 function setSettingsSelection(index: number) {
   settingsIndex = index;
-  // Flip to the page holding the selection FIRST (focus() below is a no-op on
-  // a row that's still display:none on a paged-out page), then refresh the
-  // footer-bar hint for the newly selected row.
+  // Show the selected option on the active surface before moving focus.
   updateSettingsCrtChrome();
   settingsRowKeys.forEach((key, idx) => {
     const id = key === SETTINGS_CLOSE_KEY ? 'btn-settings-close' : `setting-row-${key}`;
@@ -1611,8 +1428,7 @@ function activateSetting(key: string, dir: number) {
     settingsPage = null;
     generateSettingsDrawer();
     refreshSettingsValues();
-    // Land back on the category row we came from (Service has no index row —
-    // indexOf misses and the selection safely lands on the first row).
+    // Return to the category row we came from.
     const idx = settingsRowKeys.indexOf(SETTINGS_GROUP_PREFIX + fromPage);
     setSettingsSelection(Math.max(0, idx));
     return;
@@ -1639,11 +1455,11 @@ function activateSetting(key: string, dir: number) {
     return;
   }
   if (key === SWITCH_MEMBER_KEY) {
-    closeSettingsDrawer();
+    closeSettingsDrawer(false);
     switchMember();
     return;
   }
-  if (key === FORGET_SERVER_KEY) { if (activateForgetServer()) closeSettingsDrawer(); return; }
+  if (key === FORGET_SERVER_KEY) { if (activateForgetServer()) closeSettingsDrawer(false); return; }
   if (key.startsWith(BRAND_ROW_PREFIX)) {
     // Store Brand rows carry their own controls; settings.ts routes dir.
     activateBrandRow(key, dir);
@@ -1711,8 +1527,8 @@ function activateSetting(key: string, dir: number) {
   // Toggling the games master switch changes which rows exist on this page
   // (platform toggles and Romm fields are gated on it via visibleWhen), so
   // rebuild the page in place to reveal/hide them immediately. GAMES ONLY does
-  // the same to the Platforms sub-page, which it overrides.
-  if (key === 'bb_games_enabled' || key === 'bb_games_only') {
+  // the same to Platforms; rental mode reveals its short test timer.
+  if (key === 'bb_games_enabled' || key === 'bb_games_only' || key === 'bb_rental_mode') {
     generateSettingsDrawer();
     refreshSettingsValues();
     setSettingsSelection(Math.max(0, settingsRowKeys.indexOf(key)));
@@ -1732,8 +1548,8 @@ function activateSetting(key: string, dir: number) {
 
   const el = document.getElementById(`setting-value-${key}`);
   if (el) el.textContent = currentValueLabel(key);
-  refreshSettingThumb(key); // swap the option thumbnail to the new value
   updateSettingsStatus();
+  updateSettingsCrtChrome();
   logToConsole(`[Settings] ${def.label}: ${currentValueLabel(key)}`, 'system');
 }
 
@@ -1763,6 +1579,7 @@ function commitTextSetting(key: string, raw: string) {
   if (key === 'jellyfin_url' || key === 'jellyfin_username') settingsPendingAuthReset = true;
   if (def.applyMode === 'reload') settingsPendingReload = true;
   updateSettingsStatus();
+  updateSettingsCrtChrome();
   logToConsole(`[Settings] ${def.label} updated.`, 'system');
 }
 
@@ -1775,7 +1592,7 @@ function updateSettingsStatus() {
   const status = document.getElementById('settings-status');
   if (!status) return;
   if (settingsPendingReload) {
-    status.textContent = 'Connection changed — the app will restart when you close this menu.';
+    status.textContent = 'Changes saved — the app will restart when you close this menu.';
   } else if (settingsPendingRebuild) {
     status.textContent = 'Store look will update when you close this menu.';
   } else {
@@ -1785,12 +1602,8 @@ function updateSettingsStatus() {
 
 let elementBeforeSettingsOpened: HTMLElement | null = null;
 
-/**
- * Open the drawer, by default on the category index page. `page` opens
- * straight onto a specific page instead — the counter CRT's MANAGER OVERRIDE
- * row passes 'Service' (the staff page has no index row to navigate from).
- */
-function openSettingsDrawer(page: SettingGroup | 'Service' | 'Controls' | null = null) {
+/** Open ordinary settings on the desk CRT; visual editors use the full screen. */
+function openSettingsDrawer(page: SettingGroup | 'Controls' | null = null, fromTerminal = false) {
   if (ui.isPowerMenuOpen) closePowerMenu();
 
   if (getSetting<string>('bb_render_mode') === 'flat') {
@@ -1800,6 +1613,7 @@ function openSettingsDrawer(page: SettingGroup | 'Service' | 'Controls' | null =
     }
   }
 
+  settingsSurface.open(getSetting<string>('bb_render_mode') === 'flat' ? null : storeScene, fromTerminal);
   ui.isSettingsDrawerOpen = true;
   settingsPendingRebuild = false;
   settingsPendingReload = false;
@@ -1814,17 +1628,17 @@ function openSettingsDrawer(page: SettingGroup | 'Service' | 'Controls' | null =
   document.getElementById('settings-drawer-overlay')!.classList.add('visible');
   // Opening straight onto a page: row 0 is Back, land on the first setting.
   setSettingsSelection(page !== null && settingsRowKeys.length > 2 ? 1 : 0);
-  logToConsole(page === 'Service'
-    ? '[Settings] MANAGER OVERRIDE — service mode open.'
-    : '[Settings] Opened store settings.', 'system');
+  logToConsole('[Settings] Opened store settings.', 'system');
 }
 
-function closeSettingsDrawer() {
+function closeSettingsDrawer(returnToTerminal = true) {
   ui.isSettingsDrawerOpen = false;
   // Clearing the flag FIRST is what stops the studio's onClose from rebuilding
   // a drawer that is on its way out.
   if (isEmblemStudioOpen()) closeEmblemStudio();
   document.getElementById('settings-drawer-overlay')!.classList.remove('visible');
+  const resumeTerminal = settingsSurface.close() && returnToTerminal && !settingsPendingRebuild && !settingsPendingReload;
+  if (resumeTerminal) counterTerminalOpen();
   logToConsole('[Settings] Closed store settings.', 'system');
 
   if (getSetting<string>('bb_render_mode') === 'flat' && elementBeforeSettingsOpened) {
@@ -1839,7 +1653,7 @@ function closeSettingsDrawer() {
     settingsPendingReload = false;
     settingsPendingRebuild = false;
     settingsPendingGameRefetch = false;
-    logToConsole('[Settings] Restarting to apply connection changes...', 'system');
+    logToConsole('[Settings] Restarting to apply settings...', 'system');
     showBootOverlay();
     void finishConnectionEditsAndReload();
     return;
@@ -3084,12 +2898,6 @@ async function executePowerMenuAction(btnId: string) {
   switch (btnId) {
     case 'btn-settings':
       openSettingsDrawer();
-      return;
-
-    case 'btn-service':
-      // MANAGER OVERRIDE: straight onto the staff-only SERVICE MODE page —
-      // the hidden developer/service knobs.
-      openSettingsDrawer('Service');
       return;
 
     case 'btn-controls':

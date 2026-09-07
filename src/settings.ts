@@ -96,12 +96,7 @@ export interface SettingDef<T = unknown> {
    * era-follow so the pick can actually stick).
    */
   onChange?: (value: unknown) => string | void;
-  /**
-   * Service/developer knob: registered so the registry documents the key and
-   * live-apply still works, but never rendered on the couch-facing drawer
-   * pages. All hidden rows appear together on the SERVICE MODE page, entered
-   * via the counter CRT's MANAGER OVERRIDE row (review §4.3).
-   */
+  /** Internal compatibility key; not shown in the settings menu. */
   hidden?: boolean;
   /**
    * Couch sub-page this row lives on. Rows sharing a subpage collapse into a
@@ -158,15 +153,6 @@ export function subpagesInGroup(group: SettingGroup): string[] {
     if (!names.includes(d.subpage)) names.push(d.subpage);
   }
   return names;
-}
-
-/**
- * The SERVICE MODE roster: every `hidden:true` registration, in order. The
- * service page deliberately ignores both `hidden` and `visibleWhen` — staff
- * see every knob, gated or not.
- */
-export function serviceSettings(): SettingDef[] {
-  return allSettings().filter((d) => d.hidden);
 }
 
 /** Groups that currently have at least one visible setting, in a fixed order. */
@@ -252,81 +238,6 @@ export function resolveHint(def: SettingDef): string | undefined {
   return typeof def.hint === 'function' ? def.hint() : def.hint;
 }
 
-// ─── Option thumbnails (W3) ──────────────────────────────────────────────────
-//
-// Pre-grabbed PNG snapshots of every visually-distinct option value, generated
-// by tools/gen_setting_thumbs.mjs into public/setting-thumbs/<key>--<value>.png
-// and committed. Rows for the keys below show a small preview beside the value
-// that swaps as the value cycles. Anything without a PNG on disk (free-text,
-// the user's own uploaded wrap, a value added before its thumb was regenerated)
-// falls back gracefully: the <img> hides itself on load error.
-
-const THUMBED_SETTINGS = new Set([
-  'bb_theme',
-  'bb_medium',
-  'bb_case_art',
-  'bb_cover_vhs',
-  'bb_cover_dvd',
-  'bb_arrangement',
-  'bb_outside',
-  'bb_ceiling',
-  'bb_corner',
-  'bb_walldecor',
-  'bb_marquee_bulbs',
-  'bb_storefront',
-  'bb_render_mode',
-  'bb_quality',
-]);
-
-/** Thumb PNG url for a (key, value id) pair, or null if the key isn't thumbed. */
-export function settingThumbSrc(key: string, valueId: string): string | null {
-  if (!THUMBED_SETTINGS.has(key)) return null;
-  // Same base-URL resolution as assetUrl (inlined to keep this module's
-  // imports scene-free): works at '/' and under a subpath deploy.
-  return `${import.meta.env.BASE_URL}setting-thumbs/${encodeURIComponent(key)}--${encodeURIComponent(valueId)}.png`;
-}
-
-/** The value id a thumb filename uses for the CURRENT value (toggles → on/off). */
-function currentThumbValueId(key: string): string {
-  const def = registry.get(key);
-  if (def?.kind === 'toggle') return getSetting<boolean>(key) ? 'on' : 'off';
-  return String(getSetting(key));
-}
-
-/**
- * Build the preview <img> for a drawer row, already pointed at the current
- * value's thumb — or null when the setting has no thumbs at all (callers skip
- * the element entirely). Lazy-loaded so opening the drawer doesn't fetch
- * dozens of images; a missing PNG hides itself via the error handler.
- */
-export function createSettingThumb(key: string): HTMLImageElement | null {
-  const src = settingThumbSrc(key, currentThumbValueId(key));
-  if (!src) return null;
-  const img = document.createElement('img');
-  img.className = 'settings-row-thumb';
-  img.id = `setting-thumb-${key}`;
-  img.alt = '';
-  img.loading = 'lazy';
-  img.decoding = 'async';
-  img.draggable = false;
-  img.addEventListener('error', () => img.classList.add('thumb-missing'));
-  img.src = src;
-  return img;
-}
-
-/** Re-point a row's thumb at the (possibly new) current value. */
-export function refreshSettingThumb(key: string): void {
-  const img = document.getElementById(`setting-thumb-${key}`) as HTMLImageElement | null;
-  if (!img) return;
-  const src = settingThumbSrc(key, currentThumbValueId(key));
-  if (!src) return;
-  const abs = new URL(src, location.href).href;
-  if (img.src !== abs) {
-    img.classList.remove('thumb-missing'); // retry: the new value may have a PNG
-    img.src = src;
-  }
-}
-
 // ─── Core registrations ─────────────────────────────────────────────────────
 //
 // Every existing localStorage key the app already used, now declared in one
@@ -347,6 +258,7 @@ export function registerCoverVariantSettings(): void {
     if (variants.length < 2) continue;
     registerSetting({
       key: `bb_cover_${medium}`,
+      subpage: 'Movie Cases',
       label: `${medium.toUpperCase()} Rental Cover`,
       kind: 'cycle',
       group: 'Store Look',
@@ -364,7 +276,7 @@ export function registerCoverVariantSettings(): void {
 }
 
 /**
- * One line describing the brand pack's actual state — what the SERVICE MODE
+ * One line describing the brand pack's actual state — what the brand pack
  * row reports and what the Store Brand page's status row is built from.
  * "Asked for a pack and did not get one" is the case worth naming: a misspelt
  * directory renders exactly like no pack at all.
@@ -496,7 +408,7 @@ export function registerCoreSettings(): void {
   // evaluation — see store-format.ts's header); this row DRIVES it via
   // onChange, and a small reconciliation at the bottom of registerCoreSettings
   // keeps the two keys in lockstep for stores that set either one by hand
-  // (harness --set, old installs, the service-mode row).
+  // (harness --set, old installs).
   registerSetting({
     key: 'bb_theme',
     label: 'Store Theme',
@@ -531,11 +443,7 @@ export function registerCoreSettings(): void {
   });
 
   // Store Brand -------------------------------------------------------------
-  // The group's couch page is the logo editor (buildStoreBrandPanel), which
-  // renders INSTEAD of this group's registry rows — so this registration shows
-  // up on the SERVICE MODE page, which is the right home for it anyway: it
-  // takes a typed directory name and it changes the whole store's identity.
-  // The editor page carries a read-only status row mirroring it.
+  // Brand pack selection lives with the logo editor and its preview.
   registerSetting({
     key: 'bb_brand_pack',
     label: 'Brand Pack',
@@ -546,11 +454,10 @@ export function registerCoreSettings(): void {
     // store builds (src/brand-pack.ts) — a rebuild would repaint textures
     // around a pack that was never loaded.
     applyMode: 'reload',
-    // Live getter, not a fixed string: this row's hint IS the service-mode
+    // Live getter, not a fixed string: this row's hint IS the brand
     // diagnostic (the drawer's footer bar prints the selected row's hint), and
     // a pack that failed to load is otherwise indistinguishable from no pack.
     get hint() { return brandPackDiagnostic(); },
-    hidden: true,
   });
 
   // Studio-spotlight floor stands used to pick from a fixed curated list
@@ -576,6 +483,7 @@ export function registerCoreSettings(): void {
     label: 'Media Format',
     kind: 'cycle',
     group: 'Store Look',
+    subpage: 'Movie Cases',
     values: [
       { id: 'dvd', label: 'DVD' },
       { id: 'vhs', label: 'VHS' },
@@ -590,6 +498,7 @@ export function registerCoreSettings(): void {
     label: 'Rental Case Art',
     kind: 'cycle',
     group: 'Store Look',
+    subpage: 'Movie Cases',
     values: [
       { id: 'auto', label: 'Auto' },
       { id: 'vhs', label: 'VHS Box' },
@@ -602,7 +511,6 @@ export function registerCoreSettings(): void {
     // video-case.ts), so only a full reinit picks up a forced art change.
     applyMode: 'reload',
     hint: 'Force the VHS/DVD rental box design. Auto follows format.',
-    hidden: true, // service knob: dev override, Auto already follows Media Format
   });
 
   // Swappable rental-cover scans (COVER_VARIANTS in video-case.ts), one
@@ -612,13 +520,11 @@ export function registerCoreSettings(): void {
   // and its row lights up here with no further wiring).
   registerCoverVariantSettings();
 
-  // The store FORMAT comes first on the Store Look page: it decides the shape of
-  // the room, and several rows below it (Shelf Arrangement, Corner Step) are
-  // things a given format may not offer at all. See store-format-setting.ts.
+  // Keep the legacy format key registered; Store Theme is its only UI.
   registerStoreFormatSetting();
   // Reconcile bb_theme and bb_store_format at boot (see the Store Theme row's
   // header comment): either key can be set alone by hand (harness --set, an
-  // install predating the merged row, the service-mode format row) — whenever
+  // install predating the merged row, legacy format preferences) — whenever
   // ONE of them says mom-and-pop, both do. Runs after the row registrations so
   // the drawer renders the reconciled truth on first open. The page already
   // BUILT from the pre-reconcile bb_store_format, which is unchanged for every
@@ -656,7 +562,7 @@ export function registerCoreSettings(): void {
   }
   registerSetting({
     key: 'bb_outside',
-    label: 'Environment',
+    label: 'Time of Day',
     kind: 'cycle',
     group: 'Store Look',
     values: [
@@ -760,6 +666,7 @@ export function registerCoreSettings(): void {
     label: 'Marquee Animation',
     kind: 'cycle',
     group: 'Store Look',
+    subpage: 'Building & Storefront',
     values: [
       { id: 'off', label: 'Unlit' },
       { id: 'steady', label: 'Steady' },
@@ -769,7 +676,6 @@ export function registerCoreSettings(): void {
     applyMode: 'live',
     apply: (value, scene) => scene.setMarqueeAnimMode(value as 'off' | 'steady' | 'chase'),
     hint: 'Chase never wakes the idle renderer by itself.',
-    hidden: true, // service knob: render-scheduling behavior, not decor
   });
 
   registerSetting({
@@ -796,11 +702,11 @@ export function registerCoreSettings(): void {
     label: 'Start at entrance overview',
     kind: 'toggle',
     group: 'Store Look',
+    subpage: 'Browsing & Rentals',
     default: true,
     applyMode: 'live',
     apply: (value, scene) => scene.setOverviewStart(!!value),
     hint: 'Start inside the doors on the jump index. Off = cam view.',
-    hidden: true, // service knob: navigation-flow experiment (T21)
   });
 
   // The tip jar on the counter (src/fixtures/tip-jar.ts). ON by default and
@@ -840,6 +746,7 @@ export function registerCoreSettings(): void {
     label: 'Carry & checkout',
     kind: 'toggle',
     group: 'Store Look',
+    subpage: 'Browsing & Rentals',
     default: false,
     applyMode: 'live',
     apply: (value, scene) => scene.setCarryMode(!!value),
@@ -853,6 +760,7 @@ export function registerCoreSettings(): void {
     label: 'Rental mode (real lockout)',
     kind: 'toggle',
     group: 'Store Look',
+    subpage: 'Browsing & Rentals',
     default: false,
     applyMode: 'live',
     apply: (value, scene) => scene.setRentalMode(!!value),
@@ -870,10 +778,10 @@ export function registerCoreSettings(): void {
     label: 'Rental dev timer (5 min)',
     kind: 'toggle',
     group: 'Store Look',
+    subpage: 'Browsing & Rentals',
     default: false,
     applyMode: 'live',
     hint: '5-minute lockout for testing. Applies to the NEXT checkout.',
-    hidden: true, // service knob: dev timer for exercising the rental loop
     visibleWhen: () => getSetting<boolean>('bb_rental_mode'),
   });
 
@@ -919,6 +827,7 @@ export function registerCoreSettings(): void {
     label: 'Color Response',
     kind: 'cycle',
     group: 'Store Look',
+    subpage: 'Color & Lighting',
     values: [
       { id: 'neutral', label: 'True Color (PBR Neutral)' },
       { id: 'agx', label: 'Filmic (AgX)' },
@@ -926,7 +835,6 @@ export function registerCoreSettings(): void {
     default: 'neutral',
     applyMode: 'rebuild-scene',
     hint: 'True Color keeps art as printed; Filmic softens highlights.',
-    hidden: true, // service knob: tone-mapping engine choice
   });
 
   // Color warmth (store-grade.ts): a display-space white-balance lean toward
@@ -940,6 +848,7 @@ export function registerCoreSettings(): void {
     label: 'Color Warmth',
     kind: 'cycle',
     group: 'Store Look',
+    subpage: 'Color & Lighting',
     values: [
       { id: '0', label: 'Neutral' },
       { id: '0.18', label: 'Subtle' },
@@ -950,7 +859,6 @@ export function registerCoreSettings(): void {
     applyMode: 'live',
     apply: (value, scene) => scene.setGradeWarmth(parseFloat(String(value))),
     hint: 'Warm leans tungsten, like 90s film. Neutral is pure white.',
-    hidden: true, // service knob: grade-pass sweep parameter
   });
 
   // Optional nostalgia film LUT (store-grade.ts): a procedural 33³ 3D-LUT in
@@ -962,11 +870,11 @@ export function registerCoreSettings(): void {
     label: 'Film Look (LUT)',
     kind: 'toggle',
     group: 'Store Look',
+    subpage: 'Color & Lighting',
     default: false,
     applyMode: 'live',
     apply: (value, scene) => scene.setGradeLut(!!value),
     hint: 'Film-look grade: floated blacks, amber midtones. Free.',
-    hidden: true, // service knob: film-emulation LUT experiment
   });
 
   // Performance --------------------------------------------------------------
@@ -1190,7 +1098,6 @@ export function registerCoreSettings(): void {
     applyMode: 'live',
     apply: (value) => setRemotePlayEnabled(!!value),
     hint: 'Streams the store to any browser at /remote.html. Connecting queries a public STUN server.',
-    hidden: true, // service knob: dev/preview-server streaming feature
   });
 
   // Romm connection fields only make sense once the Video Games section itself
@@ -1448,7 +1355,7 @@ function logoSpecDiff(spec: LogoSpec, base: LogoSpec): Partial<LogoSpec> | null 
  * there was another branch in it.)
  */
 export function buildCustomSettingsPage(
-  page: SettingGroup | 'Service' | 'Controls' | null,
+  page: SettingGroup | 'Controls' | null,
   container: HTMLElement,
   hooks: BrandPanelHooks,
 ): page is 'Store Brand' | 'Controls' {
@@ -1829,18 +1736,10 @@ export function buildStoreBrandPanel(container: HTMLElement, hooks: BrandPanelHo
 
 // ─── Harness drawer preview (W3, tools/shot.mjs --state settings) ────────────
 //
-// harness.html has no app DOM, so the screenshot harness builds the drawer
-// shell itself and renders a group's rows through here — the same markup
-// main.ts's generateSettingsDrawer produces (label/hint/value + option thumb),
-// minus interactivity, so `--state settings --title "Store Look"` shows the
-// real thumbnail rows. `--title Service` renders the SERVICE MODE roster
-// (every hidden row) the same way. `"<group>/<subpage>"` renders a sub-page.
-// Returns how many rows carry a thumb (checkpoint gate).
-export function buildSettingsGroupPreview(container: HTMLElement, group: SettingGroup | 'Service' | `${SettingGroup}/${string}`): number {
-  let thumbed = 0;
-  const defs = group === 'Service'
-    ? serviceSettings()
-    : group.includes('/')
+// Render the ordinary text choices for the screenshot harness.
+// A group/subpage path selects the same rows used by the live settings menu.
+export function buildSettingsGroupPreview(container: HTMLElement, group: SettingGroup | `${SettingGroup}/${string}`): number {
+  const defs = group.includes('/')
       ? settingsInSubpage(group.split('/')[0] as SettingGroup, group.split('/')[1])
       : settingsInGroup(group as SettingGroup);
   for (const def of defs) {
@@ -1858,13 +1757,7 @@ export function buildSettingsGroupPreview(container: HTMLElement, group: Setting
       <span class="settings-row-leader" aria-hidden="true"></span>
       <span class="settings-row-value" id="setting-value-${def.key}">${currentValueLabel(def.key)}</span>
     `;
-    const thumb = createSettingThumb(def.key);
-    if (thumb) {
-      thumb.loading = 'eager'; // screenshots must not race lazy loading
-      row.insertBefore(thumb, row.querySelector('.settings-row-value'));
-      thumbed++;
-    }
     container.appendChild(row);
   }
-  return thumbed;
+  return 0;
 }
