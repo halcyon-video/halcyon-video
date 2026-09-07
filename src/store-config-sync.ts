@@ -116,6 +116,7 @@ export type HydrateOutcome =
   | { status: 'failed'; error: string };
 
 let hydrated = false;
+let syncGeneration = 0;
 
 /**
  * Whether this session has earned the right to WRITE to the server.
@@ -174,6 +175,7 @@ export async function hydrateStoreConfig(): Promise<HydrateOutcome> {
 /** Test/teardown seam: a log-out or member switch makes the next boot a fresh
  *  one, so the next store gets ITS user's configuration rather than skipping. */
 export function resetStoreConfigSync(): void {
+  syncGeneration++;
   hydrated = false;
   // Drops write permission with it, and cancels anything pending. Between one
   // member signing out and the next signing in, the localStorage on this
@@ -184,6 +186,7 @@ export function resetStoreConfigSync(): void {
     clearTimeout(pushTimer);
     pushTimer = null;
   }
+  pushInFlight = null;
 }
 
 // ─── Pushing changes back ────────────────────────────────────────────────────
@@ -200,7 +203,7 @@ let pushTimer: ReturnType<typeof setTimeout> | null = null;
 let pushInFlight: Promise<void> | null = null;
 let exitHookInstalled = false;
 
-async function pushNow(opts?: { keepalive?: boolean }): Promise<void> {
+async function performPush(opts?: { keepalive?: boolean }): Promise<void> {
   if (!pushAllowed) return;
   const host = configHost();
   if (!host || !host.provider.saveUserConfig) return;
@@ -213,6 +216,22 @@ async function pushNow(opts?: { keepalive?: boolean }): Promise<void> {
   // console of a document that no longer exists.
   const work = host.provider.saveUserConfig(host.server, host.session, snapshot);
   await (opts?.keepalive ? work.catch(() => {}) : withTimeout(work, NETWORK_TIMEOUT_MS, 'Store config save'));
+}
+
+async function pushNow(opts?: { keepalive?: boolean }): Promise<void> {
+  const previousPush = pushInFlight;
+  const generation = syncGeneration;
+  let currentPush: Promise<void>;
+  currentPush = (async () => {
+    if (previousPush) {
+      await previousPush.catch(() => {});
+    }
+    // A queued save belongs to the member who scheduled it, even if another
+    // member has already hydrated and earned write permission in the meantime.
+    if (generation === syncGeneration) await performPush(opts);
+  })();
+  pushInFlight = currentPush;
+  return currentPush;
 }
 
 /**
@@ -249,7 +268,7 @@ export function scheduleConfigPush(): void {
   if (pushTimer !== null) clearTimeout(pushTimer);
   pushTimer = setTimeout(() => {
     pushTimer = null;
-    pushInFlight = pushNow().catch((e) => {
+    void pushNow().catch((e) => {
       // Losing a save is recoverable — the next change pushes the whole
       // snapshot again, so one failed round trip costs nothing but this line.
       console.warn(`[Config] Could not save store settings to the server: ${e?.message ?? e}`);
@@ -272,5 +291,4 @@ export async function flushConfigPush(): Promise<void> {
   } catch (e: any) {
     console.warn(`[Config] Could not save store settings to the server: ${e?.message ?? e}`);
   }
-  await pushInFlight?.catch(() => {});
 }

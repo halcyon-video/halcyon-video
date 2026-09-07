@@ -145,6 +145,7 @@ import { buildControlsHelpPanel, HELP_ROW_PREFIX } from './controls-help';
 import type { CandyRow } from './fixtures/period-fixtures';
 import { getCandyDeliveryAdapter } from './candy-delivery';
 import { loadOperatorDefaults } from './operator-defaults';
+import { scheduleConfigPush, flushConfigPush } from './store-config-sync';
 import { isDemoMode } from './demo-mode';
 import { startScreensaverAnimation, stopScreensaverAnimation } from './screensaver';
 import { buildDemoDiscovery, makeSyntheticEpisodes, demoPoster } from './demo-library';
@@ -1301,6 +1302,7 @@ function generateSettingsDrawer() {
       // flow here, and activateSetting() delegates back via activateBrandRow.
       buildStoreBrandPanel(groupEl, {
         onDirty: () => {
+          scheduleConfigPush();
           settingsPendingRebuild = true;
           updateSettingsStatus();
         },
@@ -1673,6 +1675,7 @@ function closeSettingsDrawer(returnToTerminal = true) {
  * fall through to a plain reload.
  */
 async function finishConnectionEditsAndReload() {
+  await flushConfigPush();
   const password = settingsPendingJellyfinPassword;
   settingsPendingJellyfinPassword = null;
   const url = localStorage.getItem('jellyfin_url');
