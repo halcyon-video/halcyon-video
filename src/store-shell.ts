@@ -55,6 +55,7 @@ import { getSetting } from './settings';
 import { tryLoadUserAssetTexture, loadUserAssetSurface } from './user-assets';
 import { buildStorefrontFacade, WINDOW_HEAD_Y, SIDE_RIBBON_PANE_W } from './storefront-facade';
 import { buildShopfrontFacade } from './storefront-facade-shop';
+import { buildWindowAwnings, setWindowAwningLighting } from './storefront-awning';
 import { buildStorefrontLogo3D } from './logo-storefront';
 import { create3DDoubleLayeredSign, markSignMesh, auditSignMeshes } from './sign-builders';
 import { retailAudio } from './audio';
@@ -444,6 +445,12 @@ export function buildStore(scene: StoreScene) {
       });
   dimEnvOutside(facade.group);
   scene.scene.add(facade.group);
+  if (!isShopFacade && localStorage.getItem('bb_window_awnings') !== '0') {
+    const awnings = buildWindowAwnings(scene.fixtureContext(), extVestibuleGapHalf);
+    dimEnvOutside(awnings);
+    scene.scene.add(awnings);
+    setWindowAwningLighting(scene.scene, scene.outdoor.outsideMode);
+  }
 
   // Optional real photo-scanned facade masonry from the git-ignored user-assets
   // tree: brick (ambientCG Bricks051, CC0). Every material brickMaterial() cloned is now in

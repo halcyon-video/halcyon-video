@@ -1,0 +1,29 @@
+{
+  "units": "feet",
+  "run": 30,
+  "height": 3.3,
+  "projection": 3.25,
+  "meshes": [
+    {
+      "name": "AwningFabric",
+      "triangles": 452,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "AwningSoffit",
+      "triangles": 12,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "AwningBinding",
+      "triangles": 2064,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "AwningFrame",
+      "triangles": 504,
+      "nonManifoldEdges": 0
+    }
+  ],
+  "bytes": 174536
+}

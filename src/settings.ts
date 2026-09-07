@@ -695,6 +695,17 @@ export function registerCoreSettings(): void {
     subpage: 'Building & Storefront',
   });
 
+  registerSetting({
+    key: 'bb_window_awnings',
+    label: 'Window awnings',
+    kind: 'toggle',
+    group: 'Store Look',
+    subpage: 'Building & Storefront',
+    default: true,
+    applyMode: 'rebuild-scene',
+    hint: 'Rounded, illuminated canopies over the large store’s front windows.',
+  });
+
   // T21: entrance-overview browsing start. Live apply so toggling it off
   // returns the classic first-aisle start with no reload (and no rebuild).
   registerSetting({
