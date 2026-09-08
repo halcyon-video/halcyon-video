@@ -334,9 +334,11 @@ export function installAttractMode(s: StoreScene, isBlocked: () => boolean): voi
     length: attractTourLength,
   };
   if (poll) window.clearInterval(poll);
+  const installedAt = performance.now();
   poll = window.setInterval(() => {
     if (active || !scene || !enabled()) return;
-    const idleFor = performance.now() - getLastUserActivity();
+    const lastActivity = Math.max(installedAt, getLastUserActivity());
+    const idleFor = performance.now() - lastActivity;
     if (idleFor < (forced === true ? FORCED_IDLE_MS : ATTRACT_IDLE_MS)) return;
     if (document.visibilityState === 'hidden' || blocked()) return;
     startAttractTour();
