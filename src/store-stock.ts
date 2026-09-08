@@ -6,6 +6,7 @@
 // swap. Every function takes the StoreScene as its first parameter and
 // reads/writes scene state exactly as the original methods did.
 import * as THREE from 'three';
+import { isPublicDemo } from './demo-mode';
 import { Movie } from './jellyfin';
 import { buildGoldClamshellFillers, getGoldCaseMaterials, repaintGoldCase } from './fixtures/gold-clamshell';
 import { posterQueue, CASE_MEDIUM, CASE_HEIGHT, CASE_DEPTH, textureArrayManager, createClonedCaseGeometry, getGlobalFrontMaterials, getGlobalBackMaterials, updateGlobalMaterialsEnvMap, leftmostColorCache, posterPixelCache, reflectionProbes, isGlobalMaterial, lowResCache, createProgramWarmupMaterials, gameShapeKey, gameDimsForShape, gameCaseDims, gameRentalDims, rentalBottomLift, rentalBoxDepth, rentalBoxHeight, beginRebuildDrain, SERIES_DEPTH_MULT } from './video-case';
@@ -943,7 +944,9 @@ export function buildAllMovieBoxes(scene: StoreScene) {
   // reveal of aisles they aren't in. They still load (queued in the .then
   // below, same priority) and paint in as they land; they just don't hold the
   // door.
-  const gatedSlots = allSlots.filter(slot => !slot.movie.streaming);
+  // Public entry never waits on this promise. Include its real movie covers
+  // now so they consume the early prefetch rather than starting after reveal.
+  const gatedSlots = isPublicDemo ? allSlots : allSlots.filter(slot => !slot.movie.streaming);
   const total = gatedSlots.length;
   let loaded = 0;
   // Nothing is interactive while this preload runs (the boot overlay is up), so
@@ -952,7 +955,7 @@ export function buildAllMovieBoxes(scene: StoreScene) {
   // no-reload rebuild. It matters most at catalog scale: a 7k-title store
   // otherwise reveals a room of bare rental shells that paint in over tens of
   // seconds. Self-clearing when the queue empties.
-  beginRebuildDrain();
+  if (!isPublicDemo) beginRebuildDrain();
   scene.onTextureLoadProgress?.(0, total);
   // The runtime-program warm-up needs ONE decoded poster to build real hero
   // materials, not all of them: run it as soon as the first few covers have
@@ -980,7 +983,9 @@ export function buildAllMovieBoxes(scene: StoreScene) {
     // than at the tail of the gated set, because on a home connection the
     // gated tail and these were sharing one pipe — they paint in over the
     // first seconds instead of stretching the wait for aisles they aren't in.
-    for (const slot of allSlots) if (slot.movie.streaming) slot.loadShelfDetails(0);
+    if (!isPublicDemo) {
+      for (const slot of allSlots) if (slot.movie.streaming) slot.loadShelfDetails(0);
+    }
   });
 
   // T25 #26 (superseded): the per-rented-title gold filler group is gone —

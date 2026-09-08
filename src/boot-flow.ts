@@ -37,7 +37,7 @@ import {
 import { buildDemoLibraries, buildDemoGames } from './demo-library';
 import { getSetting } from './settings';
 import { operatorDefault, type OperatorServiceId } from './operator-defaults';
-import { isDemoMode } from './demo-mode';
+import { isDemoMode, useSyntheticDemoStock } from './demo-mode';
 import { fetchCatalogFromAllSources } from './catalog-sync';
 import { hydrateStoreConfig, resetStoreConfigSync } from './store-config-sync';
 import {
@@ -741,8 +741,8 @@ async function demoCatalogBaseCount(): Promise<number> {
 
 /**
  * Demo-mode boot (see src/demo-mode.ts): no credential gate, no Jellyfin
- * fetch, no login overlay ever — stock the store from the synthetic demo
- * library and hand off to the normal texture-gated reveal.
+ * fetch, no login overlay — the hosted root uses real streaming stock and an
+ * explicit ?demo=1 retains the synthetic library for development verification.
  */
 export async function startDemoAndLoad() {
   if (!deps) return;
@@ -754,6 +754,15 @@ export async function startDemoAndLoad() {
   // First visit defaults to daytime out the windows (the scene otherwise
   // rolls day/night 50/50 per boot); user-changeable in Store Look after.
   if (!localStorage.getItem('bb_outside')) localStorage.setItem('bb_outside', 'day');
+  if (!useSyntheticDemoStock) {
+    // Public first visit: the bundled streaming stock needs no credentials,
+    // and no synthetic movie/game artwork belongs on its critical path.
+    deps.setLibraries([]);
+    deps.setGames([]);
+    await deps.loadStreaming();
+    deps.launchStore();
+    return;
+  }
   // The games department is off by default (bb_games_enabled, main.ts fetchGames)
   // because it costs a RomM round-trip nobody asked for. The demo has no RomM and
   // no round trip — buildDemoGames() is synchronous and local — so that default

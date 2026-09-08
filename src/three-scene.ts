@@ -1,10 +1,13 @@
 import * as THREE from 'three';
+import { isPublicDemo } from './demo-mode';
+import { isTouchInputActive } from './store-touch';
 import { Movie, JellyfinLibrary, Episode } from './jellyfin';
 import { assetUrl } from './asset-url';
 import {
   clearVideoCaseCache,
   InstancedMovieGroup,
   setReflectionProbes,
+  updateGlobalMaterialsEnvMap,
   setUploadRenderer,
   setTextureStreamWake,
   setPosterLoadedNotify,
@@ -466,6 +469,12 @@ export class StoreScene {
       this.generateReflectionProbes();
       this.updateLOD();
       this.applyExteriorEnvClamp();
+      this.bootstrapEnvRT?.dispose();
+      this.bootstrapPmremGen?.dispose();
+      this.bootstrapRoomEnv?.dispose();
+      this.bootstrapEnvRT = null;
+      this.bootstrapPmremGen = null;
+      this.bootstrapRoomEnv = null;
     },
     onModeLighting: (mode) => this.applyModeLighting(mode),
   });
@@ -1437,6 +1446,13 @@ export class StoreScene {
     // (Floor plan already computed above, before the NR wall derivation.)
 
     this.initThree();
+    if (isPublicDemo) {
+      // A settings rebuild may preserve case caches from the outgoing scene.
+      // Until this room's deferred bake, use its live bootstrap environment
+      // instead of keeping references to the previous room's disposed probes.
+      setReflectionProbes([]);
+      updateGlobalMaterialsEnvMap(null);
+    }
     this.setupLighting();
     this.buildStore();
     this.installMirrorThrottle();
@@ -1451,18 +1467,23 @@ export class StoreScene {
     // First environment bake: the empty store shell (movie boxes don't exist yet).
     // This replaces the bootstrap RoomEnvironment with the real room, so the
     // reflection probes baked next capture correctly-lit shelving.
-    this.outdoor.bakeEnvironment();
+    // Public entry uses the existing inexpensive room environment until the
+    // visitor pauses. The full bounce/probe bake used to compile the whole
+    // room several times before the first interactive frame.
+    if (!isPublicDemo) this.outdoor.bakeEnvironment();
     // The bootstrap PMREM (scene.environment before the line above) is no longer
     // referenced by anything — dispose its render target, compiled blur shader,
     // and the synthetic RoomEnvironment scene now rather than leaking them for
     // the whole session (issue #121).
-    this.bootstrapEnvRT?.dispose();
-    this.bootstrapPmremGen?.dispose();
-    this.bootstrapRoomEnv?.dispose();
-    this.bootstrapEnvRT = null;
-    this.bootstrapPmremGen = null;
-    this.bootstrapRoomEnv = null;
-    this.generateReflectionProbes();
+    if (!isPublicDemo) {
+      this.bootstrapEnvRT?.dispose();
+      this.bootstrapPmremGen?.dispose();
+      this.bootstrapRoomEnv?.dispose();
+      this.bootstrapEnvRT = null;
+      this.bootstrapPmremGen = null;
+      this.bootstrapRoomEnv = null;
+      this.generateReflectionProbes();
+    }
     this.buildAllMovieBoxes();
     // #60: the poster layer shortfall (if any) is settled the instant
     // buildAllMovieBoxes() returns (textureArrayManager.init() computes it
@@ -1880,7 +1901,12 @@ export class StoreScene {
     // calibration and calibration-failure fallback.
     const explicitQuality = localStorage.getItem('bb_quality');
     const calibrated = !explicitQuality && !softwareGL ? readCalibratedQuality(gpuName) : null;
-    const effectiveQuality = explicitQuality || calibrated?.tier || (softwareGL ? 'low' : integratedGL ? 'medium' : 'high');
+    const phoneEntry = isPublicDemo && isTouchInputActive() && Math.min(width, height) < 700;
+    const automaticQuality = calibrated?.tier || (softwareGL ? 'low' : integratedGL ? 'medium' : 'high');
+    // A phone viewport can receive a desktop-GPU calibration (or an overly
+    // optimistic mobile result). Keep its first visit within the existing
+    // medium budget; an explicit quality choice remains authoritative.
+    const effectiveQuality = explicitQuality || (phoneEntry && automaticQuality === 'high' ? 'medium' : automaticQuality);
     this.effectiveQuality = effectiveQuality as 'high' | 'medium' | 'low';
     this.softwareGL = softwareGL;
     // Supersample grant: an AUTO-tiered 'high' only earns the above-native
@@ -2059,7 +2085,7 @@ export class StoreScene {
     // Tuned against the baked-room environment (see bakeEnvironment), which is
     // considerably dimmer than the synthetic RoomEnvironment this value was
     // originally set for (0.55): the real room needs more of its own bounce.
-    this.scene.environmentIntensity = 0.95;
+    this.scene.environmentIntensity = isPublicDemo ? 0.55 : 0.95;
 
     this.container.appendChild(this.renderer.domElement);
 
@@ -2515,7 +2541,7 @@ export class StoreScene {
     // before the cases are placed (see pendingStockedRebake).
     (window as any).debugForceStockedRebake = () => {
       this.pendingStockedRebake = false;
-      this.outdoor.rebakeEnvironment();
+      this.outdoor.rebakeEnvironment(true);
       this.requestRender();
       return true;
     };
@@ -5447,7 +5473,7 @@ export class StoreScene {
     // shopper pauses costs nothing and can never hitch an interaction.
     if (this.stockedRebakeDue(time)) {
       this.pendingStockedRebake = false;
-      this.outdoor.rebakeEnvironment();
+      this.outdoor.rebakeEnvironment(true);
     }
 
     // 2.5 Prebaked shadows: re-render the sun's shadow map only on frames where a
@@ -5857,6 +5883,12 @@ export class StoreScene {
   // Clean up WebGL resources
   public destroy(preservePosterCache = false) {
     this.isRendering = false;
+    this.bootstrapEnvRT?.dispose();
+    this.bootstrapPmremGen?.dispose();
+    this.bootstrapRoomEnv?.dispose();
+    this.bootstrapEnvRT = null;
+    this.bootstrapPmremGen = null;
+    this.bootstrapRoomEnv = null;
     window.removeEventListener('resize', this.onWindowResize);
 
     // Every live-brand subscriber holds a canvas or material belonging to THIS

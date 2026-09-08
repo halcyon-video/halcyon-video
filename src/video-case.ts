@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { isPublicDemo } from './demo-mode';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { Movie, Episode } from './jellyfin';
 import { loadGameFaceTexture, isTwoFlapSpine, jewelSpineComposite, uprightSpine } from './game-case-art';
@@ -134,10 +135,10 @@ export function prefetchCoverBytes(movies: Iterable<Movie>): number {
   for (const m of movies) {
     if (!m.posterUrl || posterPixelCache.has(m.id)) continue;
     titles++;
-    // Streaming-service art is third-party and does not gate the reveal
-    // (store-stock.ts loads it after) — fetching it early would only take
-    // bandwidth from the covers that do.
-    if (m.streaming) continue;
+    // In a public store these ARE the first shelves: start downloading their
+    // covers while the room builds. Local-library boots keep their own
+    // covers ahead of optional third-party streaming sections.
+    if (m.streaming && !isPublicDemo) continue;
     // Romm art needs the auth header + proxy dance fetchPosterBytes does; a
     // plain prefetch of it would only 401.
     if (rommConfig && rewriteLocalhost(m.posterUrl).startsWith(rommConfig.url)) continue;
@@ -147,7 +148,9 @@ export function prefetchCoverBytes(movies: Iterable<Movie>): number {
   // 42 across ~2,300) decodes each file once and copies (poster-prefetch.ts).
   const unique = new Set(urls).size;
   setSharedDecodeEnabled(titles >= 64 && unique * 2 < titles);
-  return prefetchPosterBytes(urls, rewriteLocalhost);
+  // Give the first shelf a head start without racing the entire public
+  // catalog against scene/worker startup on a phone connection.
+  return prefetchPosterBytes(isPublicDemo ? [...new Set(urls)].slice(0, 8) : urls, rewriteLocalhost);
 }
 
 /**

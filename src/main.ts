@@ -146,7 +146,7 @@ import type { CandyRow } from './fixtures/period-fixtures';
 import { getCandyDeliveryAdapter } from './candy-delivery';
 import { loadOperatorDefaults } from './operator-defaults';
 import { scheduleConfigPush, flushConfigPush } from './store-config-sync';
-import { isDemoMode } from './demo-mode';
+import { isDemoMode, isPublicDemo } from './demo-mode';
 import { startScreensaverAnimation, stopScreensaverAnimation } from './screensaver';
 import { buildDemoDiscovery, makeSyntheticEpisodes, demoPoster } from './demo-library';
 import { EMPTY_STAFF_PICKS, loadStaffPicks, StaffPicks } from './staff-picks-loader';
@@ -2497,8 +2497,8 @@ async function initializeStoreScene(preservePosterCache = false) {
     const jfUrl = localStorage.getItem('jellyfin_url') ?? '';
     const jfToken = localStorage.getItem('jellyfin_token') ?? '';
     // Built into a local `scene` first and only published to the module-level
-    // `storeScene` (and revealed to the user) once every cover has finished
-    // loading — see the texturesReadyPromise handoff below. Until then, the
+    // `storeScene` (and revealed to the user) after setup below. Local media
+    // waits for its covers; the public store reveals while they load. Until then, the
     // boot overlay stays up and `storeScene?.` call sites elsewhere are all
     // no-ops, so neither the view nor input can reach the half-dressed scene.
     // Watch-history staff picks (stickers + genre endcaps, see
@@ -2740,7 +2740,9 @@ async function initializeStoreScene(preservePosterCache = false) {
 
     logToConsole('[System] Loading store textures...', 'system');
 
-    scene.texturesReadyPromise.then(() => {
+    // The public store is usable as soon as its geometry and input exist.
+    // Cover loading continues through the same budgeted queue after entry.
+    (isPublicDemo ? Promise.resolve() : scene.texturesReadyPromise).then(() => {
       if (contextLossGaveUp) {
         // A boot-time context loss already exhausted its retries and put the
         // give-up message on screen (see installContextLossRecovery) — decode
@@ -2792,7 +2794,7 @@ async function initializeStoreScene(preservePosterCache = false) {
       updateBrowseHUDVisibility();
       aisleIndicatorInterval = window.setInterval(updateBrowseHUDVisibility, 200);
 
-      logToConsole('[System] All textures loaded. Store ready.', 'system');
+      logToConsole(isPublicDemo ? '[System] Store ready. Artwork continues loading.' : '[System] All textures loaded. Store ready.', 'system');
       initSharedPlace(scene, isSetupPending(), () => storeScene, () => ui.isLoginOpen || textEntryHasFocus(), showClerkToast);
       // Opening day (#41): dock the counter CRT's NEW STORE SETUP before the
       // overlay drops, so the player wakes already at the terminal.
@@ -4347,8 +4349,8 @@ async function main() {
     renderCandyCheckout();
   });
 
-  // A phone or a WebGL2-less browser can't drive the 3D store; offer 2.5D
-  // instead of letting the boot dead-end (see device-gate.ts). Awaited here,
+  // A WebGL2-less browser cannot render the 3D store; offer 2.5D instead of
+  // letting the boot dead-end. Capable phones enter directly. Awaited here,
   // before the boot call below, so the chosen mode is already settled and the
   // store builds it first time — no 3D scene raised only to be torn down.
   // Resolves immediately on hardware that's fine, which is every kiosk.
@@ -4407,4 +4409,3 @@ if (document.readyState === 'loading') {
   // an overlay that was previously only reachable through the "/" key.
   openSearch,
 };
-

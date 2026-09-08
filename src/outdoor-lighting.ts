@@ -679,9 +679,9 @@ export class OutdoorLightingRig {
 
   // Re-bake the environment after the outside mode (sky texture + sun/hemisphere
   // settings) changes, so window light and interior ambient stay coherent. No-op
-  // until the first constructor-time bake has run.
-  rebakeEnvironment() {
-    if (!this.envBakeReady) return;
+  // until the first bake, unless the deferred public-entry bake is requested.
+  rebakeEnvironment(allowFirstBake = false) {
+    if (!this.envBakeReady && !allowFirstBake) return;
     this.deps.getRenderer().shadowMap.needsUpdate = true;
     this.bakeEnvironment();
     // The per-library reflection probes (the env maps on the case materials) were
