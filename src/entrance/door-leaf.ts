@@ -18,3 +18,37 @@ export function createDoorLeafFrame(width: number, height: number): THREE.Extrud
   geometry.translate(0, 0, -.0575);
   return geometry;
 }
+
+/** A black horizontal push bar with shallow returns reaching the leaf stiles. */
+export function createDoorPushBarGeometry(width: number): THREE.ExtrudeGeometry {
+  const halfSpan = width / 2 - 0.15;
+  const stockThickness = 0.075;
+  const standoff = 0.16;
+  const barHeight = 0.14;
+
+  const shape = new THREE.Shape();
+  shape.moveTo(-halfSpan, 0);
+  shape.lineTo(-halfSpan, standoff);
+  shape.lineTo(halfSpan, standoff);
+  shape.lineTo(halfSpan, 0);
+  shape.lineTo(halfSpan - stockThickness, 0);
+  shape.lineTo(halfSpan - stockThickness, standoff - stockThickness);
+  shape.lineTo(-halfSpan + stockThickness, standoff - stockThickness);
+  shape.lineTo(-halfSpan + stockThickness, 0);
+  shape.closePath();
+
+  const geometry = new THREE.ExtrudeGeometry(shape, {
+    depth: barHeight,
+    bevelEnabled: true,
+    bevelThickness: 0.005,
+    bevelSize: 0.005,
+    bevelSegments: 1,
+    steps: 1,
+    curveSegments: 1,
+  });
+
+  geometry.translate(0, 0, -barHeight / 2);
+  // +Z faces away from the glazing; the return ends seat on the leaf at Z=0.
+  geometry.rotateX(Math.PI / 2);
+  return geometry;
+}
