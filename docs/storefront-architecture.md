@@ -32,11 +32,14 @@ The facade uses eight-inch stretchers in running bond, 2 2/3-inch courses,
 and 3/8-inch mortar joints. The entry header and pier caps/bases use upright
 soldier courses. Two-inch glazed squares form the blue bands: two across
 the entrance, higher short bands on the piers, and a continuous band around
-the wings. The entrance canopy projects 4.2 feet, supported by 2.75-foot-wide
-freestanding pillars. Their shafts leave two feet clear of the finished wall; the soldier plinths
+the wings. The entrance canopy projects 6.2 feet, supported by 2.75-foot-wide
+freestanding pillars. Their shafts leave four feet clear of the finished wall; the soldier plinths
 project 0.1 feet beyond each shaft face. Above the opening, continuous masonry
 returns join the pillars to the wall. Below it, only short jambs remain at the
-recessed door plane.
+recessed door plane, flush with the masonry door divider instead of projecting
+into the passage. The sidewalk extends 6.7 feet to support the pillar bases,
+with its curb and drive-lane apron following the same dimension. The parking
+stalls retain their positions.
 The pillar bases, tile bands, and soldier caps wrap all four faces. These
 adaptable dimensions are estimates, not surveyed measurements.
 Tile abuts brick directly, without a contrasting metal strip above it. A

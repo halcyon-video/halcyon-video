@@ -20,6 +20,7 @@ import { AmbientTvs } from './ambient-tvs';
 import { EntranceCheckout } from './entrance';
 import { buildWindowBays } from './entrance/windows';
 import { windowBayLayout } from './storefront-window-layout';
+import { facadeDimensions, facadeStyle } from './storefront-architecture';
 import { addGlassReflectionPane } from './glass-reflection';
 import { buildExteriorEnvironment, PARKING_STALLS, lotWidth } from './exterior-environment';
 import { NR_WALL_SHELF_DEPTH, NR_WALL_CLEARANCE, NR_LEFT_UNIT_STANDOFF, WALL_SHELF_HEIGHTS, BOX_SPACING, SECTION_COLS, UNIT_SECTIONS, seededRandom01, getStorefrontSpec, vestibuleHalfWidth, posterBayIndices, entranceOpeningHalfWidth, mapWallSegmentUV, STORE_CENTER_X, FRONT_GLASS_Z } from './store-layout';
@@ -504,7 +505,8 @@ export function buildStore(scene: StoreScene) {
   const FRONT_Z = FRONT_GLASS_Z; // matches the storefront glass line (frontZ in exterior-environment.ts)
   const STALL_W = PARKING_STALLS.stallWidth; // stall width (one texture tile across)
   const STALL_DEPTH = PARKING_STALLS.depth;  // single stall row at the far side of the lot
-  const LOT_APRON = 5.0;     // sidewalk + curb strip along the glass line
+  const sidewalkDepth = isShopFacade ? 4.7 : facadeDimensions(scene.ceilingY, extVestibuleGapHalf, facadeStyle()).sidewalkDepth;
+  const LOT_APRON = sidewalkDepth + .3; // sidewalk + curb strip along the glass line
   const LANE_DEPTH = PARKING_STALLS.rowFrontZ - FRONT_Z - LOT_APRON; // drive lane between the sidewalk and the stalls
   const LOT_D = LOT_APRON + LANE_DEPTH + STALL_DEPTH; // 47 ft beyond the glass
   // Odd multiple of STALL_W so stall boundaries land at x = centerX ± 4.5,
@@ -543,7 +545,7 @@ export function buildStore(scene: StoreScene) {
   // Also builds the GH #144 ground-blend ring (see exterior-environment.ts)
   // that fades the lot's exposed edges into whatever ground the current sky
   // pano shows there — recolored live via the listener below as panos load.
-  scene.exterior = buildExteriorEnvironment(scene.scene, storeWidth);
+  scene.exterior = buildExteriorEnvironment(scene.scene, storeWidth, sidewalkDepth);
   scene.exterior.setOutsideMode(scene.outdoor.outsideMode);
   scene.exterior.setGroundColor(scene.outdoor.getGroundColor());
   scene.outdoor.setGroundColorListener((color) => {

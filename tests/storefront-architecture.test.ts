@@ -23,7 +23,7 @@ test('tall rooms retain roof clearance without stretching the entrance opening',
       assert(d.parapetTop > height+.85, 'parapet conceals the structural roof');
       assert.equal(d.headerBottom, 9.15);
       assert(d.headerTop > d.headerBottom);
-      assert(d.frontProjection <= 4.2, 'portico remains on the established sidewalk');
+      assert(d.frontProjection <= d.sidewalkDepth-.5, 'sidewalk supports the full portico');
     }
   }
 });
@@ -39,8 +39,9 @@ test('flat and arcaded fronts do not inherit a hidden triangular roof', () => {
 
 test('gabled canopy pillars leave a clear passage behind their rear faces', () => {
   const d = facadeDimensions(13.5, 7.9, 'gabled-brick');
-  assert(d.pierBack-.75 >= 2, 'two feet clear of the finished wall');
+  assert(d.pierBack-.75 >= 4, 'four feet clear of the finished wall at shaft height');
+  assert(d.pierBack-.1-.75 >= 3.9, 'the projecting base preserves the wider passage');
   assert(d.pierFront > d.pierBack+1.5, 'pillars retain physical depth');
-  assert(d.pierFront < 4.7, 'the pillar base remains on the sidewalk');
+  assert(d.pierFront+.1 < d.sidewalkDepth, 'the pillar base remains on the sidewalk');
   assert(d.frontProjection >= d.pierBack && d.frontProjection <= d.pierFront);
 });

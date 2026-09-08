@@ -74,7 +74,7 @@ export function buildFacadeEntryModel(ctx: FixtureContext, p: EntryParams): THRE
         box(width+step, top-bottom, front-courseBack+step, sign*(m+width/2), (bottom+top)/2, (front+courseBack)/2, material);
       }
       box(width, 14.4-d.headerBottom, back-.1, sign*(m+width/2), (14.4+d.headerBottom)/2, (back+.1)/2, brick);
-      box(m-o, d.headerBottom, .65, sign*(m+o)/2, d.headerBottom/2, .425, brick);
+      box(m-o, d.headerBottom, .43, sign*(m+o)/2, d.headerBottom/2, .035, brick);
     } else {
       box(width, d.pierTop, front-back, sign*(m+width/2), d.pierTop/2, (front+back)/2, brick);
     }
