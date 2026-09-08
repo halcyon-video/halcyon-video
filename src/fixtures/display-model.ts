@@ -11,6 +11,7 @@ export function installDisplayModel(
   file: string,
   finishes: Record<string, THREE.Material>,
   scale = new THREE.Vector3(1, 1, 1),
+  prepare?: (model: THREE.Group) => void,
 ): () => void {
   fallback.name = 'display-fallback';
   let cancelled = false;
@@ -41,6 +42,7 @@ export function installDisplayModel(
     });
     replaced.forEach((m) => m.dispose());
     if (detached) { release(model); return; }
+    prepare?.(model);
     model.name = 'display-model';
     model.scale.copy(scale);
     parent.add(model);

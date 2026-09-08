@@ -56,6 +56,7 @@ import { tryLoadUserAssetTexture, loadUserAssetSurface } from './user-assets';
 import { buildStorefrontFacade, WINDOW_HEAD_Y, SIDE_RIBBON_PANE_W } from './storefront-facade';
 import { buildShopfrontFacade } from './storefront-facade-shop';
 import { buildWindowAwnings, setWindowAwningLighting } from './storefront-awning';
+import { setFacadeEntryLighting } from './storefront-entry-model';
 import { buildStorefrontLogo3D } from './logo-storefront';
 import { create3DDoubleLayeredSign, markSignMesh, auditSignMeshes } from './sign-builders';
 import { retailAudio } from './audio';
@@ -409,10 +410,8 @@ export function buildStore(scene: StoreScene) {
     scene.scene.add(veneer);
   });
 
-  // Photo-matched exterior facade: brick parapet
-  // fascia with the blue glazed-tile stripe band, capped corner piers, and
-  // the gabled entrance tower whose face carries the storefront logo below.
-  // Replaces the old curved awning + valance and the roofline corner piers.
+  // Exterior masonry and its fitted entrance, selected independently of
+  // the interior era, door style and store branding.
   // ACTUAL corner margin left solid by the whole-pane front glazing (>= the
   // FRONT_WINDOW_CORNER_MARGIN minimum — pane quantization widens it): the
   // exterior brick returns must fill exactly what the glass doesn't reach.
@@ -432,6 +431,7 @@ export function buildStore(scene: StoreScene) {
         frontCornerMargin: actualFrontCornerMargin,
       })
     : buildStorefrontFacade({
+        context: scene.fixtureContext(),
         storeWidth,
         backWallZ: scene.backWallZ,
         ceilingY: scene.ceilingY,
@@ -445,6 +445,7 @@ export function buildStore(scene: StoreScene) {
       });
   dimEnvOutside(facade.group);
   scene.scene.add(facade.group);
+  setFacadeEntryLighting(scene.scene, scene.outdoor.outsideMode);
   if (!isShopFacade && localStorage.getItem('bb_window_awnings') !== '0') {
     const awnings = buildWindowAwnings(scene.fixtureContext(), extVestibuleGapHalf);
     dimEnvOutside(awnings);
@@ -734,15 +735,10 @@ export function buildStore(scene: StoreScene) {
   // non-shadow-casting decoration, so without this the directional sun shone
   // straight through the "roof" and painted daylight across the whole floor —
   // interior sun patches must only come in through the storefront glass.
-  // The chain box hides its 2 ft eave behind a deep brick parapet. The little
-  // shop's false front (storefront-facade-shop.ts) is a thin stucco skin
-  // standing just 0.6 ft off the walls, so the same eave punched through it
-  // and hung over the door as a dark awning-like slab (owner hotfix
-  // 2026-08-23) — tuck the slab inside the parapet ring instead. 0.25 ft
-  // still laps every wall head, and the parapet skirts run floor-to-coping
-  // on all four sides, so nothing shows and no daylight leaks. (The sky-dome
-  // radius above keeps the fixed 2.0 ROOF_OVERHANG as a conservative bound.)
-  const roofOverhang = isShopFacade ? 0.25 : 2.0;
+  // Keep the structural roof inside the masonry skin on every format.
+  // A two-foot overhang protrudes through the thin parapet as a dark belt.
+  // The sky bound above remains conservatively larger than the real roof.
+  const roofOverhang = .25;
   const roofGeo = new THREE.BoxGeometry(storeWidth + 2 * roofOverhang, 0.5, floorCeilLen + 2 * roofOverhang);
   const roofMat = new THREE.MeshStandardMaterial({ color: 0x35383c, roughness: 0.95 });
   const roof = new THREE.Mesh(roofGeo, roofMat);

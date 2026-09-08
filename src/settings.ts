@@ -696,6 +696,22 @@ export function registerCoreSettings(): void {
   });
 
   registerSetting({
+    key: 'bb_facade',
+    label: 'Building facade',
+    kind: 'cycle',
+    group: 'Store Look',
+    subpage: 'Building & Storefront',
+    values: [
+      { id: 'gabled-brick', label: 'Gabled Brick' },
+      { id: 'flat-parapet', label: 'Flat Parapet' },
+      { id: 'arcaded-brick', label: 'Arcaded Brick' },
+    ],
+    default: 'gabled-brick',
+    applyMode: 'rebuild-scene',
+    hint: 'The large store’s exterior architecture, independent of its era and brand.',
+  });
+
+  registerSetting({
     key: 'bb_window_awnings',
     label: 'Window awnings',
     kind: 'toggle',
