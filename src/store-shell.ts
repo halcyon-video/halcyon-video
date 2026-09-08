@@ -19,6 +19,7 @@ import { SlottedFixture } from './fixtures';
 import { AmbientTvs } from './ambient-tvs';
 import { EntranceCheckout } from './entrance';
 import { buildWindowBays } from './entrance/windows';
+import { windowBayLayout } from './storefront-window-layout';
 import { addGlassReflectionPane } from './glass-reflection';
 import { buildExteriorEnvironment, PARKING_STALLS, lotWidth } from './exterior-environment';
 import { NR_WALL_SHELF_DEPTH, NR_WALL_CLEARANCE, NR_LEFT_UNIT_STANDOFF, WALL_SHELF_HEIGHTS, BOX_SPACING, SECTION_COLS, UNIT_SECTIONS, seededRandom01, getStorefrontSpec, vestibuleHalfWidth, posterBayIndices, entranceOpeningHalfWidth, mapWallSegmentUV, STORE_CENTER_X, FRONT_GLASS_Z } from './store-layout';
@@ -417,8 +418,8 @@ export function buildStore(scene: StoreScene) {
   // ACTUAL corner margin left solid by the whole-pane front glazing (>= the
   // FRONT_WINDOW_CORNER_MARGIN minimum — pane quantization widens it): the
   // exterior brick returns must fill exactly what the glass doesn't reach.
-  const frontGlazedSpan =
-    scene.storefrontSpec.windowBays.reduce((s, b) => s + b.width, 0) + 2 * extVestibuleGapHalf;
+  const exteriorWindowLayout = windowBayLayout(scene.storefrontSpec.windowBays, { center: 0, halfWidth: extVestibuleGapHalf });
+  const frontGlazedSpan = exteriorWindowLayout.width;
   const actualFrontCornerMargin = Math.max(0, (storeWidth - frontGlazedSpan) / 2);
   // GH #110: the format's own building, not a narrower copy of the chain's —
   // see StoreFormatSpec.facadeStyle and storefront-facade-shop.ts.
@@ -439,6 +440,7 @@ export function buildStore(scene: StoreScene) {
         ceilingY: scene.ceilingY,
         entryHalfWidth: extVestibuleGapHalf,
         entryOpeningHalfWidth: entranceOpeningHalfWidth(scene.storefrontSpec),
+        windowMasonryGaps: exteriorWindowLayout.gaps,
         brickMaterial,
         stripeColor: theme.palette.primary,
         trimColor: theme.palette.secondary,

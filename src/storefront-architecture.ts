@@ -29,7 +29,10 @@ export function facadeDimensions(ceilingY: number, entryHalfWidth: number, style
   const gableBase = parapetTop + .3;
   return {
     parapetTop, massHalf, gableBase,
-    frontProjection: style === 'gabled-brick' ? 1.4 : 2.4,
+    frontProjection: style === 'gabled-brick' ? 4.2 : 2.4,
+    // The pillars support the front canopy, with daylight behind them.
+    pierBack: style === 'gabled-brick' ? 2.75 : .1,
+    pierFront: style === 'gabled-brick' ? 4.48 : 2.4,
     gableHeight: style === 'gabled-brick' ? (entryHalfWidth - 1) * .87 : 0,
     pierWidth: style === 'gabled-brick' ? 2.75 : 2,
     pierTop: style === 'gabled-brick' ? gableBase + .8 : parapetTop + 1.8,

@@ -92,9 +92,9 @@ for style in ['gabled-brick','flat-parapet','arcaded-brick']:
     opening=6.75 if style=='gabled-brick' else 5.55
     pier_width=2.75 if style=='gabled-brick' else 2
     spring=17.1;peak=spring+6.003
-    # The opening is a notch in one connected masonry solid. No floating
-    # header, joined triangles or hidden overlapping boxes at the gable seam.
-    profile=[(-m,0),(-opening,0),(-opening,9.15),(opening,9.15),(opening,0),(m,0)]
+    # The gabled canopy is supported by freestanding front pillars. Nothing
+    # below the header joins those pillars back to the building wall.
+    profile=[(-m,9.15),(m,9.15)] if style=='gabled-brick' else [(-m,0),(-opening,0),(-opening,9.15),(opening,9.15),(opening,0),(m,0)]
     roof=[(m,spring),(m-1,spring),(0,peak),(-m+1,spring),(-m,spring)] if style=='gabled-brick' else [(m,18.6),(-m,18.6)]
     prism('Continuous masonry portal',profile+roof,.10,4.2,0)
     crown('Folded portal coping',list(reversed(roof)),.02,4.2)
@@ -102,12 +102,17 @@ for style in ['gabled-brick','flat-parapet','arcaded-brick']:
         x0,x1=sorted([s*m,s*(m+pier_width)])
         h=17.9 if style=='gabled-brick' else 18.6
         pier_front=4.48 if style=='gabled-brick' else 2.4
-        box('Stepped masonry pier',x0,x1,0,h,.10,pier_front,0)
-        crown('Pier cap',[(x0-.08,h),(x1+.08,h)],.02,pier_front)
+        pier_back=2.75 if style=='gabled-brick' else .10
+        crown('Pier cap',[(x0-.08,h),(x1+.08,h)],pier_back-.08,pier_front)
         if style=='gabled-brick':
-            box('Pier raised tile course',x0,x1,14.4,15.45,pier_front+.001,pier_front+.045,1)
-            for y0,y1 in [(0,2),(15.45,h)]:
-                box('Pier soldier courses',x0,x1,y0,y1,pier_front+.001,pier_front+.025,6)
+            # Fitted courses wrap all four faces, including the rear face
+            # visible from the passage. Separate courses meet without overlap.
+            for name,y0,y1,mat in [('base',0,2,6),('shaft',2,14.4,0),('tile',14.4,15.45,1),('cap',15.45,h,6)]:
+                box('Freestanding pier '+name,x0,x1,y0,y1,pier_back,pier_front,mat)
+            j0,j1=sorted([s*opening,s*m])
+            box('Rear entry jamb',j0,j1,0,9.15,.10,.75,0)
+        else:
+            box('Stepped masonry pier',x0,x1,0,h,pier_back,pier_front,0)
     box('Recessed entry soffit',-opening,opening,9.10,9.15,.10,4.16,4)
     if style=='gabled-brick':
         # The upper tile band on the entrance sits BELOW the wing stripe,
@@ -157,14 +162,6 @@ for style in ['gabled-brick','flat-parapet','arcaded-brick']:
             for a,b in zip(boundary,boundary[1:]+boundary[:1]):faces.append((a,b,b+layer_size,a+layer_size))
             mesh('Entry dome',verts,faces,5)
     objects=[o for o in bpy.context.scene.objects if o not in before]
-    if style=='gabled-brick':
-        # Shallow recessed storefront, not a walk-through portico. The
-        # door-plane masonry stays put; only the projecting portal contracts.
-        for obj in objects:
-            if any(label in obj.name for label in ['divider','Sidelight']):continue
-            for vertex in obj.data.vertices:
-                z=-vertex.co.y
-                vertex.co.y=-(z*(1.4/4.2) if z<=4.2 else z-2.8)
     if style!='gabled-brick':
         # A shallower portal lets the dome cover the existing sidewalk instead
         # of projecting several feet out over the parking stalls.

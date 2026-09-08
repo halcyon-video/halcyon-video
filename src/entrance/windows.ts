@@ -16,6 +16,7 @@ import { StorefrontSpec, mapWallSegmentUV } from '../store-layout';
 import { getActiveTheme, themeKneeGoldHex } from '../themes';
 import { createGlassSurfaceNormalMap, useCheapMaterials } from '../canvas-textures';
 import { addGlassReflectionPane } from '../glass-reflection';
+import { windowBayLayout } from '../storefront-window-layout';
 
 export interface WindowBaysResult {
   group: THREE.Group;
@@ -44,24 +45,7 @@ export function buildWindowBays(
   const group = new THREE.Group();
   const KNEE_H = 2.0; // knee-wall height (ft), matches three-scene.ts's KNEE_EXT_H
 
-  // Wings: with an entrance gap, the bays split half/half around it and sit
-  // flush against its edges; without one, they run as one contiguous strip.
-  interface Wing { lo: number; hi: number; widths: number[] }
-  const sum = (list: { width: number }[]) => list.reduce((s, b) => s + b.width, 0);
-  const wings: Wing[] = [];
-  if (kneeGap) {
-    const half = Math.floor(bays.length / 2);
-    const leftBays = bays.slice(0, half);
-    const rightBays = bays.slice(half);
-    const gLo = kneeGap.center - kneeGap.halfWidth;
-    const gHi = kneeGap.center + kneeGap.halfWidth;
-    if (leftBays.length) wings.push({ lo: gLo - sum(leftBays), hi: gLo, widths: leftBays.map((b) => b.width) });
-    if (rightBays.length) wings.push({ lo: gHi, hi: gHi + sum(rightBays), widths: rightBays.map((b) => b.width) });
-  } else {
-    const total = sum(bays);
-    wings.push({ lo: -total / 2, hi: total / 2, widths: bays.map((b) => b.width) });
-  }
-  const width = wings[wings.length - 1].hi - wings[0].lo;
+  const { runs: wings, width, panes, gaps } = windowBayLayout(bays, kneeGap);
 
   // Glass pane material — starts at the knee wall, not the floor.
   const glassMat = new THREE.MeshPhysicalMaterial({
@@ -143,10 +127,22 @@ export function buildWindowBays(
     group.add(kick);
   });
 
+  for (const { lo, hi } of gaps) {
+    const geo = new THREE.BoxGeometry(hi - lo, height, .3);
+    if (kneeSurface) mapWallSegmentUV(geo, hi-lo, height, 0, kneeSurface.storeWidth, kneeSurface.roomHeight);
+    const divider = new THREE.Mesh(geo, kneeMat);
+    divider.name = 'frontWindowMasonryInterior';
+    divider.position.set((lo+hi)/2, height/2, 0);
+    divider.castShadow = divider.receiveShadow = true;
+    group.add(divider);
+    const kick = new THREE.Mesh(new THREE.BoxGeometry(hi-lo, .2, .34), kneeTrimMat);
+    kick.position.set((lo+hi)/2, .1, 0);
+    group.add(kick);
+  }
+
   // Per-wing glass + frames + dividers.
-  const panes: { lo: number; hi: number }[] = [];
   const mullionGeo = new THREE.BoxGeometry(frameThickness * 0.7, height - KNEE_H, frameDepth * 0.7);
-  wings.forEach((wing, wi) => {
+  wings.forEach((wing) => {
     const wingW = wing.hi - wing.lo;
     const wingC = (wing.lo + wing.hi) / 2;
 
@@ -179,14 +175,12 @@ export function buildWindowBays(
     const vertGeo = new THREE.BoxGeometry(frameThickness, height, frameDepth);
     const vertSillGeo = new THREE.BoxGeometry(frameThickness, height - KNEE_H, frameDepth);
     const sillVertY = KNEE_H + (height - KNEE_H) / 2;
-    const isLeftWing = kneeGap ? wi === 0 : false;
-    const innerAtHi = isLeftWing; // left wing's vestibule-side edge is its hi end
-    const leftIsVestibule = !!kneeGap && !innerAtHi;
+    const leftIsVestibule = wing.innerAtLo;
     const leftVert = new THREE.Mesh(leftIsVestibule ? vertGeo : vertSillGeo, frameMat);
     leftVert.position.set(
       leftIsVestibule ? wing.lo - frameThickness / 2 : wing.lo + frameThickness / 2,
       leftIsVestibule ? height / 2 : sillVertY, 0);
-    const rightIsVestibule = !!kneeGap && innerAtHi;
+    const rightIsVestibule = wing.innerAtHi;
     const rightVert = new THREE.Mesh(rightIsVestibule ? vertGeo : vertSillGeo, frameMat);
     rightVert.position.set(
       rightIsVestibule ? wing.hi + frameThickness / 2 : wing.hi - frameThickness / 2,
@@ -200,7 +194,6 @@ export function buildWindowBays(
     // Pane boundaries within the wing, in build order left -> right.
     const edges: number[] = [wing.lo];
     wing.widths.forEach((w) => edges.push(edges[edges.length - 1] + w));
-    for (let i = 0; i < wing.widths.length; i++) panes.push({ lo: edges[i], hi: edges[i + 1] });
 
     // Grid vertical dividers between panes — only through the glazed span
     // above the knee wall.

@@ -6,7 +6,7 @@ Window awnings have their own toggle. The small shop keeps its own facade.
 
 | Facade | Architectural character |
 | --- | --- |
-| Gabled Brick | Low parapet, central gable, projecting piers, tiled bands, and separate entry/exit doors |
+| Gabled Brick | Low parapet, central gable on freestanding pillars, tiled bands, and separate entry/exit doors |
 | Flat Parapet | Shallow entry, framed sign field, and a simple molded cornice |
 | Arcaded Brick | Broad entrance, dentil cornice, domed entry canopy, and trimmed window arches |
 
@@ -28,9 +28,19 @@ The facade uses eight-inch stretchers in running bond, 2 2/3-inch courses,
 and 3/8-inch mortar joints. The entry header and pier caps/bases use upright
 soldier courses. Two-inch glazed squares form the blue bands: two across
 the entrance, higher short bands on the piers, and a continuous band around
-the wings. The 2.75-foot piers project in front of the central wall; the
-doorway recess is 1.4 feet deep. Tile abuts brick
-directly, without a contrasting metal strip above it.
+the wings. The entrance canopy projects 4.2 feet, supported by 2.75-foot-wide
+freestanding pillars. Their rear faces leave two feet clear of the finished
+wall; below the header, only short jambs remain at the recessed door plane.
+The pillar bases, tile bands, and soldier caps wrap all four faces. These
+adaptable dimensions are estimates, not surveyed measurements.
+Tile abuts brick directly, without a contrasting metal strip above it.
+
+Each front window wing has one 1.25-foot masonry divider between its panes.
+The glass and frames stop at the divider and resume beyond it; the divider
+has matching exterior brick and interior wall finishes. Individual panes stay
+four feet wide, with the baseline shell allowing room for all sixteen panes
+plus both masonry breaks. Wider stores retain one symmetric break per wing.
+The flat, arcaded, and small-shop facades keep their existing window layouts.
 
 UVs use building coordinates at four feet per texture repeat, including the
 window knees and corner returns. Resizing a wall or fitting an entrance does
@@ -61,7 +71,7 @@ arches. Higher ceilings retain roof clearance without moving the door head.
 Named finish roles allow the active brand to recolor the tile and fabric;
 the normal logo renderer supplies all lettering.
 
-The gabled export contains 412 triangles across five material groups. The
+The gabled export contains 420 triangles across five material groups. The
 source checks every solid part for manifoldness. Unit checks cover aligned
 mortar courses and door clearance; the in-app navigation rig covers both roots.
 

@@ -34,6 +34,7 @@ export interface FacadeBuildParams {
   // quantization can widen it): the brick returns below fill exactly the
   // spans the front glazing no longer reaches.
   frontCornerMargin: number;
+  windowMasonryGaps: { lo: number; hi: number }[];
 }
 
 // Brand mounting plane and available architectural sign area. The gabled
@@ -187,6 +188,10 @@ export function buildStorefrontFacade(params: FacadeBuildParams): StorefrontFaca
   // arris now (the old proud corner piers are gone, per user direction:
   // nothing may protrude at the corner).
   const frontBandBot = WINDOW_HEAD_Y - 0.1;
+  for (const { lo, hi } of params.windowMasonryGaps) {
+    const pier = brickBox(hi-lo, frontBandBot, .7, CX-(lo+hi)/2, frontBandBot/2, FRONT_Z+.4);
+    pier.name = 'frontWindowMasonryExterior';
+  }
   brickBox(storeWidth + 1.5, parapetTop - frontBandBot, 0.7, CX, (frontBandBot + parapetTop) / 2, FRONT_Z + 0.4);
   if (style === 'gabled-brick') {
     addBox(storeWidth + 1.82, stripeH, 0.16, CX, stripeCY, FRONT_Z + 0.83, glazedTile);

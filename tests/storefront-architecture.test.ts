@@ -36,3 +36,11 @@ test('flat and arcaded fronts do not inherit a hidden triangular roof', () => {
     assert(d.frontProjection < 3, 'shallow frontage leaves room for its canopy');
   }
 });
+
+test('gabled canopy pillars leave a clear passage behind their rear faces', () => {
+  const d = facadeDimensions(13.5, 7.9, 'gabled-brick');
+  assert(d.pierBack-.75 >= 2, 'two feet clear of the finished wall');
+  assert(d.pierFront > d.pierBack+1.5, 'pillars retain physical depth');
+  assert(d.pierFront < 4.7, 'the pillar base remains on the sidewalk');
+  assert(d.frontProjection >= d.pierBack && d.frontProjection <= d.pierFront);
+});

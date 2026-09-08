@@ -38,8 +38,12 @@ export function buildFacadeEntryModel(ctx: FixtureContext, p: EntryParams): THRE
   const m = d.massHalf, o = p.openingHalfWidth;
   const shape = new THREE.Shape();
   const top = p.style === 'gabled-brick' ? d.gableBase : d.pierTop;
-  shape.moveTo(-m, 0); shape.lineTo(-o, 0); shape.lineTo(-o, d.headerBottom);
-  shape.lineTo(o, d.headerBottom); shape.lineTo(o, 0); shape.lineTo(m, 0);
+  if (p.style === 'gabled-brick') {
+    shape.moveTo(-m, d.headerBottom); shape.lineTo(m, d.headerBottom);
+  } else {
+    shape.moveTo(-m, 0); shape.lineTo(-o, 0); shape.lineTo(-o, d.headerBottom);
+    shape.lineTo(o, d.headerBottom); shape.lineTo(o, 0); shape.lineTo(m, 0);
+  }
   shape.lineTo(m, top);
   if (p.style === 'gabled-brick') {
     shape.lineTo(m-1, top); shape.lineTo(0, top+d.gableHeight); shape.lineTo(-m+1, top);
@@ -60,18 +64,19 @@ export function buildFacadeEntryModel(ctx: FixtureContext, p: EntryParams): THRE
   };
   for (const sign of [-1, 1]) {
     const width = p.style === 'arcaded-brick' ? 8 : d.pierWidth;
-    const front = p.style === 'gabled-brick' ? 1.68 : 2.4;
-    box(width, d.pierTop, front-.1, sign*(m+width/2), d.pierTop/2, (front+.1)/2, brick);
+    const front = d.pierFront, back = d.pierBack;
     if (p.style === 'gabled-brick') {
-      box(width, 1.05, .04, sign*(m+width/2), 14.925, front+.025, tile);
-      for (const [bottom, top] of [[0, 2], [15.45, d.pierTop]]) {
-        box(width, top-bottom, .025, sign*(m+width/2), (bottom+top)/2, front+.013, soldier);
+      for (const [bottom, top, material] of [[0, 2, soldier], [2, 14.4, brick], [14.4, 15.45, tile], [15.45, d.pierTop, soldier]] as const) {
+        box(width, top-bottom, front-back, sign*(m+width/2), (bottom+top)/2, (front+back)/2, material);
       }
+      box(m-o, d.headerBottom, .65, sign*(m+o)/2, d.headerBottom/2, .425, brick);
+    } else {
+      box(width, d.pierTop, front-back, sign*(m+width/2), d.pierTop/2, (front+back)/2, brick);
     }
   }
   if (p.style === 'gabled-brick') {
-    for (const top of [d.headerTop, d.towerStripeTop]) box(m*2, 1.05, .07, 0, top-.525, 1.435, tile);
-    box(m*2, 2.15, .025, 0, 11.275, 1.413, soldier);
+    for (const top of [d.headerTop, d.towerStripeTop]) box(m*2, 1.05, .07, 0, top-.525, d.frontProjection+.035, tile);
+    box(m*2, 2.15, .025, 0, 11.275, d.frontProjection+.013, soldier);
     box(1.6, 9.1, .43, 0, 4.55, .035, brick);
     for (const sign of [-1, 1]) box(o-4, 1.82, .43, sign*(o+4)/2, .91, .035, brick);
   }
