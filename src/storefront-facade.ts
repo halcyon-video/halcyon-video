@@ -1,21 +1,21 @@
 import { selfLit } from './material-lighting';
-// Photo-matched exterior facade: the classic
-// early-90s freestanding video-store prototype building. Rust-red running-bond
-// brick walls with a dark-capped flat parapet, one house-color glazed-tile
-// stripe band wrapping the front and left elevations, and a central entrance
-// tower — recessed glass entry under a blue tile header, brick jamb pillars,
-// stepped flanking piers with vertical house-color stripes, and a steep gable
-// ("steeple") whose face carries the storefront logo. Replaces the old curved
-// awning + valance. Everything here is static exterior dressing: plain
-// box/prism meshes built once, no per-frame work, no colliders (it all lives
-// outside the walkable glass line at z = 15).
+// Exterior envelope shared by three architectural styles. Window openings,
+// service-door placement and masonry tiling follow the store's live plan.
+// Fitted entrance portals and canopies are authored in Blender; none of this
+// exterior dressing changes the walkable entrance or its door animations.
 import * as THREE from 'three';
+import type { FixtureContext } from './fixtures';
+import { facadeStyle, facadeDimensions, type FacadeStyle } from './storefront-architecture';
+import { buildFacadeEntryModel } from './storefront-entry-model';
+import { onBrandChange } from './brand-live';
+import { getActiveTheme } from './themes';
 import { WINDOW_BAY_TARGET_WIDTH, FRONT_WINDOW_CORNER_MARGIN, STORE_CENTER_X, FRONT_GLASS_Z } from './store-layout';
 
 export interface FacadeBuildParams {
+  context: FixtureContext;
   storeWidth: number;      // ft, front-wall span (store centreline is x = 11)
   backWallZ: number;       // ft, world z of the back wall (left fascia runs to it)
-  ceilingY: number;        // ft, interior ceiling = storefront glazing head
+  ceilingY: number;        // ft, interior ceiling; independent of the window head
   entryHalfWidth: number;  // vestibuleHalfWidth(spec): tower proportions key off it
   // entranceOpeningHalfWidth(spec) (store-layout.ts): half-width of the glazed
   // entry composition — sidelight | door | door | sidelight — that the recessed
@@ -35,8 +35,8 @@ export interface FacadeBuildParams {
   frontCornerMargin: number;
 }
 
-// Where the storefront logo must sit: centered in the gable face, just above
-// the spring line — exactly where the reference building wears its emblem.
+// Brand mounting plane and available architectural sign area. The gabled
+// prototype wears its sign below the spring line, above the lower tile band.
 export interface FacadeLogoAnchor {
   x: number;
   y: number;
@@ -66,8 +66,8 @@ const BRICK_FEET = 4.0; // must match three-scene.ts's brick-texture tile size
 // Entrance-tower masonry, in feet from the store centreline. The gabled mass
 // overhangs the vestibule glass by ENTRY_MASS_OVERHANG on each side, and a
 // stepped flanking pier of ENTRY_PIER_W stands immediately outboard of it.
-const ENTRY_MASS_OVERHANG = 1.2;
-const ENTRY_PIER_W = 1.5;
+const ENTRY_MASS_OVERHANG = 0;
+const ENTRY_PIER_W = 2;
 
 /**
  * Half-width (ft, from the store centreline x = 11) of the SOLID stretch of
@@ -81,8 +81,8 @@ const ENTRY_PIER_W = 1.5;
  * before choosing a bay. `entryHalfWidth` is the same vestibuleHalfWidth(spec)
  * the facade is built from.
  */
-export function entryMassSolidHalfWidth(entryHalfWidth: number): number {
-  return entryHalfWidth + ENTRY_MASS_OVERHANG + ENTRY_PIER_W;
+export function entryMassSolidHalfWidth(entryHalfWidth: number, style: FacadeStyle = facadeStyle()): number {
+  return entryHalfWidth + ENTRY_MASS_OVERHANG + (style === 'arcaded-brick' ? 8 : ENTRY_PIER_W);
 }
 
 // Glazing head for ALL storefront windows — front bays and side ribbons.
@@ -138,36 +138,12 @@ export function buildStorefrontFacade(params: FacadeBuildParams): StorefrontFaca
   const leftEdgeX = CX - storeWidth / 2;
   const rightEdgeX = CX + storeWidth / 2;
 
-  // ── Vertical proportions (photo ratios re-anchored to the 13.5 ft glazing
-  // head; the ratios are recorded in the constants below) ─────────────────
-  const fasciaBot = ceilingY - 0.15;        // brick fascia overlaps the glass head frame
-  const parapetTop = ceilingY + 4.6;        // wing parapet
-  const stripeH = 1.45;                     // glazed-tile band height (thinned ~25% per user review)
-  const stripeTop = parapetTop - 1.1;       // band rides just below the cap
+  const style = facadeStyle();
+  const dimensions = facadeDimensions(ceilingY, entryHalfWidth, style);
+  const { parapetTop, massHalf, gableBase, gableHeight: gableH, stripeHeight: stripeH, stripeTop } = dimensions;
+  const fasciaBot = ceilingY - .15;
   const stripeCY = stripeTop - stripeH / 2;
-
-  // ── Tower proportions ────────────────────────────────────────────────────
-  const massHalf = entryHalfWidth + ENTRY_MASS_OVERHANG; // gabled mass half-width (jambs overlap the vestibule glass edges)
-  // Deep portico projection: the entry pillars stand well proud of the
-  // building body (the close-up photo shows a covered WALKWAY between the
-  // pillars and the doors), stopping at the sidewalk's outer edge (its 4.4 ft
-  // depth in exterior-environment.ts) so the pillars keep their feet on it.
-  const towerFrontZ = FRONT_Z + 4.2;
-  // Entry recess half-width: frames EXACTLY the glazed composition behind it
-  // (sidelight | door | door | sidelight — entranceOpeningHalfWidth in
-  // store-layout.ts), so the brick jamb pillars read as the reference photo's
-  // pilasters hugging the doors + sidelights.
-  const openHalf = entryOpeningHalfWidth;
-  // Walkway-opening top: right at the storefront glazing head — the vestibule's
-  // continuous transom (doors up to WINDOW_HEAD_Y) fills the opening, and the
-  // window heads across the whole storefront align with it.
-  const headerBot = WINDOW_HEAD_Y + 0.15;
-  const headerTop = headerBot + 1.9;        // blue tile entry header
-  const gableBase = ceilingY + 4.9;         // spring line, a step above the wing parapet
-  const gableH = 0.55 * (2 * massHalf);     // steep "steeple" rake per the photos
-  const pierW = ENTRY_PIER_W;               // stepped flanking piers ("pillars")
-  const pierTop = gableBase + 1.5;          // piers ride above the spring line
-  const pierFrontZ = FRONT_Z + 2.4;         // middle relief plane: wall < pier < gabled mass
+  const towerFrontZ = FRONT_Z + dimensions.frontProjection;
 
   const glazedTile = new THREE.MeshStandardMaterial({
     color: new THREE.Color(stripeColor),
@@ -185,8 +161,13 @@ export function buildStorefrontFacade(params: FacadeBuildParams): StorefrontFaca
     envMapIntensity: 1.0,
   });
   const TRIM_H = 0.16; // ft — one course
+  const unsubscribe = onBrandChange(() => {
+    const palette = getActiveTheme().palette;
+    glazedTile.color.set(palette.primary);
+    trimCourse.color.set(palette.secondary);
+  });
+  group.addEventListener('removed', unsubscribe);
   const coping = new THREE.MeshStandardMaterial({ color: 0x26282b, roughness: 0.55, metalness: 0.35 });
-  const soffitDark = new THREE.MeshStandardMaterial({ color: 0x191a1c, roughness: 0.9, metalness: 0.0 });
 
   const addBox = (
     w: number, h: number, d: number,
@@ -215,8 +196,14 @@ export function buildStorefrontFacade(params: FacadeBuildParams): StorefrontFaca
   // nothing may protrude at the corner).
   const frontBandBot = WINDOW_HEAD_Y - 0.1;
   brickBox(storeWidth + 1.5, parapetTop - frontBandBot, 0.7, CX, (frontBandBot + parapetTop) / 2, FRONT_Z + 0.4);
-  addBox(storeWidth + 1.82, stripeH, 0.16, CX, stripeCY, FRONT_Z + 0.83, glazedTile);
-  addBox(storeWidth + 1.82, TRIM_H, 0.17, CX, stripeTop + TRIM_H / 2, FRONT_Z + 0.835, trimCourse);
+  if (style === 'gabled-brick') {
+    addBox(storeWidth + 1.82, stripeH, 0.16, CX, stripeCY, FRONT_Z + 0.83, glazedTile);
+    addBox(storeWidth + 1.82, TRIM_H, 0.17, CX, stripeTop + TRIM_H / 2, FRONT_Z + 0.835, trimCourse);
+  } else {
+    const stone = new THREE.MeshStandardMaterial({ color: 0xd8cfb7, roughness: .8 });
+    addBox(storeWidth + 1.8, .40, .96, CX, parapetTop-.30, FRONT_Z+.48, stone);
+    addBox(storeWidth + 1.6, .16, .88, CX, parapetTop-.64, FRONT_Z+.44, stone);
+  }
   addBox(storeWidth + 1.8, 0.3, 1.0, CX, parapetTop + 0.15, FRONT_Z + 0.4, coping);
 
   // Brick returns filling the front-wall corner margins from the ground to the
@@ -257,8 +244,10 @@ export function buildStorefrontFacade(params: FacadeBuildParams): StorefrontFaca
       vBox(sideRibbon.backZ, sideRibbon.frontZ, 0, 2.0); // brick knee under the glass
     }
     brickBox(0.7, fasciaH, sideLen, wallX + s * 0.4, fasciaCY, sideCZ);
-    addBox(0.16, stripeH, sideLen, wallX + s * 0.83, stripeCY, sideCZ, glazedTile);
-    addBox(0.17, TRIM_H, sideLen, wallX + s * 0.835, stripeTop + TRIM_H / 2, sideCZ, trimCourse);
+    if (style === 'gabled-brick') {
+      addBox(0.16, stripeH, sideLen, wallX + s * 0.83, stripeCY, sideCZ, glazedTile);
+      addBox(0.17, TRIM_H, sideLen, wallX + s * 0.835, stripeTop + TRIM_H / 2, sideCZ, trimCourse);
+    }
     // Side coping stops at the front coping's back face (FRONT_Z - 0.1) instead
     // of running 0.15 past the corner: the two run perpendicular at the same
     // top height (y = parapetTop + 0.15) in the same material, so the old
@@ -372,73 +361,24 @@ export function buildStorefrontFacade(params: FacadeBuildParams): StorefrontFaca
     group.add(exitFace);
   }
 
-  // ── Entrance tower ───────────────────────────────────────────────────────
-  const towerD = towerFrontZ - (FRONT_Z + 0.1);
-  const towerCZ = (FRONT_Z + 0.1 + towerFrontZ) / 2;
+  group.add(buildFacadeEntryModel(params.context, {
+    style, entryHalfWidth, openingHalfWidth: entryOpeningHalfWidth,
+    frontCornerMargin, brickMaterial, primary: stripeColor,
+  }));
 
-  // Brick jamb pillars flanking the recessed entry (ground level).
-  const jambW = massHalf - openHalf;
-  [-1, 1].forEach((s) => {
-    brickBox(jambW, headerBot, towerD, CX + s * (openHalf + jambW / 2), headerBot / 2, towerCZ);
-  });
-  // Solid face above the entry, up to the gable spring line.
-  brickBox(2 * massHalf, gableBase - headerBot, towerD, CX, (headerBot + gableBase) / 2, towerCZ);
-  // Dark soffit closing the recess overhead (hides the stretched box underside).
-  addBox(2 * openHalf, 0.08, towerD, CX, headerBot - 0.04, towerCZ, soffitDark, false);
-  // Blue tile entry header over the doors.
-  addBox(2 * openHalf + 1.6, headerTop - headerBot, 0.14, CX, (headerBot + headerTop) / 2, towerFrontZ + 0.07, glazedTile);
-  // The wing stripe continues across the tower face and around its returns.
-  addBox(2 * massHalf, stripeH, 0.14, CX, stripeCY, towerFrontZ + 0.07, glazedTile);
-  addBox(2 * massHalf, TRIM_H, 0.15, CX, stripeTop + TRIM_H / 2, towerFrontZ + 0.075, trimCourse);
-  [-1, 1].forEach((s) => {
-    addBox(0.14, stripeH, towerD, CX + s * (massHalf + 0.07), stripeCY, towerCZ, glazedTile);
-  });
-
-  // Gable: triangular brick prism springing from the spring line.
-  const gableShape = new THREE.Shape();
-  gableShape.moveTo(-massHalf, 0);
-  gableShape.lineTo(massHalf, 0);
-  gableShape.lineTo(0, gableH);
-  gableShape.closePath();
-  const gableGeo = new THREE.ExtrudeGeometry(gableShape, { depth: towerD, bevelEnabled: false });
-  // Extrude UVs are in shape units (feet) — scale to the shared brick tile.
-  const gable = new THREE.Mesh(gableGeo, brickMaterial(1 / BRICK_FEET, 1 / BRICK_FEET));
-  gable.position.set(CX, gableBase, FRONT_Z + 0.1);
-  gable.castShadow = true;
-  gable.receiveShadow = true;
-  group.add(gable);
-
-  // Dark coping up both raking edges (meets itself at the peak).
-  const rakeLen = Math.hypot(massHalf, gableH);
-  const rakeAngle = Math.atan2(gableH, massHalf);
-  [-1, 1].forEach((s) => {
-    const rake = addBox(rakeLen + 0.5, 0.32, towerD + 0.2, CX + s * massHalf / 2, gableBase + gableH / 2 + 0.1, towerCZ, coping);
-    rake.rotation.z = -s * rakeAngle;
-  });
-
-  // Stepped flanking piers with their caps (plain brick — no vertical tile
-  // stripes, per user review).
-  [-1, 1].forEach((s) => {
-    const px = CX + s * (massHalf + pierW / 2);
-    brickBox(pierW, pierTop, pierFrontZ - (FRONT_Z + 0.1), px, pierTop / 2, (FRONT_Z + 0.1 + pierFrontZ) / 2);
-    addBox(pierW + 0.35, 0.3, pierFrontZ - FRONT_Z + 0.35, px, pierTop + 0.15, (FRONT_Z + 0.1 + pierFrontZ) / 2, coping);
-  });
-
-  // ── Logo anchor: centered in the gable, just above the spring line ──────
-  // Sized to sit INSIDE the gable triangle (user review: the previous 15ft
-  // frame ran the visible ticket past the raking copings on both sides and
-  // over the peak). Two-thirds of that frame, and the anchor dropped so the
-  // emblem's bottom clears the spring line while its top corners stay under
-  // the raking edges with a comfortable margin.
+  // The brand cabinet sits over the entry, below the peak. Separate gable
+  // and fascia bounds also keep optional freestanding letters inside the wall.
   const logoWidth = Math.min(9.0, massHalf * 1.05);
   const logoHeight = logoWidth * 0.6;
   const logoAnchor: FacadeLogoAnchor = {
     x: CX,
-    y: gableBase + logoHeight * 0.58,
+    y: dimensions.logoY,
     z: towerFrontZ + 0.05,
     width: logoWidth,
     height: logoHeight,
-    gable: { baseY: gableBase, halfWidth: massHalf, height: gableH },
+    gable: style === 'gabled-brick'
+      ? { baseY: gableBase, halfWidth: massHalf-1, height: gableH }
+      : { baseY: 13.4, halfWidth: massHalf, height: dimensions.pierTop-13.4 },
     fascia: { width: storeWidth, bottomY: WINDOW_HEAD_Y, topY: parapetTop },
   };
 

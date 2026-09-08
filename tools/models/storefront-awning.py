@@ -103,8 +103,9 @@ for j in range(9):
     seam += [(z-.018, y-.022) for z, y in reversed(outer)]
     extrude_profile(f'Panel seam {j+1:02}', seam, x-.016, x+.016, 1)
     # Real wall brackets behind the fabric, clear of the window heads.
-    tube(f'Standoff {j+1:02}', (x, .13, .10), (x, .13, 3.12), .045)
-    tube(f'Brace {j+1:02}', (x, 2.9, .10), (x, .13, 3.12), .035)
+    bracket_x = max(-14.88, min(14.88, x))
+    tube(f'Standoff {j+1:02}', (bracket_x, .13, .10), (bracket_x, .13, 3.12), .045)
+    tube(f'Brace {j+1:02}', (bracket_x, 2.9, .10), (bracket_x, .13, 3.12), .035)
 
 for y, z in [(.08, 3.23), (.12, .07), (3.27, .05)]:
     tube('Rolled continuous rail', (-15.02, y, z), (15.02, y, z), .048, 1)

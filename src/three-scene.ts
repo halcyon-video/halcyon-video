@@ -33,6 +33,7 @@ import * as mirrors from './store-mirrors';
 import { BeautyPass, PartialComposite } from './partial-composite';
 import { FixtureContext, SlottedFixture } from './fixtures';
 import { setWindowAwningLighting, disposeWindowAwnings } from './storefront-awning';
+import { setFacadeEntryLighting, disposeFacadeEntry } from './storefront-entry-model';
 import { OverviewCursors, OverviewCursorTarget } from './overview-cursors';
 import { resetBrandLive, setBrandRenderHook } from './brand-live';
 import { AmbientTvs } from './ambient-tvs';
@@ -523,6 +524,7 @@ export class StoreScene {
   // brighten the key spots after dark so the carpet actually receives it.
   private applyModeLighting(mode: OutsideMode) {
     setWindowAwningLighting(this.scene, mode);
+    setFacadeEntryLighting(this.scene, mode);
     // Day 110 -> 145 -> 180 chased a dark carpet by raising energy, but the
     // light was being thrown away by the spots' distance cutoff, not
     // under-supplied (see the SpotLight construction in buildStore). With the
@@ -5979,6 +5981,7 @@ export class StoreScene {
     }
     
     disposeWindowAwnings(this.scene);
+    disposeFacadeEntry(this.scene);
     // Traverse and dispose materials/geometries of static shelves
     this.scene.traverse((object) => {
       if ((object as any).type === 'Reflector' || (object as any).isReflector) {
