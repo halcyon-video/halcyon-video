@@ -1,0 +1,33 @@
+:root { color-scheme: light; font-family: system-ui, sans-serif; color: #f5f0df; background: #c8d2df; }
+* { box-sizing: border-box; }
+html, body, #light-store { margin: 0; width: 100%; height: 100%; overflow: hidden; }
+#light-store { position: relative; height: 100dvh; }
+#light-store > canvas { display: block; width: 100%; height: 100%; }
+button, a { -webkit-tap-highlight-color: transparent; }
+button { font: inherit; cursor: pointer; }
+button:focus-visible, a:focus-visible { outline: 3px solid #f5cf72; outline-offset: 4px; }
+.light-brand { position: absolute; top: max(20px, env(safe-area-inset-top)); left: 20px; z-index: 2; display: grid; gap: 3px; color: #15233a; pointer-events: none; padding: 8px 10px; border-radius: 8px; background: #eef0eedb; }
+.light-brand strong { font-size: 21px; letter-spacing: -.6px; }
+.light-brand span { font-size: 11px; }
+.light-nav { position: absolute; z-index: 3; bottom: 0; left: 0; right: 0; padding: 28px 20px max(16px, env(safe-area-inset-bottom)); text-align: center; background: linear-gradient(transparent, #15233afa 22%); }
+.light-nav h1 { font-size: 25px; letter-spacing: -.5px; margin: 6px auto; max-width: 600px; }
+.light-nav p { margin: 5px 0 14px; color: #d1d8e3; font-size: 13px; }
+.light-actions { display: flex; gap: 7px; justify-content: center; }
+.light-actions button, .light-actions a, .light-back { border: 1px solid #8793a7; border-radius: 8px; padding: 10px 13px; min-height: 44px; color: #f5f0df; background: #26364e; font-size: 13px; text-decoration: none; }
+.light-actions .light-primary { background: #f2e8c9; color: #14233a; font-weight: 700; border-color: #f2e8c9; }
+.light-actions button:disabled { opacity: .45; cursor: default; }
+.light-back { margin-top: 10px; background: transparent; border-color: transparent; padding: 4px 15px; min-height: 34px; }
+.light-cursor { position: absolute; z-index: 2; transform: translate(-50%, -100%); color: #182842; background: #f2e8c9; border: 2px solid #fff8e5; border-radius: 8px; box-shadow: 0 4px 18px #14233a40; font-size: 13px; font-weight: 700; padding: 10px 14px; min-height: 44px; white-space: nowrap; }
+.light-nav .light-attribution { font-size: 9px; margin: 10px auto 3px; color: #aeb9cc; }
+.light-scope { display: block; font-size: 10px; color: #aeb9cc; }
+[hidden] { display: none !important; }
+@media (max-width: 540px) {
+  .light-brand { top: max(16px, env(safe-area-inset-top)); left: 14px; }
+  .light-brand strong { font-size: 17px; }
+  .light-brand span { max-width: 120px; font-size: 10px; }
+  .light-nav { padding-left: 12px; padding-right: 12px; }
+  .light-nav h1 { font-size: 22px; }
+  .light-nav p { font-size: 12px; }
+  .light-actions { gap: 5px; }
+  .light-actions button { padding: 8px 9px; font-size: 12px; }
+}

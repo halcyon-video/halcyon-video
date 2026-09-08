@@ -222,7 +222,7 @@ export function synthesizeStreamingMovie(item: RawDiscoverItem, def: StreamingSe
   const title = item.title || item.name;
   if (typeof tmdbId !== 'number' || !title) return null;
   const releaseDate = item.releaseDate || '';
-  const year = releaseDate ? new Date(releaseDate).getFullYear() : new Date().getFullYear();
+  const year = releaseDate ? new Date(releaseDate).getUTCFullYear() : new Date().getFullYear();
   return {
     id: `streaming_${def.id}_${tmdbId}`,
     title,

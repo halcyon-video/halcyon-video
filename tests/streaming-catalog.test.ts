@@ -18,6 +18,18 @@ import {
   buildStreamingLibraries,
 } from '../src/streaming-catalog.ts';
 
+test('a snapshot year stays in its calendar year west of UTC', () => {
+  const timezone = process.env.TZ;
+  process.env.TZ = 'America/Chicago';
+  try {
+    const movie = synthesizeStreamingMovie({ id: 123, title: 'Calendar boundary', releaseDate: '2026-01-01' }, DEFAULT_STREAMING_SERVICES[0]);
+    assert.equal(movie?.year, 2026);
+  } finally {
+    if (timezone === undefined) delete process.env.TZ;
+    else process.env.TZ = timezone;
+  }
+});
+
 test('resolveStreamingSource: TMDB wins when both are configured; Jellyseerr is the fallback; neither falls back to the bundled snapshot', () => {
   assert.equal(resolveStreamingSource(true, true), 'tmdb');
   assert.equal(resolveStreamingSource(true, false), 'tmdb');
