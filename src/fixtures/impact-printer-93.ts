@@ -32,7 +32,7 @@ export function buildImpactPrinter93(
   box(.86, .03, .3, .31, 0, 0xbfb49a);
   box(.66, .16, .5, .08, -.5, 0xfbfaf4);
   const sheet = markSignMesh(new THREE.Mesh(new THREE.PlaneGeometry(.62, .5),
-    new THREE.MeshStandardMaterial({ map: paperTexture, roughness: .9, side: THREE.DoubleSide })));
+    new THREE.MeshStandardMaterial({ map: paperTexture, roughness: .9, side: THREE.DoubleSide })), { casts: true });
   sheet.position.set(0, .52, -.12);
   sheet.rotation.x = -.35;
   fallback.add(sheet);

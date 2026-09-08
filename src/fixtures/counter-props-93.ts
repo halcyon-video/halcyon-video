@@ -278,10 +278,10 @@ export function buildCounterProps93(scene: StoreScene): void {
 
   // 4. Dot-matrix printer with fanfold paper, back of the inner counter.
   {
-    // The clear centre stretch between the VFD (-1.5) and rewinder (+2.9)
-    // supports this on both island lengths. The old +4.3 location pushed
-    // the printer through the rental CRT's casing.
-    const a = entrance.getCounterTopAnchorAt(.9)!;
+    // Keep the printer between the VFD (-1.5) and the membership frame (+0.8).
+    // At +0.9 that frame's post ran through the printer and its paper feed.
+    // The centre-left top supports the feet on either island profile.
+    const a = entrance.getCounterTopAnchorAt(-.3)!;
     buildImpactPrinter93(scene, group, a, fanfoldTex());
 
     // Beige corded desk phone beside the station — every register in the
