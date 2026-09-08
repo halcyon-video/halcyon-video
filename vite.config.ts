@@ -593,7 +593,6 @@ export default defineConfig(async () => ({
         harness: path.join(import.meta.dirname, "harness.html"),
         assetviewer: path.join(import.meta.dirname, "asset-viewer.html"),
         remote: path.join(import.meta.dirname, "remote.html"),
-        lightstore: path.join(import.meta.dirname, "light-store.html"),
       }).filter(([, f]) => fs.existsSync(f))),
     },
   },

@@ -138,9 +138,6 @@ Open the **[hosted demo](https://halcyon-video.github.io/halcyon-video/)**.
 It scales the demo catalog to the browser's measured GPU headroom, from a
 smaller phone store to the full layout on a discrete GPU.
 
-Development builds also include an opt-in [lightweight 3D prototype](docs/lightweight-prototype.md),
-with a visible low-detail label and an on-demand full-quality comparison.
-
 ### Local launchers
 
 Clone the repository, then run the launcher for your platform. It checks Node,
