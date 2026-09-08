@@ -18,12 +18,10 @@ import { selfLit } from './material-lighting';
 //     cornice segments stop — BOTH read that x from soffitConnectHalf() below,
 //     which is the single source of truth — at the z of the cornice's inner
 //     face (15 - CORNICE_WALL_GAP - CORNICE_BAND)
-//   * the fascia reuses the cornice's drop / band / mirror height / 20 deg tilt
-// so the two meet as one continuous band. Changing either side without the
-// other reopens the gap at the vestibule.
+//   * mirrored fascia is fitted with the perimeter in ceiling-cornice.ts,
+//     sharing its profile, mirror height, tilt and corner bisectors.
 
 import * as THREE from 'three';
-import { Reflector } from 'three/examples/jsm/objects/Reflector.js';
 import { vestibuleHalfWidth, type StorefrontSpec, STORE_CENTER_X, FRONT_GLASS_Z } from './store-layout';
 import { activeStoreFormat } from './store-format';
 
@@ -222,32 +220,6 @@ export function soffitMirroredEdges(poly: SoffitPoint[]): SoffitEdge[] {
   return edges;
 }
 
-// How far the two end runs extend BACK past their corner, along their own axis.
-//
-// Each run's end face is cut perpendicular to its own diagonal, so it can never
-// sit flush against the front cornice's square end — the two leave a wedge of
-// open ceiling between them. Pushing the run back along its axis buries that
-// end face inside the cornice body (which spans z from the cornice's inner face
-// out to zFront), so the two bands read as one that simply turns the corner.
-// Clamped so the extension stops short of the cornice's outer face rather than
-// bursting through it toward the glass.
-function endRunOverlap(
-  poly: SoffitPoint[], corniceWallGap: number, corniceBand: number,
-): number {
-  const edges = soffitMirroredEdges(poly);
-  if (edges.length === 0) return 0;
-  const backZ = FRONT_Z - corniceWallGap - corniceBand;
-  const limitZ = FRONT_Z - corniceWallGap - 0.1; // stay inside the cornice body
-  let allowed = corniceBand;
-  // Both end runs travel AWAY from the cornice line, so backing up along -u
-  // moves toward +z on the first run and on the last (which is reversed).
-  const rates = [-edges[0].uz, edges[edges.length - 1].uz];
-  for (const rate of rates) {
-    if (rate > 1e-6) allowed = Math.min(allowed, (limitZ - backZ) / rate);
-  }
-  return Math.max(0, allowed);
-}
-
 export function pointInSoffit(x: number, z: number, poly: SoffitPoint[]): boolean {
   let inside = false;
   for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
@@ -323,7 +295,7 @@ export function buildFrontSoffit(params: FrontSoffitParams): FrontSoffitResult {
   const {
     scene, ceilingY, storefrontSpec, storeWidth, corniceWallGap, corniceBand, corniceDrop,
     tileMaterial, trofferPanelMaterial, trofferFrameMaterial, tileX, tileZ,
-    softwareGL, reflectorSize, plainWhite,
+    plainWhite,
   } = params;
 
   // Painted drywall receives interior bounce and retains its surface texture.
@@ -398,21 +370,14 @@ export function buildFrontSoffit(params: FrontSoffitParams): FrontSoffitResult {
         const wall = new THREE.Mesh(new THREE.BoxGeometry(t, runH, runD), capMat);
         // Inset so the board sits under the lid rather than overhanging its cut.
         wall.position.set(sx + (sx < CX ? t / 2 : -t / 2), soffitY + runH / 2, backZ + runD / 2);
+        wall.castShadow = wall.receiveShadow = true;
         group.add(wall);
       }
     }
   }
 
-  const mirrorH = 1.9;
-  const mirrorY = ceilingY - corniceDrop * 0.5;
-  const tiltAngle = (20 * Math.PI) / 180;
-  const localOffset = (mirrorH / 2) * Math.sin(tiltAngle);
-
   const edges = soffitMirroredEdges(poly);
   const fasciaCount = edges.length;
-  // How far the two END runs push back past their corner, along their own axis,
-  // to bury their end face inside the front cornice body they hand off to.
-  const jointOverlap = endRunOverlap(poly, corniceWallGap, corniceBand);
 
   // ── Fascia: ONE mitred ring, not a box per edge ──────────────────────────
   // A box per edge is fine while the joints are square, but this outline meets
@@ -423,12 +388,11 @@ export function buildFrontSoffit(params: FrontSoffitParams): FrontSoffitResult {
   // chain back along the same edges offset inward by `band`, with each inner
   // joint placed where the two offset lines actually intersect — extruded down
   // through the drop. Same trick counter.ts uses for the counter's own band.
-  {
-    // The two chain ends push back along their own axis by jointOverlap so
-    // their end faces bury inside the cornice body instead of leaving a wedge.
+  if (plainWhite) {
+    // Plain painted fascia closes at its actual endpoints.
     const first = edges[0], last = edges[fasciaCount - 1];
-    const startOuter = { x: first.a.x - first.ux * jointOverlap, z: first.a.z - first.uz * jointOverlap };
-    const endOuter = { x: last.b.x + last.ux * jointOverlap, z: last.b.z + last.uz * jointOverlap };
+    const startOuter = first.a;
+    const endOuter = last.b;
 
     const inner: SoffitPoint[] = [];
     inner.push({ x: startOuter.x + first.nx * corniceBand, z: startOuter.z + first.nz * corniceBand });
@@ -481,53 +445,8 @@ export function buildFrontSoffit(params: FrontSoffitParams): FrontSoffitResult {
     group.add(bandMesh);
   }
 
-  // The mirror ring is dropped entirely in the bb-2000 plain-white soffit.
-  for (let i = 0; !plainWhite && i < fasciaCount; i++) {
-    const { nx, nz, ux, uz, len, midX, midZ } = edges[i];
-
-    // The fascia body itself is the mitred ring built above; this loop only
-    // hangs the mirror on each run's outer face.
-    //
-    // The two END runs carry their mirror back over the same jointOverlap the
-    // body does. Stopping the strip at the corner while the chrome ran on left
-    // a bare stub of body exactly where the two mirrors are supposed to meet —
-    // the overlap continues INTO the cornice body, where it is hidden, so the
-    // visible band is continuous through the turn.
-    const extBack = i === 0 ? jointOverlap : 0;
-    const extFwd = i === fasciaCount - 1 ? jointOverlap : 0;
-    const mirrorW = len + extBack + extFwd;
-    const cxm = midX + ux * (extFwd - extBack) / 2;
-    const czm = midZ + uz * (extFwd - extBack) / 2;
-
-    // The mirror rides the OUTER face, looking back out over the sales floor
-    // (the cornice's mirrors look inward off the walls — same ring, and at an
-    // outside corner "inward off the wall" and "outward off the soffit" are
-    // the same direction of travel).
-    const mirrorRotY = Math.atan2(-nx, -nz);
-    const mx = cxm - nx * 0.02 + localOffset * Math.sin(mirrorRotY);
-    const mz = czm - nz * 0.02 + localOffset * Math.cos(mirrorRotY);
-
-    const placeMirror = (mesh: THREE.Object3D) => {
-      mesh.position.set(mx, mirrorY, mz);
-      mesh.rotation.order = 'YXZ';
-      mesh.rotation.y = mirrorRotY;
-      mesh.rotation.x = tiltAngle;
-      group.add(mesh);
-    };
-
-    if (softwareGL) {
-      // Matches buildCeilingFrame: a live Reflector replays the whole scene per
-      // mirror, which SwiftShader pays for in CPU. Static chrome keeps the look.
-      placeMirror(new THREE.Mesh(new THREE.PlaneGeometry(mirrorW, mirrorH), chromeMat));
-    } else {
-      placeMirror(new Reflector(new THREE.PlaneGeometry(mirrorW, mirrorH), {
-        clipBias: 0.003,
-        textureWidth: reflectorSize.w,
-        textureHeight: reflectorSize.h,
-        color: 0xffffff,
-      }));
-    }
-  }
+  // Mirrored formats get one continuous Blender cornice from buildCeilingFrame,
+  // including the counter V. The lid and light anchors remain owned here.
 
   let troffers: SoffitPoint[];
   if (plainWhite) {
