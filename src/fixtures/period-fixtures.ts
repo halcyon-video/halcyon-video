@@ -5,6 +5,8 @@ import { selfLit } from '../material-lighting';
 // store-fixtures-config.ts, following the FourSidedDisplay reference pattern
 // (src/fixtures/four-sided-display.ts).
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { assetUrl } from '../asset-url';
 import { Movie } from '../jellyfin';
 import { FixturePlacement, seededRandom01 } from '../store-layout';
 import { FixtureContext, StoreFixture } from '../fixtures';
@@ -444,6 +446,10 @@ export class TapeRewinder implements StoreFixture {
     // (toward the entrance), so add a half-turn to point the front at the floor.
     group.rotation.y = this.placement.yaw + Math.PI;
     this.group = group;
+    group.name = 'tape-rewinder';
+    const fallback = new THREE.Group();
+    fallback.name = 'tape-rewinder-fallback';
+    group.add(fallback);
 
     // Glossy black plastic, shared across base/lid/ridges/slider.
     const bodyMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.34, metalness: 0.12 });
@@ -455,7 +461,7 @@ export class TapeRewinder implements StoreFixture {
     const blue = new THREE.Mesh(blueGeo, blueMat);
     blue.position.y = RW_BLUE_H / 2;
     blue.receiveShadow = true;
-    group.add(blue);
+    fallback.add(blue);
     this.disposables.push({ geo: blueGeo, mat: blueMat });
 
     // ── Base box ──────────────────────────────────────────────────────────
@@ -464,7 +470,7 @@ export class TapeRewinder implements StoreFixture {
     base.position.y = RW_BLUE_H + RW_BASE_H / 2;
     base.castShadow = true;
     base.receiveShadow = true;
-    group.add(base);
+    fallback.add(base);
     this.disposables.push({ geo: baseGeo });
 
     // ── Lid built as a FRAME around the window opening (a solid slab would
@@ -478,7 +484,7 @@ export class TapeRewinder implements StoreFixture {
       const bar = new THREE.Mesh(geo, bodyMat);
       bar.position.set(x, lidY, z);
       bar.castShadow = true;
-      group.add(bar);
+      fallback.add(bar);
       this.disposables.push({ geo });
     };
     const zBack = -lidD / 2 + (lidD / 2 - winD / 2) / 2;  // strip behind window
@@ -502,7 +508,7 @@ export class TapeRewinder implements StoreFixture {
       ridges.setMatrixAt(i, m);
     }
     ridges.instanceMatrix.needsUpdate = true;
-    group.add(ridges);
+    fallback.add(ridges);
     this.disposables.push({ geo: ridgeGeo });
 
     // ── STOP/EJECT slider on the RIGHT shoulder: a recessed channel with a
@@ -511,12 +517,12 @@ export class TapeRewinder implements StoreFixture {
     const channelGeo = new THREE.BoxGeometry(0.05, 0.014, RW_D * 0.62);
     const channel = new THREE.Mesh(channelGeo, channelMat);
     channel.position.set(RW_W / 2 - 0.075, RW_BASE_TOP + 0.007, 0);
-    group.add(channel);
+    fallback.add(channel);
     const sliderGeo = new THREE.BoxGeometry(0.045, 0.022, 0.09);
     const slider = new THREE.Mesh(sliderGeo, bodyMat);
     slider.position.set(RW_W / 2 - 0.075, RW_BASE_TOP + 0.011, 0.07);
     slider.castShadow = true;
-    group.add(slider);
+    fallback.add(slider);
     this.disposables.push({ geo: channelGeo, mat: channelMat }, { geo: sliderGeo });
 
     // ── Tape well recessed into the opening, with the spinning reel hub ────
@@ -524,6 +530,7 @@ export class TapeRewinder implements StoreFixture {
     const wellGeo = new THREE.BoxGeometry(winW, 0.012, winD);
     const well = new THREE.Mesh(wellGeo, wellMat);
     well.position.set(winCx, RW_BASE_TOP + 0.006, 0); // floor near the base top
+    well.name = 'rewinder-well';
     group.add(well);
     this.disposables.push({ geo: wellGeo, mat: wellMat });
 
@@ -531,6 +538,7 @@ export class TapeRewinder implements StoreFixture {
     const reelGeo = new THREE.CylinderGeometry(0.078, 0.078, 0.016, 24);
     const reel = new THREE.Mesh(reelGeo, reelMat);
     reel.position.set(winCx, RW_BASE_TOP + 0.02, 0);
+    reel.name = 'rewinder-reel';
     group.add(reel);
     this.reel = reel;
     this.disposables.push({ geo: reelGeo, mat: reelMat });
@@ -539,6 +547,7 @@ export class TapeRewinder implements StoreFixture {
     const hubGeo = new THREE.CylinderGeometry(0.019, 0.019, 0.022, 12);
     const hub = new THREE.Mesh(hubGeo, hubMat);
     hub.position.set(winCx, RW_BASE_TOP + 0.03, 0);
+    hub.name = 'rewinder-hub';
     group.add(hub);
     this.disposables.push({ geo: hubGeo, mat: hubMat });
 
@@ -549,6 +558,7 @@ export class TapeRewinder implements StoreFixture {
     const glassGeo = new THREE.BoxGeometry(winW, 0.006, winD);
     const glass = new THREE.Mesh(glassGeo, glassMat);
     glass.position.set(winCx, RW_LID_TOP - 0.004, 0);
+    glass.name = 'rewinder-glass';
     group.add(glass);
     this.disposables.push({ geo: glassGeo, mat: glassMat });
 
@@ -562,6 +572,7 @@ export class TapeRewinder implements StoreFixture {
     const logo = new THREE.Mesh(logoGeo, logoMat);
     logo.position.set(lidCx + 0.19, RW_LID_TOP + 0.001, 0);
     logo.rotation.set(-Math.PI / 2, 0, Math.PI / 2); // lie flat, reading front→back
+    logo.name = 'rewinder-logo';
     group.add(logo);
     this.disposables.push({ geo: logoGeo, mat: logoMat, tex: logoTex });
     // The display face loads async; redraw once it resolves so the
@@ -587,12 +598,48 @@ export class TapeRewinder implements StoreFixture {
     const ledGeo = new THREE.SphereGeometry(0.014, 12, 10);
     const led = new THREE.Mesh(ledGeo, ledMat);
     led.position.set(RW_W / 2 - 0.14, RW_BLUE_H + RW_BASE_H * 0.4, RW_D / 2 + 0.006);
+    led.name = 'rewinder-led';
     group.add(led);
     this.disposables.push({ geo: ledGeo, mat: ledMat });
 
     this.ctx.scene.add(group);
     this.ctx.addCollider(base);
     this.ctx.requestShadowRefresh();
+    new GLTFLoader().load(assetUrl('models/tape-rewinder.glb'), ({ scene: model }) => {
+      const retired = this.group !== group || group.parent !== this.ctx.scene;
+      const geometries = new Set<THREE.BufferGeometry>();
+      const ownedMaterials = new Set<THREE.Material>();
+      const replacedMaterials = new Set<THREE.Material>();
+      model.traverse(object => {
+        if (!(object instanceof THREE.Mesh)) return;
+        geometries.add(object.geometry);
+        const replace = (material: THREE.Material) => {
+          if (retired) { ownedMaterials.add(material); return material; }
+          const finish = material.name === 'RewinderBody' ? bodyMat
+            : material.name === 'RewinderTrim' ? blueMat : null;
+          if (finish) { replacedMaterials.add(material); return finish; }
+          ownedMaterials.add(material);
+          return material;
+        };
+        object.material = Array.isArray(object.material) ? object.material.map(replace) : replace(object.material);
+        object.castShadow = object.receiveShadow = true;
+      });
+      replacedMaterials.forEach(material => material.dispose());
+      if (retired) {
+        geometries.forEach(geometry => geometry.dispose());
+        ownedMaterials.forEach(material => material.dispose());
+        return;
+      }
+      // This texture-free model joins the fixture's existing resource owner.
+      // Live reel, glass, logo/drop-in texture and power light stay separate.
+      geometries.forEach(geo => this.disposables.push({ geo }));
+      ownedMaterials.forEach(mat => this.disposables.push({ mat }));
+      model.name = 'tape-rewinder-model';
+      group.add(model);
+      fallback.visible = false;
+      this.ctx.requestShadowRefresh();
+      this.ctx.requestRender();
+    }, undefined, () => { /* Original shell remains usable when unavailable. */ });
   }
 
   // Sits ON the checkout counter (see build()'s surfaceY note above) — not a

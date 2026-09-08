@@ -68,3 +68,10 @@ mesh authoring source are `tools/models/customer-pole-display.blend` and
 `tools/models/customer-pole-display.py`. It contains no downloaded geometry,
 images or manufacturer marks. See `docs/customer-pole-display-model.md` for
 its dimensions, material roles, resource costs and stable message/anchor contract.
+
+The `tape-rewinder.glb` countertop shell is original generic Halcyon construction
+under this repository's license. Editable named parts and reproducible mesh
+authoring live in `tools/models/tape-rewinder.blend` and
+`tools/models/tape-rewinder.py`. No downloaded meshes, images or manufacturer
+marks are included. See `docs/tape-rewinder-model.md` for its dimensions,
+resource costs and preserved live reel, logo and placement contracts.
