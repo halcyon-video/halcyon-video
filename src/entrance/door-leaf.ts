@@ -22,9 +22,9 @@ export function createDoorLeafFrame(width: number, height: number): THREE.Extrud
 /** A black horizontal push bar with shallow returns reaching the leaf stiles. */
 export function createDoorPushBarGeometry(width: number): THREE.ExtrudeGeometry {
   const halfSpan = width / 2 - 0.15;
-  const stockThickness = 0.075;
-  const standoff = 0.16;
-  const barHeight = 0.14;
+  const stockThickness = 0.10;
+  const standoff = 0.185;
+  const barHeight = 0.24; // Three inches overall including the eased edges.
 
   const shape = new THREE.Shape();
   shape.moveTo(-halfSpan, 0);
