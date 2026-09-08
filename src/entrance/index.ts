@@ -46,7 +46,8 @@ import { makeCrtGlassMaterial, addGlassReflectionPane } from '../glass-reflectio
 import { assetUrl } from '../asset-url';
 import { FixtureContext, StoreFixture } from '../fixtures';
 import { getActiveTheme, themeKneeGoldHex } from '../themes';
-import { ENTRANCE_SIDELIGHT_WIDTH, CEILING_Y, mapWallSegmentUV, vestibuleHalfWidth } from '../store-layout';
+import { CEILING_Y, mapWallSegmentUV, vestibuleHalfWidth } from '../store-layout';
+import { facadeEntryGlazing, facadeStyle } from '../storefront-architecture';
 import { vestibuleCeilingY } from '../ceiling-soffit';
 import { WINDOW_HEAD_Y } from '../storefront-facade';
 import { buildVestibuleDoor, updateVestibuleDoors, VestibuleDoor } from './doors';
@@ -365,23 +366,23 @@ export class EntranceCheckout implements StoreFixture {
     const doorMats = { frameMat, glassMat, chrome };
 
     if (hasChamber) {
-      // ----- Front wall (Z = frontZ): the reference photo's recessed-entry
-      // composition — narrow sidelight | door | door | narrow sidelight. The two
-      // full-glass leaves are ADJACENT at the store centreline, meeting at a
-      // center stile; the exit leaf is on the left (-X, swings out to the
-      // street), the entrance leaf on the right (+X, swings into the vestibule).
-      // A continuous transom of glass runs above doors and sidelights up to the
-      // storefront glazing head (WINDOW_HEAD_Y), where every window head across
-      // the whole storefront aligns. -----
-      const exitX = cx - doorW / 2;  // left leaf, hinged at its left jamb
-      const entrX = cx + doorW / 2;  // right leaf, hinged at its right jamb
-      buildGlazedWall('X', frontZ, xL, xR, [exitX, entrX], {
-        transomY: WINDOW_HEAD_Y,
-        extraMullions: [
-          cx - doorW - ENTRANCE_SIDELIGHT_WIDTH, // left sidelight's outer post
-          cx + doorW + ENTRANCE_SIDELIGHT_WIDTH, // right sidelight's outer post
-        ],
-      });
+      // Gabled stores have separate entry/exit doors and transoms around a
+      // masonry divider. Other facade styles retain the adjacent door pair.
+      const glazing = facadeEntryGlazing(doorW, facadeStyle());
+      const exitX = cx - glazing.doorCenterOffset;
+      const entrX = cx + glazing.doorCenterOffset;
+      if (glazing.dividerWidth) {
+        // Separate transoms end at the masonry instead of crossing its face.
+        buildGlazedWall('X', frontZ, xL, cx - glazing.dividerWidth / 2, [exitX], { transomY: WINDOW_HEAD_Y });
+        buildGlazedWall('X', frontZ, cx + glazing.dividerWidth / 2, xR, [entrX], { transomY: WINDOW_HEAD_Y });
+        const divider = box(glazing.dividerWidth, WINDOW_HEAD_Y, .32, frameMat, cx, WINDOW_HEAD_Y / 2, frontZ);
+        divider.visible = false; // collision proxy; the facade owns its masonry finish
+      } else {
+        buildGlazedWall('X', frontZ, xL, xR, [exitX, entrX], {
+          transomY: WINDOW_HEAD_Y,
+          extraMullions: [cx - doorW - glazing.sidelightWidth, cx + doorW + glazing.sidelightWidth],
+        });
+      }
       // The glazed wall above already frames the paired opening completely: the
       // full-width transom bar at the door head is the shared header, and the
       // posts at cx ± doorW (hinge jambs) and cx (the meeting stile) are the

@@ -55,8 +55,9 @@ import { getSetting } from './settings';
 import { tryLoadUserAssetTexture, loadUserAssetSurface } from './user-assets';
 import { buildStorefrontFacade, WINDOW_HEAD_Y, SIDE_RIBBON_PANE_W } from './storefront-facade';
 import { buildShopfrontFacade } from './storefront-facade-shop';
-import { buildWindowAwnings, setWindowAwningLighting } from './storefront-awning';
+import { mapFacadeUV } from './facade-masonry';
 import { setFacadeEntryLighting } from './storefront-entry-model';
+import { buildWindowAwnings, setWindowAwningLighting } from './storefront-awning';
 import { buildStorefrontLogo3D } from './logo-storefront';
 import { create3DDoubleLayeredSign, markSignMesh, auditSignMeshes } from './sign-builders';
 import { retailAudio } from './audio';
@@ -402,8 +403,9 @@ export function buildStore(scene: StoreScene) {
     const segW = b - a;
     const veneer = new THREE.Mesh(
       new THREE.BoxGeometry(segW, KNEE_EXT_H, kneeVeneerThick),
-      kneeVeneerMaterial(segW / BRICK_FEET, KNEE_EXT_H / BRICK_FEET));
+      kneeVeneerMaterial(isShopFacade ? segW / BRICK_FEET : 1, isShopFacade ? KNEE_EXT_H / BRICK_FEET : 1));
     veneer.position.set(STORE_CENTER_X + (a + b) / 2, KNEE_EXT_H / 2, kneeVeneerZ);
+    if (!isShopFacade) mapFacadeUV(veneer.geometry, veneer.position);
     veneer.castShadow = true;
     veneer.receiveShadow = true;
     dimEnvOutside(veneer);
@@ -453,8 +455,9 @@ export function buildStore(scene: StoreScene) {
     setWindowAwningLighting(scene.scene, scene.outdoor.outsideMode);
   }
 
-  // Optional real photo-scanned facade masonry from the git-ignored user-assets
-  // tree: brick (ambientCG Bricks051, CC0). Every material brickMaterial() cloned is now in
+  // Optional installed masonry replaces the measured running-bond fallback.
+  // The bundled scan has a different bond and module, so it is not substituted
+  // for this facade. Every material brickMaterial() cloned is now in
   // brickMats; when the real map loads we re-clone it onto each, preserving that
   // material's per-mesh repeat/offset/anisotropy. A 404 leaves the procedural
   // masonry up.
@@ -478,7 +481,7 @@ export function buildStore(scene: StoreScene) {
           mat.needsUpdate = true;
         }
         scene.requestRender();
-      }, { srgb });
+      }, { srgb, shippedSurfaceFallback: false });
     };
     swapBrickSlot('map', 'color.png', true);
     swapBrickSlot('normalMap', 'normal.png', false);
@@ -633,12 +636,14 @@ export function buildStore(scene: StoreScene) {
       // Mount the logo on the gable face (its layered planes step outward from
       // the anchor's z, so the back plane sits just proud of the brick).
       entranceLogo.position.set(facade.logoAnchor.x, facade.logoAnchor.y, facade.logoAnchor.z);
+      entranceLogo.name = 'storefrontLayeredLogo';
       scene.scene.add(entranceLogo);
     }
 
     // Add a PointLight directly in front of the glowing sign to illuminate the tower and building front
     const logoLightColor = new THREE.Color(theme.palette.secondary);
     const logoLight = new THREE.PointLight(logoLightColor, 15, 30); // Warm theme light
+    logoLight.name = 'storefrontSignLight';
     logoLight.position.set(facade.logoAnchor.x, facade.logoAnchor.y, facade.logoAnchor.z + 3.5);
     logoLight.castShadow = true;
     logoLight.shadow.bias = -0.002;
@@ -658,6 +663,7 @@ export function buildStore(scene: StoreScene) {
     logoLight.shadow.needsUpdate = true;
     scene.scene.add(logoLight);
     scene.outdoor.logoLight = logoLight;
+    setFacadeEntryLighting(scene.scene, scene.outdoor.outsideMode);
   }
 
 

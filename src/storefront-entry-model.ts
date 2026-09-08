@@ -7,6 +7,8 @@ import { selfLit } from './material-lighting';
 import type { OutsideMode } from './outdoor-lighting';
 import { onBrandChange } from './brand-live';
 import { getActiveTheme } from './themes';
+import { createFacadeTileMaterial, mapFacadeUV } from './facade-masonry';
+import { createBrickTexture } from './canvas-textures';
 
 interface EntryParams {
   style: FacadeStyle;
@@ -24,12 +26,13 @@ export function buildFacadeEntryModel(ctx: FixtureContext, p: EntryParams): THRE
   group.position.set(STORE_CENTER_X, 0, FRONT_GLASS_Z);
   const d = facadeDimensions(ctx.ceilingY, p.entryHalfWidth, p.style);
   const brick = p.brickMaterial(1, 1);
-  const tile = new THREE.MeshStandardMaterial({ color: p.primary, roughness: .34, envMapIntensity: .2 });
+  const tile = createFacadeTileMaterial(p.primary);
+  const soldier = new THREE.MeshStandardMaterial({ ...createBrickTexture('soldier'), roughness: 1, envMapIntensity: .2 });
   const trim = new THREE.MeshStandardMaterial({ color: 0xd8cfb7, roughness: .75, envMapIntensity: .2 });
   const coping = new THREE.MeshStandardMaterial({ color: 0x292d31, metalness: .35, roughness: .52, envMapIntensity: .2 });
   const soffit = new THREE.MeshStandardMaterial({ color: 0x32322f, roughness: .9, envMapIntensity: .2 });
   const canopy = selfLit(new THREE.MeshStandardMaterial({ color: p.primary, emissive: p.primary, emissiveIntensity: 0, roughness: .6, envMapIntensity: .2 }), 'light-source');
-  const finishes = { FacadeBrick: brick, FacadeTile: tile, FacadeTrim: trim, FacadeCoping: coping, FacadeSoffit: soffit, FacadeCanopy: canopy };
+  const finishes = { FacadeBrick: brick, FacadeSoldierBrick: soldier, FacadeTile: tile, FacadeTrim: trim, FacadeCoping: coping, FacadeSoffit: soffit, FacadeCanopy: canopy };
   const releases: (() => void)[] = [];
   const fallback = new THREE.Group();
   const m = d.massHalf, o = p.openingHalfWidth;
@@ -43,17 +46,34 @@ export function buildFacadeEntryModel(ctx: FixtureContext, p: EntryParams): THRE
   }
   shape.lineTo(-m, top); shape.closePath();
   const geo = new THREE.ExtrudeGeometry(shape, { depth: d.frontProjection-.1, bevelEnabled: false });
-  const uv = geo.getAttribute('uv');
-  for (let i=0; i<uv.count; i++) uv.setXY(i, uv.getX(i)/4, uv.getY(i)/4);
+  mapFacadeUV(geo, new THREE.Vector3(STORE_CENTER_X, 0, FRONT_GLASS_Z + .1));
   const portal = new THREE.Mesh(geo, brick);
   portal.position.z = .1; portal.castShadow = portal.receiveShadow = true;
   fallback.add(portal);
+  const box = (w: number, h: number, depth: number, x: number, y: number, z: number, material: THREE.Material) => {
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, depth), material);
+    mesh.position.set(x, y, z);
+    mapFacadeUV(mesh.geometry, mesh.position.clone().add(group.position));
+    mesh.castShadow = mesh.receiveShadow = true;
+    fallback.add(mesh);
+    return mesh;
+  };
   for (const sign of [-1, 1]) {
     const width = p.style === 'arcaded-brick' ? 8 : d.pierWidth;
-    const pier = new THREE.Mesh(new THREE.BoxGeometry(width, d.pierTop, 2.3), brick);
-    pier.position.set(sign*(m+width/2), d.pierTop/2, 1.25);
-    pier.castShadow = pier.receiveShadow = true;
-    fallback.add(pier);
+    const front = p.style === 'gabled-brick' ? 1.68 : 2.4;
+    box(width, d.pierTop, front-.1, sign*(m+width/2), d.pierTop/2, (front+.1)/2, brick);
+    if (p.style === 'gabled-brick') {
+      box(width, 1.05, .04, sign*(m+width/2), 14.925, front+.025, tile);
+      for (const [bottom, top] of [[0, 2], [15.45, d.pierTop]]) {
+        box(width, top-bottom, .025, sign*(m+width/2), (bottom+top)/2, front+.013, soldier);
+      }
+    }
+  }
+  if (p.style === 'gabled-brick') {
+    for (const top of [d.headerTop, d.towerStripeTop]) box(m*2, 1.05, .07, 0, top-.525, 1.435, tile);
+    box(m*2, 2.15, .025, 0, 11.275, 1.413, soldier);
+    box(1.6, 9.1, .43, 0, 4.55, .035, brick);
+    for (const sign of [-1, 1]) box(o-4, 1.82, .43, sign*(o+4)/2, .91, .035, brick);
   }
   group.add(fallback);
   // All finishes remain reachable by the normal scene cleanup, including
@@ -64,18 +84,18 @@ export function buildFacadeEntryModel(ctx: FixtureContext, p: EntryParams): THRE
     model.traverse(obj => {
       if (!(obj instanceof THREE.Mesh)) return;
       const position = obj.geometry.getAttribute('position');
-      const uv = obj.geometry.getAttribute('uv');
+      const authoredOpening = p.style === 'gabled-brick' ? 6.75 : 5.55;
+      const authoredMass = p.style === 'gabled-brick' ? 7.15 : 7.9;
       for (let i=0; i<position.count; i++) {
         const x = position.getX(i), y = position.getY(i), a = Math.abs(x);
-        const newX = a <= 5.55 ? a*o/5.55
-          : a <= 7.9 ? o+(a-5.55)*(m-o)/2.35 : m+a-7.9;
+        const newX = a <= authoredOpening ? a*o/authoredOpening
+          : a <= authoredMass ? o+(a-authoredOpening)*(m-o)/(authoredMass-authoredOpening) : m+a-authoredMass;
         const newY = y+lift*Math.max(0, Math.min(1, (y-9.15)/7.95));
         position.setXYZ(i, Math.sign(x)*newX, newY, position.getZ(i));
-        if (uv && y > 9.15) uv.setY(i, uv.getY(i)+(newY-y)/4);
       }
       position.needsUpdate = true;
-      if (uv) uv.needsUpdate = true;
       obj.geometry.computeVertexNormals();
+      mapFacadeUV(obj.geometry, group.position);
       obj.geometry.computeBoundingBox(); obj.geometry.computeBoundingSphere();
     });
   };
@@ -108,6 +128,7 @@ export function buildFacadeEntryModel(ctx: FixtureContext, p: EntryParams): THRE
     unsubscribe();
     releases.forEach(release => release());
     Object.values(finishes).forEach(material => material.dispose());
+    [tile.map, tile.bumpMap, soldier.map, soldier.normalMap, soldier.roughnessMap].forEach(texture => texture?.dispose());
   };
   group.userData.dispose = dispose;
   group.addEventListener('removed', dispose);
@@ -116,6 +137,21 @@ export function buildFacadeEntryModel(ctx: FixtureContext, p: EntryParams): THRE
 
 export function setFacadeEntryLighting(scene: THREE.Scene, mode: OutsideMode): void {
   scene.getObjectByName('storefrontEntryModel')?.userData.setOutsideMode?.(mode);
+  // The facade sign is backlit after dusk, with no bloom obscuring its ink
+  // in daylight. Store the authored night value once so toggles do not drift.
+  const level = mode === 'night' ? 1 : mode === 'sunset' ? .2 : 0;
+  for (const name of ['storefrontLogo3D', 'storefrontLayeredLogo']) {
+    scene.getObjectByName(name)?.traverse(obj => {
+      if (!(obj instanceof THREE.Mesh)) return;
+      for (const material of Array.isArray(obj.material) ? obj.material : [obj.material]) {
+        if (!(material instanceof THREE.MeshStandardMaterial)) continue;
+        material.userData.facadeNightEmissive ??= material.emissiveIntensity;
+        material.emissiveIntensity = material.userData.facadeNightEmissive * level;
+      }
+    });
+  }
+  const light = scene.getObjectByName('storefrontSignLight');
+  if (light instanceof THREE.PointLight) light.intensity = 15 * level;
 }
 
 export function disposeFacadeEntry(scene: THREE.Scene): void {

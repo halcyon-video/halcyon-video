@@ -18,7 +18,9 @@ by the knee-wall veneer and `buildStorefrontFacade`), replacing the procedural
 
 Tiled at `BRICK_FEET` (4 ft) per texture tile, matching the procedural scale.
 
-## Shipped default
+## Optional scan
 
-This copy is the 1K default the repo ships (downscaled from the 2K pack).
-Drop the full-res set into `public/user-assets/surfaces/store-brick/` to override it.
+This is the 1K scan retained from the earlier facade (downscaled from the 2K
+pack). The current facade uses its measured procedural running bond instead:
+this scan contains short headers and a different course count. Install a set
+into `public/user-assets/surfaces/store-brick/` to opt into a custom surface.

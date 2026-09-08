@@ -9,6 +9,7 @@ import { facadeStyle, facadeDimensions, type FacadeStyle } from './storefront-ar
 import { buildFacadeEntryModel } from './storefront-entry-model';
 import { onBrandChange } from './brand-live';
 import { getActiveTheme } from './themes';
+import { createFacadeTileMaterial, mapFacadeUV } from './facade-masonry';
 import { WINDOW_BAY_TARGET_WIDTH, FRONT_WINDOW_CORNER_MARGIN, STORE_CENTER_X, FRONT_GLASS_Z } from './store-layout';
 
 export interface FacadeBuildParams {
@@ -61,7 +62,6 @@ export interface StorefrontFacade {
 
 const CX = STORE_CENTER_X; // store centreline
 const FRONT_Z = FRONT_GLASS_Z; // storefront glass line
-const BRICK_FEET = 4.0; // must match three-scene.ts's brick-texture tile size
 
 // Entrance-tower masonry, in feet from the store centreline. The gabled mass
 // overhangs the vestibule glass by ENTRY_MASS_OVERHANG on each side, and a
@@ -131,7 +131,7 @@ export function rightSideDoorZone(sideRibbon: { frontZ: number; backZ: number } 
 }
 
 export function buildStorefrontFacade(params: FacadeBuildParams): StorefrontFacade {
-  const { storeWidth, backWallZ, ceilingY, entryHalfWidth, entryOpeningHalfWidth, brickMaterial, stripeColor, trimColor, sideRibbon, frontCornerMargin } = params;
+  const { storeWidth, backWallZ, ceilingY, entryHalfWidth, entryOpeningHalfWidth, brickMaterial, stripeColor, sideRibbon, frontCornerMargin } = params;
   const group = new THREE.Group();
   group.name = 'storefrontFacade';
 
@@ -145,28 +145,15 @@ export function buildStorefrontFacade(params: FacadeBuildParams): StorefrontFaca
   const stripeCY = stripeTop - stripeH / 2;
   const towerFrontZ = FRONT_Z + dimensions.frontProjection;
 
-  const glazedTile = new THREE.MeshStandardMaterial({
-    color: new THREE.Color(stripeColor),
-    roughness: 0.32, // glazed tile: glossier than brick, duller than glass
-    metalness: 0.0,
-    envMapIntensity: 0.9,
-  });
-  // A single brass course capping the glazed band — the trim line that ties
-  // the facade to the store's own livery. Derived from the trim color the
-  // caller passes, so it follows the theme like everything else out here.
-  const trimCourse = new THREE.MeshStandardMaterial({
-    color: new THREE.Color(trimColor),
-    roughness: 0.38,
-    metalness: 0.25,
-    envMapIntensity: 1.0,
-  });
-  const TRIM_H = 0.16; // ft — one course
+  const glazedTile = createFacadeTileMaterial(stripeColor);
   const unsubscribe = onBrandChange(() => {
     const palette = getActiveTheme().palette;
     glazedTile.color.set(palette.primary);
-    trimCourse.color.set(palette.secondary);
   });
-  group.addEventListener('removed', unsubscribe);
+  group.addEventListener('removed', () => {
+    unsubscribe();
+    glazedTile.map?.dispose(); glazedTile.bumpMap?.dispose();
+  });
   const coping = new THREE.MeshStandardMaterial({ color: 0x26282b, roughness: 0.55, metalness: 0.35 });
 
   const addBox = (
@@ -176,13 +163,18 @@ export function buildStorefrontFacade(params: FacadeBuildParams): StorefrontFaca
   ): THREE.Mesh => {
     const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
     m.position.set(x, y, z);
+    if (mat === glazedTile) mapFacadeUV(m.geometry, m.position);
     m.castShadow = shadows;
     m.receiveShadow = true;
     group.add(m);
     return m;
   };
-  const brickBox = (w: number, h: number, d: number, x: number, y: number, z: number) =>
-    addBox(w, h, d, x, y, z, brickMaterial(Math.max(w, d) / BRICK_FEET, h / BRICK_FEET));
+  const masonry = brickMaterial(1, 1);
+  const brickBox = (w: number, h: number, d: number, x: number, y: number, z: number) => {
+    const mesh = addBox(w, h, d, x, y, z, masonry);
+    mapFacadeUV(mesh.geometry, mesh.position);
+    return mesh;
+  };
 
   // ── Wing parapet fascia ──────────────────────────────────────────────────
   const fasciaH = parapetTop - fasciaBot;
@@ -198,7 +190,6 @@ export function buildStorefrontFacade(params: FacadeBuildParams): StorefrontFaca
   brickBox(storeWidth + 1.5, parapetTop - frontBandBot, 0.7, CX, (frontBandBot + parapetTop) / 2, FRONT_Z + 0.4);
   if (style === 'gabled-brick') {
     addBox(storeWidth + 1.82, stripeH, 0.16, CX, stripeCY, FRONT_Z + 0.83, glazedTile);
-    addBox(storeWidth + 1.82, TRIM_H, 0.17, CX, stripeTop + TRIM_H / 2, FRONT_Z + 0.835, trimCourse);
   } else {
     const stone = new THREE.MeshStandardMaterial({ color: 0xd8cfb7, roughness: .8 });
     addBox(storeWidth + 1.8, .40, .96, CX, parapetTop-.30, FRONT_Z+.48, stone);
@@ -245,8 +236,9 @@ export function buildStorefrontFacade(params: FacadeBuildParams): StorefrontFaca
     }
     brickBox(0.7, fasciaH, sideLen, wallX + s * 0.4, fasciaCY, sideCZ);
     if (style === 'gabled-brick') {
-      addBox(0.16, stripeH, sideLen, wallX + s * 0.83, stripeCY, sideCZ, glazedTile);
-      addBox(0.17, TRIM_H, sideLen, wallX + s * 0.835, stripeTop + TRIM_H / 2, sideCZ, trimCourse);
+      // Meet the back of the front strip at z=FRONT_Z+.75. Ending at the
+      // glass line leaves a visible untiled gap around the outside corner.
+      addBox(0.16, stripeH, sideLen + .75, wallX + s * 0.83, stripeCY, sideCZ + .375, glazedTile);
     }
     // Side coping stops at the front coping's back face (FRONT_Z - 0.1) instead
     // of running 0.15 past the corner: the two run perpendicular at the same
@@ -368,7 +360,7 @@ export function buildStorefrontFacade(params: FacadeBuildParams): StorefrontFaca
 
   // The brand cabinet sits over the entry, below the peak. Separate gable
   // and fascia bounds also keep optional freestanding letters inside the wall.
-  const logoWidth = Math.min(9.0, massHalf * 1.05);
+  const logoWidth = Math.min(9.0, entryHalfWidth * 1.05);
   const logoHeight = logoWidth * 0.6;
   const logoAnchor: FacadeLogoAnchor = {
     x: CX,

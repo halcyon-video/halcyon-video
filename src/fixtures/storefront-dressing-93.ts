@@ -25,6 +25,7 @@
 import * as THREE from 'three';
 import type { StoreScene } from '../three-scene';
 import { getStorefrontSpec, ENTRANCE_SIDELIGHT_WIDTH } from '../store-layout';
+import { facadeEntryGlazing, facadeStyle } from '../storefront-architecture';
 import { markSignMesh } from '../sign-builders';
 
 const texCache = new Map<string, THREE.CanvasTexture>();
@@ -116,7 +117,8 @@ export function buildStorefrontDressing93(scene: StoreScene): void {
     // about the centreline (see buildGlazedWall's extraMullions in
     // src/entrance/index.ts). A storefront-door entrance has no sidelight to
     // hang this on (GH #110) — see the gate above the EAS pedestals below.
-    const x = 11.0 + spec.doorWidth + ENTRANCE_SIDELIGHT_WIDTH / 2;
+    const dividerHalf = facadeEntryGlazing(spec.doorWidth, facadeStyle()).dividerWidth / 2;
+    const x = 11.0 + dividerHalf + spec.doorWidth + ENTRANCE_SIDELIGHT_WIDTH / 2;
     const panel = new THREE.Mesh(new THREE.PlaneGeometry(1.35, 0.9), printedOut(letterboardTex()));
     panel.position.set(x, 4.8, glassZ - 0.06);
     markSignMesh(panel);

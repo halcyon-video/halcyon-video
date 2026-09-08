@@ -11,6 +11,7 @@ import type { Movie } from './jellyfin';
 // derive from it and still be a plain `const`. See that module's header for
 // why switching format is a reload rather than a scene rebuild.
 import { activeStoreFormat, type CounterShape } from './store-format.ts';
+import { facadeEntryGlazing, facadeStyle } from './storefront-architecture.ts';
 
 const FORMAT = activeStoreFormat();
 
@@ -180,18 +181,11 @@ export const SIDE_PANES_BASELINE = FORMAT.sidePanesBaseline;
 // much (GH #110).
 export const FRONT_WINDOW_CORNER_MARGIN = FORMAT.frontCornerMargin;
 
-// Width of the narrow sidelight pane flanking each entrance door leaf (ft) —
-// the reference photo's recess composition is sidelight | door | door |
-// sidelight, the two leaves adjacent at the centreline. Shared by the
-// vestibule front-wall build (src/entrance/index.ts) and the exterior
-// facade's recess opening (entranceOpeningHalfWidth below).
-export const ENTRANCE_SIDELIGHT_WIDTH = 2.0;
-
-// Half-width of the glazed entry composition (door pair + sidelights) plus a
-// small reveal — the exterior facade sizes its recessed entry-bay opening off
-// this so the brick jamb pillars frame exactly the doors + sidelights.
+// The facade opening and entrance glazing share the door, sidelight and
+// central-divider dimensions. The small reveal keeps the frames clear.
+export const ENTRANCE_SIDELIGHT_WIDTH = facadeEntryGlazing(FORMAT.doorWidth, facadeStyle()).sidelightWidth;
 export function entranceOpeningHalfWidth(spec: Pick<StorefrontSpec, 'doorWidth'>): number {
-  return spec.doorWidth + ENTRANCE_SIDELIGHT_WIDTH + 0.35;
+  return facadeEntryGlazing(spec.doorWidth, facadeStyle()).openingHalfWidth;
 }
 
 // Baseline (small-store) front-wall width, sized by the window spec: exactly

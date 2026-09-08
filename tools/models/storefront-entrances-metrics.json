@@ -1,7 +1,7 @@
 {
   "gabled-brick": {
-    "triangles": 292,
-    "meshes": 4,
+    "triangles": 412,
+    "meshes": 5,
     "nonManifoldEdges": 0
   },
   "flat-parapet": {
