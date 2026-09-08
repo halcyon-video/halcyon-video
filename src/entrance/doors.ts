@@ -14,6 +14,7 @@ import * as THREE from 'three';
 import { addGlassReflectionPane } from '../glass-reflection';
 import { FixtureContext } from '../fixtures';
 import { StorefrontSpec } from '../store-layout';
+import { createDoorLeafFrame } from './door-leaf';
 
 export interface VestibuleDoor {
   group: THREE.Group;
@@ -113,6 +114,13 @@ export function buildVestibuleDoor(
   const frameShrink = isSingle ? 0.12 : 0.2;
   const localOffset = isSliding ? 0 : (alongX ? (hingeOnLeftOrInner ? w / 2 : -w / 2) : (hingeOnLeftOrInner ? w / 2 : -w / 2));
 
+  const leafFrame = new THREE.Mesh(createDoorLeafFrame(w, doorH), frameMat);
+  leafFrame.name = 'movingDoorLeafFrame';
+  if (alongX) leafFrame.position.x = localOffset;
+  else { leafFrame.rotation.y = Math.PI / 2; leafFrame.position.z = localOffset; }
+  leafFrame.castShadow = leafFrame.receiveShadow = true;
+  addToDoorGroup(leafFrame);
+
   if (alongX) {
     const glassMesh = new THREE.Mesh(new THREE.BoxGeometry(w - frameShrink, doorH - 0.4, glassThick), glassMat);
     glassMesh.position.set(localOffset, doorH / 2, 0);
@@ -128,7 +136,7 @@ export function buildVestibuleDoor(
     if (isSingle) {
       // Vertical pull handle near the leaf's free edge instead of a push bar.
       const handleMesh = new THREE.Mesh(new THREE.BoxGeometry(0.06, 1.1, 0.08), chrome);
-      handleMesh.position.set(localOffset + (hingeOnLeftOrInner ? -0.55 : 0.55), barY, -0.14);
+      handleMesh.position.set(localOffset + (hingeOnLeftOrInner ? 0.55 : -0.55), barY, -0.14);
       handleMesh.castShadow = true;
       handleMesh.receiveShadow = true;
       addToDoorGroup(handleMesh);
@@ -138,6 +146,18 @@ export function buildVestibuleDoor(
       pushBarMesh.castShadow = true;
       pushBarMesh.receiveShadow = true;
       addToDoorGroup(pushBarMesh);
+      const pullBar = new THREE.Mesh(new THREE.CylinderGeometry(.035, .035, w-.7, 12), chrome);
+      pullBar.name = 'exteriorDoorPull';
+      pullBar.rotation.z = Math.PI/2;
+      pullBar.position.set(localOffset, barY, .16);
+      pullBar.castShadow = true;
+      addToDoorGroup(pullBar);
+      for (const side of [-1, 1]) {
+        const mount = new THREE.Mesh(new THREE.CylinderGeometry(.045, .045, .11, 12), chrome);
+        mount.rotation.x = Math.PI/2;
+        mount.position.set(localOffset + side*(w-.8)/2, barY, .105);
+        addToDoorGroup(mount);
+      }
     }
   } else {
     const glassMesh = new THREE.Mesh(new THREE.BoxGeometry(glassThick, doorH - 0.4, w - frameShrink), glassMat);
@@ -153,7 +173,7 @@ export function buildVestibuleDoor(
 
     if (isSingle) {
       const handleMesh = new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.1, 0.06), chrome);
-      handleMesh.position.set(-0.14, barY, localOffset + (hingeOnLeftOrInner ? -0.55 : 0.55));
+      handleMesh.position.set(-0.14, barY, localOffset + (hingeOnLeftOrInner ? 0.55 : -0.55));
       handleMesh.castShadow = true;
       handleMesh.receiveShadow = true;
       addToDoorGroup(handleMesh);

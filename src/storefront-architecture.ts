@@ -11,12 +11,12 @@ export function facadeStyle(): FacadeStyle {
 
 /** Separate entry/exit leaves flank the gabled store's masonry divider. */
 export function facadeEntryGlazing(doorWidth: number, style: FacadeStyle) {
-  const dividerWidth = style === 'gabled-brick' ? 1.6 : 0;
-  const sidelightWidth = style === 'gabled-brick' ? 2.4 : 2;
+  const dividerWidth = style === 'gabled-brick' ? 1.8 : 0;
+  const sidelightWidth = style === 'gabled-brick' ? 2.8 : 2;
   return {
     dividerWidth, sidelightWidth,
     doorCenterOffset: (doorWidth + dividerWidth) / 2,
-    openingHalfWidth: doorWidth + sidelightWidth + dividerWidth / 2 + .35,
+    openingHalfWidth: doorWidth + sidelightWidth + dividerWidth / 2 + (style === 'gabled-brick' ? .3 : .35),
   };
 }
 
@@ -25,7 +25,7 @@ export function facadeEntryGlazing(doorWidth: number, style: FacadeStyle) {
 // gable by the full difference between the glazing and interior ceiling.
 export function facadeDimensions(ceilingY: number, entryHalfWidth: number, style: FacadeStyle) {
   const parapetTop = Math.max(16.8, ceilingY + 1.2);
-  const massHalf = entryHalfWidth - (style === 'gabled-brick' ? .75 : 0);
+  const massHalf = entryHalfWidth - (style === 'gabled-brick' ? .3 : 0);
   const gableBase = parapetTop + .3;
   return {
     parapetTop, massHalf, gableBase,

@@ -27,10 +27,10 @@ import { selfLit } from '../material-lighting';
 //                 street side (+X = right when seen from outside)
 //
 //  - Front (street, +Z): the reference photo's composition — TWO full-glass
-//    aluminum-framed doors ADJACENT at the store centreline, meeting at a
-//    center stile, with a narrow (~2 ft) sidelight ("sl") flanking each, and
-//    a continuous glass TRANSOM above doors and sidelights running up to the
-//    storefront glazing head (WINDOW_HEAD_Y). Exit leaf on the left (-X),
+//    aluminum-framed doors separated by masonry in the gabled facade, with
+//    a full-height sidelight ("sl") flanking each. Each door has its own
+//    transom below a broad aluminum head. Other facades retain paired doors.
+//    Exit leaf on the left (-X),
 //    entrance leaf on the right (+X).
 //  - A glass pane down the centre (X = cx) splits entrance (right) from exit
 //    (left).
@@ -312,7 +312,7 @@ export class EntranceCheckout implements StoreFixture {
     // delineate the narrow sidelights beside the door pair.
     const buildGlazedWall = (
       orient: 'X' | 'Z', fixed: number, s0: number, s1: number, gaps: number[],
-      opts?: { transomY?: number; extraMullions?: number[] },
+      opts?: { transomY?: number; extraMullions?: number[]; splitTransom?: boolean; sillY?: number },
     ) => {
       // place a box whose long axis lies along the wall's run direction
       const along = (center: number, lenAlong: number, y: number, h: number, thick: number, mat: THREE.Material) => {
@@ -328,7 +328,8 @@ export class EntranceCheckout implements StoreFixture {
       if (s1 - cur > 0.01) panels.push([cur, s1]);
 
       // glass: lower panels beside the doors + a full-width transom above the doors
-      panels.forEach(([a, b]) => along((a + b) / 2, b - a, doorH / 2, doorH, wallT, glassMat));
+      const sillY = opts?.sillY ?? 0;
+      panels.forEach(([a, b]) => along((a + b) / 2, b - a, (doorH + sillY) / 2, doorH - sillY, wallT, glassMat));
       along((s0 + s1) / 2, s1 - s0, doorH + (wallH - doorH) / 2, wallH - doorH, wallT, glassMat);
 
       // vertical mullions at every panel/gap boundary (adjacent door gaps
@@ -341,7 +342,7 @@ export class EntranceCheckout implements StoreFixture {
       if (!opts?.transomY) panels.forEach(([a, b]) => { if (b - a > 4.5) verts.add((a + b) / 2); });
       opts?.extraMullions?.forEach((v) => verts.add(v));
       verts.forEach((v) => {
-        const fullHeight = !opts?.transomY || Math.abs(v - s0) < 0.01 || Math.abs(v - s1) < 0.01;
+        const fullHeight = opts?.splitTransom || !opts?.transomY || Math.abs(v - s0) < 0.01 || Math.abs(v - s1) < 0.01;
         if (fullHeight) along(v, frameT, wallH / 2, wallH, frameD, frameMat);
         else along(v, frameT, doorH / 2, doorH, frameD, frameMat);
       });
@@ -352,10 +353,15 @@ export class EntranceCheckout implements StoreFixture {
       // second full-width rail at the glazing head; otherwise a short head
       // rail across each door opening, as before.
       along((s0 + s1) / 2, s1 - s0, wallH - frameT / 2, frameT, frameD, frameMat);
-      panels.forEach(([a, b]) => along((a + b) / 2, b - a, frameT / 2, frameT, frameD, frameMat));
+      panels.forEach(([a, b]) => along((a + b) / 2, b - a, sillY + frameT / 2, frameT, frameD, frameMat));
       if (opts?.transomY) {
-        along((s0 + s1) / 2, s1 - s0, doorH, frameT, frameD, frameMat);
-        along((s0 + s1) / 2, s1 - s0, opts.transomY, frameT, frameD, frameMat);
+        if (opts.splitTransom) {
+          intervals.forEach(([a, b]) => along((a+b)/2, b-a, doorH+.10, .28, frameD, frameMat));
+          along((s0+s1)/2, s1-s0, opts.transomY-.325, .65, frameD, frameMat);
+        } else {
+          along((s0 + s1) / 2, s1 - s0, doorH, frameT, frameD, frameMat);
+          along((s0 + s1) / 2, s1 - s0, opts.transomY, frameT, frameD, frameMat);
+        }
       } else {
         intervals.forEach(([a, b]) => along((a + b) / 2, b - a, doorH, frameT, frameD, frameMat));
       }
@@ -373,8 +379,9 @@ export class EntranceCheckout implements StoreFixture {
       const entrX = cx + glazing.doorCenterOffset;
       if (glazing.dividerWidth) {
         // Separate transoms end at the masonry instead of crossing its face.
-        buildGlazedWall('X', frontZ, xL, cx - glazing.dividerWidth / 2, [exitX], { transomY: WINDOW_HEAD_Y });
-        buildGlazedWall('X', frontZ, cx + glazing.dividerWidth / 2, xR, [entrX], { transomY: WINDOW_HEAD_Y });
+        const entryGlazing = { transomY: WINDOW_HEAD_Y, splitTransom: true, sillY: 1.82 };
+        buildGlazedWall('X', frontZ, cx - glazing.openingHalfWidth, cx - glazing.dividerWidth / 2, [exitX], entryGlazing);
+        buildGlazedWall('X', frontZ, cx + glazing.dividerWidth / 2, cx + glazing.openingHalfWidth, [entrX], entryGlazing);
         const divider = box(glazing.dividerWidth, WINDOW_HEAD_Y, .32, frameMat, cx, WINDOW_HEAD_Y / 2, frontZ);
         divider.visible = false; // collision proxy; the facade owns its masonry finish
       } else {

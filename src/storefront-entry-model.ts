@@ -9,6 +9,7 @@ import { onBrandChange } from './brand-live';
 import { getActiveTheme } from './themes';
 import { createFacadeTileMaterial, mapFacadeUV } from './facade-masonry';
 import { createBrickTexture } from './canvas-textures';
+import { addStorefrontParkingPlaques } from './storefront-parking-plaques';
 
 interface EntryParams {
   style: FacadeStyle;
@@ -30,7 +31,8 @@ export function buildFacadeEntryModel(ctx: FixtureContext, p: EntryParams): THRE
   const soldier = new THREE.MeshStandardMaterial({ ...createBrickTexture('soldier'), roughness: 1, envMapIntensity: .2 });
   const trim = new THREE.MeshStandardMaterial({ color: 0xd8cfb7, roughness: .75, envMapIntensity: .2 });
   const coping = new THREE.MeshStandardMaterial({ color: 0x292d31, metalness: .35, roughness: .52, envMapIntensity: .2 });
-  const soffit = new THREE.MeshStandardMaterial({ color: 0x32322f, roughness: .9, envMapIntensity: .2 });
+  const soffit = p.style === 'gabled-brick' ? p.brickMaterial(1, 1)
+    : new THREE.MeshStandardMaterial({ color: 0x32322f, roughness: .9, envMapIntensity: .2 });
   const canopy = selfLit(new THREE.MeshStandardMaterial({ color: p.primary, emissive: p.primary, emissiveIntensity: 0, roughness: .6, envMapIntensity: .2 }), 'light-source');
   const finishes = { FacadeBrick: brick, FacadeSoldierBrick: soldier, FacadeTile: tile, FacadeTrim: trim, FacadeCoping: coping, FacadeSoffit: soffit, FacadeCanopy: canopy };
   const releases: (() => void)[] = [];
@@ -67,8 +69,11 @@ export function buildFacadeEntryModel(ctx: FixtureContext, p: EntryParams): THRE
     const front = d.pierFront, back = d.pierBack;
     if (p.style === 'gabled-brick') {
       for (const [bottom, top, material] of [[0, 2, soldier], [2, 14.4, brick], [14.4, 15.45, tile], [15.45, d.pierTop, soldier]] as const) {
-        box(width, top-bottom, front-back, sign*(m+width/2), (bottom+top)/2, (front+back)/2, material);
+        const courseBack = bottom >= 14.4 ? .1 : back;
+        const step = bottom === 0 ? .2 : 0;
+        box(width+step, top-bottom, front-courseBack+step, sign*(m+width/2), (bottom+top)/2, (front+courseBack)/2, material);
       }
+      box(width, 14.4-d.headerBottom, back-.1, sign*(m+width/2), (14.4+d.headerBottom)/2, (back+.1)/2, brick);
       box(m-o, d.headerBottom, .65, sign*(m+o)/2, d.headerBottom/2, .425, brick);
     } else {
       box(width, d.pierTop, front-back, sign*(m+width/2), d.pierTop/2, (front+back)/2, brick);
@@ -77,10 +82,11 @@ export function buildFacadeEntryModel(ctx: FixtureContext, p: EntryParams): THRE
   if (p.style === 'gabled-brick') {
     for (const top of [d.headerTop, d.towerStripeTop]) box(m*2, 1.05, .07, 0, top-.525, d.frontProjection+.035, tile);
     box(m*2, 2.15, .025, 0, 11.275, d.frontProjection+.013, soldier);
-    box(1.6, 9.1, .43, 0, 4.55, .035, brick);
-    for (const sign of [-1, 1]) box(o-4, 1.82, .43, sign*(o+4)/2, .91, .035, brick);
+    box(1.8, 9.1, .43, 0, 4.55, .035, brick);
+    for (const sign of [-1, 1]) box(3.1, 1.82, .43, sign*(o-1.55), .91, .035, brick);
   }
   group.add(fallback);
+  if (p.style === 'gabled-brick') releases.push(addStorefrontParkingPlaques(ctx, group, m+d.pierWidth/2, d.pierFront));
   // All finishes remain reachable by the normal scene cleanup, including
   // ones used only by the exported model or an optional style.
   group.userData.ownedFinishes = Object.values(finishes);
@@ -89,12 +95,16 @@ export function buildFacadeEntryModel(ctx: FixtureContext, p: EntryParams): THRE
     model.traverse(obj => {
       if (!(obj instanceof THREE.Mesh)) return;
       const position = obj.geometry.getAttribute('position');
-      const authoredOpening = p.style === 'gabled-brick' ? 6.75 : 5.55;
-      const authoredMass = p.style === 'gabled-brick' ? 7.15 : 7.9;
+      const authoredOpening = p.style === 'gabled-brick' ? 7.2 : 5.55;
+      const authoredMass = p.style === 'gabled-brick' ? 7.6 : 7.9;
       for (let i=0; i<position.count; i++) {
         const x = position.getX(i), y = position.getY(i), a = Math.abs(x);
-        const newX = a <= authoredOpening ? a*o/authoredOpening
+        let newX = a <= authoredOpening ? a*o/authoredOpening
           : a <= authoredMass ? o+(a-authoredOpening)*(m-o)/(authoredMass-authoredOpening) : m+a-authoredMass;
+        if (p.style === 'gabled-brick' && a <= authoredOpening) {
+          const doorEdge = o-3.1;
+          newX = a <= .9 ? a : a <= 4.1 ? .9+(a-.9)*(doorEdge-.9)/3.2 : doorEdge+(a-4.1);
+        }
         const newY = y+lift*Math.max(0, Math.min(1, (y-9.15)/7.95));
         position.setXYZ(i, Math.sign(x)*newX, newY, position.getZ(i));
       }

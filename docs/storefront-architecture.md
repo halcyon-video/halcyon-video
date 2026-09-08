@@ -19,8 +19,12 @@ the dark slab that previously protruded through the front wall.
 These are adaptable store designs, not architectural surveys. Windows remain
 four-foot modules and the building grows with the library. The arcade spans
 pairs of those modules. The vestibule footprint stays fixed. In the gabled
-front, the two 3.2-foot door leaves flank a 1.6-foot masonry divider with
-2.4-foot sidelights outside them. The other fronts retain their paired doors.
+front, the two 3.2-foot door leaves flank a 1.8-foot masonry divider with
+2.8-foot sidelights outside them. The other fronts retain their paired doors. The gabled sidelights have no
+waist rail or transom divider: each remains a single tall pane over its brick
+sill. Individual door transoms sit below broad aluminum heads. The moving
+leaves have continuous aluminum frames, bottom rails, and exterior pull bars;
+these parts follow their leaf when it swings or slides.
 
 ## Masonry construction
 
@@ -29,11 +33,15 @@ and 3/8-inch mortar joints. The entry header and pier caps/bases use upright
 soldier courses. Two-inch glazed squares form the blue bands: two across
 the entrance, higher short bands on the piers, and a continuous band around
 the wings. The entrance canopy projects 4.2 feet, supported by 2.75-foot-wide
-freestanding pillars. Their rear faces leave two feet clear of the finished
-wall; below the header, only short jambs remain at the recessed door plane.
+freestanding pillars. Their shafts leave two feet clear of the finished wall; the soldier plinths
+project 0.1 feet beyond each shaft face. Above the opening, continuous masonry
+returns join the pillars to the wall. Below it, only short jambs remain at the
+recessed door plane.
 The pillar bases, tile bands, and soldier caps wrap all four faces. These
 adaptable dimensions are estimates, not surveyed measurements.
-Tile abuts brick directly, without a contrasting metal strip above it.
+Tile abuts brick directly, without a contrasting metal strip above it. A
+shallow step breaks the upper wing fascia, and brick rowlock sills finish the
+front window knees. Permit-parking plates mount to both front pillar faces.
 
 Each front window wing has one 1.25-foot masonry divider between its panes.
 The glass and frames stop at the divider and resume beyond it; the divider
@@ -71,7 +79,7 @@ arches. Higher ceilings retain roof clearance without moving the door head.
 Named finish roles allow the active brand to recolor the tile and fabric;
 the normal logo renderer supplies all lettering.
 
-The gabled export contains 420 triangles across five material groups. The
+The gabled export contains 436 triangles across five material groups. The
 source checks every solid part for manifoldness. Unit checks cover aligned
 mortar courses and door clearance; the in-app navigation rig covers both roots.
 

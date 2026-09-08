@@ -88,8 +88,8 @@ metrics={}
 for style in ['gabled-brick','flat-parapet','arcaded-brick']:
     collection=bpy.data.collections.new(style);bpy.context.scene.collection.children.link(collection)
     before=set(bpy.context.scene.objects)
-    m=7.15 if style=='gabled-brick' else 7.9
-    opening=6.75 if style=='gabled-brick' else 5.55
+    m=7.6 if style=='gabled-brick' else 7.9
+    opening=7.2 if style=='gabled-brick' else 5.55
     pier_width=2.75 if style=='gabled-brick' else 2
     spring=17.1;peak=spring+6.003
     # The gabled canopy is supported by freestanding front pillars. Nothing
@@ -103,12 +103,21 @@ for style in ['gabled-brick','flat-parapet','arcaded-brick']:
         h=17.9 if style=='gabled-brick' else 18.6
         pier_front=4.48 if style=='gabled-brick' else 2.4
         pier_back=2.75 if style=='gabled-brick' else .10
-        crown('Pier cap',[(x0-.08,h),(x1+.08,h)],pier_back-.08,pier_front)
+        crown('Pier cap',[(x0-.08,h),(x1+.08,h)],(.02 if style=='gabled-brick' else pier_back-.08),pier_front)
         if style=='gabled-brick':
             # Fitted courses wrap all four faces, including the rear face
             # visible from the passage. Separate courses meet without overlap.
-            for name,y0,y1,mat in [('base',0,2,6),('shaft',2,14.4,0),('tile',14.4,15.45,1),('cap',15.45,h,6)]:
-                box('Freestanding pier '+name,x0,x1,y0,y1,pier_back,pier_front,mat)
+            box('Projecting soldier plinth',x0-.10,x1+.10,0,2,pier_back-.10,pier_front+.10,6)
+            # One L-shaped shaft: a clear passage below, with the upper return
+            # carried continuously back to the wall. No overlapping box seam.
+            side=[(pier_back,2),(pier_front,2),(pier_front,14.4),(.10,14.4),(.10,9.15),(pier_back,9.15)]
+            verts=[(x,y,z) for x in [x0,x1] for z,y in side]
+            n=len(side)
+            faces=[tuple(reversed(range(n))),tuple(range(n,2*n))]
+            faces += [(i,(i+1)%n,(i+1)%n+n,i+n) for i in range(n)]
+            mesh('Continuous pier and upper return',verts,faces,0)
+            box('Pier tile wrap',x0,x1,14.4,15.45,.10,pier_front,1)
+            box('Pier soldier capital',x0,x1,15.45,h,.10,pier_front,6)
             j0,j1=sorted([s*opening,s*m])
             box('Rear entry jamb',j0,j1,0,9.15,.10,.75,0)
         else:
@@ -120,9 +129,9 @@ for style in ['gabled-brick','flat-parapet','arcaded-brick']:
         for y0,y1 in [(9.15,10.2),(12.35,13.4)]:
             box('Entrance tile course',-m,m,y0,y1,4.201,4.27,1)
         box('Upright brick entry header',-m,m,10.2,12.35,4.201,4.225,6)
-        box('Entry exit masonry divider',-.8,.8,0,9.1,-.18,.25,0)
+        box('Entry exit masonry divider',-.9,.9,0,9.1,-.18,.25,0)
         for s in [-1,1]:
-            x0,x1=sorted([s*4,s*opening])
+            x0,x1=sorted([s*4.1,s*opening])
             box('Sidelight masonry knee',x0,x1,0,1.6,-.18,.25,0)
             box('Sidelight soldier sill',x0,x1,1.6,1.82,-.18,.32,6)
     else:

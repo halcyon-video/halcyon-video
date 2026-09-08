@@ -10,6 +10,7 @@ import { buildFacadeEntryModel } from './storefront-entry-model';
 import { onBrandChange } from './brand-live';
 import { getActiveTheme } from './themes';
 import { createFacadeTileMaterial, mapFacadeUV } from './facade-masonry';
+import { createBrickTexture } from './canvas-textures';
 import { WINDOW_BAY_TARGET_WIDTH, FRONT_WINDOW_CORNER_MARGIN, STORE_CENTER_X, FRONT_GLASS_Z } from './store-layout';
 
 export interface FacadeBuildParams {
@@ -83,6 +84,7 @@ const ENTRY_PIER_W = 2;
  * the facade is built from.
  */
 export function entryMassSolidHalfWidth(entryHalfWidth: number, style: FacadeStyle = facadeStyle()): number {
+  if (style === 'gabled-brick') return entryHalfWidth - .3 + 2.75 + .1;
   return entryHalfWidth + ENTRY_MASS_OVERHANG + (style === 'arcaded-brick' ? 8 : ENTRY_PIER_W);
 }
 
@@ -195,6 +197,22 @@ export function buildStorefrontFacade(params: FacadeBuildParams): StorefrontFaca
   brickBox(storeWidth + 1.5, parapetTop - frontBandBot, 0.7, CX, (frontBandBot + parapetTop) / 2, FRONT_Z + 0.4);
   if (style === 'gabled-brick') {
     addBox(storeWidth + 1.82, stripeH, 0.16, CX, stripeCY, FRONT_Z + 0.83, glazedTile);
+    // The upper fascia advances slightly, leaving a narrow shadow course
+    // above the tile ribbon. The brick sill is a rowlock below the glazing.
+    brickBox(storeWidth+1.5, 1.2, .10, CX, parapetTop-.6, FRONT_Z+.80);
+    const sill = new THREE.MeshStandardMaterial({ ...createBrickTexture('soldier'), roughness: 1, envMapIntensity: .2 });
+    const inner = entryHalfWidth;
+    for (const sign of [-1, 1]) {
+      const outer = storeWidth/2-frontCornerMargin;
+      const ledge = addBox(outer-inner, .22, .24, CX+sign*(outer+inner)/2, 1.89, FRONT_Z+.31, sill);
+      mapFacadeUV(ledge.geometry, ledge.position);
+      const uv = ledge.geometry.getAttribute('uv');
+      for (let i=0; i<uv.count; i++) uv.setY(i, (uv.getY(i)-1.78/4)*3);
+    }
+    group.addEventListener('removed', () => {
+      [sill.map, sill.normalMap, sill.roughnessMap].forEach(texture => texture?.dispose());
+      sill.dispose();
+    });
   } else {
     const stone = new THREE.MeshStandardMaterial({ color: 0xd8cfb7, roughness: .8 });
     addBox(storeWidth + 1.8, .40, .96, CX, parapetTop-.30, FRONT_Z+.48, stone);
