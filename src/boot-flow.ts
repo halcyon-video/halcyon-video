@@ -47,6 +47,7 @@ import {
   listMediaSources,
   primaryMediaSource,
 } from './media-sources';
+import { verifySeerrCredentialsLive } from './seerr-service-status';
 import {
   initSetupFlow,
   openSetupTerminal,
@@ -474,6 +475,20 @@ export function showLoginOverlay() {
     // visitor to paste a credential that would only override a working
     // connection with their own.
     hideIfOperatorManaged('jellyseerr', savedJellyseerrUrl, [jellyseerrUrlInput, jellyseerrKeyInput]);
+
+    const seerrStatusEl = document.getElementById('login-jellyseerr-status') as HTMLDivElement | null;
+    if (savedJellyseerrUrl && savedJellyseerrKey && seerrStatusEl) {
+      void verifySeerrCredentialsLive({ url: savedJellyseerrUrl, apiKey: savedJellyseerrKey }, 'login').then((res) => {
+        if (!seerrStatusEl) return;
+        if (res.ok) {
+          seerrStatusEl.textContent = '✓ Connected to Jellyseerr' + (res.email ? ` (${res.email})` : '');
+          seerrStatusEl.className = 'login-field-status is-success';
+        } else {
+          seerrStatusEl.textContent = `✗ ${res.reason || 'Connection failed'}`;
+          seerrStatusEl.className = 'login-field-status is-error';
+        }
+      });
+    }
 
     // T18: Romm (optional) -- same prefill treatment as Jellyseerr. Column
     // stays hidden (values still prefilled, just not shown) unless the Video
@@ -1165,6 +1180,48 @@ export function setupLoginHandlers() {
     });
   }
 
+  const seerrUrlInput = document.getElementById('login-jellyseerr-url') as HTMLInputElement | null;
+  const seerrKeyInput = document.getElementById('login-jellyseerr-key') as HTMLInputElement | null;
+  const seerrStatusEl = document.getElementById('login-jellyseerr-status') as HTMLDivElement | null;
+
+  const validateSeerrInput = async () => {
+    if (!seerrUrlInput || !seerrKeyInput || !seerrStatusEl) return;
+    const url = seerrUrlInput.value.trim();
+    const apiKey = seerrKeyInput.value.trim();
+    if (!url && !apiKey) {
+      seerrStatusEl.textContent = '';
+      seerrStatusEl.className = 'login-field-status';
+      return;
+    }
+    if (!url || !apiKey) {
+      seerrStatusEl.textContent = 'Enter both URL and API Key to verify connection.';
+      seerrStatusEl.className = 'login-field-status is-hint';
+      return;
+    }
+    seerrStatusEl.textContent = 'Verifying Jellyseerr connection…';
+    seerrStatusEl.className = 'login-field-status is-testing';
+    const res = await verifySeerrCredentialsLive({ url, apiKey }, 'login');
+    if (res.ok) {
+      seerrStatusEl.textContent = '✓ Connected to Jellyseerr' + (res.email ? ` (${res.email})` : '');
+      seerrStatusEl.className = 'login-field-status is-success';
+    } else {
+      seerrStatusEl.textContent = `✗ ${res.reason || 'Connection failed'}`;
+      seerrStatusEl.className = 'login-field-status is-error';
+    }
+  };
+
+  if (seerrUrlInput && seerrKeyInput) {
+    let timer: any = null;
+    const onInput = () => {
+      clearTimeout(timer);
+      timer = setTimeout(validateSeerrInput, 400);
+    };
+    seerrUrlInput.addEventListener('input', onInput);
+    seerrKeyInput.addEventListener('input', onInput);
+    seerrUrlInput.addEventListener('blur', validateSeerrInput);
+    seerrKeyInput.addEventListener('blur', validateSeerrInput);
+  }
+
   if (form) {
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -1236,6 +1293,7 @@ export function setupLoginHandlers() {
         if (jellyseerrUrlInput && jellyseerrKeyInput) {
           localStorage.setItem('jellyseerr_url', jellyseerrUrlInput);
           localStorage.setItem('jellyseerr_apikey', jellyseerrKeyInput);
+          void verifySeerrCredentialsLive({ url: jellyseerrUrlInput, apiKey: jellyseerrKeyInput }, 'login');
         } else {
           localStorage.removeItem('jellyseerr_url');
           localStorage.removeItem('jellyseerr_apikey');

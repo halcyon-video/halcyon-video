@@ -61,6 +61,8 @@ import {
   getJellyseerrConfig,
   pingJellyseerr,
 } from './jellyseerr';
+import { reportError } from './error-telemetry';
+import { verifySeerrCredentialsLive } from './seerr-service-status';
 import { fetchGames, launchGame } from './romm';
 import { isGamesOnly, storeCatalog } from './games-only';
 import { buildStreamingLibraries, resolveEnabledServices } from './streaming-catalog';
@@ -411,6 +413,7 @@ async function logJellyseerrStatus(gapCount: number): Promise<void> {
     logToConsole('[System] Jellyseerr: connected, but no requests or discoveries to shelve.', 'system');
   } else {
     logToConsole(`[System] Jellyseerr ERROR: ${ping.reason} — coming-soon and recommendations are OFF. Re-check the URL and API key on the membership screen.`, 'system');
+    reportError(`[Jellyseerr Misconfigured] ${ping.reason} — coming-soon and recommendations are OFF.`, undefined, 'warn', 'boot');
   }
 }
 
@@ -819,10 +822,15 @@ function logToConsole(message: string, type: 'system' | 'cec' | 'video' = 'syste
 
 // Global error listener to dump frontend crashes to terminal
 window.addEventListener('error', (e) => {
-  console.error(`[Frontend Crash] ${e.message} at ${e.filename}:${e.lineno}:${e.colno}`);
+  const line = `[Frontend Crash] ${e.message} at ${e.filename}:${e.lineno}:${e.colno}`;
+  console.error(line);
+  reportError(line, { filename: e.filename, lineno: e.lineno, colno: e.colno }, 'error', 'frontend');
 });
 window.addEventListener('unhandledrejection', (e) => {
-  console.error(`[Frontend Unhandled Rejection] ${e.reason?.message || e.reason}`);
+  const reason = e.reason?.message || e.reason?.stack || String(e.reason);
+  const line = `[Frontend Unhandled Rejection] ${reason}`;
+  console.error(line);
+  reportError(line, undefined, 'error', 'frontend');
 });
 
 function updateMovieHUD(movie: Movie | null) {
@@ -1580,6 +1588,16 @@ function commitTextSetting(key: string, raw: string) {
   // reload path can drop the token unless a new password re-auths first.
   if (key === 'jellyfin_url' || key === 'jellyfin_username') settingsPendingAuthReset = true;
   if (def.applyMode === 'reload') settingsPendingReload = true;
+  if (key === 'jellyseerr_url' || key === 'jellyseerr_apikey') {
+    void verifySeerrCredentialsLive(undefined, 'settings').then((res) => {
+      updateSettingsCrtChrome();
+      if (res.ok) {
+        logToConsole('[Settings] Jellyseerr connected.', 'system');
+      } else if (res.reason && res.reason !== 'not configured') {
+        logToConsole(`[Settings] Jellyseerr error: ${res.reason}`, 'system');
+      }
+    });
+  }
   updateSettingsStatus();
   updateSettingsCrtChrome();
   logToConsole(`[Settings] ${def.label} updated.`, 'system');
@@ -1630,6 +1648,9 @@ function openSettingsDrawer(page: SettingGroup | 'Controls' | null = null, fromT
   document.getElementById('settings-drawer-overlay')!.classList.add('visible');
   // Opening straight onto a page: row 0 is Back, land on the first setting.
   setSettingsSelection(page !== null && settingsRowKeys.length > 2 ? 1 : 0);
+  if (page === 'Connection') {
+    void verifySeerrCredentialsLive(undefined, 'settings').then(() => updateSettingsCrtChrome());
+  }
   logToConsole('[Settings] Opened store settings.', 'system');
 }
 

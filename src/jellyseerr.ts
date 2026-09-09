@@ -10,7 +10,12 @@
 import { invoke } from '@tauri-apps/api/core';
 import { Movie } from './jellyfin';
 import { isDemoMode } from './demo-mode';
-import { resolveSeerrConfig as resolveSeerr, type SeerrConfig } from './seerr-config';
+import {
+  resolveSeerrConfig as resolveSeerr,
+  validateSeerrCredentialsInput,
+  classifySeerrError,
+  type SeerrConfig,
+} from './seerr-config';
 import { operatorDefault } from './operator-defaults';
 import { activeSuggestionWindow, titleInWindow, windowGteParam, windowLteParam } from './media-release-date';
 import {
@@ -171,14 +176,45 @@ async function jellyseerrRequest(
  * rejected key produced zero visible evidence anywhere — the boot console uses
  * this to print a definitive status line instead.
  */
-export async function pingJellyseerr(): Promise<{ ok: boolean; reason?: string }> {
-  const config = getJellyseerrConfig();
+export interface JellyseerrPingResult {
+  ok: boolean;
+  reason?: string;
+  email?: string;
+}
+
+/**
+ * One cheap authenticated round-trip answering "does Jellyseerr actually
+ * accept this URL + API key?". The sync loaders below all swallow failures by
+ * design (the integration must never block boot), which historically meant a
+ * rejected key produced zero visible evidence anywhere — the boot console and
+ * live credential inputs use this to surface status immediately.
+ */
+export async function pingJellyseerr(
+  override?: { url: string; apiKey?: string } | null
+): Promise<JellyseerrPingResult> {
+  let config: JellyseerrConfig | null = null;
+  if (override) {
+    const op = operatorDefault('jellyseerr');
+    const isOp = !!op && op.url === (override.url || '').trim().replace(/\/+$/, '');
+    const validation = validateSeerrCredentialsInput(override.url, override.apiKey ?? '', isOp);
+    if (!validation.ok) {
+      return { ok: false, reason: validation.reason };
+    }
+    config = {
+      url: validation.normalized!.url,
+      apiKey: validation.normalized!.apiKey,
+      viaOperator: isOp && !validation.normalized!.apiKey,
+    };
+  } else {
+    config = getJellyseerrConfig();
+  }
+
   if (!config) return { ok: false, reason: 'not configured' };
   try {
-    await jellyseerrRequest(config, '/api/v1/auth/me');
-    return { ok: true };
+    const res = await jellyseerrRequest(config, '/api/v1/auth/me');
+    return { ok: true, email: res?.email };
   } catch (e: any) {
-    return { ok: false, reason: String(e?.message || e) };
+    return { ok: false, reason: classifySeerrError(e) };
   }
 }
 

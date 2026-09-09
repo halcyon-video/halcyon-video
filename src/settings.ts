@@ -51,6 +51,7 @@ import { formatUnlockLabel, makeRentalRecord, rentalCapacityAt } from './rental-
 import { activeProviderKind } from './providers/provider-registry';
 import { topStudiosInLibrary } from './promo-campaigns';
 import { ALL_DEFAULT_STREAMING_SERVICES_CSV } from './streaming-catalog';
+import { getSeerrValidationStatus } from './seerr-service-status';
 import type { StoreScene } from './three-scene';
 import type { JellyfinLibrary } from './jellyfin';
 
@@ -1030,16 +1031,29 @@ export function registerCoreSettings(): void {
   // which is what makes a visitor's own address take the rows back.
   const operatorManaged = (id: OperatorServiceId, urlKey: string) => (): boolean =>
     !!operatorDefault(id) && !getSetting<string>(urlKey);
-  const operatorHint = (id: OperatorServiceId, urlKey: string, otherwise = '') => (): string => {
-    if (!operatorManaged(id, urlKey)()) return otherwise;
+  const operatorHint = (id: OperatorServiceId, urlKey: string, otherwise: string | (() => string) = '') => (): string => {
+    if (!operatorManaged(id, urlKey)()) return typeof otherwise === 'function' ? otherwise() : otherwise;
     return `Provided by this store's server (${operatorDefault(id)!.url}) — its API key stays there `
       + 'and never reaches your browser. Enter an address to use your own instead.';
   };
 
+  const seerrStatusHint = (): string => {
+    const status = getSeerrValidationStatus();
+    if (status.testing) return 'Verifying Jellyseerr connection…';
+    if (status.lastChecked) {
+      if (status.ok) return '✓ Connected to Jellyseerr' + (status.email ? ` (${status.email})` : '');
+      return `✗ Connection error: ${status.reason || 'Failed to connect'}`;
+    }
+    const hasUrl = !!getSetting<string>('jellyseerr_url') || !!operatorDefault('jellyseerr');
+    if (!hasUrl) return 'Connect Jellyseerr or Overseerr to enable Coming Soon and recommendations.';
+    return 'URL for Jellyseerr or Overseerr server.';
+  };
+
   cred('jellyseerr_url', 'Jellyseerr / Overseerr URL', 'text', {
-    hint: operatorHint('jellyseerr', 'jellyseerr_url'),
+    hint: operatorHint('jellyseerr', 'jellyseerr_url', seerrStatusHint),
   });
   cred('jellyseerr_apikey', 'Jellyseerr / Overseerr API Key', 'secret', {
+    hint: seerrStatusHint,
     visibleWhen: () => !operatorManaged('jellyseerr', 'jellyseerr_url')(),
   });
 

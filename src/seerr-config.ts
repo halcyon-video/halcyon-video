@@ -62,3 +62,63 @@ export function resolveSeerrConfig(read: (key: string) => string | null | undefi
   }
   return { url: url.replace(/\/$/, ''), apiKey };
 }
+
+export interface SeerrInputValidation {
+  ok: boolean;
+  reason?: string;
+  normalized?: { url: string; apiKey: string };
+}
+
+/**
+ * Validates and normalizes Seerr URL and API Key inputs before initiating
+ * connection checks. Restores base64 '=' padding if truncated during copy-paste.
+ */
+export function validateSeerrCredentialsInput(
+  rawUrl: string,
+  rawApiKey: string,
+  isOperatorManaged = false
+): SeerrInputValidation {
+  const url = (rawUrl || '').trim().replace(/\/+$/, '');
+  let apiKey = (rawApiKey || '').trim();
+
+  if (!url) {
+    return { ok: false, reason: 'Server URL is required.' };
+  }
+  if (!apiKey && !isOperatorManaged) {
+    return { ok: false, reason: 'API key is required.' };
+  }
+  if (apiKey && /^[A-Za-z0-9+/]+$/.test(apiKey) && apiKey.length % 4 >= 2) {
+    apiKey += '='.repeat(4 - (apiKey.length % 4));
+  }
+  return { ok: true, normalized: { url, apiKey } };
+}
+
+/**
+ * Translates raw HTTP/network errors into human-friendly explanations so
+ * users immediately understand why their credentials failed.
+ */
+export function classifySeerrError(error: unknown): string {
+  const msg = String((error as any)?.message || error || '');
+  if (msg.includes('401')) {
+    return 'Invalid API key (HTTP 401 Unauthorized)';
+  }
+  if (msg.includes('403')) {
+    return 'Access forbidden (HTTP 403 Forbidden)';
+  }
+  if (msg.includes('404')) {
+    return 'Endpoint not found (HTTP 404) — check server URL';
+  }
+  if (
+    msg.includes('502') ||
+    msg.includes('ECONNREFUSED') ||
+    msg.includes('Failed to fetch') ||
+    msg.includes('NetworkError')
+  ) {
+    return 'Cannot reach server (check server address and network)';
+  }
+  if (msg.includes('timed out')) {
+    return 'Connection timed out';
+  }
+  return msg || 'Connection failed';
+}
+

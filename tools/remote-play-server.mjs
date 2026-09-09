@@ -334,6 +334,14 @@ export function remotePlayPlugin() {
         if (instances.get(id) === rec) instances.delete(id);
       });
       const page = await browser.newPage();
+      page.on("console", (msg) => {
+        if (msg.type() === "error") {
+          console.error(`[remote-play-instance:${id}] ${msg.text()}`);
+        }
+      });
+      page.on("pageerror", (err) => {
+        console.error(`[remote-play-instance:${id}] Uncaught page error: ${err?.message || err}`);
+      });
       // Preflight, on the blank page before the store loads: a browser with no
       // WebGL2 can never build the 3D scene, so this instance would boot to
       // nothing and answer every viewer "still booting" for as long as it
