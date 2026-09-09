@@ -127,7 +127,7 @@ export function getLowResFrontMaterial(
   const src = resolveFallbackPixels(movieId);
   if (!src) return null;
 
-  const key = `${movieId}_anim_${isAnimated}_probe_${probeIdx !== undefined ? probeIdx : 'none'}_fin_${finish ?? 'default'}`;
+  const key = `${movieId}_anim_${isAnimated}_crop_${skipCrop}_probe_${probeIdx !== undefined ? probeIdx : 'none'}_fin_${finish ?? 'default'}`;
   const cached = lowResFrontLRU.get(key);
   if (cached) {
     lowResFrontLRU.delete(key); // refresh recency
