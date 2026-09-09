@@ -343,8 +343,12 @@ export class EntranceCheckout implements StoreFixture {
       opts?.extraMullions?.forEach((v) => verts.add(v));
       verts.forEach((v) => {
         const fullHeight = opts?.splitTransom || !opts?.transomY || Math.abs(v - s0) < 0.01 || Math.abs(v - s1) < 0.01;
-        if (fullHeight) along(v, frameT, wallH / 2, wallH, frameD, frameMat);
-        else along(v, frameT, doorH / 2, doorH, frameD, frameMat);
+        // Only door jambs reach the floor. Fixed sidelight posts sit on the
+        // masonry sill instead of cutting a dark stripe through its face.
+        const isDoorJamb = intervals.some(([a, b]) => Math.abs(v - a) < 0.01 || Math.abs(v - b) < 0.01);
+        const bottom = isDoorJamb ? 0 : sillY;
+        const top = fullHeight ? wallH : doorH;
+        along(v, frameT, (top + bottom) / 2, top - bottom, frameD, frameMat);
       });
 
       // horizontal rails: top (continuous), bottom (skips the door gaps),
