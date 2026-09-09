@@ -5,6 +5,14 @@ All notable changes to Halcyon Video, generated from commit history by
 it on every version tag push. Deterministic and offline: no entry here was
 written by a model.
 
+## [v0.17.1] — 2026-09-09
+
+### CHANGELOG
+- V0.17.0
+
+### General
+- Make hosted mobile browsing follow touch and prioritize shelf artwork
+
 ## [v0.17.0] — 2026-09-09
 
 ### CHANGELOG
