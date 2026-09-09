@@ -85,6 +85,17 @@ export function resolveWalkRaycastHit(
   return false;
 }
 
+/**
+ * Controller/keyboard interaction in walk mode: raycasts straight ahead from
+ * the camera reticle/crosshair (center of the screen) within WALK_INTERACT_RANGE.
+ * Inspects the case under the crosshair, or activates clasp/tip jar if targeted.
+ */
+export function walkInteract(scene: StoreScene): boolean {
+  scene._mouse.set(0, 0);
+  scene._raycaster.setFromCamera(scene._mouse, scene.camera);
+  return resolveWalkRaycastHit(scene, scene._raycaster.intersectObjects(scene.scene.children, true));
+}
+
 export function walkInspectSlot(scene: StoreScene, slot: MovieSlot) {
   scene.walkReturnPose = {
     x: scene.currentCameraPos.x,

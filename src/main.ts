@@ -2343,7 +2343,7 @@ function applyLiveSettings(scene: StoreScene) {
  * changes on close.
  */
 async function rebuildStoreScene() {
-  if (librariesList.length === 0 && gameMovies.length === 0) return; // nothing loaded yet
+  if (librariesList.length === 0 && gameMovies.length === 0 && getStreamingMovies().length === 0 && storeLibraries.length === 0) return; // nothing loaded yet
   logToConsole('[System] Applying store changes (rebuilding scene, no reload)...', 'system');
   showBootOverlay();
   // Nothing is interactive behind the overlay — drain texture uploads at burst
@@ -3880,7 +3880,10 @@ async function main() {
       }
     },
     onEnter: async () => {
-      if (storeScene?.isWalkAroundMode) return;
+      if (storeScene?.isWalkAroundMode) {
+        storeScene.walkInteract();
+        return;
+      }
       if (videoPlayer?.isOpen) {
         if (!videoPlayer.activateFocused()) videoPlayer.togglePlayPause();
         return;
@@ -4141,7 +4144,10 @@ async function main() {
     // checkout' toggle off (or while any overlay owns the keyboard).
     onCheckout: () => {
       if (!shortcutsAllowed()) return;
-      if (storeScene?.isWalkAroundMode) return;
+      if (storeScene?.isWalkAroundMode) {
+        storeScene.walkInteract();
+        return;
+      }
       storeScene?.enterCheckout();
     },
     onReturnTape: () => {

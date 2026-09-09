@@ -214,13 +214,13 @@ function buildExtrudedEmblem(spec: LogoSpec, anchor: FacadeLogoAnchor): Storefro
     // Between the flat body board (0.2/0.2) and its glossy gold board
     // (0.1/0.9): one cap can't split finishes per-texel, and at sign distance
     // the emissive lettering is what actually sells the night read.
-    roughness: 0.2,
-    metalness: 0.3,
+    roughness: 0.55,
+    metalness: 0.05,
   }), 'light-source');
   const sideMat = new THREE.MeshStandardMaterial({
     color: new THREE.Color(spec.borderColor),
-    roughness: 0.3,
-    metalness: 0.55,
+    roughness: 0.5,
+    metalness: 0.1,
     // Metal returns reflect the exterior lighting; only the face is illuminated.
   });
 
@@ -412,13 +412,13 @@ function buildFreestandingLetters(spec: LogoSpec, anchor: FacadeLogoAnchor): Sto
     color: new THREE.Color(spec.textColor),
     emissive: new THREE.Color(spec.textColor),
     emissiveIntensity: EMISSIVE_INTENSITY,
-    roughness: 0.25,
-    metalness: 0.2,
+    roughness: 0.55,
+    metalness: 0.05,
   }), 'light-source');
   const sideMat = new THREE.MeshStandardMaterial({
     color: new THREE.Color(spec.borderColor),
-    roughness: 0.3,
-    metalness: 0.55,
+    roughness: 0.5,
+    metalness: 0.1,
   });
 
   const disposables: { dispose(): void }[] = [faceMat, sideMat];

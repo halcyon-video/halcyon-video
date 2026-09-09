@@ -30,6 +30,8 @@ import {
   MediaDateKey,
 } from './media-date-screen';
 import {
+  MEDIA_RELEASE_DATE_KEY,
+  activeMediaCutoff,
   clearMediaReleasePin,
   loadMediaReleasePin,
   saveMediaReleasePin,
@@ -184,16 +186,19 @@ async function savePin(s: MediaDateScreenState): Promise<void> {
 
 async function clearPin(): Promise<void> {
   if (!deps) return;
-  if (!loadMediaReleasePin()) {
-    // Nothing pinned — CLEAR is just a walk back to the menu.
+  const hadPin = !!loadMediaReleasePin()
+    || (typeof localStorage !== 'undefined' && !!localStorage.getItem(MEDIA_RELEASE_DATE_KEY))
+    || !!activeMediaCutoff();
+  clearMediaReleasePin();
+  if (hadPin) {
+    deps.log('[Terminal] Media Release Date pin cleared — catalog is live. Restocking...');
+    counterTerminalClose();
+    await deps.rebuild();
+  } else {
+    // Nothing pinned — walk back to the menu.
     leaveDateScreen();
     render();
-    return;
   }
-  clearMediaReleasePin();
-  deps.log('[Terminal] Media Release Date pin cleared — catalog is live. Restocking...');
-  counterTerminalClose();
-  await deps.rebuild();
 }
 
 /**

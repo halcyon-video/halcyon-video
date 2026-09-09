@@ -396,15 +396,6 @@ export function overviewEnterBrowse(scene: StoreScene, query?: string): boolean 
   return true;
 }
 
-export function setOverviewStart(scene: StoreScene, enabled: boolean): void {
-  scene.overviewStart = enabled;
-  if (typeof localStorage !== 'undefined') localStorage.setItem('bb_overview_start', enabled ? '1' : '0');
-  if (!enabled && scene.mode === 'overview') {
-    scene.hideOverviewVisuals();
-    scene.mode = 'library-select';
-    if (scene.onModeChange) scene.onModeChange(scene.mode);
-    scene.updateCameraTarget();
-  } else if (enabled && scene.mode === 'library-select') {
-    scene.enterOverview();
-  }
+export function setOverviewStart(_scene: StoreScene, _enabled: boolean): void {
+  // Store overview is always on (owner directive 2026-09-08)
 }

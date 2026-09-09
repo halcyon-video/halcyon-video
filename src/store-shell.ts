@@ -593,8 +593,8 @@ export function buildStore(scene: StoreScene) {
           map: scene.nrLogoBodyTex,
           transparent: true,
           alphaTest: 0.35,
-          roughness: 0.2,
-          metalness: 0.2,
+          roughness: 0.6,
+          metalness: 0.05,
           color: new THREE.Color(colorFactor, colorFactor, colorFactor),
           // Subtle emissive blue so the ticket body has a dark self-glow at night
           emissive: isFront ? new THREE.Color(0x020825) : new THREE.Color(0x000000),
@@ -618,8 +618,8 @@ export function buildStore(scene: StoreScene) {
           map: scene.entranceLogoYellowTex,
           transparent: true,
           alphaTest: 0.35,
-          roughness: 0.1, // very glossy
-          metalness: 0.9, // highly metallic gold feel
+          roughness: 0.55,
+          metalness: 0.05,
           color: new THREE.Color(colorFactor, colorFactor, colorFactor),
           // Warm self-glow for gold details (text + border)
           emissive: new THREE.Color(0xffaa00).multiplyScalar(colorFactor),

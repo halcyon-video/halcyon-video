@@ -193,20 +193,18 @@ export class TipJar implements StoreFixture {
     // the front face share a frame and cannot drift apart: inside it +Y runs
     // up the panel and +Z out of its face, toward the customer.
     //
-    // The acrylic is the store's ONE unlit-looking material by physical
-    // right — clear plastic — so it is built the way the rest of the store's
-    // glazing is: a nearly transmissive body carrying no diffuse colour of its
-    // own, with the reflection added ON TOP as an additive pane
-    // (glass-reflection.ts). A flat 50%-white slab was tried first and read as
-    // fog over the print, which is exactly the failure that recipe exists to
-    // prevent.
-    const acrylicMat = new THREE.MeshPhysicalMaterial({
-      color: 0xffffff,
+    // The acrylic is clear plastic — built like the rest of the store's
+    // clear glazing (sign-fixtures.ts tent signs and return-slot.ts chute plate):
+    // a near-black base under AdditiveBlending contributes no diffuse fog,
+    // leaving pure dielectric specular reflections so the standee is see-through
+    // and the card inside stays 100% opaque.
+    const acrylicMat = new THREE.MeshStandardMaterial({
+      color: 0x04060a,
       transparent: true,
-      opacity: 0.14,
-      roughness: 0.06,
+      blending: THREE.AdditiveBlending,
+      roughness: 0.05,
       metalness: 0.0,
-      ior: 1.49,               // acrylic, not glass (1.52)
+      envMapIntensity: 1.1,
       side: THREE.DoubleSide,
       depthWrite: false,
     });

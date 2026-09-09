@@ -722,19 +722,6 @@ export function registerCoreSettings(): void {
     hint: 'Rounded, illuminated canopies over the large store’s front windows.',
   });
 
-  // T21: entrance-overview browsing start. Live apply so toggling it off
-  // returns the classic first-aisle start with no reload (and no rebuild).
-  registerSetting({
-    key: 'bb_overview_start',
-    label: 'Start at entrance overview',
-    kind: 'toggle',
-    group: 'Store Look',
-    subpage: 'Browsing & Rentals',
-    default: true,
-    applyMode: 'live',
-    apply: (value, scene) => scene.setOverviewStart(!!value),
-    hint: 'Start inside the doors on the jump index. Off = cam view.',
-  });
 
   // The tip jar on the counter (src/fixtures/tip-jar.ts). ON by default and
   // deliberately easy to find here: the same build runs on a family TV, and

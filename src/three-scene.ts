@@ -970,8 +970,7 @@ export class StoreScene {
   // standing just inside the vestibule with head-look only; every shelf run
   // carries a floating labeled cursor and confirming one flies the camera to
   // that run's normal browse position. Cursors are built lazily on first entry
-  // (see ensureOverviewCursors) and disposed in destroy().
-  public overviewStart = typeof localStorage !== 'undefined' ? localStorage.getItem('bb_overview_start') !== '0' : true;
+  public readonly overviewStart = true;
   public overviewCursors: OverviewCursors | null = null;
 
   // ── T22: carried tapes + front-counter checkout ────────────────────────────
@@ -3117,10 +3116,7 @@ export class StoreScene {
   // or owning library name instead of the crosshair.
   public overviewEnterBrowse(query?: string): boolean { return overview.overviewEnterBrowse(this, query); }
 
-  // Settings toggle ("Start at entrance overview", live-apply). Turning it off
-  // returns the classic first-aisle behavior with no reload; if you're standing
-  // at the overview right now, step back to library-select.
-  public setOverviewStart(enabled: boolean): void { return overview.setOverviewStart(this, enabled); }
+  public setOverviewStart(_enabled: boolean): void {}
 
   // ─── T22: carried tapes + front-counter checkout ────────────────────────────
 
@@ -5717,6 +5713,7 @@ export class StoreScene {
    *  center they had no crosshair on yet made the first click land on the
    *  wrong spot (usually nothing) every time. */
   public handleWalkClick() { return walk.handleWalkClick(this); }
+  public walkInteract() { return walk.walkInteract(this); }
 
   /** Open a clicked slot in the regular inspect view (same plumbing as
    *  jumpToTitle), remembering the walk pose so Back returns to it. */
