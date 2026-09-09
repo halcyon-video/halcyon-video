@@ -53,6 +53,10 @@ function git(args) {
 }
 
 function parseArgs(argv) {
+  if (argv.includes('--help') || argv.includes('-h')) {
+    printHelp();
+    process.exit(0);
+  }
   const [channel, ...rest] = argv;
   const opts = { channel, tag: null, screenshot: null, repo: DEFAULT_REPO, out: null, blurb: null };
   for (let i = 0; i < rest.length; i++) {
@@ -62,7 +66,6 @@ function parseArgs(argv) {
     else if (a === '--screenshot') opts.screenshot = rest[++i];
     else if (a === '--repo') opts.repo = rest[++i];
     else if (a === '--out') opts.out = rest[++i];
-    else if (a === '--help' || a === '-h') { printHelp(); process.exit(0); }
     else { console.error(`announce-fanout: unknown option ${a}`); process.exit(2); }
   }
   if (!opts.channel) { printHelp(); process.exit(2); }
@@ -312,7 +315,8 @@ async function channelDiscord(opts, ann) {
 async function channelMastodon(opts, ann) {
   const creds = requireEnv('MASTODON_INSTANCE', 'MASTODON_TOKEN');
   if (!creds) return;
-  const base = creds.MASTODON_INSTANCE.replace(/\/+$/, '');
+  const rawBase = creds.MASTODON_INSTANCE.replace(/\/+$/, '');
+  const base = /^https?:\/\//i.test(rawBase) ? rawBase : `https://${rawBase}`;
   const auth = { Authorization: `Bearer ${creds.MASTODON_TOKEN}` };
   let mediaIds = [];
   const shot = readScreenshot(opts);
