@@ -330,6 +330,7 @@ export function buildStore(scene: StoreScene) {
   sky.position.set(0, 0, SKY_CENTER_Z);
   scene.scene.add(sky);
   scene.outdoor.skyMesh = sky;
+  scene.outdoor.commercialSky = scene.effectiveQuality === 'high';
   // Base rotation (street side at the storefront) + this visit's sun azimuth.
   scene.outdoor.applySunPlacement();
   
@@ -546,7 +547,7 @@ export function buildStore(scene: StoreScene) {
   // Also builds the GH #144 ground-blend ring (see exterior-environment.ts)
   // that fades the lot's exposed edges into whatever ground the current sky
   // pano shows there — recolored live via the listener below as panos load.
-  scene.exterior = buildExteriorEnvironment(scene.scene, storeWidth, sidewalkDepth);
+  scene.exterior = buildExteriorEnvironment(scene.scene, storeWidth, sidewalkDepth, scene.effectiveQuality === 'high', () => scene.requestRender());
   scene.exterior.setOutsideMode(scene.outdoor.outsideMode);
   scene.exterior.setGroundColor(scene.outdoor.getGroundColor());
   scene.outdoor.setGroundColorListener((color) => {

@@ -14,6 +14,7 @@ import { selfLit } from './material-lighting';
 // system this hooks into; this module owns no lighting of its own beyond a
 // couple of purely cosmetic emissive materials (lamp heads, glow decals).
 import * as THREE from 'three';
+import { installCommercialStreetscape } from './commercial-streetscape';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { createLightPoolTexture, createSoftShadowTexture, createConcreteSidewalkTexture } from './canvas-textures';
 import { buildExteriorRoad } from './exterior-road';
@@ -64,7 +65,7 @@ export function lotWidth(storeWidth: number): number {
     : PARKING_STALLS.stallWidth * 9;
 }
 
-export function buildExteriorEnvironment(scene: THREE.Scene, storeWidth: number, sidewalkDepth = 4.7): ExteriorEnvironment {
+export function buildExteriorEnvironment(scene: THREE.Scene, storeWidth: number, sidewalkDepth = 4.7, highQuality = false, requestRender: () => void = () => {}): ExteriorEnvironment {
   const group = new THREE.Group();
   group.name = 'exteriorEnvironment';
   scene.add(group);
@@ -334,8 +335,11 @@ export function buildExteriorEnvironment(scene: THREE.Scene, storeWidth: number,
     exteriorRoad.setGroundColor(color);
   }
 
+  const commercial = highQuality ? track(installCommercialStreetscape(group, centerX, requestRender)) : null;
+
   // ─── Mode reactions (no per-frame work; called on day/night flips) ─────
   function setOutsideMode(mode: OutsideMode) {
+    commercial?.setOutsideMode(mode);
     const night = mode === 'night';
     // Dusk: lot lamps come on before dark (photocells trip around sunset),
     // but their pools barely register against the remaining daylight.

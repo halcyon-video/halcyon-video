@@ -7,6 +7,7 @@
 // different time-of-day system or sky can be swapped in without touching the
 // scene core.
 import * as THREE from 'three';
+import { createCommercialSky } from './commercial-streetscape';
 import { Reflector } from 'three/examples/jsm/objects/Reflector.js';
 import { assetUrl } from './asset-url';
 import { CEILING_Y } from './store-layout';
@@ -124,6 +125,7 @@ export class OutdoorLightingRig {
   public outsideMode: OutsideMode = 'day';
   // Created by StoreScene (setupLighting / buildStore) and handed over.
   public sunLight: THREE.DirectionalLight | null = null;
+  public commercialSky = false;
   public skyMesh: THREE.Mesh | null = null;
   // The storefront sign PointLight (created by buildStore). Its shadow runs with
   // autoUpdate=false (issue #111 — a PointLight's shadow is 6 cube-face passes that
@@ -500,6 +502,10 @@ export class OutdoorLightingRig {
 
     // Load or apply cached texture — every mode's pool is keyed into the
     // same cache by resolved URL (see skyTex).
+    if (this.commercialSky) {
+      texUrl = `commercial:${this.outsideMode}`;
+      if (!this.skyTex.has(texUrl)) this.skyTex.set(texUrl, createCommercialSky(this.outsideMode));
+    }
     const texture = this.skyTex.get(texUrl) ?? null;
 
     const applyTexture = (tex: THREE.Texture | null) => {
@@ -508,7 +514,7 @@ export class OutdoorLightingRig {
         // White at noon / sunset/night (the panos carry their own color);
         // warm multiplied tint only when the day sun rolled low (see skyTint
         // above).
-        if (tex) this.skyMesh.material.color.copy(this.skyTint);
+        if (tex) this.skyMesh.material.color.copy(this.commercialSky ? new THREE.Color('#ffffff') : this.skyTint);
         this.skyMesh.material.needsUpdate = true;
       }
       if (tex) this.resolveGroundColor(texUrl, tex);
