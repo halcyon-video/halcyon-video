@@ -65,11 +65,8 @@ export interface StorefrontFacade {
 const CX = STORE_CENTER_X; // store centreline
 const FRONT_Z = FRONT_GLASS_Z; // storefront glass line
 
-// Entrance-tower masonry, in feet from the store centreline. The gabled mass
-// overhangs the vestibule glass by ENTRY_MASS_OVERHANG on each side, and a
-// stepped flanking pier of ENTRY_PIER_W stands immediately outboard of it.
-const ENTRY_MASS_OVERHANG = 0;
-const ENTRY_PIER_W = 2;
+// Entrance-tower masonry follows the shared style dimensions, in feet from
+// the store centreline; projecting pier bases define the outer solid span.
 
 /**
  * Half-width (ft, from the store centreline x = 11) of the SOLID stretch of
@@ -84,8 +81,8 @@ const ENTRY_PIER_W = 2;
  * the facade is built from.
  */
 export function entryMassSolidHalfWidth(entryHalfWidth: number, style: FacadeStyle = facadeStyle()): number {
-  if (style === 'gabled-brick') return entryHalfWidth - .3 + 2.75 + .1;
-  return entryHalfWidth + ENTRY_MASS_OVERHANG + (style === 'arcaded-brick' ? 8 : ENTRY_PIER_W);
+  const d = facadeDimensions(13.5, entryHalfWidth, style);
+  return d.massHalf + d.pierWidth + .1;
 }
 
 // Glazing head for ALL storefront windows — front bays and side ribbons.

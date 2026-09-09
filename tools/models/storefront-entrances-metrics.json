@@ -5,13 +5,13 @@
     "nonManifoldEdges": 0
   },
   "flat-parapet": {
-    "triangles": 220,
+    "triangles": 304,
     "meshes": 5,
     "nonManifoldEdges": 0
   },
   "arcaded-brick": {
-    "triangles": 3692,
-    "meshes": 5,
+    "triangles": 1024,
+    "meshes": 4,
     "nonManifoldEdges": 0
   }
 }

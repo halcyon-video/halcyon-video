@@ -40,12 +40,13 @@ export function buildFacadeEntryModel(ctx: FixtureContext, p: EntryParams): THRE
   const m = d.massHalf, o = p.openingHalfWidth;
   const shape = new THREE.Shape();
   const top = p.style === 'gabled-brick' ? d.gableBase : d.pierTop;
-  if (p.style === 'gabled-brick') {
-    shape.moveTo(-m, d.headerBottom); shape.lineTo(m, d.headerBottom);
-  } else {
-    shape.moveTo(-m, 0); shape.lineTo(-o, 0); shape.lineTo(-o, d.headerBottom);
-    shape.lineTo(o, d.headerBottom); shape.lineTo(o, 0); shape.lineTo(m, 0);
-  }
+  shape.moveTo(-m, d.headerBottom);
+  if (p.style === 'arcaded-brick') {
+    for (let k = 1; k <= 48; k++) {
+      const angle = k * Math.PI / 48;
+      shape.lineTo(-m * Math.cos(angle), d.headerBottom + 4 * Math.sin(angle));
+    }
+  } else shape.lineTo(m, d.headerBottom);
   shape.lineTo(m, top);
   if (p.style === 'gabled-brick') {
     shape.lineTo(m-1, top); shape.lineTo(0, top+d.gableHeight); shape.lineTo(-m+1, top);
@@ -65,7 +66,7 @@ export function buildFacadeEntryModel(ctx: FixtureContext, p: EntryParams): THRE
     return mesh;
   };
   for (const sign of [-1, 1]) {
-    const width = p.style === 'arcaded-brick' ? 8 : d.pierWidth;
+    const width = d.pierWidth;
     const front = d.pierFront, back = d.pierBack;
     if (p.style === 'gabled-brick') {
       for (const [bottom, top, material] of [[0, 2, soldier], [2, 14.4, brick], [14.4, 15.45, tile], [15.45, d.pierTop, soldier]] as const) {
@@ -76,7 +77,10 @@ export function buildFacadeEntryModel(ctx: FixtureContext, p: EntryParams): THRE
       box(width, 14.4-d.headerBottom, back-.1, sign*(m+width/2), (14.4+d.headerBottom)/2, (back+.1)/2, brick);
       box(m-o, d.headerBottom, .43, sign*(m+o)/2, d.headerBottom/2, .035, brick);
     } else {
-      box(width, d.pierTop, front-back, sign*(m+width/2), d.pierTop/2, (front+back)/2, brick);
+      box(width+.2, 1.6, front-back+.2, sign*(m+width/2), .8, (front+back)/2, soldier);
+      box(width, d.pierTop-1.6, front-back, sign*(m+width/2), (d.pierTop+1.6)/2, (front+back)/2, brick);
+      box(width, d.pierTop-d.headerBottom, back-.1, sign*(m+width/2), (d.pierTop+d.headerBottom)/2, (back+.1)/2, brick);
+      box(m-o, d.headerBottom, .43, sign*(m+o)/2, d.headerBottom/2, .035, brick);
     }
   }
   if (p.style === 'gabled-brick') {
@@ -118,7 +122,7 @@ export function buildFacadeEntryModel(ctx: FixtureContext, p: EntryParams): THRE
 
   if (p.style === 'arcaded-brick') {
     const outside = ctx.storeWidth/2-p.frontCornerMargin;
-    const inside = p.entryHalfWidth+8;
+    const inside = d.massHalf+d.pierWidth+.1;
     const count = Math.max(0, Math.floor((outside-inside+.01)/8));
     for (const sign of [-1,1]) for (let i=0; i<count; i++) {
       const bay = new THREE.Group();

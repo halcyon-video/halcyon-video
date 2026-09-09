@@ -33,12 +33,12 @@ test('flat and arcaded fronts do not inherit a hidden triangular roof', () => {
     const d = facadeDimensions(13.5, 7.9, style);
     assert.equal(d.gableHeight, 0);
     assert(d.pierTop > d.parapetTop);
-    assert(d.frontProjection < 3, 'shallow frontage leaves room for its canopy');
+    assert(d.pierTop >= d.parapetTop + 4, 'rectangular entrance rises clearly above the wings');
   }
 });
 
-test('gabled canopy pillars leave a clear passage behind their rear faces', () => {
-  const d = facadeDimensions(13.5, 7.9, 'gabled-brick');
+for (const style of ['gabled-brick', 'flat-parapet', 'arcaded-brick'] as FacadeStyle[]) test(`${style} pillars leave a clear passage behind their rear faces`, () => {
+  const d = facadeDimensions(13.5, 7.9, style);
   assert(d.pierBack-.75 >= 4, 'four feet clear of the finished wall at shaft height');
   assert(d.pierBack-.1-.75 >= 3.9, 'the projecting base preserves the wider passage');
   assert(d.pierFront > d.pierBack+1.5, 'pillars retain physical depth');

@@ -7,8 +7,17 @@ Window awnings have their own toggle. The small shop keeps its own facade.
 | Facade | Architectural character |
 | --- | --- |
 | Gabled Brick | Low parapet, central gable on freestanding pillars, tiled bands, and separate entry/exit doors |
-| Flat Parapet | Shallow entry, framed sign field, and a simple molded cornice |
-| Arcaded Brick | Broad entrance, dentil cornice, domed entry canopy, and trimmed window arches |
+| Flat Parapet | Raised rectangular entrance pavilion on freestanding pillars, framed sign field, and a returned cornice |
+| Arcaded Brick | Open entrance arch on substantial pillars, dentil cornice, and trimmed window arches |
+
+The flat entrance rises to 22.2 feet in the standard store, with a rectangular
+sign tower carried by 2.75-foot pillars. The arcaded entrance rises to 20.8 feet
+and uses 3.25-foot pillars, with an elliptical arch springing at 9.15 feet and
+rising another four feet. Both pavilions project 6.2 feet; their front pillars
+leave the same clear rear passage as the gabled entrance. The arcade's former
+six-foot solid shoulders and fabric dome are removed. Its window arches continue
+along the wings, outside the narrower entrance footprint. Rear glazing jambs
+remain shallow at the original door plane. Both cornices return to the wall.
 
 The gabled elevation keeps the proportions of a freestanding Louisiana
 storefront. Its peak is approximately 23 feet above grade in the standard

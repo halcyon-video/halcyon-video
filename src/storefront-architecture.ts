@@ -29,19 +29,19 @@ export function facadeDimensions(ceilingY: number, entryHalfWidth: number, style
   const gableBase = parapetTop + .3;
   return {
     parapetTop, massHalf, gableBase,
-    frontProjection: style === 'gabled-brick' ? 6.2 : 2.4,
-    sidewalkDepth: style === 'gabled-brick' ? 6.7 : 4.7,
+    frontProjection: 6.2,
+    sidewalkDepth: 6.7,
     // The pillars support the front canopy, with daylight behind them.
-    pierBack: style === 'gabled-brick' ? 4.75 : .1,
-    pierFront: style === 'gabled-brick' ? 6.48 : 2.4,
+    pierBack: 4.75,
+    pierFront: 6.48,
     gableHeight: style === 'gabled-brick' ? (entryHalfWidth - 1) * .87 : 0,
-    pierWidth: style === 'gabled-brick' ? 2.75 : 2,
-    pierTop: style === 'gabled-brick' ? gableBase + .8 : parapetTop + 1.8,
+    pierWidth: style === 'arcaded-brick' ? 3.25 : 2.75,
+    pierTop: style === 'gabled-brick' ? gableBase + .8 : parapetTop + (style === 'flat-parapet' ? 5.4 : 4),
     headerBottom: 9.15,
     headerTop: 10.2,
     towerStripeTop: 13.4,
     stripeHeight: 1.05,
     stripeTop: parapetTop - 1.5,
-    logoY: style === 'gabled-brick' ? 15.65 + Math.max(0, parapetTop-16.8) : parapetTop-.9,
+    logoY: (style === 'gabled-brick' ? 15.65 : style === 'flat-parapet' ? 17.6 : 17.1) + Math.max(0, parapetTop-16.8),
   };
 }
