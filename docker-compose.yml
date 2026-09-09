@@ -20,6 +20,8 @@ services:
     #   - "1420:1420"
 
     environment:
+      # Prefill Jellyfin without rebuilding; use a browser-reachable address.
+      # HALCYON_JELLYFIN_URL: https://jellyfin.example.com
       REMOTE_PLAY_SEED: /data/remote-play-seed.json
       # The server answers to localhost, raw IPs, and the names of the
       # machine it runs on — but in a container that means the CONTAINER's

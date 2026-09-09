@@ -177,6 +177,45 @@ WebRTC advertise an address other devices can reach; ordinary browser-only use
 can publish port 1420 instead. The compose file documents GPU, allowed-host,
 and optional shared-service settings.
 
+### Prefill Jellyfin for visitors (Docker)
+
+Set `HALCYON_JELLYFIN_URL` when starting the published container. No source
+checkout, build arguments, or custom image is needed:
+
+```yaml
+services:
+  halcyon:
+    image: ghcr.io/halcyon-video/halcyon-video:latest
+    ports:
+      - "1420:1420"
+    restart: unless-stopped
+    environment:
+      HALCYON_JELLYFIN_URL: https://jellyfin.example.com
+```
+
+This example uses ordinary browser rendering. For Remote Play, use the host
+networking and other options in the repository's compose file; replace its
+`build: .` with `image:` to use the published image.
+
+Use an address reachable from visitors' browsers, including Jellyfin's base
+path if needed, and HTTPS when Halcyon uses HTTPS. It prefills the Jellyfin
+login field; visitors still sign in with their own accounts and can edit the
+address. Their saved server takes priority. Do not include credentials, query
+strings, or fragments in the address. Runtime `VITE_JELLYFIN_URL` is also
+accepted as an alias; `HALCYON_JELLYFIN_URL` takes precedence. Runtime username
+and password variables are never exposed by this configuration endpoint.
+
+Update with the same compose file:
+
+```sh
+docker compose pull
+docker compose up -d
+```
+
+The replacement container keeps the configured address without rebuilding.
+To change it, edit the environment setting and run `docker compose up -d`
+again. Existing visitors' saved server choices are preserved.
+
 ### HTPC kiosk
 
 ```sh
@@ -212,7 +251,8 @@ older-browser route, not a separate catalog.
 | Clone and launcher | `git pull`, then run the launcher again |
 | Clone and npm | `git pull && npm install && npm run build` |
 | Compose from this repository | `git pull && docker compose up -d --build` |
-| Published container | Pull the new image, remove the old container, and recreate it |
+| Published image in Compose | `docker compose pull && docker compose up -d` |
+| Published container with docker run | Pull the new image and recreate the container with the same environment and volumes |
 
 This repository's compose file builds from the clone. `docker compose pull`
 alone therefore does not fetch new application code.

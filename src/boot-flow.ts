@@ -36,7 +36,7 @@ import {
 } from './membership-cards';
 import { buildDemoLibraries, buildDemoGames } from './demo-library';
 import { getSetting } from './settings';
-import { operatorDefault, type OperatorServiceId } from './operator-defaults';
+import { defaultJellyfinUrl, operatorDefault, type OperatorServiceId } from './operator-defaults';
 import { isDemoMode, useSyntheticDemoStock } from './demo-mode';
 import { fetchCatalogFromAllSources } from './catalog-sync';
 import { hydrateStoreConfig, resetStoreConfigSync } from './store-config-sync';
@@ -437,7 +437,7 @@ export function showLoginOverlay() {
     overlay.classList.add('visible');
 
     const envUrl = typeof import.meta.env !== 'undefined' ? import.meta.env.VITE_JELLYFIN_URL : undefined;
-    const savedUrl = localStorage.getItem('jellyfin_url') || envUrl;
+    const savedUrl = defaultJellyfinUrl(localStorage.getItem('jellyfin_url'), envUrl);
     if (savedUrl) {
       const urlInput = document.getElementById('login-url') as HTMLInputElement;
       if (urlInput) urlInput.value = savedUrl;

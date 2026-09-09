@@ -60,6 +60,7 @@ import {
   streamingChoiceScreen,
 } from './streaming-choice';
 import { getSetting, setSetting } from './settings';
+import { defaultJellyfinUrl } from './operator-defaults';
 import { flushConfigPush, hydrateStoreConfig } from './store-config-sync';
 import {
   SetupScreen,
@@ -183,7 +184,7 @@ function onTypedKey(e: KeyboardEvent): void {
 export function openSetupTerminal(): void {
   if (!deps) return;
   initSetupReport();
-  openWith(initialHomeScreen(localStorage.getItem('jellyfin_url')));
+  openWith(initialHomeScreen(defaultJellyfinUrl(localStorage.getItem('jellyfin_url'), import.meta.env.VITE_JELLYFIN_URL)));
   deps.log('[Setup] Opening day — NEW STORE SETUP is on the counter CRT.');
 }
 
@@ -706,7 +707,7 @@ export async function setupTerminalInput(kind: SetupKey): Promise<void> {
       await manualSignIn();
       return;
     case 'back-home':
-      screen = initialHomeScreen(pendingUrl || localStorage.getItem('jellyfin_url'));
+      screen = initialHomeScreen(defaultJellyfinUrl(pendingUrl || localStorage.getItem('jellyfin_url'), import.meta.env.VITE_JELLYFIN_URL));
       render();
       return;
     case 'open-store':
@@ -734,7 +735,7 @@ export async function setupTerminalInput(kind: SetupKey): Promise<void> {
       return;
     case 'change-server':
       deps.callbacks.changeServer();
-      screen = initialHomeScreen(localStorage.getItem('jellyfin_url'));
+      screen = initialHomeScreen(defaultJellyfinUrl(localStorage.getItem('jellyfin_url'), import.meta.env.VITE_JELLYFIN_URL));
       render();
       return;
     case 'copy-report':
