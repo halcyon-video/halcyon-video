@@ -4216,7 +4216,7 @@ async function main() {
   // Touch layer for the 3D store (issue #126) — a no-op DOM-wise on anything
   // but a touch-primary device. See src/store-touch.ts for why this calls
   // `inputCallbacks` directly rather than synthesizing key events.
-  installStoreTouchControls(inputCallbacks, () => inputManager.poke());
+  installStoreTouchControls(inputCallbacks, () => inputManager.poke(), () => storeScene);
 
   // Remote Play: stream the store to /remote.html viewers when the option is
   // on (Connection settings, or ?remote=1). The getter tracks storeScene

@@ -1766,7 +1766,7 @@ class PosterLoadingQueue {
   }>();
   private sortPending = false;
   private activeCount = 0;
-  private maxConcurrent = 100;
+  private maxConcurrent = isPublicDemo ? 8 : 100;
 
   /**
    * `onSettled`, if provided, always fires exactly once — on success AND on
@@ -1835,8 +1835,8 @@ class PosterLoadingQueue {
       return;
     }
 
+    this.sortQueue();
     const item = this.queue.shift()!;
-    this.queuedItems.delete(item.movieId);
     this.activeCount++;
     try {
       const url = item.movie.posterUrl!;
@@ -1890,11 +1890,13 @@ class PosterLoadingQueue {
         // uploaded above; the few dedicated cases (hero/endcap/decor) create
         // their texture lazily from this cache when actually displayed.
         posterPixelCache.set(item.movieId, finalHighRes);
+        this.queuedItems.delete(item.movieId);
         item.callbacks.forEach(cb => cb(finalHighRes));
         item.settledCallbacks.forEach(cb => cb());
       }, 'priority');
     } catch (err) {
       console.warn("Failed to load poster image:", err);
+      this.queuedItems.delete(item.movieId);
       item.settledCallbacks.forEach(cb => cb());
     } finally {
       this.activeCount--;

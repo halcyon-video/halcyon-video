@@ -1,3 +1,4 @@
+import { mobileStoreActive, slotWorld } from './mobile-store';
 // Movie-box stock instancing — extracted from StoreScene (three-scene.ts
 // keeps one-line delegating stubs): building/clearing the instanced shelf
 // stock (buildAllMovieBoxes/clearMovieBoxes/rebuildMovieBoxes), the stacked
@@ -21,6 +22,7 @@ import { retailAudio } from './audio';
 import { clearPosterPrefetch } from './poster-prefetch';
 import {
   SlotPos,
+  OVERVIEW_POS,
   AO_MASK_LAYER,
 } from './scene-shared';
 import type { StoreScene } from './three-scene';
@@ -970,6 +972,13 @@ export function buildAllMovieBoxes(scene: StoreScene) {
   // Public entry never waits on this promise. Include its real movie covers
   // now so they consume the early prefetch rather than starting after reveal.
   const gatedSlots = isPublicDemo ? allSlots : allSlots.filter(slot => !slot.movie.streaming);
+  // Nearby shelf faces lead the download queue. Copies share one decode.
+  if (mobileStoreActive()) {
+    const eye = OVERVIEW_POS;
+    const distance = (slot: MovieSlot) => (slot.restingX - eye.x) ** 2
+      + (slot.restingY - eye.y) ** 2 + (slot.restingZ - eye.z) ** 2;
+    gatedSlots.sort((a, b) => distance(a) - distance(b));
+  }
   const total = gatedSlots.length;
   let loaded = 0;
   // Nothing is interactive while this preload runs (the boot overlay is up), so
@@ -1403,7 +1412,27 @@ export function restockSlottedFixtures(scene: StoreScene): void {
   if (touched) scene.requestRender();
 }
 
+const priorityPoint = new THREE.Vector3();
+const requestedPriority = new WeakMap<MovieSlot, number>();
 export function updateLOD(scene: StoreScene) {
+  if (mobileStoreActive()) {
+    // One narrow visible lane plus a margin for the next finger movement.
+    // Leave distant covers low-res; do not promote a whole library at once.
+    scene.camera.updateMatrixWorld();
+    for (const slot of scene.slotsByPosition.values()) {
+      if (slot.hidden) continue;
+      slotWorld(slot, priorityPoint);
+      const distance = priorityPoint.distanceToSquared(scene.camera.position);
+      priorityPoint.project(scene.camera);
+      if (priorityPoint.z < -1 || priorityPoint.z > 1 || Math.abs(priorityPoint.x) > 1.5
+          || Math.abs(priorityPoint.y) > 1.5 || distance > 900) continue;
+      const priority = distance < 144 ? 3 : 1;
+      if ((requestedPriority.get(slot) ?? 0) >= priority) continue;
+      requestedPriority.set(slot, priority);
+      slot.loadShelfDetails(priority);
+    }
+    return;
+  }
   // 1. Update reflection probe on global materials
   const probeIdx = Math.min(scene.selectedLibraryIdx, 4);
   const activeEnvMap = reflectionProbes[probeIdx] || null;

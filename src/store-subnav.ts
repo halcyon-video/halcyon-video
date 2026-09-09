@@ -1,3 +1,4 @@
+import { mobileStoreActive } from './mobile-store';
 // The JUMP INDEX — the store's ONE navigation layer, and what you are in the
 // moment the doors close behind you.
 //
@@ -353,7 +354,12 @@ function aisleVantage(scene: StoreScene, item: SubNavItem): { x: number; z: numb
 function previewCurrent(scene: StoreScene, state: SubNavState): void {
   const item = state.rows[state.row][state.sel[state.row]];
   if (!item) return;
-  if (state.row === 1) {
+  if (mobileStoreActive() && scene.mode === 'overview') {
+    state.aisleCam = false;
+    aimOverviewAt(scene, item.x, item.y, item.z);
+    scene.cameraGlideLerp = SUBNAV_GLIDE_LERP;
+    scene.requestRender();
+  } else if (state.row === 1) {
     faceFixture(scene, item, PREVIEW_DIST, PREVIEW_EYE_Y);
     scene.targetLookAt.y = item.y + PREVIEW_LOOK_LIFT; // frame marker AND stock
   } else if (scene.mode === 'overview') {
@@ -405,6 +411,11 @@ function applyRow(scene: StoreScene, state: SubNavState): void {
 export function openSubNav(scene: StoreScene, root = false): boolean {
   if (scene.subNav) return true;
   const rows = [buildLibraryRow(scene), buildDisplayRow(scene)];
+  if (mobileStoreActive()) {
+    rows[0] = [...rows[0].filter(i => i.kind !== 'checkout' && i.kind !== 'flat-mode'),
+      ...rows[1].filter(i => scene.slottedFixtures[i.fixtureIdx]?.getSlots().length)];
+    sortByScreenOrder(rows[0]); rows[1] = [];
+  }
   // Land on the player's FIRST LIBRARY. This is where they are standing when
   // the store finishes loading, so it has to be a place they meant to go — a
   // library of their own, named on the marker, and the same one every time.
