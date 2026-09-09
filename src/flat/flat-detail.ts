@@ -158,6 +158,14 @@ export function openDetailsOverlay(
   if (movie.game) {
     playBtnText = 'Rent';
     playBtnIcon = '🎮';
+  } else if (movie.streaming) {
+    playBtnIcon = '▶';
+    if (!movie.streamingUrl) {
+      playBtnText = 'Link unavailable';
+      playBtnDisabled = 'disabled';
+    } else {
+      playBtnText = 'Open streaming service';
+    }
   } else if (movie.discovery || movie.collectionGap) {
     playBtnText = isRequested ? (movie.collectionGap ? 'Coming Soon' : 'Requested') : 'Request';
     playBtnIcon = isRequested ? '✓' : '✦';
@@ -284,8 +292,20 @@ export function openDetailsOverlay(
   const playBtn = overlayEl.querySelector('.flat-detail-btn--play') as HTMLButtonElement;
   const closeBtn = overlayEl.querySelector('.flat-detail-btn--close') as HTMLButtonElement;
   
+  if (movie.streaming) {
+    const btnTextEl = playBtn.querySelector('.flat-detail-btn-text');
+    if (btnTextEl) {
+      if (!movie.streamingUrl) {
+        btnTextEl.textContent = 'Link unavailable';
+      } else {
+        const serviceName = movie.streamingServiceName;
+        btnTextEl.textContent = serviceName ? `Open ${serviceName}` : 'Open streaming service';
+      }
+    }
+  }
+
   let items: HTMLElement[] = [playBtn, closeBtn];
-  let focusedIndex = movie.comingSoon ? 1 : 0;
+  let focusedIndex = (movie.comingSoon || (movie.streaming && !movie.streamingUrl)) ? 1 : 0;
   let episodesList: Episode[] = [];
 
   const setOverlayFocus = (index: number) => {
@@ -392,6 +412,16 @@ export function openDetailsOverlay(
 
   // Wire event handlers
   playBtn.addEventListener('click', async () => {
+    if (movie.streaming) {
+      if (!movie.streamingUrl) return;
+      logSystemMessage(`[System] Opening ${movie.streamingServiceName || 'the streaming service'} for "${movie.title}"...`);
+      try {
+        window.open(movie.streamingUrl, '_blank', 'noopener');
+      } catch {
+        logSystemMessage(`[System] Couldn't open the link for "${movie.title}" (popup blocked?).`);
+      }
+      return;
+    }
     if (movie.game) {
       logSystemMessage(`[System] Renting "${movie.title}" (${movie.platform || 'game'})...`);
       const result = await launchGame(movie);

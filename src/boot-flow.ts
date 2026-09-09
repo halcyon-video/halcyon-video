@@ -36,8 +36,8 @@ import {
 } from './membership-cards';
 import { buildDemoLibraries, buildDemoGames } from './demo-library';
 import { getSetting } from './settings';
-import { operatorDefault, type OperatorServiceId } from './operator-defaults';
-import { isDemoMode } from './demo-mode';
+import { defaultJellyfinUrl, operatorDefault, type OperatorServiceId } from './operator-defaults';
+import { isDemoMode, useSyntheticDemoStock } from './demo-mode';
 import { fetchCatalogFromAllSources } from './catalog-sync';
 import { hydrateStoreConfig, resetStoreConfigSync } from './store-config-sync';
 import {
@@ -47,6 +47,7 @@ import {
   listMediaSources,
   primaryMediaSource,
 } from './media-sources';
+import { verifySeerrCredentialsLive } from './seerr-service-status';
 import {
   initSetupFlow,
   openSetupTerminal,
@@ -437,7 +438,7 @@ export function showLoginOverlay() {
     overlay.classList.add('visible');
 
     const envUrl = typeof import.meta.env !== 'undefined' ? import.meta.env.VITE_JELLYFIN_URL : undefined;
-    const savedUrl = localStorage.getItem('jellyfin_url') || envUrl;
+    const savedUrl = defaultJellyfinUrl(localStorage.getItem('jellyfin_url'), envUrl);
     if (savedUrl) {
       const urlInput = document.getElementById('login-url') as HTMLInputElement;
       if (urlInput) urlInput.value = savedUrl;
@@ -474,6 +475,20 @@ export function showLoginOverlay() {
     // visitor to paste a credential that would only override a working
     // connection with their own.
     hideIfOperatorManaged('jellyseerr', savedJellyseerrUrl, [jellyseerrUrlInput, jellyseerrKeyInput]);
+
+    const seerrStatusEl = document.getElementById('login-jellyseerr-status') as HTMLDivElement | null;
+    if (savedJellyseerrUrl && savedJellyseerrKey && seerrStatusEl) {
+      void verifySeerrCredentialsLive({ url: savedJellyseerrUrl, apiKey: savedJellyseerrKey }, 'login').then((res) => {
+        if (!seerrStatusEl) return;
+        if (res.ok) {
+          seerrStatusEl.textContent = '✓ Connected to Jellyseerr' + (res.email ? ` (${res.email})` : '');
+          seerrStatusEl.className = 'login-field-status is-success';
+        } else {
+          seerrStatusEl.textContent = `✗ ${res.reason || 'Connection failed'}`;
+          seerrStatusEl.className = 'login-field-status is-error';
+        }
+      });
+    }
 
     // T18: Romm (optional) -- same prefill treatment as Jellyseerr. Column
     // stays hidden (values still prefilled, just not shown) unless the Video
@@ -741,8 +756,8 @@ async function demoCatalogBaseCount(): Promise<number> {
 
 /**
  * Demo-mode boot (see src/demo-mode.ts): no credential gate, no Jellyfin
- * fetch, no login overlay ever — stock the store from the synthetic demo
- * library and hand off to the normal texture-gated reveal.
+ * fetch, no login overlay — the hosted root uses real streaming stock and an
+ * explicit ?demo=1 retains the synthetic library for development verification.
  */
 export async function startDemoAndLoad() {
   if (!deps) return;
@@ -754,6 +769,15 @@ export async function startDemoAndLoad() {
   // First visit defaults to daytime out the windows (the scene otherwise
   // rolls day/night 50/50 per boot); user-changeable in Store Look after.
   if (!localStorage.getItem('bb_outside')) localStorage.setItem('bb_outside', 'day');
+  if (!useSyntheticDemoStock) {
+    // Public first visit: the bundled streaming stock needs no credentials,
+    // and no synthetic movie/game artwork belongs on its critical path.
+    deps.setLibraries([]);
+    deps.setGames([]);
+    await deps.loadStreaming();
+    deps.launchStore();
+    return;
+  }
   // The games department is off by default (bb_games_enabled, main.ts fetchGames)
   // because it costs a RomM round-trip nobody asked for. The demo has no RomM and
   // no round trip — buildDemoGames() is synchronous and local — so that default
@@ -1156,6 +1180,48 @@ export function setupLoginHandlers() {
     });
   }
 
+  const seerrUrlInput = document.getElementById('login-jellyseerr-url') as HTMLInputElement | null;
+  const seerrKeyInput = document.getElementById('login-jellyseerr-key') as HTMLInputElement | null;
+  const seerrStatusEl = document.getElementById('login-jellyseerr-status') as HTMLDivElement | null;
+
+  const validateSeerrInput = async () => {
+    if (!seerrUrlInput || !seerrKeyInput || !seerrStatusEl) return;
+    const url = seerrUrlInput.value.trim();
+    const apiKey = seerrKeyInput.value.trim();
+    if (!url && !apiKey) {
+      seerrStatusEl.textContent = '';
+      seerrStatusEl.className = 'login-field-status';
+      return;
+    }
+    if (!url || !apiKey) {
+      seerrStatusEl.textContent = 'Enter both URL and API Key to verify connection.';
+      seerrStatusEl.className = 'login-field-status is-hint';
+      return;
+    }
+    seerrStatusEl.textContent = 'Verifying Jellyseerr connection…';
+    seerrStatusEl.className = 'login-field-status is-testing';
+    const res = await verifySeerrCredentialsLive({ url, apiKey }, 'login');
+    if (res.ok) {
+      seerrStatusEl.textContent = '✓ Connected to Jellyseerr' + (res.email ? ` (${res.email})` : '');
+      seerrStatusEl.className = 'login-field-status is-success';
+    } else {
+      seerrStatusEl.textContent = `✗ ${res.reason || 'Connection failed'}`;
+      seerrStatusEl.className = 'login-field-status is-error';
+    }
+  };
+
+  if (seerrUrlInput && seerrKeyInput) {
+    let timer: any = null;
+    const onInput = () => {
+      clearTimeout(timer);
+      timer = setTimeout(validateSeerrInput, 400);
+    };
+    seerrUrlInput.addEventListener('input', onInput);
+    seerrKeyInput.addEventListener('input', onInput);
+    seerrUrlInput.addEventListener('blur', validateSeerrInput);
+    seerrKeyInput.addEventListener('blur', validateSeerrInput);
+  }
+
   if (form) {
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -1227,6 +1293,7 @@ export function setupLoginHandlers() {
         if (jellyseerrUrlInput && jellyseerrKeyInput) {
           localStorage.setItem('jellyseerr_url', jellyseerrUrlInput);
           localStorage.setItem('jellyseerr_apikey', jellyseerrKeyInput);
+          void verifySeerrCredentialsLive({ url: jellyseerrUrlInput, apiKey: jellyseerrKeyInput }, 'login');
         } else {
           localStorage.removeItem('jellyseerr_url');
           localStorage.removeItem('jellyseerr_apikey');

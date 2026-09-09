@@ -1485,20 +1485,19 @@ export function createStuccoTexture(): {
 // wall. Running bond: alternate rows offset by half a brick. Mortar shows
 // through as the base fill colour; each brick gets its own rust/red hue and
 // lightness so big spans don't read as one flat swatch.
-export function createBrickTexture(): {
+export function createBrickTexture(bond: 'running' | 'soldier' = 'running'): {
   map: THREE.CanvasTexture;
   normalMap: THREE.CanvasTexture;
   roughnessMap: THREE.CanvasTexture;
 } {
   const SIZE = 512;
-  // Real modular brick coursing is ~8in long x ~2.67in tall (nominal, incl.
-  // mortar joint) — a ~3:1 width:height ratio. rows=24 (was 16) gets us there:
-  // width stays 4ft-tile/8cols=6in, height becomes 4ft-tile/24rows=2in, ~3:1.
-  // (T15: previously rows=16 gave a stubby ~2:1 brick that read too tall.)
-  const brickW = 64, mortar = 6;
-  const cols = SIZE / brickW;   // 8
-  const rows = 24;
-  const brickH = SIZE / rows;   // ~21.3
+  // Modular clay brick: eight-inch stretchers and 2 2/3-inch courses,
+  // including a 3/8-inch mortar joint. Soldier courses turn the units upright.
+  const cols = bond === 'soldier' ? 18 : 6;
+  const rows = bond === 'soldier' ? 6 : 18;
+  const brickW = SIZE / cols, brickH = SIZE / rows, mortar = 4;
+  let seed = 1979;
+  const random = () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; };
 
   const paintBricks = (
     ctx: CanvasRenderingContext2D,
@@ -1506,7 +1505,7 @@ export function createBrickTexture(): {
   ) => {
     for (let r = -1; r <= rows; r++) {
       const y = r * brickH;
-      const offset = (((r % 2) + 2) % 2 === 0) ? 0 : brickW / 2;
+      const offset = bond === 'soldier' || ((r % 2) + 2) % 2 === 0 ? 0 : brickW / 2;
       for (let c = -1; c <= cols + 1; c++) {
         const x = c * brickW + offset;
         ctx.fillStyle = brickFill(r, c);
@@ -1519,19 +1518,19 @@ export function createBrickTexture(): {
   const canvas = document.createElement('canvas');
   canvas.width = SIZE; canvas.height = SIZE;
   const ctx = canvas.getContext('2d')!;
-  ctx.fillStyle = '#8f867a'; // mortar
+  ctx.fillStyle = '#776253'; // mortar
   ctx.fillRect(0, 0, SIZE, SIZE);
   paintBricks(ctx, () => {
-    const hue = 6 + Math.random() * 12;       // reds through rust
-    const sat = 42 + Math.random() * 22;
-    const light = 30 + Math.random() * 16;
+    const hue = 15 + random() * 5;       // reds through rust
+    const sat = 44 + random() * 8;
+    const light = 24 + random() * 5;
     return `hsl(${hue}, ${sat}%, ${light}%)`;
   });
   // Fine speckle grain on top so bricks aren't perfectly flat swatches.
   for (let i = 0; i < 3000; i++) {
-    const v = Math.random();
+    const v = random();
     ctx.fillStyle = v > 0.5 ? 'rgba(40,15,10,0.12)' : 'rgba(200,150,120,0.10)';
-    const x = Math.random() * SIZE, y = Math.random() * SIZE;
+    const x = random() * SIZE, y = random() * SIZE;
     stampTiled(ctx, SIZE, (c) => c.fillRect(x, y, 1.5, 1.5));
   }
   const map = new THREE.CanvasTexture(canvas);
@@ -1546,7 +1545,7 @@ export function createBrickTexture(): {
   rCtx.fillStyle = '#f2f2f2'; // mortar rough ~0.95
   rCtx.fillRect(0, 0, SIZE, SIZE);
   paintBricks(rCtx, () => {
-    const g = 210 + Math.floor(Math.random() * 25); // ~0.82-0.90
+    const g = 210 + Math.floor(random() * 25); // ~0.82-0.90
     return `rgb(${g},${g},${g})`;
   });
   const roughnessMap = new THREE.CanvasTexture(roughCanvas);
@@ -1560,7 +1559,7 @@ export function createBrickTexture(): {
   hCtx.fillStyle = '#606060'; // recessed mortar
   hCtx.fillRect(0, 0, SIZE, SIZE);
   paintBricks(hCtx, () => {
-    const g = 150 + Math.floor(Math.random() * 20);
+    const g = 150 + Math.floor(random() * 20);
     return `rgb(${g},${g},${g})`;
   });
   const normalMap = heightToNormalTexture(heightCanvas, 1.2);

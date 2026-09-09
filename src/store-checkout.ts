@@ -22,6 +22,7 @@ import {
 } from './scene-shared';
 import type { StoreScene } from './three-scene';
 import { counterFrame } from './counter-anchors';
+import { facadeEntryGlazing, facadeStyle } from './storefront-architecture';
 
 export function ensureCarried(scene: StoreScene): CarriedTapes {
   if (!scene.carried) {
@@ -712,7 +713,7 @@ export function buildCheckoutExitPath(scene: StoreScene, stand: THREE.Vector3): 
   const backZ = 15.0 - 2 * doorW;            // vestibule store-side wall
   const xL = 11.0 - (9.0 + 2 * doorW) / 2;   // vestibule left (-X, exit-side) wall
   const sideDoorZ = backZ + doorW / 2 + 0.4; // exiters' door in that wall
-  const exitX = 11.0 - doorW / 2;            // front exit leaf
+  const exitX = STORE_CENTER_X - facadeEntryGlazing(doorW, facadeStyle()).doorCenterOffset;
   return new THREE.CatmullRomCurve3([
     new THREE.Vector3(stand.x, 0, stand.z),
     new THREE.Vector3(stand.x - 3.7, 0, stand.z + 1.9), // swing wide of the candy rack

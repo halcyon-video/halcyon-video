@@ -41,7 +41,7 @@ function loadOne(
 export function tryLoadUserAssetTexture(
   relPath: string,
   onLoad: (tex: THREE.Texture) => void,
-  opts: { srgb?: boolean; onMiss?: () => void; allowKtx2?: boolean } = {}
+  opts: { srgb?: boolean; onMiss?: () => void; allowKtx2?: boolean; shippedSurfaceFallback?: boolean } = {}
 ): void {
   // Colour/albedo maps are sRGB (the default); data maps (normal, roughness,
   // metalness, AO, displacement) MUST stay linear or PBR lighting goes wrong —
@@ -64,10 +64,13 @@ export function tryLoadUserAssetTexture(
   // neutralizeScanTexture on the carpet color map) cannot work on it. Those
   // callers keep paying the PNG's extra VRAM for that one map; every other
   // surface map still gets the compressed path.
-  const miss = relPath.startsWith('surfaces/') && opts.allowKtx2 !== false
+  // A measured procedural surface can opt out when the stock scan uses a
+  // different masonry bond or physical module. Installed user art still wins.
+  const shippedSurface = relPath.startsWith('surfaces/') && opts.shippedSurfaceFallback !== false;
+  const miss = shippedSurface && opts.allowKtx2 !== false
     ? () => tryLoadShippedSurfaceKtx2(relPath, onLoad, srgb,
         () => loadOne(`textures/${relPath}`, onLoad, srgb, () => opts.onMiss?.()))
-    : relPath.startsWith('surfaces/')
+    : shippedSurface
       ? () => loadOne(`textures/${relPath}`, onLoad, srgb, () => opts.onMiss?.())
       : () => opts.onMiss?.();
   // The hosted build has no user-assets tree to probe (see HOSTED_BUILD).

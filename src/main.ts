@@ -1,7 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { measureDisplayHz } from './display-hz';
-import { keyboardOwnedByControl, textEntryHasFocus } from './text-entry-focus';
+import { keyboardOwnedByControl, textEntryHasFocus, hasReachableFocusedControl } from './text-entry-focus';
 import { installDebugLog, debugLogPath } from './debug-log';
 
 // Before anything else that might fail: a packaged build has no devtools and
@@ -61,6 +61,8 @@ import {
   getJellyseerrConfig,
   pingJellyseerr,
 } from './jellyseerr';
+import { reportError } from './error-telemetry';
+import { verifySeerrCredentialsLive } from './seerr-service-status';
 import { fetchGames, launchGame } from './romm';
 import { isGamesOnly, storeCatalog } from './games-only';
 import { buildStreamingLibraries, resolveEnabledServices } from './streaming-catalog';
@@ -146,7 +148,7 @@ import type { CandyRow } from './fixtures/period-fixtures';
 import { getCandyDeliveryAdapter } from './candy-delivery';
 import { loadOperatorDefaults } from './operator-defaults';
 import { scheduleConfigPush, flushConfigPush } from './store-config-sync';
-import { isDemoMode } from './demo-mode';
+import { isDemoMode, isPublicDemo } from './demo-mode';
 import { startScreensaverAnimation, stopScreensaverAnimation } from './screensaver';
 import { buildDemoDiscovery, makeSyntheticEpisodes, demoPoster } from './demo-library';
 import { EMPTY_STAFF_PICKS, loadStaffPicks, StaffPicks } from './staff-picks-loader';
@@ -411,6 +413,7 @@ async function logJellyseerrStatus(gapCount: number): Promise<void> {
     logToConsole('[System] Jellyseerr: connected, but no requests or discoveries to shelve.', 'system');
   } else {
     logToConsole(`[System] Jellyseerr ERROR: ${ping.reason} — coming-soon and recommendations are OFF. Re-check the URL and API key on the membership screen.`, 'system');
+    reportError(`[Jellyseerr Misconfigured] ${ping.reason} — coming-soon and recommendations are OFF.`, undefined, 'warn', 'boot');
   }
 }
 
@@ -819,10 +822,15 @@ function logToConsole(message: string, type: 'system' | 'cec' | 'video' = 'syste
 
 // Global error listener to dump frontend crashes to terminal
 window.addEventListener('error', (e) => {
-  console.error(`[Frontend Crash] ${e.message} at ${e.filename}:${e.lineno}:${e.colno}`);
+  const line = `[Frontend Crash] ${e.message} at ${e.filename}:${e.lineno}:${e.colno}`;
+  console.error(line);
+  reportError(line, { filename: e.filename, lineno: e.lineno, colno: e.colno }, 'error', 'frontend');
 });
 window.addEventListener('unhandledrejection', (e) => {
-  console.error(`[Frontend Unhandled Rejection] ${e.reason?.message || e.reason}`);
+  const reason = e.reason?.message || e.reason?.stack || String(e.reason);
+  const line = `[Frontend Unhandled Rejection] ${reason}`;
+  console.error(line);
+  reportError(line, undefined, 'error', 'frontend');
 });
 
 function updateMovieHUD(movie: Movie | null) {
@@ -1021,7 +1029,8 @@ function updateBrowseHUDVisibility() {
  */
 function shortcutsAllowed(): boolean {
   return !!storeScene && !ui.isAnyOverlayOpen && !ui.isPlaybackActive
-    && !ui.isScreensaverActive && !storeScene.isNavOverlayOpen();
+    && !ui.isScreensaverActive && !storeScene.isNavOverlayOpen()
+    && !hasReachableFocusedControl();
 }
 
 /** True when nothing modal/immersive should be eating the hold shortcuts. */
@@ -1580,6 +1589,16 @@ function commitTextSetting(key: string, raw: string) {
   // reload path can drop the token unless a new password re-auths first.
   if (key === 'jellyfin_url' || key === 'jellyfin_username') settingsPendingAuthReset = true;
   if (def.applyMode === 'reload') settingsPendingReload = true;
+  if (key === 'jellyseerr_url' || key === 'jellyseerr_apikey') {
+    void verifySeerrCredentialsLive(undefined, 'settings').then((res) => {
+      updateSettingsCrtChrome();
+      if (res.ok) {
+        logToConsole('[Settings] Jellyseerr connected.', 'system');
+      } else if (res.reason && res.reason !== 'not configured') {
+        logToConsole(`[Settings] Jellyseerr error: ${res.reason}`, 'system');
+      }
+    });
+  }
   updateSettingsStatus();
   updateSettingsCrtChrome();
   logToConsole(`[Settings] ${def.label} updated.`, 'system');
@@ -1630,6 +1649,9 @@ function openSettingsDrawer(page: SettingGroup | 'Controls' | null = null, fromT
   document.getElementById('settings-drawer-overlay')!.classList.add('visible');
   // Opening straight onto a page: row 0 is Back, land on the first setting.
   setSettingsSelection(page !== null && settingsRowKeys.length > 2 ? 1 : 0);
+  if (page === 'Connection') {
+    void verifySeerrCredentialsLive(undefined, 'settings').then(() => updateSettingsCrtChrome());
+  }
   logToConsole('[Settings] Opened store settings.', 'system');
 }
 
@@ -2343,7 +2365,7 @@ function applyLiveSettings(scene: StoreScene) {
  * changes on close.
  */
 async function rebuildStoreScene() {
-  if (librariesList.length === 0 && gameMovies.length === 0) return; // nothing loaded yet
+  if (librariesList.length === 0 && gameMovies.length === 0 && getStreamingMovies().length === 0 && storeLibraries.length === 0) return; // nothing loaded yet
   logToConsole('[System] Applying store changes (rebuilding scene, no reload)...', 'system');
   showBootOverlay();
   // Nothing is interactive behind the overlay — drain texture uploads at burst
@@ -2497,8 +2519,8 @@ async function initializeStoreScene(preservePosterCache = false) {
     const jfUrl = localStorage.getItem('jellyfin_url') ?? '';
     const jfToken = localStorage.getItem('jellyfin_token') ?? '';
     // Built into a local `scene` first and only published to the module-level
-    // `storeScene` (and revealed to the user) once every cover has finished
-    // loading — see the texturesReadyPromise handoff below. Until then, the
+    // `storeScene` (and revealed to the user) after setup below. Local media
+    // waits for its covers; the public store reveals while they load. Until then, the
     // boot overlay stays up and `storeScene?.` call sites elsewhere are all
     // no-ops, so neither the view nor input can reach the half-dressed scene.
     // Watch-history staff picks (stickers + genre endcaps, see
@@ -2636,6 +2658,8 @@ async function initializeStoreScene(preservePosterCache = false) {
       }
       if (movie.game) {
         void handleGameLaunch(movie, false);
+      } else if (movie.streaming) {
+        handleStreamingLaunch(movie);
       } else {
         void launchVideoPlayback(movie);
       }
@@ -2740,7 +2764,9 @@ async function initializeStoreScene(preservePosterCache = false) {
 
     logToConsole('[System] Loading store textures...', 'system');
 
-    scene.texturesReadyPromise.then(() => {
+    // The public store is usable as soon as its geometry and input exist.
+    // Cover loading continues through the same budgeted queue after entry.
+    (isPublicDemo ? Promise.resolve() : scene.texturesReadyPromise).then(() => {
       if (contextLossGaveUp) {
         // A boot-time context loss already exhausted its retries and put the
         // give-up message on screen (see installContextLossRecovery) — decode
@@ -2792,7 +2818,7 @@ async function initializeStoreScene(preservePosterCache = false) {
       updateBrowseHUDVisibility();
       aisleIndicatorInterval = window.setInterval(updateBrowseHUDVisibility, 200);
 
-      logToConsole('[System] All textures loaded. Store ready.', 'system');
+      logToConsole(isPublicDemo ? '[System] Store ready. Artwork continues loading.' : '[System] All textures loaded. Store ready.', 'system');
       initSharedPlace(scene, isSetupPending(), () => storeScene, () => ui.isLoginOpen || textEntryHasFocus(), showClerkToast);
       // Opening day (#41): dock the counter CRT's NEW STORE SETUP before the
       // overlay drops, so the player wakes already at the terminal.
@@ -3209,6 +3235,10 @@ function finishPlayback(movie: Movie, fromCouch: boolean): void {
 }
 
 export async function launchVideoPlayback(movie: Movie, overrideItemId?: string, overridePath?: string, startHidden = false, fromCouch = false, version?: MovieVersion) {
+  if (movie.streaming) {
+    handleStreamingLaunch(movie);
+    return;
+  }
   revealPendingHidden = false; // fresh launch — clear any stale reveal handshake
   // The session this launch belongs to. Anything that retires the session
   // while we're awaiting invalidates the whole attempt — see sessionLost().
@@ -3878,7 +3908,10 @@ async function main() {
       }
     },
     onEnter: async () => {
-      if (storeScene?.isWalkAroundMode) return;
+      if (storeScene?.isWalkAroundMode) {
+        storeScene.walkInteract();
+        return;
+      }
       if (videoPlayer?.isOpen) {
         if (!videoPlayer.activateFocused()) videoPlayer.togglePlayPause();
         return;
@@ -4139,7 +4172,10 @@ async function main() {
     // checkout' toggle off (or while any overlay owns the keyboard).
     onCheckout: () => {
       if (!shortcutsAllowed()) return;
-      if (storeScene?.isWalkAroundMode) return;
+      if (storeScene?.isWalkAroundMode) {
+        storeScene.walkInteract();
+        return;
+      }
       storeScene?.enterCheckout();
     },
     onReturnTape: () => {
@@ -4347,8 +4383,8 @@ async function main() {
     renderCandyCheckout();
   });
 
-  // A phone or a WebGL2-less browser can't drive the 3D store; offer 2.5D
-  // instead of letting the boot dead-end (see device-gate.ts). Awaited here,
+  // A WebGL2-less browser cannot render the 3D store; offer 2.5D instead of
+  // letting the boot dead-end. Capable phones enter directly. Awaited here,
   // before the boot call below, so the chosen mode is already settled and the
   // store builds it first time — no 3D scene raised only to be torn down.
   // Resolves immediately on hardware that's fine, which is every kiosk.
@@ -4407,4 +4443,3 @@ if (document.readyState === 'loading') {
   // an overlay that was previously only reachable through the "/" key.
   openSearch,
 };
-

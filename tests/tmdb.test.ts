@@ -54,6 +54,16 @@ test('normalizeDiscoverItem: falls back to `name` when `title` is absent', () =>
   assert.equal(normalizeDiscoverItem({ id: 1, name: 'Show Name' }).title, 'Show Name');
 });
 
+test('normalizeDiscoverItem: preserves backdrop_path as backdropPath', () => {
+  const raw = {
+    id: 603,
+    title: 'The Matrix',
+    backdrop_path: '/backdrop.jpg',
+  };
+  const normalized = normalizeDiscoverItem(raw as any);
+  assert.equal((normalized as any).backdropPath, '/backdrop.jpg');
+});
+
 // ─── fetchStreamingMoviesFromTmdb (mocked localStorage + fetch) ────────────
 
 class FakeLocalStorage {

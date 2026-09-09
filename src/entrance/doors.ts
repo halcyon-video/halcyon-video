@@ -14,6 +14,7 @@ import * as THREE from 'three';
 import { addGlassReflectionPane } from '../glass-reflection';
 import { FixtureContext } from '../fixtures';
 import { StorefrontSpec } from '../store-layout';
+import { createDoorLeafFrame, createDoorPushBarGeometry } from './door-leaf';
 
 export interface VestibuleDoor {
   group: THREE.Group;
@@ -113,6 +114,13 @@ export function buildVestibuleDoor(
   const frameShrink = isSingle ? 0.12 : 0.2;
   const localOffset = isSliding ? 0 : (alongX ? (hingeOnLeftOrInner ? w / 2 : -w / 2) : (hingeOnLeftOrInner ? w / 2 : -w / 2));
 
+  const leafFrame = new THREE.Mesh(createDoorLeafFrame(w, doorH), frameMat);
+  leafFrame.name = 'movingDoorLeafFrame';
+  if (alongX) leafFrame.position.x = localOffset;
+  else { leafFrame.rotation.y = Math.PI / 2; leafFrame.position.z = localOffset; }
+  leafFrame.castShadow = leafFrame.receiveShadow = true;
+  addToDoorGroup(leafFrame);
+
   if (alongX) {
     const glassMesh = new THREE.Mesh(new THREE.BoxGeometry(w - frameShrink, doorH - 0.4, glassThick), glassMat);
     glassMesh.position.set(localOffset, doorH / 2, 0);
@@ -128,16 +136,25 @@ export function buildVestibuleDoor(
     if (isSingle) {
       // Vertical pull handle near the leaf's free edge instead of a push bar.
       const handleMesh = new THREE.Mesh(new THREE.BoxGeometry(0.06, 1.1, 0.08), chrome);
-      handleMesh.position.set(localOffset + (hingeOnLeftOrInner ? -0.55 : 0.55), barY, -0.14);
+      handleMesh.position.set(localOffset + (hingeOnLeftOrInner ? 0.55 : -0.55), barY, -0.14);
       handleMesh.castShadow = true;
       handleMesh.receiveShadow = true;
       addToDoorGroup(handleMesh);
     } else {
-      const pushBarMesh = new THREE.Mesh(new THREE.BoxGeometry(w - 0.7, 0.14, 0.1), chrome);
-      pushBarMesh.position.set(localOffset, barY, -0.14);
-      pushBarMesh.castShadow = true;
-      pushBarMesh.receiveShadow = true;
-      addToDoorGroup(pushBarMesh);
+      const pushBarGeo = createDoorPushBarGeometry(w);
+      const pushBar = new THREE.Mesh(pushBarGeo, frameMat);
+      pushBar.name = 'doorPushBar';
+      pushBar.position.set(localOffset, barY, -0.0575);
+      pushBar.rotation.y = Math.PI;
+      pushBar.castShadow = pushBar.receiveShadow = true;
+      addToDoorGroup(pushBar);
+
+      const pullBar = new THREE.Mesh(pushBarGeo, frameMat);
+      pullBar.name = 'exteriorDoorPull';
+      pullBar.position.set(localOffset, barY, 0.0575);
+      pullBar.rotation.y = 0;
+      pullBar.castShadow = pullBar.receiveShadow = true;
+      addToDoorGroup(pullBar);
     }
   } else {
     const glassMesh = new THREE.Mesh(new THREE.BoxGeometry(glassThick, doorH - 0.4, w - frameShrink), glassMat);
@@ -153,16 +170,25 @@ export function buildVestibuleDoor(
 
     if (isSingle) {
       const handleMesh = new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.1, 0.06), chrome);
-      handleMesh.position.set(-0.14, barY, localOffset + (hingeOnLeftOrInner ? -0.55 : 0.55));
+      handleMesh.position.set(-0.14, barY, localOffset + (hingeOnLeftOrInner ? 0.55 : -0.55));
       handleMesh.castShadow = true;
       handleMesh.receiveShadow = true;
       addToDoorGroup(handleMesh);
     } else {
-      const pushBarMesh = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.14, w - 0.7), chrome);
-      pushBarMesh.position.set(-0.14, barY, localOffset);
-      pushBarMesh.castShadow = true;
-      pushBarMesh.receiveShadow = true;
-      addToDoorGroup(pushBarMesh);
+      const pushBarGeo = createDoorPushBarGeometry(w);
+      const pushBar = new THREE.Mesh(pushBarGeo, frameMat);
+      pushBar.name = 'doorPushBar';
+      pushBar.position.set(0.0575, barY, localOffset);
+      pushBar.rotation.y = Math.PI / 2;
+      pushBar.castShadow = pushBar.receiveShadow = true;
+      addToDoorGroup(pushBar);
+
+      const pullBar = new THREE.Mesh(pushBarGeo, frameMat);
+      pullBar.name = 'exteriorDoorPull';
+      pullBar.position.set(-0.0575, barY, localOffset);
+      pullBar.rotation.y = -Math.PI / 2;
+      pullBar.castShadow = pullBar.receiveShadow = true;
+      addToDoorGroup(pullBar);
     }
   }
 

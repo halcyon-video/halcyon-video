@@ -13,16 +13,19 @@ import { Movie } from './jellyfin';
 import { assetUrl } from './asset-url';
 import { posterQueue, loadDecorPosterTexture } from './video-case';
 import { bakeFloorAO, makeWallContactAO } from './lightmap-bake';
-import { Reflector } from 'three/examples/jsm/objects/Reflector.js';
+import { buildCornice } from './ceiling-cornice';
+import { corniceOffset } from './cornice-plan';
 import { liveMirrorsAllowed, reflectorTargetSize } from './store-mirrors';
 import { SlottedFixture } from './fixtures';
 import { AmbientTvs } from './ambient-tvs';
 import { EntranceCheckout } from './entrance';
 import { buildWindowBays } from './entrance/windows';
+import { windowBayLayout } from './storefront-window-layout';
+import { facadeDimensions, facadeStyle } from './storefront-architecture';
 import { addGlassReflectionPane } from './glass-reflection';
 import { buildExteriorEnvironment, PARKING_STALLS, lotWidth } from './exterior-environment';
 import { NR_WALL_SHELF_DEPTH, NR_WALL_CLEARANCE, NR_LEFT_UNIT_STANDOFF, WALL_SHELF_HEIGHTS, BOX_SPACING, SECTION_COLS, UNIT_SECTIONS, seededRandom01, getStorefrontSpec, vestibuleHalfWidth, posterBayIndices, entranceOpeningHalfWidth, mapWallSegmentUV, STORE_CENTER_X, FRONT_GLASS_Z } from './store-layout';
-import { buildFrontSoffit, frontSoffitLidPolygon, frontSoffitPolygon, frontSoffitY, pointInSoffit, soffitConnectHalf, soffitMirroredEdges, soffitTrofferCenters, tileOverlapsSoffit } from './ceiling-soffit';
+import { buildFrontSoffit, frontSoffitLidPolygon, frontSoffitPolygon, frontSoffitY, pointInSoffit, soffitConnectHalf, soffitTrofferCenters, tileOverlapsSoffit } from './ceiling-soffit';
 import { createFixture } from './fixture-registry';
 import { CandyDisplay } from './fixtures/period-fixtures';
 import { TipJar } from './fixtures/tip-jar';
@@ -55,6 +58,9 @@ import { getSetting } from './settings';
 import { tryLoadUserAssetTexture, loadUserAssetSurface } from './user-assets';
 import { buildStorefrontFacade, WINDOW_HEAD_Y, SIDE_RIBBON_PANE_W } from './storefront-facade';
 import { buildShopfrontFacade } from './storefront-facade-shop';
+import { mapFacadeUV } from './facade-masonry';
+import { setFacadeEntryLighting } from './storefront-entry-model';
+import { buildWindowAwnings, setWindowAwningLighting } from './storefront-awning';
 import { buildStorefrontLogo3D } from './logo-storefront';
 import { create3DDoubleLayeredSign, markSignMesh, auditSignMeshes } from './sign-builders';
 import { retailAudio } from './audio';
@@ -400,23 +406,22 @@ export function buildStore(scene: StoreScene) {
     const segW = b - a;
     const veneer = new THREE.Mesh(
       new THREE.BoxGeometry(segW, KNEE_EXT_H, kneeVeneerThick),
-      kneeVeneerMaterial(segW / BRICK_FEET, KNEE_EXT_H / BRICK_FEET));
+      kneeVeneerMaterial(isShopFacade ? segW / BRICK_FEET : 1, isShopFacade ? KNEE_EXT_H / BRICK_FEET : 1));
     veneer.position.set(STORE_CENTER_X + (a + b) / 2, KNEE_EXT_H / 2, kneeVeneerZ);
+    if (!isShopFacade) mapFacadeUV(veneer.geometry, veneer.position);
     veneer.castShadow = true;
     veneer.receiveShadow = true;
     dimEnvOutside(veneer);
     scene.scene.add(veneer);
   });
 
-  // Photo-matched exterior facade: brick parapet
-  // fascia with the blue glazed-tile stripe band, capped corner piers, and
-  // the gabled entrance tower whose face carries the storefront logo below.
-  // Replaces the old curved awning + valance and the roofline corner piers.
+  // Exterior masonry and its fitted entrance, selected independently of
+  // the interior era, door style and store branding.
   // ACTUAL corner margin left solid by the whole-pane front glazing (>= the
   // FRONT_WINDOW_CORNER_MARGIN minimum — pane quantization widens it): the
   // exterior brick returns must fill exactly what the glass doesn't reach.
-  const frontGlazedSpan =
-    scene.storefrontSpec.windowBays.reduce((s, b) => s + b.width, 0) + 2 * extVestibuleGapHalf;
+  const exteriorWindowLayout = windowBayLayout(scene.storefrontSpec.windowBays, { center: 0, halfWidth: extVestibuleGapHalf });
+  const frontGlazedSpan = exteriorWindowLayout.width;
   const actualFrontCornerMargin = Math.max(0, (storeWidth - frontGlazedSpan) / 2);
   // GH #110: the format's own building, not a narrower copy of the chain's —
   // see StoreFormatSpec.facadeStyle and storefront-facade-shop.ts.
@@ -431,11 +436,13 @@ export function buildStore(scene: StoreScene) {
         frontCornerMargin: actualFrontCornerMargin,
       })
     : buildStorefrontFacade({
+        context: scene.fixtureContext(),
         storeWidth,
         backWallZ: scene.backWallZ,
         ceilingY: scene.ceilingY,
         entryHalfWidth: extVestibuleGapHalf,
         entryOpeningHalfWidth: entranceOpeningHalfWidth(scene.storefrontSpec),
+        windowMasonryGaps: exteriorWindowLayout.gaps,
         brickMaterial,
         stripeColor: theme.palette.primary,
         trimColor: theme.palette.secondary,
@@ -444,9 +451,17 @@ export function buildStore(scene: StoreScene) {
       });
   dimEnvOutside(facade.group);
   scene.scene.add(facade.group);
+  setFacadeEntryLighting(scene.scene, scene.outdoor.outsideMode);
+  if (!isShopFacade && localStorage.getItem('bb_window_awnings') !== '0') {
+    const awnings = buildWindowAwnings(scene.fixtureContext(), extVestibuleGapHalf);
+    dimEnvOutside(awnings);
+    scene.scene.add(awnings);
+    setWindowAwningLighting(scene.scene, scene.outdoor.outsideMode);
+  }
 
-  // Optional real photo-scanned facade masonry from the git-ignored user-assets
-  // tree: brick (ambientCG Bricks051, CC0). Every material brickMaterial() cloned is now in
+  // Optional installed masonry replaces the measured running-bond fallback.
+  // The bundled scan has a different bond and module, so it is not substituted
+  // for this facade. Every material brickMaterial() cloned is now in
   // brickMats; when the real map loads we re-clone it onto each, preserving that
   // material's per-mesh repeat/offset/anisotropy. A 404 leaves the procedural
   // masonry up.
@@ -470,7 +485,7 @@ export function buildStore(scene: StoreScene) {
           mat.needsUpdate = true;
         }
         scene.requestRender();
-      }, { srgb });
+      }, { srgb, shippedSurfaceFallback: false });
     };
     swapBrickSlot('map', 'color.png', true);
     swapBrickSlot('normalMap', 'normal.png', false);
@@ -491,7 +506,8 @@ export function buildStore(scene: StoreScene) {
   const FRONT_Z = FRONT_GLASS_Z; // matches the storefront glass line (frontZ in exterior-environment.ts)
   const STALL_W = PARKING_STALLS.stallWidth; // stall width (one texture tile across)
   const STALL_DEPTH = PARKING_STALLS.depth;  // single stall row at the far side of the lot
-  const LOT_APRON = 5.0;     // sidewalk + curb strip along the glass line
+  const sidewalkDepth = isShopFacade ? 4.7 : facadeDimensions(scene.ceilingY, extVestibuleGapHalf, facadeStyle()).sidewalkDepth;
+  const LOT_APRON = sidewalkDepth + .3; // sidewalk + curb strip along the glass line
   const LANE_DEPTH = PARKING_STALLS.rowFrontZ - FRONT_Z - LOT_APRON; // drive lane between the sidewalk and the stalls
   const LOT_D = LOT_APRON + LANE_DEPTH + STALL_DEPTH; // 47 ft beyond the glass
   // Odd multiple of STALL_W so stall boundaries land at x = centerX ± 4.5,
@@ -530,7 +546,7 @@ export function buildStore(scene: StoreScene) {
   // Also builds the GH #144 ground-blend ring (see exterior-environment.ts)
   // that fades the lot's exposed edges into whatever ground the current sky
   // pano shows there — recolored live via the listener below as panos load.
-  scene.exterior = buildExteriorEnvironment(scene.scene, storeWidth);
+  scene.exterior = buildExteriorEnvironment(scene.scene, storeWidth, sidewalkDepth);
   scene.exterior.setOutsideMode(scene.outdoor.outsideMode);
   scene.exterior.setGroundColor(scene.outdoor.getGroundColor());
   scene.outdoor.setGroundColorListener((color) => {
@@ -577,8 +593,8 @@ export function buildStore(scene: StoreScene) {
           map: scene.nrLogoBodyTex,
           transparent: true,
           alphaTest: 0.35,
-          roughness: 0.2,
-          metalness: 0.2,
+          roughness: 0.6,
+          metalness: 0.05,
           color: new THREE.Color(colorFactor, colorFactor, colorFactor),
           // Subtle emissive blue so the ticket body has a dark self-glow at night
           emissive: isFront ? new THREE.Color(0x020825) : new THREE.Color(0x000000),
@@ -602,8 +618,8 @@ export function buildStore(scene: StoreScene) {
           map: scene.entranceLogoYellowTex,
           transparent: true,
           alphaTest: 0.35,
-          roughness: 0.1, // very glossy
-          metalness: 0.9, // highly metallic gold feel
+          roughness: 0.55,
+          metalness: 0.05,
           color: new THREE.Color(colorFactor, colorFactor, colorFactor),
           // Warm self-glow for gold details (text + border)
           emissive: new THREE.Color(0xffaa00).multiplyScalar(colorFactor),
@@ -625,12 +641,14 @@ export function buildStore(scene: StoreScene) {
       // Mount the logo on the gable face (its layered planes step outward from
       // the anchor's z, so the back plane sits just proud of the brick).
       entranceLogo.position.set(facade.logoAnchor.x, facade.logoAnchor.y, facade.logoAnchor.z);
+      entranceLogo.name = 'storefrontLayeredLogo';
       scene.scene.add(entranceLogo);
     }
 
     // Add a PointLight directly in front of the glowing sign to illuminate the tower and building front
     const logoLightColor = new THREE.Color(theme.palette.secondary);
     const logoLight = new THREE.PointLight(logoLightColor, 15, 30); // Warm theme light
+    logoLight.name = 'storefrontSignLight';
     logoLight.position.set(facade.logoAnchor.x, facade.logoAnchor.y, facade.logoAnchor.z + 3.5);
     logoLight.castShadow = true;
     logoLight.shadow.bias = -0.002;
@@ -650,6 +668,7 @@ export function buildStore(scene: StoreScene) {
     logoLight.shadow.needsUpdate = true;
     scene.scene.add(logoLight);
     scene.outdoor.logoLight = logoLight;
+    setFacadeEntryLighting(scene.scene, scene.outdoor.outsideMode);
   }
 
 
@@ -727,15 +746,10 @@ export function buildStore(scene: StoreScene) {
   // non-shadow-casting decoration, so without this the directional sun shone
   // straight through the "roof" and painted daylight across the whole floor —
   // interior sun patches must only come in through the storefront glass.
-  // The chain box hides its 2 ft eave behind a deep brick parapet. The little
-  // shop's false front (storefront-facade-shop.ts) is a thin stucco skin
-  // standing just 0.6 ft off the walls, so the same eave punched through it
-  // and hung over the door as a dark awning-like slab (owner hotfix
-  // 2026-08-23) — tuck the slab inside the parapet ring instead. 0.25 ft
-  // still laps every wall head, and the parapet skirts run floor-to-coping
-  // on all four sides, so nothing shows and no daylight leaks. (The sky-dome
-  // radius above keeps the fixed 2.0 ROOF_OVERHANG as a conservative bound.)
-  const roofOverhang = isShopFacade ? 0.25 : 2.0;
+  // Keep the structural roof inside the masonry skin on every format.
+  // A two-foot overhang protrudes through the thin parapet as a dark belt.
+  // The sky bound above remains conservatively larger than the real roof.
+  const roofOverhang = .25;
   const roofGeo = new THREE.BoxGeometry(storeWidth + 2 * roofOverhang, 0.5, floorCeilLen + 2 * roofOverhang);
   const roofMat = new THREE.MeshStandardMaterial({ color: 0x35383c, roughness: 0.95 });
   const roof = new THREE.Mesh(roofGeo, roofMat);
@@ -839,7 +853,8 @@ export function buildStore(scene: StoreScene) {
   // dropped, since a clipped module would desync from the T-bar texture).
   const leftEdge = STORE_CENTER_X - storeWidth / 2;
   const rightWallX = STORE_CENTER_X + storeWidth / 2;
-  const cornerMargin = CORNICE_WALL_GAP + CORNICE_BAND;
+  const wantsCeilingCornice = getActiveTheme().id !== 'bb-2000' && activeStoreFormat().ceilingMirror;
+  const cornerMargin = wantsCeilingCornice ? CORNICE_WALL_GAP + CORNICE_BAND : 0;
   const safeXMin = leftEdge + cornerMargin;
   const safeXMax = rightWallX - cornerMargin;
   const safeZMin = backWallZ + cornerMargin;
@@ -877,12 +892,16 @@ export function buildStore(scene: StoreScene) {
         tx - TILE_X / 2 < STORE_CENTER_X + vestHalfW &&
         tz + TILE_Z / 2 > vestBackZ;
       if (inVestibule) continue;
+      // The back-right notch is solid building, including on mirror-free decks.
+      if (scene.hasStep && tx + TILE_X/2 > scene.stepX - cornerMargin &&
+          tz - TILE_Z/2 < backWallZ + scene.stepDepth + cornerMargin) continue;
 
       const overSoffit = tileOverlapsSoffit(tx, tz, TILE_X / 2, TILE_Z / 2, soffitPoly);
       const isLight = !overSoffit &&
         (((k % 4 === 0) && (m % 4 === 0)) || ((k % 4 === 2) && (m % 4 === 2)));
       if (isLight) {
         const frame = new THREE.Mesh(trofferFrameGeo, trofferFrameMat);
+        frame.castShadow = frame.receiveShadow = true;
         frame.position.set(tx, ceilingY - 0.03, tz);
         scene.scene.add(frame);
         const panel = new THREE.Mesh(trofferPanelGeo, trofferMat);
@@ -923,6 +942,8 @@ export function buildStore(scene: StoreScene) {
     panelFaceMesh.instanceMatrix.setUsage(THREE.StaticDrawUsage);
     panelFrameMesh.frustumCulled = false;
     panelFaceMesh.frustumCulled = false;
+    panelFrameMesh.castShadow = panelFrameMesh.receiveShadow = true;
+    panelFaceMesh.castShadow = panelFaceMesh.receiveShadow = true;
     const m4 = new THREE.Matrix4();
     const tileTint = new THREE.Color();
     panelSpots.forEach((spot, i) => {
@@ -968,6 +989,8 @@ export function buildStore(scene: StoreScene) {
     ventFaceMesh.instanceMatrix.setUsage(THREE.StaticDrawUsage);
     ventFrameMesh.frustumCulled = false;
     ventFaceMesh.frustumCulled = false;
+    ventFrameMesh.castShadow = ventFrameMesh.receiveShadow = true;
+    ventFaceMesh.castShadow = ventFaceMesh.receiveShadow = true;
     const vm4 = new THREE.Matrix4();
     ventSpots.forEach((spot, i) => {
       vm4.makeTranslation(spot.x, ceilingY - 0.03, spot.z);
@@ -1205,7 +1228,7 @@ export function buildStore(scene: StoreScene) {
       reflectorSize: soffitReflectorSize,
       // bb-2000: all-white soffit body + inset circular can lights, no mirror
       // ring (the perimeter cornice is dropped for that store — user).
-      plainWhite: getActiveTheme().id === 'bb-2000',
+      plainWhite: !wantsCeilingCornice,
     });
     // Keep the register of panel centres complete. Nothing reads it today —
     // the emitters reach the bake as scene geometry, not through this list —
@@ -2771,8 +2794,7 @@ export function validateStoreLayout(scene: StoreScene, fixtureFootprints: Footpr
   (window as any).__layoutViolations = violations;
 }
 
-export function buildCeilingFrame(scene: StoreScene, storeWidth: number, backWallZ: number) {
-  const ceilY = scene.ceilingY;
+function ceilingCornicePoints(scene: StoreScene, storeWidth: number, backWallZ: number) {
   // The cornice keeps a 2 ft standoff from every wall (and from the stepped
   // corner and the vestibule glass, below) so the chrome body floats clear
   // of the shell instead of touching or clipping it. Shared with the
@@ -2786,257 +2808,35 @@ export function buildCeilingFrame(scene: StoreScene, storeWidth: number, backWal
   const rightEdge = wallRight - WALL_GAP;
   const zFront = wallFront - WALL_GAP;
   const zBack = backWallZ + WALL_GAP;
-  const drop = CORNICE_DROP; // how far the cornice body hangs below the ceiling
   const band = CORNICE_BAND; // horizontal depth of the cornice
-  // Height of the mirror band on the inner face. 1.9 → 2.3 with the
-  // shallower tilt below: on the narrower ring (feedback/044) the old short,
-  // steeply-tilted strip went edge-on at wall-grazing views and the band
-  // read as a dead dark chrome face down the whole run.
-  const mirrorH = 2.3;
-  const mirrorY = ceilY - drop * 0.5;
-  const innerDepth = (zFront - zBack) - 2 * band; // left/right runs tuck between front/back
-
-  const chromeMat = new THREE.MeshStandardMaterial({
-    color: 0xd6dbe2, metalness: 1.0, roughness: 0.12, envMapIntensity: 1.0
-  });
-
-  // Chrome BODY: one mitred ring strip extruded from the cornice's plan
-  // polyline, instead of the old per-run boxes + oversize square "weld"
-  // patches at the stepped-corner seams. The boxes met the rotated diagonal
-  // in axis-aligned overlaps, and the welds (band*2 squares) poked their
-  // corners out past both faces — the "jutting out silver parts" of
-  // feedback/043. An extruded strip mitres every corner by construction:
-  // the runs meet in clean plane joins at whatever obtuse angle the plan
-  // turns, and there is nothing extra to jut.
-  const buildBodyRing = (outer: { x: number; z: number }[]) => {
-    const interior = { x: STORE_CENTER_X, z: (zFront + zBack) / 2 };
-    // Per-segment inward normal (toward the store interior).
-    const segN: { x: number; z: number }[] = [];
-    for (let i = 0; i < outer.length - 1; i++) {
-      const ux = outer[i + 1].x - outer[i].x, uz = outer[i + 1].z - outer[i].z;
-      const len = Math.hypot(ux, uz) || 1;
-      let nx = uz / len, nz = -ux / len;
-      const midx = (outer[i].x + outer[i + 1].x) / 2, midz = (outer[i].z + outer[i + 1].z) / 2;
-      if (nx * (interior.x - midx) + nz * (interior.z - midz) < 0) { nx = -nx; nz = -nz; }
-      segN.push({ x: nx, z: nz });
-    }
-    // Inner polyline: segment lines offset by `band`, adjacent lines
-    // intersected for the mitre; square caps at the two open ends.
-    const inner: { x: number; z: number }[] = [];
-    for (let i = 0; i < outer.length; i++) {
-      const prev = i > 0 ? i - 1 : null, next = i < segN.length ? i : null;
-      if (prev === null || next === null) {
-        const n = segN[prev ?? next!];
-        inner.push({ x: outer[i].x + n.x * band, z: outer[i].z + n.z * band });
-        continue;
-      }
-      const nA = segN[prev], nB = segN[next];
-      const a0 = { x: outer[i - 1].x + nA.x * band, z: outer[i - 1].z + nA.z * band };
-      const b0 = { x: outer[i].x + nB.x * band, z: outer[i].z + nB.z * band };
-      const dA = { x: outer[i].x - outer[i - 1].x, z: outer[i].z - outer[i - 1].z };
-      const dB = { x: outer[i + 1].x - outer[i].x, z: outer[i + 1].z - outer[i].z };
-      const det = dA.x * -dB.z - dA.z * -dB.x;
-      if (Math.abs(det) < 1e-6) {
-        inner.push(b0); // collinear runs — no corner
-        continue;
-      }
-      const t = ((b0.x - a0.x) * -dB.z - (b0.z - a0.z) * -dB.x) / det;
-      inner.push({ x: a0.x + dA.x * t, z: a0.z + dA.z * t });
-    }
-    const shape = new THREE.Shape();
-    shape.moveTo(outer[0].x, outer[0].z);
-    for (let i = 1; i < outer.length; i++) shape.lineTo(outer[i].x, outer[i].z);
-    for (let i = inner.length - 1; i >= 0; i--) shape.lineTo(inner[i].x, inner[i].z);
-    shape.closePath();
-    const geo = new THREE.ExtrudeGeometry(shape, { depth: drop, bevelEnabled: false });
-    // Shape (x, y=plan z) extruded along +z → rotateX(+90°) maps the
-    // extrusion to hang straight down from the ceiling plane.
-    geo.rotateX(Math.PI / 2);
-    geo.translate(0, ceilY, 0);
-    const body = new THREE.Mesh(geo, chromeMat);
-    body.castShadow = true;
-    body.receiveShadow = true;
-    scene.scene.add(body);
-    scene.shelves.push(body);
-  };
-
-  // edge: inset mirror plane using Reflector (the chrome body is the ring above).
-  const addEdge = (
-    mirrorW: number, mirrorPos: THREE.Vector3, mirrorRotY: number
-  ) => {
-    const group = new THREE.Group();
-
-    // Short runs (stepped-corner notch, slivers beside the vestibule) can
-    // leave no room for a mirror once the corner tucks are subtracted.
-    if (mirrorW < 0.75) {
-      scene.scene.add(group);
-      scene.shelves.push(group);
-      return;
-    }
-
-    const tiltAngle = 14 * Math.PI / 180; // downward tilt (20° went edge-on at grazing views)
-    const localZOffset = (mirrorH / 2) * Math.sin(tiltAngle);
-
-    // Software GL: a live Reflector re-renders the entire scene per mirror —
-    // several extra full draw-call replays per boot that SwiftShader pays in
-    // CPU. A static chrome plane keeps the band's look at zero render cost.
-    // WebKitGTK pays the replay too (~14ms blocking per refresh), so it
-    // takes the same static plane.
-    if (!liveMirrorsAllowed(scene)) {
-      const still = new THREE.Mesh(new THREE.PlaneGeometry(mirrorW, mirrorH), chromeMat);
-      const stillPos = mirrorPos.clone();
-      stillPos.x += localZOffset * Math.sin(mirrorRotY);
-      stillPos.z += localZOffset * Math.cos(mirrorRotY);
-      still.position.copy(stillPos);
-      still.rotation.order = 'YXZ';
-      still.rotation.y = mirrorRotY;
-      still.rotation.x = tiltAngle;
-      group.add(still);
-      scene.scene.add(group);
-      scene.shelves.push(group);
-      return;
-    }
-
-    // Reflection resolution (F8 pin 028 — "this is ugly and messed up", filed
-    // on the smeared, stair-stepped strip this band showed above the cornice):
-    // a fixed 512x512 target stretched over a 20:1 band is the blocky smear in
-    // that pin, and headless was pinned at 64 regardless of quality, so no
-    // screenshot could gate a fix. reflectorTargetSize derives it from the real
-    // drawing buffer instead — see store-mirrors.ts.
-    const tex = reflectorTargetSize(scene.renderer);
-
-    const mirror = new Reflector(new THREE.PlaneGeometry(mirrorW, mirrorH), {
-      clipBias: 0.003,
-      textureWidth: tex.w,
-      textureHeight: tex.h,
-      color: 0xffffff
-    });
-    
-    // Calculate adjusted mirror position to prevent clipping at the bottom edge.
-    const adjustedMirrorPos = mirrorPos.clone();
-    adjustedMirrorPos.x += localZOffset * Math.sin(mirrorRotY);
-    adjustedMirrorPos.z += localZOffset * Math.cos(mirrorRotY);
-    
-    mirror.position.copy(adjustedMirrorPos);
-    mirror.rotation.order = 'YXZ';
-    mirror.rotation.y = mirrorRotY;
-    mirror.rotation.x = tiltAngle;
-    group.add(mirror);
-
-    scene.scene.add(group);
-    scene.shelves.push(group);
-  };
-
-  // The cornice follows the real wall line: the stepped back-right corner
-  // (walls at x = stepX and z = stepZ) and the entrance vestibule (a
-  // floor-to-ceiling glass box at 11 +- vestHalfW, protruding in from the
-  // front glass) would otherwise slice straight through the chrome + mirror.
-  // With no stepped corner (bb_corner 'none', stepDepth 0) the back-right
-  // wall is flat: the back run spans the full width and meets the right run
-  // in a plain square corner, exactly like the front/left pair. The diagonal
-  // seam math below would degenerate to 0/0 = NaN there (NaN-width mirror
-  // geometry = the whole back-wall mirror band silently invisible), so the
-  // diagonal run and its seam points only exist when the step does.
-  const stepX = scene.hasStep ? scene.stepX - WALL_GAP : rightEdge;
-  const stepZ = zBack + scene.stepDepth;
-
-  const bo = band + 0.02;
-  // Where the back run's mirror strip ends (x) and the right run's starts
-  // (z). Flat corner: the plain band insets, matching the front/left corner.
-  let seamBackX = rightEdge - band;
-  let seamRightZ = zBack + band;
-  if (scene.hasStep) {
-    // The cornice turns the stepped corner the way the WALL turns it — back
-    // run, connector, stepped-forward face — each run held off its own wall
-    // face by WALL_GAP, exactly as the 1990 wall stripe traces it
-    // (wall-stripe-1990.ts).
-    //
-    // This replaces a single hypotenuse from (stepX, zBack) to (rightEdge,
-    // stepZ). That chord was cheaper by one Reflector, but the step does not
-    // cut the corner off — it leaves a SOLID block at the back right, and the
-    // chord ran straight through it. The block's inner corner stood 3.1 ft
-    // proud of the chord on the 'wide' setting and 2.2 ft on the default,
-    // both deeper than the 1.8 ft band, so the gold wall sheared clean
-    // through chrome and mirror alike (feedback/062).
-    seamBackX = stepX - bo;
-    seamRightZ = stepZ + bo;
-    // Connector (runs along Z at x = stepX, faces -X into the room).
-    addEdge(
-      stepZ - zBack,
-      new THREE.Vector3(stepX - bo, mirrorY, (zBack + stepZ) / 2 + bo), -Math.PI / 2
-    );
-    // Stepped-forward face (runs along X at z = stepZ, faces +Z).
-    addEdge(
-      rightEdge - stepX,
-      new THREE.Vector3((stepX + rightEdge) / 2 - bo, mirrorY, stepZ + bo), 0
-    );
-  }
-  // Chrome body: the whole cornice as ONE mitred ring strip, front-left
-  // connect point around left/back/(diagonal)/right to the front-right
-  // connect point (the cash-wrap soffit fascia closes the loop across the
-  // entrance — see ceiling-soffit.ts).
-  {
-    const connectHalfB = soffitConnectHalf(scene.storefrontSpec, storeWidth, WALL_GAP);
-    const plan: { x: number; z: number }[] = [
-      { x: STORE_CENTER_X - connectHalfB, z: zFront },
-      { x: leftEdge, z: zFront },
-      { x: leftEdge, z: zBack },
-      { x: stepX, z: zBack },
-    ];
-    if (scene.hasStep) {
-      plan.push({ x: stepX, z: stepZ });      // connector, along the step's -X face
-      plan.push({ x: rightEdge, z: stepZ });  // the stepped-forward face
-    }
-    plan.push({ x: rightEdge, z: zFront });
-    plan.push({ x: STORE_CENTER_X + connectHalfB, z: zFront });
-    buildBodyRing(plan);
-  }
-  // Back edge mirror (runs along X, faces +Z) — stops at the stepped corner
-  // when there is one, otherwise runs the full width of the flat back wall.
-  const backMirrorW = seamBackX - (leftEdge + band);
-  addEdge(
-    backMirrorW,
-    new THREE.Vector3((leftEdge + band + seamBackX) / 2, mirrorY, zBack + bo), 0
-  );
-  // Front edge (runs along X, faces -Z) — split around the vestibule so the
-  // cornice never crosses the entrance zone.
-  // Stop where the cash-wrap soffit's back corners are, so the two bands
-  // hand off to each other. soffitConnectHalf() is the shared source of that
-  // x — it sits well outside the vestibule clearance (vestHalfW + WALL_GAP)
-  // so the soffit's wedge has room to taper to a point.
-  const connectHalf = soffitConnectHalf(scene.storefrontSpec, storeWidth, WALL_GAP);
-  const frontSegs: [number, number, 'x0' | 'x1'][] = [
-    [leftEdge, STORE_CENTER_X - connectHalf, 'x0'],
-    [STORE_CENTER_X + connectHalf, rightEdge, 'x1'],
+  // The baseline is the old mirror seat, including the stepped wall and
+  // shared soffit endpoints. One CLOSED fitted section now makes both parts.
+  const sx = scene.hasStep ? scene.stepX - WALL_GAP : rightEdge;
+  const sz = zBack + scene.stepDepth;
+  const connect = soffitConnectHalf(scene.storefrontSpec, storeWidth, WALL_GAP);
+  const plan = [
+    {x: STORE_CENTER_X-connect, z:zFront-band},
+    {x:leftEdge+band,z:zFront-band},
+    {x:leftEdge+band,z:zBack+band},
+    {x:sx-band,z:zBack+band},
   ];
-  // Each segment insets its mirror by `band` at the WALL end only (the tuck
-  // that keeps it from colliding with the side run around the corner). The
-  // vestibule end runs the strip out to the full segment edge, because that
-  // is where the cash-wrap soffit's fascia picks the band up and carries it
-  // around the counter (src/ceiling-soffit.ts) — insetting both ends, as the
-  // other runs do, left 2.9 ft of bare chrome on each side of the entrance
-  // and broke the ring exactly where it now needs to be continuous.
-  for (const [x0, x1, wallEnd] of frontSegs) {
-    const w = x1 - x0;
-    if (w < 0.5) continue;
-    const mx0 = wallEnd === 'x0' ? x0 + band : x0;
-    const mx1 = wallEnd === 'x1' ? x1 - band : x1;
-    addEdge(
-      mx1 - mx0,
-      new THREE.Vector3((mx0 + mx1) / 2, mirrorY, zFront - band - 0.02), Math.PI
-    );
-  }
-  // Left edge (runs along Z, faces +X)
-  addEdge(
-    innerDepth,
-    new THREE.Vector3(leftEdge + band + 0.02, mirrorY, (zFront + zBack) / 2), Math.PI / 2
-  );
-  // Right edge (runs along Z, faces -X) — starts at the stepped corner. The
-  // mirror strip runs all the way down to the diagonal seam point.
-  addEdge(
-    (zFront - band) - seamRightZ,
-    new THREE.Vector3(rightEdge - bo, mirrorY, (seamRightZ + zFront - band) / 2), -Math.PI / 2
-  );
+  if(scene.hasStep) plan.push({x:sx-band,z:sz+band},{x:rightEdge-band,z:sz+band});
+  plan.push({x:rightEdge-band,z:zFront-band},{x:STORE_CENTER_X+connect,z:zFront-band});
+  const soffit = frontSoffitPolygon(scene.storefrontSpec,storeWidth,WALL_GAP,band);
+  plan.push(...soffit.slice(1,-1).reverse());
+  return plan;
+}
+
+export function buildCeilingFrame(scene: StoreScene, storeWidth: number, backWallZ: number) {
+  const ceilY = scene.ceilingY, drop = CORNICE_DROP;
+  const wallLeft = STORE_CENTER_X - storeWidth / 2;
+  const wallRight = STORE_CENTER_X + storeWidth / 2;
+  const wallFront = FRONT_GLASS_Z;
+  const plan = ceilingCornicePoints(scene, storeWidth, backWallZ);
+  const cornice = buildCornice(scene.scene,plan,ceilY,liveMirrorsAllowed(scene),reflectorTargetSize(scene.renderer),()=>{
+    scene.renderer.shadowMap.needsUpdate=true; scene.requestRender();
+  });
+  scene.shelves.push(cornice);
 
   // --- Prebaked warm up-glow where the cornice meets the gold walls ---
   // The cornice's wall-facing back side throws a static warm wash down the
@@ -3098,113 +2898,22 @@ export function buildMarqueeBulbs(scene: StoreScene, storeWidth: number, backWal
     return;
   }
 
-  // Same cornice geometry constants as buildCeilingFrame(), kept independent
-  // (not shared via closure) so toggling this feature can never regress the
-  // mirror cornice itself. The frame MUST match the cornice's: inset
-  // CORNICE_WALL_GAP from every wall and split around the vestibule, or the
-  // bulb rim detaches from the mirror body (feedback/005) — most bulbs end
-  // up buried inside the chrome box and the only visible ones float in air
-  // across the vestibule glass and at the stepped-corner diagonal.
-  const ceilY = scene.ceilingY;
-  const WALL_GAP = CORNICE_WALL_GAP;
-  const leftEdge = STORE_CENTER_X - storeWidth / 2 + WALL_GAP;
-  const rightEdge = STORE_CENTER_X + storeWidth / 2 - WALL_GAP;
-  const zFront = FRONT_GLASS_Z - WALL_GAP;
-  const zBack = backWallZ + WALL_GAP;
-  const drop = CORNICE_DROP;
-  const band = CORNICE_BAND;
-  const bulbY = ceilY - drop + 0.10; // just above the cornice's true bottom edge
+  // Mount the chase on the same fitted rim as the cornice, including the
+  // true stepped-wall turns and the joined soffit peak. The old independent
+  // path cut diagonally across the notch and buried bulbs in the rolled lip.
+  const bulbY = scene.ceilingY - CORNICE_DROP + 0.10;
   const bulbSpacing = 0.5;
   const bulbRadius = 0.045;
-
   const spots: THREE.Vector3[] = [];
   const addLine = (from: THREE.Vector3, to: THREE.Vector3) => {
-    const len = from.distanceTo(to);
-    const count = Math.max(2, Math.round(len / bulbSpacing));
-    for (let i = 0; i < count; i++) {
-      spots.push(from.clone().lerp(to, (i + 0.5) / count));
-    }
+    const count = Math.max(2, Math.round(from.distanceTo(to) / bulbSpacing));
+    for (let i = 0; i < count; i++) spots.push(from.clone().lerp(to, (i + 0.5) / count));
   };
-
-  // Cornice rim, all the way around: back/front runs span the full store
-  // width (including the corners); left/right runs tuck into the remaining
-  // inner depth between them — the same split buildCeilingFrame's mirror
-  // strips use, so there's no gap and no double-covered corner.
-  // Stepped back-right corner: the cornice runs diagonally between the back
-  // and right runs there (see buildCeilingFrame's diagonal edge), so the
-  // bulb rim follows the same three-segment path — back run to the diagonal
-  // seam, the diagonal itself, then the right run — instead of blindly
-  // spanning the full width straight through the stepped wall.
-  const bo = band + 0.03; // bulb line's inward offset from the cornice's wall line
-  // The seam math below divides by the diagonal's Z component, which is the
-  // step depth — so with no stepped corner (bb_corner 'none') diagS1 goes
-  // 0/0 = NaN and the BACK-WALL run collapses to NaN instances that render
-  // nothing, i.e. bulbs everywhere except along the back-wall mirror. Guard
-  // it exactly like buildCeilingFrame() already does for the mirror band.
-  if (scene.hasStep) {
-    const stepX = scene.stepX - WALL_GAP;
-    const stepZ = zBack + scene.stepDepth;
-    const diagDX = rightEdge - stepX;
-    const diagDZ = stepZ - zBack;
-    const diagLen = Math.hypot(diagDX, diagDZ);
-    const diagNX = -diagDZ / diagLen;
-    const diagNZ = diagDX / diagLen;
-    const diagUX = diagDX / diagLen, diagUZ = diagDZ / diagLen;
-    const diagS1 = (bo * (1 - diagNZ)) / diagUZ;
-    const diagS2 = (diagDX - bo * (1 + diagNX)) / diagUX;
-    const diagP1 = new THREE.Vector3(
-      stepX + diagNX * bo + diagS1 * diagUX, bulbY, zBack + diagNZ * bo + diagS1 * diagUZ);
-    const diagP2 = new THREE.Vector3(
-      stepX + diagNX * bo + diagS2 * diagUX, bulbY, zBack + diagNZ * bo + diagS2 * diagUZ);
-    addLine(new THREE.Vector3(leftEdge, bulbY, zBack + bo), diagP1);
-    addLine(diagP1, diagP2);
-    addLine(diagP2, new THREE.Vector3(rightEdge - bo, bulbY, zFront - band));
-  } else {
-    // Flat back-right wall: straight back run, then straight down the right.
-    addLine(
-      new THREE.Vector3(leftEdge, bulbY, zBack + bo),
-      new THREE.Vector3(rightEdge - bo, bulbY, zBack + bo)
-    );
-    addLine(
-      new THREE.Vector3(rightEdge - bo, bulbY, zBack + bo),
-      new THREE.Vector3(rightEdge - bo, bulbY, zFront - band)
-    );
+  const rim = corniceOffset(ceilingCornicePoints(scene, storeWidth, backWallZ), 0.12);
+  for (let i = 0; i < rim.length; i++) {
+    const a = rim[i], b = rim[(i + 1) % rim.length];
+    addLine(new THREE.Vector3(a.x, bulbY, a.z), new THREE.Vector3(b.x, bulbY, b.z));
   }
-  // Front rim: split around the vestibule exactly like the cornice body —
-  // a straight full-width run would cross the entrance glass with no chrome
-  // behind it.
-  // Split at the cash-wrap soffit's back corners, NOT at the vestibule — the
-  // front runs now hand off to the soffit there, and the rim follows it
-  // around rather than stopping short and leaving the soffit's own band
-  // unlit while the wall band beside it glows.
-  const connectHalf = soffitConnectHalf(scene.storefrontSpec, storeWidth, WALL_GAP);
-  const frontBulbSegs: [number, number][] = [
-    [leftEdge, STORE_CENTER_X - connectHalf],
-    [STORE_CENTER_X + connectHalf, rightEdge],
-  ];
-  for (const [x0, x1] of frontBulbSegs) {
-    if (x1 - x0 < 0.5) continue; // same skip threshold as buildCeilingFrame
-    addLine(
-      new THREE.Vector3(x0, bulbY, zFront - band - 0.03),
-      new THREE.Vector3(x1, bulbY, zFront - band - 0.03)
-    );
-  }
-  // ...and on around the soffit's mirrored runs. Same 0.03 stand-off past the
-  // mirror plane the wall runs use, measured along each run's outward normal,
-  // and the same bulbY — the soffit's fascia hangs the identical drop, so the
-  // rim stays one unbroken line of bulbs through the corner.
-  for (const e of soffitMirroredEdges(
-    frontSoffitPolygon(scene.storefrontSpec, storeWidth, WALL_GAP, band)
-  )) {
-    addLine(
-      new THREE.Vector3(e.a.x - e.nx * 0.03, bulbY, e.a.z - e.nz * 0.03),
-      new THREE.Vector3(e.b.x - e.nx * 0.03, bulbY, e.b.z - e.nz * 0.03)
-    );
-  }
-  addLine(
-    new THREE.Vector3(leftEdge + band + 0.03, bulbY, zBack + band),
-    new THREE.Vector3(leftEdge + band + 0.03, bulbY, zFront - band)
-  );
 
   // Window poster frames: a bulb ring around each poster's rectangle, in the
   // poster's own world plane (front window posters face -Z, left window

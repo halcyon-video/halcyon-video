@@ -24,9 +24,9 @@ import * as THREE from 'three';
 import { carryIdFor } from './media-sources';
 import type { Movie } from './jellyfin';
 import {
-  CASE_MEDIUM,
-  CASE_DEPTH,
+  rentalBoxDepth,
   getRentalCaseGeometry,
+  gameRentalDims,
   createHeroRentalMaterials,
 } from './video-case';
 
@@ -499,11 +499,10 @@ export class CarriedTapes {
   // ── Internals ──────────────────────────────────────────────────────────────
 
   private caseGeometry(movie: Movie): THREE.BufferGeometry {
-    const isAnimated = CASE_MEDIUM === 'vhs' && movie.libraryName === 'Animated Movies';
     // What you carry to the counter is the STORE'S copy — the rental
-    // rental clamshell that sits behind the retail display box on the shelf —
+    // clamshell that sits behind the retail display box on the shelf —
     // so use the rental geometry (identical on DVD; the molded rim on VHS).
-    return getRentalCaseGeometry(isAnimated); // shared module singleton — never disposed here
+    return getRentalCaseGeometry(false, movie.game ? gameRentalDims(movie.platform) : undefined); // shared cache, borrowed
   }
 
   // Clone the rental-clamshell materials (house-colored panels with
@@ -533,7 +532,14 @@ export class CarriedTapes {
   /** Hand-slot pose for stack index i (bottom = 0). Returns the roll (rad). */
   private slotLocalInto(idx: number, p: THREE.Vector3): number {
     const i = Math.max(0, idx);
-    p.set(i * FAN_X, i * FAN_Y, i * (CASE_DEPTH + FAN_GAP));
+    let z = 0;
+    for (let n = 1; n <= i; n++) {
+      const previous = this.entries[n - 1].movie, current = this.entries[n].movie;
+      const a = rentalBoxDepth(undefined, previous.game ? gameRentalDims(previous.platform) : undefined);
+      const b = rentalBoxDepth(undefined, current.game ? gameRentalDims(current.platform) : undefined);
+      z += (a + b) / 2 + FAN_GAP;
+    }
+    p.set(i * FAN_X, i * FAN_Y, z);
     return BASE_ROLL + i * FAN_ROLL;
   }
 

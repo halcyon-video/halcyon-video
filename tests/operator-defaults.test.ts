@@ -7,6 +7,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  defaultJellyfinUrl,
+  loadOperatorDefaults,
   operatorAuthHeaders,
   operatorDefault,
   operatorRequestAllowed,
@@ -118,4 +120,44 @@ test('the client cache reports only what the server actually sent', () => {
   assert.deepEqual(operatorDefault('romm'), { url: 'http://box:8080', managed: true });
   assert.equal(operatorDefault('jellyseerr'), null);
   setOperatorDefaults(null);
+});
+
+
+test('runtime Jellyfin is a URL-only hint, never a managed credential or proxy target', () => {
+  const cfg = readOperatorEnv({
+    HALCYON_JELLYFIN_URL: ' https://media.example.com/jellyfin/ ',
+    HALCYON_JELLYFIN_PASSWORD: 'PRIVATE-SENTINEL',
+    HALCYON_JELLYFIN_APIKEY: 'PRIVATE-SENTINEL',
+    VITE_JELLYFIN_USERNAME: 'PRIVATE-SENTINEL',
+  });
+  assert.deepEqual(publicOperatorDefaults(cfg), {
+    jellyfin: { url: 'https://media.example.com/jellyfin' },
+  });
+  assert.equal(operatorServiceForTarget(cfg, 'https://media.example.com/jellyfin/Users'), null);
+  assert.ok(!JSON.stringify(cfg).includes('PRIVATE-SENTINEL'));
+});
+
+test('runtime Jellyfin alias works and canonical address takes precedence', () => {
+  assert.equal(readOperatorEnv({ VITE_JELLYFIN_URL: 'http://legacy:8096/' }).jellyfin?.url, 'http://legacy:8096');
+  assert.equal(readOperatorEnv({ HALCYON_JELLYFIN_URL: 'https://house.test', VITE_JELLYFIN_URL: 'https://old.test' }).jellyfin?.url, 'https://house.test');
+});
+
+test('invalid or credential-bearing Jellyfin defaults are not published', () => {
+  for (const url of ['media:8096', 'javascript:alert(1)', 'https://user:pass@media.test',
+    'https://media.test?api_key=secret', 'https://media.test/#secret', 'http://']) {
+    assert.deepEqual(readOperatorEnv({ HALCYON_JELLYFIN_URL: url }), {}, url);
+  }
+});
+
+test('browser loads runtime hint while saved server and build fallback retain precedence', async (t) => {
+  t.mock.method(globalThis, 'fetch', async () => new Response(JSON.stringify({
+    jellyfin: { url: 'https://runtime.test/jellyfin/', password: 'PRIVATE-SENTINEL' },
+  }), { headers: { 'content-type': 'application/json' } }));
+  const defaults = await loadOperatorDefaults();
+  assert.deepEqual(defaults, { jellyfin: { url: 'https://runtime.test/jellyfin' } });
+  assert.equal(defaultJellyfinUrl(null, 'https://build.test'), 'https://runtime.test/jellyfin');
+  assert.equal(defaultJellyfinUrl('https://mine.test', 'https://build.test'), 'https://mine.test');
+  setOperatorDefaults(null);
+  assert.equal(defaultJellyfinUrl(null, 'https://build.test'), 'https://build.test');
+  assert.equal(defaultJellyfinUrl(null), '');
 });

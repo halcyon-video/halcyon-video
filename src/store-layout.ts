@@ -11,6 +11,8 @@ import type { Movie } from './jellyfin';
 // derive from it and still be a plain `const`. See that module's header for
 // why switching format is a reload rather than a scene rebuild.
 import { activeStoreFormat, type CounterShape } from './store-format.ts';
+import { facadeEntryGlazing, facadeStyle } from './storefront-architecture.ts';
+import type { WindowBay } from './storefront-window-layout.ts';
 
 const FORMAT = activeStoreFormat();
 
@@ -137,7 +139,7 @@ export interface StorefrontSpec {
   doorWidth: number;
   /** How the entrance is built — see StoreFormatSpec.entryStyle. */
   entryStyle: 'vestibule' | 'storefront-door';
-  windowBays: { width: number; hasCenterMullion: boolean }[]; // left -> right
+  windowBays: WindowBay[]; // left -> right
   frameColor: string;        // '#111' today; must support gray '#888'
   counterStyle: 'laminate-90s' | 'rounded-2000s';
   counterTop: 'white' | 'woodgrain' | 'speckled';
@@ -180,18 +182,15 @@ export const SIDE_PANES_BASELINE = FORMAT.sidePanesBaseline;
 // much (GH #110).
 export const FRONT_WINDOW_CORNER_MARGIN = FORMAT.frontCornerMargin;
 
-// Width of the narrow sidelight pane flanking each entrance door leaf (ft) —
-// the reference photo's recess composition is sidelight | door | door |
-// sidelight, the two leaves adjacent at the centreline. Shared by the
-// vestibule front-wall build (src/entrance/index.ts) and the exterior
-// facade's recess opening (entranceOpeningHalfWidth below).
-export const ENTRANCE_SIDELIGHT_WIDTH = 2.0;
+function frontWindowMasonryWidth(): number {
+  return FORMAT.facadeStyle === 'chain-tower' && facadeStyle() === 'gabled-brick' ? 1.25 : 0;
+}
 
-// Half-width of the glazed entry composition (door pair + sidelights) plus a
-// small reveal — the exterior facade sizes its recessed entry-bay opening off
-// this so the brick jamb pillars frame exactly the doors + sidelights.
+// The facade opening and entrance glazing share the door, sidelight and
+// central-divider dimensions. The small reveal keeps the frames clear.
+export const ENTRANCE_SIDELIGHT_WIDTH = facadeEntryGlazing(FORMAT.doorWidth, facadeStyle()).sidelightWidth;
 export function entranceOpeningHalfWidth(spec: Pick<StorefrontSpec, 'doorWidth'>): number {
-  return spec.doorWidth + ENTRANCE_SIDELIGHT_WIDTH + 0.35;
+  return facadeEntryGlazing(spec.doorWidth, facadeStyle()).openingHalfWidth;
 }
 
 // Baseline (small-store) front-wall width, sized by the window spec: exactly
@@ -201,7 +200,7 @@ export function entranceOpeningHalfWidth(spec: Pick<StorefrontSpec, 'doorWidth'>
 export function baselineStorefrontWidth(doorWidth = DEFAULT_DOOR_WIDTH): number {
   return FRONT_PANES_BASELINE * WINDOW_BAY_TARGET_WIDTH
     + 2 * vestibuleHalfWidth({ doorWidth, entryStyle: FORMAT.entryStyle })
-    + 2 * FRONT_WINDOW_CORNER_MARGIN;
+    + 2 * (FRONT_WINDOW_CORNER_MARGIN + frontWindowMasonryWidth());
 }
 
 // Baseline (small-store) depth, front glass to back wall. Depth rule (user
@@ -233,7 +232,8 @@ export function posterBayIndices(bayCount: number): number[] {
 // FRONT_PANES_BASELINE/2 panes per wing.
 function defaultWindowBays(storeWidth: number, doorWidth: number, hasCenterMullion = false): StorefrontSpec['windowBays'] {
   const wingRun = storeWidth / 2 - FRONT_WINDOW_CORNER_MARGIN - vestibuleHalfWidth({ doorWidth, entryStyle: FORMAT.entryStyle });
-  const perWing = Math.max(1, Math.floor(wingRun / WINDOW_BAY_TARGET_WIDTH));
+  const masonryWidth = frontWindowMasonryWidth();
+  const perWing = Math.max(1, Math.floor((wingRun - masonryWidth) / WINDOW_BAY_TARGET_WIDTH));
   const count = perWing * 2;
   // Bays that will carry a suspended poster stay a single uninterrupted pane
   // even when the rest of the storefront carries a center mullion — splitting
@@ -243,6 +243,8 @@ function defaultWindowBays(storeWidth: number, doorWidth: number, hasCenterMulli
   return Array.from({ length: count }, (_, i) => ({
     width: WINDOW_BAY_TARGET_WIDTH,
     hasCenterMullion: hasCenterMullion && !posterBays!.has(i),
+    ...(masonryWidth && perWing > 1 && (i === Math.floor(perWing / 2) || i === perWing + Math.ceil(perWing / 2))
+      ? { masonryBefore: masonryWidth } : {}),
   }));
 }
 
@@ -997,6 +999,8 @@ export interface MovieSlot {
    * otherwise hangs through the shelf. See rentalBottomLift() in video-case.
    */
   backYLift: number;
+  /** Horizontal rental center at rest, accounting for real shell depth and lean. */
+  rentalRestZ?: number;
 
   currentScale: number;
   loadShelfDetails: (priority?: number, onSettled?: () => void) => void;

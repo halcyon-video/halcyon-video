@@ -162,22 +162,41 @@ const CSS = `
 #browse-hint { bottom: 84px; max-width: 62vw; white-space: normal; line-height: 1.4; }
 `;
 
-/** Press on touchstart, release on touchend/touchcancel; never a bare 'click' (no compat click follows a preventDefault()'d touchstart). */
+/** Press on touchstart, release on touchend; touchcancel cancels without firing. */
 function bind(el: HTMLElement, fire: () => void): void {
+  let pressed = false;
   const press = (e: TouchEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    pressed = true;
     el.classList.add('st-pressed');
-    fire();
+  };
+  const cancel = (e: TouchEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    pressed = false;
+    el.classList.remove('st-pressed');
   };
   const release = (e: TouchEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    if (!pressed) return;
+    pressed = false;
     el.classList.remove('st-pressed');
+    const t = e.changedTouches[0];
+    if (t) {
+      const rect = el.getBoundingClientRect();
+      if (rect.width > 0 && rect.height > 0) {
+        const inBounds = t.clientX >= rect.left && t.clientX <= rect.right
+                      && t.clientY >= rect.top && t.clientY <= rect.bottom;
+        if (!inBounds) return; // cancelled by sliding finger off the button
+      }
+    }
+    fire();
   };
   el.addEventListener('touchstart', press, { passive: false });
   el.addEventListener('touchend', release, { passive: false });
-  el.addEventListener('touchcancel', release, { passive: false });
+  el.addEventListener('touchcancel', cancel, { passive: false });
 }
 
 /**

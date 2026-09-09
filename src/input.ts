@@ -187,6 +187,8 @@ export class InputManager {
   // Keyboard navigation mappings
   private setupKeyboardListeners() {
     window.addEventListener('keydown', (e: KeyboardEvent) => {
+      this.handleActivity();
+
       // Ignore HTPC shortcuts if user is focused on form inputs
       if (document.querySelector(".flat-detail-overlay") || document.querySelector(".flat-search-overlay")) {
         return;
@@ -208,8 +210,6 @@ export class InputManager {
       if (e.ctrlKey || e.metaKey) {
         return;
       }
-
-      this.handleActivity();
 
       switch (e.key) {
         case 'ArrowLeft':

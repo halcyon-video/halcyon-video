@@ -54,6 +54,12 @@ test('a custom service typed in the drawer is offered, not silently dropped', ()
   assert.equal(streamingChoiceCsv(rows), 'netflix,shudder');
 });
 
+test('streamingChoiceRows: does not produce duplicate rows when custom service is repeated in CSV', () => {
+  const rows = streamingChoiceRows('netflix,Shudder,shudder');
+  const shudderRows = rows.filter((r) => r.id === 'shudder');
+  assert.equal(shudderRows.length, 1);
+});
+
 test('the manager terminal renders its own confirm label; opening day keeps OPEN THE STORE', () => {
   const reentry = streamingChoiceScreen('netflix', 'SAVE AND RESTOCK');
   const openingDay = streamingChoiceScreen('netflix');

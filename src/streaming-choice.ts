@@ -41,8 +41,12 @@ export function streamingChoiceRows(currentCsv: string | null | undefined): Setu
     carried: chosenIds.has(d.id),
   }));
   const defaultIds = new Set(DEFAULT_STREAMING_SERVICES.map((d) => d.id));
+  const seenCustomIds = new Set<string>();
   for (const d of chosen) {
-    if (!defaultIds.has(d.id)) rows.push({ id: d.id, name: d.name, carried: true });
+    if (!defaultIds.has(d.id) && !seenCustomIds.has(d.id)) {
+      seenCustomIds.add(d.id);
+      rows.push({ id: d.id, name: d.name, carried: true });
+    }
   }
   return rows;
 }

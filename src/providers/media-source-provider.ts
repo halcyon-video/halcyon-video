@@ -82,6 +82,9 @@ export interface Title {
   // "(Disc N)" tags across the rom + its siblings). Only set when >= 2 —
   // it thickens a jewel-case platform's box to the multi-disc fat case.
   discCount?: number;
+  // Explicit physical edition, independent of genre/studio/poster aspect.
+  // Currently the movie VHS path accepts the distinct large white clamshell.
+  packaging?: 'vhs-slipcase' | 'vhs-white-clamshell';
   // Audio/subtitle streams of the primary media source (already fetched with
   // the catalog) — drives the in-app player's track picker. Absent for series
   // containers, games, and discovery titles.

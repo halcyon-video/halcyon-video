@@ -1,10 +1,12 @@
 import * as THREE from 'three';
+import { isPublicDemo } from './demo-mode';
 import { Movie, JellyfinLibrary, Episode } from './jellyfin';
 import { assetUrl } from './asset-url';
 import {
   clearVideoCaseCache,
   InstancedMovieGroup,
   setReflectionProbes,
+  updateGlobalMaterialsEnvMap,
   setUploadRenderer,
   setTextureStreamWake,
   setPosterLoadedNotify,
@@ -32,6 +34,8 @@ import { Reflector } from 'three/examples/jsm/objects/Reflector.js';
 import * as mirrors from './store-mirrors';
 import { BeautyPass, PartialComposite } from './partial-composite';
 import { FixtureContext, SlottedFixture } from './fixtures';
+import { setWindowAwningLighting, disposeWindowAwnings } from './storefront-awning';
+import { setFacadeEntryLighting, disposeFacadeEntry } from './storefront-entry-model';
 import { OverviewCursors, OverviewCursorTarget } from './overview-cursors';
 import { resetBrandLive, setBrandRenderHook } from './brand-live';
 import { AmbientTvs } from './ambient-tvs';
@@ -117,7 +121,7 @@ import { GondolaMaterials } from './shelving';
 import { StoreClerk } from './clerk';
 import { ClerkNavGrid, NavRect } from './clerk-nav';
 import { setMaxAnisotropy, setCheapMaterials } from './canvas-textures';
-import { readCalibratedQuality } from './quality-calibrate';
+import { readCalibratedQuality, usesPhoneQualityDefault } from './quality-calibrate';
 import {
   SIDE_RIBBON_FRONT_Z,
   SIDE_RIBBON_CLEARANCE,
@@ -464,6 +468,12 @@ export class StoreScene {
       this.generateReflectionProbes();
       this.updateLOD();
       this.applyExteriorEnvClamp();
+      this.bootstrapEnvRT?.dispose();
+      this.bootstrapPmremGen?.dispose();
+      this.bootstrapRoomEnv?.dispose();
+      this.bootstrapEnvRT = null;
+      this.bootstrapPmremGen = null;
+      this.bootstrapRoomEnv = null;
     },
     onModeLighting: (mode) => this.applyModeLighting(mode),
   });
@@ -521,6 +531,8 @@ export class StoreScene {
   // (user: "carpet is dark as night"). Real troffers pour direct light DOWN;
   // brighten the key spots after dark so the carpet actually receives it.
   private applyModeLighting(mode: OutsideMode) {
+    setWindowAwningLighting(this.scene, mode);
+    setFacadeEntryLighting(this.scene, mode);
     // Day 110 -> 145 -> 180 chased a dark carpet by raising energy, but the
     // light was being thrown away by the spots' distance cutoff, not
     // under-supplied (see the SpotLight construction in buildStore). With the
@@ -957,8 +969,7 @@ export class StoreScene {
   // standing just inside the vestibule with head-look only; every shelf run
   // carries a floating labeled cursor and confirming one flies the camera to
   // that run's normal browse position. Cursors are built lazily on first entry
-  // (see ensureOverviewCursors) and disposed in destroy().
-  public overviewStart = typeof localStorage !== 'undefined' ? localStorage.getItem('bb_overview_start') !== '0' : true;
+  public readonly overviewStart = true;
   public overviewCursors: OverviewCursors | null = null;
 
   // ── T22: carried tapes + front-counter checkout ────────────────────────────
@@ -1433,6 +1444,13 @@ export class StoreScene {
     // (Floor plan already computed above, before the NR wall derivation.)
 
     this.initThree();
+    if (isPublicDemo) {
+      // A settings rebuild may preserve case caches from the outgoing scene.
+      // Until this room's deferred bake, use its live bootstrap environment
+      // instead of keeping references to the previous room's disposed probes.
+      setReflectionProbes([]);
+      updateGlobalMaterialsEnvMap(null);
+    }
     this.setupLighting();
     this.buildStore();
     this.installMirrorThrottle();
@@ -1447,18 +1465,23 @@ export class StoreScene {
     // First environment bake: the empty store shell (movie boxes don't exist yet).
     // This replaces the bootstrap RoomEnvironment with the real room, so the
     // reflection probes baked next capture correctly-lit shelving.
-    this.outdoor.bakeEnvironment();
+    // Public entry uses the existing inexpensive room environment until the
+    // visitor pauses. The full bounce/probe bake used to compile the whole
+    // room several times before the first interactive frame.
+    if (!isPublicDemo) this.outdoor.bakeEnvironment();
     // The bootstrap PMREM (scene.environment before the line above) is no longer
     // referenced by anything — dispose its render target, compiled blur shader,
     // and the synthetic RoomEnvironment scene now rather than leaking them for
     // the whole session (issue #121).
-    this.bootstrapEnvRT?.dispose();
-    this.bootstrapPmremGen?.dispose();
-    this.bootstrapRoomEnv?.dispose();
-    this.bootstrapEnvRT = null;
-    this.bootstrapPmremGen = null;
-    this.bootstrapRoomEnv = null;
-    this.generateReflectionProbes();
+    if (!isPublicDemo) {
+      this.bootstrapEnvRT?.dispose();
+      this.bootstrapPmremGen?.dispose();
+      this.bootstrapRoomEnv?.dispose();
+      this.bootstrapEnvRT = null;
+      this.bootstrapPmremGen = null;
+      this.bootstrapRoomEnv = null;
+      this.generateReflectionProbes();
+    }
     this.buildAllMovieBoxes();
     // #60: the poster layer shortfall (if any) is settled the instant
     // buildAllMovieBoxes() returns (textureArrayManager.init() computes it
@@ -1484,6 +1507,7 @@ export class StoreScene {
     this.renderer.domElement.addEventListener('pointermove', this.onClaspPointerMove);
     window.addEventListener('keydown', this.onClaspKey, true);
     this.renderer.domElement.addEventListener('pointerup', this.onPointerUp);
+    this.renderer.domElement.addEventListener('pointercancel', this.onPointerCancel);
 
     // First-person walk mode keyboard and mouse listeners
     window.addEventListener('keydown', this.handleWalkKeyDown);
@@ -1876,7 +1900,13 @@ export class StoreScene {
     // calibration and calibration-failure fallback.
     const explicitQuality = localStorage.getItem('bb_quality');
     const calibrated = !explicitQuality && !softwareGL ? readCalibratedQuality(gpuName) : null;
-    const effectiveQuality = explicitQuality || calibrated?.tier || (softwareGL ? 'low' : integratedGL ? 'medium' : 'high');
+    const phoneEntry = usesPhoneQualityDefault();
+    const phoneBudget = phoneEntry && !explicitQuality;
+    const automaticQuality = calibrated?.tier || (softwareGL ? 'low' : integratedGL ? 'medium' : 'high');
+    // A phone viewport can receive a desktop-GPU calibration (or an overly
+    // optimistic mobile result). Keep its first visit within the existing
+    // medium budget; an explicit quality choice remains authoritative.
+    const effectiveQuality = explicitQuality || (phoneEntry && automaticQuality === 'high' ? 'medium' : automaticQuality);
     this.effectiveQuality = effectiveQuality as 'high' | 'medium' | 'low';
     this.softwareGL = softwareGL;
     // Supersample grant: an AUTO-tiered 'high' only earns the above-native
@@ -1972,13 +2002,15 @@ export class StoreScene {
     // the store no longer shreds the ceiling grid / far shelves into jaggies.
     // Idle power is untouched (a still store renders zero frames). Instant A/B
     // off-switch, no rebuild: localStorage.bb_motion_sharp = "0".
-    this.motionSharpDisabled = localStorage.getItem('bb_motion_sharp') === '0';
+    // Automatic phone quality keeps its pixel cap during swipes and settling.
+    // Native-DPR refinement otherwise multiplies this budget by up to eight.
+    this.motionSharpDisabled = phoneBudget || localStorage.getItem('bb_motion_sharp') === '0';
     // Settle supersample factor (see settleScale). Software GL never pays it —
     // one full-res SwiftShader composite is already seconds long — and the
     // 'low' tier is a "this machine is struggling" signal, so it opts out too.
     const _settleRaw = localStorage.getItem('bb_settle_ss');
     const _settleFactor = _settleRaw === null ? StoreScene.SETTLE_SS_DEFAULT : Number(_settleRaw);
-    this.settleSsFactor = (this.softwareGL || effectiveQuality === 'low' ||
+    this.settleSsFactor = (phoneBudget || this.softwareGL || effectiveQuality === 'low' ||
                            !Number.isFinite(_settleFactor) || _settleFactor < 1)
       ? 0 : _settleFactor;
     // Motion supersample (see motionScale). Same opt-outs as the settle
@@ -1986,7 +2018,7 @@ export class StoreScene {
     // must not take it. Off-switch, no rebuild: bb_motion_ss = "0".
     const _motionRaw = localStorage.getItem('bb_motion_ss');
     const _motionFactor = _motionRaw === null ? StoreScene.MOTION_SS_DEFAULT : Number(_motionRaw);
-    this.motionSsFactor = (this.softwareGL || effectiveQuality === 'low' ||
+    this.motionSsFactor = (phoneBudget || this.softwareGL || effectiveQuality === 'low' ||
                            !Number.isFinite(_motionFactor) || _motionFactor < 1)
       ? 0 : _motionFactor;
     // Anisotropic-filtering budget for the procedural shell textures (carpet,
@@ -2055,7 +2087,7 @@ export class StoreScene {
     // Tuned against the baked-room environment (see bakeEnvironment), which is
     // considerably dimmer than the synthetic RoomEnvironment this value was
     // originally set for (0.55): the real room needs more of its own bounce.
-    this.scene.environmentIntensity = 0.95;
+    this.scene.environmentIntensity = isPublicDemo ? 0.55 : 0.95;
 
     this.container.appendChild(this.renderer.domElement);
 
@@ -2511,7 +2543,7 @@ export class StoreScene {
     // before the cases are placed (see pendingStockedRebake).
     (window as any).debugForceStockedRebake = () => {
       this.pendingStockedRebake = false;
-      this.outdoor.rebakeEnvironment();
+      this.outdoor.rebakeEnvironment(true);
       this.requestRender();
       return true;
     };
@@ -3087,10 +3119,7 @@ export class StoreScene {
   // or owning library name instead of the crosshair.
   public overviewEnterBrowse(query?: string): boolean { return overview.overviewEnterBrowse(this, query); }
 
-  // Settings toggle ("Start at entrance overview", live-apply). Turning it off
-  // returns the classic first-aisle behavior with no reload; if you're standing
-  // at the overview right now, step back to library-select.
-  public setOverviewStart(enabled: boolean): void { return overview.setOverviewStart(this, enabled); }
+  public setOverviewStart(_enabled: boolean): void {}
 
   // ─── T22: carried tapes + front-counter checkout ────────────────────────────
 
@@ -5132,7 +5161,7 @@ export class StoreScene {
       // re-hashed here — this runs for every dirty slot on every rendered frame
       // during placement waves and genre-filter rebuilds (issue #116).
       let targetBackX = targetFrontX + slot.backJitter;
-      let targetBackZ = -depth / 2;
+      let targetBackZ = slot.rentalRestZ ?? -depth / 2;
       let targetBackRotY = 0;
 
       if (isSelected && targetScale > 0) {
@@ -5219,7 +5248,7 @@ export class StoreScene {
           targetFrontRotY = 0.05;
 
           targetBackX = -0.04;
-          targetBackZ = -depth / 2 - 0.01;
+          targetBackZ = (slot.rentalRestZ ?? -depth / 2) - 0.01;
           targetBackRotY = -0.05;
         }
       } else {
@@ -5443,7 +5472,7 @@ export class StoreScene {
     // shopper pauses costs nothing and can never hitch an interaction.
     if (this.stockedRebakeDue(time)) {
       this.pendingStockedRebake = false;
-      this.outdoor.rebakeEnvironment();
+      this.outdoor.rebakeEnvironment(true);
     }
 
     // 2.5 Prebaked shadows: re-render the sun's shadow map only on frames where a
@@ -5673,6 +5702,10 @@ export class StoreScene {
     }
   };
 
+  private onPointerCancel = (_e: PointerEvent) => {
+    this.requestRender(); this.isDragging = false; this.pointerStartTime = 0; this.walkPressDragPx = 0;
+  };
+
   // How far (ft) a walk-mode click can reach. Roughly "a case you could lean
   // over and grab", not "any box across the store".
 
@@ -5687,6 +5720,7 @@ export class StoreScene {
    *  center they had no crosshair on yet made the first click land on the
    *  wrong spot (usually nothing) every time. */
   public handleWalkClick() { return walk.handleWalkClick(this); }
+  public walkInteract() { return walk.walkInteract(this); }
 
   /** Open a clicked slot in the regular inspect view (same plumbing as
    *  jumpToTitle), remembering the walk pose so Back returns to it. */
@@ -5853,6 +5887,12 @@ export class StoreScene {
   // Clean up WebGL resources
   public destroy(preservePosterCache = false) {
     this.isRendering = false;
+    this.bootstrapEnvRT?.dispose();
+    this.bootstrapPmremGen?.dispose();
+    this.bootstrapRoomEnv?.dispose();
+    this.bootstrapEnvRT = null;
+    this.bootstrapPmremGen = null;
+    this.bootstrapRoomEnv = null;
     window.removeEventListener('resize', this.onWindowResize);
 
     // Every live-brand subscriber holds a canvas or material belonging to THIS
@@ -5976,6 +6016,8 @@ export class StoreScene {
       this.promoSignRedMat = null;
     }
     
+    disposeWindowAwnings(this.scene);
+    disposeFacadeEntry(this.scene);
     // Traverse and dispose materials/geometries of static shelves
     this.scene.traverse((object) => {
       if ((object as any).type === 'Reflector' || (object as any).isReflector) {
@@ -6025,6 +6067,7 @@ export class StoreScene {
     if (this.renderer) {
       this.renderer.domElement.removeEventListener('pointerdown', this.onPointerDown);
       this.renderer.domElement.removeEventListener('pointerup', this.onPointerUp);
+      this.renderer.domElement.removeEventListener('pointercancel', this.onPointerCancel);
       this.renderer.dispose();
       this.renderer.domElement.remove();
     }
@@ -6129,20 +6172,9 @@ export class StoreScene {
     this.requestRender();
     if (!this.isWalkAroundMode) return;
 
-    // FPS mouse-look off raw movement deltas, locked or not. movementX/Y is
-    // populated on every mousemove in all modern engines, so look works even
-    // when pointer lock was refused or is unsupported (some webviews) — the
-    // lock, requested on entering walk mode and on click, only adds
-    // edge-of-screen capture. The old code required the lock OR a held
-    // button, so on any lock failure bare mouse motion did nothing at all:
-    // the "fps mouse controls don't work" bug.
+    // FPS mouse-look off raw movement deltas, locked or not.
     const MOUSE_SENSITIVITY = 0.0025;
-    // Pointer-lock acquisition can emit one bogus giant movement event (the
-    // OS cursor's jump to the recapture point reported as mouse motion —
-    // long-standing Chromium behavior). Letting it through both whipped the
-    // camera to a random heading on the click that engaged the lock AND
-    // blew the tap-vs-drag budget, swallowing that click. No real mouse
-    // move approaches 200px in a single 8ms event, so drop the outlier.
+    // Drop pointer-lock jump burst outlier (>200px)
     const burst = Math.abs(e.movementX) + Math.abs(e.movementY);
     if (burst === 0 || burst > 200) return;
     this.yaw -= e.movementX * MOUSE_SENSITIVITY;

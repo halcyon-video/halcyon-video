@@ -32,6 +32,10 @@ interface SnapshotTitle {
   title: string;
   year: number;
   posterPath?: string;
+  backdropPath?: string;
+  overview?: string;
+  voteAverage?: number;
+  genreIds?: number[];
 }
 
 interface SnapshotService {
@@ -55,6 +59,10 @@ function normalizeSnapshotTitle(t: SnapshotTitle): RawDiscoverItem {
     title: t.title,
     releaseDate: t.year ? `${t.year}-01-01` : undefined,
     posterPath: t.posterPath,
+    backdropPath: t.backdropPath,
+    overview: t.overview,
+    voteAverage: t.voteAverage,
+    genreIds: t.genreIds,
   };
 }
 

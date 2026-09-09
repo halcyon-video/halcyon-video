@@ -449,10 +449,14 @@ function integrationProxyPlugin() {
         headers,
         body: chunks.length && method !== "GET" && method !== "HEAD" ? Buffer.concat(chunks) : undefined,
       });
+      if (!r.ok) {
+        console.warn(`[dev-proxy] Upstream error from ${method} ${target}: HTTP ${r.status} ${r.statusText}`);
+      }
       res.statusCode = r.status;
       res.setHeader("Content-Type", r.headers.get("content-type") || "application/json");
       res.end(Buffer.from(await r.arrayBuffer()));
     } catch (err) {
+      console.error(`[dev-proxy] Failed to reach target ${target}:`, err);
       json(502, { error: String(err) });
     }
   }
@@ -548,6 +552,7 @@ function hostGuardPlugin() {
       const shown = String(req.headers.host ?? "")
         .replace(/[^\x20-\x7e]/g, "")
         .slice(0, 100);
+      console.warn(`[host-guard] Blocked request for host "${shown}". Set HALCYON_ALLOWED_HOSTS="${shown.split(":")[0]}" to allow it.`);
       res.statusCode = 403;
       res.setHeader("Content-Type", "text/plain; charset=utf-8");
       res.end(
@@ -568,11 +573,63 @@ function hostGuardPlugin() {
   };
 }
 
+// Endpoint POST /__log: receives client runtime crashes, unhandled rejections,
+// and misconfiguration reports from src/error-telemetry.ts, outputting them
+// directly to the server terminal / Docker logs.
+function clientErrorRelayPlugin() {
+  const handler = (req: any, res: any, next: any) => {
+    if (req.method !== "POST" || req.url !== "/__log") {
+      next();
+      return;
+    }
+    const chunks: Buffer[] = [];
+    let total = 0;
+    req.on("data", (c: any) => {
+      total += c.length;
+      if (total <= 64 * 1024) chunks.push(c);
+    });
+    req.on("end", () => {
+      try {
+        const body = JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}");
+        const level = body.level === "warn" ? "WARN" : body.level === "info" ? "INFO" : "ERROR";
+        const message = String(body.message || "(no message)");
+        const source = body.source ? ` [${body.source}]` : "";
+        const details = body.details ? ` | ${typeof body.details === "string" ? body.details : JSON.stringify(body.details)}` : "";
+        const line = `[client${source}] ${level}: ${message}${details}`;
+        if (level === "ERROR") {
+          console.error(line);
+        } else if (level === "WARN") {
+          console.warn(line);
+        } else {
+          console.log(line);
+        }
+        res.statusCode = 200;
+        res.setHeader("Content-Type", "application/json");
+        res.end(JSON.stringify({ ok: true }));
+      } catch (err) {
+        res.statusCode = 400;
+        res.setHeader("Content-Type", "application/json");
+        res.end(JSON.stringify({ error: String(err) }));
+      }
+    });
+  };
+  return {
+    name: "client-error-relay",
+    configureServer(server: any) {
+      server.middlewares.use(handler);
+    },
+    configurePreviewServer(server: any) {
+      server.middlewares.use(handler);
+    },
+  };
+}
+
 // https://vite.dev/config/
 export default defineConfig(async () => ({
   plugins: [
     // First: everything below it answers only to an allowed Host header.
     hostGuardPlugin(),
+    clientErrorRelayPlugin(),
     feedbackPinPlugin(),
     mpvPlayerPlugin(),
     integrationProxyPlugin(),

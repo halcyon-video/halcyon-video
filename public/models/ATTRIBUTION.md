@@ -61,3 +61,17 @@ same-named `.blend` in `tools/models/`; `tools/models/display-fixtures.py`
 reproduces all four. No downloaded geometry, photographs, embedded textures
 or chain marks are included. See `docs/display-fixture-models.md` for the
 construction, stock anchors, named finish roles and measured resource costs.
+
+The `customer-pole-display.glb` customer VFD is an original generic Halcyon
+model under this repository's license. Named editable parts and the scripted
+mesh authoring source are `tools/models/customer-pole-display.blend` and
+`tools/models/customer-pole-display.py`. It contains no downloaded geometry,
+images or manufacturer marks. See `docs/customer-pole-display-model.md` for
+its dimensions, material roles, resource costs and stable message/anchor contract.
+
+The `tape-rewinder.glb` countertop shell is original generic Halcyon construction
+under this repository's license. Editable named parts and reproducible mesh
+authoring live in `tools/models/tape-rewinder.blend` and
+`tools/models/tape-rewinder.py`. No downloaded meshes, images or manufacturer
+marks are included. See `docs/tape-rewinder-model.md` for its dimensions,
+resource costs and preserved live reel, logo and placement contracts.

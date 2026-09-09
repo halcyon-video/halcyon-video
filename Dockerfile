@@ -43,6 +43,9 @@ RUN npm ci && npm cache clean --force
 
 COPY . .
 
+# For an address default, set HALCYON_JELLYFIN_URL at container startup
+# instead: no build args or custom image needed (see README.md).
+#
 # Optional autologin baked into the bundle at build time (in-app login is the
 # normal flow). NOTE: values land in plain text in the served JS and the image
 # layers — only bake credentials into an image that never leaves your network.

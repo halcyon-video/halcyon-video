@@ -64,7 +64,7 @@ export function lotWidth(storeWidth: number): number {
     : PARKING_STALLS.stallWidth * 9;
 }
 
-export function buildExteriorEnvironment(scene: THREE.Scene, storeWidth: number): ExteriorEnvironment {
+export function buildExteriorEnvironment(scene: THREE.Scene, storeWidth: number, sidewalkDepth = 4.7): ExteriorEnvironment {
   const group = new THREE.Group();
   group.name = 'exteriorEnvironment';
   scene.add(group);
@@ -81,7 +81,6 @@ export function buildExteriorEnvironment(scene: THREE.Scene, storeWidth: number)
   // Flush with the interior floor (no trip hazard at the threshold), running
   // the width of the storefront plus the corner piers, from the glass line
   // out to just past the entrance tower's projection (storefront-facade.ts).
-  const sidewalkDepth = 4.4;
   // One texture tile = one ~4.5 ft slab, so the baked expansion joints repeat
   // at the real sidewalk rhythm (was a single flat color — front and center
   // in the view out the doors).

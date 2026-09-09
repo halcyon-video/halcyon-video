@@ -15,6 +15,8 @@ import { selfLit } from '../material-lighting';
 // full geometry/material disposal like every other sign. Canvas textures are
 // module-cached and survive rebuilds (material.dispose never disposes maps).
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { assetUrl } from '../asset-url';
 import type { StoreScene } from '../three-scene';
 import { seededRandom01 } from '../store-layout';
 import { markSignMesh } from '../sign-builders';
@@ -134,11 +136,14 @@ export function buildCounterProps93(scene: StoreScene): void {
   // terminal 15.0 and phone 16.3. The printer now sits nearer the centre.
   {
     const a = entrance.getCounterTopAnchor(cx - 1.5)!;
+    const fallback = new THREE.Group();
+    fallback.name = 'customer-vfd-fallback';
+    group.add(fallback);
     const poleH = 0.95;
     const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.034, poleH, 10), matte(0xf0eee8, 0.45));
     pole.position.set(a.x, a.y + poleH / 2, a.z);
     pole.castShadow = true;
-    group.add(pole);
+    fallback.add(pole);
     // getCounterTopAnchor's rotY is the counter edge's inward normal (it faces
     // the CLERK side) — the customer side is the opposite way. NOTE this is
     // the raw counter-spine anchor, NOT getSignAnchors(), whose yaw already
@@ -148,17 +153,51 @@ export function buildCounterProps93(scene: StoreScene): void {
     head.position.set(a.x, a.y + poleH + 0.19, a.z);
     head.rotation.y = faceYaw;
     head.castShadow = true;
-    group.add(head);
+    fallback.add(head);
     const screen = new THREE.Mesh(
       new THREE.PlaneGeometry(0.98, 0.29),
       selfLit(new THREE.MeshBasicMaterial({ map: vfdTex(), toneMapped: false }), 'light-source')
     );
-    // Sit just proud of the head's customer face.
+    screen.name = 'customer-vfd-message';
+    // Stable live texture surface; the authored housing recess surrounds it.
     screen.position.set(a.x, a.y + poleH + 0.19, a.z).add(normal(faceYaw).multiplyScalar(0.085));
     screen.rotation.y = faceYaw;
     // The lit panel must not become a lamp in the environment bake.
     screen.userData.bakeEmissiveOff = true;
     group.add(screen);
+
+    // Original Blender asset uses feet with +Z facing the customer. The
+    // counter anchor and separately owned cached message texture stay intact.
+    new GLTFLoader().load(assetUrl('models/customer-pole-display.glb'), ({ scene: model }) => {
+      let root: THREE.Object3D = group;
+      while (root.parent) root = root.parent;
+      if (root !== scene.scene) {
+        // A signage rebuild can finish while the first model load is pending.
+        const geometries = new Set<THREE.BufferGeometry>();
+        const materials = new Set<THREE.Material>();
+        model.traverse(object => {
+          if (!(object instanceof THREE.Mesh)) return;
+          geometries.add(object.geometry);
+          const list = Array.isArray(object.material) ? object.material : [object.material];
+          list.forEach(material => materials.add(material));
+        });
+        geometries.forEach(geometry => geometry.dispose());
+        materials.forEach(material => material.dispose());
+        return;
+      }
+      model.name = 'customer-vfd-model';
+      model.position.set(a.x, a.y, a.z);
+      model.rotation.y = faceYaw;
+      model.traverse(object => {
+        if (object instanceof THREE.Mesh) object.castShadow = object.receiveShadow = true;
+      });
+      group.add(model);
+      fallback.visible = false;
+      // clearActiveSignage disposes the owned meshes/materials in both paths.
+      // This texture-free GLB owns no maps; vfdTex remains module-cached.
+      scene.fixtureContext().requestShadowRefresh();
+      scene.requestRender();
+    }, undefined, () => { /* Keep the complete procedural display on failure. */ });
   }
 
   // 2. Balloon cluster tied to the band top near the left register.
@@ -239,10 +278,10 @@ export function buildCounterProps93(scene: StoreScene): void {
 
   // 4. Dot-matrix printer with fanfold paper, back of the inner counter.
   {
-    // The clear centre stretch between the VFD (-1.5) and rewinder (+2.9)
-    // supports this on both island lengths. The old +4.3 location pushed
-    // the printer through the rental CRT's casing.
-    const a = entrance.getCounterTopAnchorAt(.9)!;
+    // Keep the printer between the VFD (-1.5) and the membership frame (+0.8).
+    // At +0.9 that frame's post ran through the printer and its paper feed.
+    // The centre-left top supports the feet on either island profile.
+    const a = entrance.getCounterTopAnchorAt(-.3)!;
     buildImpactPrinter93(scene, group, a, fanfoldTex());
 
     // Beige corded desk phone beside the station — every register in the

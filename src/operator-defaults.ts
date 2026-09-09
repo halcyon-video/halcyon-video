@@ -37,7 +37,10 @@ export interface OperatorService {
   managed: boolean;
 }
 
-export type OperatorDefaults = Partial<Record<OperatorServiceId, OperatorService>>;
+export type OperatorDefaults = Partial<Record<OperatorServiceId, OperatorService>> & {
+  /** Public login hint only; visitors use their own accounts. */
+  jellyfin?: { url: string };
+};
 
 /** Where the client asks what this server provides. Served by vite.config.ts. */
 export const OPERATOR_CONFIG_PATH = '/__halcyon/config';
@@ -50,7 +53,21 @@ export interface OperatorSecret {
   apiKey: string;
 }
 
-export type OperatorEnvConfig = Partial<Record<OperatorServiceId, OperatorSecret>>;
+export type OperatorEnvConfig = Partial<Record<OperatorServiceId, OperatorSecret>> & {
+  jellyfin?: { url: string };
+};
+
+/** Login defaults must not contain credentials or query tokens. */
+function publicServerUrl(value: string | undefined): string | undefined {
+  try {
+    const url = new URL((value || '').trim());
+    if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password
+      || url.search || url.hash) return undefined;
+    return url.href.replace(/\/+$/, '');
+  } catch {
+    return undefined;
+  }
+}
 
 // Accepted env prefixes per service, in preference order. The seerr aliases
 // mirror seerr-config.ts's stored-key aliases: one client serves Jellyseerr and
@@ -81,16 +98,19 @@ export function readOperatorEnv(env: Record<string, string | undefined>): Operat
       break;
     }
   }
+  const jellyfinUrl = publicServerUrl(env.HALCYON_JELLYFIN_URL || env.VITE_JELLYFIN_URL);
+  if (jellyfinUrl) out.jellyfin = { url: jellyfinUrl };
   return out;
 }
 
 /** The same config with every credential stripped — this is what the browser gets. */
 export function publicOperatorDefaults(cfg: OperatorEnvConfig): OperatorDefaults {
   const out: OperatorDefaults = {};
-  for (const id of Object.keys(cfg) as OperatorServiceId[]) {
+  for (const id of Object.keys(ENV_PREFIXES) as OperatorServiceId[]) {
     const svc = cfg[id];
     if (svc) out[id] = { url: svc.url, managed: true };
   }
+  if (cfg.jellyfin) out.jellyfin = { url: cfg.jellyfin.url };
   return out;
 }
 
@@ -122,7 +142,7 @@ export function operatorServiceForTarget(
   cfg: OperatorEnvConfig,
   target: string
 ): OperatorServiceId | null {
-  for (const id of Object.keys(cfg) as OperatorServiceId[]) {
+  for (const id of Object.keys(ENV_PREFIXES) as OperatorServiceId[]) {
     const svc = cfg[id];
     if (svc && targetBelongsTo(target, svc.url)) return id;
   }
@@ -215,9 +235,14 @@ export function operatorDefault(id: OperatorServiceId): OperatorService | null {
   return svc && svc.url ? svc : null;
 }
 
+/** Saved visitor choice wins, then runtime hosting default, then legacy build default. */
+export function defaultJellyfinUrl(saved: string | null, buildUrl?: string): string {
+  return saved || loaded.jellyfin?.url || buildUrl || '';
+}
+
 /** Does this instance carry operator-provided connection defaults at all? */
 export function hasOperatorDefaults(): boolean {
-  return !!(loaded.romm || loaded.jellyseerr);
+  return !!(loaded.romm || loaded.jellyseerr || loaded.jellyfin);
 }
 
 /**
@@ -252,6 +277,8 @@ export async function loadOperatorDefaults(): Promise<OperatorDefaults> {
         defaults[id] = { url: svc.url.replace(/\/+$/, ''), managed: svc.managed !== false };
       }
     }
+    const jellyfinUrl = publicServerUrl(body?.jellyfin?.url);
+    if (jellyfinUrl) defaults.jellyfin = { url: jellyfinUrl };
     setOperatorDefaults(defaults);
     return defaults;
   } catch {
