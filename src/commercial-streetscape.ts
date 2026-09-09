@@ -1,12 +1,12 @@
 // Original shallow commercial context, loaded only by the resolved high tier.
-// Six opaque, vertex-shaded batches: no textures, real lights or shadow passes.
+// Four opaque scenery-card batches: no textures, real lights or shadow passes.
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { selfLit } from './material-lighting';
 import { assetUrl } from './asset-url';
 import type { OutsideMode } from './outdoor-lighting';
 
-export function installCommercialStreetscape(parent: THREE.Group, centerX: number, requestRender: () => void) {
+export function installCommercialStreetscape(parent: THREE.Group, centerX: number, backWallZ: number, requestRender: () => void) {
   let disposed = false;
   let mode: OutsideMode = 'day';
   let model: THREE.Group | null = null;
@@ -39,9 +39,16 @@ export function installCommercialStreetscape(parent: THREE.Group, centerX: numbe
       const source = Array.isArray(o.material) ? o.material[0] : o.material;
       for (const m of Array.isArray(o.material) ? o.material : [o.material]) originals.add(m);
       const role = source.name;
+      if (role === 'Rear') o.position.z = backWallZ - 24;
+      if (role === 'Ground') {
+        // Keep the road-facing edge at 255 while reaching beyond any store depth.
+        const rearEdge = backWallZ - 80;
+        o.scale.z = (255 - rearEdge) / 325;
+        o.position.z = 255 * (1 - o.scale.z);
+      }
       let material = materials.get(role);
       if (!material) {
-        material = selfLit(new THREE.MeshBasicMaterial({ vertexColors: true, fog: false }), 'baked-backdrop');
+        material = selfLit(new THREE.MeshBasicMaterial({ vertexColors: true, fog: false, side: THREE.DoubleSide }), 'baked-backdrop');
         material.name = `streetscape-${role}`;
         materials.set(role, material);
       }

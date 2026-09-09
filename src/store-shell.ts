@@ -547,7 +547,7 @@ export function buildStore(scene: StoreScene) {
   // Also builds the GH #144 ground-blend ring (see exterior-environment.ts)
   // that fades the lot's exposed edges into whatever ground the current sky
   // pano shows there — recolored live via the listener below as panos load.
-  scene.exterior = buildExteriorEnvironment(scene.scene, storeWidth, sidewalkDepth, scene.effectiveQuality === 'high', () => scene.requestRender());
+  scene.exterior = buildExteriorEnvironment(scene.scene, storeWidth, sidewalkDepth, scene.effectiveQuality === 'high', () => scene.requestRender(), scene.backWallZ);
   scene.exterior.setOutsideMode(scene.outdoor.outsideMode);
   scene.exterior.setGroundColor(scene.outdoor.getGroundColor());
   scene.outdoor.setGroundColorListener((color) => {

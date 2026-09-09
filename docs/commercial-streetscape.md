@@ -1,27 +1,35 @@
 # Commercial streetscape
 
-An original, approximate roadside shopping center for high render quality. This
-is a shallow stage for views through the store windows and from the sidewalk,
-not a surveyed reconstruction or an aerial world. Store coordinates are feet:
-X runs along the frontage, Y is height, +Z points out through the front glass.
-The asset is centered on STORE_CENTER_X. The existing road ends at Z=90; the
-opposite storefronts start at Z=180–182, behind two parking rows. Side shops
-sit outside the existing store lot. No collision or navigation bounds change.
+An original, approximate roadside shopping center for high render quality.
+Distant shops are flat opaque facade cards; the two nearby shops retain shallow
+side returns, roofs and canopies. Broadleaf tree silhouettes use fixed cards,
+with crossed cards at the sides. This is scenery for views from inside the
+store, its sidewalk and service court, not a surveyed or aerial environment.
 
-Blender source and reproducible authoring script are in tools/models, with a
-runtime GLB in public/models. Geometry is grouped into six opaque material
-batches, about 4,000 triangles; no image textures, dynamic lights, shadow
-casting or per-frame animation. Vertex colors provide static surface shading;
-mode changes adjust the overall tint and windows. The sky uses a tiny generated
-gradient rather than unrelated photographic ground. Exact costs are reported
-in commercial-streetscape-metrics.json.
+Store coordinates are feet: X runs along the frontage, Y is height, +Z points
+out through the front glass. The asset is centered on STORE_CENTER_X. The road
+ends at Z=90; opposite storefronts start at Z=180–182, behind two parking rows.
+Side shops sit beyond the store lot. Collision and navigation bounds are unchanged.
 
-The resolved effectiveQuality must be high before the model request or sky
-texture allocation. Medium and low keep their existing environment. Async
-completion requests a render; disposal releases owned geometry and materials,
-and an in-flight completion after teardown is discarded and released.
+The rear batch is authored around Z=0 and moved to backWallZ minus 24 feet when
+loaded. It contains a seven-foot masonry service boundary, low utility-building
+facades and trees beyond it. The ground sheet extends from backWallZ minus 80
+feet to Z=255, so growing the store cannot leave the rear court off the pavement.
 
-Publication captures use `--quality high --settle 1`. Useful street-level
-poses: `--fly 1 --walk 11,8,180,0,5.5` (out the window),
-`11,30,180,0,5.5` (lot toward shopping center), and `11,65,0,0,5.5`
-(close storefront). Avoid distant aerial framing that exposes the stage edge.
+Blender source and the reproducible script are in tools/models; the runtime GLB
+is in public/models. Four opaque batches group vertex-painted colors: Frontage,
+Windows, Ground and Rear. There are no image textures, alpha blending, dynamic
+lights, shadow casting or per-frame animation. Both sides of the intentional
+open cards render. Mode changes tint the scenery and adjust front window glow.
+The sky is a tiny generated gradient. Exact export counts are in
+commercial-streetscape-metrics.json.
+
+Effective quality must be high before requesting the model or allocating its
+sky. Medium and low keep their existing environment. Async completion requests
+a render; disposal releases owned geometry/materials and discards late loads.
+
+Publication captures use `--quality high --settle 1` in a user-assets-free tree.
+Useful street-level poses: `--fly 1 --walk -15,8,180,0,5.5` (out the window),
+`11,30,180,0,5.5` (lot toward shopping center), and `11,65,0,0,5.5` (storefront).
+For the rear, stand eight feet behind the current backWallZ, facing yaw zero.
+Avoid distant aerial framing and views behind the scenery cards.

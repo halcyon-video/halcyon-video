@@ -1,20 +1,11 @@
 {
-  "bytes": 419112,
-  "meshes": 6,
-  "triangles": 4400,
-  "boundsFeet": {
-    "x": [
-      -230,
-      230
-    ],
-    "y": [
-      -0.5,
-      25.15
-    ],
-    "z": [
-      -70,
-      255
-    ]
-  },
+  "bytes": 115060,
+  "meshes": 4,
+  "triangles": 1680,
+  "rearAnchor": "backWallZ - 24 feet",
+  "groundRearEdge": "backWallZ - 80 feet",
+  "flatDistantFacades": 6,
+  "shallowSideShops": 2,
+  "treeCards": 17,
   "surveyed": false
 }

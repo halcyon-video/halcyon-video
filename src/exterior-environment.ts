@@ -65,7 +65,7 @@ export function lotWidth(storeWidth: number): number {
     : PARKING_STALLS.stallWidth * 9;
 }
 
-export function buildExteriorEnvironment(scene: THREE.Scene, storeWidth: number, sidewalkDepth = 4.7, highQuality = false, requestRender: () => void = () => {}): ExteriorEnvironment {
+export function buildExteriorEnvironment(scene: THREE.Scene, storeWidth: number, sidewalkDepth = 4.7, highQuality = false, requestRender: () => void = () => {}, backWallZ = -35): ExteriorEnvironment {
   const group = new THREE.Group();
   group.name = 'exteriorEnvironment';
   scene.add(group);
@@ -335,7 +335,7 @@ export function buildExteriorEnvironment(scene: THREE.Scene, storeWidth: number,
     exteriorRoad.setGroundColor(color);
   }
 
-  const commercial = highQuality ? track(installCommercialStreetscape(group, centerX, requestRender)) : null;
+  const commercial = highQuality ? track(installCommercialStreetscape(group, centerX, backWallZ, requestRender)) : null;
 
   // ─── Mode reactions (no per-frame work; called on day/night flips) ─────
   function setOutsideMode(mode: OutsideMode) {
