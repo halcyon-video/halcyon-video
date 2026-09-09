@@ -82,6 +82,23 @@ def side_art(name,x,z0,z1,h,role):
    ob.data.uv_layers.active.data[li].uv=(u if x<0 else 1-u,y/h+.5)
  return ob
 
+def wrap_insert(border):
+ # One U-shaped paper sheet: shared front/spine/back fold vertices. Only the
+ # opening edge and top/bottom expose the separate physical plastic rim.
+ left=-W/2;right=W/2-border;front=D/2-.0016;back=-front;h=H-2*border
+ outline=[(right,front),(left,front),(left,back),(right,back)]
+ verts=[(x,y,z) for y in [-h/2,h/2] for x,z in outline]
+ ob=mesh('Continuous-paper-insert',verts,[(1,0,4,5),(2,1,5,6),(3,2,6,7)],4)
+ ob['role']='PaperInsert'
+ ob.data.materials.append(mats[1]);ob.data.materials.append(mats[5])
+ for poly in ob.data.polygons:
+  poly.material_index=poly.index
+  for li in poly.loop_indices:
+   x,nz,y=ob.data.vertices[ob.data.loops[li].vertex_index].co;z=-nz
+   u=(x-left)/(right-left) if poly.index==0 else (z-back)/(front-back) if poly.index==1 else (right-x)/(right-left)
+   ob.data.uv_layers.active.data[li].uv=(u,y/h+.5)
+ return ob
+
 def shell(family,detail):
  n=5 if detail else 1
  white=family=='vhs-white'; jewel=family.startswith('jewel');fat=family=='jewel-fat'
@@ -98,9 +115,10 @@ def shell(family,detail):
           (W,H,r,s*D*.32 if jewel else s*seam), (W-.003,H-.003,r,s*D*.32 if jewel else s*seam),
           (W-2*border,H-2*border,r*.5,z-s*.003)]
   profile(('Lid' if s==1 else 'Base')+'-molded-rim',levels,rim,n)
-  panel('Booklet' if s==1 else 'Back-inlay',W-2*border,H-2*border,z-s*.0016,4 if s==1 else 5)
+  if jewel:panel('Booklet' if s==1 else 'Back-inlay',W-2*border,H-2*border,z-s*.0016,4 if s==1 else 5)
  # Spine and opposing opening artwork remain independently oriented.
- side_art('Spine-inlay',-W/2,-D/2+.003,D/2-.003,H-2*r,1)
+ if jewel:side_art('Spine-inlay',-W/2,-D/2+.003,D/2-.003,H-2*r,1)
+ else:wrap_insert(border)
  if jewel:side_art('Opening-inlay',W/2,-D/2+.003,D/2-.003,H-2*r,0)
  # Spine bridge is recessed behind the two folds. On white VHS this is a
  # wide living hinge, while the optical mold gets narrower hinge returns.
@@ -130,10 +148,15 @@ def shell(family,detail):
  # walls below that paper seat, rather than burying the print under plastic.
  # Paper defines the exact nominal X bounds; no added width or Z fighting.
  for ob in parts:
-  if ob['role'] in ['PaperSpine','Opening']: continue
+  if ob['role'] in ['PaperSpine','Opening','PaperInsert']: continue
   for v in ob.data.vertices:
    v.co.x=max(v.co.x,-W/2+.00015)
    if jewel:v.co.x=min(v.co.x,W/2-.00015)
+   else:
+    # Recess the vertical plastic rail under the paper fold, tapering back
+    # into the unchanged rim. Positive depth scaling preserves closed solids.
+    weight=max(0,min(1,(-W/2+3*border-v.co.x)/(2*border)))
+    v.co.y*=1-weight*.0022/(D/2)
   ob.data.update()
 
 def sleeve(detail):

@@ -48,9 +48,9 @@
     "textures": 0
   },
   "packaging-vhs-white-stock": {
-    "bytes": 22728,
+    "bytes": 23464,
     "triangles": 254,
-    "parts": 7,
+    "parts": 5,
     "closedSolids": 4,
     "dimensionsFeet": [
       0.4583333333333333,
@@ -60,9 +60,9 @@
     "textures": 0
   },
   "packaging-vhs-white-hero": {
-    "bytes": 62184,
+    "bytes": 63308,
     "triangles": 886,
-    "parts": 9,
+    "parts": 7,
     "closedSolids": 6,
     "dimensionsFeet": [
       0.4583333333333333,
@@ -72,9 +72,9 @@
     "textures": 0
   },
   "packaging-vhs-rental-stock": {
-    "bytes": 22744,
+    "bytes": 23492,
     "triangles": 254,
-    "parts": 7,
+    "parts": 5,
     "closedSolids": 4,
     "dimensionsFeet": [
       0.403,
@@ -84,9 +84,9 @@
     "textures": 0
   },
   "packaging-vhs-rental-hero": {
-    "bytes": 62196,
+    "bytes": 63840,
     "triangles": 886,
-    "parts": 9,
+    "parts": 7,
     "closedSolids": 6,
     "dimensionsFeet": [
       0.403,
@@ -96,9 +96,9 @@
     "textures": 0
   },
   "packaging-dvd-keepcase-stock": {
-    "bytes": 22752,
+    "bytes": 23496,
     "triangles": 254,
-    "parts": 7,
+    "parts": 5,
     "closedSolids": 4,
     "dimensionsFeet": [
       0.445,
@@ -108,9 +108,9 @@
     "textures": 0
   },
   "packaging-dvd-keepcase-hero": {
-    "bytes": 62204,
+    "bytes": 63844,
     "triangles": 886,
-    "parts": 9,
+    "parts": 7,
     "closedSolids": 6,
     "dimensionsFeet": [
       0.445,

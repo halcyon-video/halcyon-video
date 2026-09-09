@@ -23,6 +23,10 @@ ImageBitmap art pipeline. Front/back have opposite U directions, as before.
 Spine paper uses the established two-flap composition where present.
 
 Rims are closed swept sections with eased lips and recessed paper seats.
+VHS rental, white clamshell and DVD inserts are continuous U-shaped sheets: front,
+spine and back share their fold edges, with the plastic recessed beneath them.
+The outer opening edge and top/bottom retain the real case rim; no black
+plastic separator crosses a paper fold.
 Jewel halves flank a tray carrier and paper edges; the hero adds hinge lugs
 and tray grip ribs. Multi-disc geometry has a wider central carrier and paired
 hinge lugs. The white VHS model has larger rounded halves, a broad living hinge,
@@ -157,7 +161,7 @@ one runtime geometry per size/LOD, with contiguous material ranges. Cost exclude
 existing paper textures, room lighting and the two reflection
 planes (four triangles total). No physical-phone FPS performance claim is made.
 
-All twelve files total 592,736 bytes; only requested families/LODs load.
+All twelve files total 599,372 bytes; only requested families/LODs load.
 Each has zero image textures. GLBs contain seven named materials for jewels,
 six for sleeves and four for the other families. “Ranges” means material draw ranges in one runtime
 geometry; the material array retains unused art lanes for compatibility.

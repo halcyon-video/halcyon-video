@@ -95,3 +95,32 @@ for (const [name, cost] of Object.entries(costs) as [string, any][]) {
     assert.ok(triangles < (name.endsWith('stock') ? 400 : 2200));
   });
 }
+
+for (const family of ['vhs-rental', 'vhs-white', 'dvd-keepcase']) for (const detail of ['stock', 'hero']) {
+  test(`${family} ${detail}: paper front/spine/back share both fold edges without a plastic separator`, () => {
+    const { doc, values } = glb(`packaging-${family}-${detail}`);
+    const paper: Record<string, number[][]> = { PaperFront: [], PaperSpine: [], PaperBack: [] };
+    const plastic: number[][] = [];
+    for (const mesh of doc.meshes) for (const primitive of mesh.primitives) {
+      const role = doc.materials[primitive.material].name;
+      const points = values(primitive.attributes.POSITION);
+      if (paper[role]) paper[role].push(...points);
+      else if (['Shell', 'WhiteShell'].includes(role)) plastic.push(...points);
+    }
+    const left = Math.min(...paper.PaperSpine.map(p => p[0]));
+    const front = Math.max(...paper.PaperSpine.map(p => p[2]));
+    const back = Math.min(...paper.PaperSpine.map(p => p[2]));
+    const edge = (points: number[][], z: number) => [...new Set(points
+      .filter(p => Math.abs(p[0] - left) < 1e-6 && Math.abs(p[2] - z) < 1e-6)
+      .map(p => p.map(n => n.toFixed(6)).join(',')))].sort();
+    for (const [role, z] of [['PaperFront', front], ['PaperBack', back]] as [string, number][]) {
+      const folded = edge(paper[role], z);
+      assert.equal(folded.length, 2, `${role} stops before the spine fold`);
+      assert.deepEqual(folded, edge(paper.PaperSpine, z));
+    }
+    const border = family === 'vhs-white' ? .009 : .003;
+    const underFold = plastic.filter(p => p[0] < left + border + 1e-6);
+    assert.ok(underFold.length > 0);
+    assert.ok(underFold.every(p => p[2] < front - .0001 && p[2] > back + .0001), 'plastic protrudes through the paper fold');
+  });
+}
