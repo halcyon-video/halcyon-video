@@ -13,10 +13,40 @@ import {
   matchProviderId,
   buildStreamingUrl,
   tmdbWatchFallbackUrl,
+  fallbackToSnapshotOnFailure,
   synthesizeStreamingMovie,
   ingestStreamingResults,
   buildStreamingLibraries,
 } from '../src/streaming-catalog.ts';
+
+test('fallbackToSnapshotOnFailure: falls back to snapshot when network source yields no titles', async () => {
+  let fallbackCalled = false;
+  const dummySnapshotMovie = synthesizeStreamingMovie({ id: 999, title: 'Snapshot Title' }, DEFAULT_STREAMING_SERVICES[0])!;
+  const fallback = async () => {
+    fallbackCalled = true;
+    return [dummySnapshotMovie];
+  };
+
+  // 1. TMDB returns empty -> falls back
+  const recovered = await fallbackToSnapshotOnFailure([], 'tmdb', fallback);
+  assert.equal(fallbackCalled, true);
+  assert.equal(recovered.length, 1);
+  assert.equal(recovered[0].title, 'Snapshot Title');
+
+  // 2. TMDB returns movies -> does NOT fall back
+  fallbackCalled = false;
+  const netflixMovie = synthesizeStreamingMovie({ id: 1, title: 'Network Title' }, DEFAULT_STREAMING_SERVICES[0])!;
+  const retained = await fallbackToSnapshotOnFailure([netflixMovie], 'tmdb', fallback);
+  assert.equal(fallbackCalled, false);
+  assert.equal(retained.length, 1);
+  assert.equal(retained[0].title, 'Network Title');
+
+  // 3. Snapshot source itself returning empty -> does NOT recursively fall back
+  fallbackCalled = false;
+  const snapEmpty = await fallbackToSnapshotOnFailure([], 'snapshot', fallback);
+  assert.equal(fallbackCalled, false);
+  assert.deepEqual(snapEmpty, []);
+});
 
 test('a snapshot year stays in its calendar year west of UTC', () => {
   const timezone = process.env.TZ;
@@ -79,6 +109,12 @@ test('resolveEnabledServices: a name outside the default eight becomes a templat
   assert.equal(svcs[0].urlTemplate, undefined);
 });
 
+test('resolveEnabledServices: deduplicates repeated service names and aliases, keeping the first occurrence', () => {
+  const svcs = resolveEnabledServices('netflix, Netflix, shudder, Shudder, HBO Max, max');
+  assert.equal(svcs.length, 3);
+  assert.deepEqual(svcs.map((s) => s.id), ['netflix', 'shudder', 'max']);
+});
+
 test('matchProviderId: exact case-insensitive alias match, and null when absent', () => {
   const netflix = DEFAULT_STREAMING_SERVICES.find((d) => d.id === 'netflix')!;
   assert.equal(
@@ -135,6 +171,17 @@ test('synthesizeStreamingMovie: a malformed item (no id/title) is dropped, not t
   const netflix = DEFAULT_STREAMING_SERVICES.find((d) => d.id === 'netflix')!;
   assert.equal(synthesizeStreamingMovie({ title: 'No id' }, netflix), null);
   assert.equal(synthesizeStreamingMovie({ id: 1 }, netflix), null);
+});
+
+test('synthesizeStreamingMovie: maps backdropPath to TMDB backdrop URL', () => {
+  const netflix = DEFAULT_STREAMING_SERVICES.find((d) => d.id === 'netflix')!;
+  const movie = synthesizeStreamingMovie({
+    id: 603,
+    title: 'The Matrix',
+    backdropPath: '/backdrop.jpg',
+  }, netflix);
+  assert.ok(movie);
+  assert.equal(movie!.backdropUrl, 'https://image.tmdb.org/t/p/w780/backdrop.jpg');
 });
 
 test('ingestStreamingResults: skips owned/requested (mediaInfo), dismissed, duplicate and malformed entries, caps at the limit', () => {

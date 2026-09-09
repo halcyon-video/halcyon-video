@@ -133,17 +133,20 @@ interface TmdbDiscoverItemRaw {
   name?: string;
   release_date?: string;
   poster_path?: string;
+  backdrop_path?: string;
   overview?: string;
   vote_average?: number;
   genre_ids?: number[];
 }
 
 export function normalizeDiscoverItem(raw: TmdbDiscoverItemRaw): RawDiscoverItem {
+  if (!raw) return {};
   return {
     id: raw.id,
     title: raw.title || raw.name,
     releaseDate: raw.release_date,
     posterPath: raw.poster_path,
+    ...(raw.backdrop_path ? { backdropPath: raw.backdrop_path } : {}),
     overview: raw.overview,
     voteAverage: raw.vote_average,
     genreIds: raw.genre_ids,

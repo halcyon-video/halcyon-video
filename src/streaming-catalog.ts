@@ -116,12 +116,19 @@ function slugify(name: string): string {
 export function resolveEnabledServices(overrideCsv: string | undefined | null): StreamingServiceDef[] {
   const names = (overrideCsv ?? '').split(',').map((s) => s.trim()).filter(Boolean);
   if (names.length === 0) return [];
-  return names.map((name): StreamingServiceDef => {
+  const seen = new Set<string>();
+  const out: StreamingServiceDef[] = [];
+  for (const name of names) {
     const lower = name.toLowerCase();
     const known = DEFAULT_STREAMING_SERVICES.find((d) =>
       d.id === lower || d.aliases.some((a) => a.toLowerCase() === lower));
-    return known ?? { id: slugify(name), name: name.toUpperCase(), aliases: [name] };
-  });
+    const def = known ?? { id: slugify(name), name: name.toUpperCase(), aliases: [name] };
+    if (!seen.has(def.id)) {
+      seen.add(def.id);
+      out.push(def);
+    }
+  }
+  return out;
 }
 
 /** CSV of every default service's id, in order -- a concrete, non-blank
@@ -149,6 +156,22 @@ export function resolveStreamingSource(hasTmdbKey: boolean, hasJellyseerr: boole
   if (hasTmdbKey) return 'tmdb';
   if (hasJellyseerr) return 'jellyseerr';
   return 'snapshot';
+}
+
+/**
+ * Recovery behavior when a network streaming provider fails or returns zero titles
+ * (issue #292 / zero-setup normie path): falls back to the bundled snapshot rather
+ * than leaving the chosen streaming aisles completely empty.
+ */
+export async function fallbackToSnapshotOnFailure(
+  primaryMovies: Movie[],
+  source: StreamingSource,
+  fallbackFn: () => Promise<Movie[]>
+): Promise<Movie[]> {
+  if (primaryMovies.length > 0 || source === 'snapshot') {
+    return primaryMovies;
+  }
+  return fallbackFn();
 }
 
 /** Match a service def against Jellyseerr's watch-provider list by exact
@@ -196,6 +219,7 @@ function genreNames(genreIds: unknown): string[] {
 }
 
 const TMDB_POSTER_BASE = 'https://image.tmdb.org/t/p/w342';
+const TMDB_BACKDROP_BASE = 'https://image.tmdb.org/t/p/w780';
 
 /** One raw entry off Jellyseerr's GET /api/v1/discover/movies `results`
  *  array -- same camelCased shape jellyseerr.ts's fetchDiscoverMovies already
@@ -206,6 +230,7 @@ export interface RawDiscoverItem {
   name?: string;
   releaseDate?: string;
   posterPath?: string;
+  backdropPath?: string;
   overview?: string;
   voteAverage?: number;
   genreIds?: number[];
@@ -236,6 +261,7 @@ export function synthesizeStreamingMovie(item: RawDiscoverItem, def: StreamingSe
     genres: genreNames(item.genreIds),
     localPath: '',
     posterUrl: item.posterPath ? `${TMDB_POSTER_BASE}${item.posterPath}` : undefined,
+    backdropUrl: item.backdropPath ? `${TMDB_BACKDROP_BASE}${item.backdropPath}` : undefined,
     communityRating: typeof item.voteAverage === 'number' ? item.voteAverage : undefined,
     libraryName: def.name,
     tmdbId,

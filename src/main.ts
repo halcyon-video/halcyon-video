@@ -2657,6 +2657,8 @@ async function initializeStoreScene(preservePosterCache = false) {
       }
       if (movie.game) {
         void handleGameLaunch(movie, false);
+      } else if (movie.streaming) {
+        handleStreamingLaunch(movie);
       } else {
         void launchVideoPlayback(movie);
       }
@@ -3232,6 +3234,10 @@ function finishPlayback(movie: Movie, fromCouch: boolean): void {
 }
 
 export async function launchVideoPlayback(movie: Movie, overrideItemId?: string, overridePath?: string, startHidden = false, fromCouch = false, version?: MovieVersion) {
+  if (movie.streaming) {
+    handleStreamingLaunch(movie);
+    return;
+  }
   revealPendingHidden = false; // fresh launch — clear any stale reveal handshake
   // The session this launch belongs to. Anything that retires the session
   // while we're awaiting invalidates the whole attempt — see sessionLost().
