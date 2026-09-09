@@ -999,6 +999,8 @@ export interface MovieSlot {
    * otherwise hangs through the shelf. See rentalBottomLift() in video-case.
    */
   backYLift: number;
+  /** Horizontal rental center at rest, accounting for real shell depth and lean. */
+  rentalRestZ?: number;
 
   currentScale: number;
   loadShelfDetails: (priority?: number, onSettled?: () => void) => void;

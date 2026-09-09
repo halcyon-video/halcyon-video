@@ -9,6 +9,8 @@ import * as THREE from 'three';
 import { Movie, Episode } from './jellyfin';
 import { requestHeroFrontDetail } from './hero-front-detail';
 import { posterQueue, CASE_MEDIUM, leftmostColorCache, posterPixelCache, getCaseGeometry, getRentalCaseGeometry, createHeroJellyfinMaterials, createHeroRentalMaterials, applyGameCaseArt, backCoverRegions, getSeriesBoxsetGeometry, createHeroSeriesBoxsetMaterials, drawSeriesBrandPanel, drawSeriesEpisodeBackCover, drawSeriesSeasonPanel, gameCaseDims, gameRentalDims } from './video-case';
+import { isWhiteClamshell } from './packaging-formats';
+import { detailedCaseGeometry, withCaseConstructionMaterials } from './packaging-model';
 import { syncJewelDressing } from './jewel-case';
 import { AISLE_SHELF_HEIGHTS, WALL_SHELF_HEIGHTS, BACK_WALL_UNIT_IDX, MovieSlot } from './store-layout';
 import { tempPosition, tempRotation, tempQuaternion, tempScale, tempMatrix, _bagFallback, _bagBaseFallback } from './scene-shared';
@@ -588,29 +590,15 @@ export function updateBackCoverHighlight(scene: StoreScene) {
 
   scene.heroFrontMesh.material = scene.heroFrontMaterials(movie);
 
-  // GH #139: the rental clamshell's VHS_RIM widening (getRentalCaseGeometry)
-  // exists so the case peeks out asymmetrically from BEHIND the retail
-  // cover in the unflipped hero view (matching the nested browse-mode
-  // meshes). Flipped, the two hero cases fan fully apart with nothing
-  // occluding the rental copy, so that extra width just reads as a stray
-  // white/black edge strip stuck on one side of an otherwise normal-looking
-  // case — most visible on the white-cased Animated Movies tapes. Swap to
-  // the plain (un-widened) case geometry while flipped; swap back on the
-  // way to front so the peeking edge returns for the unflipped view.
+  // Flipping changes the pose, never the physical rental construction.
   if (scene.heroBackMesh) {
-    // The spine view gets the plain geometry too: edge-on, the rim widening
-    // reads as the same stray strip the flipped view had.
-    // Both branches are the RENTAL copy, so both take the shell's media-class
-    // dims — never the game's retail carton (see gameRentalDims).
-    const shellDims = movie.game ? gameRentalDims(movie.platform) : undefined;
-    scene.heroBackMesh.geometry = (scene.isFlipped || scene.heroSpine)
-      ? getCaseGeometry(false, shellDims)
-      : getRentalCaseGeometry(false, shellDims);
+    scene.heroBackMesh.geometry = detailedCaseGeometry(getRentalCaseGeometry(false,
+      movie.game ? gameRentalDims(movie.platform) : undefined));
   }
 }
 
 export function ensureHeroCases(scene: StoreScene, movie: Movie, nrCase = false) {
-  const isAnimated = CASE_MEDIUM === 'vhs' && movie.libraryName === 'Animated Movies';
+  const isAnimated = CASE_MEDIUM === 'vhs' && isWhiteClamshell(movie, CASE_MEDIUM);
   // The hero pair must match the shelf instances, which batch retail and rental
   // separately (store-stock's gameDimsForShape): the FRONT box is the platform's
   // real carton, the shell behind it is the media-class rental case. Using
@@ -652,8 +640,8 @@ export function ensureHeroCases(scene: StoreScene, movie: Movie, nrCase = false)
     scene.heroMovieId = movie.id;
     heroWasNRCase = nrCase;
     heroDetailKey = wantDetail;
-    scene.heroFrontMesh.geometry = movie.isSeries ? getSeriesBoxsetGeometry() : getCaseGeometry(isAnimated, gameDims);
-    scene.heroBackMesh.geometry = getRentalCaseGeometry(false, shellDims);
+    scene.heroFrontMesh.geometry = movie.isSeries ? getSeriesBoxsetGeometry() : detailedCaseGeometry(getCaseGeometry(isAnimated, gameDims));
+    scene.heroBackMesh.geometry = detailedCaseGeometry(getRentalCaseGeometry(false, shellDims));
     scene.heroFrontMesh.material = scene.heroFrontMaterials(movie);
     // Jewel-case platforms carry their clear-lid dressing on the hero mesh;
     // keyed internally, so a movie/cartridge title strips it right back off.
@@ -661,7 +649,7 @@ export function ensureHeroCases(scene: StoreScene, movie: Movie, nrCase = false)
     // NR wall slots: the rental copy is the red-sleeve/gold-ticket NEW
     // RELEASE RENTAL case, matching the wall's instanced back boxes.
     scene.heroBackMesh.material = nrCase
-      ? getGoldCaseMaterials()
+      ? withCaseConstructionMaterials(getGoldCaseMaterials())
       : createHeroRentalMaterials(movie, wantDetail !== null, probeIdx);
     perfTrace.end(SP_HERO);
     if (movie.isSeries) scene.ensureSeriesEpisodes(movie);
@@ -702,7 +690,7 @@ export function heroFrontMaterials(scene: StoreScene, movie: Movie): THREE.Mater
   // it up a frame later under render-on-demand.
   if (heroDetail) {
     requestHeroFrontDetail(movie, mats, probeIdx,
-      CASE_MEDIUM === 'vhs' && movie.libraryName === 'Animated Movies', !!movie.game,
+      CASE_MEDIUM === 'vhs' && isWhiteClamshell(movie, CASE_MEDIUM), !!movie.game,
       movie.isSeries ? 'shrinkwrap' : undefined)
       .then((changed) => { if (changed) scene.requestRender(); });
   }

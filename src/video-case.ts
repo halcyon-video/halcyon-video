@@ -3,7 +3,8 @@ import { isPublicDemo } from './demo-mode';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { Movie, Episode } from './jellyfin';
 import { loadGameFaceTexture, isTwoFlapSpine, jewelSpineComposite, uprightSpine } from './game-case-art';
-import { isJewelCasePlatform, JEWEL_FAT_DEPTH_IN } from './jewel-case';
+import { isJewelCasePlatform, JEWEL_FAT_DEPTH_IN, gameConstruction, WHITE_CLAMSHELL_DIMS, isWhiteClamshell, type CaseDimensions, GAME_BOX_IN } from './packaging-formats';
+import { modelCaseGeometry, cloneCaseGeometry, withCaseConstructionMaterials, clearCaseModels, isCaseConstructionMaterial } from './packaging-model';
 import { getReviewSnippetForMovie } from './review-snippets';
 import { getActiveTheme } from './themes';
 import { getActiveLogoSpec, logoSpecCacheKey } from './logo-spec';
@@ -523,35 +524,7 @@ export const GAME_CLASS_DIMS: Record<'cart' | 'disc', { w: number; h: number; d:
 // entry against a real photo when one is on hand (the authority rule the 1993
 // POS art follows). A platform with NO entry keeps the generic clamshell shape,
 // which is the right answer for an odd cart a store would just sleeve.
-const GAME_BOX_IN: Record<string, [number, number, number]> = {
-  // Cartridge era — cardboard cartons and plastic clamshells.
-  'NES': [5.0, 7.0, 1.0],
-  'SNES': [7.5, 5.25, 1.1],              // NA landscape carton
-  'SUPER FAMICOM': [4.2, 7.5, 1.1],      // JP carton: tall and narrow, not a wide Snes box
-  'NINTENDO 64': [7.5, 5.25, 1.1],       // landscape carton
-  'GAME BOY': [4.75, 5.25, 0.9],         // near-square
-  'GAME BOY COLOR': [4.75, 5.25, 0.9],
-  'GAME BOY ADVANCE': [4.8, 5.4, 0.9],   // portrait, like the GB carton
-  'GENESIS': [5.5, 7.5, 1.2],
-  'SEGA MASTER SYSTEM': [5.5, 7.0, 1.0],
-  'ATARI': [5.0, 7.0, 1.0],
-  'TURBOGRAFX-16': [5.5, 4.9, 0.9],
-  'ARCADE': [5.0, 7.0, 1.0],             // Neo Geo AES cartons are far larger;
-                                         // a rental store sleeved odd carts.
-  // Optical era — jewel cases and keep cases.
-  'PLAYSTATION': [5.6, 4.9, 0.4],        // CD jewel case, landscape
-  'SEGA SATURN': [4.9, 5.6, 0.4],        // CD jewel case, portrait
-  'SEGA CD': [5.5, 7.9, 0.75],
-  'DREAMCAST': [5.5, 7.5, 0.6],
-  'PLAYSTATION 2': [5.3, 7.5, 0.55],     // DVD keep case
-  'GAMECUBE': [5.3, 7.4, 0.6],
-  'XBOX': [5.3, 7.5, 0.55],
-  'NINTENDO 3DS': [5.4, 4.75, 0.5],      // small keep case, landscape
-  'NINTENDO DSI': [5.4, 4.9, 0.5],       // DS-family keep case, landscape
-  'NINTENDO SWITCH': [4.2, 6.6, 0.45],   // portrait keep case
-  'PSP': [4.1, 6.7, 0.6],                // UMD case, portrait
-  'WII U': [5.3, 7.5, 0.6],              // DVD-footprint keep case
-};
+
 
 /** Does this platform have a real carton on file (vs. the generic clamshell)? */
 export function hasRealGameBox(platform?: string): boolean {
@@ -591,6 +564,7 @@ export function gameCaseDims(platform?: string, discCount?: number): { w: number
     // stable, and the class fallbacks (shared with the movie CASE_DIMS
     // objects) are never marked.
     if (isJewelCasePlatform(platform)) (dims as any).jewel = true;
+    (dims as CaseDimensions).family = gameConstruction(platform, discCount);
     gameBoxDimsCache.set(key, dims);
   }
   return dims;
@@ -706,6 +680,7 @@ export function rentalBoxDepth(
 // per-platform shells (see the note above DISC_PLATFORMS). The carton sits in
 // front of a shell that is the same size for every game of its media class.
 const gameShapeRegistry = new Map<string, { retail: { w: number; h: number; d: number }; rental: { w: number; h: number; d: number } }>([
+  ['white', { retail: WHITE_CLAMSHELL_DIMS, rental: GAME_CLASS_DIMS.cart }],
   ['disc', { retail: GAME_CLASS_DIMS.disc, rental: GAME_CLASS_DIMS.disc }],
   ['cart', { retail: GAME_CLASS_DIMS.cart, rental: GAME_CLASS_DIMS.cart }],
 ]);
@@ -850,6 +825,7 @@ export function initCaseMedium() {
   rentalGeometryRegular = null;
   rentalGeometryAnimated = null;
 
+  clearCaseModels();
   customDimsGeometriesRegular.forEach(geo => geo.dispose());
   customDimsGeometriesRegular.clear();
   customDimsGeometriesAnimated.forEach(geo => geo.dispose());
@@ -1343,6 +1319,7 @@ export function clearVideoCaseCache(mode: 'full' | 'rebuild' = 'full') {
     posterQueue.clear();
     return;
   }
+  clearCaseModels();
   customDimsGeometriesRegular.forEach(geo => geo.dispose());
   customDimsGeometriesRegular.clear();
   customDimsGeometriesAnimated.forEach(geo => geo.dispose());
@@ -1609,7 +1586,7 @@ export function createClonedCaseGeometry(
   noPosterCrop: boolean = false
 ): THREE.BufferGeometry {
   const baseGeo = rental ? getRentalGeometry(isAnimated, dims) : getGeometry(isAnimated, dims);
-  const geo = baseGeo.clone();
+  const geo = cloneCaseGeometry(baseGeo);
 
   // Add aTextureIndex instanced attribute
   const texIndices = new Float32Array(count);
@@ -2178,7 +2155,7 @@ function getJellyfinBackMaterial(movie: Movie, probeIdx?: number): THREE.MeshSta
   const env = (probeIdx !== undefined && reflectionProbes[probeIdx]) ? reflectionProbes[probeIdx] : null;
 
   const mat = makePlasticMaterial({ map: tex, envMap: env, finish: movie.isSeries ? 'shrinkwrap' : undefined });
-  const isAnimated = CASE_MEDIUM === 'vhs' && movie.libraryName === 'Animated Movies';
+  const isAnimated = CASE_MEDIUM === 'vhs' && isWhiteClamshell(movie, CASE_MEDIUM);
   if (isAnimated) {
     applyWhiteBorderShader(mat, 0, 'left');
   }
@@ -2312,7 +2289,7 @@ function getJellyfinBackMaterialHero(
   tex.needsUpdate = true;
 
   const env = (probeIdx !== undefined && reflectionProbes[probeIdx]) ? reflectionProbes[probeIdx] : null;
-  const isAnimated = CASE_MEDIUM === 'vhs' && movie.libraryName === 'Animated Movies';
+  const isAnimated = CASE_MEDIUM === 'vhs' && isWhiteClamshell(movie, CASE_MEDIUM);
   const finish = movie.isSeries ? 'shrinkwrap' as const : undefined;
 
   const mat = heroFaceMaterial(
@@ -2509,7 +2486,22 @@ function getRentalSpineMaterial(movie: Movie, probeIdx?: number): THREE.MeshStan
   return mat;
 }
 
-function getGeometry(isAnimated: boolean = false, dims?: { w: number; h: number; d: number }): THREE.BufferGeometry {
+// Authored case meshes preserve the six art lanes and the rental origin shift.
+function getGeometry(isAnimated = false, dims?: CaseDimensions): THREE.BufferGeometry {
+  const white = CASE_MEDIUM === 'vhs' && isAnimated && !dims;
+  const size = white ? WHITE_CLAMSHELL_DIMS : dims ?? CASE_DIMS[CASE_MEDIUM];
+  const family = white ? 'vhs-white' : dims ? dims.family : CASE_MEDIUM === 'vhs' ? 'vhs-slipcase' : 'dvd-keepcase';
+  const fallback = getFallbackGeometry(isAnimated, white ? WHITE_CLAMSHELL_DIMS : dims);
+  return modelCaseGeometry(fallback, family, size);
+}
+function getRentalGeometry(isAnimated = false, dims?: CaseDimensions): THREE.BufferGeometry {
+  const base = dims ?? CASE_DIMS[CASE_MEDIUM];
+  const dvd = base.w === CASE_DIMS.dvd.w && base.h === CASE_DIMS.dvd.h;
+  const size = dvd ? base : { w: base.w + VHS_RIM_RIGHT_FT, h: base.h + VHS_RIM_VERTICAL_FT, d: VHS_RENTAL_DEPTH_FT };
+  return modelCaseGeometry(getRentalFallbackGeometry(isAnimated, dims), dvd ? 'dvd-keepcase' : 'vhs-rental', size, false, dvd ? 0 : VHS_RIM_RIGHT_FT / 2);
+}
+
+function getFallbackGeometry(isAnimated: boolean = false, dims?: { w: number; h: number; d: number }): THREE.BufferGeometry {
   if (dims) {
     const key = `${dims.w.toFixed(4)}_${dims.h.toFixed(4)}_${dims.d.toFixed(4)}`;
     const cache = isAnimated ? customDimsGeometriesAnimated : customDimsGeometriesRegular;
@@ -2566,7 +2558,7 @@ function getGeometry(isAnimated: boolean = false, dims?: { w: number; h: number;
 // symmetrically about the box centre; the tiny forward poke stays hidden behind
 // the opaque cover box in front (front cover spans local z [0, CASE_DEPTH], the
 // clamshell sits centred at -CASE_DEPTH/2 behind it — see three-scene slot z).
-function getRentalGeometry(isAnimated: boolean = false, dims?: { w: number; h: number; d: number }): THREE.BufferGeometry {
+function getRentalFallbackGeometry(isAnimated: boolean = false, dims?: { w: number; h: number; d: number }): THREE.BufferGeometry {
   if (dims) {
     // Custom dims come from gameCaseDims(): the class decides the rental
     // shape, NOT the store medium — a cartridge game rents in the VHS
@@ -4704,7 +4696,7 @@ export let globalBackMaterialAnimated: THREE.MeshPhysicalMaterial | null = null;
 setCaseMaterialUniformProvider(() => [globalFrontMaterialRegular, globalFrontMaterialAnimated]);
 
 export function isGlobalMaterial(m: THREE.Material): boolean {
-  return m === globalFrontMaterialRegular ||
+  return isCaseConstructionMaterial(m) || m === globalFrontMaterialRegular ||
          m === globalFrontMaterialAnimated ||
          m === globalSpineMaterialRegular ||
          m === globalSpineMaterialAnimated ||
@@ -5054,7 +5046,7 @@ export function getGlobalFrontMaterials(isAnimated: boolean = false): THREE.Mate
   // non-animated VHS so the box top reads as a colour rather than a flat black
   // edge; animated VHS (white edge) and DVD stay as their edgeMat.
   const topMat = (CASE_MEDIUM === 'vhs' && !isAnimated) ? spineMat : edgeMat;
-  return [
+  return withCaseConstructionMaterials([
     // Both wide side faces carry the per-instance aSpineColor (the poster's
     // dominant/prevalent colour) rather than a flat black edge, so a series
     // boxset's chunky sides pick up their cover colour in browse mode instead
@@ -5065,7 +5057,7 @@ export function getGlobalFrontMaterials(isAnimated: boolean = false): THREE.Mate
     edgeMat,
     frontMat,
     edgeMat,
-  ];
+  ]);
 }
 
 export function getGlobalBackMaterials(_isAnimated: boolean = false): THREE.Material[] {
@@ -5271,7 +5263,7 @@ export async function applyGameCaseArt(movie: Movie, mats: THREE.Material[], pro
 
 export function createHeroJellyfinMaterials(movie: Movie, highlightedName?: string, pinEndcap: boolean = false, heroDetail: boolean = false, probeIdx?: number): THREE.Material[] {
   initSharedMaterials();
-  const isAnimated = CASE_MEDIUM === 'vhs' && movie.libraryName === 'Animated Movies';
+  const isAnimated = CASE_MEDIUM === 'vhs' && isWhiteClamshell(movie, CASE_MEDIUM);
   const spineColor = leftmostColorCache.get(movie.id) || null;
 
   const edgeMat = isAnimated ? sharedWhiteMaterial! : sharedBlackMaterial!;
@@ -5289,7 +5281,7 @@ export function createHeroJellyfinMaterials(movie: Movie, highlightedName?: stri
     : null)
     ?? getPosterMaterial(movie.id, probeIdx, isAnimated, !!movie.game, pinEndcap ? 'endcap' : 'none', finish);
 
-  return [
+  return withCaseConstructionMaterials([
     edgeMat,
     getJellyfinSpineMaterial(spineColor, probeIdx, isAnimated),
     edgeMat,
@@ -5298,7 +5290,7 @@ export function createHeroJellyfinMaterials(movie: Movie, highlightedName?: stri
     (heroDetail || highlightedName)
       ? getJellyfinBackMaterialHero(movie, highlightedName, probeIdx)
       : getJellyfinBackMaterial(movie, probeIdx),
-  ];
+  ]);
 }
 
 // rental copy: front, spine and back all carry this movie's real
@@ -5308,7 +5300,7 @@ export function createHeroJellyfinMaterials(movie: Movie, highlightedName?: stri
 // being inspected, which is the one whose print anyone can actually read.
 export function createHeroRentalMaterials(movie: Movie, heroDetail: boolean = false, probeIdx?: number): THREE.Material[] {
   initSharedMaterials();
-  const isAnimated = CASE_MEDIUM === 'vhs' && movie.libraryName === 'Animated Movies';
+  const isAnimated = CASE_MEDIUM === 'vhs' && isWhiteClamshell(movie, CASE_MEDIUM);
 
   // GH #42: the hero rental copy is a clamshell — black molded edges on VHS
   // (including Animated Movies, which now match every other tape); white on DVD.
@@ -5319,14 +5311,14 @@ export function createHeroRentalMaterials(movie: Movie, heroDetail: boolean = fa
     ? getRentalFrontMaterialHero(movie, probeIdx)
     : getRentalFrontMaterial(movie, probeIdx, isAnimated);
 
-  return [
+  return withCaseConstructionMaterials([
     edgeMat,
     heroDetail ? getRentalSpineMaterialHero(movie, probeIdx) : getRentalSpineMaterial(movie, probeIdx),
     edgeMat,
     edgeMat,
     front,
     heroDetail ? getRentalBackMaterialHero(movie, probeIdx) : getRentalBackMaterial(movie, probeIdx),
-  ];
+  ]);
 }
 
 // ─── TV-series season boxsets ────────────────────────────────────────────────

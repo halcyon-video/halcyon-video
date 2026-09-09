@@ -5162,7 +5162,7 @@ export class StoreScene {
       // re-hashed here — this runs for every dirty slot on every rendered frame
       // during placement waves and genre-filter rebuilds (issue #116).
       let targetBackX = targetFrontX + slot.backJitter;
-      let targetBackZ = -depth / 2;
+      let targetBackZ = slot.rentalRestZ ?? -depth / 2;
       let targetBackRotY = 0;
 
       if (isSelected && targetScale > 0) {
@@ -5249,7 +5249,7 @@ export class StoreScene {
           targetFrontRotY = 0.05;
 
           targetBackX = -0.04;
-          targetBackZ = -depth / 2 - 0.01;
+          targetBackZ = (slot.rentalRestZ ?? -depth / 2) - 0.01;
           targetBackRotY = -0.05;
         }
       } else {

@@ -6,17 +6,21 @@
 // swap. Every function takes the StoreScene as its first parameter and
 // reads/writes scene state exactly as the original methods did.
 import * as THREE from 'three';
+import { isWhiteClamshell, WHITE_CLAMSHELL_DIMS } from './packaging-formats';
+import { onCaseModelsChanged } from './packaging-model';
+import { rentalRestZ, shelfCasePacking } from './packaging-fit';
+import { updateBackstock, forgetBackstock } from './case-backstock';
+const caseModelSubscriptions = new WeakMap<StoreScene, () => void>();
 import { isPublicDemo } from './demo-mode';
 import { Movie } from './jellyfin';
 import { buildGoldClamshellFillers, getGoldCaseMaterials, repaintGoldCase } from './fixtures/gold-clamshell';
 import { posterQueue, CASE_MEDIUM, CASE_HEIGHT, CASE_DEPTH, textureArrayManager, createClonedCaseGeometry, getGlobalFrontMaterials, getGlobalBackMaterials, updateGlobalMaterialsEnvMap, leftmostColorCache, posterPixelCache, reflectionProbes, isGlobalMaterial, lowResCache, createProgramWarmupMaterials, gameShapeKey, gameDimsForShape, gameCaseDims, gameRentalDims, rentalBottomLift, rentalBoxDepth, rentalBoxHeight, beginRebuildDrain, SERIES_DEPTH_MULT } from './video-case';
-import { AISLE_SHELF_HEIGHTS, WALL_SHELF_HEIGHTS, LEAN_ANGLE, STAGGER_OFFSET, UNIT_SIDE_CAPACITY, BACK_WALL_UNIT_IDX, sideEntrySlot, COPY_X_JITTER_RANGE, EXTRA_COPY_DEPTH_STEP, extraCopiesCount, isUnstockedTitle, seededRandom01, MovieSlot } from './store-layout';
+import { AISLE_SHELF_HEIGHTS, WALL_SHELF_HEIGHTS, LEAN_ANGLE, STAGGER_OFFSET, UNIT_SIDE_CAPACITY, BACK_WALL_UNIT_IDX, sideEntrySlot, COPY_X_JITTER_RANGE, unitDepthAtHeight, extraCopiesCount, isUnstockedTitle, seededRandom01, MovieSlot } from './store-layout';
 import { validateCaseFit, type CaseFitPair } from './layout-validator';
 import { retailAudio } from './audio';
 import { clearPosterPrefetch } from './poster-prefetch';
 import {
-  CASE_EULER_ORDER, SlotPos,
-  tempPosition, tempRotation, tempQuaternion, tempScale, tempMatrix,
+  SlotPos,
   AO_MASK_LAYER,
 } from './scene-shared';
 import type { StoreScene } from './three-scene';
@@ -50,7 +54,7 @@ function aisleMeshKey(libIdx: number, unitIdx: number, side: 'front' | 'back', m
   const base = `${libIdx}_${unitIdx}_${side}`;
   return movie.game
     ? `${base}${AISLE_SHAPE_SEP}${gameShapeKey(movie.platform, movie.discCount)}`
-    : base;
+    : isWhiteClamshell(movie, CASE_MEDIUM) ? `${base}${AISLE_SHAPE_SEP}white` : base;
 }
 
 /** The shape half of an aisle batch key, or null for ordinary movie stock. */
@@ -66,6 +70,7 @@ function aisleKeyShape(key: string): string | null {
  * title.
  */
 function aisleCaseDims(movie: Movie): { height: number; depth: number; liftDepth: number } {
+  if (isWhiteClamshell(movie, CASE_MEDIUM)) { const d = WHITE_CLAMSHELL_DIMS; return { height: d.h, depth: d.d, liftDepth: d.d }; }
   if (movie.game) {
     const d = gameCaseDims(movie.platform, movie.discCount);
     return { height: d.h, depth: d.d, liftDepth: d.d };
@@ -84,20 +89,27 @@ function aisleCaseDims(movie: Movie): { height: number; depth: number; liftDepth
  * far enough to push the shell down through the shelf.
  */
 function slotRentalLift(movie: Movie): number {
+  if (isWhiteClamshell(movie, CASE_MEDIUM)) return rentalBottomLift(WHITE_CLAMSHELL_DIMS, gameRentalDims());
   if (!movie.game) return rentalBottomLift();
   return rentalBottomLift(gameCaseDims(movie.platform, movie.discCount), gameRentalDims(movie.platform));
 }
 
 /**
- * Half-depth to seat the rental shell BEHIND the parting plane rather than
- * across it. The slot's own `depth` is the retail box's, and offsetting both
- * boxes by half of it buries the thicker shell's front face inside the box in
- * front (see rentalBoxDepth). Front stays at +retail/2; the shell goes to
- * -shell/2, so the two faces meet instead of overlapping.
+ * Horizontal offset for a rental shell behind a leaned retail case. The
+ * normal projection includes the height lift and the actual two half-depths.
  */
-function slotRentalHalfDepth(movie: Movie): number {
-  if (!movie.game) return rentalBoxDepth() / 2;
-  return rentalBoxDepth(gameCaseDims(movie.platform, movie.discCount), gameRentalDims(movie.platform)) / 2;
+function slotRentalHalfDepth(movie: Movie, tilt = LEAN_ANGLE): number {
+  const retail = aisleCaseDims(movie);
+  const shell = movie.game ? gameRentalDims(movie.platform) : undefined;
+  const depth = rentalBoxDepth(undefined, shell);
+  return -rentalRestZ(retail.depth, depth, slotRentalLift(movie), tilt);
+}
+function packingFor(movie: Movie, shelfY: number, tilt = LEAN_ANGLE) {
+  if (movie.isSeries || isUnstockedTitle(movie)) return { offset: .44, count: 0, pitch: 0 };
+  const retail = aisleCaseDims(movie);
+  const rental = movie.game ? gameRentalDims(movie.platform) : undefined;
+  return shelfCasePacking(retail.height, retail.depth, rentalBoxHeight(undefined,rental),
+    rentalBoxDepth(undefined,rental),tilt,unitDepthAtHeight(shelfY)/2,extraCopiesCount(movie));
 }
 
 /**
@@ -114,7 +126,7 @@ function validateCaseFitForStock(scene: StoreScene): void {
   scene.slotsByPosition.forEach((slot) => {
     const movie = slot.movie;
     if (!movie) return;
-    const label = movie.game ? `game:${movie.platform || '?'}${(movie.discCount ?? 1) >= 2 ? '#fat' : ''}` : `movie:${CASE_MEDIUM}`;
+    const label = movie.game ? `game:${movie.platform || '?'}${(movie.discCount ?? 1) >= 2 ? '#fat' : ''}` : `movie:${CASE_MEDIUM}:${movie.packaging ?? "default"}`;
     if (seen.has(label)) return;
     seen.add(label);
     // Two INDEPENDENT sources, which is the only thing that makes this an
@@ -124,9 +136,9 @@ function validateCaseFitForStock(scene: StoreScene): void {
     // wrong shared helper. Reconstructing the placement here instead — the
     // first cut did — makes the check vacuous: it stayed silent with both
     // shipped bugs reintroduced.
-    const retail = movie.game ? gameCaseDims(movie.platform, movie.discCount) : { w: 0, h: CASE_HEIGHT, d: CASE_DEPTH };
-    const rental = movie.game ? gameRentalDims(movie.platform) : undefined;
-    const retailArg = movie.game ? retail : undefined;
+    const retail = movie.game ? gameCaseDims(movie.platform, movie.discCount) : isWhiteClamshell(movie, CASE_MEDIUM) ? WHITE_CLAMSHELL_DIMS : { w: 0, h: CASE_HEIGHT, d: CASE_DEPTH };
+    const rental = movie.game ? gameRentalDims(movie.platform) : isWhiteClamshell(movie, CASE_MEDIUM) ? gameRentalDims() : undefined;
+    const retailArg = movie.game || isWhiteClamshell(movie, CASE_MEDIUM) ? retail : undefined;
     pairs.push({
       label,
       retailH: retail.h, retailD: retail.d,
@@ -143,6 +155,8 @@ function validateCaseFitForStock(scene: StoreScene): void {
 }
 
 export function clearMovieBoxes(scene: StoreScene) {
+  forgetBackstock(scene);
+  caseModelSubscriptions.get(scene)?.(); caseModelSubscriptions.delete(scene);
   scene.meshes.forEach(mesh => {
     scene.scene.remove(mesh);
     mesh.traverse((object) => {
@@ -194,6 +208,9 @@ export function updateColsCount(scene: StoreScene) {
 
 export function buildAllMovieBoxes(scene: StoreScene) {
   scene.clearMovieBoxes();
+  caseModelSubscriptions.set(scene, onCaseModelsChanged(() => {
+    scene.queueStructuralShadowRefresh(); scene.requestRender();
+  }));
   scene.slotsByPosition.clear();
   scene.movieInstancesMap.clear();
   scene.slotsByMovieId.clear();
@@ -265,7 +282,7 @@ export function buildAllMovieBoxes(scene: StoreScene) {
   // aisle slots), so exact sizing is safe.
   const fixtureMeshKey = (fixtureId: string, movie: Movie): string => {
     const base = `fixture_${fixtureId}`;
-    const isMovieAnimated = CASE_MEDIUM === 'vhs' && movie.libraryName === 'Animated Movies';
+    const isMovieAnimated = CASE_MEDIUM === 'vhs' && isWhiteClamshell(movie, CASE_MEDIUM);
     if (fixtureId.startsWith('game-section')) {
       // One batch per RETAIL box shape (gameShapeKey): platforms sharing a
       // carton size share a batch, disc platforms use the keep case, and
@@ -287,7 +304,7 @@ export function buildAllMovieBoxes(scene: StoreScene) {
   // regular/animated wall meshes are likewise sized to actual usage instead
   // of full wall capacity for both.
   const isBackWallMovieAnimated = (movie: Movie) =>
-    CASE_MEDIUM === 'vhs' && movie.libraryName === 'Animated Movies';
+    CASE_MEDIUM === 'vhs' && isWhiteClamshell(movie, CASE_MEDIUM);
   const backWallPlacements: { movie: Movie; slotPos: SlotPos }[] = [];
   // Every section is pinned to its physical bay's column range (a double-
   // feature to two whole adjacent bays of one run — store-nr-bays.ts), so a
@@ -325,7 +342,7 @@ export function buildAllMovieBoxes(scene: StoreScene) {
     const base = isBackWallMovieAnimated(movie) ? 'back_wall_animated' : 'back_wall_regular';
     return movie.game
       ? `${base}${AISLE_SHAPE_SEP}${gameShapeKey(movie.platform, movie.discCount)}`
-      : base;
+      : isWhiteClamshell(movie, CASE_MEDIUM) ? `${base}${AISLE_SHAPE_SEP}white` : base;
   };
   const backWallCounts = new Map<string, number>();
   backWallPlacements.forEach(p => {
@@ -349,14 +366,7 @@ export function buildAllMovieBoxes(scene: StoreScene) {
   };
 
   unitSideCapacity.forEach((capacity, key) => {
-    let isAnimated = false;
-    if (!key.startsWith('fixture_')) {
-      const parts = key.split('_');
-      const libIdx = parseInt(parts[0], 10);
-      if (scene.libraries[libIdx] && scene.libraries[libIdx].name === 'Animated Movies') {
-        isAnimated = true;
-      }
-    }
+    const isAnimated = aisleKeyShape(key) === 'white';
 
     if (key.startsWith('fixture_')) {
       if (key.startsWith('fixture_game-section')) {
@@ -447,7 +457,7 @@ export function buildAllMovieBoxes(scene: StoreScene) {
       const gameDims = shape ? gameDimsForShape(shape) : null;
       const frontMesh = new THREE.InstancedMesh(
         gameDims
-          ? createClonedCaseGeometry(capacity, isAnimated, false, gameDims.retail, true)
+          ? createClonedCaseGeometry(capacity, isAnimated, false, gameDims.retail, shape !== 'white')
           : createClonedCaseGeometry(capacity, isAnimated),
         getGlobalFrontMaterials(isAnimated),
         capacity
@@ -484,7 +494,7 @@ export function buildAllMovieBoxes(scene: StoreScene) {
 
     const bwFrontMesh = new THREE.InstancedMesh(
       gameDims
-        ? createClonedCaseGeometry(count, isAnim, false, gameDims.retail, true)
+        ? createClonedCaseGeometry(count, isAnim, false, gameDims.retail, shape !== 'white')
         : createClonedCaseGeometry(count, isAnim),
       getGlobalFrontMaterials(isAnim),
       count
@@ -696,8 +706,7 @@ export function buildAllMovieBoxes(scene: StoreScene) {
 
       const localZ = scene.aisleColZ(unit, col, side);
       const fSign = unit.browseSign;
-      const copies = extraCopiesCount(movie);
-      const offset = 0.44 + copies * 0.07;
+      const offset = packingFor(movie, shelfY).offset;
       const localX = xCenter + (side === 'front' ? 1 : -1) * fSign * offset;
       const unitAngle = unit.yaw;
       const aisleWorld = scene.unitToWorld(unit, localX, localZ);
@@ -752,6 +761,7 @@ export function buildAllMovieBoxes(scene: StoreScene) {
         backJitter,
         backX: -STAGGER_OFFSET + backJitter,
         backZ: -slotRentalHalfDepth(movie),
+        rentalRestZ: -slotRentalHalfDepth(movie),
         backYLift: slotRentalLift(movie),
         backRotY: 0,
         currentScale: 1.0,
@@ -826,6 +836,7 @@ export function buildAllMovieBoxes(scene: StoreScene) {
       backJitter,
       backX: -STAGGER_OFFSET + backJitter,
       backZ: -slotRentalHalfDepth(movie),
+      rentalRestZ: -slotRentalHalfDepth(movie),
       backYLift: slotRentalLift(movie),
       backRotY: 0,
       currentScale: 1.0,
@@ -849,6 +860,17 @@ export function buildAllMovieBoxes(scene: StoreScene) {
     const slots = fixture.getSlots();
     slots.forEach(fixtureSlot => {
       const movie = fixtureSlot.movie;
+      const white = isWhiteClamshell(movie, CASE_MEDIUM);
+      const depth = white ? WHITE_CLAMSHELL_DIMS.d : fixtureSlot.depth;
+      const tilt = fixtureSlot.restingRotX ?? -0.25;
+      const lift = white ? (WHITE_CLAMSHELL_DIMS.h - CASE_HEIGHT) / 2 * Math.cos(tilt)
+        + (depth - fixtureSlot.depth) / 2 * Math.abs(Math.sin(tilt)) : 0;
+      const gameShelf = fixture.placement.id.startsWith('game-section');
+      const retail = aisleCaseDims(movie);
+      const shelfY = fixtureSlot.restingY - .03 - retail.height/2*Math.cos(tilt) - retail.depth/2*Math.abs(Math.sin(tilt));
+      const forward = gameShelf ? packingFor(movie,shelfY,tilt).offset - .44 : 0;
+      const x = fixtureSlot.restingX + forward * Math.sin(fixtureSlot.restingRotY);
+      const z = fixtureSlot.restingZ + forward * Math.cos(fixtureSlot.restingRotY);
       const key = fixtureSlot.key;
       // Same key derivation the sizing pass used in step 2, so every slot
       // lands in a mesh allocated at exactly its split's usage count
@@ -880,23 +902,24 @@ export function buildAllMovieBoxes(scene: StoreScene) {
         backMesh,
         instanceIdx: instIdx,
         genericInstanceIdx: 0,
-        restingX: fixtureSlot.restingX,
-        restingY: fixtureSlot.restingY,
-        restingZ: fixtureSlot.restingZ,
+        restingX: x,
+        restingY: fixtureSlot.restingY + lift,
+        restingZ: z,
         restingRotY: fixtureSlot.restingRotY,
         restingRotX: fixtureSlot.restingRotX ?? -0.25,
-        depth: fixtureSlot.depth,
-        currentX: fixtureSlot.restingX,
-        currentY: fixtureSlot.restingY,
-        currentZ: fixtureSlot.restingZ,
+        depth,
+        currentX: x,
+        currentY: fixtureSlot.restingY + lift,
+        currentZ: z,
         currentRotX: fixtureSlot.restingRotX ?? -0.25,
         currentRotY: fixtureSlot.restingRotY,
         frontX: 0,
-        frontZ: fixtureSlot.depth / 2,
+        frontZ: depth / 2,
         frontRotY: 0,
         backJitter,
         backX: backJitter,
-        backZ: -slotRentalHalfDepth(movie),
+        backZ: -slotRentalHalfDepth(movie, tilt),
+        rentalRestZ: -slotRentalHalfDepth(movie, tilt),
         backYLift: slotRentalLift(movie),
         backRotY: 0,
         currentScale: 1.0,
@@ -1012,7 +1035,7 @@ export function warmupRuntimePrograms(scene: StoreScene) {
       for (const m of lib.movies) {
         if (!firstWithPoster && posterPixelCache.has(m.id)) firstWithPoster = m;
         if (!firstSeries && m.isSeries) firstSeries = m;
-        if (!firstAnimated && lib.name === 'Animated Movies') firstAnimated = m;
+        if (!firstAnimated && isWhiteClamshell(m,CASE_MEDIUM)) firstAnimated = m;
         if (firstWithPoster && firstSeries && firstAnimated) break;
       }
     }
@@ -1077,111 +1100,21 @@ export function warmupRuntimePrograms(scene: StoreScene) {
 }
 
 export function rebuildExtraCopies(scene: StoreScene) {
-  // NR wall slots carry no backstock stack: the ~0.38ft wall shelf fits only
-  // the display box + its gold NEW RELEASE RENTAL copy, and the blue generic
-  // extras both mismatched the wall's red/gold case and sank through the
-  // shelf/backing (user-reported when picking a title up). The same title's
-  // aisle slot keeps its backstock as before.
-  //
-  // Nor do the DUPLICATE face-out copies a thin section gets stocked with
-  // (sectionFillCopies): those adjacent boxes already ARE that title's depth on
-  // this face, so restacking backstock behind every one of them multiplies the
-  // instance count on exactly the well-rated titles the fill ranks highest, for
-  // no visual gain. The first copy on a face keeps its stack; its repeats don't.
-  // Fixture slots keep the old per-slot behaviour (their stock is curated, not
-  // padded, and their ids don't share a unit face).
-  const copies = new Map<MovieSlot, number>();
-  const stackedOnFace = new Set<string>();
-  let totalExtra = 0;
+  const copies = new Map<MovieSlot, {count:number;pitch:number}>();
+  const seen = new Set<string>();
   scene.slotsByPosition.forEach(slot => {
-    let n = 0;
-    if (slot.unitIdx === BACK_WALL_UNIT_IDX) {
-      n = 0;
-    } else if (slot.source === 'fixture') {
-      n = extraCopiesCount(slot.movie);
-    } else {
-      const faceKey = `${slot.libraryIdx}_${slot.unitIdx}_${slot.side}_${slot.movie.id}`;
-      if (!stackedOnFace.has(faceKey)) {
-        stackedOnFace.add(faceKey);
-        n = extraCopiesCount(slot.movie);
-      }
-    }
-    if (n > 0) copies.set(slot, n);
-    totalExtra += n;
+    if (slot.unitIdx === BACK_WALL_UNIT_IDX || slot.noRentalCase || slot.movie.isSeries) return;
+    // Other fixtures publish face slots, not backstock depth. Their main
+    // rental copy remains; don't invent storage behind a shallow display.
+    if (slot.source === 'fixture' && !slot.fixtureId?.startsWith('game-section')) return;
+    const key = `${slot.libraryIdx}:${slot.unitIdx}:${slot.side}:${slot.movie.id}`;
+    if (seen.has(key)) return; seen.add(key);
+    const retail = aisleCaseDims(slot.movie), tilt = slot.restingRotX ?? LEAN_ANGLE;
+    const shelfY = slot.restingY - .03 - retail.height/2*Math.cos(tilt) - retail.depth/2*Math.abs(Math.sin(tilt));
+    const plan = packingFor(slot.movie,shelfY,tilt);
+    if (plan.count) copies.set(slot,{count:plan.count,pitch:plan.pitch});
   });
-
-  if (totalExtra === 0) {
-    if (scene.extraCopiesMesh) {
-      scene.extraCopiesMesh.visible = false;
-    }
-    return;
-  }
-
-  if (!scene.extraCopiesMesh || scene.extraCopiesCapacity !== totalExtra) {
-    if (scene.extraCopiesMesh) {
-      scene.scene.remove(scene.extraCopiesMesh);
-      const idx = scene.meshes.indexOf(scene.extraCopiesMesh);
-      if (idx !== -1) scene.meshes.splice(idx, 1);
-      scene.extraCopiesMesh.geometry.dispose();
-    }
-    const extraMesh = new THREE.InstancedMesh(
-      createClonedCaseGeometry(totalExtra, false, true),
-      getGlobalBackMaterials(),
-      totalExtra
-    );
-    extraMesh.castShadow = true;
-    extraMesh.receiveShadow = true;
-    extraMesh.frustumCulled = true;
-    scene.scene.add(extraMesh);
-    scene.meshes.push(extraMesh);
-    scene.extraCopiesMesh = extraMesh;
-    scene.extraCopiesCapacity = totalExtra;
-  }
-
-  const extraMesh = scene.extraCopiesMesh;
-  extraMesh.visible = true;
-
-  let extraIdx = 0;
-  scene.slotsByPosition.forEach(slot => {
-    const count = copies.get(slot) ?? 0;
-    if (count === 0) return;
-    const theta = slot.restingRotY;
-    const pitch = slot.restingRotX ?? LEAN_ANGLE;
-    // Same orientation as the box itself -- the local depth-offset vector below is
-    // rotated through this same quaternion so a copy's offset actually follows the
-    // box's own leaned depth axis instead of sliding back purely horizontally.
-    tempRotation.set(pitch, theta, 0, CASE_EULER_ORDER);
-    tempQuaternion.setFromEuler(tempRotation);
-    for (let n = 0; n < count; n++) {
-      if (slot.hidden) {
-        tempMatrix.makeScale(0, 0, 0);
-        extraMesh.setMatrixAt(extraIdx++, tempMatrix);
-        continue;
-      }
-      // Deterministic per-copy horizontal jitter -- STAGGER_OFFSET is the leftmost
-      // bound (matching the front case's peek) and jitter can push a copy slightly
-      // right of that, so stacked copies don't all peek out at the same spot.
-      const isDisplayStand = slot.source === 'fixture';
-      const midpoint = isDisplayStand ? 0 : -STAGGER_OFFSET;
-      const jitter = seededRandom01(`${slot.movie.id}_${n}`);
-      const backXLocal = midpoint + (jitter - 0.5) * COPY_X_JITTER_RANGE;
-      // Shift start position by CASE_DEPTH so they don't overlap the main box.
-      const backZLocal = -(CASE_DEPTH / 2) - CASE_DEPTH - EXTRA_COPY_DEPTH_STEP * n;
-      // Rotating by pitch+yaw (not just yaw, as before) keeps the copy's bottom
-      // edge flush with the shelf instead of sinking through it as it moves back --
-      // the same reasoning as leanHingeOffset(), applied to a depth offset instead
-      // of a height offset.
-      const rx = backXLocal * Math.cos(theta) + backZLocal * Math.sin(theta);
-      const rz = -backXLocal * Math.sin(theta) + backZLocal * Math.cos(theta);
-      tempPosition.set(slot.restingX + rx, slot.restingY, slot.restingZ + rz);
-      tempScale.set(1, 1, 1);
-      tempMatrix.compose(tempPosition, tempQuaternion, tempScale);
-      extraMesh.setMatrixAt(extraIdx++, tempMatrix);
-    }
-  });
-
-  extraMesh.instanceMatrix.needsUpdate = true;
-  extraMesh.boundingSphere = null; // matrices changed → recompute culling sphere on next cull
+  updateBackstock(scene,copies);
 }
 
 export function rebuildSSAOExclusionList(scene: StoreScene) {
@@ -1277,8 +1210,7 @@ export function rebuildMovieBoxes(scene: StoreScene) {
       const { height: boxHeight, liftDepth } = aisleCaseDims(movie);
       const localZ = scene.aisleColZ(unit, col, side);
       const fSign = unit.browseSign;
-      const copies = extraCopiesCount(movie);
-      const offset = 0.44 + copies * 0.07;
+      const offset = packingFor(movie, shelfY).offset;
       const localX = xCenter + (side === 'front' ? 1 : -1) * fSign * offset;
       const unitAngle = unit.yaw;
       const aisleWorld = scene.unitToWorld(unit, localX, localZ);
@@ -1406,30 +1338,20 @@ export function rebuildMovieBoxes(scene: StoreScene) {
 // moment a title finishes playing, before the store is shown again, so any
 // texture pop is invisible.
 //
-// Deliberately NOT a buildAllMovieBoxes() pass: that re-inits the whole
-// texture-array manager and rebuilds every shelf/back-wall/fixture slot in
-// the store for the sake of one fixture's ~66 slots — expensive, and risks
-// disturbing browse/selection state elsewhere. A fixture's slot KEYS
-// (side/shelf/col) are a fixed grid independent of which movie occupies
-// them, so a fresh getSlots() call always names the exact same key set the
-// original buildAllMovieBoxes() populated; this only ever needs to overwrite
-// which movie (and its texture index / spine colour) sits at an existing
-// key's existing (frontMesh, backMesh, instanceIdx) — never touching mesh
-// allocation, so nothing here can outgrow the capacity buildAllMovieBoxes()
-// sized fixtureMeshKey's submeshes to.
-//
-// One accepted trade-off from skipping mesh reallocation: a slot keeps
-// whichever regular/animated submesh (see fixtureMeshKey above) it was
-// ORIGINALLY assigned at boot, even if the newly-swapped-in movie's
-// animated-ness differs. That only exists in VHS medium (CASE_MEDIUM ===
-// 'vhs' && library === 'Animated Movies') and is purely cosmetic (case
-// artwork treatment) — a fine trade for a restock that's safe to run
-// mid-session instead of a full mesh reallocation.
+// Ordinary same-shape swaps reuse the allocated instances. A change between
+// sleeve and large molded packaging needs fresh batches and shelf anchors.
 export function restockSlottedFixtures(scene: StoreScene): void {
+  for (const fixture of scene.slottedFixtures) {
+    if (typeof fixture.refreshStock !== 'function') continue;
+    fixture.refreshStock();
+    if (fixture.getSlots().some(slot => {
+      const old = scene.slotsByPosition.get(slot.key)?.movie;
+      return old && isWhiteClamshell(old, CASE_MEDIUM) !== isWhiteClamshell(slot.movie, CASE_MEDIUM);
+    })) { scene.buildAllMovieBoxes(); return; }
+  }
   let touched = false;
   scene.slottedFixtures.forEach((fixture) => {
     if (typeof fixture.refreshStock !== 'function') return;
-    fixture.refreshStock();
     fixture.getSlots().forEach((fixtureSlot) => {
       const existing = scene.slotsByPosition.get(fixtureSlot.key);
       if (!existing || existing.movie.id === fixtureSlot.movie.id) return;
