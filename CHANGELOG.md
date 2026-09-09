@@ -5,6 +5,41 @@ All notable changes to Halcyon Video, generated from commit history by
 it on every version tag push. Deterministic and offline: no entry here was
 written by a model.
 
+## [v0.17.0] — 2026-09-09
+
+### CHANGELOG
+- V0.16.1
+
+### General
+- Keep automatic phone rendering within its pixel budget
+- Raise flat entrance pavilion and open the arcade on freestanding pillars
+- Fix touch cancellation, escape/back key recovery, and focused control guards
+- Keep fixed window frames above the brick footer
+- Fix streaming choice deduplication, backdrop metadata, checkout linkout, and snapshot fallback (Closes [#292](https://github.com/halcyon-video/halcyon-video/issues/292))
+- Surface sidecar errors and relay client crashes to container logs
+- Enforce store overview, fix date pin clear, and polish walk interaction
+- Wrap case paper continuously across the spine folds
+- Model reusable case families and preserve retail/rental fit (Closes [#246](https://github.com/halcyon-video/halcyon-video/issues/246), [#247](https://github.com/halcyon-video/halcyon-video/issues/247), [#248](https://github.com/halcyon-video/halcyon-video/issues/248), [#250](https://github.com/halcyon-video/halcyon-video/issues/250))
+- Allow runtime Jellyfin address defaults in published containers
+- Keep the receipt printer clear of the membership sign
+- Model continuous ceiling cornice and align ceiling borders (Closes [#228](https://github.com/halcyon-video/halcyon-video/issues/228))
+- Remove the rejected separate phone-store prototype
+- Prototype a lightweight 3D store for phones
+- Begin progressive entry for the hosted store
+- Start the idle tour timer when the store is ready
+- Fix streaming links in the 2D store
+- Widen the entrance pillar passage and flatten rear jambs
+- Thicken entrance push bars and their fitted returns
+- Fit black door bars to moving entrance frames
+- Refine gabled entrance glazing and freestanding masonry details
+- Restore freestanding entrance pillars and split window runs
+- Match facade masonry and entrance proportions
+- Refocus the README around the store experience
+- Add selectable modeled storefront facades
+- Model the countertop tape rewinder in Blender (Closes [#179](https://github.com/halcyon-video/halcyon-video/issues/179))
+- Model the customer VFD pole display in Blender (Closes [#177](https://github.com/halcyon-video/halcyon-video/issues/177))
+- Add modeled window awnings with live store branding
+
 ## [v0.16.1] — 2026-09-07
 
 ### CHANGELOG
