@@ -1,7 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { measureDisplayHz } from './display-hz';
-import { keyboardOwnedByControl, textEntryHasFocus } from './text-entry-focus';
+import { keyboardOwnedByControl, textEntryHasFocus, hasReachableFocusedControl } from './text-entry-focus';
 import { installDebugLog, debugLogPath } from './debug-log';
 
 // Before anything else that might fail: a packaged build has no devtools and
@@ -1029,7 +1029,8 @@ function updateBrowseHUDVisibility() {
  */
 function shortcutsAllowed(): boolean {
   return !!storeScene && !ui.isAnyOverlayOpen && !ui.isPlaybackActive
-    && !ui.isScreensaverActive && !storeScene.isNavOverlayOpen();
+    && !ui.isScreensaverActive && !storeScene.isNavOverlayOpen()
+    && !hasReachableFocusedControl();
 }
 
 /** True when nothing modal/immersive should be eating the hold shortcuts. */

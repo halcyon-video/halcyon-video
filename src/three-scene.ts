@@ -1508,6 +1508,7 @@ export class StoreScene {
     this.renderer.domElement.addEventListener('pointermove', this.onClaspPointerMove);
     window.addEventListener('keydown', this.onClaspKey, true);
     this.renderer.domElement.addEventListener('pointerup', this.onPointerUp);
+    this.renderer.domElement.addEventListener('pointercancel', this.onPointerCancel);
 
     // First-person walk mode keyboard and mouse listeners
     window.addEventListener('keydown', this.handleWalkKeyDown);
@@ -5699,6 +5700,10 @@ export class StoreScene {
     }
   };
 
+  private onPointerCancel = (_e: PointerEvent) => {
+    this.requestRender(); this.isDragging = false; this.pointerStartTime = 0; this.walkPressDragPx = 0;
+  };
+
   // How far (ft) a walk-mode click can reach. Roughly "a case you could lean
   // over and grab", not "any box across the store".
 
@@ -6060,6 +6065,7 @@ export class StoreScene {
     if (this.renderer) {
       this.renderer.domElement.removeEventListener('pointerdown', this.onPointerDown);
       this.renderer.domElement.removeEventListener('pointerup', this.onPointerUp);
+      this.renderer.domElement.removeEventListener('pointercancel', this.onPointerCancel);
       this.renderer.dispose();
       this.renderer.domElement.remove();
     }
@@ -6164,20 +6170,9 @@ export class StoreScene {
     this.requestRender();
     if (!this.isWalkAroundMode) return;
 
-    // FPS mouse-look off raw movement deltas, locked or not. movementX/Y is
-    // populated on every mousemove in all modern engines, so look works even
-    // when pointer lock was refused or is unsupported (some webviews) — the
-    // lock, requested on entering walk mode and on click, only adds
-    // edge-of-screen capture. The old code required the lock OR a held
-    // button, so on any lock failure bare mouse motion did nothing at all:
-    // the "fps mouse controls don't work" bug.
+    // FPS mouse-look off raw movement deltas, locked or not.
     const MOUSE_SENSITIVITY = 0.0025;
-    // Pointer-lock acquisition can emit one bogus giant movement event (the
-    // OS cursor's jump to the recapture point reported as mouse motion —
-    // long-standing Chromium behavior). Letting it through both whipped the
-    // camera to a random heading on the click that engaged the lock AND
-    // blew the tap-vs-drag budget, swallowing that click. No real mouse
-    // move approaches 200px in a single 8ms event, so drop the outlier.
+    // Drop pointer-lock jump burst outlier (>200px)
     const burst = Math.abs(e.movementX) + Math.abs(e.movementY);
     if (burst === 0 || burst > 200) return;
     this.yaw -= e.movementX * MOUSE_SENSITIVITY;

@@ -30,6 +30,7 @@ import { activeStoreFormat } from './store-format';
 import { STORE_CENTER_X, FRONT_GLASS_Z, FLOOR_FIXTURE_MAX_Z } from './store-layout';
 import { fadeToBlack, fadeFromBlack } from './back-room';
 import { isWelcomeActive, dismissWelcome } from './store-welcome';
+import { hasReachableFocusedControl } from './text-entry-focus';
 
 export const ATTRACT_SETTING_KEY = 'bb_attract_mode';
 /** Idle time before the tour starts — long enough to read the welcome card. */
@@ -238,7 +239,7 @@ export function attractTourLength(): number {
 export function startAttractTour(): boolean {
   const s = scene;
   if (active || !s) return false;
-  if (s.mode === 'backroom' || s.mode === 'checkout' || s.mode === 'person-endcap') return false;
+  if (s.mode === 'backroom' || s.mode === 'checkout' || s.mode === 'person-endcap' || hasReachableFocusedControl()) return false;
   legs = buildTour(s);
   totalMs = legs.reduce((sum, l) => sum + l.ms + l.holdMs, 0);
   const first = poseAt(0);
@@ -340,7 +341,7 @@ export function installAttractMode(s: StoreScene, isBlocked: () => boolean): voi
     const lastActivity = Math.max(installedAt, getLastUserActivity());
     const idleFor = performance.now() - lastActivity;
     if (idleFor < (forced === true ? FORCED_IDLE_MS : ATTRACT_IDLE_MS)) return;
-    if (document.visibilityState === 'hidden' || blocked()) return;
+    if (document.visibilityState === 'hidden' || blocked() || hasReachableFocusedControl()) return;
     startAttractTour();
   }, POLL_MS);
 }

@@ -269,6 +269,15 @@ export function initFlatNavigation() {
         return;
       }
 
+      if (e.key === 'Backspace' || e.key === 'Escape' || e.key === 'q' || e.key === 'Q') {
+        const menuBtn = document.querySelector('.flat-menu-btn') as HTMLElement;
+        if (menuBtn) {
+          setButtonFocus(menuBtn);
+          e.preventDefault();
+          return;
+        }
+      }
+
       let direction: 'ArrowLeft' | 'ArrowRight' | 'ArrowUp' | 'ArrowDown' | null = null;
       if (e.key === 'ArrowLeft') direction = 'ArrowLeft';
       else if (e.key === 'ArrowRight') direction = 'ArrowRight';
@@ -294,7 +303,7 @@ export function initFlatNavigation() {
     // ─── Row Browse Mode (Cases Nav) ───
     const focused = currentFocus?.classList.contains('case') ? currentFocus : null;
 
-    if (e.key === 'Backspace') {
+    if (e.key === 'Backspace' || e.key === 'Escape' || e.key === 'q' || e.key === 'Q') {
       const backBtn = document.querySelector('.flat-back-btn') as HTMLElement;
       if (backBtn) {
         backBtn.click();

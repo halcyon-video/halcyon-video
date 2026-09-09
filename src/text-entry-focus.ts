@@ -71,11 +71,21 @@ function isReachable(el: HTMLElement): boolean {
  * predicates.
  */
 export function healStrandedFocus(): boolean {
+  if (typeof document === 'undefined') return false;
   const el = document.activeElement;
   if (!isKeyboardControl(el)) return false;
   if (isReachable(el)) return false;
   el.blur();
   return true;
+}
+
+/**
+ * True when a visible form control currently has focus, without altering focus state.
+ */
+export function hasReachableFocusedControl(): boolean {
+  if (typeof document === 'undefined') return false;
+  const el = document.activeElement;
+  return isKeyboardControl(el) && isReachable(el);
 }
 
 /**
@@ -87,6 +97,7 @@ export function healStrandedFocus(): boolean {
  * dialog, the player's own shortcuts).
  */
 export function keyboardOwnedByControl(): boolean {
+  if (typeof document === 'undefined') return false;
   const el = document.activeElement;
   if (!isKeyboardControl(el)) return false;
   if (isReachable(el)) return true;
@@ -100,6 +111,7 @@ export function keyboardOwnedByControl(): boolean {
  * (F8) still works while one is focused.
  */
 export function textEntryHasFocus(): boolean {
+  if (typeof document === 'undefined') return false;
   const el = document.activeElement;
   if (!isTextEntry(el)) return false;
   if (isReachable(el)) return true;
@@ -113,7 +125,7 @@ export function textEntryHasFocus(): boolean {
  * first place, so the heal path stays a safety net rather than the mechanism.
  */
 export function blurFocusWithin(root: Element | null | undefined): void {
-  if (!root) return;
+  if (!root || typeof document === 'undefined') return;
   const el = document.activeElement as HTMLElement | null;
   if (el && el !== document.body && root.contains(el)) el.blur();
 }
