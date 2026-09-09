@@ -1,6 +1,5 @@
 import * as THREE from 'three';
 import { isPublicDemo } from './demo-mode';
-import { isTouchInputActive } from './store-touch';
 import { Movie, JellyfinLibrary, Episode } from './jellyfin';
 import { assetUrl } from './asset-url';
 import {
@@ -122,7 +121,7 @@ import { GondolaMaterials } from './shelving';
 import { StoreClerk } from './clerk';
 import { ClerkNavGrid, NavRect } from './clerk-nav';
 import { setMaxAnisotropy, setCheapMaterials } from './canvas-textures';
-import { readCalibratedQuality } from './quality-calibrate';
+import { readCalibratedQuality, usesPhoneQualityDefault } from './quality-calibrate';
 import {
   SIDE_RIBBON_FRONT_Z,
   SIDE_RIBBON_CLEARANCE,
@@ -1901,7 +1900,8 @@ export class StoreScene {
     // calibration and calibration-failure fallback.
     const explicitQuality = localStorage.getItem('bb_quality');
     const calibrated = !explicitQuality && !softwareGL ? readCalibratedQuality(gpuName) : null;
-    const phoneEntry = isPublicDemo && isTouchInputActive() && Math.min(width, height) < 700;
+    const phoneEntry = usesPhoneQualityDefault();
+    const phoneBudget = phoneEntry && !explicitQuality;
     const automaticQuality = calibrated?.tier || (softwareGL ? 'low' : integratedGL ? 'medium' : 'high');
     // A phone viewport can receive a desktop-GPU calibration (or an overly
     // optimistic mobile result). Keep its first visit within the existing
@@ -2002,13 +2002,15 @@ export class StoreScene {
     // the store no longer shreds the ceiling grid / far shelves into jaggies.
     // Idle power is untouched (a still store renders zero frames). Instant A/B
     // off-switch, no rebuild: localStorage.bb_motion_sharp = "0".
-    this.motionSharpDisabled = localStorage.getItem('bb_motion_sharp') === '0';
+    // Automatic phone quality keeps its pixel cap during swipes and settling.
+    // Native-DPR refinement otherwise multiplies this budget by up to eight.
+    this.motionSharpDisabled = phoneBudget || localStorage.getItem('bb_motion_sharp') === '0';
     // Settle supersample factor (see settleScale). Software GL never pays it —
     // one full-res SwiftShader composite is already seconds long — and the
     // 'low' tier is a "this machine is struggling" signal, so it opts out too.
     const _settleRaw = localStorage.getItem('bb_settle_ss');
     const _settleFactor = _settleRaw === null ? StoreScene.SETTLE_SS_DEFAULT : Number(_settleRaw);
-    this.settleSsFactor = (this.softwareGL || effectiveQuality === 'low' ||
+    this.settleSsFactor = (phoneBudget || this.softwareGL || effectiveQuality === 'low' ||
                            !Number.isFinite(_settleFactor) || _settleFactor < 1)
       ? 0 : _settleFactor;
     // Motion supersample (see motionScale). Same opt-outs as the settle
@@ -2016,7 +2018,7 @@ export class StoreScene {
     // must not take it. Off-switch, no rebuild: bb_motion_ss = "0".
     const _motionRaw = localStorage.getItem('bb_motion_ss');
     const _motionFactor = _motionRaw === null ? StoreScene.MOTION_SS_DEFAULT : Number(_motionRaw);
-    this.motionSsFactor = (this.softwareGL || effectiveQuality === 'low' ||
+    this.motionSsFactor = (phoneBudget || this.softwareGL || effectiveQuality === 'low' ||
                            !Number.isFinite(_motionFactor) || _motionFactor < 1)
       ? 0 : _motionFactor;
     // Anisotropic-filtering budget for the procedural shell textures (carpet,

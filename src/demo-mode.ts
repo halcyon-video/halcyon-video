@@ -8,9 +8,11 @@ export const isDemoMode: boolean =
   (typeof import.meta.env !== 'undefined' && import.meta.env.VITE_DEMO === '1') ||
   (typeof location !== 'undefined' && new URLSearchParams(location.search).get('demo') === '1');
 
-// Synthetic titles are an explicit development fixture. The hosted root
+// Synthetic titles are an explicit local development fixture. Hosted builds
+// always use real streaming stock, including links carrying ?demo=1. The root
 // stocks the real bundled streaming catalog without generating fake covers.
 export const useSyntheticDemoStock =
+  !(typeof import.meta.env !== 'undefined' && import.meta.env.VITE_DEMO === '1') &&
   typeof location !== 'undefined' && new URLSearchParams(location.search).get('demo') === '1';
 
 /** The hosted product path, distinct from the explicit synthetic fixture. */

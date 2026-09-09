@@ -116,6 +116,14 @@ const SUPERSAMPLE_MAX_MS = 35; // subset of 'high' with enough headroom to rende
 const MEDIUM_MAX_MS = 160;
 const BOUNDARY_BAND = 0.85; // within 15% of a threshold counts as "near" it for the integratedGL prior
 
+/** Phones start conservatively without a blocking throwaway GPU benchmark. */
+export function usesPhoneQualityDefault(): boolean {
+  return typeof window !== 'undefined' && typeof window.matchMedia === 'function' &&
+    window.matchMedia('(pointer: coarse)').matches &&
+    window.matchMedia('(hover: none)').matches &&
+    Math.min(window.innerWidth, window.innerHeight) < 700;
+}
+
 function computeSig(gpuName: string): string {
   const dpr = typeof window !== 'undefined' ? (window.devicePixelRatio || 1) : 1;
   const w = typeof screen !== 'undefined' ? screen.width : 0;
@@ -135,6 +143,12 @@ function isValidTier(v: string | null): v is QualityTier {
  * regex guess.
  */
 export function readCalibratedQuality(gpuName: string): CalibratedQuality | null {
+  if (usesPhoneQualityDefault()) {
+    const measuredLow = typeof localStorage !== 'undefined' &&
+      localStorage.getItem('bb_quality_auto') === 'low' &&
+      localStorage.getItem('bb_quality_sig') === computeSig(gpuName);
+    return { tier: measuredLow ? 'low' : 'medium', supersample: false };
+  }
   if (typeof localStorage === 'undefined') return null;
   const tier = localStorage.getItem('bb_quality_auto');
   if (!isValidTier(tier)) return null;
@@ -470,6 +484,7 @@ export async function calibrateQualityIfNeeded(): Promise<QualityTier | null> {
   const explicit = localStorage.getItem('bb_quality');
   if (explicit) return isValidTier(explicit) ? explicit : null; // explicit override always wins, skips calibration entirely
   if (isHarnessActive()) return null;
+  if (usesPhoneQualityDefault()) return 'medium';
 
   try {
     const probe = openProbe();
