@@ -1,38 +1,8 @@
-// Touch controls for the 3D store — issue #126.
-//
-// The 3D store is a picture, not a place, on a finger: every control in
-// InputManager (src/input.ts) is a key, and a phone/tablet visitor who
-// reaches it — via ?nogate=1, a previously-answered "3D store" device-gate
-// choice, or the Settings render-mode switch — has no way to move, look,
-// select or go back. This module is that missing input layer.
-//
-// It does NOT synthesize keyboard events. main.ts already builds one
-// `InputCallbacks` object and hands it to `new InputManager(...)` with a
-// comment explaining exactly why: "Stored as a named object so the virtual
-// remote can call them directly instead of relying on fragile synthetic
-// KeyboardEvent dispatch." This module is that direct caller — every gesture
-// below calls straight into the same callback functions a keypress would, so
-// it rides the identical overlay-ladder -> StoreScene chain every other
-// input source does (verify_nav_states.mjs's coverage of that chain is
-// unaffected by anything here).
-//
-// Scope, deliberately: tapping a specific case already works before this
-// file exists — three-scene.ts's onPointerUp/handlePointerClick raycasts on
-// any quick low-movement PointerEvent, and PointerEvent fires for touch just
-// as it does for mouse. What was actually missing is MOVEMENT (there is no
-// touch equivalent of an arrow key), a way to CONFIRM once movement is
-// impossible to express as a tap (inspect mode's hero case is a raycast
-// no-op — see three-scene.ts line ~5837), and a way to BACK OUT (nothing to
-// raycast against). This file adds exactly those three: swipe-to-browse
-// (onLeft/onRight/onUp/onDown), a persistent OK button (onEnter), and a
-// persistent BACK button (onBack) — sized to the "walk an aisle, select a
-// case, inspect it, flip it, get back out" bar in full, not the wider
-// tap-a-specific-case / pinch-to-inspect sketch the issue also floats.
-// First-person walk-around mode is out of scope here: it is a keyboard-only
-// surface today (WASD held-key state read straight off three-scene.ts, not
-// through InputCallbacks at all) and none of the Done-when criteria need it;
-// onLeft/onRight/onUp/onDown/onEnter all already no-op while it's active.
+// Touch controls share the host overlay callbacks. Hosted mobile browsing
+// uses direct camera manipulation; other touch installs retain arrow swipes.
 import type { InputCallbacks } from './input';
+import type { StoreScene } from './three-scene';
+import { beginMobileDrag, mobileStoreActive } from './mobile-store';
 
 /**
  * A finger with no hover is the only signal this acts on. Unlike the
@@ -79,7 +49,7 @@ export function touchMovieHUDText(
   comingSoon: boolean,
   isRequestedDiscovery: boolean,
 ): string | null {
-  if (!isInspecting) return 'SWIPE TO BROWSE  •  TAP OK TO EXAMINE';
+  if (!isInspecting) return mobileStoreActive() ? 'DRAG TO BROWSE  •  TAP A MOVIE' : 'SWIPE TO BROWSE  •  TAP OK TO EXAMINE';
   if (game) return 'SWIPE TO FLIP  •  TAP OK TO RENT & PLAY';
   if (discovery) return isRequestedDiscovery ? 'ALREADY REQUESTED' : 'NOT IN STOCK — TAP OK TO ORDER OR PASS';
   if (collectionGap) return isRequestedDiscovery ? 'ON ORDER — COMING SOON' : 'NOT IN STOCK — TAP OK TO ORDER OR PASS';
@@ -97,7 +67,7 @@ export function touchHUDText(mode: string, canHoldToCheckout: boolean, carryMode
     case 'library-select':
       return 'TAP TO BROWSE THIS SECTION';
     case 'overview':
-      return 'SWIPE TO BROWSE  •  TAP OK TO GO';
+      return mobileStoreActive() ? 'DRAG TO LOOK  •  TAP A SHELF' : 'SWIPE TO BROWSE  •  TAP OK TO GO';
     case 'genre-select':
       return '';
     case 'browse':
@@ -208,7 +178,7 @@ function bind(el: HTMLElement, fire: () => void): void {
  * exactly this — keyboard/mouse/gamepad all reach it privately through their
  * own listeners, and touch has no other way in.
  */
-export function installStoreTouchControls(callbacks: InputCallbacks, poke: () => void): void {
+export function installStoreTouchControls(callbacks: InputCallbacks, poke: () => void, getScene?: () => StoreScene | null): void {
   if (!isTouchInputActive()) return;
 
   const style = document.createElement('style');
@@ -239,13 +209,8 @@ export function installStoreTouchControls(callbacks: InputCallbacks, poke: () =>
   (document.getElementById('hud-overlay') ?? document.body).appendChild(root);
 
   // ── Swipe to browse ───────────────────────────────────────────────────
-  // One discrete step per completed swipe (not a continuous drag-to-scroll):
-  // the browse cursor is a single highlighted case, exactly like a keyboard
-  // arrow press, so one swipe = one press. Direction matches the D-pad
-  // convention a keyboard/gamepad already uses: swipe the way you'd press.
-  // In 'inspect' mode this same onLeft/onRight already flips the case
-  // (store-nav.ts's moveLeftInternal/moveRightInternal) — "swipe to flip"
-  // falls out of reusing the one mechanism rather than needing a second.
+  // Direct hosted gestures own the camera while the finger is down.
+  // Inspection and local touch controls reuse the existing callbacks.
   const stage = document.getElementById('canvas-container');
   if (stage) {
     // touch-action: none hands the browser's own pan/pinch/double-tap-zoom
@@ -253,15 +218,26 @@ export function installStoreTouchControls(callbacks: InputCallbacks, poke: () =>
     // out of the page's way.
     stage.style.touchAction = 'none';
     let startX = 0, startY = 0, tracking = false;
+    let drag: ReturnType<typeof beginMobileDrag> = null;
+    let moved = false;
     stage.addEventListener('touchstart', (e) => {
-      if (e.touches.length !== 1) { tracking = false; return; }
+      if (e.touches.length !== 1) { tracking = false; drag?.end(); drag = null; return; }
       startX = e.touches[0].clientX;
       startY = e.touches[0].clientY;
-      tracking = true;
+      tracking = true; moved = false;
+      const scene = getScene?.();
+      drag = scene ? beginMobileDrag(scene, startX, startY) : null;
+    }, { passive: true });
+    stage.addEventListener('touchmove', (e) => {
+      if (!tracking || !drag || e.touches.length !== 1) return;
+      const t = e.touches[0];
+      if (Math.hypot(t.clientX - startX, t.clientY - startY) > 8) moved = true;
+      if (moved) { poke(); drag.move(t.clientX, t.clientY); }
     }, { passive: true });
     stage.addEventListener('touchend', (e) => {
       if (!tracking) return;
       tracking = false;
+      if (drag) { if (moved) drag.end(); drag = null; return; }
       const t = e.changedTouches[0];
       if (!t) return;
       const dx = t.clientX - startX;
@@ -277,6 +253,6 @@ export function installStoreTouchControls(callbacks: InputCallbacks, poke: () =>
         if (dy < 0) callbacks.onUp(); else callbacks.onDown();
       }
     }, { passive: true });
-    stage.addEventListener('touchcancel', () => { tracking = false; }, { passive: true });
+    stage.addEventListener('touchcancel', () => { tracking = false; drag?.end(); drag = null; }, { passive: true });
   }
 }

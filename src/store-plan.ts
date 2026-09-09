@@ -88,7 +88,9 @@ export class StorePlan {
   // blocking this otherwise-pure module from plain-Node unit testing (see
   // tests/store-plan.test.ts, tests/clerk-nav.test.ts for the same pattern).
   // Behavior is identical.
-  constructor(libraries: JellyfinLibrary[]) {
+  private fillStreamingShelves: boolean;
+  constructor(libraries: JellyfinLibrary[], fillStreamingShelves = false) {
+    this.fillStreamingShelves = fillStreamingShelves;
     this.libraries = libraries;
   }
 
@@ -311,7 +313,10 @@ export class StorePlan {
         // title count that isn't a whole number of shelf columns leaves the
         // bottom tiers of the trailing columns as bare board. Top it up with
         // face-out copies of the run's own titles (never new ones).
-        const colFill = sectionFillCopies(movies, columnFillCount(movies.length));
+        const fill = this.fillStreamingShelves && lib.streaming && movies.length > 0
+          ? Math.ceil(movies.length / UNIT_CAPACITY) * UNIT_CAPACITY - movies.length
+          : columnFillCount(movies.length);
+        const colFill = sectionFillCopies(movies, fill);
         return {
           entries: [...movies, ...colFill] as (Movie | null)[],
           sectionLabels: new Map<string, string>(),

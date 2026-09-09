@@ -1,3 +1,4 @@
+import { mobileStoreActive, mobileStoreTap, mobileArtworkTick } from './mobile-store';
 import * as THREE from 'three';
 import { isPublicDemo } from './demo-mode';
 import { Movie, JellyfinLibrary, Episode } from './jellyfin';
@@ -1188,7 +1189,7 @@ export class StoreScene {
     // Plan the whole floor before anything derives from it: category shelf order
     // per library, unit placement in hatched runs for the active arrangement, and
     // the room bounds (backWallZ, aisle pivot). See store-plan.ts.
-    this.plan = new StorePlan(this.libraries);
+    this.plan = new StorePlan(this.libraries, mobileStoreActive());
     this.plan.plan();
 
     // Derive the New Releases wall layout from the store width. The back-wall
@@ -4549,6 +4550,7 @@ export class StoreScene {
       this.camera.position.copy(this.currentCameraPos);
       this.camera.lookAt(this.currentLookAt);
     }
+    mobileArtworkTick(this, time);
     if (this.headlight) {
       this._headlightOffset.set(2.0, 1.5, 0);
       this._headlightOffset.applyQuaternion(this.camera.quaternion);
@@ -5125,7 +5127,7 @@ export class StoreScene {
     let movingSlots = 0;
     for (const slot of this.dirtySlots) {
       if (this.launchAnim && slot === this.launchAnim.slot) continue;
-      const isSelected = (slot.key === activeKey);
+      const isSelected = (slot.key === activeKey) && !(mobileStoreActive() && this.mode === 'browse');
       const isBackSide = slot.side === 'back';
       const isBackWall = (slot.unitIdx === BACK_WALL_UNIT_IDX);
       // Series titles render as one chunky season boxset: the shared case
@@ -5697,7 +5699,7 @@ export class StoreScene {
     const dist = Math.sqrt(dx * dx + dy * dy);
 
     // Only handle quick taps/clicks without large movements (dragging/swiping)
-    if (elapsed < 300 && dist < 10) {
+    if ((mobileStoreActive() || elapsed < 300) && dist < 10) {
       this.handlePointerClick(e);
     }
   };
@@ -5729,6 +5731,7 @@ export class StoreScene {
   public getSlotFromIntersection(object: THREE.Object3D, instanceId: number): MovieSlot | null { return walk.getSlotFromIntersection(this, object, instanceId); }
 
   private handlePointerClick(e: PointerEvent) {
+    if (mobileStoreTap(this, e)) return;
     // T21: at the entrance overview a tap/click acts like Enter on the focused
     // cursor (input is arrows/enter-first; the pointer is just a convenience).
     if (this.mode === 'overview') {

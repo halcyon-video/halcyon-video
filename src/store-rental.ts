@@ -1,3 +1,4 @@
+import { mobileStoreActive } from './mobile-store';
 // Rental mode & the T23 back room — extracted from StoreScene
 // (three-scene.ts keeps one-line delegating stubs): entering/leaving the
 // rented-tapes back room, the rental lockout clock and unlock scheduling,
@@ -257,6 +258,7 @@ export function backRoomCloseInspect(scene: StoreScene): void {
 }
 
 export function loadAllArtworkForActiveLibrary(scene: StoreScene) {
+  if (mobileStoreActive()) { scene.updateLOD(); return; }
   const activeLibIdx = scene.selectedLibraryIdx;
   const isNewReleases = scene.selectedLibraryIdx === scene.libraries.length || scene.isBrowsingNewReleasesDirectly;
   const isDisplay = scene.selectedLibraryIdx > scene.libraries.length;
