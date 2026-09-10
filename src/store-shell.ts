@@ -19,6 +19,7 @@ import { liveMirrorsAllowed, reflectorTargetSize } from './store-mirrors';
 import { SlottedFixture } from './fixtures';
 import { AmbientTvs } from './ambient-tvs';
 import { EntranceCheckout } from './entrance';
+import { installHalloween } from './entrance/halloween';
 import { buildWindowBays } from './entrance/windows';
 import { windowBayLayout } from './storefront-window-layout';
 import { facadeDimensions, facadeStyle } from './storefront-architecture';
@@ -1504,6 +1505,7 @@ export function buildStore(scene: StoreScene) {
   frontWindow.position.set(STORE_CENTER_X, floorY, FRONT_GLASS_Z);
   frontWindow.rotation.y = Math.PI; // Facing inwards
   scene.scene.add(frontWindow);
+  installHalloween(frontWindow, frontPanes, () => { scene.renderer.shadowMap.needsUpdate = true; scene.queueStructuralShadowRefresh(); scene.requestRender(); });
 
   // Interior wall band above the front glazing, flanking the vestibule
   // span (the vestibule's own transom glazing runs to the ceiling there;
