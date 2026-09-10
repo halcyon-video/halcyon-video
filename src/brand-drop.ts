@@ -41,6 +41,9 @@
 // with what the user saw in their editor.
 import type { LogoArtLayer, LogoSpec } from './logo-spec';
 import type { BrandPackManifest } from './brand-pack';
+import {
+  loopArea, nestLoops, orientLoop, simplifyLoop, traceAlphaContours,
+} from './alpha-trace.ts';
 
 /** The folder candidates, relative to public/user-assets/. */
 export const BRAND_DROP_DIRS = ['brand', 'BRAND', 'Brand'] as const;
@@ -235,6 +238,49 @@ function sampleSvgShapes(svgText: string): SampledShape[] {
  * or art too sparse to read). Marching squares over a downsampled alpha grid,
  * then Douglas-Peucker to a manageable point count.
  */
+export function tracedAlphaPathD(
+  alpha: Float32Array, w: number, h: number, sourceScale = 1,
+): string | null {
+  if (w < 2 || h < 2 || alpha.length !== w * h) return null;
+  // A transparent apron closes marks that touch the source image's edge.
+  const gw = w + 2, gh = h + 2;
+  const field = new Float32Array(gw * gh);
+  let opaque = 0;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const a = alpha[y * w + x];
+      field[(y + 1) * gw + x + 1] = a;
+      if (a > 128) opaque++;
+    }
+  }
+  const cover = opaque / (w * h);
+  if (cover > 0.97 || cover < 0.01) return null;
+
+  const loops = traceAlphaContours(field, gw, gh, 128)
+    .map((loop) => simplifyLoop(loop, 0.6))
+    .filter((loop) => loopArea(loop) > 4);
+  if (!loops.length) return null;
+
+  // Preserve every disconnected piece of the mark, with counters wound
+  // opposite their containing outline for Canvas's nonzero fill rule. The old
+  // boundary walk stopped after the first opaque component, which turned a
+  // wordmark into one stray letter on the storefront.
+  let d = '';
+  const append = (loop: { x: number; y: number }[]) => {
+    loop.forEach((p, i) => {
+      const x = (p.x - 1) * sourceScale;
+      const y = (p.y - 1) * sourceScale;
+      d += `${i === 0 ? 'M' : 'L'}${x.toFixed(1)} ${y.toFixed(1)}`;
+    });
+    d += 'Z';
+  };
+  for (const { outer, holes } of nestLoops(loops)) {
+    append(orientLoop(outer, 1));
+    for (const hole of holes) append(orientLoop(hole, -1));
+  }
+  return d || null;
+}
+
 function traceAlphaContour(img: HTMLImageElement): { d: string; w: number; h: number } | null {
   if (typeof document === 'undefined') return null;
   const long = Math.max(img.width, img.height);
@@ -251,86 +297,10 @@ function traceAlphaContour(img: HTMLImageElement): { d: string; w: number; h: nu
   let data: Uint8ClampedArray;
   try { data = ctx.getImageData(0, 0, w, h).data; } catch { return null; }
 
-  // 1-cell transparent apron so a shape touching the edge still closes.
-  const gw = w + 2, gh = h + 2;
-  const on = new Uint8Array(gw * gh);
-  let opaque = 0;
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      if (data[(y * w + x) * 4 + 3] > 128) { on[(y + 1) * gw + (x + 1)] = 1; opaque++; }
-    }
-  }
-  const cover = opaque / (w * h);
-  // Effectively opaque = no silhouette in the file (it's a rectangle), and
-  // near-empty = nothing we could honestly cut a sign to.
-  if (cover > 0.97 || cover < 0.01) return null;
-
-  // Marching squares on the cell corners: walk the boundary of the largest
-  // opaque blob. Start at the topmost-leftmost boundary cell.
-  let sx = -1, sy = -1;
-  outer: for (let y = 1; y < gh && sy < 0; y++) {
-    for (let x = 1; x < gw; x++) {
-      if (on[y * gw + x]) { sx = x; sy = y; break outer; }
-    }
-  }
-  if (sx < 0) return null;
-  const at = (x: number, y: number) => (x < 0 || y < 0 || x >= gw || y >= gh ? 0 : on[y * gw + x]);
-  const pts: { x: number; y: number }[] = [];
-  let cx = sx, cy = sy;
-  let dx = 0, dy = 0;
-  const MAX_STEPS = gw * gh * 4;
-  let closed = false;
-  for (let step = 0; step < MAX_STEPS; step++) {
-    // Case index from the 2x2 cell square whose bottom-right cell is (cx,cy).
-    const idx = at(cx - 1, cy - 1) | (at(cx, cy - 1) << 1) | (at(cx - 1, cy) << 2) | (at(cx, cy) << 3);
-    const pdx = dx, pdy = dy;
-    switch (idx) {
-      case 1: case 5: case 13: dx = 0; dy = -1; break;   // up
-      case 2: case 3: case 7: dx = 1; dy = 0; break;     // right
-      case 4: case 12: case 14: dx = -1; dy = 0; break;  // left
-      case 8: case 10: case 11: dx = 0; dy = 1; break;   // down
-      // Saddles: resolve by where we came from, so the walk stays on one loop
-      // instead of hopping to the diagonal neighbour's boundary.
-      case 6: dx = pdy === -1 ? -1 : 1; dy = 0; break;
-      case 9: dy = pdx === 1 ? -1 : 1; dx = 0; break;
-      default: return null; // 0 or 15: not on a boundary — bad start
-    }
-    pts.push({ x: cx - 1, y: cy - 1 });
-    cx += dx; cy += dy;
-    if (cx === sx && cy === sy) { closed = true; break; }
-  }
-  if (!closed || pts.length < 8) return null;
-
-  // Douglas-Peucker down to a workable outline (the flattener and the 3D
-  // extruder both prefer a few hundred points to a few thousand).
-  const simplified = simplify(pts, Math.max(0.6, long * 0.0015 * s));
-  if (simplified.length < 6) return null;
-  const scale = 1 / s; // back to the source image's own pixel coordinates
-  let d = '';
-  simplified.forEach((p, i) => {
-    d += `${i === 0 ? 'M' : 'L'}${(p.x * scale).toFixed(1)} ${(p.y * scale).toFixed(1)}`;
-  });
-  return { d: d + 'Z', w: img.width, h: img.height };
-}
-
-function simplify(pts: { x: number; y: number }[], tol: number): { x: number; y: number }[] {
-  if (pts.length < 3) return pts;
-  const keep = new Uint8Array(pts.length);
-  keep[0] = keep[pts.length - 1] = 1;
-  const stack: [number, number][] = [[0, pts.length - 1]];
-  while (stack.length) {
-    const [i0, i1] = stack.pop()!;
-    const a = pts[i0], b = pts[i1];
-    const ax = b.x - a.x, ay = b.y - a.y;
-    const len = Math.hypot(ax, ay) || 1;
-    let far = -1, farD = tol;
-    for (let i = i0 + 1; i < i1; i++) {
-      const d = Math.abs((pts[i].x - a.x) * ay - (pts[i].y - a.y) * ax) / len;
-      if (d > farD) { farD = d; far = i; }
-    }
-    if (far > 0) { keep[far] = 1; stack.push([i0, far], [far, i1]); }
-  }
-  return pts.filter((_, i) => keep[i]);
+  const alpha = new Float32Array(w * h);
+  for (let i = 0; i < alpha.length; i++) alpha[i] = data[i * 4 + 3];
+  const d = tracedAlphaPathD(alpha, w, h, 1 / s);
+  return d ? { d, w: img.width, h: img.height } : null;
 }
 
 /** Dominant + highest-contrast colours of an image's opaque pixels. */
