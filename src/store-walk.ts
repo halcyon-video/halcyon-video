@@ -10,6 +10,7 @@ import { recordInspect } from './clerk-recommend';
 import { retailAudio } from './audio';
 import { takeTapeIntoCarry } from './store-checkout';
 import type { StoreScene } from './three-scene';
+import { showClerkToast } from './carried-tapes';
 
 // Max reach (ft) for walk-mode click interactions — beyond this a raycast
 // hit is out of arm's-plus-a-step range and the click is ignored.
@@ -139,6 +140,11 @@ export function walkInspectSlot(scene: StoreScene, slot: MovieSlot) {
 // see store-vr.ts) never ends here. The player physically carries the case
 // to the checkout counter and confirms there.
 export function walkTakeSlot(scene: StoreScene, slot: MovieSlot): void {
+  if (slot.movie.streaming) {
+    retailAudio.playDenyBuzz();
+    showClerkToast(`"${slot.movie.title}" is on streaming — inspect it to open the service.`);
+    return;
+  }
   if (!takeTapeIntoCarry(scene, slot.movie, slot)) return;
   recordInspect(slot.movie);
   scene.onConsoleLog(`[System] Took "${slot.movie.title}" — carry it to the counter to check out.`, "system");
