@@ -2658,6 +2658,7 @@ async function initializeStoreScene(preservePosterCache = false) {
         void handleGameLaunch(movie, false);
       } else if (movie.streaming) {
         handleStreamingLaunch(movie);
+        scene.returnToEntrance();
       } else {
         void launchVideoPlayback(movie);
       }
