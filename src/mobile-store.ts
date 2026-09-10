@@ -1,13 +1,18 @@
 // Direct manipulation for the hosted touch store. Desktop input stays in its
 // existing keyboard/mouse state machine.
 import * as THREE from 'three';
-import { isPublicDemo } from './demo-mode';
-import { OVERVIEW_POS } from './scene-shared';
-import { BACK_WALL_UNIT_IDX, type MovieSlot } from './store-layout';
-import type { StoreScene } from './three-scene';
+import { isPublicDemo } from './demo-mode.ts';
+import { OVERVIEW_POS } from './scene-shared.ts';
+import { BACK_WALL_UNIT_IDX, BROWSE_WINDOW_SIZE, type MovieSlot } from './store-layout.ts';
+import type { StoreScene } from './three-scene.ts';
 
 let coarse: MediaQueryList | undefined, noHover: MediaQueryList | undefined;
+let testOverride: boolean | null = null;
+export function _setMobileStoreActiveForTesting(active: boolean | null): void {
+  testOverride = active;
+}
 export function mobileStoreActive(): boolean {
+  if (testOverride !== null) return testOverride;
   if (!isPublicDemo || typeof matchMedia !== 'function') return false;
   coarse ??= matchMedia('(pointer: coarse)');
   noHover ??= matchMedia('(hover: none)');
@@ -24,6 +29,15 @@ function selectSlot(scene: StoreScene, slot: MovieSlot): void {
   scene.selectedCol = slot.col;
   scene.isBrowsingNewReleasesDirectly = slot.unitIdx === BACK_WALL_UNIT_IDX;
   scene.updateColsCount();
+  const windowSize = BROWSE_WINDOW_SIZE;
+  if (scene.colsCount <= windowSize) {
+    scene.cameraWindowMinCol = 0;
+  } else {
+    scene.cameraWindowMinCol = Math.max(
+      0,
+      Math.min(scene.selectedCol - Math.floor(windowSize / 2), scene.colsCount - windowSize),
+    );
+  }
 }
 
 const dragged = new WeakSet<StoreScene>();
@@ -98,9 +112,22 @@ export function beginMobileDrag(scene: StoreScene, x: number, y: number) {
   const forward = look.clone().sub(pos).normalize();
   const yaw = Math.atan2(-forward.x, -forward.z);
   const pitch = Math.asin(forward.y);
+  const isAisleShelving = !scene.selectedFixtureId && scene.selectedUnitSource !== 'fixture'
+    && scene.selectedUnitIdx !== BACK_WALL_UNIT_IDX && scene.selectedUnitIdx >= 0;
+  const activeUnit = isAisleShelving
+    ? scene.shelvingUnits.find(u => u.libraryIdx === scene.selectedLibraryIdx && u.unitIdxInLibrary === scene.selectedUnitIdx)
+    : null;
+  const runUnitIndices = activeUnit && activeUnit.rowGroupId !== undefined
+    ? new Set(
+        scene.shelvingUnits
+          .filter(u => u.libraryIdx === scene.selectedLibraryIdx && u.rowGroupId === activeUnit.rowGroupId)
+          .map(u => u.unitIdxInLibrary)
+      )
+    : null;
   const face = [...scene.slotsByPosition.values()].filter(s => !s.hidden
-    && s.libraryIdx === scene.selectedLibraryIdx && s.unitIdx === scene.selectedUnitIdx
-    && s.side === scene.selectedSide && (s.fixtureId ?? null) === scene.selectedFixtureId);
+    && s.libraryIdx === scene.selectedLibraryIdx
+    && (runUnitIndices ? runUnitIndices.has(s.unitIdx) : s.unitIdx === scene.selectedUnitIdx)
+    && s.side === scene.selectedSide && (s.fixtureId ?? null) === (scene.selectedFixtureId ?? null));
   let minX = 0, maxX = 0, minY = 0, maxY = 0;
   for (const slot of face) {
     const delta = slotWorld(slot, world).sub(look);
@@ -143,8 +170,19 @@ export function beginMobileDrag(scene: StoreScene, x: number, y: number) {
           const d = slotWorld(slot, world).distanceToSquared(scene.targetLookAt);
           if (d < best) { best = d; nearest = slot; }
         }
-        if (nearest && scene.getSelectedMovie()?.id !== nearest.movie.id) {
-          selectSlot(scene, nearest); scene.onSelectionChange?.(nearest.movie);
+        if (nearest) {
+          const targetUnitIdx = nearest.source === 'fixture' ? -1 : nearest.unitIdx;
+          const slotChanged = scene.selectedCol !== nearest.col
+            || scene.selectedShelf !== nearest.shelfIdx
+            || scene.selectedUnitIdx !== targetUnitIdx
+            || scene.selectedSide !== nearest.side
+            || scene.selectedLibraryIdx !== nearest.libraryIdx
+            || (scene.selectedFixtureId ?? null) !== (nearest.fixtureId ?? null);
+          const movieChanged = scene.getSelectedMovie()?.id !== nearest.movie.id;
+          if (slotChanged || movieChanged) {
+            selectSlot(scene, nearest);
+            if (movieChanged) scene.onSelectionChange?.(nearest.movie);
+          }
         }
       }
       scene.currentCameraPos.copy(scene.targetCameraPos);
@@ -164,6 +202,9 @@ export function beginMobileDrag(scene: StoreScene, x: number, y: number) {
           scene.updateCameraTarget();
           scene.cameraGlideLerp = 0.16;
         }
+      } else if (!overview) {
+        scene.updateCameraTarget();
+        scene.cameraGlideLerp = 0.16;
       }
       scene.updateLOD(); scene.requestRender();
     },
