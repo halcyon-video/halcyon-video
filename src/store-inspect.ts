@@ -23,6 +23,7 @@ import { SP_HERO, CT_HERO, updatedMeshes } from './scene-shared';
 import { getGoldCaseMaterials } from './fixtures/gold-clamshell';
 import type { StoreScene } from './three-scene';
 import { counterFrame } from './counter-anchors';
+import { isStreamingChoiceActive, startStreamingServiceChoice, confirmStreamingServiceChoice, getStreamingChoiceKey } from './streaming-checkout';
 
 // Whether the current hero back materials are the NR gold case — part of the
 // ensureHeroCases rebuild key alongside heroMovieId, so stepping between an
@@ -253,12 +254,16 @@ export function selectAction(scene: StoreScene): 'inspect' | 'play' | 'request' 
       }
       return 'request';
     }
-    // GH #86: a streaming-service title has no rental copy and nothing to
-    // request either -- it already exists, just not here. The same confirm
-    // press hands off to the service's page for it (main.ts's
-    // handleStreamingLaunch) instead of entering play/checkout/carry.
+    // GH #86 / #294: a streaming-service title:
+    // Tapping checkout reveals a plain black text service list on the back of the Halcyon box.
+    // Making one explicit choice resumes checkout by taking the tape and flying to the front counter.
     if (inspectedMovie?.streaming) {
-      return 'streaming';
+      if (isStreamingChoiceActive(inspectedMovie)) {
+        confirmStreamingServiceChoice(scene);
+        return 'checkout';
+      }
+      startStreamingServiceChoice(scene, inspectedMovie);
+      return null;
     }
     if (inspectedMovie?.isSeries) {
       // The front (face 0) and neutral +X panel (face 1) turn to the episode
@@ -633,7 +638,7 @@ export function ensureHeroCases(scene: StoreScene, movie: Movie, nrCase = false)
   // Folded into the rebuild key rather than hooked at each of the four sites
   // that set mode = 'inspect': this runs on every frame the hero is active, so
   // one comparison here covers every entry and exit path.
-  const wantDetail = scene.mode === 'inspect' ? `${movie.id}_${nrCase}` : null;
+  const wantDetail = scene.mode === 'inspect' ? `${movie.id}_${nrCase}_${getStreamingChoiceKey(movie)}` : null;
   if (scene.heroMovieId !== movie.id || heroWasNRCase !== nrCase || wantDetail !== heroDetailKey) {
     perfTrace.count(CT_HERO);
     perfTrace.begin(SP_HERO);

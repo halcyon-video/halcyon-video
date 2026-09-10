@@ -28,6 +28,7 @@ import { getLowResFrontMaterial, disposeLowResFrontMaterials } from './hero-lowr
 // only (that file reads every binding from here inside a function, never at
 // module scope) — same arrangement as hero-lowres-front.
 import { stampPosterBadges, getHeroFrontMaterial, disposeHeroFrontDetail, restampHeroFront, heroDetailArtEnabled } from './hero-front-detail';
+import { isStreamingChoiceActive, drawStreamingChoiceOverlays } from './streaming-checkout';
 // The two DVD typed-metadata passes live in their own module (this file is at
 // its line budget — see dvd-overlays.ts's header). They import this file's
 // shared text/measure helpers back; the cycle is function-level only.
@@ -3269,6 +3270,10 @@ function drawBoxOverlays(ctx: CanvasRenderingContext2D, L: BoxLayout, movie: Mov
   if (!movie) return;
   // All-ticket wraps have no place for metadata — render the print as-is.
   if (L.plain) return;
+  if (isStreamingChoiceActive(movie)) {
+    drawStreamingChoiceOverlays(ctx, L, movie);
+    return;
+  }
   if (L.standardVhs) {
     drawStandardVhsOverlays(ctx, movie);
     return;

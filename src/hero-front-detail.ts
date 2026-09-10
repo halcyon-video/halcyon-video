@@ -152,7 +152,7 @@ export function stampPosterBadges(data: Uint8Array, w: number, h: number, movie:
     const requested = !!movie.discoveryRequested || isDiscoveryRequested(movie.tmdbId);
     out = stampCollectionGapSticker(out, w, h, movie.id, requested);
   }
-  // Provider identities are kept hidden while browsing and inspecting (GH #297).
+  // Provider identities are kept hidden while browsing and inspecting (GH #297, #294).
   // Streaming titles carry no corner stickers during browsing; service choices
   // are revealed only at checkout per #293.
   // Watch-history staff pick (staff-picks.ts): endcap order candidates only.

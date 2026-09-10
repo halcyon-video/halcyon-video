@@ -48,8 +48,12 @@ export function touchMovieHUDText(
   collectionGap: boolean,
   comingSoon: boolean,
   isRequestedDiscovery: boolean,
+  streaming?: boolean,
+  streamingChoice?: boolean,
 ): string | null {
   if (!isInspecting) return mobileStoreActive() ? 'DRAG TO BROWSE  •  TAP A MOVIE' : 'SWIPE TO BROWSE  •  TAP OK TO EXAMINE';
+  if (streamingChoice) return 'TAP A SERVICE  •  TAP OK TO CONFIRM';
+  if (streaming) return 'SWIPE TO FLIP  •  TAP OK TO CHECK OUT';
   if (game) return 'SWIPE TO FLIP  •  TAP OK TO RENT & PLAY';
   if (discovery) return isRequestedDiscovery ? 'ALREADY REQUESTED' : 'NOT IN STOCK — TAP OK TO ORDER OR PASS';
   if (collectionGap) return isRequestedDiscovery ? 'ON ORDER — COMING SOON' : 'NOT IN STOCK — TAP OK TO ORDER OR PASS';

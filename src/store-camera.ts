@@ -648,7 +648,7 @@ export function updateSelectionArrowLabel(scene: StoreScene, text: string) {
 
 export function updateSelectionArrow(scene: StoreScene) {
   if (!scene.selectionArrow) return;
-  if (mobileStoreActive()) { scene.selectionArrow.visible = false; return; }
+  if (mobileStoreActive() && scene.mode !== 'overview' && !scene.subNav) { scene.selectionArrow.visible = false; return; }
   // The ▼ jump index (store-subnav.ts, browse mode) drives this same single
   // big cursor over its focused destination — the owner retired the
   // per-target chevron cloud in feedback/003 and the index follows suit.

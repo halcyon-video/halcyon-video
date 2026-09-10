@@ -103,6 +103,8 @@ import { brandString, loadBrandPack } from './brand-pack';
 import type { StoreScene } from './three-scene';
 import { InputManager, type InputCallbacks } from './input';
 import { installStoreTouchControls, isTouchInputActive, touchHUDText, touchMovieHUDText } from './store-touch';
+import { isStreamingChoiceActive, cancelStreamingServiceChoice, getStreamingCheckoutMovie, clearStreamingCheckoutMovie, setStreamingStockResolver } from './streaming-checkout';
+setStreamingStockResolver(getStreamingMovies);
 import { triggerHostedWelcome, isWelcomeActive, dismissWelcome, welcomeHUDText } from './store-welcome';
 import { showClerkToast } from './carried-tapes';
 import { initSharedPlace } from './shared-place-ui';
@@ -847,12 +849,16 @@ function updateMovieHUD(movie: Movie | null) {
     if (isTouchInputActive()) {
       hint.textContent = touchMovieHUDText(
         !!isInspecting, !!movie.game, !!movie.discovery, !!movie.collectionGap,
-        !!movie.comingSoon, !!isRequestedDiscovery);
+        !!movie.comingSoon, !!isRequestedDiscovery, !!movie.streaming, !!(movie.streaming && isStreamingChoiceActive(movie)));
       return;
     }
     if (isInspecting) {
       if (movie.game) {
         hint.textContent = 'FLIP CASE  •  OK TO RENT & PLAY THIS GAME';
+      } else if (movie.streaming) {
+        hint.textContent = isStreamingChoiceActive(movie)
+          ? 'ARROWS SELECT SERVICE  •  OK TO CONFIRM  •  BACK TO CANCEL'
+          : 'FLIP CASE  •  OK TO CHECK OUT';
       } else if (movie.discovery) {
         hint.textContent = isRequestedDiscovery
           ? 'FLIP CASE  •  ALREADY REQUESTED'
@@ -4052,6 +4058,14 @@ async function main() {
         return;
       }
 
+      if (storeScene && cancelStreamingServiceChoice(storeScene)) {
+        updateMovieHUD(storeScene.getSelectedMovie() || null);
+        return;
+      }
+      if (storeScene && storeScene.mode === 'checkout' && getStreamingCheckoutMovie(storeScene)) {
+        storeScene.carried?.clearAll(false);
+        clearStreamingCheckoutMovie(storeScene);
+      }
       const handled = storeScene?.backAction();
       if (handled) {
         updateMovieHUD(storeScene?.getSelectedMovie() || null);

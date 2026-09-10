@@ -31,6 +31,7 @@ import {
   subNavRefresh, closeSubNav, debugSubNav, forgetSubNav,
 } from './store-subnav';
 import { talkToClerkAtCounter } from './store-checkout';
+import { stepStreamingServiceChoice } from './streaming-checkout';
 import type { StoreScene } from './three-scene';
 
 /**
@@ -661,6 +662,7 @@ export function moveUp(scene: StoreScene) {
   } else if (scene.mode === 'inspect') {
     if (scene.moveSeriesSeasonSelection(-1)) return;
     if (scene.moveSeriesEpisodeSelection(-1)) return;
+    if (stepStreamingServiceChoice(scene, -1)) return;
     if (scene.isFlipped) {
       const movie = scene.getSelectedMovie();
       const regions = movie ? (backCoverRegions.get(movie.id) || []) : [];
@@ -875,6 +877,7 @@ export function moveDown(scene: StoreScene) {
   } else if (scene.mode === 'inspect') {
     if (scene.moveSeriesSeasonSelection(1)) return;
     if (scene.moveSeriesEpisodeSelection(1)) return;
+    if (stepStreamingServiceChoice(scene, 1)) return;
     if (scene.isFlipped) {
       const movie = scene.getSelectedMovie();
       const regions = movie ? (backCoverRegions.get(movie.id) || []) : [];

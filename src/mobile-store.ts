@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { isPublicDemo } from './demo-mode.ts';
 import { OVERVIEW_POS } from './scene-shared.ts';
 import { BACK_WALL_UNIT_IDX, BROWSE_WINDOW_SIZE, type MovieSlot } from './store-layout.ts';
+import { handleStreamingBackTap } from './streaming-checkout.ts';
 import type { StoreScene } from './three-scene.ts';
 
 let coarse: MediaQueryList | undefined, noHover: MediaQueryList | undefined;
@@ -65,7 +66,12 @@ export function mobileStoreTap(scene: StoreScene, e: PointerEvent): boolean {
   let caseHit = false;
   for (const hit of hits) {
     if (!hit.object.visible) continue;
-    if (scene.mode === 'inspect' && (hit.object === scene.heroFrontMesh || hit.object === scene.heroBackMesh)) return false;
+    if (scene.mode === 'inspect' && (hit.object === scene.heroFrontMesh || hit.object === scene.heroBackMesh)) {
+      if (scene.heroBackMesh && hit.object === scene.heroBackMesh && hit.uv && handleStreamingBackTap(scene, hit.uv)) {
+        return true;
+      }
+      return false;
+    }
     picked = scene.getSlotFromIntersection(hit.object, hit.instanceId!);
     if (picked && !picked.hidden) { caseHit = true; break; }
     // Shelf boards/dividers have no title ID. Resolve their physical surface
@@ -79,6 +85,24 @@ export function mobileStoreTap(scene: StoreScene, e: PointerEvent): boolean {
     if (picked) break;
     // The first opaque surface occludes anything behind it.
     if (hit.object instanceof THREE.Mesh && !hit.object.userData.excludeFromSSAO) break;
+  }
+  if (scene.mode === 'overview') {
+    let arrowTapped = false;
+    if (scene.selectionArrow?.visible) {
+      const arrowCenter = scene.selectionArrow.position.clone();
+      arrowCenter.y += 1.0;
+      const proj = arrowCenter.project(scene.camera);
+      if (proj.z < 1) {
+        const sx = (proj.x * 0.5 + 0.5) * rect.width + rect.left;
+        const sy = (-proj.y * 0.5 + 0.5) * rect.height + rect.top;
+        if (Math.hypot(e.clientX - sx, e.clientY - sy) <= 80) {
+          arrowTapped = true;
+        }
+      }
+    }
+    if (arrowTapped || !picked) {
+      return scene.overviewEnterBrowse();
+    }
   }
   if (!picked) return true;
   const wasBrowse = scene.mode === 'browse';
@@ -153,8 +177,10 @@ export function beginMobileDrag(scene: StoreScene, x: number, y: number) {
         scene.overviewYaw = raw + (a - raw) * 0.24 * Math.exp(-gap * gap / 0.003);
         scene.overviewPitch = THREE.MathUtils.clamp(pitch - (py - y) * 0.001, -0.35, 0.4);
         if (scene.subNav && items.length) {
+          const prev = scene.subNav.sel[0];
           scene.subNav.row = 0; scene.subNav.sel[0] = nearest;
           scene.subNavRootFocus = { row: 0, label: items[nearest].label };
+          if (prev !== nearest) scene.updateSelectionArrow();
         }
         const cp = Math.cos(scene.overviewPitch);
         scene.targetCameraPos.copy(OVERVIEW_POS);
@@ -201,6 +227,7 @@ export function beginMobileDrag(scene: StoreScene, x: number, y: number) {
           scene.overviewYaw = angles[scene.subNav.sel[0]];
           scene.updateCameraTarget();
           scene.cameraGlideLerp = 0.16;
+          scene.updateSelectionArrow();
         }
       } else if (!overview) {
         scene.updateCameraTarget();
