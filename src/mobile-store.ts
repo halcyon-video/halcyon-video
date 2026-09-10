@@ -39,7 +39,10 @@ export function slotWorld(slot: MovieSlot, out: THREE.Vector3): THREE.Vector3 {
 /** One tap examines a case; a tap from overview flies to that exact section. */
 export function mobileStoreTap(scene: StoreScene, e: PointerEvent): boolean {
   if (!mobileStoreActive() || !['overview', 'browse', 'inspect'].includes(scene.mode)) return false;
-  if (dragged.has(scene)) return true;
+  if (dragged.has(scene)) {
+    dragged.delete(scene);
+    if (scene.mode !== 'inspect') return true;
+  }
   const rect = scene.renderer.domElement.getBoundingClientRect();
   ray.setFromCamera(point.set((e.clientX - rect.left) / rect.width * 2 - 1,
     1 - (e.clientY - rect.top) / rect.height * 2), scene.camera);
@@ -81,8 +84,8 @@ export function mobileStoreTap(scene: StoreScene, e: PointerEvent): boolean {
 
 /** A gesture holds its own continuous camera pose; no arrow callbacks. */
 export function beginMobileDrag(scene: StoreScene, x: number, y: number) {
-  if (!mobileStoreActive() || !['overview', 'browse'].includes(scene.mode) || scene.tvPeek) return null;
   dragged.delete(scene);
+  if (!mobileStoreActive() || !['overview', 'browse'].includes(scene.mode) || scene.tvPeek) return null;
   const overview = scene.mode === 'overview';
   const mode = scene.mode;
   const pos = scene.currentCameraPos.clone();
