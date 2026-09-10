@@ -183,16 +183,16 @@ export function buildCheckoutCounter(
   // Laminate mottle/scuff albedo + micro-stipple normal (shared generator with
   // the shelving): the counter is the single biggest uniform-color slab in the
   // store, and bare material colors on it read as untextured CG.
-  const { map: counterLamTex, normalMap: counterLamNorm } = createShelfTextures();
-  counterLamTex.repeat.set(4, 2);
-  counterLamNorm.repeat.set(4, 2);
+  const { map: counterLamTex, normalMap: counterLamNorm, roughnessMap: counterLamRough } = createShelfTextures();
+  counterLamTex.repeat.set(4, 4);
+  counterLamNorm.repeat.set(4, 4);
+  counterLamRough.repeat.set(4, 4);
   const counterWhite = new THREE.MeshStandardMaterial({
     color: new THREE.Color(theme.palette.counterBody), map: counterLamTex,
     normalMap: counterLamNorm, normalScale: new THREE.Vector2(0.25, 0.25),
-    // 0.55 -> 0.45: the big white laminate faces are the store's largest flat
-    // panels — satin enough that the window/troffer sheen visibly travels
-    // across them as the camera moves (user: "surfaces don't react to light").
-    roughness: 0.45, metalness: 0.02,
+    // The map averages 0.65: 0.69 keeps the former 0.45 satin finish while
+    // allowing subtle wipe/grain variation in reflected highlights.
+    roughnessMap: counterLamRough, roughness: 0.69, metalness: 0.02,
   });
   const counterTopBlue = new THREE.MeshStandardMaterial({
     color: new THREE.Color(theme.palette.counterTop), map: counterLamTex,
