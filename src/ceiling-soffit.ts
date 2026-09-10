@@ -1,4 +1,5 @@
-import { selfLit } from './material-lighting';
+import { selfLit } from './material-lighting.ts';
+import { installDownlightModels, DOWNLIGHT_APERTURE_RADIUS } from './downlight-model.ts';
 // Front-of-store dropped ceilings — the cash-wrap soffit and the vestibule cap.
 //
 // Real video stores never ran the open tile deck straight out to the storefront.
@@ -22,8 +23,8 @@ import { selfLit } from './material-lighting';
 //     sharing its profile, mirror height, tilt and corner bisectors.
 
 import * as THREE from 'three';
-import { vestibuleHalfWidth, type StorefrontSpec, STORE_CENTER_X, FRONT_GLASS_Z } from './store-layout';
-import { activeStoreFormat } from './store-format';
+import { vestibuleHalfWidth, type StorefrontSpec, STORE_CENTER_X, FRONT_GLASS_Z } from './store-layout.ts';
+import { activeStoreFormat } from './store-format.ts';
 
 export interface SoffitPoint { x: number; z: number }
 
@@ -334,6 +335,43 @@ export function buildFrontSoffit(params: FrontSoffitParams): FrontSoffitResult {
     color: 0xe9e9e4, roughness: 0.88, metalness: 0.0,
   });
 
+  const edges = soffitMirroredEdges(poly);
+  const fasciaCount = edges.length;
+
+  let troffers: SoffitPoint[];
+  if (plainWhite) {
+    troffers = [];
+    const canR = DOWNLIGHT_APERTURE_RADIUS, margin = canR + corniceBand + 0.1;
+    // A can fits only where the whole disc (± margin) stays inside the soffit.
+    const fits = (x: number, z: number) =>
+      pointInSoffit(x, z, poly) &&
+      pointInSoffit(x + margin, z, poly) && pointInSoffit(x - margin, z, poly) &&
+      pointInSoffit(x, z + margin, poly) && pointInSoffit(x, z - margin, poly);
+    // ~5 downlights spread evenly along the soffit's front chain (the V of the
+    // cash-wrap), each set inboard of the fascia so it lands on the flat
+    // underside — a spare row of cans following the soffit, not a dense grid.
+    const N_CANS = 5;
+    let chainLen = 0;
+    for (let i = 0; i < fasciaCount; i++) chainLen += edges[i].len;
+    for (let k = 0; k < N_CANS; k++) {
+      const target = chainLen * (k + 0.5) / N_CANS; // biased off the two ends
+      let acc = 0, e = edges[0], local = 0;
+      for (let i = 0; i < fasciaCount; i++) {
+        if (i === fasciaCount - 1 || acc + edges[i].len >= target) {
+          e = edges[i]; local = Math.min(target - acc, edges[i].len); break;
+        }
+        acc += edges[i].len;
+      }
+      const gx = e.a.x + e.ux * local + e.nx * margin;
+      const gz = e.a.z + e.uz * local + e.nz * margin;
+      if (!fits(gx, gz)) continue;
+      troffers.push({ x: gx, z: gz });
+    }
+    if (troffers.length === 0) troffers = soffitTrofferCenters(); // never leave it dark
+  } else {
+    troffers = soffitTrofferCenters();
+  }
+
   // ── The lid ──────────────────────────────────────────────────────────────
   // On the LID outline, not the band's — it runs on past the fascia, over the
   // vestibule, and dies into the storefront wall, so the whole front of the
@@ -346,6 +384,13 @@ export function buildFrontSoffit(params: FrontSoffitParams): FrontSoffitResult {
   const shape = new THREE.Shape();
   lidPoly.forEach((p, i) => (i === 0 ? shape.moveTo(p.x, p.z) : shape.lineTo(p.x, p.z)));
   shape.closePath();
+  if (plainWhite) {
+    for (const t of troffers) {
+      const hole = new THREE.Path();
+      hole.absarc(t.x, t.z, DOWNLIGHT_APERTURE_RADIUS, 0, Math.PI * 2, true);
+      shape.holes.push(hole);
+    }
+  }
   const slab = new THREE.Mesh(new THREE.ShapeGeometry(shape), whiteBodyMat ?? tileMaterial);
   slab.position.y = soffitY;
   slab.rotation.x = Math.PI / 2;
@@ -375,9 +420,6 @@ export function buildFrontSoffit(params: FrontSoffitParams): FrontSoffitResult {
       }
     }
   }
-
-  const edges = soffitMirroredEdges(poly);
-  const fasciaCount = edges.length;
 
   // ── Fascia: ONE mitred ring, not a box per edge ──────────────────────────
   // A box per edge is fine while the joints are square, but this outline meets
@@ -448,13 +490,11 @@ export function buildFrontSoffit(params: FrontSoffitParams): FrontSoffitResult {
   // Mirrored formats get one continuous Blender cornice from buildCeilingFrame,
   // including the counter V. The lid and light anchors remain owned here.
 
-  let troffers: SoffitPoint[];
   if (plainWhite) {
     // ── bb-2000: a grid of INSET CIRCULAR (recessed can) lights ─────────────
     // Small round downlights spaced along the white soffit body instead of the
-    // two rectangular troffers. A dark trim ring around a bright emissive disc.
-    troffers = [];
-    const canR = 0.32, margin = canR + corniceBand + 0.1;
+    // two rectangular troffers. Procedural fallback ring/disc + 3D model loader.
+    const canR = DOWNLIGHT_APERTURE_RADIUS;
     const trimGeo = new THREE.RingGeometry(canR, canR + 0.09, 28);
     const lightGeo = new THREE.CircleGeometry(canR, 28);
     const trimMat = new THREE.MeshStandardMaterial({ color: 0x2b2b2b, roughness: 0.7, metalness: 0.15 });
@@ -462,45 +502,30 @@ export function buildFrontSoffit(params: FrontSoffitParams): FrontSoffitResult {
       color: 0xffffff, emissive: new THREE.Color(0xfff3df), emissiveIntensity: 2.2,
       roughness: 1.0, metalness: 0.0,
     }), 'light-source');
-    // A can fits only where the whole disc (± margin) stays inside the soffit.
-    const fits = (x: number, z: number) =>
-      pointInSoffit(x, z, poly) &&
-      pointInSoffit(x + margin, z, poly) && pointInSoffit(x - margin, z, poly) &&
-      pointInSoffit(x, z + margin, poly) && pointInSoffit(x, z - margin, poly);
-    // ~5 downlights spread evenly along the soffit's front chain (the V of the
-    // cash-wrap), each set inboard of the fascia so it lands on the flat
-    // underside — a spare row of cans following the soffit, not a dense grid.
-    const N_CANS = 5;
-    let chainLen = 0;
-    for (let i = 0; i < fasciaCount; i++) chainLen += edges[i].len;
-    for (let k = 0; k < N_CANS; k++) {
-      const target = chainLen * (k + 0.5) / N_CANS; // biased off the two ends
-      let acc = 0, e = edges[0], local = 0;
-      for (let i = 0; i < fasciaCount; i++) {
-        if (i === fasciaCount - 1 || acc + edges[i].len >= target) {
-          e = edges[i]; local = Math.min(target - acc, edges[i].len); break;
-        }
-        acc += edges[i].len;
-      }
-      const gx = e.a.x + e.ux * local + e.nx * margin;
-      const gz = e.a.z + e.uz * local + e.nz * margin;
-      if (!fits(gx, gz)) continue;
-      troffers.push({ x: gx, z: gz });
+
+    const fallback = new THREE.Group();
+    fallback.name = 'downlightFallback';
+    for (const t of troffers) {
       const trim = new THREE.Mesh(trimGeo, trimMat);
-      trim.position.set(gx, soffitY - 0.005, gz); trim.rotation.x = Math.PI / 2;
-      group.add(trim);
+      trim.position.set(t.x, soffitY - 0.005, t.z); trim.rotation.x = Math.PI / 2;
+      fallback.add(trim);
       const light = new THREE.Mesh(lightGeo, canMat);
-      light.position.set(gx, soffitY - 0.02, gz); light.rotation.x = Math.PI / 2;
-      group.add(light);
+      light.position.set(t.x, soffitY - 0.02, t.z); light.rotation.x = Math.PI / 2;
+      fallback.add(light);
     }
-    if (troffers.length === 0) troffers = soffitTrofferCenters(); // never leave it dark
+    group.add(fallback);
+
+    installDownlightModels(
+      group,
+      troffers.map(t => ({ x: t.x, y: soffitY, z: t.z })),
+      fallback,
+    );
   } else {
     // ── Two troffers recessed into the lid ─────────────────────────────────
     // One over the register end of the counter, one forward over the island —
     // the pair the reference photos show. Same module as the main grid so they
     // read as the same fixture, just lower, and landing on whole printed tiles
     // rather than straddling a grid line (see soffitTrofferCenters).
-    troffers = soffitTrofferCenters();
     const panelGeo = new THREE.BoxGeometry(tileX - 0.12, 0.04, tileZ - 0.12);
     const frameGeo = new THREE.BoxGeometry(tileX, 0.06, tileZ);
     for (const t of troffers) {

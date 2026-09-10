@@ -1,0 +1,16 @@
+{
+  "total_triangles": 1736,
+  "primitives": 4,
+  "materials": 4,
+  "bytes": 71172,
+  "textures": 0,
+  "aperture_diameter_inches": 7.68,
+  "trim_outer_diameter_inches": 9.84,
+  "plenum_can_depth_inches": 6.6,
+  "parts": {
+    "Downlight_DownlightTrim": 720,
+    "Downlight_DownlightReflector": 480,
+    "Downlight_DownlightLamp": 96,
+    "Downlight_DownlightCan": 440
+  }
+}

@@ -75,3 +75,11 @@ authoring live in `tools/models/tape-rewinder.blend` and
 `tools/models/tape-rewinder.py`. No downloaded meshes, images or manufacturer
 marks are included. See `docs/tape-rewinder-model.md` for its dimensions,
 resource costs and preserved live reel, logo and placement contracts.
+
+The `recessed-downlight.glb` commercial downlight luminaire is original generic
+Halcyon construction under this repository's license. Editable named parts and
+reproducible mesh authoring live in `tools/models/recessed-downlight.blend` and
+`tools/models/recessed-downlight.py`. No downloaded meshes, images or manufacturer
+marks are included. See `docs/recessed-downlight-model.md` for its dimensions,
+material roles, resource costs and ceiling soffit integration.
+
