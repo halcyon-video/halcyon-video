@@ -209,7 +209,18 @@ export function playbackStopped(
 }
 
 /** Text subtitles and encode teardown must follow the title's own server too. */
-export function subtitleTrackUrl(server: string, token: string, itemId: string, streamIndex: number, mediaSourceId?: string, kind?: string): string {
+export function subtitleTrackUrl(
+  server: string,
+  token: string,
+  itemId: string,
+  streamIndex: number,
+  mediaSourceId?: string,
+  kind?: string
+): string | undefined {
+  if (isPlex(kind)) {
+    // Plex does not serve Jellyfin /Videos/.../Subtitles endpoints.
+    return undefined;
+  }
   return mediaBrowser(kind).buildSubtitleTrackUrl(server, token, itemId, streamIndex, mediaSourceId);
 }
 

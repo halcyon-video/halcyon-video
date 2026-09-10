@@ -3565,7 +3565,7 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
     buildSubtitleTrack: (streamIndex) => {
       const d = pickSubtitleDelivery(streams, streamIndex);
       return d.kind === 'text'
-        ? buildSourceSubtitleTrackUrl(jellyfinUrl, token, playbackId, d.streamIndex, mediaSourceId, titleKind)
+        ? (buildSourceSubtitleTrackUrl(jellyfinUrl, token, playbackId, d.streamIndex, mediaSourceId, titleKind) ?? null)
         : null;
     },
     startPositionTicks: resumeTicks || undefined,

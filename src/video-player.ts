@@ -81,7 +81,7 @@ export interface VideoPlayerOptions {
   /** Ask how a newly-picked subtitle should be delivered: a URL means text
    *  (swap the sidecar, keep playing), null means bitmap (only a burned-in
    *  re-encode can render it, so rebuild the stream the old way). */
-  buildSubtitleTrack?: (streamIndex: number) => string | null;
+  buildSubtitleTrack?: (streamIndex: number) => string | null | undefined;
   /** Initial audio MediaStream index (Settings ▸ Playback language pref).
    *  Pre-selects the picker row and rides along on every stream rebuild.
    *  The caller bakes it into the initial hlsSrc itself. */
