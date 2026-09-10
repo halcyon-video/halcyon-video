@@ -23,6 +23,7 @@ import { markSignMesh } from '../sign-builders';
 import { loadProp } from '../props';
 import { BB_ARCHIVO_BLACK } from '../bundled-fonts';
 import { buildImpactPrinter93 } from './impact-printer-93';
+import { installCounterTelephone } from './counter-telephone';
 
 const texCache = new Map<string, THREE.CanvasTexture>();
 
@@ -290,43 +291,49 @@ export function buildCounterProps93(scene: StoreScene): void {
     // entrance/index.ts signAnchors), and the phone used to share that exact
     // spot, so the sign's pole grew straight out of the phone body and its
     // cord loops read as loose rings scattered on the counter (feedback/047).
-    const pPos = entrance.getCounterTopAnchor(cx + 5.3)!;
+    // The U-shaped island ends at +5 ft; +5.3 left the old phone floating
+    // past its end. Keep the full cord/body envelope on that shorter top.
+    const phoneOffset = scene.storefrontSpec.counterShape === 'usquare' ? 4.6 : 5.3;
+    const pPos = entrance.getCounterTopAnchorAt(phoneOffset)!;
     const pYaw = pPos.rotY + 0.2;
     const pt = tangent(pYaw);
     const pn = normal(pYaw);
     const pOrigin = new THREE.Vector3(pPos.x, pPos.y, pPos.z).add(normal(pPos.rotY).multiplyScalar(0.5));
     const phoneAt = (dt: number, dn: number, dy: number) =>
       pOrigin.clone().addScaledVector(pt, dt).addScaledVector(pn, dn).setY(pOrigin.y + dy);
+    const phoneFallback = new THREE.Group();
+    phoneFallback.name = 'counter-telephone-fallback';
+    group.add(phoneFallback);
     const phoneBase = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.1, 0.4), matte(0xd9cdb2, 0.55));
     phoneBase.position.copy(phoneAt(0, 0, 0.05));
     phoneBase.rotation.y = pYaw;
     phoneBase.castShadow = true;
     phoneBase.receiveShadow = true;
-    group.add(phoneBase);
+    phoneFallback.add(phoneBase);
     // Darker keypad plate inset on the deck's far half.
     const keypad = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.014, 0.22), matte(0xbfb49a, 0.5));
     keypad.position.copy(phoneAt(0.1, 0.07, 0.105));
     keypad.rotation.y = pYaw;
-    group.add(keypad);
+    phoneFallback.add(keypad);
     // Handset lying along the near long edge on two cradle ridges, with
     // ear/mouth lumps hanging over its ends — the flat slab didn't read.
     for (const dt of [-0.13, 0.13]) {
       const ridge = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, 0.1), matte(0xcfc3a8, 0.55));
       ridge.position.copy(phoneAt(dt, -0.09, 0.12));
       ridge.rotation.y = pYaw;
-      group.add(ridge);
+      phoneFallback.add(ridge);
     }
     const handset = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.05, 0.12), matte(0xcfc3a8, 0.5));
     handset.position.copy(phoneAt(0, -0.09, 0.175));
     handset.rotation.y = pYaw;
     handset.castShadow = true;
-    group.add(handset);
+    phoneFallback.add(handset);
     for (const dt of [-0.2, 0.2]) {
       const lump = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.06, 0.135), matte(0xcfc3a8, 0.5));
       lump.position.copy(phoneAt(dt, -0.09, 0.155));
       lump.rotation.y = pYaw;
       lump.castShadow = true;
-      group.add(lump);
+      phoneFallback.add(lump);
     }
     // Coiled cord: an actual helix wound along a short sagging run from the
     // mouth end of the handset to the base's corner, instead of the old
@@ -354,8 +361,9 @@ export function buildCounterProps93(scene: StoreScene): void {
         new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), SAMPLES * 2, 0.0055, 5, false),
         cordMat
       );
-      group.add(cord);
+      phoneFallback.add(cord);
     }
+    installCounterTelephone(scene, group, phoneFallback, pOrigin, pYaw);
   }
 
   // 6. RENT A GAME / GET A CARD counter display — only when the game
