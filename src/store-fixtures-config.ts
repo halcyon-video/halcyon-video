@@ -13,6 +13,8 @@ import { deskGroundPlan } from './entrance/desk-plan';
 registerFixtureKind('structure-footprint', (placement) => new StructureFootprint(placement));
 
 export const DEFAULT_FIXTURE_PLACEMENTS: FixturePlacement[] = [
+  // Reserved left checkout bay, opposite the sale table; clear of the queue.
+  { id: 'release-cart-checkout', kind: 'release-cart', position: { x: -5, z: 3 }, yaw: 0, options: { noRentalCase: true } },
   // Floor displays are SPREAD down the store's open central corridor (the
   // island-free CENTER_WALKWAY, x roughly 3..19) instead of bunched in the back
   // area. The corridor runs clear from just behind the checkout counter's apex

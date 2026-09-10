@@ -1,3 +1,4 @@
+import { ReleaseCart } from './fixtures/release-cart';
 import { FixturePlacement } from './store-layout';
 import { FixtureContext, StoreFixture } from './fixtures';
 import { FourSidedDisplay } from './fixtures/four-sided-display';
@@ -66,3 +67,5 @@ registerFixtureKind('tip-jar', (placement, ctx) => new TipJar(placement, ctx));
 registerFixtureKind('mirror-column', (placement, ctx) => new MirrorColumn(placement, ctx));
 registerFixtureKind('curtained-alcove', (placement, ctx) => new CurtainedAlcove(placement, ctx));
 registerFixtureKind('potted-plant', (placement, ctx) => new PottedPlant(placement, ctx));
+
+registerFixtureKind('release-cart', (placement, ctx) => new ReleaseCart(placement, ctx));
