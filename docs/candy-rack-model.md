@@ -1,73 +1,64 @@
 # Queue candy rack (#193)
 
-Original generic Blender hardware upgrades the existing `CandyDisplay` at
-`candy-display-front`. No new fixture, placement, stock catalog or checkout flow
-is introduced. The original procedural frame remains available on loading/error;
-only its hardware is hidden after both GLBs load. Candy labels and row IDs remain
-owned by `CandyDisplay`, including its existing seven cartons per default row.
+CandyDisplay remains the single existing queue rack. Its five labels, catalog
+IDs, selection flow and era behavior are unchanged. Repeated procedural cartons
+now fill the tray depth (175 cartons at the default size, five instanced draws).
+The collision footprint is 3 × 1.6 feet. Both counter placements move outward
+0.45 feet along the customer-facing normal, retaining the previous rear edge
+and clerk access. The standalone desk format still has no queue rack.
 
-## Construction and coordinate contract
+## Original public fallback
 
-Scene units are feet. Origin is the footprint center at floor height; +Y is up,
--Z is the customer-facing side. Blender uses `(x, -store_z, height)` and exports
-Y-up glTF. The default collision footprint stays 3 × 0.7 ft at its existing
-position/yaw. Hardware bounds are approximately 2.936 × 4.028 × 0.656 ft
-(width × height × depth). There are no moving parts.
+The committed Blender hardware is the existing original generic design, with
+rounded side hoops and sheet trays. It is not a photographic reconstruction.
+Its normalized exports remain unchanged: frame 628 triangles / two primitives /
+29,796 bytes; tray 492 triangles / one primitive / 25,592 bytes. At runtime the
+frame and tray depth scale from the original 0.7-foot authoring contract to the
+fixture depth. Five trays share geometry. Hardware totals 3,088 triangles and
+seven draws; stock adds 2,100 triangles and five draws. No new textures are added.
 
-The editable source contains named bent side hoops, sled feet, nonmarking foot
-pads, rear ties/diagonal brace, tray decks and bent retainers with welded
-stanchions. Five assembled tiers use linked editable parts; a hidden tray
-template provides the export source. Closed components pass Blender manifold
-checks. All meshes have UVs; no image textures are required.
+Source: tools/models/candy-rack.blend. Rebuild with
+`blender -b --python tools/models/candy-rack.py`. Source units are feet; Blender
+(x, -store_z, height) exports as store (x, y, z). Tray support is local y=0,
+rotated -12 degrees, translated to y=0.615 + row*0.7. Stock is transformed by
+the same support plane. The public source and exports carry no private imagery
+or reference-derived replacement geometry.
 
-Tray support centers are `y = 0.615 + row * 0.7`; trays rotate -12 degrees about
-X. Their deck top is local y=0, and cartons rotate with their tray. Carton bottom
-corners are checked against the actual exported triangles by raycasting.
-Width/depth options scale hardware horizontally; rows repeat the shared tray
-geometry. Taller row counts extend the frame. No new era gate is introduced.
+## Optional local hardware
 
-`RackSteel` is replaced by the fixture-owned steel finish; `RackFeet` remains
-rubber. Frame and tray GLBs are loaded once per fixture. Tray clones share their
-geometry/materials within that fixture. The disposer frees each owned resource
-once, including successful partial loads and requests completed after teardown.
-The caller retains ownership of its replacement finish. Successful installation
-requests both a render and a shadow refresh.
+A locally installed pair at
+`public/user-assets/fixtures/candy-queue-rack/candy-rack-{frame,tray}.glb`
+replaces the public hardware. Both must load successfully; a missing/failed
+member releases the partial pair and falls back to the public pair. If that
+also fails, the built-in procedural frame and shelves stay visible. Late
+responses after disposal release their resources without adding to the scene.
 
-## Provenance and uncertainty
+The local pair's normalization is 3 feet wide × 1.6 feet deep, floor-centered,
+with the same tray origins, angle and material roles (`RackSteel`, `RackFeet`).
+The frame scales in height for extra rows; trays repeat for the existing row
+option. The local path also adds three packets per row to its side support,
+sharing the original stock geometry and catalog materials. These add five
+instanced draws and 180 triangles. They add no selectable row or new product.
+The fixture owns the shared stock resources and replacement steel finish;
+the loader owns imported resources. Install refreshes shadows and rendering.
 
-This is an original generic design dimensioned from the existing scene fixture,
-not an exact reconstruction of a manufacturer's product. The local queue-rack
-study's original video frames and 1993 footage were inspected: they support
-black, floor-standing, roughly four-foot tiered racks and sloped merchandise
-trays. They do not resolve exact tube sections, bend radii, joinery or a distinct
-shorter rack requiring a separate variant. Those construction details are
-original design choices. The existing four-foot floor-rack form is retained.
-No archive imagery, branding, merchandise artwork or photo-derived mesh is
-included in these deliverables.
+Private source, reference provenance, uncertainty, geometry measurements and
+inspected photographs accompany the local drop-in, outside the public tree.
+Their construction must not be inferred from the original public fallback.
 
-## Delivery and verification
+## Verification
 
-- Source: `tools/models/candy-rack.blend`
-- Rebuild: `blender -b --python tools/models/candy-rack.py`
-- Runtime: `public/models/candy-rack-{frame,tray}.glb`
-- Measured cost: `tools/models/candy-rack-metrics.json`
-- Geometry checks: `node --experimental-strip-types --test tests/candy-rack-assets.test.ts`
-- Browser lifecycle/contact checks: `node tools/verify-candy-rack.mjs`
-- Project checks: `npm test` and `npm run build`
+- `npm run build` and `npm test`.
+- `node tools/verify-candy-rack.mjs`: public loading, all stock-bottom corners
+  raycast against exported tray triangles, footprint, failure and disposal.
+- `CANDY_CHECK_PRIVATE=1 node tools/verify-candy-rack.mjs`: the same checks
+  against an installed local pair. Both runs include a 3-row, 4 × 1 ft rack.
+- `node --experimental-strip-types --test tests/candy-rack-assets.test.ts`:
+  public exported bounds, UVs, normals and resource budgets.
 
-Frame: 628 triangles, two material primitives, 29,796 bytes. Shared tray: 492
-triangles, one primitive, 25,592 bytes. Default loaded hardware: 3,088 triangles,
-seven draws and 55,388 downloaded bytes, zero textures. The existing stock adds
-35 instanced boxes across five draws; hidden fallback geometry remains allocated
-for collision and normal fixture disposal. The old hardware used ten draws.
-
-Inspected in-store before/after front and side photographs, an over-counter rear
-view (partly obscured by the counter), and an isolated rear construction detail
-are kept in `scratch/publicity-kits/issue-193/` in the development checkout and
-in the dispatch conversation's outbox. Public evidence was captured without
-user-assets. The normal five-row configuration and custom three-row 4 × 1 ft
-configuration pass stock-contact and lifecycle checks.
-
-The local Blender installation reports an OCIO library/config version mismatch
-and uses fallback color management. Mesh exports, UVs and geometry checks pass;
-visual verification uses the actual Three.js store renderer.
+The private screenshot harness additionally checks both shield and square-U
+counter placements for candy-related layout violations, preserves the five
+checkout rows, and runs the clerk-path checkpoint. Inspected public photographs
+must come from a tree containing no user-assets. Private in-store front, side,
+over-counter rear and isolated rear detail are delivered separately; the
+counter occludes the lower rear in the in-store rear view.

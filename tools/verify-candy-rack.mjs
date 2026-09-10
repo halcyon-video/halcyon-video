@@ -18,10 +18,12 @@ try {
   const page = await browser.newPage();
   await page.setRequestInterception(true);
   let mode = 'success';
+  const privateMode = process.env.CANDY_CHECK_PRIVATE === '1';
   let held = [];
   page.on('request', request => {
     if (request.url().endsWith('/__candy_check')) return void request.respond({ status: 200, contentType: 'text/html', body: '<html></html>' });
-    if (request.url().includes('/models/candy-rack-')) {
+    if (!privateMode && request.url().includes('/user-assets/fixtures/candy-queue-rack/')) return void request.abort();
+    if (/candy-rack-(frame|tray)\.glb/.test(request.url())) {
       if (mode === 'hold') { held.push(request); return; }
       if (mode === 'failure' && request.url().includes('-tray.')) return void request.abort();
     }
@@ -55,7 +57,9 @@ try {
       let maxContactError = 0;
       group.updateMatrixWorld(true);
       stock.forEach((inst, r) => {
-        const matrix = new THREE.Matrix4(); inst.getMatrixAt(0, matrix);
+        const matrix = new THREE.Matrix4();
+        for (let instance = 0; instance < inst.count; instance++) {
+        inst.getMatrixAt(instance, matrix);
         const shelf = model.getObjectByName(`candy-rack-tray-${r}`);
         // Transform every bottom corner into tray space: all four rest at y=0.
         shelf.updateMatrix();
@@ -69,16 +73,20 @@ try {
           if (!hit) throw new Error('Stock corner misses exported tray geometry');
           maxContactError = Math.max(maxContactError,Math.abs(hit.distance-.01));
         }
+        }
       });
       const geometries = new Set(), materials = new Set();
       model.traverse(o => { if (o.isMesh) { geometries.add(o.geometry.uuid); materials.add(o.material.uuid); } });
       const rows = fixture.rows.map(r => ({ ...r }));
       const footprint = fixture.getFootprint();
+      const source = model.userData.source || 'public';
+      const bounds = new THREE.Box3().setFromObject(model);
       const hidden = !group.getObjectByName('candy-rack-fallback').visible;
       fixture.dispose();
-      return { rows, footprint, colliders, hidden, stock: stock.map(s => s.count), maxContactError,
+      return { source, bounds: { min: bounds.min.toArray(), max: bounds.max.toArray() }, rows, footprint, colliders, hidden, stock: stock.map(s => s.count), maxContactError,
         detached: scene.children.length === 0, released: [...geometries].every(id => deletedGeometry.has(id)) && [...materials].every(id => deletedMaterial.has(id)) };
     });
+    assert.equal(result.source, privateMode ? 'user-assets' : 'public');
     assert.equal(result.rows.length, options.rows || 5);
     assert.equal(result.rows[0].id, 'candy-display-front_row_0_choco-bars');
     assert.equal(result.rows[0].name, 'Assorted Chocolate Candy Bars');
@@ -86,6 +94,7 @@ try {
     assert.ok(result.hidden && result.detached && result.released);
     assert.ok(result.maxContactError < 1e-6, JSON.stringify(result));
     assert.equal(result.footprint.w, options.footprintWidth || 3);
+    assert.equal(result.footprint.d, options.footprintDepth || 1.6);
     console.log('PASS loaded stock/contact/footprint/cleanup', JSON.stringify(result));
   }
   mode = 'failure';

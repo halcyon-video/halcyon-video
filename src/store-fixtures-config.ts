@@ -644,7 +644,7 @@ export function counterAnchoredPlacements(
       {
         id: 'candy-display-front',
         kind: 'candy-display',
-        position: { x: 9.0, z: -4.0 }, // band outer face -3.6 − rackDepth/2 − 0.05
+        position: { x: 9.0, z: -4.45 }, // keep rear edge clear of band at z=-3.6
         yaw: 0,
         options: { rows: 5, footprintWidth: 3.0 }
       },
@@ -727,7 +727,7 @@ export function counterAnchoredPlacements(
     {
       id: 'candy-display-front',
       kind: 'candy-display',
-      position: { x: 6.09, z: -2.12 },
+      position: { x: 5.81066, z: -2.47278 },
       yaw: 0.6697,
       options: { rows: 5, footprintWidth: 3.0 }
     },

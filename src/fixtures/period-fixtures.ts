@@ -1,4 +1,4 @@
-import { CANDY_TRAY_ANGLE, installCandyRackModel } from './candy-rack-model';
+import { CANDY_TRAY_ANGLE, installCandyRackModel, candyStockMatrix } from './candy-rack-model';
 import { selfLit } from '../material-lighting';
 // T06 — period fixtures & props: candy display, previously-viewed bin, tape
 // rewinder, tape-cleaner display. All primitive-geometry + canvas-texture,
@@ -99,7 +99,7 @@ export class CandyDisplay implements StoreFixture {
     const options = this.placement.options || {};
     const rows = (options.rows as number) || 5;
     const width = (options.footprintWidth as number) || 3.0;
-    const depth = (options.footprintDepth as number) || 0.7;
+    const depth = (options.footprintDepth as number) || 1.6;
     const labels = (options.labels as string[]) || DEFAULT_CANDY_LABELS;
     const palette = (options.palette as string[]) || ['#c81e2c', '#1a3fae', '#e08a00', '#1c8a4a', '#7a1cae'];
 
@@ -155,16 +155,19 @@ export class CandyDisplay implements StoreFixture {
       this.disposables.push({ mat: boxMat, tex });
 
       const perRow = Math.max(3, Math.floor((width - 0.3) / 0.36));
-      const inst = new THREE.InstancedMesh(boxGeo, boxMat, perRow);
+      const stockDepth = Math.max(1, Math.floor((depth - .22) / .24));
+      const inst = new THREE.InstancedMesh(boxGeo, boxMat, perRow * stockDepth);
+      inst.name = `candy-stock-${r}`;
       inst.castShadow = true;
       inst.receiveShadow = true;
       const m4 = new THREE.Matrix4();
       for (let i = 0; i < perRow; i++) {
-        const bx = -width / 2 + 0.3 + i * ((width - 0.6) / Math.max(1, perRow - 1) || 0.36);
-        m4.makeRotationX(CANDY_TRAY_ANGLE);
-        // The box bottom lies on the tray top, including its 12-degree slope.
-        m4.setPosition(bx, y + .015 + .21 * Math.cos(CANDY_TRAY_ANGLE), .21 * Math.sin(CANDY_TRAY_ANGLE));
-        inst.setMatrixAt(i, m4);
+        const span = width * .9 - .32;
+        const bx = -span / 2 + i * span / Math.max(1, perRow - 1);
+        for (let d = 0; d < stockDepth; d++) {
+          candyStockMatrix(m4, bx, y + .015, (d - (stockDepth - 1) / 2) * .24);
+          inst.setMatrixAt(i * stockDepth + d, m4);
+        }
       }
       inst.instanceMatrix.needsUpdate = true;
       group.add(inst);
@@ -186,7 +189,7 @@ export class CandyDisplay implements StoreFixture {
   getFootprint(): Footprint {
     const options = this.placement.options || {};
     const width = (options.footprintWidth as number) || 3.0;
-    const depth = (options.footprintDepth as number) || 0.7;
+    const depth = (options.footprintDepth as number) || 1.6;
     return {
       label: `fixture:${this.placement.id}`,
       kind: 'fixture',
