@@ -4,7 +4,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { detectBrandDrop, BRAND_DROP_DIRS } from '../src/brand-drop.ts';
+import { detectBrandDrop, BRAND_DROP_DIRS, tracedAlphaPathD } from '../src/brand-drop.ts';
 
 // Mock minimal DOM Image for testing image probing in node
 class MockImage {
@@ -36,6 +36,26 @@ test('BRAND_DROP_DIRS includes common case variations', () => {
   assert.ok(BRAND_DROP_DIRS.includes('brand'));
   assert.ok(BRAND_DROP_DIRS.includes('BRAND'));
   assert.ok(BRAND_DROP_DIRS.includes('Brand'));
+});
+
+test('raster silhouette preserves disconnected mark pieces and a counter', () => {
+  // Synthetic brand-free lockup: two separate blocks, the second with a
+  // transparent counter. A one-component boundary walk used to return only
+  // the left block — exactly the reported dropped-wordmark crop.
+  const w = 30, h = 12;
+  const alpha = new Float32Array(w * h);
+  const fill = (x0: number, y0: number, x1: number, y1: number, a = 255) => {
+    for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) alpha[y * w + x] = a;
+  };
+  fill(1, 2, 9, 10);
+  fill(17, 1, 29, 11);
+  fill(21, 4, 25, 8, 0);
+
+  const d = tracedAlphaPathD(alpha, w, h);
+  assert.ok(d);
+  assert.equal(d!.match(/M/g)?.length, 3, 'two outer pieces plus the counter must survive');
+  const xs = [...d!.matchAll(/[ML](-?\d+(?:\.\d+)?)\s/g)].map((m) => Number(m[1]));
+  assert.ok(Math.min(...xs) < 2 && Math.max(...xs) >= 28, 'path spans the whole lockup');
 });
 
 test('detectBrandDrop finds uppercase BRAND/LOGO.PNG', async () => {
