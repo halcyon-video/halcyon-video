@@ -7,6 +7,7 @@ import {
   HALLOWEEN_CLING_FINISH,
   HALLOWEEN_COUNTER_BAND_TOP_Y,
   HALLOWEEN_PUMPKIN_COUNTER_U,
+  HALLOWEEN_PUMPKIN_DESK_U,
   halloweenClingPlacements,
   halloweenPumpkinCounterPosition,
 } from '../src/entrance/halloween-layout.ts';
@@ -70,3 +71,33 @@ test('Pumpkin sits on the outer counter band instead of colliding with register 
   assert.ok(Math.abs(p.x - 6.45) < 1e-9);
   assert.ok(p.z > 4);
 });
+
+test('Pumpkin placement supports standalone desk without outer blue band', () => {
+  assert.equal(HALLOWEEN_PUMPKIN_DESK_U, -1.85);
+  const pDesk = halloweenPumpkinCounterPosition({ x: 3.2, y: 2.85, z: 2.1, rotY: 0, depth: 1.0 }, false);
+  assert.deepEqual(pDesk, { x: 3.2, y: 2.85, z: 2.1 });
+});
+
+test('Pumpkin authored metrics record valid dimensions, materials and triangle budget', () => {
+  const metrics = JSON.parse(readFileSync(new URL('../tools/models/halloween-pumpkin-metrics.json', import.meta.url), 'utf8'));
+  assert.equal(metrics.bytes, 84000);
+  assert.equal(metrics.triangles, 2752);
+  assert.equal(metrics.materials, 2);
+  assert.deepEqual(metrics.dimensions_ft, [1.34, 1.24, 1.34]);
+});
+
+test('Halloween cling art is non-empty SVG with transparent background and no external imagery', () => {
+  const svg = readFileSync(new URL('../public/art/halloween-clings.svg', import.meta.url), 'utf8');
+  assert.ok(svg.includes('<svg'));
+  assert.ok(svg.includes('<path'));
+  assert.ok(!svg.includes('<image'));
+  assert.ok(!svg.includes('<rect'));
+});
+
+test('Halloween cling placements skip even panes and adapt to store width', () => {
+  const smallPanes = [{ lo: 0, hi: 4 }, { lo: 4, hi: 8 }];
+  const placements = halloweenClingPlacements(smallPanes);
+  assert.equal(placements.length, 3);
+  assert.ok(placements.every(p => p.paneIndex === 1));
+});
+
