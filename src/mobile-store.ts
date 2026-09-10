@@ -47,6 +47,12 @@ const point = new THREE.Vector2();
 const world = new THREE.Vector3();
 const matrix = new THREE.Matrix4();
 export function slotWorld(slot: MovieSlot, out: THREE.Vector3): THREE.Vector3 {
+  if (typeof slot.currentX === 'number' && Number.isFinite(slot.currentX)) {
+    return out.set(slot.currentX, slot.currentY, slot.currentZ);
+  }
+  if (typeof slot.restingX === 'number' && Number.isFinite(slot.restingX)) {
+    return out.set(slot.restingX, slot.restingY, slot.restingZ);
+  }
   slot.frontMesh.getMatrixAt(slot.instanceIdx, matrix);
   return out.setFromMatrixPosition(matrix).applyMatrix4(slot.frontMesh.matrixWorld);
 }
@@ -79,7 +85,11 @@ export function mobileStoreTap(scene: StoreScene, e: PointerEvent): boolean {
     let best = 2.25;
     for (const slot of scene.slotsByPosition.values()) {
       if (slot.hidden) continue;
-      const d = slotWorld(slot, world).distanceToSquared(hit.point);
+      const sx = slot.currentX ?? slot.restingX;
+      const sy = slot.currentY ?? slot.restingY;
+      const sz = slot.currentZ ?? slot.restingZ;
+      const dx = sx - hit.point.x, dy = sy - hit.point.y, dz = sz - hit.point.z;
+      const d = dx * dx + dy * dy + dz * dz;
       if (d < best) { best = d; picked = slot; }
     }
     if (picked) break;
@@ -131,8 +141,11 @@ export function beginMobileDrag(scene: StoreScene, x: number, y: number) {
   const right = new THREE.Vector3().setFromMatrixColumn(scene.camera.matrixWorld, 0);
   const up = new THREE.Vector3().setFromMatrixColumn(scene.camera.matrixWorld, 1);
   const distance = pos.distanceTo(look);
+  const domEl = scene.renderer.domElement;
+  const clientWidth = domEl.clientWidth || 1;
+  const clientHeight = domEl.clientHeight || 1;
   const unitsPerPixel = 2 * distance * Math.tan(scene.camera.fov * Math.PI / 360)
-    / scene.renderer.domElement.clientHeight;
+    / clientHeight;
   const forward = look.clone().sub(pos).normalize();
   const yaw = Math.atan2(-forward.x, -forward.z);
   const pitch = Math.asin(forward.y);
@@ -167,7 +180,7 @@ export function beginMobileDrag(scene: StoreScene, x: number, y: number) {
       if (scene.mode !== mode) return;
       dragged.add(scene);
       if (overview) {
-        const raw = THREE.MathUtils.clamp(yaw + (px - x) * Math.PI / scene.renderer.domElement.clientWidth * 0.65,
+        const raw = THREE.MathUtils.clamp(yaw + (px - x) * Math.PI / clientWidth * 0.65,
           Math.min(...angles, yaw) - 0.12, Math.max(...angles, yaw) + 0.12);
         let nearest = 0, gap = Infinity;
         angles.forEach((a, i) => { const d = Math.abs(a - raw); if (d < gap) { gap = d; nearest = i; } });

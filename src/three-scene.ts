@@ -1904,10 +1904,9 @@ export class StoreScene {
     const phoneEntry = usesPhoneQualityDefault();
     const phoneBudget = phoneEntry && !explicitQuality;
     const automaticQuality = calibrated?.tier || (softwareGL ? 'low' : integratedGL ? 'medium' : 'high');
-    // A phone viewport can receive a desktop-GPU calibration (or an overly
-    // optimistic mobile result). Keep its first visit within the existing
-    // medium budget; an explicit quality choice remains authoritative.
-    const effectiveQuality = explicitQuality || (phoneEntry && automaticQuality === 'high' ? 'medium' : automaticQuality);
+    // A phone viewport defaults conservatively to low; an explicit quality
+    // choice remains authoritative.
+    const effectiveQuality = explicitQuality || (phoneEntry ? 'low' : automaticQuality);
     this.effectiveQuality = effectiveQuality as 'high' | 'medium' | 'low';
     this.softwareGL = softwareGL;
     // Supersample grant: an AUTO-tiered 'high' only earns the above-native
@@ -4854,8 +4853,7 @@ export class StoreScene {
 
     // Persist an already-composited static frame instead of re-drawing it every
     // stay-awake rAF. The sharp settle frame stays on screen at zero GPU.
-    const staticPersist = !this.motionSharpDisabled &&
-      !this.tierIsIdle && !videoPlaying && !sceneChanging && this.staticSettled;
+    const staticPersist = !this.tierIsIdle && !videoPlaying && !sceneChanging && this.staticSettled;
 
     // SETTLE REFINEMENT: once quiet for QUALITY_SETTLE_MS, redraw parked frame SUPERSAMPLED.
     // qualityScale < settleScale tests if there is anything to gain. softwareGL excluded.
@@ -4875,7 +4873,7 @@ export class StoreScene {
     // moved. Idle/video/persist frames keep the last drawn frame's qualityScale,
     // so a parked still never softens under the viewer (no res "pop").
     if (!settleRefine && !staticPersist && !this.tierIsIdle && (sceneChanging || cameraMoving)) {
-      const wantSharp = !this.softwareGL && !this.motionSharpDisabled &&
+      const wantSharp = !this.softwareGL && (this.mode === 'inspect' || !this.motionSharpDisabled) &&
         this.motionScale > 1 &&
         (cameraMoving || this.mode === 'inspect' || (time - this.lastCameraMotionTime) < StoreScene.QUALITY_SETTLE_MS);
       const targetQuality = wantSharp ? this.motionScale : 1.0;

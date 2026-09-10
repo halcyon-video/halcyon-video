@@ -653,22 +653,24 @@ export function buildStore(scene: StoreScene) {
     const logoLight = new THREE.PointLight(logoLightColor, 15, 30); // Warm theme light
     logoLight.name = 'storefrontSignLight';
     logoLight.position.set(facade.logoAnchor.x, facade.logoAnchor.y, facade.logoAnchor.z + 3.5);
-    logoLight.castShadow = true;
-    logoLight.shadow.bias = -0.002;
-    logoLight.shadow.mapSize.width = 1024;
-    logoLight.shadow.mapSize.height = 1024;
-    // On-demand only (issue #111): a PointLight's shadow is 6 cube-face passes, and
-    // its 30ft radius reaches into the store, so leaving this on default autoUpdate
-    // means every interior-motion rebake (case-pop settle, clerk walk, launch
-    // flourish, end-cap lerp — all of which only need the SUN's map refreshed) pays
-    // for this too. autoUpdate=false opts it out of those. The paired one-shot
-    // needsUpdate=true bakes it once during the boot-time bake just below (~line 638)
-    // so the cube depth texture still gets allocated before anything samples it — see
-    // that bake's comment for why a shadow-casting light that never renders once
-    // leaves the sampler bound to nothing. Stored on the rig so day/night reroll can
-    // re-flag it if the exterior ever actually changes.
-    logoLight.shadow.autoUpdate = false;
-    logoLight.shadow.needsUpdate = true;
+    logoLight.castShadow = scene.effectiveQuality !== 'low' && !scene.softwareGL;
+    if (logoLight.castShadow) {
+      logoLight.shadow.bias = -0.002;
+      logoLight.shadow.mapSize.width = 1024;
+      logoLight.shadow.mapSize.height = 1024;
+      // On-demand only (issue #111): a PointLight's shadow is 6 cube-face passes, and
+      // its 30ft radius reaches into the store, so leaving this on default autoUpdate
+      // means every interior-motion rebake (case-pop settle, clerk walk, launch
+      // flourish, end-cap lerp — all of which only need the SUN's map refreshed) pays
+      // for this too. autoUpdate=false opts it out of those. The paired one-shot
+      // needsUpdate=true bakes it once during the boot-time bake just below (~line 638)
+      // so the cube depth texture still gets allocated before anything samples it — see
+      // that bake's comment for why a shadow-casting light that never renders once
+      // leaves the sampler bound to nothing. Stored on the rig so day/night reroll can
+      // re-flag it if the exterior ever actually changes.
+      logoLight.shadow.autoUpdate = false;
+      logoLight.shadow.needsUpdate = true;
+    }
     scene.scene.add(logoLight);
     scene.outdoor.logoLight = logoLight;
     setFacadeEntryLighting(scene.scene, scene.outdoor.outsideMode);
@@ -1090,8 +1092,8 @@ export function buildStore(scene: StoreScene) {
     // The lights themselves all stay — brightness and pool coverage are
     // unchanged, the uncast ones simply don't ground their own fixtures.
     // Fewer depth passes at bake time is a straight perf win too.
-    const MATERIAL_SAMPLER_RESERVE = 7; // worst shell material is 4 maps + envMap, + headroom
-    const OTHER_SHADOW_LIGHTS = 2;      // the sun (directional) + the storefront logo (point)
+    const MATERIAL_SAMPLER_RESERVE = 8; // worst lit material (retail cases with poster arrays) needs 8 samplers + envMap
+    const OTHER_SHADOW_LIGHTS = scene.outdoor.logoLight?.castShadow ? 2 : 1; // the sun (directional) + the storefront logo (point)
     const spotShadowBudget = Math.max(0,
       scene.renderer.capabilities.maxTextures - MATERIAL_SAMPLER_RESERVE - OTHER_SHADOW_LIGHTS);
     // Spacing is set by where a pool actually still reads, not by the cone's

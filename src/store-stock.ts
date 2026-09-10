@@ -1,4 +1,4 @@
-import { mobileStoreActive, slotWorld } from './mobile-store';
+import { mobileStoreActive } from './mobile-store';
 // Movie-box stock instancing — extracted from StoreScene (three-scene.ts
 // keeps one-line delegating stubs): building/clearing the instanced shelf
 // stock (buildAllMovieBoxes/clearMovieBoxes/rebuildMovieBoxes), the stacked
@@ -1419,13 +1419,18 @@ export function updateLOD(scene: StoreScene) {
     // One narrow visible lane plus a margin for the next finger movement.
     // Leave distant covers low-res; do not promote a whole library at once.
     scene.camera.updateMatrixWorld();
+    const camPos = scene.camera.position;
     for (const slot of scene.slotsByPosition.values()) {
       if (slot.hidden) continue;
-      slotWorld(slot, priorityPoint);
-      const distance = priorityPoint.distanceToSquared(scene.camera.position);
-      priorityPoint.project(scene.camera);
+      const sx = slot.currentX ?? slot.restingX;
+      const sy = slot.currentY ?? slot.restingY;
+      const sz = slot.currentZ ?? slot.restingZ;
+      const dx = sx - camPos.x, dy = sy - camPos.y, dz = sz - camPos.z;
+      const distance = dx * dx + dy * dy + dz * dz;
+      if (distance > 900) continue;
+      priorityPoint.set(sx, sy, sz).project(scene.camera);
       if (priorityPoint.z < -1 || priorityPoint.z > 1 || Math.abs(priorityPoint.x) > 1.5
-          || Math.abs(priorityPoint.y) > 1.5 || distance > 900) continue;
+          || Math.abs(priorityPoint.y) > 1.5) continue;
       const priority = distance < 144 ? 3 : 1;
       if ((requestedPriority.get(slot) ?? 0) >= priority) continue;
       requestedPriority.set(slot, priority);

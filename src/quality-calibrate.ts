@@ -144,10 +144,7 @@ function isValidTier(v: string | null): v is QualityTier {
  */
 export function readCalibratedQuality(gpuName: string): CalibratedQuality | null {
   if (usesPhoneQualityDefault()) {
-    const measuredLow = typeof localStorage !== 'undefined' &&
-      localStorage.getItem('bb_quality_auto') === 'low' &&
-      localStorage.getItem('bb_quality_sig') === computeSig(gpuName);
-    return { tier: measuredLow ? 'low' : 'medium', supersample: false };
+    return { tier: 'low', supersample: false };
   }
   if (typeof localStorage === 'undefined') return null;
   const tier = localStorage.getItem('bb_quality_auto');
@@ -484,7 +481,7 @@ export async function calibrateQualityIfNeeded(): Promise<QualityTier | null> {
   const explicit = localStorage.getItem('bb_quality');
   if (explicit) return isValidTier(explicit) ? explicit : null; // explicit override always wins, skips calibration entirely
   if (isHarnessActive()) return null;
-  if (usesPhoneQualityDefault()) return 'medium';
+  if (usesPhoneQualityDefault()) return 'low';
 
   try {
     const probe = openProbe();
