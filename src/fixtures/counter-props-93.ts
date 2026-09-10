@@ -24,6 +24,7 @@ import { loadProp } from '../props';
 import { BB_ARCHIVO_BLACK } from '../bundled-fonts';
 import { buildImpactPrinter93 } from './impact-printer-93';
 import { installCounterTelephone } from './counter-telephone';
+import { installCounterScanner } from './counter-scanner';
 
 const texCache = new Map<string, THREE.CanvasTexture>();
 
@@ -111,6 +112,7 @@ export function buildCounterProps93(scene: StoreScene): void {
   group.name = 'counter-props-93';
   scene.scene.add(group);
   scene.activeSignageObjects.push(group);
+  installCounterScanner(scene, group);
 
   const cx = inner.x;
   const matte = (color: number, roughness = 0.6) =>
