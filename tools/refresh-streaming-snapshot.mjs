@@ -102,6 +102,15 @@ for (const def of DEFAULT_STREAMING_SERVICES) {
       title,
       year: Number.isFinite(year) ? year : new Date().getFullYear(),
       ...(item.posterPath ? { posterPath: item.posterPath } : {}),
+      ...(item.overview ? { overview: item.overview } : {}),
+      ...(item.backdropPath ? { backdropPath: item.backdropPath } : {}),
+      ...(item.duration ? { duration: item.duration } : {}),
+      ...(item.rating ? { rating: item.rating } : {}),
+      ...(item.director ? { director: item.director } : {}),
+      ...(Array.isArray(item.actors) ? { actors: item.actors } : {}),
+      ...(typeof item.voteAverage === 'number' ? { voteAverage: item.voteAverage } : {}),
+      ...(Array.isArray(item.genres) ? { genres: item.genres } : {}),
+      ...(Array.isArray(item.genreIds) ? { genreIds: item.genreIds } : {}),
     });
   }
   console.log(`    ${titles.length} title(s).`);
@@ -111,6 +120,8 @@ for (const def of DEFAULT_STREAMING_SERVICES) {
 const snapshot = {
   generatedAt: new Date().toISOString(),
   watchRegion: WATCH_REGION,
+  provenance: 'tmdb-watch-providers',
+  refreshPolicy: 'weekly',
   services,
 };
 

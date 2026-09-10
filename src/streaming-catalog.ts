@@ -221,6 +221,12 @@ function genreNames(genreIds: unknown): string[] {
 const TMDB_POSTER_BASE = 'https://image.tmdb.org/t/p/w342';
 const TMDB_BACKDROP_BASE = 'https://image.tmdb.org/t/p/w780';
 
+export const DEFAULT_STREAMING_WATCH_REGION = 'US';
+
+export function resolveStreamingWatchRegion(region?: string | null): string {
+  return (region && region.trim().toUpperCase()) || DEFAULT_STREAMING_WATCH_REGION;
+}
+
 /** One raw entry off Jellyseerr's GET /api/v1/discover/movies `results`
  *  array -- same camelCased shape jellyseerr.ts's fetchDiscoverMovies already
  *  parses (verified against overseerr's mapMovieResult). */
@@ -232,6 +238,11 @@ export interface RawDiscoverItem {
   posterPath?: string;
   backdropPath?: string;
   overview?: string;
+  duration?: string;
+  rating?: string;
+  director?: string;
+  actors?: string[];
+  genres?: string[];
   voteAverage?: number;
   genreIds?: number[];
   /** Present once Jellyseerr already tracks the title (owned or requested) --
@@ -248,27 +259,33 @@ export function synthesizeStreamingMovie(item: RawDiscoverItem, def: StreamingSe
   if (typeof tmdbId !== 'number' || !title) return null;
   const releaseDate = item.releaseDate || '';
   const year = releaseDate ? new Date(releaseDate).getUTCFullYear() : new Date().getFullYear();
+  const streamingUrl = buildStreamingUrl(def, title, tmdbId);
   return {
     id: `streaming_${def.id}_${tmdbId}`,
     title,
     year: Number.isFinite(year) ? year : new Date().getFullYear(),
     premiereDate: releaseDate || undefined,
-    duration: 'N/A',
-    rating: 'NR',
+    duration: item.duration || 'N/A',
+    rating: item.rating || 'NR',
     overview: item.overview || 'No synopsis available yet.',
-    director: 'Unknown Director',
-    actors: [],
-    genres: genreNames(item.genreIds),
+    director: item.director || 'Unknown Director',
+    actors: Array.isArray(item.actors) ? item.actors : [],
+    genres: Array.isArray(item.genres) && item.genres.length > 0 ? item.genres : genreNames(item.genreIds),
     localPath: '',
     posterUrl: item.posterPath ? `${TMDB_POSTER_BASE}${item.posterPath}` : undefined,
     backdropUrl: item.backdropPath ? `${TMDB_BACKDROP_BASE}${item.backdropPath}` : undefined,
     communityRating: typeof item.voteAverage === 'number' ? item.voteAverage : undefined,
-    libraryName: def.name,
+    libraryName: 'Movies',
     tmdbId,
     streaming: true,
     streamingServiceId: def.id,
     streamingServiceName: def.name,
-    streamingUrl: buildStreamingUrl(def, title, tmdbId),
+    streamingUrl,
+    streamingServices: [{
+      id: def.id,
+      name: def.name,
+      url: streamingUrl,
+    }],
   };
 }
 
@@ -307,33 +324,116 @@ export function ingestStreamingResults(
 }
 
 /**
- * Group synthesized streaming movies into one synthetic Library per service
- * (mirrors games-only.ts's buildGameLibraries -- one un-sectioned aisle per
- * key, signed with the key's own name), ordered per `order` (the resolved
- * enabled-service list) so the shelves come out in a stable, configured
- * left-to-right order rather than whatever order titles happened to resolve
- * in. A service with no surviving stock builds no library at all -- an empty
- * aisle would be a lie, same as every other synthetic source in this app.
+ * Deduplicates streaming movies across services (GH #297):
+ * Consolidates duplicate titles by tmdbId (or normalized title + year), merges
+ * their streaming services into `streamingServices`, preserves enriched metadata,
+ * ensures `libraryName` is unified ('Movies'), and orders `streamingServices`
+ * according to the configured service order.
+ */
+export function deduplicateStreamingMovies(
+  movies: Movie[],
+  order?: StreamingServiceDef[],
+): Movie[] {
+  if (!movies || movies.length === 0) return [];
+  const orderIdx = order ? new Map(order.map((d, i) => [d.id, i])) : null;
+  const byKey = new Map<string, Movie>();
+
+  for (const m of movies) {
+    const key = (m.tmdbId && m.tmdbId > 0)
+      ? `tmdb:${m.tmdbId}`
+      : `title:${m.title.trim().toLowerCase()}:${m.year}`;
+
+    const existing = byKey.get(key);
+    if (!existing) {
+      const services = m.streamingServices ? [...m.streamingServices] : [];
+      if (services.length === 0 && m.streamingServiceId) {
+        services.push({
+          id: m.streamingServiceId,
+          name: m.streamingServiceName || m.streamingServiceId.toUpperCase(),
+          url: m.streamingUrl || (m.tmdbId ? tmdbWatchFallbackUrl(m.tmdbId) : ''),
+        });
+      }
+      const cloned: Movie = {
+        ...m,
+        libraryName: 'Movies',
+        streamingServices: services,
+      };
+      byKey.set(key, cloned);
+    } else {
+      const servicesToAdd = m.streamingServices && m.streamingServices.length > 0
+        ? m.streamingServices
+        : (m.streamingServiceId ? [{
+            id: m.streamingServiceId,
+            name: m.streamingServiceName || m.streamingServiceId.toUpperCase(),
+            url: m.streamingUrl || (m.tmdbId ? tmdbWatchFallbackUrl(m.tmdbId) : ''),
+          }] : []);
+
+      for (const s of servicesToAdd) {
+        if (!existing.streamingServices!.some((x) => x.id === s.id)) {
+          existing.streamingServices!.push(s);
+        }
+      }
+
+      if ((existing.duration === 'N/A' || !existing.duration) && m.duration && m.duration !== 'N/A') {
+        existing.duration = m.duration;
+      }
+      if ((existing.rating === 'NR' || !existing.rating) && m.rating && m.rating !== 'NR') {
+        existing.rating = m.rating;
+      }
+      if ((existing.director === 'Unknown Director' || !existing.director) && m.director && m.director !== 'Unknown Director') {
+        existing.director = m.director;
+      }
+      if ((!existing.actors || existing.actors.length === 0) && m.actors && m.actors.length > 0) {
+        existing.actors = [...m.actors];
+      }
+      if ((!existing.genres || existing.genres.length === 0) && m.genres && m.genres.length > 0) {
+        existing.genres = [...m.genres];
+      }
+      if (!existing.backdropUrl && m.backdropUrl) {
+        existing.backdropUrl = m.backdropUrl;
+      }
+      if ((!existing.overview || existing.overview === 'No synopsis available yet.') && m.overview && m.overview !== 'No synopsis available yet.') {
+        existing.overview = m.overview;
+      }
+      if (existing.communityRating === undefined && m.communityRating !== undefined) {
+        existing.communityRating = m.communityRating;
+      }
+    }
+  }
+
+  const result = [...byKey.values()];
+  for (const movie of result) {
+    if (orderIdx && movie.streamingServices && movie.streamingServices.length > 1) {
+      movie.streamingServices.sort((a, b) => (orderIdx.get(a.id) ?? 999) - (orderIdx.get(b.id) ?? 999));
+    }
+    if (movie.streamingServices && movie.streamingServices.length > 0) {
+      movie.streamingServiceId = movie.streamingServices[0].id;
+      movie.streamingServiceName = movie.streamingServices[0].name;
+      movie.streamingUrl = movie.streamingServices[0].url;
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Builds the unified streaming library (GH #297):
+ * Returns a single shared "Movies" library containing all deduplicated titles
+ * across the enabled services, so provider identities are hidden while browsing
+ * and aisles are unified rather than branded per provider.
  */
 export function buildStreamingLibraries(
   movies: Movie[],
   order: StreamingServiceDef[],
 ): JellyfinLibrary[] {
-  const byService = new Map<string, Movie[]>();
-  for (const m of movies) {
-    if (!m.streamingServiceId) continue;
-    let list = byService.get(m.streamingServiceId);
-    if (!list) byService.set(m.streamingServiceId, (list = []));
-    list.push(m);
-  }
-  const orderIdx = new Map(order.map((d, i) => [d.id, i]));
-  return [...byService.entries()]
-    .sort((a, b) => (orderIdx.get(a[0]) ?? Infinity) - (orderIdx.get(b[0]) ?? Infinity))
-    .map(([serviceId, serviceMovies]) => ({
-      id: `streaming:${serviceId}`,
-      name: serviceMovies[0].streamingServiceName || serviceId.toUpperCase(),
-      movies: serviceMovies,
-      genres: [],
-      streaming: true,
-    }));
+  if (!movies || movies.length === 0) return [];
+  const deduplicated = deduplicateStreamingMovies(movies, order);
+  if (deduplicated.length === 0) return [];
+  return [{
+    id: 'streaming:movies',
+    name: 'Movies',
+    movies: deduplicated,
+    genres: [],
+    streaming: true,
+  }];
 }

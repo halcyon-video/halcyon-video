@@ -16,7 +16,10 @@ import {
   fallbackToSnapshotOnFailure,
   synthesizeStreamingMovie,
   ingestStreamingResults,
+  deduplicateStreamingMovies,
   buildStreamingLibraries,
+  resolveStreamingWatchRegion,
+  DEFAULT_STREAMING_WATCH_REGION,
 } from '../src/streaming-catalog.ts';
 
 test('fallbackToSnapshotOnFailure: falls back to snapshot when network source yields no titles', async () => {
@@ -150,6 +153,10 @@ test('synthesizeStreamingMovie: maps a raw discover item to a shelvable streamin
     releaseDate: '1999-03-31',
     posterPath: '/poster.jpg',
     overview: 'A hacker discovers reality is a simulation.',
+    duration: '2h 16m',
+    rating: 'R',
+    director: 'Lilly Wachowski',
+    actors: ['Keanu Reeves', 'Laurence Fishburne'],
     voteAverage: 8.7,
     genreIds: [28, 878, 99999], // 99999 = unknown id, dropped rather than guessed
   }, netflix);
@@ -158,13 +165,23 @@ test('synthesizeStreamingMovie: maps a raw discover item to a shelvable streamin
   assert.equal(movie!.title, 'The Matrix');
   assert.equal(movie!.year, 1999);
   assert.equal(movie!.streaming, true);
+  assert.equal(movie!.libraryName, 'Movies');
   assert.equal(movie!.streamingServiceId, 'netflix');
   assert.equal(movie!.streamingServiceName, 'NETFLIX');
   assert.equal(movie!.streamingUrl, 'https://www.netflix.com/search?q=The%20Matrix');
   assert.equal(movie!.posterUrl, 'https://image.tmdb.org/t/p/w342/poster.jpg');
+  assert.equal(movie!.duration, '2h 16m');
+  assert.equal(movie!.rating, 'R');
+  assert.equal(movie!.director, 'Lilly Wachowski');
+  assert.deepEqual(movie!.actors, ['Keanu Reeves', 'Laurence Fishburne']);
   assert.equal(movie!.communityRating, 8.7);
   assert.deepEqual(movie!.genres, ['Action', 'Science Fiction']);
   assert.equal(movie!.localPath, '');
+  assert.deepEqual(movie!.streamingServices, [{
+    id: 'netflix',
+    name: 'NETFLIX',
+    url: 'https://www.netflix.com/search?q=The%20Matrix',
+  }]);
 });
 
 test('synthesizeStreamingMovie: a malformed item (no id/title) is dropped, not thrown', () => {
@@ -205,27 +222,81 @@ test('ingestStreamingResults: caps at the requested limit', () => {
   assert.equal(out.length, 5);
 });
 
-test('buildStreamingLibraries: groups by service, orders per the resolved service list, drops empty services', () => {
+test('deduplicateStreamingMovies: consolidates titles with same tmdbId across services and merges streaming services in order', () => {
+  const netflix = DEFAULT_STREAMING_SERVICES.find((d) => d.id === 'netflix')!;
+  const prime = DEFAULT_STREAMING_SERVICES.find((d) => d.id === 'prime')!;
+  const hulu = DEFAULT_STREAMING_SERVICES.find((d) => d.id === 'hulu')!;
+
+  const netflixMovie = synthesizeStreamingMovie({
+    id: 424,
+    title: "Schindler's List",
+    duration: '3h 15m',
+    rating: 'R',
+    director: 'Steven Spielberg',
+    actors: ['Liam Neeson', 'Ben Kingsley'],
+  }, netflix)!;
+
+  const primeMovie = synthesizeStreamingMovie({
+    id: 424,
+    title: "Schindler's List",
+    backdropPath: '/schindler-backdrop.jpg',
+  }, prime)!;
+
+  const huluMovie = synthesizeStreamingMovie({
+    id: 999,
+    title: 'Different Title',
+  }, hulu)!;
+
+  const deduplicated = deduplicateStreamingMovies([primeMovie, netflixMovie, huluMovie], DEFAULT_STREAMING_SERVICES);
+  assert.equal(deduplicated.length, 2);
+
+  const schindler = deduplicated.find((m) => m.tmdbId === 424)!;
+  assert.ok(schindler);
+  assert.equal(schindler.title, "Schindler's List");
+  assert.equal(schindler.libraryName, 'Movies');
+  assert.equal(schindler.duration, '3h 15m');
+  assert.equal(schindler.rating, 'R');
+  assert.equal(schindler.director, 'Steven Spielberg');
+  assert.deepEqual(schindler.actors, ['Liam Neeson', 'Ben Kingsley']);
+  assert.equal(schindler.backdropUrl, 'https://image.tmdb.org/t/p/w780/schindler-backdrop.jpg');
+
+  // In DEFAULT_STREAMING_SERVICES, netflix precedes prime.
+  assert.equal(schindler.streamingServices?.length, 2);
+  assert.equal(schindler.streamingServices?.[0].id, 'netflix');
+  assert.equal(schindler.streamingServices?.[1].id, 'prime');
+  assert.equal(schindler.streamingServiceId, 'netflix');
+});
+
+test('buildStreamingLibraries: returns single unified Movies library with deduplicated stock', () => {
   const netflix = DEFAULT_STREAMING_SERVICES.find((d) => d.id === 'netflix')!;
   const hulu = DEFAULT_STREAMING_SERVICES.find((d) => d.id === 'hulu')!;
   const movies = [
     synthesizeStreamingMovie({ id: 1, title: 'Hulu Title' }, hulu)!,
     synthesizeStreamingMovie({ id: 2, title: 'Netflix Title A' }, netflix)!,
+    synthesizeStreamingMovie({ id: 2, title: 'Netflix Title A' }, hulu)!, // duplicate across services
     synthesizeStreamingMovie({ id: 3, title: 'Netflix Title B' }, netflix)!,
   ];
   const libs = buildStreamingLibraries(movies, DEFAULT_STREAMING_SERVICES);
-  assert.equal(libs.length, 2);
-  // DEFAULT_STREAMING_SERVICES lists netflix before hulu -- the library order
-  // must follow that, not insertion order of the movies array.
-  assert.equal(libs[0].id, 'streaming:netflix');
-  assert.equal(libs[0].name, 'NETFLIX');
-  assert.equal(libs[0].movies.length, 2);
+  assert.equal(libs.length, 1);
+  assert.equal(libs[0].id, 'streaming:movies');
+  assert.equal(libs[0].name, 'Movies');
   assert.equal(libs[0].streaming, true);
   assert.deepEqual(libs[0].genres, []);
-  assert.equal(libs[1].id, 'streaming:hulu');
-  assert.equal(libs[1].movies.length, 1);
+  assert.equal(libs[0].movies.length, 3); // 1, 2, 3
+
+  const dup = libs[0].movies.find((m) => m.tmdbId === 2)!;
+  assert.equal(dup.streamingServices?.length, 2);
 });
 
 test('buildStreamingLibraries: no movies -> no libraries', () => {
   assert.deepEqual(buildStreamingLibraries([], DEFAULT_STREAMING_SERVICES), []);
+});
+
+test('resolveStreamingWatchRegion: defaults to US and normalizes whitespace and case', () => {
+  assert.equal(DEFAULT_STREAMING_WATCH_REGION, 'US');
+  assert.equal(resolveStreamingWatchRegion(), 'US');
+  assert.equal(resolveStreamingWatchRegion(null), 'US');
+  assert.equal(resolveStreamingWatchRegion(''), 'US');
+  assert.equal(resolveStreamingWatchRegion('  gb  '), 'GB');
+  assert.equal(resolveStreamingWatchRegion('ca'), 'CA');
 });

@@ -34,7 +34,12 @@ interface SnapshotTitle {
   posterPath?: string;
   backdropPath?: string;
   overview?: string;
+  duration?: string;
+  rating?: string;
+  director?: string;
+  actors?: string[];
   voteAverage?: number;
+  genres?: string[];
   genreIds?: number[];
 }
 
@@ -47,11 +52,27 @@ interface SnapshotService {
 interface Snapshot {
   generatedAt: string;
   watchRegion: string;
+  provenance?: string;
+  refreshPolicy?: string;
   services: SnapshotService[];
 }
 
 const SNAPSHOT = snapshotData as Snapshot;
 const SNAPSHOT_BY_ID = new Map(SNAPSHOT.services.map((s) => [s.id, s]));
+
+export function getStreamingSnapshotMeta(): {
+  generatedAt: string;
+  watchRegion: string;
+  provenance?: string;
+  refreshPolicy?: string;
+} {
+  return {
+    generatedAt: SNAPSHOT.generatedAt,
+    watchRegion: SNAPSHOT.watchRegion,
+    provenance: SNAPSHOT.provenance,
+    refreshPolicy: SNAPSHOT.refreshPolicy,
+  };
+}
 
 function normalizeSnapshotTitle(t: SnapshotTitle): RawDiscoverItem {
   return {
@@ -61,6 +82,11 @@ function normalizeSnapshotTitle(t: SnapshotTitle): RawDiscoverItem {
     posterPath: t.posterPath,
     backdropPath: t.backdropPath,
     overview: t.overview,
+    duration: t.duration,
+    rating: t.rating,
+    director: t.director,
+    actors: t.actors,
+    genres: t.genres,
     voteAverage: t.voteAverage,
     genreIds: t.genreIds,
   };

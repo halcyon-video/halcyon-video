@@ -6,7 +6,7 @@
 // same file to avoid hardcoding brittle title/id fixtures.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { fetchStreamingMoviesFromSnapshot } from '../src/streaming-snapshot.ts';
+import { fetchStreamingMoviesFromSnapshot, getStreamingSnapshotMeta } from '../src/streaming-snapshot.ts';
 import snapshotData from '../src/data/streaming-snapshot.json' with { type: 'json' };
 
 class FakeLocalStorage {
@@ -29,7 +29,15 @@ async function withStorage(initial: Record<string, string>, fn: () => Promise<vo
   }
 }
 
-test('the committed snapshot has all eight default services with real stock', () => {
+test('getStreamingSnapshotMeta: returns provenance, freshness policy, and watch region', () => {
+  const meta = getStreamingSnapshotMeta();
+  assert.equal(meta.watchRegion, 'US');
+  assert.equal(meta.provenance, 'tmdb-watch-providers');
+  assert.equal(meta.refreshPolicy, 'weekly');
+  assert.ok(typeof meta.generatedAt === 'string' && meta.generatedAt.length > 0);
+});
+
+test('the committed snapshot has all eight default services with real stock and factual metadata', () => {
   const ids = snapshotData.services.map((s: any) => s.id).sort();
   assert.deepEqual(ids, ['appletv', 'disney', 'hulu', 'max', 'netflix', 'paramount', 'peacock', 'prime'].sort());
   for (const s of snapshotData.services as any[]) {
@@ -37,6 +45,12 @@ test('the committed snapshot has all eight default services with real stock', ()
     for (const t of s.titles) {
       assert.equal(typeof t.tmdbId, 'number');
       assert.equal(typeof t.title, 'string');
+      assert.ok(typeof t.overview === 'string' && t.overview.length > 0);
+      assert.ok(typeof t.duration === 'string' && t.duration.length > 0);
+      assert.ok(typeof t.rating === 'string' && t.rating.length > 0);
+      assert.ok(typeof t.director === 'string' && t.director.length > 0);
+      assert.ok(Array.isArray(t.actors) && t.actors.length > 0);
+      assert.ok(Array.isArray(t.genres) && t.genres.length > 0);
     }
   }
 });
@@ -59,6 +73,12 @@ test('fetchStreamingMoviesFromSnapshot: one chosen service returns only its stoc
       assert.equal(m.streamingServiceId, 'netflix');
       assert.equal(m.streamingServiceName, 'NETFLIX');
       assert.ok(m.posterUrl === undefined || m.posterUrl!.startsWith('https://image.tmdb.org/'));
+      assert.notEqual(m.duration, 'N/A');
+      assert.notEqual(m.rating, 'NR');
+      assert.notEqual(m.director, 'Unknown Director');
+      assert.ok(m.actors && m.actors.length > 0);
+      assert.ok(m.genres && m.genres.length > 0);
+      assert.ok(m.streamingServices && m.streamingServices.length === 1);
     }
   });
 });

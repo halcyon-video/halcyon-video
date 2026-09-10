@@ -8,7 +8,14 @@
 // reached through the accessors below rather than an exported `let`.
 import { fetchStreamingMovies, getJellyseerrConfig } from './jellyseerr';
 import type { Movie } from './providers/media-source-provider';
-import { fallbackToSnapshotOnFailure, resolveEnabledServices, resolveStreamingSource } from './streaming-catalog';
+import {
+  fallbackToSnapshotOnFailure,
+  resolveEnabledServices,
+  resolveStreamingSource,
+  deduplicateStreamingMovies,
+  resolveStreamingWatchRegion,
+  type StreamingSource,
+} from './streaming-catalog';
 import { fetchStreamingMoviesFromSnapshot } from './streaming-snapshot';
 import { getSetting } from './settings';
 import { fetchStreamingMoviesFromTmdb, getTmdbConfig } from './tmdb';
@@ -32,14 +39,21 @@ const NEVER_LOADED = '\0never-loaded';
 const SWITCHED_OFF = '\0off';
 let streamingStockKey: string = NEVER_LOADED;
 
+let streamingLoadedAt = 0;
+let streamingLoadedSource: StreamingSource | null = null;
+let streamingLoadedRegion = 'US';
+
 /** `true` unless the owner switched streaming sections off (default ON). */
 export function streamingEnabled(): boolean {
   return getSetting<boolean>('bb_streaming_enabled') !== false;
 }
 
-/** The chosen-services CSV, or a sentinel while the master switch is off. */
+/** The chosen-services CSV and region, or a sentinel while the master switch is off. */
 function streamingChoiceKey(): string {
-  return streamingEnabled() ? (getSetting<string>('bb_streaming_services') || '') : SWITCHED_OFF;
+  if (!streamingEnabled()) return SWITCHED_OFF;
+  const services = getSetting<string>('bb_streaming_services') || '';
+  const region = resolveStreamingWatchRegion(getSetting<string>('bb_watch_region'));
+  return `${services}|${region}`;
 }
 
 /** The loaded stock, for whoever is building the aisles. */
@@ -47,9 +61,26 @@ export function getStreamingMovies(): Movie[] {
   return streamingMovies;
 }
 
-/** Has the choice moved since the stock was fetched? A rebuild asks this. */
+/** Has the choice or region moved since the stock was fetched? A rebuild asks this. */
 export function streamingStockIsStale(): boolean {
   return streamingChoiceKey() !== streamingStockKey;
+}
+
+/** Metadata regarding currently loaded streaming stock provenance and freshness. */
+export function getStreamingStockInfo(): {
+  loadedAt: number;
+  source: StreamingSource | null;
+  region: string;
+  titleCount: number;
+  isStale: boolean;
+} {
+  return {
+    loadedAt: streamingLoadedAt,
+    source: streamingLoadedSource,
+    region: streamingLoadedRegion,
+    titleCount: streamingMovies.length,
+    isStale: streamingStockIsStale(),
+  };
 }
 
 /**
@@ -71,36 +102,49 @@ export async function loadStreamingMovies(): Promise<void> {
   streamingStockKey = streamingChoiceKey();
   if (!streamingEnabled()) {
     streamingMovies = [];
+    streamingLoadedAt = Date.now();
+    streamingLoadedSource = null;
     return;
   }
   const servicesOverride = getSetting<string>('bb_streaming_services');
-  if (resolveEnabledServices(servicesOverride).length === 0) {
+  const enabledDefs = resolveEnabledServices(servicesOverride);
+  if (enabledDefs.length === 0) {
     streamingMovies = []; // nothing chosen -- no network round trip needed
+    streamingLoadedAt = Date.now();
+    streamingLoadedSource = null;
     return;
   }
+  const region = resolveStreamingWatchRegion(getSetting<string>('bb_watch_region'));
+  streamingLoadedRegion = region;
   const TIMEOUT_MS = 15_000;
   const timeoutPromise = new Promise<Movie[]>((resolve) => setTimeout(() => resolve([]), TIMEOUT_MS));
   const source = resolveStreamingSource(!!getTmdbConfig(), !!getJellyseerrConfig());
   const fetchPromise = source === 'tmdb' ? fetchStreamingMoviesFromTmdb(servicesOverride)
     : source === 'jellyseerr' ? fetchStreamingMovies(servicesOverride)
     : fetchStreamingMoviesFromSnapshot(servicesOverride);
+  let rawMovies: Movie[] = [];
   try {
     const primary = await Promise.race([fetchPromise, timeoutPromise]);
-    streamingMovies = await fallbackToSnapshotOnFailure(
+    rawMovies = await fallbackToSnapshotOnFailure(
       primary,
       source,
       () => fetchStreamingMoviesFromSnapshot(servicesOverride)
     );
+    streamingLoadedSource = (primary.length > 0 && source !== 'snapshot') ? source : 'snapshot';
   } catch (e) {
     console.warn('[Streaming] Failed to load streaming-service titles:', e);
     try {
-      streamingMovies = await fallbackToSnapshotOnFailure(
+      rawMovies = await fallbackToSnapshotOnFailure(
         [],
         source,
         () => fetchStreamingMoviesFromSnapshot(servicesOverride)
       );
+      streamingLoadedSource = 'snapshot';
     } catch {
-      streamingMovies = [];
+      rawMovies = [];
+      streamingLoadedSource = null;
     }
   }
+  streamingMovies = deduplicateStreamingMovies(rawMovies, enabledDefs);
+  streamingLoadedAt = Date.now();
 }

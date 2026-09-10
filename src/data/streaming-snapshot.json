@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-21T05:57:17.064Z",
+  "generatedAt": "2026-09-10T08:00:00.000Z",
   "watchRegion": "US",
   "services": [
     {
@@ -10,121 +10,579 @@
           "tmdbId": 1284041,
           "title": "The Last House",
           "year": 2026,
-          "posterPath": "/6JU7E8Vv2M11egkctWVOScxWR75.jpg"
+          "posterPath": "/6JU7E8Vv2M11egkctWVOScxWR75.jpg",
+          "overview": "A family suddenly sealed inside their home must work together to survive against dwindling resources and the ominous threat keeping them trapped.",
+          "backdropPath": "/1RhfevWmWCVHtEqxWBEjPOC5KG1.jpg",
+          "duration": "1h 50m",
+          "rating": "PG-13",
+          "director": "Louis Leterrier",
+          "actors": [
+            "Greta Lee",
+            "Wagner Moura",
+            "Riley Chung",
+            "Noah Alexander Sosnowski",
+            "Emma Ho"
+          ],
+          "voteAverage": 6.9,
+          "genres": [
+            "Horror",
+            "Science Fiction",
+            "Thriller"
+          ],
+          "genreIds": [
+            27,
+            878,
+            53
+          ]
         },
         {
           "tmdbId": 315635,
           "title": "Spider-Man: Homecoming",
           "year": 2017,
-          "posterPath": "/c24sv2weTHPsmDa7jEMN0m2P3RT.jpg"
+          "posterPath": "/c24sv2weTHPsmDa7jEMN0m2P3RT.jpg",
+          "overview": "Following the events of Captain America: Civil War, Peter Parker, with the help of his mentor Tony Stark, tries to balance his life as an ordinary high school student in Queens, New York City, with fighting crime as his superhero alter ego Spider-Man as a new threat, the Vulture, emerges.",
+          "backdropPath": "/fn4n6uOYcB6Uh89nbNPoU2w80RV.jpg",
+          "duration": "2h 13m",
+          "rating": "PG-13",
+          "director": "Jon Watts",
+          "actors": [
+            "Tom Holland",
+            "Michael Keaton",
+            "Robert Downey Jr.",
+            "Marisa Tomei",
+            "Jon Favreau"
+          ],
+          "voteAverage": 7.3,
+          "genres": [
+            "Action",
+            "Adventure",
+            "Science Fiction"
+          ],
+          "genreIds": [
+            28,
+            12,
+            878
+          ]
         },
         {
           "tmdbId": 1504358,
           "title": "Don't Say Good Luck",
           "year": 2026,
-          "posterPath": "/dgTKahWonzVLeN8Lm22WR2S7D0A.jpg"
+          "posterPath": "/dgTKahWonzVLeN8Lm22WR2S7D0A.jpg",
+          "overview": "Sophie Birenbaum is ready for the spotlight as the lead in her high school musical — until she's suddenly facing more drama at home than on the stage.",
+          "backdropPath": "/yzdMGn8IRHSGuV8AIzw19wkRU2W.jpg",
+          "duration": "1h 36m",
+          "rating": "PG-13",
+          "director": "Julia Hart",
+          "actors": [
+            "Sunny Sandler",
+            "Melanie Lynskey",
+            "Max Greenfield",
+            "Stephanie Beatriz",
+            "Bebe Neuwirth"
+          ],
+          "voteAverage": 7.3,
+          "genres": [
+            "Comedy",
+            "Music",
+            "Drama"
+          ],
+          "genreIds": [
+            35,
+            10402,
+            18
+          ]
         },
         {
           "tmdbId": 324857,
           "title": "Spider-Man: Into the Spider-Verse",
           "year": 2018,
-          "posterPath": "/iiZZdoQBEYBv6id8su7ImL0oCbD.jpg"
+          "posterPath": "/iiZZdoQBEYBv6id8su7ImL0oCbD.jpg",
+          "overview": "Struggling to find his place in the world while juggling school and family, Brooklyn teenager Miles Morales is unexpectedly bitten by a radioactive spider and develops unfathomable powers just like the one and only Spider-Man. While wrestling with the implications of his new abilities, Miles discovers a super collider created by the madman Wilson \"Kingpin\" Fisk, causing others from across the Spider-Verse to be inadvertently transported to his dimension.",
+          "backdropPath": "/8mnXR9rey5uQ08rZAvzojKWbDQS.jpg",
+          "duration": "1h 57m",
+          "rating": "PG",
+          "director": "Rodney Rothman",
+          "actors": [
+            "Shameik Moore",
+            "Jake Johnson",
+            "Hailee Steinfeld",
+            "Mahershala Ali",
+            "Brian Tyree Henry"
+          ],
+          "voteAverage": 8.4,
+          "genres": [
+            "Animation",
+            "Action",
+            "Adventure",
+            "Science Fiction"
+          ],
+          "genreIds": [
+            16,
+            28,
+            12,
+            878
+          ]
         },
         {
           "tmdbId": 1007757,
           "title": "Swapped",
           "year": 2026,
-          "posterPath": "/tHhxWxge06goXU6ZQH1hj7vK8Hd.jpg"
+          "posterPath": "/tHhxWxge06goXU6ZQH1hj7vK8Hd.jpg",
+          "overview": "A small woodland creature and a majestic bird, two natural sworn enemies of the Valley, magically trade places and set off on an adventure of a lifetime to switch back. Their journey soon uncovers a greater threat—one that could endanger not only their species, but the entire valley they call home.",
+          "backdropPath": "/zMwhWailP1WY7sb6AoE6b8ugoy.jpg",
+          "duration": "1h 42m",
+          "rating": "PG",
+          "director": "Nathan Greno",
+          "actors": [
+            "Michael B. Jordan",
+            "Juno Temple",
+            "Tracy Morgan",
+            "Cedric the Entertainer",
+            "Justina Machado"
+          ],
+          "voteAverage": 8.9,
+          "genres": [
+            "Adventure",
+            "Animation",
+            "Family",
+            "Fantasy"
+          ],
+          "genreIds": [
+            12,
+            16,
+            10751,
+            14
+          ]
         },
         {
           "tmdbId": 803796,
           "title": "KPop Demon Hunters",
           "year": 2025,
-          "posterPath": "/zT7Lhw3BhJbMkRqm9Zlx2YGMsY0.jpg"
+          "posterPath": "/zT7Lhw3BhJbMkRqm9Zlx2YGMsY0.jpg",
+          "overview": "When K-pop superstars Rumi, Mira and Zoey aren't selling out stadiums, they're using their secret powers to protect their fans from supernatural threats.",
+          "backdropPath": "/w3Bi0wygeFQctn6AqFTwhGNXRwL.jpg",
+          "duration": "1h 36m",
+          "rating": "PG",
+          "director": "Maggie Kang",
+          "actors": [
+            "Arden Cho",
+            "May Hong",
+            "Ji-young Yoo",
+            "Ken Jeong",
+            "Daniel Dae Kim"
+          ],
+          "voteAverage": 8,
+          "genres": [
+            "Fantasy",
+            "Music",
+            "Comedy",
+            "Animation"
+          ],
+          "genreIds": [
+            14,
+            10402,
+            35,
+            16
+          ]
         },
         {
           "tmdbId": 1625901,
           "title": "The Dating App Killer: The Monica White Story",
           "year": 2026,
-          "posterPath": "/wyu5CdFptyz7ZxmgwcHMMhR5tt0.jpg"
+          "posterPath": "/wyu5CdFptyz7ZxmgwcHMMhR5tt0.jpg",
+          "overview": "A divorcee reenters the dating pool by creating an online profile, but when her match displays unsettling behavior and a series of women from the same dating site go missing, she must save herself from becoming the next victim.",
+          "backdropPath": "/micCchBozENNYpBYl5kIJPlAowi.jpg",
+          "duration": "1h 26m",
+          "director": "Elisabeth Röhm",
+          "actors": [
+            "Lela Rochon",
+            "Jarod Joseph",
+            "Katrina Reynolds",
+            "Trezzo Mahoro",
+            "Kendall Cross"
+          ],
+          "voteAverage": 6.8,
+          "genres": [
+            "Thriller",
+            "TV Movie"
+          ],
+          "genreIds": [
+            53,
+            10770
+          ],
+          "rating": "TV-14"
         },
         {
           "tmdbId": 1234821,
           "title": "Jurassic World Rebirth",
           "year": 2025,
-          "posterPath": "/1RICxzeoNCAO5NpcRMIgg1XT6fm.jpg"
+          "posterPath": "/1RICxzeoNCAO5NpcRMIgg1XT6fm.jpg",
+          "overview": "Five years after the events of Jurassic World Dominion, covert operations expert Zora Bennett is contracted to lead a skilled team on a top-secret mission to secure genetic material from the world's three most massive dinosaurs. When Zora's operation intersects with a civilian family whose boating expedition was capsized, they all find themselves stranded on an island where they come face-to-face with a sinister, shocking discovery that's been hidden from the world for decades.",
+          "backdropPath": "/wCmImy8AIssROutl4oerW9vMOD6.jpg",
+          "duration": "2h 14m",
+          "rating": "PG-13",
+          "director": "Gareth Edwards",
+          "actors": [
+            "Scarlett Johansson",
+            "Mahershala Ali",
+            "Jonathan Bailey",
+            "Rupert Friend",
+            "Manuel Garcia-Rulfo"
+          ],
+          "voteAverage": 6.3,
+          "genres": [
+            "Science Fiction",
+            "Adventure",
+            "Action"
+          ],
+          "genreIds": [
+            878,
+            12,
+            28
+          ]
         },
         {
           "tmdbId": 967941,
           "title": "Wicked: For Good",
           "year": 2025,
-          "posterPath": "/si9tolnefLSUKaqQEGz1bWArOaL.jpg"
+          "posterPath": "/si9tolnefLSUKaqQEGz1bWArOaL.jpg",
+          "overview": "As an angry mob rises against the Wicked Witch, Glinda and Elphaba will need to come together one final time. With their singular friendship now the fulcrum of their futures, they will need to truly see each other, with honesty and empathy, if they are to change themselves, and all of Oz, for good.",
+          "backdropPath": "/u6NZLraa4QjN1I64pgSKoC5jr8u.jpg",
+          "duration": "2h 17m",
+          "rating": "PG",
+          "director": "Jon M. Chu",
+          "actors": [
+            "Cynthia Erivo",
+            "Ariana Grande",
+            "Jeff Goldblum",
+            "Michelle Yeoh",
+            "Jonathan Bailey"
+          ],
+          "voteAverage": 6.6,
+          "genres": [
+            "Fantasy",
+            "Adventure",
+            "Romance"
+          ],
+          "genreIds": [
+            14,
+            12,
+            10749
+          ]
         },
         {
           "tmdbId": 1265609,
           "title": "War Machine",
           "year": 2026,
-          "posterPath": "/rFhKkXhk7ClU03jQ5rHIApJDwev.jpg"
+          "posterPath": "/rFhKkXhk7ClU03jQ5rHIApJDwev.jpg",
+          "overview": "On one last grueling mission during Army Ranger training, a combat engineer must lead his unit in a fight against a giant otherworldly killing machine.",
+          "backdropPath": "/6yeVcxFR0j08vlv2OlL6zbewm4D.jpg",
+          "duration": "1h 50m",
+          "rating": "R",
+          "director": "Patrick Hughes",
+          "actors": [
+            "Alan Ritchson",
+            "Stephan James",
+            "Blake Richardson",
+            "Dennis Quaid",
+            "Esai Morales"
+          ],
+          "voteAverage": 7.5,
+          "genres": [
+            "Action",
+            "Science Fiction",
+            "Thriller"
+          ],
+          "genreIds": [
+            28,
+            878,
+            53
+          ]
         },
         {
           "tmdbId": 949838,
           "title": "72 HOURS",
           "year": 2026,
-          "posterPath": "/9Bu1PW2R1XayqRqnl0aDOgMcrdS.jpg"
+          "posterPath": "/9Bu1PW2R1XayqRqnl0aDOgMcrdS.jpg",
+          "overview": "To save his career, a 40-year-old ad exec joins a crew of twentysomethings for a wild Miami bachelor party after they mistakenly add him to a group chat.",
+          "backdropPath": "/hL5EIk48251OXlbIbRJq3yaBHk8.jpg",
+          "duration": "1h 45m",
+          "rating": "R",
+          "director": "Tim Story",
+          "actors": [
+            "Kevin Hart",
+            "Marcello Hernández",
+            "Mason Gooding",
+            "Kam Patterson",
+            "Ben Marshall"
+          ],
+          "voteAverage": 6.8,
+          "genres": [
+            "Comedy",
+            "Crime"
+          ],
+          "genreIds": [
+            35,
+            80
+          ]
         },
         {
           "tmdbId": 1318447,
           "title": "Apex",
           "year": 2026,
-          "posterPath": "/eTp7gSPkSF3Aw79mNx1NkBP1PZT.jpg"
+          "posterPath": "/eTp7gSPkSF3Aw79mNx1NkBP1PZT.jpg",
+          "overview": "A grieving woman pushing her limits on a solo adventure in the Australian wild is ensnared in a twisted game with a cunning killer who thinks she's prey.",
+          "backdropPath": "/9nzfyiYbmTUXWC4B2kwjl4NAlqO.jpg",
+          "duration": "1h 36m",
+          "rating": "R",
+          "director": "Baltasar Kormákur",
+          "actors": [
+            "Charlize Theron",
+            "Taron Egerton",
+            "Eric Bana",
+            "Caitlin Stasey",
+            "Bessie Holland"
+          ],
+          "voteAverage": 6.9,
+          "genres": [
+            "Action",
+            "Thriller"
+          ],
+          "genreIds": [
+            28,
+            53
+          ]
         },
         {
           "tmdbId": 424,
           "title": "Schindler's List",
           "year": 1993,
-          "posterPath": "/sF1U4EUQS8YHUYjNl3pMGNIQyr0.jpg"
+          "posterPath": "/sF1U4EUQS8YHUYjNl3pMGNIQyr0.jpg",
+          "overview": "The true story of how businessman Oskar Schindler saved over a thousand Jewish lives from the Nazis while they worked as slaves in his factory during World War II.",
+          "backdropPath": "/zb6fM1CX41D9rF9hdgclu0peUmy.jpg",
+          "duration": "3h 15m",
+          "rating": "R",
+          "director": "Steven Spielberg",
+          "actors": [
+            "Liam Neeson",
+            "Ben Kingsley",
+            "Ralph Fiennes",
+            "Caroline Goodall",
+            "Embeth Davidtz"
+          ],
+          "voteAverage": 8.6,
+          "genres": [
+            "Drama",
+            "History",
+            "War"
+          ],
+          "genreIds": [
+            18,
+            36,
+            10752
+          ]
         },
         {
           "tmdbId": 1272837,
           "title": "28 Years Later: The Bone Temple",
           "year": 2026,
-          "posterPath": "/kK1BGkG3KAvWB0WMV1DfOx9yTMZ.jpg"
+          "posterPath": "/kK1BGkG3KAvWB0WMV1DfOx9yTMZ.jpg",
+          "overview": "Dr. Kelson finds himself in a shocking new relationship - with consequences that could change the world as they know it - and Spike's encounter with Jimmy Crystal becomes a nightmare he can't escape.",
+          "backdropPath": "/hHDNOlATHhre4eZ7aYz5cdyJLik.jpg",
+          "duration": "1h 49m",
+          "rating": "R",
+          "director": "Nia DaCosta",
+          "actors": [
+            "Jack O&#39;Connell",
+            "Alfie Williams",
+            "Erin Kellyman",
+            "Ralph Fiennes",
+            "Chi Lewis-Parry"
+          ],
+          "voteAverage": 7.1,
+          "genres": [
+            "Horror",
+            "Thriller",
+            "Science Fiction"
+          ],
+          "genreIds": [
+            27,
+            53,
+            878
+          ]
         },
         {
           "tmdbId": 1297842,
           "title": "GOAT",
           "year": 2026,
-          "posterPath": "/wfuqMlaExcoYiUEvKfVpUTt1v4u.jpg"
+          "posterPath": "/wfuqMlaExcoYiUEvKfVpUTt1v4u.jpg",
+          "overview": "A small goat with big dreams gets a once-in-a-lifetime shot to join the pros and play roarball, a high-intensity, co-ed, full-contact sport dominated by the fastest, fiercest animals in the world.",
+          "backdropPath": "/tq3h43fZy0H80vzf47MAY7R9Mxo.jpg",
+          "duration": "1h 40m",
+          "rating": "PG",
+          "director": "Tyree Dillihay",
+          "actors": [
+            "Caleb McLaughlin",
+            "Gabrielle Union",
+            "Stephen Curry",
+            "Aaron Pierre",
+            "Nicola Coughlan"
+          ],
+          "voteAverage": 8.1,
+          "genres": [
+            "Animation",
+            "Comedy",
+            "Family"
+          ],
+          "genreIds": [
+            16,
+            35,
+            10751
+          ]
         },
         {
           "tmdbId": 539972,
           "title": "Kraven the Hunter",
           "year": 2024,
-          "posterPath": "/1GvBhRxY6MELDfxFrete6BNhBB5.jpg"
+          "posterPath": "/1GvBhRxY6MELDfxFrete6BNhBB5.jpg",
+          "overview": "Kraven Kravinoff's complex relationship with his ruthless gangster father, Nikolai, starts him down a path of vengeance with brutal consequences, motivating him to become not only the greatest hunter in the world, but also one of its most feared.",
+          "backdropPath": "/bGGjyPqtNc8hhGkPo8W8D8t90bW.jpg",
+          "duration": "2h 7m",
+          "rating": "R",
+          "director": "J.C. Chandor",
+          "actors": [
+            "Aaron Taylor-Johnson",
+            "Ariana DeBose",
+            "Fred Hechinger",
+            "Alessandro Nivola",
+            "Christopher Abbott"
+          ],
+          "voteAverage": 6.4,
+          "genres": [
+            "Action",
+            "Adventure",
+            "Thriller"
+          ],
+          "genreIds": [
+            28,
+            12,
+            53
+          ]
         },
         {
           "tmdbId": 1100988,
           "title": "28 Years Later",
           "year": 2025,
-          "posterPath": "/n5FygjEppOvac6yEaowi26nTyw3.jpg"
+          "posterPath": "/n5FygjEppOvac6yEaowi26nTyw3.jpg",
+          "overview": "Twenty-eight years after the Rage virus outbreak, a heavily-defended island survives connected to the mainland by a single causeway. When one of the group leaves the island into the dark heart of the mainland, he discovers secrets, wonders, and horrors that have mutated not only the infected but other survivors as well.",
+          "backdropPath": "/6WqqEjiycNvDLjbEClM1zCwIbDD.jpg",
+          "duration": "1h 55m",
+          "rating": "R",
+          "director": "Danny Boyle",
+          "actors": [
+            "Aaron Taylor-Johnson",
+            "Alfie Williams",
+            "Ralph Fiennes",
+            "Jodie Comer",
+            "Jack O&#39;Connell"
+          ],
+          "voteAverage": 6.6,
+          "genres": [
+            "Horror",
+            "Thriller",
+            "Science Fiction"
+          ],
+          "genreIds": [
+            27,
+            53,
+            878
+          ]
         },
         {
           "tmdbId": 912649,
           "title": "Venom: The Last Dance",
           "year": 2024,
-          "posterPath": "/vGXptEdgZIhPg3cGlc7e8sNPC2e.jpg"
+          "posterPath": "/vGXptEdgZIhPg3cGlc7e8sNPC2e.jpg",
+          "overview": "Eddie and Venom are on the run. Hunted by both of their worlds and with the net closing in, the duo are forced into a devastating decision that will bring the curtains down on Venom and Eddie's last dance.",
+          "backdropPath": "/3V4kLQg0kSqPLctI5ziYWabAZYF.jpg",
+          "duration": "1h 49m",
+          "rating": "PG-13",
+          "director": "Kelly Marcel",
+          "actors": [
+            "Tom Hardy",
+            "Chiwetel Ejiofor",
+            "Juno Temple",
+            "Rhys Ifans",
+            "Stephen Graham"
+          ],
+          "voteAverage": 6.7,
+          "genres": [
+            "Science Fiction",
+            "Action",
+            "Adventure"
+          ],
+          "genreIds": [
+            878,
+            28,
+            12
+          ]
         },
         {
           "tmdbId": 1740877,
           "title": "Storm on Sesame Street",
           "year": 2026,
-          "posterPath": "/w4GrHRGgRQOYG95f2oVLYzGJ4Md.jpg"
+          "posterPath": "/w4GrHRGgRQOYG95f2oVLYzGJ4Md.jpg",
+          "overview": "In the Storm on Sesame Street special, Elmo and his friends work together to get ready for a big storm, learning how to be prepared, have courage, and calm their bodies and minds when things feel scary. After the storm passes, Sesame Street looks different, and everyone pitches in to help their neighbors rebuild their homes. With the help of the neighborhood, including celebrity guests Post Malone and Michelle Buteau, Elmo and Abby set out to make a difference, and discover that small acts of kindness, and support from friends, can make the biggest difference of all.",
+          "backdropPath": "/ewuZpFd7zoB8xCtwlRGUU3E599s.jpg",
+          "duration": "30m",
+          "rating": "G",
+          "director": "Scott Preston",
+          "actors": [
+            "Chris Knowings",
+            "Suki Lopez",
+            "Alan Muraoka",
+            "Michelle Buteau",
+            "Post Malone"
+          ],
+          "voteAverage": 6.4,
+          "genres": [
+            "Family",
+            "Animation"
+          ],
+          "genreIds": [
+            10751,
+            16
+          ]
         },
         {
           "tmdbId": 436270,
           "title": "Black Adam",
           "year": 2022,
-          "posterPath": "/rCtreCr4xiYEWDQTebybolIh6Xe.jpg"
+          "posterPath": "/rCtreCr4xiYEWDQTebybolIh6Xe.jpg",
+          "overview": "Nearly 5,000 years after he was bestowed with the almighty powers of the Egyptian gods—and imprisoned just as quickly—Black Adam is freed from his earthly tomb, ready to unleash his unique form of justice on the modern world.",
+          "backdropPath": "/bQXAqRx2Fgc46uCVWgoPz5L5Dtr.jpg",
+          "duration": "2h 5m",
+          "rating": "PG-13",
+          "director": "Jaume Collet-Serra",
+          "actors": [
+            "Dwayne Johnson",
+            "Aldis Hodge",
+            "Noah Centineo",
+            "Sarah Shahi",
+            "Quintessa Swindell"
+          ],
+          "voteAverage": 6.8,
+          "genres": [
+            "Action",
+            "Adventure",
+            "Science Fiction"
+          ],
+          "genreIds": [
+            28,
+            12,
+            878
+          ]
         }
       ]
     },
@@ -136,121 +594,573 @@
           "tmdbId": 687163,
           "title": "Project Hail Mary",
           "year": 2026,
-          "posterPath": "/yihdXomYb5kTeSivtFndMy5iDmf.jpg"
+          "posterPath": "/yihdXomYb5kTeSivtFndMy5iDmf.jpg",
+          "overview": "Science teacher Ryland Grace wakes up on a spaceship light years from home with no recollection of who he is or how he got there. As his memory returns, he begins to uncover his mission: solve the riddle of the mysterious substance causing the sun to die out. He must call on his scientific knowledge and unorthodox ideas to save everything on Earth from extinction.",
+          "backdropPath": "/8Tfys3mDZVp4tNoH2ktm06a0Tau.jpg",
+          "duration": "2h 37m",
+          "rating": "PG-13",
+          "director": "Christopher Miller",
+          "actors": [
+            "Ryan Gosling",
+            "Sandra Hüller",
+            "James Ortiz",
+            "Lionel Boyce",
+            "Milana Vayntrub"
+          ],
+          "voteAverage": 8.6,
+          "genres": [
+            "Science Fiction",
+            "Adventure"
+          ],
+          "genreIds": [
+            878,
+            12
+          ]
         },
         {
           "tmdbId": 454639,
           "title": "Masters of the Universe",
           "year": 2026,
-          "posterPath": "/oRuyGUHdoaQxWP3SDfafGkStxTC.jpg"
+          "posterPath": "/oRuyGUHdoaQxWP3SDfafGkStxTC.jpg",
+          "overview": "After being separated for 15 years, the Sword of Power leads Prince Adam back to Eternia, where he discovers his home shattered under the fiendish rule of Skeletor. To save his family and his world, Adam must join forces with his closest allies, Teela and Duncan/Man-At-Arms, and embrace his true destiny as He-Man — the most powerful man in the universe.",
+          "backdropPath": "/5MUMB3aPEPEQPCIAaygXFUTWE9Y.jpg",
+          "duration": "2h 21m",
+          "rating": "PG-13",
+          "director": "Travis Knight",
+          "actors": [
+            "Nicholas Galitzine",
+            "Camila Mendes",
+            "Idris Elba",
+            "Jared Leto",
+            "Alison Brie"
+          ],
+          "voteAverage": 7.1,
+          "genres": [
+            "Action",
+            "Fantasy",
+            "Science Fiction"
+          ],
+          "genreIds": [
+            28,
+            14,
+            878
+          ]
         },
         {
           "tmdbId": 1481343,
           "title": "The Devil's Mouth",
           "year": 2026,
-          "posterPath": "/lH8k9uCWYn2b2gsYleqYBDPbWa8.jpg"
+          "posterPath": "/lH8k9uCWYn2b2gsYleqYBDPbWa8.jpg",
+          "overview": "A group of college friends' Thailand adventure turns deadly when they become trapped in submerged caves with a dangerous predator. As oxygen runs low, past conflicts emerge in their desperate fight for survival.",
+          "backdropPath": "/pLyaH6k69OJHnONSmN3R7Peh6HE.jpg",
+          "duration": "1h 46m",
+          "rating": "PG-13",
+          "director": "Jeff Wadlow",
+          "actors": [
+            "Kathryn Newton",
+            "Lana Condor",
+            "Nico Hiraga",
+            "Gavin Casalegno",
+            "Tommi Rose"
+          ],
+          "voteAverage": 6.5,
+          "genres": [
+            "Horror",
+            "Thriller"
+          ],
+          "genreIds": [
+            27,
+            53
+          ]
         },
         {
           "tmdbId": 755898,
           "title": "War of the Worlds",
           "year": 2025,
-          "posterPath": "/yvirUYrva23IudARHn3mMGVxWqM.jpg"
+          "posterPath": "/yvirUYrva23IudARHn3mMGVxWqM.jpg",
+          "overview": "Will Radford is a top analyst for Homeland Security who tracks potential threats through a mass surveillance program, until one day an attack by an unknown entity leads him to question whether the government is hiding something from him... and from the rest of the world.",
+          "backdropPath": "/iZLqwEwUViJdSkGVjePGhxYzbDb.jpg",
+          "duration": "1h 31m",
+          "rating": "PG-13",
+          "director": "Rich Lee",
+          "actors": [
+            "Ice Cube",
+            "Eva Longoria",
+            "Clark Gregg",
+            "Iman Benson",
+            "Henry Hunter Hall"
+          ],
+          "voteAverage": 4,
+          "genres": [
+            "Science Fiction",
+            "Thriller"
+          ],
+          "genreIds": [
+            878,
+            53
+          ]
         },
         {
           "tmdbId": 157336,
           "title": "Interstellar",
           "year": 2014,
-          "posterPath": "/yQvGrMoipbRoddT0ZR8tPoR7NfX.jpg"
+          "posterPath": "/yQvGrMoipbRoddT0ZR8tPoR7NfX.jpg",
+          "overview": "The adventures of a group of explorers who make use of a newly discovered wormhole to surpass the limitations on human space travel and conquer the vast distances involved in an interstellar voyage.",
+          "backdropPath": "/5XNQBqnBwPA9yT0jZ0p3s8bbLh0.jpg",
+          "duration": "2h 49m",
+          "rating": "PG-13",
+          "director": "Christopher Nolan",
+          "actors": [
+            "Matthew McConaughey",
+            "Anne Hathaway",
+            "Michael Caine",
+            "Jessica Chastain",
+            "Casey Affleck"
+          ],
+          "voteAverage": 8.5,
+          "genres": [
+            "Adventure",
+            "Drama",
+            "Science Fiction"
+          ],
+          "genreIds": [
+            12,
+            18,
+            878
+          ]
         },
         {
           "tmdbId": 1184918,
           "title": "The Wild Robot",
           "year": 2024,
-          "posterPath": "/wTnV3PCVW5O92JMrFvvrRcV39RU.jpg"
+          "posterPath": "/wTnV3PCVW5O92JMrFvvrRcV39RU.jpg",
+          "overview": "After a shipwreck, an intelligent robot called Roz is stranded on an uninhabited island. To survive the harsh environment, Roz bonds with the island's animals and cares for an orphaned baby goose.",
+          "backdropPath": "/1pmXyN3sKeYoUhu5VBZiDU4BX21.jpg",
+          "duration": "1h 42m",
+          "rating": "PG",
+          "director": "Chris Sanders",
+          "actors": [
+            "Lupita Nyong&#39;o",
+            "Pedro Pascal",
+            "Kit Connor",
+            "Bill Nighy",
+            "Stephanie Hsu"
+          ],
+          "voteAverage": 8.3,
+          "genres": [
+            "Family",
+            "Animation",
+            "Science Fiction",
+            "Adventure"
+          ],
+          "genreIds": [
+            10751,
+            16,
+            878,
+            12
+          ]
         },
         {
           "tmdbId": 680,
           "title": "Pulp Fiction",
           "year": 1994,
-          "posterPath": "/vQWk5YBFWF4bZaofAbv0tShwBvQ.jpg"
+          "posterPath": "/vQWk5YBFWF4bZaofAbv0tShwBvQ.jpg",
+          "overview": "A burger-loving hit man, his philosophical partner, a drug-addled gangster's moll and a washed-up boxer converge in this sprawling, comedic crime caper. Their adventures unfurl in three stories that ingeniously trip back and forth in time.",
+          "backdropPath": "/suaEOtk1N1sgg2MTM7oZd2cfVp3.jpg",
+          "duration": "2h 34m",
+          "rating": "R",
+          "director": "Quentin Tarantino",
+          "actors": [
+            "John Travolta",
+            "Samuel L. Jackson",
+            "Uma Thurman",
+            "Bruce Willis",
+            "Ving Rhames"
+          ],
+          "voteAverage": 8.5,
+          "genres": [
+            "Thriller",
+            "Crime",
+            "Comedy"
+          ],
+          "genreIds": [
+            53,
+            80,
+            35
+          ]
         },
         {
           "tmdbId": 1301421,
           "title": "The Sheep Detectives",
           "year": 2026,
-          "posterPath": "/mGWOmj2jHFol3kOGNv1EhbSDDE1.jpg"
+          "posterPath": "/mGWOmj2jHFol3kOGNv1EhbSDDE1.jpg",
+          "overview": "George Hardy is a shepherd who reads detective novels to his beloved sheep every night, assuming they can't possibly understand. But when a mysterious incident disrupts life on the farm, the sheep realize they must become the detectives. As they follow the clues and investigate human suspects, they prove that even sheep can be brilliant crime-solvers.",
+          "backdropPath": "/a8uQvrplTkhGJQog6GZ6CqF8An6.jpg",
+          "duration": "1h 49m",
+          "rating": "PG",
+          "director": "Kyle Balda",
+          "actors": [
+            "Hugh Jackman",
+            "Nicholas Braun",
+            "Nicholas Galitzine",
+            "Molly Gordon",
+            "Julia Louis-Dreyfus"
+          ],
+          "voteAverage": 7.9,
+          "genres": [
+            "Comedy",
+            "Family",
+            "Mystery"
+          ],
+          "genreIds": [
+            35,
+            10751,
+            9648
+          ]
         },
         {
           "tmdbId": 798645,
           "title": "The Running Man",
           "year": 2025,
-          "posterPath": "/dKL78O9zxczVgjtNcQ9UkbYLzqX.jpg"
+          "posterPath": "/dKL78O9zxczVgjtNcQ9UkbYLzqX.jpg",
+          "overview": "Desperate to save his sick daughter, working-class Ben Richards is convinced by The Running Man's charming but ruthless producer to enter the deadly competition game as a last resort. But Ben's defiance, instincts, and grit turn him into an unexpected fan favorite — and a threat to the entire system. As ratings skyrocket, so does the danger, and Ben must outwit not just the Hunters, but a nation addicted to watching him fall.",
+          "backdropPath": "/aHj7d7wSLqrg5cjAcgHhiGr97Ih.jpg",
+          "duration": "2h 13m",
+          "rating": "R",
+          "director": "Edgar Wright",
+          "actors": [
+            "Glen Powell",
+            "Colman Domingo",
+            "Lee Pace",
+            "Josh Brolin",
+            "William H. Macy"
+          ],
+          "voteAverage": 6.7,
+          "genres": [
+            "Action",
+            "Thriller",
+            "Science Fiction"
+          ],
+          "genreIds": [
+            28,
+            53,
+            878
+          ]
         },
         {
           "tmdbId": 1061474,
           "title": "Superman",
           "year": 2025,
-          "posterPath": "/ldyfo0BKmz5rWtJJKCvwaNS4cJT.jpg"
+          "posterPath": "/ldyfo0BKmz5rWtJJKCvwaNS4cJT.jpg",
+          "overview": "Superman, a journalist in Metropolis, embarks on a journey to reconcile his Kryptonian heritage with his human upbringing as Clark Kent.",
+          "backdropPath": "/yRBc6WY3r1Fz5Cjd6DhSvzqunED.jpg",
+          "duration": "2h 10m",
+          "rating": "PG-13",
+          "director": "James Gunn",
+          "actors": [
+            "David Corenswet",
+            "Rachel Brosnahan",
+            "Nicholas Hoult",
+            "Edi Gathegi",
+            "Nathan Fillion"
+          ],
+          "voteAverage": 7.3,
+          "genres": [
+            "Science Fiction",
+            "Adventure",
+            "Action"
+          ],
+          "genreIds": [
+            878,
+            12,
+            28
+          ]
         },
         {
           "tmdbId": 1168190,
           "title": "The Wrecking Crew",
           "year": 2026,
-          "posterPath": "/gbVwHl4YPSq6BcC92TQpe7qUTh6.jpg"
+          "posterPath": "/gbVwHl4YPSq6BcC92TQpe7qUTh6.jpg",
+          "overview": "Estranged half-brothers Jonny and James reunite after their father's mysterious death. As they search for the truth, buried secrets reveal a conspiracy threatening to tear their family apart.",
+          "backdropPath": "/cz4vLJrmaV1zJlRYbxqtvLzeLWB.jpg",
+          "duration": "2h 5m",
+          "rating": "R",
+          "director": "Ángel Manuel Soto",
+          "actors": [
+            "Dave Bautista",
+            "Jason Momoa",
+            "Temuera Morrison",
+            "Morena Baccarin",
+            "Roimata Fox"
+          ],
+          "voteAverage": 7.1,
+          "genres": [
+            "Action",
+            "Comedy",
+            "Crime",
+            "Mystery"
+          ],
+          "genreIds": [
+            28,
+            35,
+            80,
+            9648
+          ]
         },
         {
           "tmdbId": 390062,
           "title": "Jungle",
           "year": 2017,
-          "posterPath": "/tDgxknTVwrScxpCYyGUjXSn5NRk.jpg"
+          "posterPath": "/tDgxknTVwrScxpCYyGUjXSn5NRk.jpg",
+          "overview": "In 1981, an enthusiastic young adventurer follows his dreams into the Bolivian Amazon jungle with two friends and a guide with a mysterious past. Their journey quickly turns into a terrifying ordeal as the darkest elements of human nature and the deadliest threats of the wilderness lead to an all-out fight for survival.",
+          "backdropPath": "/lUqBGngYLKomteGQrwM6gd89uEM.jpg",
+          "duration": "1h 55m",
+          "rating": "R",
+          "director": "Greg McLean",
+          "actors": [
+            "Daniel Radcliffe",
+            "Alex Russell",
+            "Thomas Kretschmann",
+            "Joel Jackson",
+            "Yasmin Kassim"
+          ],
+          "voteAverage": 6.7,
+          "genres": [
+            "Adventure",
+            "Thriller"
+          ],
+          "genreIds": [
+            12,
+            53
+          ]
         },
         {
           "tmdbId": 106646,
           "title": "The Wolf of Wall Street",
           "year": 2013,
-          "posterPath": "/kW9LmvYHAaS9iA0tHmZVq8hQYoq.jpg"
+          "posterPath": "/kW9LmvYHAaS9iA0tHmZVq8hQYoq.jpg",
+          "overview": "A New York stockbroker refuses to cooperate in a large securities fraud case involving corruption on Wall Street, corporate banking world and mob infiltration. Based on Jordan Belfort's autobiography.",
+          "backdropPath": "/7Nwnmyzrtd0FkcRyPqmdzTPppQa.jpg",
+          "duration": "3h",
+          "rating": "R",
+          "director": "Martin Scorsese",
+          "actors": [
+            "Leonardo DiCaprio",
+            "Jonah Hill",
+            "Margot Robbie",
+            "Matthew McConaughey",
+            "Kyle Chandler"
+          ],
+          "voteAverage": 8,
+          "genres": [
+            "Crime",
+            "Drama",
+            "Comedy"
+          ],
+          "genreIds": [
+            80,
+            18,
+            35
+          ]
         },
         {
           "tmdbId": 1171145,
           "title": "Crime 101",
           "year": 2026,
-          "posterPath": "/tVvpFIoteRHNnoZMhdnwIVwJpCA.jpg"
+          "posterPath": "/tVvpFIoteRHNnoZMhdnwIVwJpCA.jpg",
+          "overview": "When an elusive thief whose high-stakes heists unfold along the iconic 101 freeway in Los Angeles eyes the score of a lifetime, with hopes of this being his final job, his path collides with a disillusioned insurance broker who is facing her own crossroads. Determined to crack the case, a relentless detective closes in on the operation, raising the stakes even higher.",
+          "backdropPath": "/kKF4gEiBDArhONlCcunHVgBp3bA.jpg",
+          "duration": "2h 21m",
+          "rating": "R",
+          "director": "Bart Layton",
+          "actors": [
+            "Chris Hemsworth",
+            "Mark Ruffalo",
+            "Halle Berry",
+            "Barry Keoghan",
+            "Monica Barbaro"
+          ],
+          "voteAverage": 7,
+          "genres": [
+            "Crime",
+            "Thriller"
+          ],
+          "genreIds": [
+            80,
+            53
+          ]
         },
         {
           "tmdbId": 1380291,
           "title": "Tom Clancy's Jack Ryan: Ghost War",
           "year": 2026,
-          "posterPath": "/8ehYxUh5MWE41AeE9gkHE8DKzvB.jpg"
+          "posterPath": "/8ehYxUh5MWE41AeE9gkHE8DKzvB.jpg",
+          "overview": "Jack Ryan is reluctantly pulled back into espionage when an international covert mission unravels a deadly conspiracy. Racing against time, he joins CIA allies Mike November & James Greer and sharp MI6 officer Emma Marlowe to battle a rogue black-ops unit in a high-stakes, deeply personal fight.",
+          "backdropPath": "/dd31qJxOarrHyGZwYsCzOjobQzP.jpg",
+          "duration": "1h 47m",
+          "rating": "R",
+          "director": "Andrew Bernstein",
+          "actors": [
+            "John Krasinski",
+            "Wendell Pierce",
+            "Sienna Miller",
+            "Michael Kelly",
+            "Max Beesley"
+          ],
+          "voteAverage": 6.9,
+          "genres": [
+            "Action",
+            "Thriller"
+          ],
+          "genreIds": [
+            28,
+            53
+          ]
         },
         {
           "tmdbId": 939243,
           "title": "Sonic the Hedgehog 3",
           "year": 2024,
-          "posterPath": "/d8Ryb8AunYAuycVKDp5HpdWPKgC.jpg"
+          "posterPath": "/d8Ryb8AunYAuycVKDp5HpdWPKgC.jpg",
+          "overview": "Sonic, Knuckles, and Tails reunite against a powerful new adversary, Shadow, a mysterious villain with powers unlike anything they have faced before. With their abilities outmatched in every way, Team Sonic must seek out an unlikely alliance in hopes of stopping Shadow and protecting the planet.",
+          "backdropPath": "/zOpe0eHsq0A2NvNyBbtT6sj53qV.jpg",
+          "duration": "1h 50m",
+          "rating": "PG",
+          "director": "Jeff Fowler",
+          "actors": [
+            "Ben Schwartz",
+            "Jim Carrey",
+            "Keanu Reeves",
+            "Idris Elba",
+            "Colleen O&#39;Shaughnessey"
+          ],
+          "voteAverage": 7.6,
+          "genres": [
+            "Action",
+            "Science Fiction",
+            "Comedy",
+            "Family"
+          ],
+          "genreIds": [
+            28,
+            878,
+            35,
+            10751
+          ]
         },
         {
           "tmdbId": 1054867,
           "title": "One Battle After Another",
           "year": 2025,
-          "posterPath": "/lbBWwxBht4JFP5PsuJ5onpMqugW.jpg"
+          "posterPath": "/lbBWwxBht4JFP5PsuJ5onpMqugW.jpg",
+          "overview": "Washed-up revolutionary Bob exists in a state of stoned paranoia, surviving off-grid with his spirited, self-reliant daughter, Willa. When his evil nemesis resurfaces after 16 years and she goes missing, the former radical scrambles to find her, father and daughter both battling the consequences of his past.",
+          "backdropPath": "/zpEWFNqoN8Qg1SzMMHmaGyOBTdW.jpg",
+          "duration": "2h 42m",
+          "rating": "R",
+          "director": "Paul Thomas Anderson",
+          "actors": [
+            "Leonardo DiCaprio",
+            "Sean Penn",
+            "Chase Infiniti",
+            "Benicio del Toro",
+            "Regina Hall"
+          ],
+          "voteAverage": 7.3,
+          "genres": [
+            "Thriller",
+            "Crime",
+            "Comedy"
+          ],
+          "genreIds": [
+            53,
+            80,
+            35
+          ]
         },
         {
           "tmdbId": 575265,
           "title": "Mission: Impossible - The Final Reckoning",
           "year": 2025,
-          "posterPath": "/iKPsC9EFUafRP9SrUznI61getVP.jpg"
+          "posterPath": "/iKPsC9EFUafRP9SrUznI61getVP.jpg",
+          "overview": "Ethan Hunt and team continue their search for the terrifying AI known as the Entity — which has infiltrated intelligence networks all over the globe — with the world's governments and a mysterious ghost from Hunt's past on their trail. Joined by new allies and armed with the means to shut the Entity down for good, Hunt is in a race against time to prevent the world as we know it from changing forever.",
+          "backdropPath": "/538U9snNc2fpnOmYXAPUh3zn31H.jpg",
+          "duration": "2h 50m",
+          "rating": "PG-13",
+          "director": "Christopher McQuarrie",
+          "actors": [
+            "Tom Cruise",
+            "Hayley Atwell",
+            "Ving Rhames",
+            "Simon Pegg",
+            "Esai Morales"
+          ],
+          "voteAverage": 7.2,
+          "genres": [
+            "Action",
+            "Thriller",
+            "Adventure"
+          ],
+          "genreIds": [
+            28,
+            53,
+            12
+          ]
         },
         {
           "tmdbId": 11036,
           "title": "The Notebook",
           "year": 2004,
-          "posterPath": "/rNzQyW4f8B8cQeg7Dgj3n6eT5k9.jpg"
+          "posterPath": "/rNzQyW4f8B8cQeg7Dgj3n6eT5k9.jpg",
+          "overview": "An epic love story centered around an older man who reads aloud to a woman with Alzheimer's. From a faded notebook, the old man's words bring to life the story about a couple who is separated by World War II, and is then passionately reunited, seven years later, after they have taken different paths.",
+          "backdropPath": "/zdXnJqBaGFVtLoPNuMeKfEYUViZ.jpg",
+          "duration": "2h 3m",
+          "rating": "PG-13",
+          "director": "Nick Cassavetes",
+          "actors": [
+            "Ryan Gosling",
+            "Rachel McAdams",
+            "Gena Rowlands",
+            "James Garner",
+            "Joan Allen"
+          ],
+          "voteAverage": 7.9,
+          "genres": [
+            "Romance",
+            "Drama"
+          ],
+          "genreIds": [
+            10749,
+            18
+          ]
         },
         {
           "tmdbId": 189,
           "title": "Sin City: A Dame to Kill For",
           "year": 2014,
-          "posterPath": "/50kALxDX4mmzIRljbNbPY0u4cie.jpg"
+          "posterPath": "/50kALxDX4mmzIRljbNbPY0u4cie.jpg",
+          "overview": "Some of Sin City's most hard-boiled citizens cross paths with a few of its more reviled inhabitants.",
+          "backdropPath": "/rxMnmklIpunsNsRkQ7hw61ZJa84.jpg",
+          "duration": "1h 42m",
+          "rating": "R",
+          "director": "Frank Miller",
+          "actors": [
+            "Jessica Alba",
+            "Bruce Willis",
+            "Mickey Rourke",
+            "Josh Brolin",
+            "Joseph Gordon-Levitt"
+          ],
+          "voteAverage": 6.4,
+          "genres": [
+            "Action",
+            "Crime",
+            "Thriller"
+          ],
+          "genreIds": [
+            28,
+            80,
+            53
+          ]
         }
       ]
     },
@@ -262,121 +1172,589 @@
           "tmdbId": 634649,
           "title": "Spider-Man: No Way Home",
           "year": 2021,
-          "posterPath": "/1g0dhYtq4irTY1GPXvft6k4YLjm.jpg"
+          "posterPath": "/1g0dhYtq4irTY1GPXvft6k4YLjm.jpg",
+          "overview": "Peter Parker is unmasked and no longer able to separate his normal life from the high-stakes of being a super-hero. When he asks for help from Doctor Strange the stakes become even more dangerous, forcing him to discover what it truly means to be Spider-Man.",
+          "backdropPath": "/uyrOU4BDm2kbVxFsMiDFIHDhc4d.jpg",
+          "duration": "2h 28m",
+          "rating": "PG-13",
+          "director": "Jon Watts",
+          "actors": [
+            "Tom Holland",
+            "Zendaya",
+            "Benedict Cumberbatch",
+            "Jacob Batalon",
+            "Jon Favreau"
+          ],
+          "voteAverage": 7.9,
+          "genres": [
+            "Action",
+            "Adventure",
+            "Science Fiction"
+          ],
+          "genreIds": [
+            28,
+            12,
+            878
+          ]
         },
         {
           "tmdbId": 315635,
           "title": "Spider-Man: Homecoming",
           "year": 2017,
-          "posterPath": "/c24sv2weTHPsmDa7jEMN0m2P3RT.jpg"
+          "posterPath": "/c24sv2weTHPsmDa7jEMN0m2P3RT.jpg",
+          "overview": "Following the events of Captain America: Civil War, Peter Parker, with the help of his mentor Tony Stark, tries to balance his life as an ordinary high school student in Queens, New York City, with fighting crime as his superhero alter ego Spider-Man as a new threat, the Vulture, emerges.",
+          "backdropPath": "/fn4n6uOYcB6Uh89nbNPoU2w80RV.jpg",
+          "duration": "2h 13m",
+          "rating": "PG-13",
+          "director": "Jon Watts",
+          "actors": [
+            "Tom Holland",
+            "Michael Keaton",
+            "Robert Downey Jr.",
+            "Marisa Tomei",
+            "Jon Favreau"
+          ],
+          "voteAverage": 7.3,
+          "genres": [
+            "Action",
+            "Adventure",
+            "Science Fiction"
+          ],
+          "genreIds": [
+            28,
+            12,
+            878
+          ]
         },
         {
           "tmdbId": 557,
           "title": "Spider-Man",
           "year": 2002,
-          "posterPath": "/nXdAh5vUwERL4WGVMaee8RoDEAS.jpg"
+          "posterPath": "/nXdAh5vUwERL4WGVMaee8RoDEAS.jpg",
+          "overview": "After being bitten by a genetically altered spider at Oscorp, nerdy but endearing high school student Peter Parker is endowed with amazing powers to become the superhero known as Spider-Man.",
+          "backdropPath": "/zQ8AxTPiCiS5nnwXpwTBPBHSaa5.jpg",
+          "duration": "2h 1m",
+          "rating": "PG-13",
+          "director": "Sam Raimi",
+          "actors": [
+            "Tobey Maguire",
+            "Willem Dafoe",
+            "Kirsten Dunst",
+            "James Franco",
+            "Cliff Robertson"
+          ],
+          "voteAverage": 7.4,
+          "genres": [
+            "Action",
+            "Science Fiction"
+          ],
+          "genreIds": [
+            28,
+            878
+          ]
         },
         {
           "tmdbId": 299536,
           "title": "Avengers: Infinity War",
           "year": 2018,
-          "posterPath": "/7WsyChQLEftFiDOVTGkv3hFpyyt.jpg"
+          "posterPath": "/7WsyChQLEftFiDOVTGkv3hFpyyt.jpg",
+          "overview": "As the Avengers and their allies have continued to protect the world from threats too large for any one hero to handle, a new danger has emerged from the cosmic shadows: Thanos. A despot of intergalactic infamy, his goal is to collect all six Infinity Stones, artifacts of unimaginable power, and use them to inflict his twisted will on all of reality. Everything the Avengers have fought for has led up to this moment - the fate of Earth and existence itself has never been more uncertain.",
+          "backdropPath": "/mDfJG3LC3Dqb67AZ52x3Z0jU0uB.jpg",
+          "duration": "2h 29m",
+          "rating": "PG-13",
+          "director": "Joe Russo",
+          "actors": [
+            "Robert Downey Jr.",
+            "Chris Evans",
+            "Chris Hemsworth",
+            "Josh Brolin",
+            "Mark Ruffalo"
+          ],
+          "voteAverage": 8.2,
+          "genres": [
+            "Adventure",
+            "Action",
+            "Science Fiction"
+          ],
+          "genreIds": [
+            12,
+            28,
+            878
+          ]
         },
         {
           "tmdbId": 83533,
           "title": "Avatar: Fire and Ash",
           "year": 2025,
-          "posterPath": "/bRBeSHfGHwkEpImlhxPmOcUsaeg.jpg"
+          "posterPath": "/bRBeSHfGHwkEpImlhxPmOcUsaeg.jpg",
+          "overview": "In the wake of the devastating war against the RDA and the loss of their eldest son, Jake Sully and Neytiri face a new threat on Pandora: the Ash People, a violent and power-hungry Na'vi tribe led by the ruthless Varang. Jake's family must fight for their survival and the future of Pandora in a conflict that pushes them to their emotional and physical limits.",
+          "backdropPath": "/u8DU5fkLoM5tTRukzPC31oGPxaQ.jpg",
+          "duration": "3h 18m",
+          "rating": "PG-13",
+          "director": "James Cameron",
+          "actors": [
+            "Sam Worthington",
+            "Zoe Saldaña",
+            "Sigourney Weaver",
+            "Stephen Lang",
+            "Oona Chaplin"
+          ],
+          "voteAverage": 7.6,
+          "genres": [
+            "Science Fiction",
+            "Adventure",
+            "Fantasy"
+          ],
+          "genreIds": [
+            878,
+            12,
+            14
+          ]
         },
         {
           "tmdbId": 1493400,
           "title": "Camp Rock 3",
           "year": 2026,
-          "posterPath": "/rS7byWK9cfPfdLeFNlRIaJxH9mN.jpg"
+          "posterPath": "/rS7byWK9cfPfdLeFNlRIaJxH9mN.jpg",
+          "overview": "When Connect 3 loses their opening act for a major reunion tour, they return to their beloved Camp Rock to discover the next big thing. As campers vie for the chance to open for their favorite band, tensions rise and friendships are tested - leading to unexpected alliances, revelations, and romances.",
+          "backdropPath": "/vJb3fniB8E0JnSMr1tDyIsb6gPi.jpg",
+          "duration": "1h 33m",
+          "rating": "G",
+          "director": "Veronica Rodriguez",
+          "actors": [
+            "Liamani Segura",
+            "Malachi Barton",
+            "Lumi Pollack",
+            "Hudson Stone",
+            "Casey Trotter"
+          ],
+          "voteAverage": 6.6,
+          "genres": [
+            "Music",
+            "Comedy",
+            "Drama",
+            "TV Movie"
+          ],
+          "genreIds": [
+            10402,
+            35,
+            18,
+            10770
+          ]
         },
         {
           "tmdbId": 24428,
           "title": "The Avengers",
           "year": 2012,
-          "posterPath": "/RYMX2wcKCBAr24UyPD7xwmjaTn.jpg"
+          "posterPath": "/RYMX2wcKCBAr24UyPD7xwmjaTn.jpg",
+          "overview": "When an unexpected enemy emerges and threatens global safety and security, Nick Fury, director of the international peacekeeping agency known as S.H.I.E.L.D., finds himself in need of a team to pull the world back from the brink of disaster. Spanning the globe, a daring recruitment effort begins!",
+          "backdropPath": "/pGFQCp12a8andfPlpnmXz44IIvY.jpg",
+          "duration": "2h 23m",
+          "rating": "PG-13",
+          "director": "Joss Whedon",
+          "actors": [
+            "Robert Downey Jr.",
+            "Chris Evans",
+            "Mark Ruffalo",
+            "Chris Hemsworth",
+            "Scarlett Johansson"
+          ],
+          "voteAverage": 8.1,
+          "genres": [
+            "Science Fiction",
+            "Action",
+            "Adventure"
+          ],
+          "genreIds": [
+            878,
+            28,
+            12
+          ]
         },
         {
           "tmdbId": 1314481,
           "title": "The Devil Wears Prada 2",
           "year": 2026,
-          "posterPath": "/xTI42pmsP5EDnvsNJPEDubwWBQO.jpg"
+          "posterPath": "/xTI42pmsP5EDnvsNJPEDubwWBQO.jpg",
+          "overview": "Andy Sachs returns to Runway as Miranda Priestly navigates a new media landscape and Runway's position within. The duo reconnect with former assistant Emily Charlton, now the head of a luxury brand that possesses funding which could ensure Runway's survival.",
+          "backdropPath": "/Af907x5h9W1wVis8XrSd7ynTWuy.jpg",
+          "duration": "1h 59m",
+          "rating": "PG-13",
+          "director": "David Frankel",
+          "actors": [
+            "Anne Hathaway",
+            "Meryl Streep",
+            "Emily Blunt",
+            "Stanley Tucci",
+            "Kenneth Branagh"
+          ],
+          "voteAverage": 7,
+          "genres": [
+            "Comedy",
+            "Drama"
+          ],
+          "genreIds": [
+            35,
+            18
+          ]
         },
         {
           "tmdbId": 1930,
           "title": "The Amazing Spider-Man",
           "year": 2012,
-          "posterPath": "/jexoNYnPd6vVrmygwF6QZmWPFdu.jpg"
+          "posterPath": "/jexoNYnPd6vVrmygwF6QZmWPFdu.jpg",
+          "overview": "A teenage Peter Parker grapples with both high school and amazing super-human crises as his alter-ego Spider-Man.",
+          "backdropPath": "/HVcza6tJtWFrLriuh3Ano4Vt46.jpg",
+          "duration": "2h 16m",
+          "rating": "PG-13",
+          "director": "Marc Webb",
+          "actors": [
+            "Andrew Garfield",
+            "Emma Stone",
+            "Rhys Ifans",
+            "Denis Leary",
+            "Martin Sheen"
+          ],
+          "voteAverage": 6.8,
+          "genres": [
+            "Action",
+            "Adventure",
+            "Science Fiction"
+          ],
+          "genreIds": [
+            28,
+            12,
+            878
+          ]
         },
         {
           "tmdbId": 1439930,
           "title": "The Punisher: One Last Kill",
           "year": 2026,
-          "posterPath": "/qQclTgLMDvGBuUBFGHRipxkEwWR.jpg"
+          "posterPath": "/qQclTgLMDvGBuUBFGHRipxkEwWR.jpg",
+          "overview": "As Frank Castle searches for meaning beyond revenge, an unexpected force pulls him back into the fight.",
+          "backdropPath": "/qO55CD8tgVL1T4WKn6zYFFiD6lL.jpg",
+          "duration": "51m",
+          "rating": "R",
+          "director": "Reinaldo Marcus Green",
+          "actors": [
+            "Jon Bernthal",
+            "Deborah Ann Woll",
+            "Jason R. Moore",
+            "Judith Light",
+            "Kelli Barrett"
+          ],
+          "voteAverage": 8.3,
+          "genres": [
+            "Action",
+            "Drama",
+            "Crime"
+          ],
+          "genreIds": [
+            28,
+            18,
+            80
+          ]
         },
         {
           "tmdbId": 1084242,
           "title": "Zootopia 2",
           "year": 2025,
-          "posterPath": "/oJ7g2CifqpStmoYQyaLQgEU32qO.jpg"
+          "posterPath": "/oJ7g2CifqpStmoYQyaLQgEU32qO.jpg",
+          "overview": "After cracking the biggest case in Zootopia's history, rookie cops Judy Hopps and Nick Wilde find themselves on the twisting trail of a great mystery when Gary De'Snake arrives and turns the animal metropolis upside down. To crack the case, Judy and Nick must go undercover to unexpected new parts of town, where their growing partnership is tested like never before.",
+          "backdropPath": "/lgotja3xMoJZbynwHfcQcJAEMWH.jpg",
+          "duration": "1h 48m",
+          "rating": "PG",
+          "director": "Jared Bush",
+          "actors": [
+            "Ginnifer Goodwin",
+            "Jason Bateman",
+            "Ke Huy Quan",
+            "Fortune Feimster",
+            "Andy Samberg"
+          ],
+          "voteAverage": 7.7,
+          "genres": [
+            "Animation",
+            "Adventure",
+            "Comedy",
+            "Mystery",
+            "Family"
+          ],
+          "genreIds": [
+            16,
+            12,
+            35,
+            9648,
+            10751
+          ]
         },
         {
           "tmdbId": 429617,
           "title": "Spider-Man: Far From Home",
           "year": 2019,
-          "posterPath": "/4q2NNj4S5dG2RLF9CpXsej7yXl.jpg"
+          "posterPath": "/4q2NNj4S5dG2RLF9CpXsej7yXl.jpg",
+          "overview": "Peter Parker and his friends go on a summer trip to Europe. However, they will hardly be able to rest - Peter will have to agree to help Nick Fury uncover the mystery of creatures that cause natural disasters and destruction throughout the continent.",
+          "backdropPath": "/vamhMTvh9m9zFHDoR0v1nRtf6T4.jpg",
+          "duration": "2h 9m",
+          "rating": "PG-13",
+          "director": "Jon Watts",
+          "actors": [
+            "Tom Holland",
+            "Jake Gyllenhaal",
+            "Samuel L. Jackson",
+            "Marisa Tomei",
+            "Jon Favreau"
+          ],
+          "voteAverage": 7.4,
+          "genres": [
+            "Action",
+            "Adventure",
+            "Science Fiction"
+          ],
+          "genreIds": [
+            28,
+            12,
+            878
+          ]
         },
         {
           "tmdbId": 299534,
           "title": "Avengers: Endgame",
           "year": 2019,
-          "posterPath": "/ulzhLuWrPK07P1YkdWQLZnQh1JL.jpg"
+          "posterPath": "/ulzhLuWrPK07P1YkdWQLZnQh1JL.jpg",
+          "overview": "After the devastating events of Avengers: Infinity War, the universe is in ruins due to the efforts of the Mad Titan, Thanos. With the help of remaining allies, the Avengers must assemble once more in order to undo Thanos' actions and restore order to the universe once and for all, no matter what consequences may be in store.",
+          "backdropPath": "/7RyHsO4yDXtBv1zUU3mTpHeQ0d5.jpg",
+          "duration": "3h 1m",
+          "rating": "PG-13",
+          "director": "Anthony Russo",
+          "actors": [
+            "Robert Downey Jr.",
+            "Chris Evans",
+            "Mark Ruffalo",
+            "Chris Hemsworth",
+            "Scarlett Johansson"
+          ],
+          "voteAverage": 8.2,
+          "genres": [
+            "Adventure",
+            "Science Fiction",
+            "Action"
+          ],
+          "genreIds": [
+            12,
+            878,
+            28
+          ]
         },
         {
           "tmdbId": 559,
           "title": "Spider-Man 3",
           "year": 2007,
-          "posterPath": "/sJMTTGjtjvrMZ7G0oP9D13wNUum.jpg"
+          "posterPath": "/sJMTTGjtjvrMZ7G0oP9D13wNUum.jpg",
+          "overview": "The seemingly invincible Spider-Man goes up against an all-new crop of villains—including the shape-shifting Sandman. While Spider-Man’s superpowers are altered by an alien organism, his alter ego, Peter Parker, deals with nemesis Eddie Brock and also gets caught up in a love triangle.",
+          "backdropPath": "/FfAU0PUs8AJkMU2VbkVNFtRXR4.jpg",
+          "duration": "2h 19m",
+          "rating": "PG-13",
+          "director": "Sam Raimi",
+          "actors": [
+            "Tobey Maguire",
+            "Kirsten Dunst",
+            "James Franco",
+            "Thomas Haden Church",
+            "Topher Grace"
+          ],
+          "voteAverage": 6.5,
+          "genres": [
+            "Action",
+            "Adventure",
+            "Science Fiction"
+          ],
+          "genreIds": [
+            28,
+            12,
+            878
+          ]
         },
         {
           "tmdbId": 569094,
           "title": "Spider-Man: Across the Spider-Verse",
           "year": 2023,
-          "posterPath": "/8Vt6mWEReuy4Of61Lnj5Xj704m8.jpg"
+          "posterPath": "/8Vt6mWEReuy4Of61Lnj5Xj704m8.jpg",
+          "overview": "After reuniting with Gwen Stacy, Brooklyn’s full-time, friendly neighborhood Spider-Man is catapulted across the Multiverse, where he encounters the Spider Society, a team of Spider-People charged with protecting the Multiverse's very existence. But when the heroes clash on how to handle a new threat, Miles finds himself pitted against the other Spiders and must set out on his own to save those he loves most.",
+          "backdropPath": "/kVd3a9YeLGkoeR50jGEXM6EqseS.jpg",
+          "duration": "2h 20m",
+          "rating": "PG",
+          "director": "Joaquim Dos Santos",
+          "actors": [
+            "Shameik Moore",
+            "Hailee Steinfeld",
+            "Brian Tyree Henry",
+            "Luna Lauren Vélez",
+            "Jake Johnson"
+          ],
+          "voteAverage": 8.3,
+          "genres": [
+            "Animation",
+            "Action",
+            "Adventure",
+            "Science Fiction"
+          ],
+          "genreIds": [
+            16,
+            28,
+            12,
+            878
+          ]
         },
         {
           "tmdbId": 822119,
           "title": "Captain America: Brave New World",
           "year": 2025,
-          "posterPath": "/pzIddUEMWhWzfvLI3TwxUG2wGoi.jpg"
+          "posterPath": "/pzIddUEMWhWzfvLI3TwxUG2wGoi.jpg",
+          "overview": "After meeting with newly elected U.S. President Thaddeus Ross, Sam finds himself in the middle of an international incident. He must discover the reason behind a nefarious global plot before the true mastermind has the entire world seeing red.",
+          "backdropPath": "/ce3prrjh9ZehEl5JinNqr4jIeaB.jpg",
+          "duration": "1h 59m",
+          "rating": "PG-13",
+          "director": "Julius Onah",
+          "actors": [
+            "Anthony Mackie",
+            "Harrison Ford",
+            "Danny Ramirez",
+            "Tim Blake Nelson",
+            "Carl Lumbly"
+          ],
+          "voteAverage": 6,
+          "genres": [
+            "Action",
+            "Thriller",
+            "Science Fiction"
+          ],
+          "genreIds": [
+            28,
+            53,
+            878
+          ]
         },
         {
           "tmdbId": 533535,
           "title": "Deadpool & Wolverine",
           "year": 2024,
-          "posterPath": "/8cdWjvZQUExUUTzyp4t6EDMubfO.jpg"
+          "posterPath": "/8cdWjvZQUExUUTzyp4t6EDMubfO.jpg",
+          "overview": "A listless Wade Wilson toils away in civilian life with his days as the morally flexible mercenary, Deadpool, behind him. But when his homeworld faces an existential threat, Wade must reluctantly suit-up again with an even more reluctant Wolverine.",
+          "backdropPath": "/by8z9Fe8y7p4jo2YlW2SZDnptyT.jpg",
+          "duration": "2h 8m",
+          "rating": "R",
+          "director": "Shawn Levy",
+          "actors": [
+            "Ryan Reynolds",
+            "Hugh Jackman",
+            "Emma Corrin",
+            "Matthew Macfadyen",
+            "Dafne Keen"
+          ],
+          "voteAverage": 7.6,
+          "genres": [
+            "Action",
+            "Comedy",
+            "Science Fiction"
+          ],
+          "genreIds": [
+            28,
+            35,
+            878
+          ]
         },
         {
           "tmdbId": 102382,
           "title": "The Amazing Spider-Man 2",
           "year": 2014,
-          "posterPath": "/dGjoPttcbKR5VWg1jQuNFB247KL.jpg"
+          "posterPath": "/dGjoPttcbKR5VWg1jQuNFB247KL.jpg",
+          "overview": "For Peter Parker, life is busy. Between taking out the bad guys as Spider-Man and spending time with the person he loves, Gwen Stacy, high school graduation cannot come quickly enough. Peter has not forgotten about the promise he made to Gwen’s father to protect her by staying away, but that is a promise he cannot keep. Things will change for Peter when a new villain, Electro, emerges, an old friend, Harry Osborn, returns, and Peter uncovers new clues about his past.",
+          "backdropPath": "/k0hlAzTryCYX1O1LyC6P8tAa8s0.jpg",
+          "duration": "2h 21m",
+          "rating": "PG-13",
+          "director": "Marc Webb",
+          "actors": [
+            "Andrew Garfield",
+            "Emma Stone",
+            "Jamie Foxx",
+            "Dane DeHaan",
+            "Colm Feore"
+          ],
+          "voteAverage": 6.6,
+          "genres": [
+            "Action",
+            "Adventure",
+            "Science Fiction"
+          ],
+          "genreIds": [
+            28,
+            12,
+            878
+          ]
         },
         {
           "tmdbId": 1327819,
           "title": "Hoppers",
           "year": 2026,
-          "posterPath": "/xjtWQ2CL1mpmMNwuU5HeS4Iuwuu.jpg"
+          "posterPath": "/xjtWQ2CL1mpmMNwuU5HeS4Iuwuu.jpg",
+          "overview": "Scientists have discovered how to 'hop' human consciousness into lifelike robotic animals, allowing people to communicate with animals as animals. Animal lover Mabel seizes an opportunity to use the technology, uncovering mysteries within the animal world beyond anything she could have imagined.",
+          "backdropPath": "/u53UYu5XG2hNgWGvs3xGhAVzypl.jpg",
+          "duration": "1h 44m",
+          "rating": "PG",
+          "director": "Daniel Chong",
+          "actors": [
+            "Piper Curda",
+            "Bobby Moynihan",
+            "Jon Hamm",
+            "Kathy Najimy",
+            "Dave Franco"
+          ],
+          "voteAverage": 8.2,
+          "genres": [
+            "Adventure",
+            "Animation",
+            "Comedy",
+            "Family",
+            "Science Fiction"
+          ],
+          "genreIds": [
+            12,
+            16,
+            35,
+            10751,
+            878
+          ]
         },
         {
           "tmdbId": 271110,
           "title": "Captain America: Civil War",
           "year": 2016,
-          "posterPath": "/rAGiXaUfPzY7CDEyNKUofk3Kw2e.jpg"
+          "posterPath": "/rAGiXaUfPzY7CDEyNKUofk3Kw2e.jpg",
+          "overview": "Following the events of Age of Ultron, the collective governments of the world pass an act designed to regulate all superhuman activity. This polarizes opinion amongst the Avengers, causing two factions to side with Iron Man or Captain America, which causes an epic battle between former allies.",
+          "backdropPath": "/7FWlcZq3r6525LWOcvO9kNWurN1.jpg",
+          "duration": "2h 27m",
+          "rating": "PG-13",
+          "director": "Anthony Russo",
+          "actors": [
+            "Chris Evans",
+            "Robert Downey Jr.",
+            "Scarlett Johansson",
+            "Sebastian Stan",
+            "Anthony Mackie"
+          ],
+          "voteAverage": 7.5,
+          "genres": [
+            "Adventure",
+            "Action",
+            "Science Fiction"
+          ],
+          "genreIds": [
+            12,
+            28,
+            878
+          ]
         }
       ]
     },
@@ -388,121 +1766,577 @@
           "tmdbId": 557,
           "title": "Spider-Man",
           "year": 2002,
-          "posterPath": "/nXdAh5vUwERL4WGVMaee8RoDEAS.jpg"
+          "posterPath": "/nXdAh5vUwERL4WGVMaee8RoDEAS.jpg",
+          "overview": "After being bitten by a genetically altered spider at Oscorp, nerdy but endearing high school student Peter Parker is endowed with amazing powers to become the superhero known as Spider-Man.",
+          "backdropPath": "/zQ8AxTPiCiS5nnwXpwTBPBHSaa5.jpg",
+          "duration": "2h 1m",
+          "rating": "PG-13",
+          "director": "Sam Raimi",
+          "actors": [
+            "Tobey Maguire",
+            "Willem Dafoe",
+            "Kirsten Dunst",
+            "James Franco",
+            "Cliff Robertson"
+          ],
+          "voteAverage": 7.4,
+          "genres": [
+            "Action",
+            "Science Fiction"
+          ],
+          "genreIds": [
+            28,
+            878
+          ]
         },
         {
           "tmdbId": 24428,
           "title": "The Avengers",
           "year": 2012,
-          "posterPath": "/RYMX2wcKCBAr24UyPD7xwmjaTn.jpg"
+          "posterPath": "/RYMX2wcKCBAr24UyPD7xwmjaTn.jpg",
+          "overview": "When an unexpected enemy emerges and threatens global safety and security, Nick Fury, director of the international peacekeeping agency known as S.H.I.E.L.D., finds himself in need of a team to pull the world back from the brink of disaster. Spanning the globe, a daring recruitment effort begins!",
+          "backdropPath": "/pGFQCp12a8andfPlpnmXz44IIvY.jpg",
+          "duration": "2h 23m",
+          "rating": "PG-13",
+          "director": "Joss Whedon",
+          "actors": [
+            "Robert Downey Jr.",
+            "Chris Evans",
+            "Mark Ruffalo",
+            "Chris Hemsworth",
+            "Scarlett Johansson"
+          ],
+          "voteAverage": 8.1,
+          "genres": [
+            "Science Fiction",
+            "Action",
+            "Adventure"
+          ],
+          "genreIds": [
+            878,
+            28,
+            12
+          ]
         },
         {
           "tmdbId": 1314481,
           "title": "The Devil Wears Prada 2",
           "year": 2026,
-          "posterPath": "/xTI42pmsP5EDnvsNJPEDubwWBQO.jpg"
+          "posterPath": "/xTI42pmsP5EDnvsNJPEDubwWBQO.jpg",
+          "overview": "Andy Sachs returns to Runway as Miranda Priestly navigates a new media landscape and Runway's position within. The duo reconnect with former assistant Emily Charlton, now the head of a luxury brand that possesses funding which could ensure Runway's survival.",
+          "backdropPath": "/Af907x5h9W1wVis8XrSd7ynTWuy.jpg",
+          "duration": "1h 59m",
+          "rating": "PG-13",
+          "director": "David Frankel",
+          "actors": [
+            "Anne Hathaway",
+            "Meryl Streep",
+            "Emily Blunt",
+            "Stanley Tucci",
+            "Kenneth Branagh"
+          ],
+          "voteAverage": 7,
+          "genres": [
+            "Comedy",
+            "Drama"
+          ],
+          "genreIds": [
+            35,
+            18
+          ]
         },
         {
           "tmdbId": 157336,
           "title": "Interstellar",
           "year": 2014,
-          "posterPath": "/yQvGrMoipbRoddT0ZR8tPoR7NfX.jpg"
+          "posterPath": "/yQvGrMoipbRoddT0ZR8tPoR7NfX.jpg",
+          "overview": "The adventures of a group of explorers who make use of a newly discovered wormhole to surpass the limitations on human space travel and conquer the vast distances involved in an interstellar voyage.",
+          "backdropPath": "/5XNQBqnBwPA9yT0jZ0p3s8bbLh0.jpg",
+          "duration": "2h 49m",
+          "rating": "PG-13",
+          "director": "Christopher Nolan",
+          "actors": [
+            "Matthew McConaughey",
+            "Anne Hathaway",
+            "Michael Caine",
+            "Jessica Chastain",
+            "Casey Affleck"
+          ],
+          "voteAverage": 8.5,
+          "genres": [
+            "Adventure",
+            "Drama",
+            "Science Fiction"
+          ],
+          "genreIds": [
+            12,
+            18,
+            878
+          ]
         },
         {
           "tmdbId": 559,
           "title": "Spider-Man 3",
           "year": 2007,
-          "posterPath": "/sJMTTGjtjvrMZ7G0oP9D13wNUum.jpg"
+          "posterPath": "/sJMTTGjtjvrMZ7G0oP9D13wNUum.jpg",
+          "overview": "The seemingly invincible Spider-Man goes up against an all-new crop of villains—including the shape-shifting Sandman. While Spider-Man’s superpowers are altered by an alien organism, his alter ego, Peter Parker, deals with nemesis Eddie Brock and also gets caught up in a love triangle.",
+          "backdropPath": "/FfAU0PUs8AJkMU2VbkVNFtRXR4.jpg",
+          "duration": "2h 19m",
+          "rating": "PG-13",
+          "director": "Sam Raimi",
+          "actors": [
+            "Tobey Maguire",
+            "Kirsten Dunst",
+            "James Franco",
+            "Thomas Haden Church",
+            "Topher Grace"
+          ],
+          "voteAverage": 6.5,
+          "genres": [
+            "Action",
+            "Adventure",
+            "Science Fiction"
+          ],
+          "genreIds": [
+            28,
+            12,
+            878
+          ]
         },
         {
           "tmdbId": 1242898,
           "title": "Predator: Badlands",
           "year": 2025,
-          "posterPath": "/pHpq9yNUIo6aDoCXEBzjSolywgz.jpg"
+          "posterPath": "/pHpq9yNUIo6aDoCXEBzjSolywgz.jpg",
+          "overview": "Cast out from his clan, a young Predator finds an unlikely ally in a damaged android and embarks on a treacherous journey in search of the ultimate adversary.",
+          "backdropPath": "/82lM4GJ9uuNvNDOEpxFy77uv4Ak.jpg",
+          "duration": "1h 47m",
+          "rating": "PG-13",
+          "director": "Dan Trachtenberg",
+          "actors": [
+            "Elle Fanning",
+            "Dimitrius Schuster-Koloamatangi",
+            "Ravi Narayan",
+            "Michael Homick",
+            "Stefan Grube"
+          ],
+          "voteAverage": 7.8,
+          "genres": [
+            "Action",
+            "Science Fiction",
+            "Adventure"
+          ],
+          "genreIds": [
+            28,
+            878,
+            12
+          ]
         },
         {
           "tmdbId": 1726,
           "title": "Iron Man",
           "year": 2008,
-          "posterPath": "/78lPtwv72eTNqFW9COBYI0dWDJa.jpg"
+          "posterPath": "/78lPtwv72eTNqFW9COBYI0dWDJa.jpg",
+          "overview": "After being held captive in an Afghan cave, billionaire engineer Tony Stark creates a unique weaponized suit of armor to fight evil.",
+          "backdropPath": "/cKvDv2LpwVEqbdXWoQl4XgGN6le.jpg",
+          "duration": "2h 6m",
+          "rating": "PG-13",
+          "director": "Jon Favreau",
+          "actors": [
+            "Robert Downey Jr.",
+            "Terrence Howard",
+            "Jeff Bridges",
+            "Gwyneth Paltrow",
+            "Leslie Bibb"
+          ],
+          "voteAverage": 7.7,
+          "genres": [
+            "Action",
+            "Science Fiction",
+            "Adventure"
+          ],
+          "genreIds": [
+            28,
+            878,
+            12
+          ]
         },
         {
           "tmdbId": 1724,
           "title": "The Incredible Hulk",
           "year": 2008,
-          "posterPath": "/gKzYx79y0AQTL4UAk1cBQJ3nvrm.jpg"
+          "posterPath": "/gKzYx79y0AQTL4UAk1cBQJ3nvrm.jpg",
+          "overview": "Scientist Bruce Banner scours the planet for an antidote to the unbridled force of rage within him: the Hulk. But when the military masterminds who dream of exploiting his powers force him back to civilization, he finds himself coming face to face with a new, deadly foe.",
+          "backdropPath": "/jPu8yiadqgzwFPGKJmGo637ASVP.jpg",
+          "duration": "1h 54m",
+          "rating": "PG-13",
+          "director": "Louis Leterrier",
+          "actors": [
+            "Edward Norton",
+            "Liv Tyler",
+            "Tim Roth",
+            "William Hurt",
+            "Tim Blake Nelson"
+          ],
+          "voteAverage": 6.3,
+          "genres": [
+            "Science Fiction",
+            "Action",
+            "Adventure"
+          ],
+          "genreIds": [
+            878,
+            28,
+            12
+          ]
         },
         {
           "tmdbId": 350,
           "title": "The Devil Wears Prada",
           "year": 2006,
-          "posterPath": "/8912AsVuS7Sj915apArUFbv6F9L.jpg"
+          "posterPath": "/8912AsVuS7Sj915apArUFbv6F9L.jpg",
+          "overview": "A young woman from the Midwest gets more than she bargained for when she moves to New York to become a writer and ends up as the assistant to the tyrannical, larger-than-life editor-in-chief of a major fashion magazine.",
+          "backdropPath": "/gkh6Nt8DtY1XT4gQsyFq9XAVJlJ.jpg",
+          "duration": "1h 49m",
+          "rating": "PG-13",
+          "director": "David Frankel",
+          "actors": [
+            "Meryl Streep",
+            "Anne Hathaway",
+            "Emily Blunt",
+            "Stanley Tucci",
+            "Simon Baker"
+          ],
+          "voteAverage": 7.4,
+          "genres": [
+            "Drama",
+            "Comedy"
+          ],
+          "genreIds": [
+            18,
+            35
+          ]
         },
         {
           "tmdbId": 862,
           "title": "Toy Story",
           "year": 1995,
-          "posterPath": "/uXDfjJbdP4ijW5hWSBrPrlKpxab.jpg"
+          "posterPath": "/uXDfjJbdP4ijW5hWSBrPrlKpxab.jpg",
+          "overview": "Led by Woody, Andy's toys live happily in his room until Andy's birthday brings Buzz Lightyear onto the scene. Afraid of losing his place in Andy's heart, Woody plots against Buzz. But when circumstances separate Buzz and Woody from their owner, the duo eventually learns to put aside their differences.",
+          "backdropPath": "/3Rfvhy1Nl6sSGJwyjb0QiZzZYlB.jpg",
+          "duration": "1h 21m",
+          "rating": "G",
+          "director": "John Lasseter",
+          "actors": [
+            "Tom Hanks",
+            "Tim Allen",
+            "Don Rickles",
+            "Jim Varney",
+            "Wallace Shawn"
+          ],
+          "voteAverage": 8,
+          "genres": [
+            "Family",
+            "Comedy",
+            "Animation",
+            "Adventure"
+          ],
+          "genreIds": [
+            10751,
+            35,
+            16,
+            12
+          ]
         },
         {
           "tmdbId": 10138,
           "title": "Iron Man 2",
           "year": 2010,
-          "posterPath": "/6WBeq4fCfn7AN0o21W9qNcRF2l9.jpg"
+          "posterPath": "/6WBeq4fCfn7AN0o21W9qNcRF2l9.jpg",
+          "overview": "With the world now aware of his dual life as the armored superhero Iron Man, billionaire inventor Tony Stark faces pressure from the government, the press and the public to share his technology with the military. Unwilling to let go of his invention, Stark, with Pepper Potts and James 'Rhodey' Rhodes at his side, must forge new alliances – and confront powerful enemies.",
+          "backdropPath": "/7lmBufEG7P7Y1HClYK3gCxYrkgS.jpg",
+          "duration": "2h 4m",
+          "rating": "PG-13",
+          "director": "Jon Favreau",
+          "actors": [
+            "Robert Downey Jr.",
+            "Gwyneth Paltrow",
+            "Don Cheadle",
+            "Scarlett Johansson",
+            "Sam Rockwell"
+          ],
+          "voteAverage": 6.9,
+          "genres": [
+            "Adventure",
+            "Action",
+            "Science Fiction"
+          ],
+          "genreIds": [
+            12,
+            28,
+            878
+          ]
         },
         {
           "tmdbId": 106646,
           "title": "The Wolf of Wall Street",
           "year": 2013,
-          "posterPath": "/kW9LmvYHAaS9iA0tHmZVq8hQYoq.jpg"
+          "posterPath": "/kW9LmvYHAaS9iA0tHmZVq8hQYoq.jpg",
+          "overview": "A New York stockbroker refuses to cooperate in a large securities fraud case involving corruption on Wall Street, corporate banking world and mob infiltration. Based on Jordan Belfort's autobiography.",
+          "backdropPath": "/7Nwnmyzrtd0FkcRyPqmdzTPppQa.jpg",
+          "duration": "3h",
+          "rating": "R",
+          "director": "Martin Scorsese",
+          "actors": [
+            "Leonardo DiCaprio",
+            "Jonah Hill",
+            "Margot Robbie",
+            "Matthew McConaughey",
+            "Kyle Chandler"
+          ],
+          "voteAverage": 8,
+          "genres": [
+            "Crime",
+            "Drama",
+            "Comedy"
+          ],
+          "genreIds": [
+            80,
+            18,
+            35
+          ]
         },
         {
           "tmdbId": 19995,
           "title": "Avatar",
           "year": 2009,
-          "posterPath": "/gKY6q7SjCkAU6FqvqWybDYgUKIF.jpg"
+          "posterPath": "/gKY6q7SjCkAU6FqvqWybDYgUKIF.jpg",
+          "overview": "In the 22nd century, a paraplegic Marine is dispatched to the moon Pandora on a unique mission, but becomes torn between following orders and protecting an alien civilization.",
+          "backdropPath": "/vL5LR6WdxWPjLPFRLe133jXWsh5.jpg",
+          "duration": "2h 42m",
+          "rating": "PG-13",
+          "director": "James Cameron",
+          "actors": [
+            "Sam Worthington",
+            "Zoe Saldaña",
+            "Sigourney Weaver",
+            "Stephen Lang",
+            "Michelle Rodriguez"
+          ],
+          "voteAverage": 7.6,
+          "genres": [
+            "Science Fiction",
+            "Action",
+            "Adventure"
+          ],
+          "genreIds": [
+            878,
+            28,
+            12
+          ]
         },
         {
           "tmdbId": 10195,
           "title": "Thor",
           "year": 2011,
-          "posterPath": "/prSfAi1xGrhLQNxVSUFh61xQ4Qy.jpg"
+          "posterPath": "/prSfAi1xGrhLQNxVSUFh61xQ4Qy.jpg",
+          "overview": "Against his father Odin's will, The Mighty Thor - a powerful but arrogant warrior god - recklessly reignites an ancient war. Thor is cast down to Earth and forced to live among humans as punishment. Once here, Thor learns what it takes to be a true hero when the most dangerous villain of his world sends the darkest forces of Asgard to invade Earth.",
+          "backdropPath": "/cDJ61O1STtbWNBwefuqVrRe3d7l.jpg",
+          "duration": "1h 55m",
+          "rating": "PG-13",
+          "director": "Kenneth Branagh",
+          "actors": [
+            "Chris Hemsworth",
+            "Natalie Portman",
+            "Tom Hiddleston",
+            "Anthony Hopkins",
+            "Stellan Skarsgård"
+          ],
+          "voteAverage": 6.8,
+          "genres": [
+            "Adventure",
+            "Fantasy",
+            "Action"
+          ],
+          "genreIds": [
+            12,
+            14,
+            28
+          ]
         },
         {
           "tmdbId": 284054,
           "title": "Black Panther",
           "year": 2018,
-          "posterPath": "/uxzzxijgPIY7slzFvMotPv8wjKA.jpg"
+          "posterPath": "/uxzzxijgPIY7slzFvMotPv8wjKA.jpg",
+          "overview": "King T'Challa returns home to the reclusive, technologically advanced African nation of Wakanda to serve as his country's new leader. However, T'Challa soon finds that he is challenged for the throne by factions within his own country as well as without. Using powers reserved to Wakandan kings, T'Challa assumes the Black Panther mantle to join with ex-girlfriend Nakia, the queen-mother, his princess-kid sister, members of the Dora Milaje (the Wakandan 'special forces') and an American secret agent, to prevent Wakanda from being dragged into a world war.",
+          "backdropPath": "/b6ZJZHUdMEFECvGiDpJjlfUWela.jpg",
+          "duration": "2h 15m",
+          "rating": "PG-13",
+          "director": "Ryan Coogler",
+          "actors": [
+            "Chadwick Boseman",
+            "Michael B. Jordan",
+            "Lupita Nyong&#39;o",
+            "Danai Gurira",
+            "Martin Freeman"
+          ],
+          "voteAverage": 7.4,
+          "genres": [
+            "Action",
+            "Adventure",
+            "Science Fiction"
+          ],
+          "genreIds": [
+            28,
+            12,
+            878
+          ]
         },
         {
           "tmdbId": 2062,
           "title": "Ratatouille",
           "year": 2007,
-          "posterPath": "/t3vaWRPSf6WjDSamIkKDs1iQWna.jpg"
+          "posterPath": "/t3vaWRPSf6WjDSamIkKDs1iQWna.jpg",
+          "overview": "In one of Paris's finest restaurants, Remy, a determined young rat, dreams of becoming a renowned French chef. Torn between his family's wishes and his true calling, Remy and his pal Linguini set in motion a hilarious chain of events that turns the City of Lights upside down.",
+          "backdropPath": "/qxGmHvmjlBlH5WZOhdHEHAjHaMB.jpg",
+          "duration": "1h 51m",
+          "rating": "G",
+          "director": "Brad Bird",
+          "actors": [
+            "Patton Oswalt",
+            "Ian Holm",
+            "Lou Romano",
+            "Brian Dennehy",
+            "Peter Sohn"
+          ],
+          "voteAverage": 7.8,
+          "genres": [
+            "Animation",
+            "Comedy",
+            "Family",
+            "Fantasy"
+          ],
+          "genreIds": [
+            16,
+            35,
+            10751,
+            14
+          ]
         },
         {
           "tmdbId": 1266127,
           "title": "Ready or Not: Here I Come",
           "year": 2026,
-          "posterPath": "/13ZcJzSGEqVgDSqsS9U5EkQwPkV.jpg"
+          "posterPath": "/13ZcJzSGEqVgDSqsS9U5EkQwPkV.jpg",
+          "overview": "Moments after surviving an all-out attack from the Le Domas family, Grace discovers she’s reached the next level of the nightmarish game — and this time with her estranged sister Faith at her side. Grace has one chance to survive, keep her sister alive, and claim the High Seat of the Council that controls the world. Four rival families are hunting her for the throne, and whoever wins rules it all.",
+          "backdropPath": "/fx2cEuadZK28VHKkc0F1nFR96i0.jpg",
+          "duration": "1h 48m",
+          "rating": "R",
+          "director": "Tyler Gillett",
+          "actors": [
+            "Samara Weaving",
+            "Kathryn Newton",
+            "Sarah Michelle Gellar",
+            "Shawn Hatosy",
+            "Nestor Carbonell"
+          ],
+          "voteAverage": 7.6,
+          "genres": [
+            "Horror",
+            "Comedy"
+          ],
+          "genreIds": [
+            27,
+            35
+          ]
         },
         {
           "tmdbId": 12,
           "title": "Finding Nemo",
           "year": 2003,
-          "posterPath": "/eHuGQ10FUzK1mdOY69wF5pGgEf5.jpg"
+          "posterPath": "/eHuGQ10FUzK1mdOY69wF5pGgEf5.jpg",
+          "overview": "Nemo, an adventurous young clownfish, is unexpectedly taken from his Great Barrier Reef home to a dentist's office aquarium. It's up to his worrisome father Marlin and a friendly but forgetful fish Dory to bring Nemo home -- meeting vegetarian sharks, surfer dude turtles, hypnotic jellyfish, hungry seagulls, and more along the way.",
+          "backdropPath": "/eCynaAOgYYiw5yN5lBwz3IxqvaW.jpg",
+          "duration": "1h 40m",
+          "rating": "G",
+          "director": "Andrew Stanton",
+          "actors": [
+            "Albert Brooks",
+            "Ellen DeGeneres",
+            "Alexander Gould",
+            "Willem Dafoe",
+            "Geoffrey Rush"
+          ],
+          "voteAverage": 7.8,
+          "genres": [
+            "Animation",
+            "Family",
+            "Adventure"
+          ],
+          "genreIds": [
+            16,
+            10751,
+            12
+          ]
         },
         {
           "tmdbId": 1198994,
           "title": "Send Help",
           "year": 2026,
-          "posterPath": "/zbJWVHOtj3ljBzWgL1P8pxP03Up.jpg"
+          "posterPath": "/zbJWVHOtj3ljBzWgL1P8pxP03Up.jpg",
+          "overview": "Two colleagues become stranded on a deserted island, the only survivors of a plane crash. On the island, they must overcome past grievances and work together to survive, but ultimately, it's a battle of wills and wits to make it out alive.",
+          "backdropPath": "/hO2jx1H3XafR7Y8QbFgVH1sHTY9.jpg",
+          "duration": "1h 53m",
+          "rating": "R",
+          "director": "Sam Raimi",
+          "actors": [
+            "Rachel McAdams",
+            "Dylan O&#39;Brien",
+            "Edyll Ismail",
+            "Xavier Samuel",
+            "Dennis Haysbert"
+          ],
+          "voteAverage": 7,
+          "genres": [
+            "Horror",
+            "Thriller",
+            "Comedy"
+          ],
+          "genreIds": [
+            27,
+            53,
+            35
+          ]
         },
         {
           "tmdbId": 558,
           "title": "Spider-Man 2",
           "year": 2004,
-          "posterPath": "/aGuvNAaaZuWXYQQ6N2v7DeuP6mB.jpg"
+          "posterPath": "/aGuvNAaaZuWXYQQ6N2v7DeuP6mB.jpg",
+          "overview": "Peter Parker is going through a major identity crisis. Burned out from being Spider-Man, he decides to shelve his superhero alter ego, which leaves the city suffering in the wake of carnage left by the evil Doc Ock. In the meantime, Parker still can't act on his feelings for Mary Jane Watson, a girl he's loved since childhood. A certain anger begins to brew in his best friend Harry Osborn as well...",
+          "backdropPath": "/6al048Lat3eLVQOuKtc9h6Tu94d.jpg",
+          "duration": "2h 7m",
+          "rating": "PG-13",
+          "director": "Sam Raimi",
+          "actors": [
+            "Tobey Maguire",
+            "Kirsten Dunst",
+            "James Franco",
+            "Alfred Molina",
+            "Rosemary Harris"
+          ],
+          "voteAverage": 7.3,
+          "genres": [
+            "Action",
+            "Adventure",
+            "Science Fiction"
+          ],
+          "genreIds": [
+            28,
+            12,
+            878
+          ]
         }
       ]
     },
@@ -514,121 +2348,567 @@
           "tmdbId": 569094,
           "title": "Spider-Man: Across the Spider-Verse",
           "year": 2023,
-          "posterPath": "/8Vt6mWEReuy4Of61Lnj5Xj704m8.jpg"
+          "posterPath": "/8Vt6mWEReuy4Of61Lnj5Xj704m8.jpg",
+          "overview": "After reuniting with Gwen Stacy, Brooklyn’s full-time, friendly neighborhood Spider-Man is catapulted across the Multiverse, where he encounters the Spider Society, a team of Spider-People charged with protecting the Multiverse's very existence. But when the heroes clash on how to handle a new threat, Miles finds himself pitted against the other Spiders and must set out on his own to save those he loves most.",
+          "backdropPath": "/kVd3a9YeLGkoeR50jGEXM6EqseS.jpg",
+          "duration": "2h 20m",
+          "rating": "PG",
+          "director": "Joaquim Dos Santos",
+          "actors": [
+            "Shameik Moore",
+            "Hailee Steinfeld",
+            "Brian Tyree Henry",
+            "Luna Lauren Vélez",
+            "Jake Johnson"
+          ],
+          "voteAverage": 8.3,
+          "genres": [
+            "Animation",
+            "Action",
+            "Adventure",
+            "Science Fiction"
+          ],
+          "genreIds": [
+            16,
+            28,
+            12,
+            878
+          ]
         },
         {
           "tmdbId": 155,
           "title": "The Dark Knight",
           "year": 2008,
-          "posterPath": "/qJ2tW6WMUDux911r6m7haRef0WH.jpg"
+          "posterPath": "/qJ2tW6WMUDux911r6m7haRef0WH.jpg",
+          "overview": "Batman raises the stakes in his war on crime. With the help of Lt. Jim Gordon and District Attorney Harvey Dent, Batman sets out to dismantle the remaining criminal organizations that plague the streets. The partnership proves to be effective, but they soon find themselves prey to a reign of chaos unleashed by a rising criminal mastermind known to the terrified citizens of Gotham as the Joker.",
+          "backdropPath": "/9FE5eD92WfVCiivM9Pq9GVSrlWk.jpg",
+          "duration": "2h 32m",
+          "rating": "PG-13",
+          "director": "Christopher Nolan",
+          "actors": [
+            "Christian Bale",
+            "Heath Ledger",
+            "Aaron Eckhart",
+            "Michael Caine",
+            "Maggie Gyllenhaal"
+          ],
+          "voteAverage": 8.5,
+          "genres": [
+            "Action",
+            "Thriller"
+          ],
+          "genreIds": [
+            28,
+            53
+          ]
         },
         {
           "tmdbId": 931285,
           "title": "Mortal Kombat II",
           "year": 2026,
-          "posterPath": "/hwRdDFIhaEmpRgoki805YvyyjZf.jpg"
+          "posterPath": "/hwRdDFIhaEmpRgoki805YvyyjZf.jpg",
+          "overview": "The fan favorite champions—now joined by Johnny Cage himself—are pitted against one another in the ultimate, no-holds barred, gory battle to defeat the dark rule of Shao Kahn that threatens the very existence of the Earthrealm and its defenders.",
+          "backdropPath": "/4EAAwpylq313qrDqpCxulUrXBNF.jpg",
+          "duration": "1h 56m",
+          "rating": "R",
+          "director": "Simon McQuoid",
+          "actors": [
+            "Adeline Rudolph",
+            "Karl Urban",
+            "Martyn Ford",
+            "Tati Gabrielle",
+            "Jessica McNamee"
+          ],
+          "voteAverage": 7.8,
+          "genres": [
+            "Action",
+            "Fantasy",
+            "Adventure"
+          ],
+          "genreIds": [
+            28,
+            14,
+            12
+          ]
         },
         {
           "tmdbId": 122,
           "title": "The Lord of the Rings: The Return of the King",
           "year": 2003,
-          "posterPath": "/rCzpDGLbOoPwLjy3OAm5NUPOTrC.jpg"
+          "posterPath": "/rCzpDGLbOoPwLjy3OAm5NUPOTrC.jpg",
+          "overview": "As armies mass for a final battle that will decide the fate of the world--and powerful, ancient forces of Light and Dark compete to determine the outcome--one member of the Fellowship of the Ring is revealed as the noble heir to the throne of the Kings of Men. Yet, the sole hope for triumph over evil lies with a brave hobbit, Frodo, who, accompanied by his loyal friend Sam and the hideous, wretched Gollum, ventures deep into the very dark heart of Mordor on his seemingly impossible quest to destroy the Ring of Power.​",
+          "backdropPath": "/ctiw6FZK4N36LmkjSklWEbuvlq9.jpg",
+          "duration": "3h 21m",
+          "rating": "PG-13",
+          "director": "Peter Jackson",
+          "actors": [
+            "Elijah Wood",
+            "Ian McKellen",
+            "Viggo Mortensen",
+            "Sean Astin",
+            "Andy Serkis"
+          ],
+          "voteAverage": 8.5,
+          "genres": [
+            "Adventure",
+            "Fantasy",
+            "Action"
+          ],
+          "genreIds": [
+            12,
+            14,
+            28
+          ]
         },
         {
           "tmdbId": 1304313,
           "title": "Lee Cronin's The Mummy",
           "year": 2026,
-          "posterPath": "/1q308iixueCU4pFtSYugNOevtNx.jpg"
+          "posterPath": "/1q308iixueCU4pFtSYugNOevtNx.jpg",
+          "overview": "The young daughter of a journalist disappears into the desert without a trace—eight years later, the broken family is shocked when she is returned to them, as what should be a joyful reunion turns into a living nightmare.",
+          "backdropPath": "/xugEpZk9YQ0DIz1aFvH5HGkqpZK.jpg",
+          "duration": "2h 13m",
+          "rating": "R",
+          "director": "Lee Cronin",
+          "actors": [
+            "Jack Reynor",
+            "Laia Costa",
+            "May Calamawy",
+            "Natalie Grace",
+            "Shylo Molina"
+          ],
+          "voteAverage": 7.9,
+          "genres": [
+            "Horror",
+            "Mystery"
+          ],
+          "genreIds": [
+            27,
+            9648
+          ]
         },
         {
           "tmdbId": 671,
           "title": "Harry Potter and the Philosopher's Stone",
           "year": 2001,
-          "posterPath": "/wuMc08IPKEatf9rnMNXvIDxqP4W.jpg"
+          "posterPath": "/wuMc08IPKEatf9rnMNXvIDxqP4W.jpg",
+          "overview": "Harry Potter has lived under the stairs at his aunt and uncle's house his whole life. But on his 11th birthday, he learns he's a powerful wizard—with a place waiting for him at the Hogwarts School of Witchcraft and Wizardry. As he learns to harness his newfound powers with the help of the school's kindly headmaster, Harry uncovers the truth about his parents' deaths—and about the villain who's to blame.",
+          "backdropPath": "/1XAC6RPT01UX9EQGy2JVn5c8pgy.jpg",
+          "duration": "2h 32m",
+          "rating": "PG",
+          "director": "Chris Columbus",
+          "actors": [
+            "Daniel Radcliffe",
+            "Rupert Grint",
+            "Emma Watson",
+            "Richard Harris",
+            "Tom Felton"
+          ],
+          "voteAverage": 7.9,
+          "genres": [
+            "Adventure",
+            "Fantasy"
+          ],
+          "genreIds": [
+            12,
+            14
+          ]
         },
         {
           "tmdbId": 840464,
           "title": "Greenland 2: Migration",
           "year": 2026,
-          "posterPath": "/z2tqCJLsw6uEJ8nJV8BsQXGa3dr.jpg"
+          "posterPath": "/z2tqCJLsw6uEJ8nJV8BsQXGa3dr.jpg",
+          "overview": "Having found the safety of the Greenland bunker after the comet Clarke decimated the Earth, the Garrity family must now risk everything to embark on a perilous journey across the wasteland of Europe to find a new home.",
+          "backdropPath": "/cLFbDVfhllIMybpo2fkGNzehiQG.jpg",
+          "duration": "1h 38m",
+          "rating": "PG-13",
+          "director": "Ric Roman Waugh",
+          "actors": [
+            "Gerard Butler",
+            "Morena Baccarin",
+            "Roman Griffin Davis",
+            "Tommie Earl Jenkins",
+            "Trond Fausa Aurvåg"
+          ],
+          "voteAverage": 6.4,
+          "genres": [
+            "Adventure",
+            "Thriller",
+            "Science Fiction"
+          ],
+          "genreIds": [
+            12,
+            53,
+            878
+          ]
         },
         {
           "tmdbId": 693134,
           "title": "Dune: Part Two",
           "year": 2024,
-          "posterPath": "/6izwz7rsy95ARzTR3poZ8H6c5pp.jpg"
+          "posterPath": "/6izwz7rsy95ARzTR3poZ8H6c5pp.jpg",
+          "overview": "Follow the mythic journey of Paul Atreides as he unites with Chani and the Fremen while on a path of revenge against the conspirators who destroyed his family. Facing a choice between the love of his life and the fate of the known universe, Paul endeavors to prevent a terrible future only he can foresee.",
+          "backdropPath": "/eZ239CUp1d6OryZEBPnO2n87gMG.jpg",
+          "duration": "2h 47m",
+          "rating": "PG-13",
+          "director": "Denis Villeneuve",
+          "actors": [
+            "Timothée Chalamet",
+            "Zendaya",
+            "Rebecca Ferguson",
+            "Javier Bardem",
+            "Josh Brolin"
+          ],
+          "voteAverage": 8.1,
+          "genres": [
+            "Science Fiction",
+            "Adventure"
+          ],
+          "genreIds": [
+            878,
+            12
+          ]
         },
         {
           "tmdbId": 120,
           "title": "The Lord of the Rings: The Fellowship of the Ring",
           "year": 2001,
-          "posterPath": "/6oom5QYQ2yQTMJIbnvbkBL9cHo6.jpg"
+          "posterPath": "/6oom5QYQ2yQTMJIbnvbkBL9cHo6.jpg",
+          "overview": "Young hobbit Frodo Baggins, after inheriting a mysterious ring from his uncle Bilbo, must leave his home in order to keep it from falling into the hands of its evil creator. Along the way, a fellowship is formed to protect the ringbearer and make sure that the ring arrives at its final destination: Mt. Doom, the only place where it can be destroyed.",
+          "backdropPath": "/oiwc338EoBgS4sEI2ixAny4KQKg.jpg",
+          "duration": "2h 59m",
+          "rating": "PG-13",
+          "director": "Peter Jackson",
+          "actors": [
+            "Elijah Wood",
+            "Ian McKellen",
+            "Viggo Mortensen",
+            "Sean Astin",
+            "Ian Holm"
+          ],
+          "voteAverage": 8.4,
+          "genres": [
+            "Adventure",
+            "Fantasy",
+            "Action"
+          ],
+          "genreIds": [
+            12,
+            14,
+            28
+          ]
         },
         {
           "tmdbId": 436969,
           "title": "The Suicide Squad",
           "year": 2021,
-          "posterPath": "/q61qEyssk2ku3okWICKArlAdhBn.jpg"
+          "posterPath": "/q61qEyssk2ku3okWICKArlAdhBn.jpg",
+          "overview": "Supervillains Harley Quinn, Bloodsport, Peacemaker and a collection of nutty cons at Belle Reve prison join the super-secret, super-shady Task Force X as they are dropped off at the remote, enemy-infused island of Corto Maltese.",
+          "backdropPath": "/jlGmlFOcfo8n5tURmhC7YVd4Iyy.jpg",
+          "duration": "2h 12m",
+          "rating": "R",
+          "director": "James Gunn",
+          "actors": [
+            "Margot Robbie",
+            "Idris Elba",
+            "John Cena",
+            "Joel Kinnaman",
+            "Sylvester Stallone"
+          ],
+          "voteAverage": 7.4,
+          "genres": [
+            "Action",
+            "Comedy",
+            "Adventure"
+          ],
+          "genreIds": [
+            28,
+            35,
+            12
+          ]
         },
         {
           "tmdbId": 1325734,
           "title": "The Drama",
           "year": 2026,
-          "posterPath": "/rnIOUhzwJDfgQakx8EjoNyItKgs.jpg"
+          "posterPath": "/rnIOUhzwJDfgQakx8EjoNyItKgs.jpg",
+          "overview": "A happily engaged couple is put to the test when an unexpected turn sends their wedding week off the rails.",
+          "backdropPath": "/1oKLEA9JOhvaBwLpqjROisvWMy7.jpg",
+          "duration": "1h 45m",
+          "rating": "R",
+          "director": "Kristoffer Borgli",
+          "actors": [
+            "Zendaya",
+            "Robert Pattinson",
+            "Alana Haim",
+            "Mamoudou Athie",
+            "Hailey Benton Gates"
+          ],
+          "voteAverage": 6.9,
+          "genres": [
+            "Romance",
+            "Comedy",
+            "Drama"
+          ],
+          "genreIds": [
+            10749,
+            35,
+            18
+          ]
         },
         {
           "tmdbId": 121,
           "title": "The Lord of the Rings: The Two Towers",
           "year": 2002,
-          "posterPath": "/5VTN0pR8gcqV3EPUHHfMGnJYN9L.jpg"
+          "posterPath": "/5VTN0pR8gcqV3EPUHHfMGnJYN9L.jpg",
+          "overview": "Frodo Baggins and the other members of the Fellowship continue on their sacred quest to destroy the One Ring--but on separate paths. Their destinies lie at two towers--Orthanc Tower in Isengard, where the corrupt wizard Saruman awaits, and Sauron's fortress at Barad-dur, deep within the dark lands of Mordor.",
+          "backdropPath": "/6G73mNyooWAEQTpckPSnFxFoNmc.jpg",
+          "duration": "2h 59m",
+          "rating": "PG-13",
+          "director": "Peter Jackson",
+          "actors": [
+            "Elijah Wood",
+            "Ian McKellen",
+            "Viggo Mortensen",
+            "Sean Astin",
+            "Andy Serkis"
+          ],
+          "voteAverage": 8.4,
+          "genres": [
+            "Adventure",
+            "Fantasy",
+            "Action"
+          ],
+          "genreIds": [
+            12,
+            14,
+            28
+          ]
         },
         {
           "tmdbId": 1061474,
           "title": "Superman",
           "year": 2025,
-          "posterPath": "/ldyfo0BKmz5rWtJJKCvwaNS4cJT.jpg"
+          "posterPath": "/ldyfo0BKmz5rWtJJKCvwaNS4cJT.jpg",
+          "overview": "Superman, a journalist in Metropolis, embarks on a journey to reconcile his Kryptonian heritage with his human upbringing as Clark Kent.",
+          "backdropPath": "/yRBc6WY3r1Fz5Cjd6DhSvzqunED.jpg",
+          "duration": "2h 10m",
+          "rating": "PG-13",
+          "director": "James Gunn",
+          "actors": [
+            "David Corenswet",
+            "Rachel Brosnahan",
+            "Nicholas Hoult",
+            "Edi Gathegi",
+            "Nathan Fillion"
+          ],
+          "voteAverage": 7.3,
+          "genres": [
+            "Science Fiction",
+            "Adventure",
+            "Action"
+          ],
+          "genreIds": [
+            878,
+            12,
+            28
+          ]
         },
         {
           "tmdbId": 12444,
           "title": "Harry Potter and the Deathly Hallows: Part 1",
           "year": 2010,
-          "posterPath": "/iGoXIpQb7Pot00EEdwpwPajheZ5.jpg"
+          "posterPath": "/iGoXIpQb7Pot00EEdwpwPajheZ5.jpg",
+          "overview": "Harry, Ron and Hermione walk away from their last year at Hogwarts to find and destroy the remaining Horcruxes, putting an end to Voldemort's bid for immortality. But with Harry's beloved Dumbledore dead and Voldemort's unscrupulous Death Eaters on the loose, the world is more dangerous than ever.",
+          "backdropPath": "/p2M4xlipwlqUzglAlF2KDlTqeLV.jpg",
+          "duration": "2h 26m",
+          "rating": "PG-13",
+          "director": "David Yates",
+          "actors": [
+            "Daniel Radcliffe",
+            "Emma Watson",
+            "Rupert Grint",
+            "Toby Jones",
+            "Helena Bonham Carter"
+          ],
+          "voteAverage": 7.7,
+          "genres": [
+            "Adventure",
+            "Fantasy"
+          ],
+          "genreIds": [
+            12,
+            14
+          ]
         },
         {
           "tmdbId": 672,
           "title": "Harry Potter and the Chamber of Secrets",
           "year": 2002,
-          "posterPath": "/sdEOH0992YZ0QSxgXNIGLq1ToUi.jpg"
+          "posterPath": "/sdEOH0992YZ0QSxgXNIGLq1ToUi.jpg",
+          "overview": "Cars fly, trees fight back, and a mysterious house-elf comes to warn Harry Potter at the start of his second year at Hogwarts. Adventure and danger await when bloody writing on a wall announces: The Chamber Of Secrets Has Been Opened. To save Hogwarts will require all of Harry, Ron and Hermione's magical abilities and courage.",
+          "backdropPath": "/qSrq6ACzPDv4xerGJ78iS3N827K.jpg",
+          "duration": "2h 41m",
+          "rating": "PG",
+          "director": "Chris Columbus",
+          "actors": [
+            "Daniel Radcliffe",
+            "Rupert Grint",
+            "Emma Watson",
+            "Kenneth Branagh",
+            "Toby Jones"
+          ],
+          "voteAverage": 7.7,
+          "genres": [
+            "Adventure",
+            "Fantasy"
+          ],
+          "genreIds": [
+            12,
+            14
+          ]
         },
         {
           "tmdbId": 129,
           "title": "Spirited Away",
           "year": 2001,
-          "posterPath": "/39wmItIWsg5sZMyRUHLkWBcuVCM.jpg"
+          "posterPath": "/39wmItIWsg5sZMyRUHLkWBcuVCM.jpg",
+          "overview": "A young girl, Chihiro, becomes trapped in a strange new world of spirits. When her parents undergo a mysterious transformation, she must call upon the courage she never knew she had to free her family.",
+          "backdropPath": "/dyJvKsNs2KP8qQnAXbRwDjblViy.jpg",
+          "duration": "2h 5m",
+          "rating": "PG",
+          "voteAverage": 8.5,
+          "genres": [
+            "Animation",
+            "Family",
+            "Fantasy"
+          ],
+          "genreIds": [
+            16,
+            10751,
+            14
+          ],
+          "director": "Hayao Miyazaki",
+          "actors": [
+            "Rumi Hiiragi",
+            "Miyu Irino",
+            "Mari Natsuki",
+            "Takashi Naito",
+            "Yasuko Sawaguchi"
+          ]
         },
         {
           "tmdbId": 674,
           "title": "Harry Potter and the Goblet of Fire",
           "year": 2005,
-          "posterPath": "/fECBtHlr0RB3foNHDiCBXeg9Bv9.jpg"
+          "posterPath": "/fECBtHlr0RB3foNHDiCBXeg9Bv9.jpg",
+          "overview": "When his name emerges from the Goblet of Fire, Harry Potter becomes a competitor in a grueling battle for glory among three wizarding schools. Signs of Voldemort's return emerge as Harry's friends help him prepare for the Triwizard Tournament.",
+          "backdropPath": "/cClWTo3ftVXvV1sF8vlLuWfnlph.jpg",
+          "duration": "2h 37m",
+          "rating": "PG-13",
+          "director": "Mike Newell",
+          "actors": [
+            "Daniel Radcliffe",
+            "Rupert Grint",
+            "Emma Watson",
+            "Brendan Gleeson",
+            "Michael Gambon"
+          ],
+          "voteAverage": 7.8,
+          "genres": [
+            "Adventure",
+            "Fantasy"
+          ],
+          "genreIds": [
+            12,
+            14
+          ]
         },
         {
           "tmdbId": 438631,
           "title": "Dune",
           "year": 2021,
-          "posterPath": "/v1tRXZ4JtD2Iv6fjkPvT4GiwslV.jpg"
+          "posterPath": "/v1tRXZ4JtD2Iv6fjkPvT4GiwslV.jpg",
+          "overview": "Paul Atreides, a brilliant and gifted young man born into a great destiny beyond his understanding, must travel to the most dangerous planet in the universe to ensure the future of his family and his people. As malevolent forces explode into conflict over the planet's exclusive supply of the most precious resource in existence - a commodity capable of unlocking humanity's greatest potential - only those who can conquer their fear will survive.",
+          "backdropPath": "/zRKQW58MBEY078AxkHxEJzUskCl.jpg",
+          "duration": "2h 35m",
+          "rating": "PG-13",
+          "director": "Denis Villeneuve",
+          "actors": [
+            "Timothée Chalamet",
+            "Rebecca Ferguson",
+            "Oscar Isaac",
+            "Jason Momoa",
+            "Stellan Skarsgård"
+          ],
+          "voteAverage": 7.8,
+          "genres": [
+            "Science Fiction",
+            "Adventure"
+          ],
+          "genreIds": [
+            878,
+            12
+          ]
         },
         {
           "tmdbId": 950387,
           "title": "A Minecraft Movie",
           "year": 2025,
-          "posterPath": "/yFHHfHcUgGAxziP1C3lLt0q2T4s.jpg"
+          "posterPath": "/yFHHfHcUgGAxziP1C3lLt0q2T4s.jpg",
+          "overview": "Four misfits find themselves struggling with ordinary problems when they are suddenly pulled through a mysterious portal into the Overworld: a bizarre, cubic wonderland that thrives on imagination. To get back home, they'll have to master this world while embarking on a magical quest with an unexpected, expert crafter, Steve.",
+          "backdropPath": "/2Nti3gYAX513wvhp8IiLL6ZDyOm.jpg",
+          "duration": "1h 41m",
+          "rating": "PG",
+          "director": "Jared Hess",
+          "actors": [
+            "Jason Momoa",
+            "Jack Black",
+            "Sebastian Eugene Hansen",
+            "Emma Myers",
+            "Danielle Brooks"
+          ],
+          "voteAverage": 6.2,
+          "genres": [
+            "Family",
+            "Fantasy",
+            "Comedy",
+            "Adventure"
+          ],
+          "genreIds": [
+            10751,
+            14,
+            35,
+            12
+          ]
         },
         {
           "tmdbId": 673,
           "title": "Harry Potter and the Prisoner of Azkaban",
           "year": 2004,
-          "posterPath": "/aWxwnYoe8p2d2fcxOqtvAtJ72Rw.jpg"
+          "posterPath": "/aWxwnYoe8p2d2fcxOqtvAtJ72Rw.jpg",
+          "overview": "Harry Potter's life is in danger once more as dangerous wizard Sirius Black has escaped from Azkaban Prison and is heading to Hogwarts.",
+          "backdropPath": "/vbk5CfaAHOjQPSAcYm6AoRRz2Af.jpg",
+          "duration": "2h 21m",
+          "rating": "PG",
+          "director": "Alfonso Cuarón",
+          "actors": [
+            "Daniel Radcliffe",
+            "Rupert Grint",
+            "Emma Watson",
+            "Robbie Coltrane",
+            "Michael Gambon"
+          ],
+          "voteAverage": 8,
+          "genres": [
+            "Adventure",
+            "Fantasy"
+          ],
+          "genreIds": [
+            12,
+            14
+          ]
         }
       ]
     },
@@ -640,121 +2920,570 @@
           "tmdbId": 597,
           "title": "Titanic",
           "year": 1997,
-          "posterPath": "/9xjZS2rlVxm8SFx8kPC3aIGCOYQ.jpg"
+          "posterPath": "/9xjZS2rlVxm8SFx8kPC3aIGCOYQ.jpg",
+          "overview": "101-year-old Rose DeWitt Bukater tells the story of her life aboard the Titanic, 84 years later. A young Rose boards the ship with her mother and fiancé. Meanwhile, Jack Dawson and Fabrizio De Rossi win third-class tickets aboard the ship. Rose tells the whole story from Titanic's departure through to its death—on its first and last voyage—on April 15, 1912.",
+          "backdropPath": "/xXCuto8YVp5RFqBJ7yKmVmLOWpF.jpg",
+          "duration": "3h 14m",
+          "rating": "PG-13",
+          "director": "James Cameron",
+          "actors": [
+            "Leonardo DiCaprio",
+            "Kate Winslet",
+            "Billy Zane",
+            "Kathy Bates",
+            "Frances Fisher"
+          ],
+          "voteAverage": 7.9,
+          "genres": [
+            "Drama",
+            "Romance"
+          ],
+          "genreIds": [
+            18,
+            10749
+          ]
         },
         {
           "tmdbId": 911430,
           "title": "F1",
           "year": 2025,
-          "posterPath": "/9PXZIUsSDh4alB80jheWX4fhZmy.jpg"
+          "posterPath": "/9PXZIUsSDh4alB80jheWX4fhZmy.jpg",
+          "overview": "Racing legend Sonny Hayes is coaxed out of retirement to lead a struggling Formula 1 team—and mentor a young hotshot driver—while chasing one more chance at glory.",
+          "backdropPath": "/lkDYN0whyE82mcM20rwtwjbniKF.jpg",
+          "duration": "2h 36m",
+          "rating": "PG-13",
+          "director": "Joseph Kosinski",
+          "actors": [
+            "Brad Pitt",
+            "Damson Idris",
+            "Javier Bardem",
+            "Kerry Condon",
+            "Tobias Menzies"
+          ],
+          "voteAverage": 7.8,
+          "genres": [
+            "Action",
+            "Drama"
+          ],
+          "genreIds": [
+            28,
+            18
+          ]
         },
         {
           "tmdbId": 950396,
           "title": "The Gorge",
           "year": 2025,
-          "posterPath": "/7iMBZzVZtG0oBug4TfqDb9ZxAOa.jpg"
+          "posterPath": "/7iMBZzVZtG0oBug4TfqDb9ZxAOa.jpg",
+          "overview": "Two highly trained operatives grow close from a distance after being sent to guard opposite sides of a mysterious gorge. When an evil below emerges, they must work together to survive what lies within.",
+          "backdropPath": "/9nhjGaFLKtddDPtPaX5EmKqsWdH.jpg",
+          "duration": "2h 8m",
+          "rating": "PG-13",
+          "director": "Scott Derrickson",
+          "actors": [
+            "Miles Teller",
+            "Anya Taylor-Joy",
+            "Sigourney Weaver",
+            "Ṣọpẹ́ Dìrísù",
+            "William Houston"
+          ],
+          "voteAverage": 7.7,
+          "genres": [
+            "Romance",
+            "Science Fiction",
+            "Thriller"
+          ],
+          "genreIds": [
+            10749,
+            878,
+            53
+          ]
         },
         {
           "tmdbId": 286217,
           "title": "The Martian",
           "year": 2015,
-          "posterPath": "/fASz8A0yFE3QB6LgGoOfwvFSseV.jpg"
+          "posterPath": "/fASz8A0yFE3QB6LgGoOfwvFSseV.jpg",
+          "overview": "During a manned mission to Mars, Astronaut Mark Watney is presumed dead after a fierce storm and left behind by his crew. But Watney has survived and finds himself stranded and alone on the hostile planet. With only meager supplies, he must draw upon his ingenuity, wit and spirit to subsist and find a way to signal to Earth that he is alive.",
+          "backdropPath": "/lzMS0CI3FLQYC5EgJoWeIaEt0lm.jpg",
+          "duration": "2h 21m",
+          "rating": "PG-13",
+          "director": "Ridley Scott",
+          "actors": [
+            "Matt Damon",
+            "Jessica Chastain",
+            "Kristen Wiig",
+            "Jeff Daniels",
+            "Michael Peña"
+          ],
+          "voteAverage": 7.7,
+          "genres": [
+            "Science Fiction",
+            "Drama",
+            "Adventure"
+          ],
+          "genreIds": [
+            878,
+            18,
+            12
+          ]
         },
         {
           "tmdbId": 329865,
           "title": "Arrival",
           "year": 2016,
-          "posterPath": "/pEzNVQfdzYDzVK0XqxERIw2x2se.jpg"
+          "posterPath": "/pEzNVQfdzYDzVK0XqxERIw2x2se.jpg",
+          "overview": "Taking place after alien crafts land around the world, an expert linguist is recruited by the military to determine whether they come in peace or are a threat.",
+          "backdropPath": "/8MUZz7oPXQftFTslZpRP3CVMOoq.jpg",
+          "duration": "1h 56m",
+          "rating": "PG-13",
+          "director": "Denis Villeneuve",
+          "actors": [
+            "Amy Adams",
+            "Jeremy Renner",
+            "Forest Whitaker",
+            "Michael Stuhlbarg",
+            "Mark O&#39;Brien"
+          ],
+          "voteAverage": 7.6,
+          "genres": [
+            "Drama",
+            "Science Fiction",
+            "Mystery"
+          ],
+          "genreIds": [
+            18,
+            878,
+            9648
+          ]
         },
         {
           "tmdbId": 1363123,
           "title": "The Family Plan 2",
           "year": 2025,
-          "posterPath": "/semFxuYx6HcrkZzslgAkBqfJvZk.jpg"
+          "posterPath": "/semFxuYx6HcrkZzslgAkBqfJvZk.jpg",
+          "overview": "Now that Dan's assassin days are behind him, all he wants for Christmas is quality time with his kids. But when he learns his daughter has her own plans, he books a family trip to London—putting them all in the crosshairs of an unexpected enemy.",
+          "backdropPath": "/hXc9jZuIfJ3lCrKJsZVwJM4anRf.jpg",
+          "duration": "1h 46m",
+          "rating": "PG-13",
+          "director": "Simon Cellan Jones",
+          "actors": [
+            "Mark Wahlberg",
+            "Michelle Monaghan",
+            "Kit Harington",
+            "Zoe Colletti",
+            "Van Crosby"
+          ],
+          "voteAverage": 6.6,
+          "genres": [
+            "Action",
+            "Comedy"
+          ],
+          "genreIds": [
+            28,
+            35
+          ]
         },
         {
           "tmdbId": 210577,
           "title": "Gone Girl",
           "year": 2014,
-          "posterPath": "/ts996lKsxvjkO2yiYG0ht4qAicO.jpg"
+          "posterPath": "/ts996lKsxvjkO2yiYG0ht4qAicO.jpg",
+          "overview": "With his wife's disappearance having become the focus of an intense media circus, a man sees the spotlight turned on him when it's suspected that he may not be innocent.",
+          "backdropPath": "/iWak7wT0j6ycCc8lKr4NBz9c7n5.jpg",
+          "duration": "2h 29m",
+          "rating": "R",
+          "director": "David Fincher",
+          "actors": [
+            "Ben Affleck",
+            "Rosamund Pike",
+            "Neil Patrick Harris",
+            "Tyler Perry",
+            "Carrie Coon"
+          ],
+          "voteAverage": 7.9,
+          "genres": [
+            "Mystery",
+            "Thriller",
+            "Drama"
+          ],
+          "genreIds": [
+            9648,
+            53,
+            18
+          ]
         },
         {
           "tmdbId": 2501,
           "title": "The Bourne Identity",
           "year": 2002,
-          "posterPath": "/aP8swke3gmowbkfZ6lmNidu0y9p.jpg"
+          "posterPath": "/aP8swke3gmowbkfZ6lmNidu0y9p.jpg",
+          "overview": "Wounded to the brink of death and suffering from amnesia, Jason Bourne is rescued at sea by a fisherman. With nothing to go on but a Swiss bank account number, he starts to reconstruct his life, but finds that many people he encounters want him dead. However, Bourne realizes that he has the combat and mental skills of a world-class spy—but who does he work for?",
+          "backdropPath": "/kJaRWmy1BGq3pHyE94LOTteiHer.jpg",
+          "duration": "1h 59m",
+          "rating": "PG-13",
+          "director": "Doug Liman",
+          "actors": [
+            "Matt Damon",
+            "Franka Potente",
+            "Chris Cooper",
+            "Clive Owen",
+            "Brian Cox"
+          ],
+          "voteAverage": 7.5,
+          "genres": [
+            "Action",
+            "Mystery",
+            "Thriller"
+          ],
+          "genreIds": [
+            28,
+            9648,
+            53
+          ]
         },
         {
           "tmdbId": 1029575,
           "title": "The Family Plan",
           "year": 2023,
-          "posterPath": "/jLLtx3nTRSLGPAKl4RoIv1FbEBr.jpg"
+          "posterPath": "/jLLtx3nTRSLGPAKl4RoIv1FbEBr.jpg",
+          "overview": "Dan Morgan is many things: a devoted husband, a loving father, a celebrated car salesman. He's also a former assassin. And when his past catches up to his present, he's forced to take his unsuspecting family on a road trip unlike any other.",
+          "backdropPath": "/arNhhBd88bP3Bjoe4HT8MFE1JQA.jpg",
+          "duration": "1h 58m",
+          "rating": "PG-13",
+          "director": "Simon Cellan Jones",
+          "actors": [
+            "Mark Wahlberg",
+            "Michelle Monaghan",
+            "Maggie Q",
+            "Zoe Colletti",
+            "Van Crosby"
+          ],
+          "voteAverage": 7.2,
+          "genres": [
+            "Action",
+            "Comedy",
+            "Adventure"
+          ],
+          "genreIds": [
+            28,
+            35,
+            12
+          ]
         },
         {
           "tmdbId": 1098006,
           "title": "Fountain of Youth",
           "year": 2025,
-          "posterPath": "/4iWjGghUj2uyHo2Hyw8NFBvsNGm.jpg"
+          "posterPath": "/4iWjGghUj2uyHo2Hyw8NFBvsNGm.jpg",
+          "overview": "A treasure-hunting mastermind assembles a team for a life-changing adventure. But to outwit and outrun threats at every turn, he'll need someone even smarter than he is: his estranged sister.",
+          "backdropPath": "/arGs8D4RfUfsk7vMiMjDi6Mtabv.jpg",
+          "duration": "2h 6m",
+          "rating": "PG-13",
+          "director": "Guy Ritchie",
+          "actors": [
+            "John Krasinski",
+            "Natalie Portman",
+            "Eiza González",
+            "Domhnall Gleeson",
+            "Arian Moayed"
+          ],
+          "voteAverage": 6.2,
+          "genres": [
+            "Adventure",
+            "Fantasy",
+            "Mystery"
+          ],
+          "genreIds": [
+            12,
+            14,
+            9648
+          ]
         },
         {
           "tmdbId": 1698575,
           "title": "Snoopy Presents: There's No Place Like Home, Snoopy",
           "year": 2026,
-          "posterPath": "/YbC4SlzE030BgxWdKDdlatMh5W.jpg"
+          "posterPath": "/YbC4SlzE030BgxWdKDdlatMh5W.jpg",
+          "overview": "When Snoopy's beloved doghouse goes missing, he tries to track it down, and learns what makes a house feel like home.",
+          "backdropPath": "/kpq5o3WbnTos5fQwtyfyOHwSMdm.jpg",
+          "duration": "32m",
+          "rating": "G",
+          "director": "Ridd Sorensen",
+          "actors": [
+            "Terry McGurrin",
+            "Rob Tinkler",
+            "Lexi Perri",
+            "Athan Giazitzidis"
+          ],
+          "voteAverage": 8.4,
+          "genres": [
+            "Animation",
+            "Family"
+          ],
+          "genreIds": [
+            16,
+            10751
+          ]
         },
         {
           "tmdbId": 601,
           "title": "E.T. the Extra-Terrestrial",
           "year": 1982,
-          "posterPath": "/an0nD6uq6byfxXCfk6lQBzdL2J1.jpg"
+          "posterPath": "/an0nD6uq6byfxXCfk6lQBzdL2J1.jpg",
+          "overview": "An alien is left behind on Earth and saved by the 10-year-old Elliott who decides to keep him hidden in his home. While a task force hunts for the extra-terrestrial, Elliott, his brother, and his little sister Gertie form an emotional bond with their new friend, and try to help him find his way home.",
+          "backdropPath": "/mXLVA0YL6tcXi6SJSuAh9ONXFj5.jpg",
+          "duration": "1h 55m",
+          "rating": "PG",
+          "director": "Steven Spielberg",
+          "actors": [
+            "Henry Thomas",
+            "Drew Barrymore",
+            "Robert MacNaughton",
+            "Peter Coyote",
+            "Dee Wallace"
+          ],
+          "voteAverage": 7.5,
+          "genres": [
+            "Adventure",
+            "Science Fiction",
+            "Family"
+          ],
+          "genreIds": [
+            12,
+            878,
+            10751
+          ]
         },
         {
           "tmdbId": 1259102,
           "title": "Eternity",
           "year": 2025,
-          "posterPath": "/yiwGcjfDKXD5PqQnyKUU9kspWQQ.jpg"
+          "posterPath": "/yiwGcjfDKXD5PqQnyKUU9kspWQQ.jpg",
+          "overview": "In an afterlife where souls have one week to decide where to spend eternity, Joan is faced with the impossible choice between the man she spent her life with and her first love, who died young and has waited decades for her to arrive.",
+          "backdropPath": "/fuacZLpnohQtLD0AhtCErcPVL98.jpg",
+          "duration": "1h 54m",
+          "rating": "PG-13",
+          "director": "David Freyne",
+          "actors": [
+            "Elizabeth Olsen",
+            "Miles Teller",
+            "Callum Turner",
+            "Da&#39;Vine Joy Randolph",
+            "John Early"
+          ],
+          "voteAverage": 7.1,
+          "genres": [
+            "Romance",
+            "Comedy",
+            "Drama"
+          ],
+          "genreIds": [
+            10749,
+            35,
+            18
+          ]
         },
         {
           "tmdbId": 466420,
           "title": "Killers of the Flower Moon",
           "year": 2023,
-          "posterPath": "/dB6Krk806zeqd0YNp2ngQ9zXteH.jpg"
+          "posterPath": "/dB6Krk806zeqd0YNp2ngQ9zXteH.jpg",
+          "overview": "When oil is discovered in 1920s Oklahoma under Osage Nation land, the Osage people are murdered one by one—until the FBI steps in to unravel the mystery.",
+          "backdropPath": "/acvE3RWjDLgvbL2RtcyzkrsAyNV.jpg",
+          "duration": "3h 26m",
+          "rating": "R",
+          "director": "Martin Scorsese",
+          "actors": [
+            "Leonardo DiCaprio",
+            "Robert De Niro",
+            "Lily Gladstone",
+            "Jesse Plemons",
+            "Tantoo Cardinal"
+          ],
+          "voteAverage": 7.4,
+          "genres": [
+            "Crime",
+            "History",
+            "Drama"
+          ],
+          "genreIds": [
+            80,
+            36,
+            18
+          ]
         },
         {
           "tmdbId": 745,
           "title": "The Sixth Sense",
           "year": 1999,
-          "posterPath": "/vOyfUXNFSnaTk7Vk5AjpsKTUWsu.jpg"
+          "posterPath": "/vOyfUXNFSnaTk7Vk5AjpsKTUWsu.jpg",
+          "overview": "Following an unexpected tragedy, child psychologist Malcolm Crowe meets a nine year old boy named Cole Sear, who is hiding a dark secret.",
+          "backdropPath": "/6TjllWT3cGrPFyqDXurVZ3L8bBi.jpg",
+          "duration": "1h 47m",
+          "rating": "PG-13",
+          "director": "M. Night Shyamalan",
+          "actors": [
+            "Bruce Willis",
+            "Haley Joel Osment",
+            "Toni Collette",
+            "Olivia Williams",
+            "Trevor Morgan"
+          ],
+          "voteAverage": 8,
+          "genres": [
+            "Mystery",
+            "Thriller",
+            "Drama"
+          ],
+          "genreIds": [
+            9648,
+            53,
+            18
+          ]
         },
         {
           "tmdbId": 18240,
           "title": "The Proposal",
           "year": 2009,
-          "posterPath": "/6stnAm1wSek8ZrislwK4xGTyCnt.jpg"
+          "posterPath": "/6stnAm1wSek8ZrislwK4xGTyCnt.jpg",
+          "overview": "When she learns she's in danger of losing her visa status and being deported, overbearing book editor Margaret Tate forces her put-upon assistant, Andrew Paxton, to marry her.",
+          "backdropPath": "/ojgXOhVi9Yk8irDpRfDkIzdD1LK.jpg",
+          "duration": "1h 48m",
+          "rating": "PG-13",
+          "director": "Anne Fletcher",
+          "actors": [
+            "Sandra Bullock",
+            "Ryan Reynolds",
+            "Malin Akerman",
+            "Craig T. Nelson",
+            "Mary Steenburgen"
+          ],
+          "voteAverage": 7.2,
+          "genres": [
+            "Comedy",
+            "Romance",
+            "Drama"
+          ],
+          "genreIds": [
+            35,
+            10749,
+            18
+          ]
         },
         {
           "tmdbId": 1949,
           "title": "Zodiac",
           "year": 2007,
-          "posterPath": "/6YmeO4pB7XTh8P8F960O1uA14JO.jpg"
+          "posterPath": "/6YmeO4pB7XTh8P8F960O1uA14JO.jpg",
+          "overview": "Over the course of a decade, editors of the San Francisco Chronicle entice themselves in the murders of the Zodiac Killer. However, as time runs its course, interest in the case dwindles in the eyes of the professionals. The Killer stops interacting with the public. However, believing he has the answers, an amateur cartoonist from the initial sightings races against time to prevent what he believes is another murder.",
+          "backdropPath": "/3zCPI4JFc54xvLaJ71oI2KoP3az.jpg",
+          "duration": "2h 37m",
+          "rating": "R",
+          "director": "David Fincher",
+          "actors": [
+            "Jake Gyllenhaal",
+            "Mark Ruffalo",
+            "Anthony Edwards",
+            "Robert Downey Jr.",
+            "Chloë Sevigny"
+          ],
+          "voteAverage": 7.5,
+          "genres": [
+            "Crime",
+            "Mystery",
+            "Thriller"
+          ],
+          "genreIds": [
+            80,
+            9648,
+            53
+          ]
         },
         {
           "tmdbId": 753342,
           "title": "Napoleon",
           "year": 2023,
-          "posterPath": "/ytFOXyghxLzAM4KZyazDdEkM66q.jpg"
+          "posterPath": "/ytFOXyghxLzAM4KZyazDdEkM66q.jpg",
+          "overview": "An epic that details the checkered rise and fall of French Emperor Napoleon Bonaparte and his relentless journey to power through the prism of his addictive, volatile relationship with his wife, Josephine.",
+          "backdropPath": "/33pMXav77ICRnceEBLhL8lXTywv.jpg",
+          "duration": "2h 38m",
+          "rating": "R",
+          "director": "Ridley Scott",
+          "actors": [
+            "Joaquin Phoenix",
+            "Vanessa Kirby",
+            "Tahar Rahim",
+            "Rupert Everett",
+            "Mark Bonnar"
+          ],
+          "voteAverage": 6.3,
+          "genres": [
+            "History",
+            "War",
+            "Drama"
+          ],
+          "genreIds": [
+            36,
+            10752,
+            18
+          ]
         },
         {
           "tmdbId": 4327,
           "title": "Charlie's Angels",
           "year": 2000,
-          "posterPath": "/paDTaHGLxhacythNZCT86VPanm6.jpg"
+          "posterPath": "/paDTaHGLxhacythNZCT86VPanm6.jpg",
+          "overview": "The captivating crime-fighting trio who are masters of disguise, espionage and martial arts are back! When a devious mastermind embroils them in a plot to destroy individual privacy, the Angels, aided by their loyal sidekick Bosley, set out to bring down the bad guys. But when a terrible secret is revealed, it makes the Angels targets for assassination.",
+          "backdropPath": "/oq3IOr7QvEmei0eXsXacqaMPqlV.jpg",
+          "duration": "1h 38m",
+          "rating": "PG-13",
+          "director": "McG",
+          "actors": [
+            "Cameron Diaz",
+            "Drew Barrymore",
+            "Lucy Liu",
+            "Bill Murray",
+            "Sam Rockwell"
+          ],
+          "voteAverage": 5.9,
+          "genres": [
+            "Action",
+            "Comedy",
+            "Adventure"
+          ],
+          "genreIds": [
+            28,
+            35,
+            12
+          ]
         },
         {
           "tmdbId": 453,
           "title": "A Beautiful Mind",
           "year": 2001,
-          "posterPath": "/rEIg5yJdNOt9fmX4P8gU9LeNoTQ.jpg"
+          "posterPath": "/rEIg5yJdNOt9fmX4P8gU9LeNoTQ.jpg",
+          "overview": "From the heights of notoriety to the depths of depravity, John Forbes Nash Jr. experiences it all. As a brilliant but socially awkward mathematician, he made a groundbreaking discovery early in his career and stands on the brink of international acclaim. But as the handsome and arrogant Nash accepts secret work in cryptography, he becomes entangled in a mysterious conspiracy. His life takes a nightmarish turn and he soon finds himself on a painful and harrowing journey of self-discovery.",
+          "backdropPath": "/hCJFWTPghXCwwSpvPpAoIB8318Q.jpg",
+          "duration": "2h 15m",
+          "rating": "PG-13",
+          "director": "Ron Howard",
+          "actors": [
+            "Russell Crowe",
+            "Jennifer Connelly",
+            "Ed Harris",
+            "Paul Bettany",
+            "Christopher Plummer"
+          ],
+          "voteAverage": 7.9,
+          "genres": [
+            "Drama",
+            "Romance"
+          ],
+          "genreIds": [
+            18,
+            10749
+          ]
         }
       ]
     },
@@ -766,121 +3495,565 @@
           "tmdbId": 980431,
           "title": "Avatar Aang: The Last Airbender",
           "year": 2026,
-          "posterPath": "/3sgnSfNT27Bx5O5ukr7B26mhEQq.jpg"
+          "posterPath": "/3sgnSfNT27Bx5O5ukr7B26mhEQq.jpg",
+          "overview": "Avatar Aang, the world's last Airbender, learns of an ancient power that could save his culture from extinction. With the help of his friends, he embarks on a global quest to find it before it falls into the wrong hands and threatens to upend the peace they sacrificed everything to achieve.",
+          "backdropPath": "/ezbrL1dMymKQZw7mDEWa2ZTzN7d.jpg",
+          "duration": "1h 39m",
+          "rating": "PG",
+          "director": "Lauren Montgomery",
+          "actors": [
+            "Dave Bautista",
+            "Jessica Matten",
+            "Román Zaragoza",
+            "Steven Yeun",
+            "Dionne Quan"
+          ],
+          "voteAverage": 9.2,
+          "genres": [
+            "Animation",
+            "Adventure",
+            "Fantasy"
+          ],
+          "genreIds": [
+            16,
+            12,
+            14
+          ]
         },
         {
           "tmdbId": 157336,
           "title": "Interstellar",
           "year": 2014,
-          "posterPath": "/yQvGrMoipbRoddT0ZR8tPoR7NfX.jpg"
+          "posterPath": "/yQvGrMoipbRoddT0ZR8tPoR7NfX.jpg",
+          "overview": "The adventures of a group of explorers who make use of a newly discovered wormhole to surpass the limitations on human space travel and conquer the vast distances involved in an interstellar voyage.",
+          "backdropPath": "/5XNQBqnBwPA9yT0jZ0p3s8bbLh0.jpg",
+          "duration": "2h 49m",
+          "rating": "PG-13",
+          "director": "Christopher Nolan",
+          "actors": [
+            "Matthew McConaughey",
+            "Anne Hathaway",
+            "Michael Caine",
+            "Jessica Chastain",
+            "Casey Affleck"
+          ],
+          "voteAverage": 8.5,
+          "genres": [
+            "Adventure",
+            "Drama",
+            "Science Fiction"
+          ],
+          "genreIds": [
+            12,
+            18,
+            878
+          ]
         },
         {
           "tmdbId": 238,
           "title": "The Godfather",
           "year": 1972,
-          "posterPath": "/3bhkrj58Vtu7enYsRolD1fZdja1.jpg"
+          "posterPath": "/3bhkrj58Vtu7enYsRolD1fZdja1.jpg",
+          "overview": "Spanning the years 1945 to 1955, a chronicle of the fictional Italian-American Corleone crime family. When organized crime family patriarch, Vito Corleone barely survives an attempt on his life, his youngest son, Michael steps in to take care of the would-be killers, launching a campaign of bloody revenge.",
+          "backdropPath": "/tSPT36ZKlP2WVHJLM4cQPLSzv3b.jpg",
+          "duration": "2h 55m",
+          "rating": "R",
+          "director": "Francis Ford Coppola",
+          "actors": [
+            "Marlon Brando",
+            "Al Pacino",
+            "James Caan",
+            "Robert Duvall",
+            "Richard S. Castellano"
+          ],
+          "voteAverage": 8.7,
+          "genres": [
+            "Drama",
+            "Crime"
+          ],
+          "genreIds": [
+            18,
+            80
+          ]
         },
         {
           "tmdbId": 680,
           "title": "Pulp Fiction",
           "year": 1994,
-          "posterPath": "/vQWk5YBFWF4bZaofAbv0tShwBvQ.jpg"
+          "posterPath": "/vQWk5YBFWF4bZaofAbv0tShwBvQ.jpg",
+          "overview": "A burger-loving hit man, his philosophical partner, a drug-addled gangster's moll and a washed-up boxer converge in this sprawling, comedic crime caper. Their adventures unfurl in three stories that ingeniously trip back and forth in time.",
+          "backdropPath": "/suaEOtk1N1sgg2MTM7oZd2cfVp3.jpg",
+          "duration": "2h 34m",
+          "rating": "R",
+          "director": "Quentin Tarantino",
+          "actors": [
+            "John Travolta",
+            "Samuel L. Jackson",
+            "Uma Thurman",
+            "Bruce Willis",
+            "Ving Rhames"
+          ],
+          "voteAverage": 8.5,
+          "genres": [
+            "Thriller",
+            "Crime",
+            "Comedy"
+          ],
+          "genreIds": [
+            53,
+            80,
+            35
+          ]
         },
         {
           "tmdbId": 361743,
           "title": "Top Gun: Maverick",
           "year": 2022,
-          "posterPath": "/n0YuM4f5lvGAP6MAW2kBIzugXnc.jpg"
+          "posterPath": "/n0YuM4f5lvGAP6MAW2kBIzugXnc.jpg",
+          "overview": "After more than thirty years of service as one of the Navy’s top aviators, and dodging the advancement in rank that would ground him, Pete “Maverick” Mitchell finds himself training a detachment of TOP GUN graduates for a specialized mission the likes of which no living pilot has ever seen.",
+          "backdropPath": "/AaV1YIdWKnjAIAOe8UUKBFm327v.jpg",
+          "duration": "2h 11m",
+          "rating": "PG-13",
+          "director": "Joseph Kosinski",
+          "actors": [
+            "Tom Cruise",
+            "Miles Teller",
+            "Jennifer Connelly",
+            "Bashir Salahuddin",
+            "Jon Hamm"
+          ],
+          "voteAverage": 8.2,
+          "genres": [
+            "Action",
+            "Drama"
+          ],
+          "genreIds": [
+            28,
+            18
+          ]
         },
         {
           "tmdbId": 98,
           "title": "Gladiator",
           "year": 2000,
-          "posterPath": "/wN2xWp1eIwCKOD0BHTcErTBv1Uq.jpg"
+          "posterPath": "/wN2xWp1eIwCKOD0BHTcErTBv1Uq.jpg",
+          "overview": "After the death of Emperor Marcus Aurelius, his devious son takes power and demotes Maximus, one of Rome's most capable generals who Marcus preferred. Eventually, Maximus is forced to become a gladiator and battle to the death against other men for the amusement of paying audiences.",
+          "backdropPath": "/Ar7QuJ7sJEiC0oP3I8fKBKIQD9u.jpg",
+          "duration": "2h 35m",
+          "rating": "R",
+          "director": "Ridley Scott",
+          "actors": [
+            "Russell Crowe",
+            "Joaquin Phoenix",
+            "Connie Nielsen",
+            "Oliver Reed",
+            "Richard Harris"
+          ],
+          "voteAverage": 8.2,
+          "genres": [
+            "Action",
+            "Drama",
+            "Adventure"
+          ],
+          "genreIds": [
+            28,
+            18,
+            12
+          ]
         },
         {
           "tmdbId": 13,
           "title": "Forrest Gump",
           "year": 1994,
-          "posterPath": "/Cw4hIUIAmSYfK9QfaUW5igp9La.jpg"
+          "posterPath": "/Cw4hIUIAmSYfK9QfaUW5igp9La.jpg",
+          "overview": "A man with a low IQ has accomplished great things in his life and been present during significant historic events—in each case, far exceeding what anyone imagined he could do. But despite all he has achieved, his one true love eludes him.",
+          "backdropPath": "/66Kn4XWhkuPkJxOJyPEx4U2CUfN.jpg",
+          "duration": "2h 22m",
+          "rating": "PG-13",
+          "director": "Robert Zemeckis",
+          "actors": [
+            "Tom Hanks",
+            "Robin Wright",
+            "Gary Sinise",
+            "Sally Field",
+            "Mykelti Williamson"
+          ],
+          "voteAverage": 8.5,
+          "genres": [
+            "Comedy",
+            "Drama",
+            "Romance"
+          ],
+          "genreIds": [
+            35,
+            18,
+            10749
+          ]
         },
         {
           "tmdbId": 798645,
           "title": "The Running Man",
           "year": 2025,
-          "posterPath": "/dKL78O9zxczVgjtNcQ9UkbYLzqX.jpg"
+          "posterPath": "/dKL78O9zxczVgjtNcQ9UkbYLzqX.jpg",
+          "overview": "Desperate to save his sick daughter, working-class Ben Richards is convinced by The Running Man's charming but ruthless producer to enter the deadly competition game as a last resort. But Ben's defiance, instincts, and grit turn him into an unexpected fan favorite — and a threat to the entire system. As ratings skyrocket, so does the danger, and Ben must outwit not just the Hunters, but a nation addicted to watching him fall.",
+          "backdropPath": "/aHj7d7wSLqrg5cjAcgHhiGr97Ih.jpg",
+          "duration": "2h 13m",
+          "rating": "R",
+          "director": "Edgar Wright",
+          "actors": [
+            "Glen Powell",
+            "Colman Domingo",
+            "Lee Pace",
+            "Josh Brolin",
+            "William H. Macy"
+          ],
+          "voteAverage": 6.7,
+          "genres": [
+            "Action",
+            "Thriller",
+            "Science Fiction"
+          ],
+          "genreIds": [
+            28,
+            53,
+            878
+          ]
         },
         {
           "tmdbId": 597,
           "title": "Titanic",
           "year": 1997,
-          "posterPath": "/9xjZS2rlVxm8SFx8kPC3aIGCOYQ.jpg"
+          "posterPath": "/9xjZS2rlVxm8SFx8kPC3aIGCOYQ.jpg",
+          "overview": "101-year-old Rose DeWitt Bukater tells the story of her life aboard the Titanic, 84 years later. A young Rose boards the ship with her mother and fiancé. Meanwhile, Jack Dawson and Fabrizio De Rossi win third-class tickets aboard the ship. Rose tells the whole story from Titanic's departure through to its death—on its first and last voyage—on April 15, 1912.",
+          "backdropPath": "/xXCuto8YVp5RFqBJ7yKmVmLOWpF.jpg",
+          "duration": "3h 14m",
+          "rating": "PG-13",
+          "director": "James Cameron",
+          "actors": [
+            "Leonardo DiCaprio",
+            "Kate Winslet",
+            "Billy Zane",
+            "Kathy Bates",
+            "Frances Fisher"
+          ],
+          "voteAverage": 7.9,
+          "genres": [
+            "Drama",
+            "Romance"
+          ],
+          "genreIds": [
+            18,
+            10749
+          ]
         },
         {
           "tmdbId": 857,
           "title": "Saving Private Ryan",
           "year": 1998,
-          "posterPath": "/uqx37cS8cpHg8U35f9U5IBlrCV3.jpg"
+          "posterPath": "/uqx37cS8cpHg8U35f9U5IBlrCV3.jpg",
+          "overview": "As U.S. troops storm the beaches of Normandy, three brothers lie dead on the battlefield, with a fourth trapped behind enemy lines. Ranger captain John Miller and seven men are tasked with penetrating German-held territory and bringing the boy home.",
+          "backdropPath": "/bdD39MpSVhKjxarTxLSfX6baoMP.jpg",
+          "duration": "2h 49m",
+          "rating": "R",
+          "director": "Steven Spielberg",
+          "actors": [
+            "Tom Hanks",
+            "Tom Sizemore",
+            "Edward Burns",
+            "Barry Pepper",
+            "Adam Goldberg"
+          ],
+          "voteAverage": 8.2,
+          "genres": [
+            "War",
+            "Drama",
+            "History"
+          ],
+          "genreIds": [
+            10752,
+            18,
+            36
+          ]
         },
         {
           "tmdbId": 106646,
           "title": "The Wolf of Wall Street",
           "year": 2013,
-          "posterPath": "/kW9LmvYHAaS9iA0tHmZVq8hQYoq.jpg"
+          "posterPath": "/kW9LmvYHAaS9iA0tHmZVq8hQYoq.jpg",
+          "overview": "A New York stockbroker refuses to cooperate in a large securities fraud case involving corruption on Wall Street, corporate banking world and mob infiltration. Based on Jordan Belfort's autobiography.",
+          "backdropPath": "/7Nwnmyzrtd0FkcRyPqmdzTPppQa.jpg",
+          "duration": "3h",
+          "rating": "R",
+          "director": "Martin Scorsese",
+          "actors": [
+            "Leonardo DiCaprio",
+            "Jonah Hill",
+            "Margot Robbie",
+            "Matthew McConaughey",
+            "Kyle Chandler"
+          ],
+          "voteAverage": 8,
+          "genres": [
+            "Crime",
+            "Drama",
+            "Comedy"
+          ],
+          "genreIds": [
+            80,
+            18,
+            35
+          ]
         },
         {
           "tmdbId": 335984,
           "title": "Blade Runner 2049",
           "year": 2017,
-          "posterPath": "/gajva2L0rPYkEWjzgFlBXCAVBE5.jpg"
+          "posterPath": "/gajva2L0rPYkEWjzgFlBXCAVBE5.jpg",
+          "overview": "Thirty years after the events of the first film, a new blade runner, LAPD Officer K, unearths a long-buried secret that has the potential to plunge what's left of society into chaos. K's discovery leads him on a quest to find Rick Deckard, a former LAPD blade runner who has been missing for 30 years.",
+          "backdropPath": "/gNdLJU9TxrpGx4dkZidjys3fyy0.jpg",
+          "duration": "2h 44m",
+          "rating": "R",
+          "director": "Denis Villeneuve",
+          "actors": [
+            "Ryan Gosling",
+            "Harrison Ford",
+            "Ana de Armas",
+            "Dave Bautista",
+            "Robin Wright"
+          ],
+          "voteAverage": 7.6,
+          "genres": [
+            "Science Fiction",
+            "Drama"
+          ],
+          "genreIds": [
+            878,
+            18
+          ]
         },
         {
           "tmdbId": 240,
           "title": "The Godfather Part II",
           "year": 1974,
-          "posterPath": "/sSuQTCZwqKrNBNIsksO9IAUoWP9.jpg"
+          "posterPath": "/sSuQTCZwqKrNBNIsksO9IAUoWP9.jpg",
+          "overview": "In the continuing saga of the Corleone crime family, a young Vito Corleone grows up in Sicily and in 1910s New York. In the 1950s, Michael Corleone attempts to expand the family business into Las Vegas, Hollywood and Cuba.",
+          "backdropPath": "/kGzFbGhp99zva6oZODW5atUtnqi.jpg",
+          "duration": "3h 22m",
+          "rating": "R",
+          "director": "Francis Ford Coppola",
+          "actors": [
+            "Al Pacino",
+            "Robert Duvall",
+            "Diane Keaton",
+            "Robert De Niro",
+            "John Cazale"
+          ],
+          "voteAverage": 8.6,
+          "genres": [
+            "Drama",
+            "Crime"
+          ],
+          "genreIds": [
+            18,
+            80
+          ]
         },
         {
           "tmdbId": 489,
           "title": "Good Will Hunting",
           "year": 1997,
-          "posterPath": "/z2FnLKpFi1HPO7BEJxdkv6hpJSU.jpg"
+          "posterPath": "/z2FnLKpFi1HPO7BEJxdkv6hpJSU.jpg",
+          "overview": "Will Hunting is a headstrong, working-class genius who is failing the lessons of life. After one too many run-ins with the law, Will's last chance is a psychology professor, who might be the only man who can reach him.",
+          "backdropPath": "/xj1Sv1xm4Y0ydBueGuf10Y9qM0O.jpg",
+          "duration": "2h 7m",
+          "rating": "R",
+          "director": "Gus Van Sant",
+          "actors": [
+            "Matt Damon",
+            "Robin Williams",
+            "Ben Affleck",
+            "Stellan Skarsgård",
+            "Minnie Driver"
+          ],
+          "voteAverage": 8.2,
+          "genres": [
+            "Drama"
+          ],
+          "genreIds": [
+            18
+          ]
         },
         {
           "tmdbId": 939243,
           "title": "Sonic the Hedgehog 3",
           "year": 2024,
-          "posterPath": "/d8Ryb8AunYAuycVKDp5HpdWPKgC.jpg"
+          "posterPath": "/d8Ryb8AunYAuycVKDp5HpdWPKgC.jpg",
+          "overview": "Sonic, Knuckles, and Tails reunite against a powerful new adversary, Shadow, a mysterious villain with powers unlike anything they have faced before. With their abilities outmatched in every way, Team Sonic must seek out an unlikely alliance in hopes of stopping Shadow and protecting the planet.",
+          "backdropPath": "/zOpe0eHsq0A2NvNyBbtT6sj53qV.jpg",
+          "duration": "1h 50m",
+          "rating": "PG",
+          "director": "Jeff Fowler",
+          "actors": [
+            "Ben Schwartz",
+            "Jim Carrey",
+            "Keanu Reeves",
+            "Idris Elba",
+            "Colleen O&#39;Shaughnessey"
+          ],
+          "voteAverage": 7.6,
+          "genres": [
+            "Action",
+            "Science Fiction",
+            "Comedy",
+            "Family"
+          ],
+          "genreIds": [
+            28,
+            878,
+            35,
+            10751
+          ]
         },
         {
           "tmdbId": 575265,
           "title": "Mission: Impossible - The Final Reckoning",
           "year": 2025,
-          "posterPath": "/iKPsC9EFUafRP9SrUznI61getVP.jpg"
+          "posterPath": "/iKPsC9EFUafRP9SrUznI61getVP.jpg",
+          "overview": "Ethan Hunt and team continue their search for the terrifying AI known as the Entity — which has infiltrated intelligence networks all over the globe — with the world's governments and a mysterious ghost from Hunt's past on their trail. Joined by new allies and armed with the means to shut the Entity down for good, Hunt is in a race against time to prevent the world as we know it from changing forever.",
+          "backdropPath": "/538U9snNc2fpnOmYXAPUh3zn31H.jpg",
+          "duration": "2h 50m",
+          "rating": "PG-13",
+          "director": "Christopher McQuarrie",
+          "actors": [
+            "Tom Cruise",
+            "Hayley Atwell",
+            "Ving Rhames",
+            "Simon Pegg",
+            "Esai Morales"
+          ],
+          "voteAverage": 7.2,
+          "genres": [
+            "Action",
+            "Thriller",
+            "Adventure"
+          ],
+          "genreIds": [
+            28,
+            53,
+            12
+          ]
         },
         {
           "tmdbId": 1159559,
           "title": "Scream 7",
           "year": 2026,
-          "posterPath": "/jjyuk0edLiW8vOSnlfwWCCLpbh5.jpg"
+          "posterPath": "/jjyuk0edLiW8vOSnlfwWCCLpbh5.jpg",
+          "overview": "When a new Ghostface killer emerges in the quiet town where Sidney Prescott has built a new life, her darkest fears are realized as her daughter becomes the next target. Determined to protect her family, Sidney must face the horrors of her past to put an end to the bloodshed once and for all.",
+          "backdropPath": "/3eUyLEF5M0ky3h6KJsWiWzaakB8.jpg",
+          "duration": "1h 54m",
+          "rating": "R",
+          "director": "Kevin Williamson",
+          "actors": [
+            "Neve Campbell",
+            "Courteney Cox",
+            "Isabel May",
+            "Jasmin Savoy Brown",
+            "Mason Gooding"
+          ],
+          "voteAverage": 6.2,
+          "genres": [
+            "Horror",
+            "Mystery",
+            "Crime"
+          ],
+          "genreIds": [
+            27,
+            9648,
+            80
+          ]
         },
         {
           "tmdbId": 189,
           "title": "Sin City: A Dame to Kill For",
           "year": 2014,
-          "posterPath": "/50kALxDX4mmzIRljbNbPY0u4cie.jpg"
+          "posterPath": "/50kALxDX4mmzIRljbNbPY0u4cie.jpg",
+          "overview": "Some of Sin City's most hard-boiled citizens cross paths with a few of its more reviled inhabitants.",
+          "backdropPath": "/rxMnmklIpunsNsRkQ7hw61ZJa84.jpg",
+          "duration": "1h 42m",
+          "rating": "R",
+          "director": "Frank Miller",
+          "actors": [
+            "Jessica Alba",
+            "Bruce Willis",
+            "Mickey Rourke",
+            "Josh Brolin",
+            "Joseph Gordon-Levitt"
+          ],
+          "voteAverage": 6.4,
+          "genres": [
+            "Action",
+            "Crime",
+            "Thriller"
+          ],
+          "genreIds": [
+            28,
+            80,
+            53
+          ]
         },
         {
           "tmdbId": 280,
           "title": "Terminator 2: Judgment Day",
           "year": 1991,
-          "posterPath": "/jFTVD4XoWQTcg7wdyJKa8PEds5q.jpg"
+          "posterPath": "/jFTVD4XoWQTcg7wdyJKa8PEds5q.jpg",
+          "overview": "Ten years after the events of the original, a reprogrammed T-800 is sent back in time to protect young John Connor from the shape-shifting T-1000. Together with his mother Sarah, he fights to stop Skynet from triggering a nuclear apocalypse.",
+          "backdropPath": "/izkMjmhauFx9DjoBQqM5sM5WAwE.jpg",
+          "duration": "2h 17m",
+          "rating": "R",
+          "director": "James Cameron",
+          "actors": [
+            "Arnold Schwarzenegger",
+            "Linda Hamilton",
+            "Edward Furlong",
+            "Robert Patrick",
+            "Earl Boen"
+          ],
+          "voteAverage": 8.2,
+          "genres": [
+            "Action",
+            "Thriller",
+            "Science Fiction"
+          ],
+          "genreIds": [
+            28,
+            53,
+            878
+          ]
         },
         {
           "tmdbId": 18785,
           "title": "The Hangover",
           "year": 2009,
-          "posterPath": "/A0uS9rHR56FeBtpjVki16M5xxSW.jpg"
+          "posterPath": "/A0uS9rHR56FeBtpjVki16M5xxSW.jpg",
+          "overview": "When three friends finally come to after a raucous night of bachelor-party revelry, they find a baby in the closet and a tiger in the bathroom. But they can't seem to locate their best friend, Doug – who's supposed to be tying the knot. Launching a frantic search for Doug, the trio perseveres through a nasty hangover to try to make it to the church on time.",
+          "backdropPath": "/iuRVt8tFiXDPGgzavhuSa3QHRxD.jpg",
+          "duration": "1h 40m",
+          "rating": "R",
+          "director": "Todd Phillips",
+          "actors": [
+            "Bradley Cooper",
+            "Ed Helms",
+            "Zach Galifianakis",
+            "Justin Bartha",
+            "Heather Graham"
+          ],
+          "voteAverage": 7.3,
+          "genres": [
+            "Comedy"
+          ],
+          "genreIds": [
+            35
+          ]
         }
       ]
     },
@@ -892,123 +4065,565 @@
           "tmdbId": 1339713,
           "title": "Obsession",
           "year": 2026,
-          "posterPath": "/bRwnj8WEKBCvmfeUNOukJPwB43K.jpg"
+          "posterPath": "/bRwnj8WEKBCvmfeUNOukJPwB43K.jpg",
+          "overview": "After breaking the mysterious \"One Wish Willow\" to win his crush's heart, a hopeless romantic finds himself getting exactly what he asked for but soon discovers that some desires come at a dark, sinister price.",
+          "backdropPath": "/rZfmzpixLKLR3Hg2u0WgC7XLFl8.jpg",
+          "duration": "1h 49m",
+          "rating": "R",
+          "director": "Curry Barker",
+          "actors": [
+            "Michael Johnston",
+            "Inde Navarrette",
+            "Cooper Tomlinson",
+            "Megan Lawless",
+            "Andy Richter"
+          ],
+          "voteAverage": 8.2,
+          "genres": [
+            "Horror",
+            "Thriller"
+          ],
+          "genreIds": [
+            27,
+            53
+          ]
         },
         {
           "tmdbId": 1226863,
           "title": "The Super Mario Galaxy Movie",
           "year": 2026,
-          "posterPath": "/eJGWx219ZcEMVQJhAgMiqo8tYY.jpg"
+          "posterPath": "/eJGWx219ZcEMVQJhAgMiqo8tYY.jpg",
+          "overview": "Having thwarted Bowser's previous plot to marry Princess Peach, Mario and Luigi now face a fresh threat in Bowser Jr., who is determined to liberate his father from captivity and restore the family legacy. Alongside companions new and old, the brothers travel across the stars to stop the young heir's crusade.",
+          "backdropPath": "/kDOl4pwu6QSqcOD3O7FyxY2p95m.jpg",
+          "duration": "1h 38m",
+          "rating": "PG",
+          "director": "Michael Jelenic",
+          "actors": [
+            "Chris Pratt",
+            "Charlie Day",
+            "Anya Taylor-Joy",
+            "Jack Black",
+            "Keegan-Michael Key"
+          ],
+          "voteAverage": 8.2,
+          "genres": [
+            "Family",
+            "Comedy",
+            "Adventure",
+            "Fantasy",
+            "Animation"
+          ],
+          "genreIds": [
+            10751,
+            35,
+            12,
+            14,
+            16
+          ]
         },
         {
           "tmdbId": 603,
           "title": "The Matrix",
           "year": 1999,
-          "posterPath": "/dXNAPwY7VrqMAo51EKhhCJfaGb5.jpg"
+          "posterPath": "/dXNAPwY7VrqMAo51EKhhCJfaGb5.jpg",
+          "overview": "Set in the 22nd century, The Matrix tells the story of a computer hacker who joins a group of underground insurgents fighting the vast and powerful computers who now rule the earth.",
+          "backdropPath": "/lrtSb1skJayPydZk0OSMAKjBOVe.jpg",
+          "duration": "2h 16m",
+          "rating": "R",
+          "director": "Lilly Wachowski",
+          "actors": [
+            "Keanu Reeves",
+            "Laurence Fishburne",
+            "Carrie-Anne Moss",
+            "Hugo Weaving",
+            "Gloria Foster"
+          ],
+          "voteAverage": 8.3,
+          "genres": [
+            "Action",
+            "Science Fiction"
+          ],
+          "genreIds": [
+            28,
+            878
+          ]
         },
         {
           "tmdbId": 652,
           "title": "Troy",
           "year": 2004,
-          "posterPath": "/a07wLy4ONfpsjnBqMwhlWTJTcm.jpg"
+          "posterPath": "/a07wLy4ONfpsjnBqMwhlWTJTcm.jpg",
+          "overview": "In year 1250 B.C. during the late Bronze age, two emerging nations begin to clash. Paris, the Trojan prince, convinces Helen, Queen of Sparta, to leave her husband Menelaus, and sail with him back to Troy. After Menelaus finds out that his wife was taken by the Trojans, he asks his brother Agamemnon to help him get her back. Agamemnon sees this as an opportunity for power. They set off with 1,000 ships holding 50,000 Greeks to Troy.",
+          "backdropPath": "/ZPcC5hJh21QiW0jmhMQhZeSoGu.jpg",
+          "duration": "2h 43m",
+          "rating": "R",
+          "director": "Wolfgang Petersen",
+          "actors": [
+            "Brad Pitt",
+            "Orlando Bloom",
+            "Eric Bana",
+            "Brian Cox",
+            "Sean Bean"
+          ],
+          "voteAverage": 7.2,
+          "genres": [
+            "Action",
+            "Adventure"
+          ],
+          "genreIds": [
+            28,
+            12
+          ]
         },
         {
           "tmdbId": 671,
           "title": "Harry Potter and the Philosopher's Stone",
           "year": 2001,
-          "posterPath": "/wuMc08IPKEatf9rnMNXvIDxqP4W.jpg"
+          "posterPath": "/wuMc08IPKEatf9rnMNXvIDxqP4W.jpg",
+          "overview": "Harry Potter has lived under the stairs at his aunt and uncle's house his whole life. But on his 11th birthday, he learns he's a powerful wizard—with a place waiting for him at the Hogwarts School of Witchcraft and Wizardry. As he learns to harness his newfound powers with the help of the school's kindly headmaster, Harry uncovers the truth about his parents' deaths—and about the villain who's to blame.",
+          "backdropPath": "/1XAC6RPT01UX9EQGy2JVn5c8pgy.jpg",
+          "duration": "2h 32m",
+          "rating": "PG",
+          "director": "Chris Columbus",
+          "actors": [
+            "Daniel Radcliffe",
+            "Rupert Grint",
+            "Emma Watson",
+            "Richard Harris",
+            "Tom Felton"
+          ],
+          "voteAverage": 7.9,
+          "genres": [
+            "Adventure",
+            "Fantasy"
+          ],
+          "genreIds": [
+            12,
+            14
+          ]
         },
         {
           "tmdbId": 872585,
           "title": "Oppenheimer",
           "year": 2023,
-          "posterPath": "/8Gxv8gSFCU0XGDykEGv7zR1n2ua.jpg"
+          "posterPath": "/8Gxv8gSFCU0XGDykEGv7zR1n2ua.jpg",
+          "overview": "The story of J. Robert Oppenheimer's role in the development of the atomic bomb during World War II.",
+          "backdropPath": "/neeNHeXjMF5fXoCJRsOmkNGC7q.jpg",
+          "duration": "3h 1m",
+          "rating": "R",
+          "director": "Christopher Nolan",
+          "actors": [
+            "Cillian Murphy",
+            "Emily Blunt",
+            "Matt Damon",
+            "Robert Downey Jr.",
+            "Florence Pugh"
+          ],
+          "voteAverage": 8,
+          "genres": [
+            "Drama",
+            "History"
+          ],
+          "genreIds": [
+            18,
+            36
+          ]
         },
         {
           "tmdbId": 12444,
           "title": "Harry Potter and the Deathly Hallows: Part 1",
           "year": 2010,
-          "posterPath": "/iGoXIpQb7Pot00EEdwpwPajheZ5.jpg"
+          "posterPath": "/iGoXIpQb7Pot00EEdwpwPajheZ5.jpg",
+          "overview": "Harry, Ron and Hermione walk away from their last year at Hogwarts to find and destroy the remaining Horcruxes, putting an end to Voldemort's bid for immortality. But with Harry's beloved Dumbledore dead and Voldemort's unscrupulous Death Eaters on the loose, the world is more dangerous than ever.",
+          "backdropPath": "/p2M4xlipwlqUzglAlF2KDlTqeLV.jpg",
+          "duration": "2h 26m",
+          "rating": "PG-13",
+          "director": "David Yates",
+          "actors": [
+            "Daniel Radcliffe",
+            "Emma Watson",
+            "Rupert Grint",
+            "Toby Jones",
+            "Helena Bonham Carter"
+          ],
+          "voteAverage": 7.7,
+          "genres": [
+            "Adventure",
+            "Fantasy"
+          ],
+          "genreIds": [
+            12,
+            14
+          ]
         },
         {
           "tmdbId": 672,
           "title": "Harry Potter and the Chamber of Secrets",
           "year": 2002,
-          "posterPath": "/sdEOH0992YZ0QSxgXNIGLq1ToUi.jpg"
+          "posterPath": "/sdEOH0992YZ0QSxgXNIGLq1ToUi.jpg",
+          "overview": "Cars fly, trees fight back, and a mysterious house-elf comes to warn Harry Potter at the start of his second year at Hogwarts. Adventure and danger await when bloody writing on a wall announces: The Chamber Of Secrets Has Been Opened. To save Hogwarts will require all of Harry, Ron and Hermione's magical abilities and courage.",
+          "backdropPath": "/qSrq6ACzPDv4xerGJ78iS3N827K.jpg",
+          "duration": "2h 41m",
+          "rating": "PG",
+          "director": "Chris Columbus",
+          "actors": [
+            "Daniel Radcliffe",
+            "Rupert Grint",
+            "Emma Watson",
+            "Kenneth Branagh",
+            "Toby Jones"
+          ],
+          "voteAverage": 7.7,
+          "genres": [
+            "Adventure",
+            "Fantasy"
+          ],
+          "genreIds": [
+            12,
+            14
+          ]
         },
         {
           "tmdbId": 674,
           "title": "Harry Potter and the Goblet of Fire",
           "year": 2005,
-          "posterPath": "/fECBtHlr0RB3foNHDiCBXeg9Bv9.jpg"
+          "posterPath": "/fECBtHlr0RB3foNHDiCBXeg9Bv9.jpg",
+          "overview": "When his name emerges from the Goblet of Fire, Harry Potter becomes a competitor in a grueling battle for glory among three wizarding schools. Signs of Voldemort's return emerge as Harry's friends help him prepare for the Triwizard Tournament.",
+          "backdropPath": "/cClWTo3ftVXvV1sF8vlLuWfnlph.jpg",
+          "duration": "2h 37m",
+          "rating": "PG-13",
+          "director": "Mike Newell",
+          "actors": [
+            "Daniel Radcliffe",
+            "Rupert Grint",
+            "Emma Watson",
+            "Brendan Gleeson",
+            "Michael Gambon"
+          ],
+          "voteAverage": 7.8,
+          "genres": [
+            "Adventure",
+            "Fantasy"
+          ],
+          "genreIds": [
+            12,
+            14
+          ]
         },
         {
           "tmdbId": 673,
           "title": "Harry Potter and the Prisoner of Azkaban",
           "year": 2004,
-          "posterPath": "/aWxwnYoe8p2d2fcxOqtvAtJ72Rw.jpg"
+          "posterPath": "/aWxwnYoe8p2d2fcxOqtvAtJ72Rw.jpg",
+          "overview": "Harry Potter's life is in danger once more as dangerous wizard Sirius Black has escaped from Azkaban Prison and is heading to Hogwarts.",
+          "backdropPath": "/vbk5CfaAHOjQPSAcYm6AoRRz2Af.jpg",
+          "duration": "2h 21m",
+          "rating": "PG",
+          "director": "Alfonso Cuarón",
+          "actors": [
+            "Daniel Radcliffe",
+            "Rupert Grint",
+            "Emma Watson",
+            "Robbie Coltrane",
+            "Michael Gambon"
+          ],
+          "voteAverage": 8,
+          "genres": [
+            "Adventure",
+            "Fantasy"
+          ],
+          "genreIds": [
+            12,
+            14
+          ]
         },
         {
           "tmdbId": 12445,
           "title": "Harry Potter and the Deathly Hallows: Part 2",
           "year": 2011,
-          "posterPath": "/c54HpQmuwXjHq2C9wmoACjxoom3.jpg"
+          "posterPath": "/c54HpQmuwXjHq2C9wmoACjxoom3.jpg",
+          "overview": "Harry, Ron and Hermione continue their quest to vanquish the evil Voldemort once and for all. Just as things begin to look hopeless for the young wizards, Harry discovers a trio of magical objects that endow him with powers to rival Voldemort's formidable skills.",
+          "backdropPath": "/eKUk4oN4ucwnLJml7wRnjuB9AQH.jpg",
+          "duration": "2h 10m",
+          "rating": "PG-13",
+          "director": "David Yates",
+          "actors": [
+            "Daniel Radcliffe",
+            "Emma Watson",
+            "Rupert Grint",
+            "Ralph Fiennes",
+            "Alan Rickman"
+          ],
+          "voteAverage": 8.1,
+          "genres": [
+            "Adventure",
+            "Fantasy"
+          ],
+          "genreIds": [
+            12,
+            14
+          ]
         },
         {
           "tmdbId": 385687,
           "title": "Fast X",
           "year": 2023,
-          "posterPath": "/fiVW06jE7z9YnO4trhaMEdclSiC.jpg"
+          "posterPath": "/fiVW06jE7z9YnO4trhaMEdclSiC.jpg",
+          "overview": "Over many missions and against impossible odds, Dom Toretto and his family have outsmarted, out-nerved and outdriven every foe in their path. Now, they confront the most lethal opponent they've ever faced: A terrifying threat emerging from the shadows of the past who's fueled by blood revenge, and who is determined to shatter this family and destroy everything—and everyone—that Dom loves, forever.",
+          "backdropPath": "/4XM8DUTQb3lhLemJC51Jx4a2EuA.jpg",
+          "duration": "2h 22m",
+          "rating": "PG-13",
+          "director": "Louis Leterrier",
+          "actors": [
+            "Vin Diesel",
+            "Michelle Rodriguez",
+            "Tyrese Gibson",
+            "Ludacris",
+            "John Cena"
+          ],
+          "voteAverage": 7,
+          "genres": [
+            "Action",
+            "Crime",
+            "Thriller"
+          ],
+          "genreIds": [
+            28,
+            80,
+            53
+          ]
         },
         {
           "tmdbId": 49018,
           "title": "Insidious",
           "year": 2011,
-          "posterPath": "/1egpmVXuXed58TH2UOnX1nATTrf.jpg"
+          "posterPath": "/1egpmVXuXed58TH2UOnX1nATTrf.jpg",
+          "overview": "A family discovers that dark spirits have invaded their home after their son inexplicably falls into an endless sleep. When they reach out to a professional for help, they learn things are a lot more personal than they thought.",
+          "backdropPath": "/tJvRdhlkonjBLBUpTqp0RPPujxJ.jpg",
+          "duration": "1h 42m",
+          "rating": "PG-13",
+          "director": "James Wan",
+          "actors": [
+            "Patrick Wilson",
+            "Rose Byrne",
+            "Lin Shaye",
+            "Ty Simpkins",
+            "Barbara Hershey"
+          ],
+          "voteAverage": 7,
+          "genres": [
+            "Horror",
+            "Thriller"
+          ],
+          "genreIds": [
+            27,
+            53
+          ]
         },
         {
           "tmdbId": 675,
           "title": "Harry Potter and the Order of the Phoenix",
           "year": 2007,
-          "posterPath": "/5aOyriWkPec0zUDxmHFP9qMmBaj.jpg"
+          "posterPath": "/5aOyriWkPec0zUDxmHFP9qMmBaj.jpg",
+          "overview": "When a new professor's methods leave Hogwarts unprepared to fight the rising tide of evil, Harry teaches students how to defend against the dark arts.",
+          "backdropPath": "/sO2VWeJ8qagNtYoznyLRL8TeSkw.jpg",
+          "duration": "2h 18m",
+          "rating": "PG-13",
+          "director": "David Yates",
+          "actors": [
+            "Daniel Radcliffe",
+            "Rupert Grint",
+            "Emma Watson",
+            "Imelda Staunton",
+            "Helena Bonham Carter"
+          ],
+          "voteAverage": 7.7,
+          "genres": [
+            "Adventure",
+            "Fantasy"
+          ],
+          "genreIds": [
+            12,
+            14
+          ]
         },
         {
           "tmdbId": 767,
           "title": "Harry Potter and the Half-Blood Prince",
           "year": 2009,
-          "posterPath": "/z7uo9zmQdQwU5ZJHFpv2Upl30i1.jpg"
+          "posterPath": "/z7uo9zmQdQwU5ZJHFpv2Upl30i1.jpg",
+          "overview": "Dumbledore tries to prepare Harry for the final battle with Voldemort while Death Eaters wreak havoc in both Muggle and Wizard worlds.",
+          "backdropPath": "/mITJS77BV4TSqdFB5FPGBc7JKXj.jpg",
+          "duration": "2h 33m",
+          "rating": "PG",
+          "director": "David Yates",
+          "actors": [
+            "Daniel Radcliffe",
+            "Rupert Grint",
+            "Emma Watson",
+            "Jim Broadbent",
+            "Michael Gambon"
+          ],
+          "voteAverage": 7.7,
+          "genres": [
+            "Adventure",
+            "Fantasy"
+          ],
+          "genreIds": [
+            12,
+            14
+          ]
         },
         {
           "tmdbId": 489,
           "title": "Good Will Hunting",
           "year": 1997,
-          "posterPath": "/z2FnLKpFi1HPO7BEJxdkv6hpJSU.jpg"
+          "posterPath": "/z2FnLKpFi1HPO7BEJxdkv6hpJSU.jpg",
+          "overview": "Will Hunting is a headstrong, working-class genius who is failing the lessons of life. After one too many run-ins with the law, Will's last chance is a psychology professor, who might be the only man who can reach him.",
+          "backdropPath": "/xj1Sv1xm4Y0ydBueGuf10Y9qM0O.jpg",
+          "duration": "2h 7m",
+          "rating": "R",
+          "director": "Gus Van Sant",
+          "actors": [
+            "Matt Damon",
+            "Robin Williams",
+            "Ben Affleck",
+            "Stellan Skarsgård",
+            "Minnie Driver"
+          ],
+          "voteAverage": 8.2,
+          "genres": [
+            "Drama"
+          ],
+          "genreIds": [
+            18
+          ]
         },
         {
           "tmdbId": 808,
           "title": "Shrek",
           "year": 2001,
-          "posterPath": "/iB64vpL3dIObOtMZgX3RqdVdQDc.jpg"
+          "posterPath": "/iB64vpL3dIObOtMZgX3RqdVdQDc.jpg",
+          "overview": "It ain't easy bein' green -- especially if you're a likable (albeit smelly) ogre named Shrek. On a mission to retrieve a gorgeous princess from the clutches of a fire-breathing dragon, Shrek teams up with an unlikely compatriot -- a wisecracking donkey.",
+          "backdropPath": "/w0eKUOEog2ImtktCHAMUZws8qif.jpg",
+          "duration": "1h 30m",
+          "rating": "PG",
+          "director": "Andrew Adamson",
+          "actors": [
+            "Mike Myers",
+            "Eddie Murphy",
+            "Cameron Diaz",
+            "John Lithgow",
+            "Vincent Cassel"
+          ],
+          "voteAverage": 7.8,
+          "genres": [
+            "Animation",
+            "Comedy",
+            "Fantasy",
+            "Adventure",
+            "Family"
+          ],
+          "genreIds": [
+            16,
+            35,
+            14,
+            12,
+            10751
+          ]
         },
         {
           "tmdbId": 502356,
           "title": "The Super Mario Bros. Movie",
           "year": 2023,
-          "posterPath": "/qNBAXBIQlnOThrVvA6mA2B5ggV6.jpg"
+          "posterPath": "/qNBAXBIQlnOThrVvA6mA2B5ggV6.jpg",
+          "overview": "While working underground to fix a water main, Brooklyn plumbers—and brothers—Mario and Luigi are transported down a mysterious pipe and wander into a magical new world. But when the brothers are separated, Mario embarks on an epic quest to find Luigi.",
+          "backdropPath": "/9n2tJBplPbgR2ca05hS5CKXwP2c.jpg",
+          "duration": "1h 33m",
+          "rating": "PG",
+          "director": "Aaron Horvath",
+          "actors": [
+            "Chris Pratt",
+            "Anya Taylor-Joy",
+            "Charlie Day",
+            "Jack Black",
+            "Keegan-Michael Key"
+          ],
+          "voteAverage": 7.6,
+          "genres": [
+            "Family",
+            "Comedy",
+            "Adventure",
+            "Fantasy",
+            "Animation"
+          ],
+          "genreIds": [
+            10751,
+            35,
+            12,
+            14,
+            16
+          ]
         },
         {
           "tmdbId": 216015,
           "title": "Fifty Shades of Grey",
           "year": 2015,
-          "posterPath": "/63kGofUkt1Mx0SIL4XI4Z5AoSgt.jpg"
+          "posterPath": "/63kGofUkt1Mx0SIL4XI4Z5AoSgt.jpg",
+          "overview": "When college senior Anastasia Steele steps in for her sick roommate to interview prominent businessman Christian Grey for their campus paper, little does she realize the path her life will take. Christian, as enigmatic as he is rich and powerful, finds himself strangely drawn to Ana, and she to him. Though sexually inexperienced, Ana plunges headlong into an affair -- and learns that Christian's true sexual proclivities push the boundaries of pain and pleasure.",
+          "backdropPath": "/7IGKrY1f1KfwMipx9wZC4NRgIdF.jpg",
+          "duration": "2h 5m",
+          "rating": "R",
+          "director": "Sam Taylor-Johnson",
+          "actors": [
+            "Dakota Johnson",
+            "Jamie Dornan",
+            "Jennifer Ehle",
+            "Eloise Mumford",
+            "Victor Rasuk"
+          ],
+          "voteAverage": 5.9,
+          "genres": [
+            "Drama",
+            "Romance",
+            "Thriller"
+          ],
+          "genreIds": [
+            18,
+            10749,
+            53
+          ]
         },
         {
           "tmdbId": 337167,
           "title": "Fifty Shades Freed",
           "year": 2018,
-          "posterPath": "/jjPJ4s3DWZZvI4vw8Xfi4Vqa1Q8.jpg"
+          "posterPath": "/jjPJ4s3DWZZvI4vw8Xfi4Vqa1Q8.jpg",
+          "overview": "Believing they have left behind shadowy figures from their past, newlyweds Christian and Ana fully embrace an inextricable connection and shared life of luxury. But just as she steps into her role as Mrs. Grey and he relaxes into an unfamiliar stability, new threats could jeopardize their happy ending before it even begins.",
+          "backdropPath": "/9ywA15OAiwjSTvg3cBs9B7kOCBF.jpg",
+          "duration": "1h 45m",
+          "rating": "R",
+          "director": "James Foley",
+          "actors": [
+            "Dakota Johnson",
+            "Jamie Dornan",
+            "Eric Johnson",
+            "Eloise Mumford",
+            "Rita Ora"
+          ],
+          "voteAverage": 6.7,
+          "genres": [
+            "Drama",
+            "Romance"
+          ],
+          "genreIds": [
+            18,
+            10749
+          ]
         }
       ]
     }
-  ]
+  ],
+  "provenance": "tmdb-watch-providers",
+  "refreshPolicy": "weekly"
 }

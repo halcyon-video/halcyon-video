@@ -170,6 +170,8 @@ export interface Title {
   streamingServiceId?: string;
   streamingServiceName?: string;
   streamingUrl?: string;
+  // All streaming services carrying this title, for deduplicated streaming stock (GH #297).
+  streamingServices?: { id: string; name: string; url: string }[];
 }
 
 export interface MediaStreamInfo {
