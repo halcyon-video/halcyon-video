@@ -29,6 +29,7 @@ import {
   fetchPlexItemPlaybackInfo,
   reportPlexPlaybackProgress,
   reportPlexPlaybackStopped,
+  stopPlexTranscode,
 } from './plex.ts';
 import { isDirectPlaySafe as codecsAreDirectPlaySafe } from './playback-capability.ts';
 import type { MediaPlaybackInfo } from './providers/media-source-provider.ts';
@@ -225,14 +226,31 @@ export function subtitleTrackUrl(
 }
 
 export function currentTranscodeSessionId(kind?: string, streamUrl?: string): string | undefined {
-  if (isPlex(kind) || !streamUrl) return undefined;
+  if (!streamUrl) return undefined;
   // A ceiling TV may build another stream before this player's metadata arrives.
   // Read the session from the URL being played, never a client's last-built URL.
-  try { return new URL(streamUrl).searchParams.get('PlaySessionId') || undefined; }
-  catch { return undefined; }
+  try {
+    const url = new URL(streamUrl);
+    if (isPlex(kind)) return url.searchParams.get('session') || undefined;
+    return url.searchParams.get('PlaySessionId') || undefined;
+  } catch {
+    return undefined;
+  }
 }
 
-export async function stopTranscodeSession(sessionId: string, log: (message: string) => void, server: { url: string; token: string; kind?: string } | null): Promise<void> {
-  if (!server || isPlex(server.kind)) return;
+export async function stopTranscodeSession(
+  sessionId: string,
+  log: (message: string) => void,
+  server: { url: string; token: string; kind?: string } | null
+): Promise<void> {
+  if (!server) return;
+  if (isPlex(server.kind)) {
+    try {
+      await stopPlexTranscode(server.url, server.token, sessionId, log);
+    } catch (e: any) {
+      log(`[Player] stopPlexTranscode failed: ${e?.message ?? e}`);
+    }
+    return;
+  }
   await mediaBrowser(server.kind).stopActiveEncoding(sessionId, log, server);
 }

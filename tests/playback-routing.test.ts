@@ -27,6 +27,7 @@ const store = new Map<string, string>();
 const {
   directStreamUrl,
   currentTranscodeSessionId,
+  stopTranscodeSession,
   transcodeStreamUrl,
   transcodeStreamUrlSync,
   playbackIsDirectSafe,
@@ -183,3 +184,68 @@ test('transcode teardown retains the playing stream when another source builds a
   assert.equal(currentTranscodeSessionId('emby', playing), new URL(playing).searchParams.get('PlaySessionId'));
   assert.equal(currentTranscodeSessionId('emby', 'http://emby.local/emby/Videos/1/stream'), undefined);
 });
+
+test('Plex transcode session ID is extracted from the session parameter', async () => {
+  const hls = await transcodeStreamUrl(SERVER, 'tok', '42', {}, 'plex');
+  const sessionId = currentTranscodeSessionId('plex', hls);
+  assert.ok(sessionId);
+  assert.match(sessionId, /^halcyon-/);
+  assert.equal(sessionId, new URL(hls).searchParams.get('session'));
+  assert.equal(currentTranscodeSessionId('plex', 'http://plex.local:32400/library/parts/1/file.mkv'), undefined);
+  assert.equal(currentTranscodeSessionId('plex', ''), undefined);
+  assert.equal(currentTranscodeSessionId('plex', undefined), undefined);
+
+  // Falls back to install-wide backend if kind is omitted
+  useBackend('plex');
+  assert.equal(currentTranscodeSessionId(undefined, hls), sessionId);
+});
+
+test('stopTranscodeSession invokes stop endpoint on Plex server', async (t) => {
+  const calls: Array<[string, any]> = [];
+  t.mock.method(globalThis, 'fetch', async (url: string, opts: any) => {
+    calls.push([url, opts]);
+    return new Response('ok', { status: 200 });
+  });
+
+  const logs: string[] = [];
+  await stopTranscodeSession('halcyon-session-123', (m) => logs.push(m), {
+    url: 'http://plex.local:32400',
+    token: 'plex-token',
+    kind: 'plex',
+  });
+
+  assert.equal(calls.length, 1);
+  const [calledUrl, calledOpts] = calls[0];
+  const urlObj = new URL(calledUrl);
+  assert.equal(urlObj.pathname, '/video/:/transcode/universal/stop');
+  assert.equal(urlObj.searchParams.get('session'), 'halcyon-session-123');
+  assert.equal(urlObj.searchParams.get('X-Plex-Token'), 'plex-token');
+  assert.equal(calledOpts.headers['X-Plex-Token'], 'plex-token');
+  assert.equal(logs.length, 0);
+});
+
+test('stopTranscodeSession is a no-op when server is null', async (t) => {
+  let called = false;
+  t.mock.method(globalThis, 'fetch', async () => {
+    called = true;
+    return new Response('ok', { status: 200 });
+  });
+  await stopTranscodeSession('halcyon-session-123', () => {}, null);
+  assert.equal(called, false);
+});
+
+test('stopTranscodeSession reports error via log callback on Plex failure', async (t) => {
+  t.mock.method(globalThis, 'fetch', async () => {
+    throw new Error('Plex unreachable');
+  });
+
+  const logs: string[] = [];
+  await stopTranscodeSession('halcyon-session-123', (m) => logs.push(m), {
+    url: 'http://plex.local:32400',
+    token: 'plex-token',
+    kind: 'plex',
+  });
+
+  assert.ok(logs.some((msg) => msg.includes('[Player] stopPlexTranscode failed: Plex unreachable')));
+});
+
