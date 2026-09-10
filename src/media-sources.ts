@@ -218,7 +218,7 @@ export function saveMediaSources(list: ReadonlyArray<MediaSource>): void {
  * — reconnecting the same box keeps its id, and therefore every carry choice
  * already made about its libraries.
  */
-export function addMediaSource(input: Omit<MediaSource, 'id'> & { id?: string }): MediaSource {
+export function addMediaSource(input: Omit<MediaSource, 'id' | 'name'> & { id?: string; name?: string }): MediaSource {
   const list = listMediaSources();
   const url = input.url;
   const existing = list.find(
@@ -231,7 +231,7 @@ export function addMediaSource(input: Omit<MediaSource, 'id'> & { id?: string })
     token: input.token,
     userId: input.userId,
     userName: input.userName,
-    name: input.name || labelForUrl(url),
+    name: input.name || existing?.name || labelForUrl(url),
   };
   const next = existing ? list.map((s) => (s.id === source.id ? source : s)) : [...list, source];
   saveMediaSources(next);
@@ -239,7 +239,7 @@ export function addMediaSource(input: Omit<MediaSource, 'id'> & { id?: string })
 }
 
 /** Two addresses for one box (trailing slash, http vs https on a LAN name). */
-function sameServer(a: string, b: string): boolean {
+export function sameServer(a: string, b: string): boolean {
   const norm = (u: string) => String(u || '').trim().replace(/\/+$/, '').toLowerCase();
   return norm(a) === norm(b);
 }

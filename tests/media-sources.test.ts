@@ -133,6 +133,50 @@ test('reconnecting the same server keeps its id, so carried-library choices surv
   assert.equal(listMediaSources()[0].token, 'refreshed');
 });
 
+test('reconnecting or refreshing a server without an explicit name preserves its existing friendly name', () => {
+  addMediaSource({ ...PLEX, name: 'Living Room Server' });
+  const refreshed = addMediaSource({
+    kind: PLEX.kind,
+    url: PLEX.url,
+    token: 'refreshed-token',
+    userId: PLEX.userId,
+    userName: PLEX.userName,
+  });
+  assert.equal(refreshed.name, 'Living Room Server');
+  assert.equal(listMediaSources()[0].name, 'Living Room Server');
+});
+
+test('reconnecting or refreshing a server with an empty name preserves its existing friendly name', () => {
+  addMediaSource({ ...PLEX, name: 'Living Room Server' });
+  const refreshed = addMediaSource({
+    ...PLEX,
+    token: 'refreshed-token',
+    name: '',
+  });
+  assert.equal(refreshed.name, 'Living Room Server');
+  assert.equal(listMediaSources()[0].name, 'Living Room Server');
+});
+
+test('reconnecting or refreshing a server with an explicit new name updates its name', () => {
+  addMediaSource({ ...PLEX, name: 'Living Room Server' });
+  const updated = addMediaSource({
+    ...PLEX,
+    name: 'Basement Server',
+  });
+  assert.equal(updated.name, 'Basement Server');
+  assert.equal(listMediaSources()[0].name, 'Basement Server');
+});
+
+test('adding a new server without an explicit name falls back to labelForUrl', () => {
+  const s = addMediaSource({
+    kind: 'plex',
+    url: 'http://192.168.1.50:32400',
+    token: 'tok-1',
+    userId: '',
+  });
+  assert.equal(s.name, '192.168.1.50:32400');
+});
+
 test('a trailing slash is the same server, not a new one', () => {
   addMediaSource(JF);
   addMediaSource({ ...JF, url: `${JF.url}/` });

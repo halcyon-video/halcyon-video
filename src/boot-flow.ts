@@ -43,6 +43,7 @@ import {
   labelForUrl,
   listMediaSources,
   primaryMediaSource,
+  sameServer,
 } from './media-sources';
 import { verifySeerrCredentialsLive } from './seerr-service-status';
 import {
@@ -555,7 +556,11 @@ export function showBootOverlay() {
  * classic login form and the membership card picker (T17). Never stores a
  * password -- only the resulting session token/userid.
  */
-async function finishLoginAndLaunch(urlInput: string, session: MembershipLoginSession) {
+async function finishLoginAndLaunch(
+  urlInput: string,
+  session: MembershipLoginSession,
+  opts?: { displayName?: string }
+) {
   if (!deps) return;
   deps.log(`[System] Authenticated successfully as ${session.userName}.`, 'system');
   // Connect (or refresh) this server as a source rather than overwriting the
@@ -563,13 +568,16 @@ async function finishLoginAndLaunch(urlInput: string, session: MembershipLoginSe
   // them, so everything that still reads jellyfin_url/token/userid is fed.
   // Matching on (kind, url) means re-authenticating a server the store already
   // knows keeps its id, and therefore its carried-library choices.
+  const existingSource = listMediaSources().find(
+    (s) => s.kind === provider().id && sameServer(s.url, urlInput)
+  );
   addMediaSource({
     kind: provider().id,
     url: urlInput,
     token: session.accessToken,
     userId: session.userId,
     userName: session.userName,
-    name: labelForUrl(urlInput),
+    name: opts?.displayName || existingSource?.name || primaryMediaSource()?.name || labelForUrl(urlInput),
   });
   localStorage.setItem('jellyfin_last_userid', session.userId); // remembered for next boot's card highlight
 
@@ -1309,14 +1317,16 @@ export function setupLoginHandlers() {
         // it is the one the person actually typed or picked first, and the
         // singleton consumers (Jellyseerr, remote play, the Settings rows)
         // resolve to it.
+        const primaryDisplayName =
+          (backendKind === 'plex' ? (plexServerNameFor(urlInput) || plexServerNameFor(connectedUrl)) : '')
+          || labelForUrl(connectedUrl);
         addMediaSource({
           kind: backendKind,
           url: connectedUrl,
           token: session.accessToken,
           userId: session.userId,
           userName: session.userName,
-          name: (backendKind === 'plex' ? (plexServerNameFor(urlInput) || plexServerNameFor(connectedUrl)) : '')
-            || labelForUrl(connectedUrl),
+          name: primaryDisplayName,
         });
         if (backendKind === 'plex') {
           const extras = selectedPlexServerUrls()
@@ -1343,7 +1353,7 @@ export function setupLoginHandlers() {
           }
         }
 
-        await finishLoginAndLaunch(connectedUrl, session);
+        await finishLoginAndLaunch(connectedUrl, session, { displayName: primaryDisplayName });
       } catch (err: any) {
         deps?.log(`[System] Connection error: ${err.message}`, 'system');
         if (errorMsg) {
