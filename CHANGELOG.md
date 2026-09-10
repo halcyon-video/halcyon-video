@@ -5,6 +5,19 @@ All notable changes to Halcyon Video, generated from commit history by
 it on every version tag push. Deterministic and offline: no entry here was
 written by a model.
 
+## [v0.18.0] — 2026-09-09
+
+### CHANGELOG
+- V0.17.1
+
+### General
+- Add Emby libraries, account sign-in and source-aware playback
+- Fix disconnected dropped-logo silhouettes
+- Ground telephone materials in geometric ambient occlusion (Closes [#296](https://github.com/halcyon-video/halcyon-video/issues/296))
+- Model the corded counter telephone in Blender (Closes [#178](https://github.com/halcyon-video/halcyon-video/issues/178))
+- Use flat scenery cards and add a rear service boundary
+- Add a high-quality commercial streetscape beyond the store
+
 ## [v0.17.1] — 2026-09-09
 
 ### CHANGELOG
