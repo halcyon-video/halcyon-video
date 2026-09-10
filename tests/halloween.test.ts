@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { inSeason } from '../src/promo-campaigns.ts';
 import {
   HALLOWEEN_CLING_MARGIN,
+  HALLOWEEN_CLING_FINISH,
   HALLOWEEN_COUNTER_BAND_TOP_Y,
   HALLOWEEN_PUMPKIN_COUNTER_U,
   halloweenClingPlacements,
@@ -53,6 +54,13 @@ test('Clings form a deterministic three-piece cluster on every other pane with f
     assert.ok(placement.y - placement.height / 2 >= 2 + HALLOWEEN_CLING_MARGIN - 1e-9);
     assert.ok(placement.y + placement.height / 2 <= 7.7 - HALLOWEEN_CLING_MARGIN + 1e-9);
   }
+});
+
+test('Gel finish keeps authored colors opaque beneath restrained gloss', () => {
+  assert.equal(HALLOWEEN_CLING_FINISH.transparent, false);
+  assert.ok(HALLOWEEN_CLING_FINISH.shininess >= 64);
+  assert.ok(HALLOWEEN_CLING_FINISH.shininess < 100);
+  assert.notEqual(HALLOWEEN_CLING_FINISH.specular, 0xffffff);
 });
 
 test('Pumpkin sits on the outer counter band instead of colliding with register equipment', () => {

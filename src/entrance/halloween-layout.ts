@@ -11,6 +11,11 @@ export interface HalloweenClingPlacement {
 }
 
 export const HALLOWEEN_CLING_MARGIN = 0.34;
+export const HALLOWEEN_CLING_FINISH = {
+  shininess: 72,
+  specular: 0x6f7782,
+  transparent: false,
+} as const;
 export const HALLOWEEN_PUMPKIN_COUNTER_U = -4.55;
 export const HALLOWEEN_PUMPKIN_DESK_U = -1.85;
 export const HALLOWEEN_COUNTER_BAND_TOP_Y = 3.54;

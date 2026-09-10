@@ -19,8 +19,9 @@ images, chain references, logos, or generated imagery.
 - Clings: `public/art/halloween-clings.svg`, transparent outside its paths,
   no backing rectangle. Runtime extrudes the three designs into thin gel-like
   pieces, enlarges them to roughly 0.9–1.3 ft, and merges all placements into
-  one translucent, clear-coated, vertex-colored mesh. It deliberately avoids
-  transmission's extra scene pass so the seasonal gloss stays phone-friendly.
+  one color-preserving, vertex-colored mesh. The thin beveled depth and a
+  controlled Phong highlight provide the gel sheen without a physical clearcoat,
+  transparency or transmission washing the colors into the bright storefront.
   No raster textures.
   Reuse the SVG paths for other kits.
 - Three visible draw calls total. The hidden sphere fallback retains its

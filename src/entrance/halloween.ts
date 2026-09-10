@@ -5,7 +5,7 @@ import { SVGLoader } from 'three/examples/jsm/loaders/SVGLoader.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { assetUrl } from '../asset-url';
 import { inSeason } from '../promo-campaigns';
-import { halloweenClingPlacements } from './halloween-layout';
+import { HALLOWEEN_CLING_FINISH, halloweenClingPlacements } from './halloween-layout';
 import clings from '../../public/art/halloween-clings.svg?raw';
 
 interface PumpkinPose { position: THREE.Vector3; yaw: number }
@@ -82,16 +82,10 @@ export function installHalloween(
   masters.forEach(g => g.dispose());
   const merged = mergeGeometries(parts); parts.forEach(g => g.dispose());
   if (merged) {
-    const art = new THREE.Mesh(merged, new THREE.MeshPhysicalMaterial({
+    const art = new THREE.Mesh(merged, new THREE.MeshPhongMaterial({
       vertexColors: true,
       side: THREE.DoubleSide,
-      roughness: .12,
-      metalness: 0,
-      transparent: true,
-      opacity: .88,
-      clearcoat: 1,
-      clearcoatRoughness: .08,
-      depthWrite: false,
+      ...HALLOWEEN_CLING_FINISH,
     }));
     art.name = 'halloween-window-clings'; kit.add(art); own(art);
   }
