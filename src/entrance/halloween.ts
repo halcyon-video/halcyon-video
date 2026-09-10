@@ -4,13 +4,22 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { SVGLoader } from 'three/examples/jsm/loaders/SVGLoader.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { assetUrl } from '../asset-url';
-import { posterBayIndices } from '../store-layout';
 import { inSeason } from '../promo-campaigns';
+import { halloweenClingPlacements } from './halloween-layout';
 import clings from '../../public/art/halloween-clings.svg?raw';
 
-export function installHalloween(parent: THREE.Group, panes: { lo: number; hi: number }[], refresh: () => void): void {
+interface PumpkinPose { position: THREE.Vector3; yaw: number }
+
+export function installHalloween(
+  windowParent: THREE.Group,
+  panes: { lo: number; hi: number }[],
+  pumpkinParent: THREE.Object3D,
+  pumpkinPose: PumpkinPose,
+  refresh: () => void,
+): void {
   if (!inSeason('halloween') || !panes.length) return;
-  const kit = new THREE.Group(); kit.name = 'halloween-decor'; parent.add(kit);
+  const kit = new THREE.Group(); kit.name = 'halloween-window-decor'; windowParent.add(kit);
+  const counterKit = new THREE.Group(); counterKit.name = 'halloween-counter-decor'; pumpkinParent.add(counterKit);
   let disposed = false;
   const geometries = new Set<THREE.BufferGeometry>();
   const materials = new Set<THREE.Material>();
@@ -21,44 +30,69 @@ export function installHalloween(parent: THREE.Group, panes: { lo: number; hi: n
     }
   });
   const dispose = () => {
-    disposed = true; parent.removeEventListener('removed', dispose);
+    disposed = true; windowParent.removeEventListener('removed', dispose);
     geometries.forEach(g => g.dispose()); materials.forEach(m => m.dispose());
-    kit.removeFromParent();
+    kit.removeFromParent(); counterKit.removeFromParent();
   };
-  parent.addEventListener('removed', dispose);
-  const pane = panes[0];
-  const x = pane.lo + .95;
-  // Parent faces inward (+local Z); footprint stays against the knee wall.
+  windowParent.addEventListener('removed', dispose);
+  // The pumpkin's authored origin is its stable base, so the model rests
+  // directly on the real counter-top anchor instead of beside the window.
   const fallback = new THREE.Mesh(new THREE.SphereGeometry(.58, 16, 10), new THREE.MeshStandardMaterial({ color: 0xb95717, roughness: .45 }));
   fallback.name = 'pumpkin-loading-fallback'; fallback.scale.y = .85;
-  fallback.position.set(x, .50, .88); kit.add(fallback); own(fallback);
+  fallback.position.copy(pumpkinPose.position).add(new THREE.Vector3(0, .50, 0));
+  fallback.rotation.y = pumpkinPose.yaw; counterKit.add(fallback); own(fallback);
   new GLTFLoader().load(assetUrl('models/halloween-pumpkin.glb'), ({ scene: model }) => {
     if (disposed) {
       const gs = new Set<THREE.BufferGeometry>(); const ms = new Set<THREE.Material>();
       model.traverse(o => { if (o instanceof THREE.Mesh) { gs.add(o.geometry); (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => ms.add(m)); } });
       gs.forEach(g => g.dispose()); ms.forEach(m => m.dispose()); return;
     }
-    model.name = 'halloween-molded-pumpkin'; model.position.set(x, .01, .88);
+    model.name = 'halloween-molded-pumpkin'; model.position.copy(pumpkinPose.position);
+    model.rotation.y = pumpkinPose.yaw + 0.18;
     model.traverse(o => { if (o instanceof THREE.Mesh) o.castShadow = o.receiveShadow = true; });
-    kit.add(model); own(model); fallback.visible = false; refresh();
+    counterKit.add(model); own(model); fallback.visible = false; refresh();
   }, undefined, () => { /* Retain the inexpensive fallback on load failure. */ });
-  // Flat SVG paths become actual die-cut geometry: transparent outside each
-  // silhouette, two-sided, no alpha texture allocation or rectangular backing.
-  const posterPanes = posterBayIndices(panes.length);
-  const clingPane = panes.find((_, i) => !posterPanes.includes(i)) ?? pane;
+  // Each SVG path becomes a reusable die-cut master. Larger clones are then
+  // scattered across every other pane with deterministic variation and a
+  // measured clear margin from frames and mullions.
   const paths = new SVGLoader().parse(clings).paths;
-  const parts: THREE.BufferGeometry[] = [];
+  const masters: THREE.BufferGeometry[] = [];
   paths.forEach(path => SVGLoader.createShapes(path).forEach(shape => {
-    const geo = new THREE.ShapeGeometry(shape, 8);
+    const geo = new THREE.ExtrudeGeometry(shape, { depth: 2.4, bevelEnabled: true, bevelSize: 1.5, bevelThickness: 1.2, bevelSegments: 2, curveSegments: 10 });
     const color = new THREE.Color(path.color);
     const count = geo.getAttribute('position').count;
     geo.setAttribute('color', new THREE.Float32BufferAttribute(Array.from({ length: count }, () => [color.r, color.g, color.b]).flat(), 3));
-    // 300px master spans 1.5ft, clear of the centre mullion and posters.
-    geo.scale(.005, -.005, 1); geo.translate(clingPane.lo + .25, 4.9, .025); parts.push(geo);
+    geo.computeBoundingBox();
+    const box = geo.boundingBox!;
+    const width = box.max.x - box.min.x;
+    const cx = (box.min.x + box.max.x) / 2;
+    const cy = (box.min.y + box.max.y) / 2;
+    geo.translate(-cx, -cy, -box.min.z);
+    geo.scale(1 / width, -1 / width, .005);
+    masters.push(geo);
   }));
+  const parts: THREE.BufferGeometry[] = [];
+  halloweenClingPlacements(panes).forEach(placement => {
+    const geo = masters[placement.designIndex % masters.length].clone();
+    geo.scale(placement.width, placement.width, 1);
+    geo.rotateZ(placement.rotation);
+    geo.translate(placement.x, placement.y, .024);
+    parts.push(geo);
+  });
+  masters.forEach(g => g.dispose());
   const merged = mergeGeometries(parts); parts.forEach(g => g.dispose());
   if (merged) {
-    const art = new THREE.Mesh(merged, new THREE.MeshStandardMaterial({ vertexColors: true, side: THREE.DoubleSide, roughness: .62 }));
+    const art = new THREE.Mesh(merged, new THREE.MeshPhysicalMaterial({
+      vertexColors: true,
+      side: THREE.DoubleSide,
+      roughness: .12,
+      metalness: 0,
+      transparent: true,
+      opacity: .88,
+      clearcoat: 1,
+      clearcoatRoughness: .08,
+      depthWrite: false,
+    }));
     art.name = 'halloween-window-clings'; kit.add(art); own(art);
   }
 }

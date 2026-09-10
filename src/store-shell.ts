@@ -20,6 +20,7 @@ import { SlottedFixture } from './fixtures';
 import { AmbientTvs } from './ambient-tvs';
 import { EntranceCheckout } from './entrance';
 import { installHalloween } from './entrance/halloween';
+import { HALLOWEEN_PUMPKIN_COUNTER_U, HALLOWEEN_PUMPKIN_DESK_U, halloweenPumpkinCounterPosition } from './entrance/halloween-layout';
 import { buildWindowBays } from './entrance/windows';
 import { windowBayLayout } from './storefront-window-layout';
 import { facadeDimensions, facadeStyle } from './storefront-architecture';
@@ -1505,7 +1506,6 @@ export function buildStore(scene: StoreScene) {
   frontWindow.position.set(STORE_CENTER_X, floorY, FRONT_GLASS_Z);
   frontWindow.rotation.y = Math.PI; // Facing inwards
   scene.scene.add(frontWindow);
-  installHalloween(frontWindow, frontPanes, () => { scene.renderer.shadowMap.needsUpdate = true; scene.queueStructuralShadowRefresh(); scene.requestRender(); });
 
   // Interior wall band above the front glazing, flanking the vestibule
   // span (the vestibule's own transom glazing runs to the ceiling there;
@@ -2387,6 +2387,20 @@ export function buildStore(scene: StoreScene) {
       width: counterRunHalfWidth * 2,
       height: counterAnchor.depth,
     });
+    const pumpkinUsesOuterBand = activeStoreFormat().counterDressing;
+    const pumpkinAnchor = scene.entrance?.getCounterTopAnchorAt(
+      pumpkinUsesOuterBand ? HALLOWEEN_PUMPKIN_COUNTER_U : HALLOWEEN_PUMPKIN_DESK_U,
+    );
+    if (pumpkinAnchor) {
+      const pumpkinPosition = halloweenPumpkinCounterPosition(pumpkinAnchor, pumpkinUsesOuterBand);
+      installHalloween(
+        frontWindow,
+        frontPanes,
+        scene.scene,
+        { position: new THREE.Vector3(pumpkinPosition.x, pumpkinPosition.y, pumpkinPosition.z), yaw: pumpkinAnchor.rotY },
+        () => { scene.renderer.shadowMap.needsUpdate = true; scene.queueStructuralShadowRefresh(); scene.requestRender(); },
+      );
+    }
   }
 
   // --- Ceiling-hung CRT TVs playing a family movie ---

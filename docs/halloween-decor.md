@@ -17,20 +17,27 @@ images, chain references, logos, or generated imagery.
   Eight ribs, subtle mold-plane parting seam, 0.025 ft wall thickness,
   underside access aperture, fitted stem socket, recessed inner return.
 - Clings: `public/art/halloween-clings.svg`, transparent outside its paths,
-  no backing rectangle. The 300 × 240 vector master occupies 1.5 × 1.2 ft.
-  Runtime triangulates and merges the three designs into one two-sided,
-  vertex-colored mesh. No raster textures. Reuse the SVG paths for other kits.
+  no backing rectangle. Runtime extrudes the three designs into thin gel-like
+  pieces, enlarges them to roughly 0.9–1.3 ft, and merges all placements into
+  one translucent, clear-coated, vertex-colored mesh. It deliberately avoids
+  transmission's extra scene pass so the seasonal gloss stays phone-friendly.
+  No raster textures.
+  Reuse the SVG paths for other kits.
 - Three visible draw calls total. The hidden sphere fallback retains its
   small allocation until shell disposal. No pumpkin request or decor geometry
   is allocated outside the season. No added animation or per-frame work.
 
 ## Placement and seasonal behavior
 
-The pumpkin sits against the outer front knee wall, away from the entrance,
-with a roughly 1.34 ft diameter footprint and 0.06 ft clearance from the wall.
-Clings occupy an outer half-pane without a suspended poster, avoiding its
-center mullion. Placement follows the existing window layout across store
-widths, rather than hardcoded world coordinates. No navigation anchors move.
+The pumpkin sits on the real checkout counter: on chain formats it occupies a
+clear stretch of the outer blue band, away from register equipment; on the
+standalone desk it uses that desk's own top. Both follow the counter's
+shape-aware spine anchor rather than a fixed world position.
+Clings form irregular three-piece clusters on every other front pane. Their
+deterministic scatter varies position, tilt and scale while retaining at least
+0.34 ft of clear glass at every pane edge. Placement follows the existing
+window layout across store widths rather than hardcoded world coordinates.
+No navigation anchors move.
 
 The existing `inSeason('halloween')` calendar enables the kit October 1–31.
 `bb_promo_date=2026-10-15` permits review; change to `2026-11-01` and rebuild
