@@ -1,0 +1,14 @@
+{
+  "frame": {
+    "triangles": 628,
+    "materials": 2,
+    "bytes": 29796,
+    "textures": 0
+  },
+  "tray": {
+    "triangles": 492,
+    "materials": 1,
+    "bytes": 25596,
+    "textures": 0
+  }
+}

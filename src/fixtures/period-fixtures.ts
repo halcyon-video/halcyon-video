@@ -1,3 +1,4 @@
+import { CANDY_TRAY_ANGLE, installCandyRackModel } from './candy-rack-model';
 import { selfLit } from '../material-lighting';
 // T06 — period fixtures & props: candy display, previously-viewed bin, tape
 // rewinder, tape-cleaner display. All primitive-geometry + canvas-texture,
@@ -84,6 +85,7 @@ export class CandyDisplay implements StoreFixture {
   private ctx: FixtureContext;
   private group: THREE.Group | null = null;
   private disposables: Disposable[] = [];
+  private disposeHardware: (() => void) | null = null;
 
   constructor(placement: FixturePlacement, ctx: FixtureContext) {
     this.placement = placement;
@@ -91,6 +93,9 @@ export class CandyDisplay implements StoreFixture {
   }
 
   build(): void {
+    this.dispose();
+    this.rowIds = [];
+    this.rows = [];
     const options = this.placement.options || {};
     const rows = (options.rows as number) || 5;
     const width = (options.footprintWidth as number) || 3.0;
@@ -102,6 +107,9 @@ export class CandyDisplay implements StoreFixture {
     group.position.set(this.placement.position.x, 0, this.placement.position.z);
     group.rotation.y = this.placement.yaw;
     this.group = group;
+    const fallback = new THREE.Group();
+    fallback.name = 'candy-rack-fallback';
+    group.add(fallback);
 
     const frameMat = new THREE.MeshStandardMaterial({ color: 0x232323, roughness: 0.45, metalness: 0.75 });
     const postGeo = new THREE.CylinderGeometry(0.03, 0.03, 4.0, 8);
@@ -119,13 +127,13 @@ export class CandyDisplay implements StoreFixture {
       post.position.set(x, 2.0, z);
       post.castShadow = true;
       post.receiveShadow = true;
-      group.add(post);
+      fallback.add(post);
     });
 
     const foot = new THREE.Mesh(footGeo, frameMat);
     foot.position.set(0, 0.03, 0);
     foot.receiveShadow = true;
-    group.add(foot);
+    fallback.add(foot);
 
     const shelfGeo = new THREE.BoxGeometry(width - 0.1, 0.03, depth - 0.1);
     const boxGeo = new THREE.BoxGeometry(0.32, 0.42, 0.18);
@@ -137,7 +145,8 @@ export class CandyDisplay implements StoreFixture {
       shelf.position.set(0, y, 0);
       shelf.castShadow = true;
       shelf.receiveShadow = true;
-      group.add(shelf);
+      shelf.rotation.x = CANDY_TRAY_ANGLE;
+      fallback.add(shelf);
 
       const label = labels[r % labels.length];
       const bg = palette[r % palette.length];
@@ -152,7 +161,9 @@ export class CandyDisplay implements StoreFixture {
       const m4 = new THREE.Matrix4();
       for (let i = 0; i < perRow; i++) {
         const bx = -width / 2 + 0.3 + i * ((width - 0.6) / Math.max(1, perRow - 1) || 0.36);
-        m4.makeTranslation(bx, y + 0.24, 0);
+        m4.makeRotationX(CANDY_TRAY_ANGLE);
+        // The box bottom lies on the tray top, including its 12-degree slope.
+        m4.setPosition(bx, y + .015 + .21 * Math.cos(CANDY_TRAY_ANGLE), .21 * Math.sin(CANDY_TRAY_ANGLE));
         inst.setMatrixAt(i, m4);
       }
       inst.instanceMatrix.needsUpdate = true;
@@ -166,6 +177,7 @@ export class CandyDisplay implements StoreFixture {
 
     this.ctx.scene.add(group);
     this.ctx.addCollider(group);
+    this.disposeHardware = installCandyRackModel(this.ctx, group, fallback, width, depth, rows, frameMat);
     this.ctx.requestShadowRefresh();
   }
 
@@ -191,6 +203,8 @@ export class CandyDisplay implements StoreFixture {
   }
 
   dispose(): void {
+    this.disposeHardware?.();
+    this.disposeHardware = null;
     if (this.group) {
       this.ctx.scene.remove(this.group);
       this.group = null;
