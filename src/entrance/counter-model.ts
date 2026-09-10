@@ -1,5 +1,6 @@
 // Blender-authored millwork. Layout/nav/prop anchors remain owned by counter.ts.
 import * as THREE from 'three';
+import { refreshTelephoneContact } from '../fixtures/telephone-surfaces';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { assetUrl } from '../asset-url';
 import type { FixtureContext } from '../fixtures';
@@ -33,6 +34,7 @@ export function installCounterModel(
         if (finish || detached) replacedMaterials.add(material);
         return finish ?? material;
       };
+      object.userData.telephoneContactReceiver = (Array.isArray(object.material) ? object.material : [object.material]).some(m => m.name === 'CounterWorktop');
       object.material = Array.isArray(object.material)
         ? object.material.map(replace) : replace(object.material);
       object.castShadow = object.receiveShadow = true;
@@ -43,6 +45,7 @@ export function installCounterModel(
     model.position.set(placement.x, 0, placement.z);
     model.rotation.y = placement.yaw;
     parent.add(model);
+    refreshTelephoneContact(parent);
     // Entrance.dispose removes its entire group before the store's scene-wide
     // disposal. Release this loader's resources at that boundary as well.
     const disposeModel = () => {

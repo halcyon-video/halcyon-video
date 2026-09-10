@@ -9,10 +9,7 @@
 // store-facing state (libraries, games, scene) and hands this module setters
 // and loaders through initBootFlow(deps); nothing here reaches back into
 // main.ts directly, so the two can't tangle.
-import {
-  fetchPublicUsers,
-  JellyfinLibrary,
-} from './jellyfin';
+import type { JellyfinLibrary } from './jellyfin';
 import {
   activeProvider as provider,
   resetActiveProvider,
@@ -56,13 +53,7 @@ import {
   type SetupTerminalScene,
 } from './store-setup-flow';
 
-// Backend access is `provider()` throughout this module (see
-// providers/active-provider.ts). One exception, deliberate: the membership-card
-// picker still reads Jellyfin's public-user shape directly in showLoginOrCards,
-// because the cards want an image tag where AccountSummary carries a resolved
-// URL. Converting it is the multiUserPicker capability's own step — it is also
-// the flow Plex can't support at all, so it wants designing rather than
-// renaming.
+// Account selection, authentication and catalog access use the selected provider.
 
 export interface BootFlowDeps {
   log: (message: string, type?: 'system' | 'cec' | 'video') => void;
@@ -635,14 +626,15 @@ async function finishLoginAndLaunch(urlInput: string, session: MembershipLoginSe
 export async function showLoginOrCards(reason?: string) {
   if (isDemoMode || !deps) return; // the demo never logs in
   const savedUrl = localStorage.getItem('jellyfin_url');
-  if (savedUrl) {
+  if (savedUrl && provider().capabilities.multiUserPicker) {
     try {
-      const users = await fetchPublicUsers(savedUrl);
+      const users = await provider().listSelectableAccounts?.(savedUrl) ?? [];
       if (users.length > 0) {
         if (reason) deps.log(`[System] ${reason}`, 'system');
         deps.log(`[System] Found ${users.length} membership card(s) on ${savedUrl}.`, 'system');
         openMembershipCardPicker({
           serverUrl: savedUrl,
+          provider: provider(),
           users,
           lastUserId: localStorage.getItem('jellyfin_last_userid'),
           onLogin: (session) => finishLoginAndLaunch(savedUrl, session),

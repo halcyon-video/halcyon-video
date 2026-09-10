@@ -26,11 +26,11 @@ export type SetupAction =
  *  provider kinds they map to are SETUP_PROVIDER_KINDS below (the terminal is
  *  40 columns of upper-case, the registry is lower-case ids — keeping the two
  *  lists adjacent is what stops them drifting apart). */
-export const SETUP_PROVIDERS = ['JELLYFIN', 'PLEX'] as const;
-export const SETUP_PROVIDER_KINDS = ['jellyfin', 'plex'] as const;
+export const SETUP_PROVIDERS = ['JELLYFIN', 'PLEX', 'EMBY'] as const;
+export const SETUP_PROVIDER_KINDS = ['jellyfin', 'plex', 'emby'] as const;
 /** Whether CONNECT needs an address typed first — false for a backend whose
  *  account tells us where its servers are (see the guard in setupScreenKey). */
-export const PROVIDER_NEEDS_ADDRESS = [true, false] as const;
+export const PROVIDER_NEEDS_ADDRESS = [true, false, true] as const;
 
 export interface SetupLibraryRow {
   id: string;
@@ -63,8 +63,9 @@ export type SetupScreen =
   | { kind: 'arriving' }
   | { kind: 'notice'; title?: string; address: string; detail: string; row: number; copied?: boolean };
 
-export function initialHomeScreen(savedAddress?: string | null): SetupHomeScreen {
-  return { kind: 'home', row: 1, provider: 0, address: savedAddress || 'http://' };
+export function initialHomeScreen(savedAddress?: string | null, providerKind = 'jellyfin'): SetupHomeScreen {
+  const provider = Math.max(0, SETUP_PROVIDER_KINDS.findIndex((kind) => kind === providerKind));
+  return { kind: 'home', row: 1, provider, address: savedAddress || 'http://' };
 }
 
 // Home rows: 0 DISTRIBUTOR / 1 SERVER ADDRESS / 2 CONNECT / 3 TRY A DEMO STORE
@@ -121,7 +122,7 @@ export function setupScreenKey(s: SetupScreen, key: SetupKey): { state: SetupScr
         if (s.row === 4) return { state: { ...s, copied: true }, action: 'copy-report' };
         return { state: s };
       }
-      // left/right on the DISTRIBUTOR row cycle providers (one today).
+      // left/right on the DISTRIBUTOR row cycle the available providers.
       if ((key === 'left' || key === 'right') && s.row === 0) {
         const n = SETUP_PROVIDERS.length;
         return { state: { ...s, provider: (s.provider + (key === 'left' ? -1 : 1) + n) % n } };

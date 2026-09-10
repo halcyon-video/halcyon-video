@@ -12,7 +12,7 @@
 // under `node --test`'s type-stripping loader, which can't resolve a bare
 // sibling specifier (same note as jellyfin.ts's own media-release-date.ts import).
 import type { Movie, Episode } from './jellyfin.ts';
-import { reportPlaybackStart, reportPlaybackProgress, reportPlaybackStopped } from './jellyfin.ts';
+import { playbackStarted, playbackProgressed, playbackStopped } from './playback-routing.ts';
 
 const TICKS_PER_SECOND = 10_000_000;
 
@@ -158,7 +158,7 @@ export async function playLocalWithMpv(
    *  install, and for anything synthesized. Kept as a plain pair rather than a
    *  media-sources import so this module stays loadable under `node --test`'s
    *  type-stripping loader (see the .ts specifiers above). */
-  reportTo?: { url: string | null; token: string | null } | null
+  reportTo?: { url: string | null; token: string | null; kind?: string } | null
 ): Promise<boolean> {
   const jellyfinUrl = reportTo ? reportTo.url : localStorage.getItem('jellyfin_url');
   const token = reportTo ? reportTo.token : localStorage.getItem('jellyfin_token');
@@ -182,7 +182,7 @@ export async function playLocalWithMpv(
   }
 
   log(`[Video] Playing off disk in mpv (from ${startSeconds}s).`);
-  if (jellyfinUrl && token) reportPlaybackStart(jellyfinUrl, token, itemId);
+  if (jellyfinUrl && token) playbackStarted(jellyfinUrl, token, itemId, reportTo?.kind);
 
   // Poll for position so Continue Watching still tracks, and so closing mpv
   // returns to the store the same way the in-app player's Back does.
@@ -194,12 +194,12 @@ export async function playLocalWithMpv(
       const s = await res.json();
       lastTicks = Math.round((s.position ?? 0) * TICKS_PER_SECOND);
       if (!s.exited) {
-        if (jellyfinUrl && token) reportPlaybackProgress(jellyfinUrl, token, itemId, lastTicks, false);
+        if (jellyfinUrl && token) playbackProgressed(jellyfinUrl, token, itemId, lastTicks, false, reportTo?.kind);
         return;
       }
       window.clearInterval(poll);
       if (s.error) log(`[Video] mpv error: ${s.error}`);
-      if (jellyfinUrl && token) reportPlaybackStopped(jellyfinUrl, token, itemId, lastTicks);
+      if (jellyfinUrl && token) playbackStopped(jellyfinUrl, token, itemId, lastTicks, durationTicks, reportTo?.kind);
       onExit(lastTicks, isMpvNaturalFinish(lastTicks, durationTicks));
     } catch {
       // Endpoint vanished (server restarted) — stop polling rather than spin.

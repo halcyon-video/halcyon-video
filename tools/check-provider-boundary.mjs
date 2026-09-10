@@ -40,51 +40,28 @@ const EXEMPT_DIR = resolve(SRC, 'providers');
  * list; never grow it without a reason on the line.
  */
 const ALLOWED = {
-  'src/boot-flow.ts': {
-    names: ['fetchPublicUsers'],
-    why: 'membership-card picker, pending the multiUserPicker reshape (address normalising went through the provider in #125)',
-  },
   'src/library-settings.ts': {
     names: ['knownServerLibraries'],
     why: 'reads the cached library list jellyfin.ts happens to hold; not a server call',
   },
   'src/main.ts': {
     names: [
-      'authenticateUser',
       'isHevcPassThroughEnabled',
-      'buildSubtitleTrackUrl',
       'pickSubtitleDelivery',
-      'collectionTmdbIds',
-      'collectionSyncStats',
     ],
-    why: 'login + subtitle/codec helpers and two collection registries, all pre-boundary',
-  },
-  'src/membership-cards.ts': {
-    names: ['authenticateUser', 'buildUserAvatarUrl'],
-    why: 'the picker is on the old path deliberately — it wants a reshape behind multiUserPicker',
-  },
-  'src/playback-flow.ts': {
-    names: ['reportPlaybackStart', 'reportPlaybackProgress', 'reportPlaybackStopped'],
-    why: 'playback reporting, called through playback-routing.ts on the Plex side',
+    why: 'pure subtitle and codec helpers shared with MediaBrowser providers',
   },
   'src/playback-routing.ts': {
-    names: [
-      'buildStaticStreamUrl',
-      'buildHlsStreamUrl',
-      'fetchItemPlaybackInfo',
-      'reportPlaybackStart',
-      'reportPlaybackProgress',
-      'reportPlaybackStopped',
-    ],
-    why: 'this file IS the per-backend router — it imports both jellyfin.ts and plex.ts by design',
+    names: ['jellyfinClient'],
+    why: 'explicit per-backend router, selects the matching immutable MediaBrowser client',
   },
   'src/store-setup-flow.ts': {
-    names: ['fetchPublicUsers', 'rememberKnownLibraries', 'normalizeUrl'],
-    why: 'setup terminal login + address normalising; library listing already moved to the provider',
+    names: ['rememberKnownLibraries'],
+    why: 'shared library cache persistence, not a network call',
   },
   'src/video-player.ts': {
-    names: ['stopActiveEncoding', 'getLastHlsPlaySessionId', 'isStreamCopyUrl'],
-    why: 'transcode teardown, pending the capability-gated cancelActiveTranscode path',
+    names: ['isStreamCopyUrl'],
+    why: 'pure stream-copy URL classification, not a server call',
   },
 };
 
@@ -112,6 +89,11 @@ function exportKinds(file) {
   )) {
     values.add(m[1]);
   }
+  // Compatibility wrappers export an instance's named functions by destructuring.
+  for (const m of text.matchAll(/export\s+const\s*\{([^}]+)\}\s*=/g)) {
+    for (const n of splitSpecifiers(m[1])) values.add(n.exported);
+  }
+
   // A name declared both ways (a `export type {}` re-export also caught by the
   // looser `export {}` sweep) is a TYPE — the narrower form wins.
   for (const t of types) values.delete(t);

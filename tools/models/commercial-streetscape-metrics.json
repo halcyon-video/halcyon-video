@@ -1,0 +1,11 @@
+{
+  "bytes": 115060,
+  "meshes": 4,
+  "triangles": 1680,
+  "rearAnchor": "backWallZ - 24 feet",
+  "groundRearEdge": "backWallZ - 80 feet",
+  "flatDistantFacades": 6,
+  "shallowSideShops": 2,
+  "treeCards": 17,
+  "surveyed": false
+}

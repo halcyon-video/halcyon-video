@@ -26,6 +26,7 @@ const store = new Map<string, string>();
 
 const {
   directStreamUrl,
+  currentTranscodeSessionId,
   transcodeStreamUrl,
   transcodeStreamUrlSync,
   playbackIsDirectSafe,
@@ -144,4 +145,28 @@ test('omitting the kind still falls back to the install-wide backend', async () 
   assert.doesNotMatch(await transcodeStreamUrl(SERVER, 'tok', '42', {}), /\/Videos\//);
   useBackend('jellyfin');
   assert.match(await transcodeStreamUrl(SERVER, 'tok', '42', {}), /\/Videos\/42\//);
+});
+
+
+test('Emby playback follows the title source even when the primary server differs', async () => {
+  useBackend('plex');
+  const direct = new URL(directStreamUrl('http://emby.local/base', 'emby-token', 'film', 'source', 'emby'));
+  assert.equal(direct.pathname, '/base/emby/Videos/film/stream');
+  assert.equal(direct.searchParams.get('api_key'), 'emby-token');
+  assert.equal(direct.searchParams.get('MediaSourceId'), 'source');
+  const hls = new URL(transcodeStreamUrlSync('http://emby.local/base/emby', 'emby-token', 'film', { mediaSourceId: 'source', startPositionTicks: 600000000 }, 'emby'));
+  assert.equal(hls.pathname, '/base/emby/Videos/film/master.m3u8');
+  assert.equal(hls.searchParams.get('MediaSourceId'), 'source');
+  assert.equal(hls.searchParams.get('StartTimeTicks'), '600000000');
+  useBackend('emby');
+  assert.equal(new URL(directStreamUrl('http://jellyfin.local', 'jf-token', 'film', undefined, 'jellyfin')).pathname, '/Videos/film/stream');
+});
+
+
+test('transcode teardown retains the playing stream when another source builds an HLS URL', () => {
+  const playing = transcodeStreamUrlSync('http://emby.local', 'tok', '1', {mediaSourceId: 'a'}, 'emby');
+  const other = transcodeStreamUrlSync('http://other.local', 'other', '1', {mediaSourceId: 'b'}, 'emby');
+  assert.notEqual(currentTranscodeSessionId('emby', playing), currentTranscodeSessionId('emby', other));
+  assert.equal(currentTranscodeSessionId('emby', playing), new URL(playing).searchParams.get('PlaySessionId'));
+  assert.equal(currentTranscodeSessionId('emby', 'http://emby.local/emby/Videos/1/stream'), undefined);
 });

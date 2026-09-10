@@ -1,0 +1,13 @@
+{
+  "triangles": 5802,
+  "materials": 4,
+  "bytes": 532324,
+  "dimensions_blender": [
+    0.639132022857666,
+    0.4000000059604645,
+    0.2786106467247009
+  ],
+  "textures": 2,
+  "runtime_procedural_textures": 1,
+  "bake_receiver_triangles_removed_on_load": 2
+}

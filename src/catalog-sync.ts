@@ -20,7 +20,7 @@
 // its background retry working exactly as before.
 import { createProvider } from './providers/provider-registry';
 import { registerBuiltInProviders } from './providers/index';
-import type { Library, LibrarySummary } from './providers/media-source-provider';
+import type { Library, LibrarySummary, MediaSourceProvider } from './providers/media-source-provider';
 import {
   listMediaSources,
   sessionForSource,
@@ -31,6 +31,12 @@ import {
   type MediaSource,
 } from './media-sources';
 import { excludedBareIdsForSource } from './library-settings';
+
+type CollectionMetadata = ReturnType<NonNullable<MediaSourceProvider['getCollectionMetadata']>>;
+let collectionMetadata: CollectionMetadata = { art: new Map(), tmdbIds: new Map(), syncStats: { boxSets: 0, scraped: 0, rejectedVersionPairs: 0 } };
+
+/** Collection enrichment accumulated from every successfully synced source. */
+export function syncedCollectionMetadata(): CollectionMetadata { return collectionMetadata; }
 
 export interface SourceSyncFailure {
   source: MediaSource;
@@ -60,6 +66,7 @@ export async function fetchCatalogFromAllSources(opts?: {
   onSourceDone?: (source: MediaSource, libraryCount: number, titleCount: number) => void;
 }): Promise<CatalogSyncResult> {
   registerBuiltInProviders();
+  collectionMetadata = { art: new Map(), tmdbIds: new Map(), syncStats: { boxSets: 0, scraped: 0, rejectedVersionPairs: 0 } };
   const sources = listMediaSources();
   if (!sources.length) return { libraries: [], failures: [], synced: [] };
 
@@ -78,6 +85,12 @@ export async function fetchCatalogFromAllSources(opts?: {
       const libs = await provider.fetchLibraries(source.url, sessionForSource(source), stage, {
         excludeLibraryIds: excludedBareIdsForSource(source.id),
       });
+      const metadata = provider.getCollectionMetadata?.();
+      if (metadata) {
+        for (const [name, art] of metadata.art) collectionMetadata.art.set(name, art);
+        for (const [name, id] of metadata.tmdbIds) collectionMetadata.tmdbIds.set(name, id);
+        for (const key of ['boxSets', 'scraped', 'rejectedVersionPairs'] as const) collectionMetadata.syncStats[key] += metadata.syncStats[key];
+      }
       rememberFrom(source, libs);
       stampSourceOnLibraries(source, libs);
       collected.push({ source, libraries: libs });

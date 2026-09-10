@@ -16,7 +16,7 @@
 // reinterpreted here as its 2D equivalent: a canvas-drawn card face plus a
 // CSS glint sweep and heavy box-shadow to sell the laminated look.
 
-import { authenticateUser, buildUserAvatarUrl, type PublicUser } from './jellyfin';
+import type { AccountSummary, MediaSourceProvider } from './providers/media-source-provider';
 import { getActiveTheme } from './themes';
 import { BB_ANTON, BB_ARCHIVO_BLACK } from './bundled-fonts';
 import { HALCYON_CREAM } from './logo-spec';
@@ -35,7 +35,8 @@ export interface MembershipLoginSession {
 
 export interface OpenCardPickerOptions {
   serverUrl: string;
-  users: PublicUser[];
+  provider: MediaSourceProvider;
+  users: AccountSummary[];
   /** Last-used user id, if any -- pre-highlighted (not auto-logged-in). */
   lastUserId?: string | null;
   onLogin: (session: MembershipLoginSession) => void | Promise<void>;
@@ -116,7 +117,7 @@ function embossText(ctx: CanvasRenderingContext2D, text: string, x: number, y: n
 const CARD_W = 1024;
 const CARD_H = 646;
 
-function drawCardFront(canvas: HTMLCanvasElement, user: PublicUser, avatarImg: HTMLImageElement | null): void {
+function drawCardFront(canvas: HTMLCanvasElement, user: AccountSummary, avatarImg: HTMLImageElement | null): void {
   const theme = getActiveTheme();
   canvas.width = CARD_W;
   canvas.height = CARD_H;
@@ -302,7 +303,7 @@ export function drawRewardsCardFace(
   ctx.restore();
 }
 
-function drawCardBack(canvas: HTMLCanvasElement, user: PublicUser): void {
+function drawCardBack(canvas: HTMLCanvasElement, user: AccountSummary): void {
   canvas.width = CARD_W;
   canvas.height = CARD_H;
   const ctx = canvas.getContext('2d');
@@ -456,11 +457,11 @@ function shakeCard(index: number, message?: string): void {
   }
 }
 
-async function attemptLogin(opts: OpenCardPickerOptions, user: PublicUser, password: string, cardIndex: number): Promise<void> {
+async function attemptLogin(opts: OpenCardPickerOptions, user: AccountSummary, password: string, cardIndex: number): Promise<void> {
   const card = cardEls[cardIndex];
   card?.classList.add('mc-loading');
   try {
-    const session = await authenticateUser(opts.serverUrl, user.name, password);
+    const session = await opts.provider.authenticate(opts.serverUrl, { username: user.name, password });
     opts.log?.(`[System] Authenticated as ${session.userName} via membership card.`);
     closeMembershipCardPicker();
     await opts.onLogin(session);
@@ -484,7 +485,7 @@ function selectCard(opts: OpenCardPickerOptions, index: number): void {
   flipCard(index, true);
 }
 
-function buildCardElement(opts: OpenCardPickerOptions, user: PublicUser, index: number): HTMLDivElement {
+function buildCardElement(opts: OpenCardPickerOptions, user: AccountSummary, index: number): HTMLDivElement {
   const card = document.createElement('div');
   card.className = 'mc-card';
 
@@ -501,7 +502,7 @@ function buildCardElement(opts: OpenCardPickerOptions, user: PublicUser, index: 
   // server without CORS headers still renders the image (canvas is only
   // ever displayed live here, never read back with getImageData/toDataURL,
   // so a "tainted" canvas is harmless).
-  const avatarUrl = buildUserAvatarUrl(opts.serverUrl, user.id, user.primaryImageTag);
+  const avatarUrl = user.avatarUrl;
   if (avatarUrl) {
     const img = new Image();
     img.onload = () => drawCardFront(front, user, img);

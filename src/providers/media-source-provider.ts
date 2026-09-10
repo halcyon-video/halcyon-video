@@ -409,6 +409,8 @@ export interface ArtworkRef {
 }
 
 export interface PlaybackRequestOptions {
+  kind?: 'direct' | 'transcode';
+  sourceVideoCodec?: string;
   audioStreamIndex?: number;
   subtitleStreamIndex?: number;
   maxBitrate?: number;
@@ -489,6 +491,13 @@ export interface MediaSourceProvider {
     seriesId: string
   ): Promise<{ id: string; path: string } | null>;
 
+  /** Latest collection enrichment from this backend's catalog sync. */
+  getCollectionMetadata?(): {
+    art: Map<string, { posterUrl?: string; backdropUrl?: string }>;
+    tmdbIds: Map<string, number>;
+    syncStats: { boxSets: number; scraped: number; rejectedVersionPairs: number };
+  };
+
   buildArtworkUrl(server: string, session: ProviderSession, ref: ArtworkRef): string | null;
 
   resolvePlaybackSource(
@@ -497,6 +506,8 @@ export interface MediaSourceProvider {
     itemId: string,
     opts?: PlaybackRequestOptions
   ): Promise<PlaybackSource>;
+  fetchItemPlaybackInfo?(server: string, session: ProviderSession, itemId: string): Promise<MediaPlaybackInfo | undefined>;
+  buildSubtitleTrackUrl?(server: string, session: ProviderSession, itemId: string, streamIndex: number, mediaSourceId?: string): string;
   isDirectPlaySafe(info: MediaPlaybackInfo | undefined | null): boolean;
 
   reportPlaybackStart(server: string, session: ProviderSession, itemId: string): Promise<void>;

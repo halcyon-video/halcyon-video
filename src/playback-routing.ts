@@ -21,14 +21,8 @@
 // Jellyfin's path is byte-identical to what it was — same functions, same
 // arguments, same order.
 import { activeProviderKind } from './providers/provider-registry.ts';
-import {
-  buildStaticStreamUrl,
-  buildHlsStreamUrl,
-  fetchItemPlaybackInfo,
-  reportPlaybackStart,
-  reportPlaybackProgress,
-  reportPlaybackStopped,
-} from './jellyfin.ts';
+import { jellyfinClient } from './jellyfin.ts';
+import { embyClient } from './providers/emby-client.ts';
 import {
   buildPlexHlsStreamUrl,
   preflightPlexTranscodeDecision,
@@ -47,6 +41,7 @@ import type { MediaPlaybackInfo } from './providers/media-source-provider.ts';
 // Falls back to the install-wide kind, so every single-backend store behaves
 // exactly as before.
 const isPlex = (kind?: string) => (kind ?? activeProviderKind()) === 'plex';
+const mediaBrowser = (kind?: string) => (kind ?? activeProviderKind()) === 'emby' ? embyClient : jellyfinClient;
 
 export interface StreamUrlOptions {
   sourceVideoCodec?: string;
@@ -91,7 +86,7 @@ export function directStreamUrl(
     // Jellyfin URL.
     return buildPlexHlsStreamUrl(server, token, itemId, { mediaSourceId }).url;
   }
-  return buildStaticStreamUrl(server, token, itemId, mediaSourceId);
+  return mediaBrowser(kind).buildStaticStreamUrl(server, token, itemId, mediaSourceId);
 }
 
 /**
@@ -125,7 +120,7 @@ export async function transcodeStreamUrl(
     await preflightPlexTranscodeDecision(server, token, itemId, sessionId, plexOpts);
     return buildPlexHlsStreamUrl(server, token, itemId, plexOpts).url;
   }
-  return buildHlsStreamUrl(server, token, itemId, opts);
+  return mediaBrowser(kind).buildHlsStreamUrl(server, token, itemId, opts);
 }
 
 /**
@@ -159,7 +154,7 @@ export function transcodeStreamUrlSync(
     });
     return buildPlexHlsStreamUrl(server, token, itemId, plexOpts).url;
   }
-  return buildHlsStreamUrl(server, token, itemId, opts);
+  return mediaBrowser(kind).buildHlsStreamUrl(server, token, itemId, opts);
 }
 
 /** Codec/container probe for an item the catalog didn't carry one for. */
@@ -173,14 +168,14 @@ export async function probeItemPlaybackInfo(
   if (isPlex(kind)) {
     return (await fetchPlexItemPlaybackInfo(server, token, itemId)).info;
   }
-  return fetchItemPlaybackInfo(server, token, userId, itemId);
+  return mediaBrowser(kind).fetchItemPlaybackInfo(server, token, userId, itemId);
 }
 
 export function playbackStarted(server: string, token: string, itemId: string, kind?: string): void {
   // Plex has no "started" write outside a timeline session; its first progress
   // ping is what registers the play. See plex.ts's note on /:/timeline.
   if (isPlex(kind)) return;
-  void reportPlaybackStart(server, token, itemId);
+  void mediaBrowser(kind).reportPlaybackStart(server, token, itemId).catch(() => console.warn('[Playback] Could not report playback start.'));
 }
 
 export function playbackProgressed(
@@ -195,7 +190,7 @@ export function playbackProgressed(
     void reportPlexPlaybackProgress(server, token, itemId, positionTicks);
     return;
   }
-  void reportPlaybackProgress(server, token, itemId, positionTicks, isPaused);
+  void mediaBrowser(kind).reportPlaybackProgress(server, token, itemId, positionTicks, isPaused).catch(() => console.warn('[Playback] Could not report playback progress.'));
 }
 
 export function playbackStopped(
@@ -210,5 +205,23 @@ export function playbackStopped(
     void reportPlexPlaybackStopped(server, token, itemId, positionTicks, runTimeTicks);
     return;
   }
-  void reportPlaybackStopped(server, token, itemId, positionTicks);
+  void mediaBrowser(kind).reportPlaybackStopped(server, token, itemId, positionTicks).catch(() => console.warn('[Playback] Could not report playback stop.'));
+}
+
+/** Text subtitles and encode teardown must follow the title's own server too. */
+export function subtitleTrackUrl(server: string, token: string, itemId: string, streamIndex: number, mediaSourceId?: string, kind?: string): string {
+  return mediaBrowser(kind).buildSubtitleTrackUrl(server, token, itemId, streamIndex, mediaSourceId);
+}
+
+export function currentTranscodeSessionId(kind?: string, streamUrl?: string): string | undefined {
+  if (isPlex(kind) || !streamUrl) return undefined;
+  // A ceiling TV may build another stream before this player's metadata arrives.
+  // Read the session from the URL being played, never a client's last-built URL.
+  try { return new URL(streamUrl).searchParams.get('PlaySessionId') || undefined; }
+  catch { return undefined; }
+}
+
+export async function stopTranscodeSession(sessionId: string, log: (message: string) => void, server: { url: string; token: string; kind?: string } | null): Promise<void> {
+  if (!server || isPlex(server.kind)) return;
+  await mediaBrowser(server.kind).stopActiveEncoding(sessionId, log, server);
 }

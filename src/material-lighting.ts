@@ -2,7 +2,7 @@
 // Ordinary props and printed signs always use the scene's lighting.
 import * as THREE from 'three';
 
-export type LightingRole = 'light-source' | 'window-poster' | 'sky' | 'overlay' | 'shadow' | 'light-spill' | 'reflection';
+export type LightingRole = 'baked-backdrop' | 'light-source' | 'window-poster' | 'sky' | 'overlay' | 'shadow' | 'light-spill' | 'reflection';
 export function selfLit<T extends THREE.Material>(material: T, role: LightingRole): T {
   material.userData.lightingRole = role;
   return material;
