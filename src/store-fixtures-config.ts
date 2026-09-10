@@ -206,6 +206,41 @@ export const DEFAULT_FIXTURE_PLACEMENTS: FixturePlacement[] = [
     yaw: Math.PI,
     options: { themes: COMING_SOON_LETTERBOARD_THEMES },
   },
+  // ── Changeable-strip information board family (#287) ─────────────────────
+  // Two distinct formats:
+  // 1. Tall silver-framed board behind registers near front glazing with companion
+  //    framed poster beside it. Attested in later store footage (post-1990);
+  //    does not displace the 1990 counter Coming Soon board.
+  {
+    id: 'wall-track-board-registers',
+    kind: 'wall-track-board',
+    position: { x: 8.8, z: 8.48 },
+    yaw: Math.PI,
+    options: {
+      format: 'tall',
+      themes: ['bb-1993', 'bb-2000', 'bb-2010'],
+      companionPoster: true,
+      surfaceY: 3.65,
+      rows: 14,
+    },
+  },
+  // 2. Shallow horizontal dark rental-terms board above front glass facing shoppers.
+  //    Parameterized 11.5 ft width fitting glazing run, configurable illumination.
+  {
+    id: 'wall-track-board-terms',
+    kind: 'wall-track-board',
+    position: { x: 24.5, z: 14.92 },
+    yaw: Math.PI,
+    options: {
+      format: 'long',
+      themes: ['bb-1993', 'bb-2000', 'bb-2010'],
+      width: 11.5,
+      height: 1.45,
+      surfaceY: 9.10,
+      rows: 8,
+      illuminated: false,
+    },
+  },
   // (The previously-viewed dump bin that used to sit at x 16.5, z 3.0 was
   // removed in #37: that spot is INSIDE the checkout counter's shield outline,
   // so its brown tub read as a stray brown box poking through the counter.)

@@ -1,0 +1,39 @@
+{
+  "wall-track-board-tall": {
+    "bytes": 88172,
+    "triangles": 1028,
+    "materials": [
+      "BoardHardware",
+      "PosterFace",
+      "PosterFrame",
+      "TrackBacking",
+      "TrackFrameSilver",
+      "TrackRail",
+      "TrackStripFace"
+    ],
+    "objects": 41
+  },
+  "wall-track-board-long": {
+    "bytes": 69164,
+    "triangles": 732,
+    "materials": [
+      "BoardHardware",
+      "TrackBacking",
+      "TrackEmissive",
+      "TrackFrameDark",
+      "TrackHood",
+      "TrackRail",
+      "TrackStripFace"
+    ],
+    "objects": 36
+  },
+  "wall-track-rail": {
+    "bytes": 5688,
+    "triangles": 56,
+    "materials": [
+      "TrackRail",
+      "TrackStripFace"
+    ],
+    "objects": 2
+  }
+}
