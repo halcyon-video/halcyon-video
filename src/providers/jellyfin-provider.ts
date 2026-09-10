@@ -1,36 +1,7 @@
-// Jellyfin as a MediaSourceProvider (GH #32).
-//
-// This is a DELEGATING wrapper, on purpose: every method forwards to the
-// functions jellyfin.ts already exports, so the boundary lands with no change
-// to a single network call. Moving that logic in here bodily is Phase 4 of
-// tickets/adapter-boundary-design-2026-08-08.md, and it stays cheap only if
-// the interface is proven against the real client first — which is what this
-// file does.
-//
-// The reference implementation for anyone adding a backend: read this next to
-// media-source-provider.ts to see what each method is expected to return.
-import {
-  authenticateUser,
-  validateToken,
-  fetchPublicUsers,
-  fetchJellyfinLibrariesAndMovies,
-  fetchLibraryList,
-  fetchSeriesEpisodes,
-  fetchFirstEpisodeOfSeries,
-  reportPlaybackStart,
-  reportPlaybackProgress,
-  reportPlaybackStopped,
-  stopActiveEncoding,
-  buildItemImageUrl,
-  buildUserAvatarUrl,
-  buildStaticStreamUrl,
-  buildHlsStreamUrl,
-  isDirectPlaySafe,
-  getLastHlsPlaySessionId,
-  normalizeUrl,
-  fetchUserConfigPrefs,
-  saveUserConfigPrefs,
-} from '../jellyfin';
+// Provider adapter over the shared, explicitly selected MediaBrowser protocol.
+// The default client retains legacy Jellyfin exports; Emby injects its own client.
+import { jellyfinClient } from '../jellyfin.ts';
+import { isDirectPlaySafe } from '../playback-capability.ts';
 import type {
   AccountSummary,
   ArtworkRef,
@@ -98,16 +69,19 @@ const CONFIG_MARKER_PREF = 'halcyon_config_v';
 const CONFIG_FORMAT_VERSION = '1';
 
 export class JellyfinProvider implements MediaSourceProvider {
-  readonly id = 'jellyfin';
-  readonly displayName = 'Jellyfin';
+  readonly id: string = 'jellyfin';
+  readonly displayName: string = 'Jellyfin';
   readonly capabilities = JELLYFIN_CAPABILITIES;
 
+  protected readonly client: typeof jellyfinClient;
+  constructor(client = jellyfinClient) { this.client = client; }
+
   normalizeServerAddress(input: string): string {
-    return normalizeUrl(input);
+    return this.client.normalizeUrl(input);
   }
 
   async authenticate(server: string, creds: ProviderCredentials): Promise<ProviderSession> {
-    const { accessToken, userId, userName } = await authenticateUser(
+    const { accessToken, userId, userName } = await this.client.authenticateUser(
       server,
       creds.username ?? '',
       creds.password
@@ -116,21 +90,21 @@ export class JellyfinProvider implements MediaSourceProvider {
   }
 
   async validateSession(server: string, session: ProviderSession): Promise<boolean> {
-    return validateToken(server, session.accessToken);
+    return this.client.validateToken(server, session.accessToken);
   }
 
   async listSelectableAccounts(server: string): Promise<AccountSummary[]> {
-    const users = await fetchPublicUsers(server);
+    const users = await this.client.fetchPublicUsers(server);
     return users.map((u) => ({
       id: u.id,
       name: u.name,
       hasPassword: u.hasPassword,
-      avatarUrl: buildUserAvatarUrl(server, u.id, u.primaryImageTag),
+      avatarUrl: this.client.buildUserAvatarUrl(server, u.id, u.primaryImageTag),
     }));
   }
 
   async listLibraries(server: string, session: ProviderSession): Promise<LibrarySummary[]> {
-    return fetchLibraryList(server, session.accessToken, session.userId);
+    return this.client.fetchLibraryList(server, session.accessToken, session.userId);
   }
 
   async fetchLibraries(
@@ -139,7 +113,7 @@ export class JellyfinProvider implements MediaSourceProvider {
     onProgress?: (stage: string) => void,
     opts?: { excludeLibraryIds?: ReadonlySet<string> }
   ): Promise<Library[]> {
-    return fetchJellyfinLibrariesAndMovies(
+    return this.client.fetchJellyfinLibrariesAndMovies(
       server,
       session.accessToken,
       session.userId,
@@ -153,7 +127,7 @@ export class JellyfinProvider implements MediaSourceProvider {
     session: ProviderSession,
     seriesId: string
   ): Promise<Episode[]> {
-    return fetchSeriesEpisodes(server, session.accessToken, session.userId, seriesId);
+    return this.client.fetchSeriesEpisodes(server, session.accessToken, session.userId, seriesId);
   }
 
   async fetchFirstEpisodeOfSeries(
@@ -161,14 +135,22 @@ export class JellyfinProvider implements MediaSourceProvider {
     session: ProviderSession,
     seriesId: string
   ): Promise<{ id: string; path: string } | null> {
-    return fetchFirstEpisodeOfSeries(server, session.accessToken, session.userId, seriesId);
+    return this.client.fetchFirstEpisodeOfSeries(server, session.accessToken, session.userId, seriesId);
+  }
+
+  getCollectionMetadata() {
+    return {
+      art: new Map(this.client.collectionArt),
+      tmdbIds: new Map(this.client.collectionTmdbIds),
+      syncStats: { ...this.client.collectionSyncStats },
+    };
   }
 
   buildArtworkUrl(server: string, session: ProviderSession, ref: ArtworkRef): string | null {
     if (ref.kind === 'avatar') {
-      return buildUserAvatarUrl(server, ref.itemId, ref.tag);
+      return this.client.buildUserAvatarUrl(server, ref.itemId, ref.tag);
     }
-    return buildItemImageUrl(server, session.accessToken, ref.itemId, ref.kind, ref.maxWidth);
+    return this.client.buildItemImageUrl(server, session.accessToken, ref.itemId, ref.kind, ref.maxWidth);
   }
 
   /**
@@ -184,7 +166,8 @@ export class JellyfinProvider implements MediaSourceProvider {
     opts?: PlaybackRequestOptions & { kind?: 'direct' | 'transcode' }
   ): Promise<PlaybackSource> {
     if (opts?.kind === 'transcode') {
-      const url = buildHlsStreamUrl(server, session.accessToken, itemId, {
+      const url = this.client.buildHlsStreamUrl(server, session.accessToken, itemId, {
+        sourceVideoCodec: opts.sourceVideoCodec,
         audioStreamIndex: opts.audioStreamIndex,
         subtitleStreamIndex: opts.subtitleStreamIndex,
         maxBitrate: opts.maxBitrate,
@@ -192,12 +175,20 @@ export class JellyfinProvider implements MediaSourceProvider {
         startPositionTicks: opts.startPositionTicks,
         mediaSourceId: opts.mediaSourceId,
       });
-      return { kind: 'transcode', url, sessionId: getLastHlsPlaySessionId() };
+      return { kind: 'transcode', url, sessionId: this.client.getLastHlsPlaySessionId() };
     }
     return {
       kind: 'direct',
-      url: buildStaticStreamUrl(server, session.accessToken, itemId, opts?.mediaSourceId),
+      url: this.client.buildStaticStreamUrl(server, session.accessToken, itemId, opts?.mediaSourceId),
     };
+  }
+
+  fetchItemPlaybackInfo(server: string, session: ProviderSession, itemId: string) {
+    return this.client.fetchItemPlaybackInfo(server, session.accessToken, session.userId, itemId);
+  }
+
+  buildSubtitleTrackUrl(server: string, session: ProviderSession, itemId: string, streamIndex: number, mediaSourceId?: string) {
+    return this.client.buildSubtitleTrackUrl(server, session.accessToken, itemId, streamIndex, mediaSourceId);
   }
 
   isDirectPlaySafe(info: MediaPlaybackInfo | undefined | null): boolean {
@@ -209,7 +200,7 @@ export class JellyfinProvider implements MediaSourceProvider {
     session: ProviderSession,
     itemId: string
   ): Promise<void> {
-    return reportPlaybackStart(server, session.accessToken, itemId);
+    return this.client.reportPlaybackStart(server, session.accessToken, itemId);
   }
 
   async reportPlaybackProgress(
@@ -218,7 +209,7 @@ export class JellyfinProvider implements MediaSourceProvider {
     itemId: string,
     progress: PlaybackProgress
   ): Promise<void> {
-    return reportPlaybackProgress(
+    return this.client.reportPlaybackProgress(
       server,
       session.accessToken,
       itemId,
@@ -233,7 +224,7 @@ export class JellyfinProvider implements MediaSourceProvider {
     itemId: string,
     positionTicks: number
   ): Promise<void> {
-    return reportPlaybackStopped(server, session.accessToken, itemId, positionTicks);
+    return this.client.reportPlaybackStopped(server, session.accessToken, itemId, positionTicks);
   }
 
   // ── Per-user store configuration (GH #123) ────────────────────────────────
@@ -249,7 +240,7 @@ export class JellyfinProvider implements MediaSourceProvider {
     server: string,
     session: ProviderSession
   ): Promise<UserConfigSnapshot | null> {
-    const stored = await fetchUserConfigPrefs(server, session.accessToken, session.userId);
+    const stored = await this.client.fetchUserConfigPrefs(server, session.accessToken, session.userId);
     if (!stored || !stored[CONFIG_MARKER_PREF]) return null;
     const {
       [SAVED_AT_PREF]: savedAt,
@@ -272,7 +263,7 @@ export class JellyfinProvider implements MediaSourceProvider {
     // as a setting.
     if (snapshot.savedAt) values[SAVED_AT_PREF] = snapshot.savedAt;
     values[CONFIG_MARKER_PREF] = CONFIG_FORMAT_VERSION;
-    return saveUserConfigPrefs(server, session.accessToken, session.userId, values);
+    return this.client.saveUserConfigPrefs(server, session.accessToken, session.userId, values);
   }
 
   async cancelActiveTranscode(
@@ -280,7 +271,7 @@ export class JellyfinProvider implements MediaSourceProvider {
     log?: (msg: string) => void,
     conn?: { server: string; session: ProviderSession }
   ): Promise<void> {
-    return stopActiveEncoding(
+    return this.client.stopActiveEncoding(
       sessionId,
       log,
       conn ? { url: conn.server, token: conn.session.accessToken } : null

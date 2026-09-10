@@ -1015,8 +1015,8 @@ export function registerCoreSettings(): void {
     registerSetting({ key, label, kind, group: 'Connection', default: '', applyMode: 'reload', ...opts });
   const jellyfinAuthVisible = (): boolean => activeProviderKind() !== 'plex';
   cred('jellyfin_url', 'Media Server URL', 'text');
-  cred('jellyfin_username', 'Jellyfin Username', 'text', { visibleWhen: jellyfinAuthVisible });
-  cred('jellyfin_password', 'Jellyfin Password', 'secret', {
+  cred('jellyfin_username', 'Server Username', 'text', { visibleWhen: jellyfinAuthVisible });
+  cred('jellyfin_password', 'Server Password', 'secret', {
     hint: 'Blank keeps session. A password re-authenticates.',
     visibleWhen: jellyfinAuthVisible,
   });

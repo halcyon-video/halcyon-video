@@ -73,7 +73,7 @@ export function applyBackendSelection(kind: string): void {
 
   if (creds) creds.style.display = isPlex ? 'none' : '';
   if (plex) plex.style.display = isPlex ? '' : 'none';
-  if (title) title.innerText = isPlex ? 'Plex Server' : 'Jellyfin Server';
+  if (title) title.innerText = isPlex ? 'Plex Server' : kind === 'emby' ? 'Emby Server' : 'Jellyfin Server';
   // `required` on a hidden input blocks form submission with a validation
   // bubble pointing at something nobody can see.
   if (user) user.required = false;

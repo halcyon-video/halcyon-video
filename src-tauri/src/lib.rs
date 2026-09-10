@@ -172,7 +172,8 @@ fn jellyfin_request(
     url: String,
     auth_header: Option<String>,
     token: Option<String>,
-    body: Option<String>
+    body: Option<String>,
+    dialect: Option<String>
 ) -> Result<String, String> {
     if cfg!(debug_assertions) {
         println!("[Jellyfin Request] {} {}", method, redact_url(&url));
@@ -196,6 +197,10 @@ fn jellyfin_request(
     // buildAuthorization (src/jellyfin.ts) normally composes the whole
     // credential and leaves `token` empty, but fold the halves here too so the
     // bridge is correct however it's called.
+    if dialect.as_deref() == Some("emby") {
+        if let Some(a) = auth_header { req = req.header("X-Emby-Authorization", a); }
+        if let Some(t) = token { req = req.header("X-Emby-Token", t); }
+    } else {
     let authorization = match (auth_header, token) {
         (Some(a), Some(t)) => Some(format!("{}, Token=\"{}\"", a, t)),
         (Some(a), None) => Some(a),
@@ -205,6 +210,7 @@ fn jellyfin_request(
 
     if let Some(a) = authorization {
         req = req.header("Authorization", a);
+    }
     }
 
     if let Some(b) = body {

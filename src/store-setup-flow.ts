@@ -16,13 +16,9 @@
 // calls, persist choices, and hand the stocked-store launch back to
 // boot-flow.ts through the callbacks it was initialized with.
 import {
-  fetchPublicUsers,
   rememberKnownLibraries,
-  normalizeUrl,
 } from './jellyfin';
-// Sign-in goes through the provider (GH #32). fetchPublicUsers stays direct:
-// it feeds the membership cards, which want an image tag rather than
-// AccountSummary's resolved URL — the multiUserPicker capability's own step.
+// Sign-in and membership cards use the selected provider.
 import {
   activeProvider,
   resetActiveProvider,
@@ -66,7 +62,7 @@ import {
   SetupScreen,
   SetupKey,
   SetupLibraryRow,
-  initialHomeScreen,
+  initialHomeScreen as createHomeScreen,
   setupScreenKey,
   setupScreenChar,
   setupScreenBackspace,
@@ -226,12 +222,16 @@ export function closeSetupTerminal(opts?: { keepCamera?: boolean }): void {
   if (!opts?.keepCamera) deps.scene()?.exitSearchMode();
 }
 
+function initialHomeScreen(address?: string | null) {
+  return createHomeScreen(address, localStorage.getItem(PROVIDER_KIND_KEY) ?? 'jellyfin');
+}
+
 async function dial(address: string): Promise<void> {
   if (!deps) return;
-  initSetupReport('jellyfin');
+  initSetupReport(activeProvider().id);
   registerSensitiveString(address);
   startSetupStage('Looking up membership cards');
-  const url = normalizeUrl(address.trim());
+  const url = activeProvider().normalizeServerAddress(address.trim());
   registerSensitiveString(url);
   // Remember the dialed server IMMEDIATELY, not at afterAuth(): both routes to
   // the CRT sign-in screen below (an empty card list, a refused one) skip
@@ -244,7 +244,7 @@ async function dial(address: string): Promise<void> {
   render();
   let users;
   try {
-    users = await fetchPublicUsers(url);
+    users = await activeProvider().listSelectableAccounts?.(url) ?? [];
   } catch (e: any) {
     const msg = String(e?.message ?? e);
     deps.log(`[Setup] No membership card list from ${url}: ${msg}`);
@@ -262,13 +262,14 @@ async function dial(address: string): Promise<void> {
     return;
   }
   endSetupStage('Looking up membership cards', 'ok');
-  recordSetupServer({ product: 'Jellyfin', address: url });
+  recordSetupServer({ product: activeProvider().displayName, address: url });
   if (users.length > 0) {
     deps.log(`[Setup] Found ${users.length} membership card(s) on ${url}.`);
     screen = { kind: 'members', count: users.length };
     render();
     openMembershipCardPicker({
       serverUrl: url,
+      provider: activeProvider(),
       users,
       lastUserId: localStorage.getItem('jellyfin_last_userid'),
       onLogin: (session) => afterAuth(url, session),
@@ -403,7 +404,7 @@ async function manualSignIn(): Promise<void> {
   const { username, password } = screen;
   registerSensitiveString(username);
   registerSensitiveString(password);
-  const url = pendingUrl || normalizeUrl(localStorage.getItem('jellyfin_url') || '');
+  const url = pendingUrl || activeProvider().normalizeServerAddress(localStorage.getItem('jellyfin_url') || '');
   registerSensitiveString(url);
   if (!url) {
     recordSetupFailure('Type the server address first.', 'Sign-in');

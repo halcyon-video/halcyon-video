@@ -6,6 +6,7 @@
 // registerProvider line here, done. Nothing in the store's own code changes.
 import { registerProvider } from './provider-registry';
 import { JellyfinProvider } from './jellyfin-provider';
+import { EmbyProvider } from './emby-provider';
 import { PlexProvider } from './plex-provider';
 
 let registered = false;
@@ -16,10 +17,7 @@ export function registerBuiltInProviders(): void {
   registered = true;
   registerProvider('jellyfin', () => new JellyfinProvider());
   registerProvider('plex', () => new PlexProvider());
-  // registerProvider('emby',   () => new EmbyProvider());   -- next, and no
-  //   longer free: since GH #53 moved this client to Jellyfin-native auth, an
-  //   Emby provider must supply its own header shape and route prefix. Small,
-  //   and mostly transport — everything above it is shared.
+  registerProvider('emby', () => new EmbyProvider());
 }
 
 export { JellyfinProvider, JELLYFIN_CAPABILITIES } from './jellyfin-provider';
@@ -32,3 +30,5 @@ export {
   DEFAULT_PROVIDER_KIND,
 } from './provider-registry';
 export type * from './media-source-provider';
+
+export { EmbyProvider, EMBY_CAPABILITIES } from './emby-provider';

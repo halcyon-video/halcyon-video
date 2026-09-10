@@ -218,3 +218,15 @@ test('cursorLine always points at a real line', () => {
   }
 });
 
+
+
+test('Emby setup keeps its provider through retries and requires a server address', () => {
+  const saved = initialHomeScreen('http://server:8096/emby', 'emby');
+  assert.match(lines(saved).join(' '), /EMBY/);
+  assert.equal(setupScreenKey({ ...saved, row: 2 }, 'ok').action, 'connect');
+  const blank = initialHomeScreen(null, 'emby');
+  assert.equal(setupScreenKey({ ...blank, row: 2 }, 'ok').action, undefined);
+  const wrapped = setupScreenKey({ ...saved, row: 0 }, 'right').state;
+  assert.match(lines(wrapped).join(' '), /JELLYFIN/);
+  assert.equal(initialHomeScreen(null, 'unrecognized').provider, 0);
+});

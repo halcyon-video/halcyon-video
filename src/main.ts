@@ -16,23 +16,21 @@ measureDisplayHz();
 const isTauri = !!(window as any).__TAURI_INTERNALS__;
 function closeApp() { isTauri ? getCurrentWindow().close() : window.close(); }
 import {
-  authenticateUser,
   Movie,
   JellyfinLibrary,
   isHevcPassThroughEnabled,
-  buildSubtitleTrackUrl,
   pickSubtitleDelivery,
   MediaPlaybackInfo,
   MovieVersion,
   Episode,
-  collectionTmdbIds,
-  collectionSyncStats
 } from './jellyfin';
+import { syncedCollectionMetadata } from './catalog-sync';
 // Playback endpoints differ per backend; this routes them (GH #32). The
 // catalog went through the provider in 0.5.3 and playback did not, which was
 // invisible until a second backend existed.
 import {
   directStreamUrl,
+  subtitleTrackUrl as buildSourceSubtitleTrackUrl,
   transcodeStreamUrl,
   transcodeStreamUrlSync,
   probeItemPlaybackInfo,
@@ -432,7 +430,7 @@ async function logJellyseerrStatus(gapCount: number): Promise<void> {
  */
 async function mergeCollectionGaps(libraries: JellyfinLibrary[]): Promise<number> {
   const TIMEOUT_MS = 15_000;
-  const stats = collectionSyncStats;
+  const { syncStats: stats, tmdbIds } = syncedCollectionMetadata();
 
   // Only ask about collections actually represented on these shelves, and let
   // the owned members supply the library + genres each gap should inherit.
@@ -457,7 +455,7 @@ async function mergeCollectionGaps(libraries: JellyfinLibrary[]): Promise<number
 
   // A BoxSet id is the fast path, not the only path: anything shelved but
   // unscraped gets its collection id looked up through a member instead.
-  const collectionIds = new Map(collectionTmdbIds);
+  const collectionIds = new Map(tmdbIds);
   const unresolved: { collectionName: string; memberTmdbId: number }[] = [];
   for (const [collectionName, memberTmdbId] of memberTmdbByCollection) {
     if (collectionIds.has(collectionName)) continue;
@@ -1704,7 +1702,7 @@ async function finishConnectionEditsAndReload() {
   const username = localStorage.getItem('jellyfin_username');
   if (password && url && username) {
     try {
-      const session = await authenticateUser(url, username, password);
+      const session = await provider().authenticate(url, { username, password });
       localStorage.setItem('jellyfin_token', session.accessToken);
       localStorage.setItem('jellyfin_userid', session.userId);
       localStorage.setItem('jellyfin_last_userid', session.userId);
@@ -3344,6 +3342,9 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
   // quit check below, the item's known runtime — see resolveActiveItemTiming.
   const { resumeTicks, durationTicks } = resolveActiveItemTiming(movie, overrideItemId, seriesQueue);
 
+  // Prime the selected media source for reporting, including local mpv playback.
+  const staticSrc = directStreamUrl(jellyfinUrl, token, playbackId, mediaSourceId, titleKind);
+
   // Local playback first. When the file is on this machine, mpv plays it
   // directly — the only path that gives real HDR and the original soundtrack,
   // and the only one that doesn't have Jellyfin spooling the film to disk as
@@ -3379,7 +3380,7 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
         },
         (msg) => logToConsole(msg, 'video'),
         // Report progress to the server that shelved this title (GH #84).
-        { url: jellyfinUrl, token },
+        { url: jellyfinUrl, token, kind: titleKind },
       );
       if (started) {
         // The store is behind a fullscreen window now — stop drawing it.
@@ -3415,7 +3416,6 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
 
   ui.isPlaybackActive = true;
 
-  const staticSrc = directStreamUrl(jellyfinUrl, token, playbackId, mediaSourceId, titleKind);
 
   // Decide direct-play vs. HLS transcode from the item's real container/codecs
   // BEFORE playing: WebKitGTK silently drops audio tracks whose codec isn't in
@@ -3489,7 +3489,7 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
   // the picture, because there is no client renderer for them.
   const subtitleDelivery = pickSubtitleDelivery(streams, initialSubtitleIndex);
   const subtitleTrackUrl = subtitleDelivery.kind === 'text'
-    ? buildSubtitleTrackUrl(jellyfinUrl, token, playbackId, subtitleDelivery.streamIndex, mediaSourceId)
+    ? buildSourceSubtitleTrackUrl(jellyfinUrl, token, playbackId, subtitleDelivery.streamIndex, mediaSourceId, titleKind)
     : undefined;
   const burnInSubtitleIndex = subtitleDelivery.kind === 'burn-in' ? subtitleDelivery.streamIndex : undefined;
 
@@ -3550,7 +3550,7 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
     title: movie.title,
     // Which server is encoding this (GH #84), so closing the player tears the
     // transcode down on THAT box rather than on whichever one is primary.
-    server: { url: jellyfinUrl, token },
+    server: { url: jellyfinUrl, token, kind: titleKind },
     audioTracks,
     subtitleTracks,
     defaultAudioIndex: initialAudioIndex,
@@ -3564,7 +3564,7 @@ export async function launchVideoPlayback(movie: Movie, overrideItemId?: string,
     buildSubtitleTrack: (streamIndex) => {
       const d = pickSubtitleDelivery(streams, streamIndex);
       return d.kind === 'text'
-        ? buildSubtitleTrackUrl(jellyfinUrl, token, playbackId, d.streamIndex, mediaSourceId)
+        ? buildSourceSubtitleTrackUrl(jellyfinUrl, token, playbackId, d.streamIndex, mediaSourceId, titleKind)
         : null;
     },
     startPositionTicks: resumeTicks || undefined,

@@ -6,7 +6,7 @@
 [![License](https://img.shields.io/badge/license-GPL--3.0-6a737d)](LICENSE)
 [![Stars](https://img.shields.io/github/stars/halcyon-video/halcyon-video?color=6a737d)](https://github.com/halcyon-video/halcyon-video/stargazers)
 
-**A walkable 3D video store for Jellyfin, Plex, streaming services, and RomM.**
+**A walkable 3D video store for Jellyfin, Plex, Emby, streaming services, and RomM.**
 
 Halcyon turns a media catalog into a place. Walk in from the parking lot,
 browse physical aisles, pull a case from the shelf, read the back, ask the
@@ -107,6 +107,7 @@ into a commit.
 |---|---|
 | **Jellyfin** | Movies, series, art, versions, playback, resume points, and watch history |
 | **Plex** | The same core store through Plex code sign-in and server discovery |
+| **Emby** | Direct server sign-in, member cards, movies, series, artwork, playback, resume points, and saved store settings |
 | **Streaming services** | Zero-setup browsable aisles that link out to the selected service |
 | **Jellyseerr / Overseerr** | Collection gaps, discovery stock, requests, and staff picks |
 | **RomM** | Platform bays, game packaging, cover scans, and optional emulator launch |
@@ -115,8 +116,8 @@ into a commit.
 Streaming aisles do not require Jellyfin, Plex, Jellyseerr, or a TMDB key.
 The setup terminal asks which services you use and stocks them from a bundled
 snapshot. A configured TMDB or Jellyseerr source can refresh that data later.
-There is no built-in folder scanner; shelving personal files requires Jellyfin
-or Plex.
+There is no built-in folder scanner; shelving personal files requires Jellyfin, Plex,
+or Emby.
 
 ## Watching something
 
@@ -160,7 +161,7 @@ npm install
 npm run dev
 ```
 
-The opening-day terminal can connect Jellyfin or Plex, select streaming
+The opening-day terminal can connect Jellyfin, Plex, or Emby, select streaming
 services, or open the store empty and configure it later at the manager CRT.
 
 ### Docker
@@ -302,9 +303,24 @@ select a server. Shelves, playback, collections, resume points, and watch
 history work through the Plex provider. Plex membership cards and cast-photo
 wall decor are omitted because Plex does not expose those lists efficiently.
 
+**Does Emby work?**
+
+Yes. Choose **Emby** at the opening-day terminal or Connection Center, enter
+your server address, and select your member card or sign in with your Emby
+server username and password. Pick the libraries to put on the shelves.
+Halcyon remembers the connection and keeps playback progress on that server;
+Emby can also be combined with Jellyfin and Plex sources in the same store.
+
+Use a server address reachable from the device running Halcyon, including any
+reverse-proxy base path. An existing trailing `/emby` is accepted. HTTPS pages
+need an HTTPS server address; a local Halcyon install can reach HTTP servers.
+This is direct server sign-in, not Emby Connect. Verified with Emby Server
+4.10.0.40, including direct video, HLS, artwork and account settings; available
+transcoding still depends on the server's configuration and permissions.
+
 **What is not shipped yet?**
 
-Emby support, a published desktop bundle, and the Apple TV client remain on
+A published desktop bundle and the Apple TV client remain on
 the roadmap. The source tree contains the Tauri shell and tvOS groundwork,
 but neither is presented here as a finished download.
 

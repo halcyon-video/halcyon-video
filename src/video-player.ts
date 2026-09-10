@@ -1,5 +1,6 @@
 import type Hls from 'hls.js';
-import { stopActiveEncoding, getLastHlsPlaySessionId, isStreamCopyUrl } from './jellyfin';
+import { isStreamCopyUrl } from './jellyfin';
+import { currentTranscodeSessionId, stopTranscodeSession } from './playback-routing';
 import { keyboardOwnedByControl } from './text-entry-focus';
 import { getSegmentFixLoader } from './hls-segment-fix';
 
@@ -99,7 +100,7 @@ export interface VideoPlayerOptions {
    *  down again, since a store can be stocked from several and the DELETE has
    *  to reach the box actually encoding. Omitted, the singleton keys stand in,
    *  which is what every one-server install has always done. */
-  server?: { url: string; token: string };
+  server?: { url: string; token: string; kind?: string };
   /** Ask "are you sure?" before a USER-initiated exit (Back button/key).
    *  Set for store playback, where closing drops the viewer back at the store
    *  entrance — a stray Back press meant to dismiss the on-screen controls
@@ -1066,7 +1067,7 @@ export class VideoPlayer {
     if (entry?.isHls) {
       // Remember which encode session is now live so a later track/quality
       // change can tell the server to stop it before starting the replacement.
-      this.currentPlaySessionId = getLastHlsPlaySessionId();
+      this.currentPlaySessionId = currentTranscodeSessionId(this.opts?.server?.kind, entry.src);
     }
     // Restore the playhead once the fresh source is playable. This runs for a
     // full stream swap (audio-restore reload or track/quality change, which
@@ -1517,7 +1518,7 @@ export class VideoPlayer {
     const src = build(sel);
     // Adopt the new session id immediately: a second change before this stream
     // goes live must stop THIS job, not the one before it.
-    this.currentPlaySessionId = getLastHlsPlaySessionId();
+    this.currentPlaySessionId = currentTranscodeSessionId(this.opts?.server?.kind, src);
     this.pendingLocalSeekSeconds = resumeAt > 0.5 ? resumeAt : null;
     this.pendingLocalSeekSetAtMs = Date.now();
     this.sources = [{ src, isHls: true }];
@@ -1589,7 +1590,7 @@ export class VideoPlayer {
    *  live for this player, and the session id can't be double-stopped. */
   private stopCurrentEncode(): void {
     if (!this.currentPlaySessionId) return;
-    void stopActiveEncoding(
+    void stopTranscodeSession(
       this.currentPlaySessionId,
       (msg) => this.log(msg),
       this.opts?.server ?? null
