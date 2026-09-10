@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { assetUrl } from '../asset-url';
 import { brandPackDir } from '../brand-pack';
+import { extractHousingContact, refreshEquipmentContact } from './counter-equipment-contact';
 import type { StoreScene } from '../three-scene';
 
 export function installCounterCashHousing(scene: StoreScene, parent: THREE.Group): void {
@@ -23,9 +24,11 @@ export function installCounterCashHousing(scene: StoreScene, parent: THREE.Group
   const load = (i: number) => {
     if (!attached() || i === candidates.length) return;
     new GLTFLoader().load(assetUrl(candidates[i]), ({ scene: model }) => {
+      const contact = extractHousingContact(model);
       const geometries = new Set<THREE.BufferGeometry>();
       const materials = new Set<THREE.Material>();
       const textures = new Set<THREE.Texture>();
+      if (contact) textures.add(contact);
       model.traverse(object => {
         if (!(object instanceof THREE.Mesh)) return;
         geometries.add(object.geometry);
@@ -39,12 +42,18 @@ export function installCounterCashHousing(scene: StoreScene, parent: THREE.Group
         geometries.forEach(g => g.dispose()); materials.forEach(m => m.dispose()); textures.forEach(t => t.dispose());
         return;
       }
-      const release = () => { parent.removeEventListener('removed', release); textures.forEach(t => t.dispose()); };
+      const release = () => {
+        parent.removeEventListener('removed', release);
+        model.userData.contactCleanup?.();
+        textures.forEach(t => t.dispose());
+      };
       parent.addEventListener('removed', release);
       model.name = 'counter-cash-housing-model';
       model.position.set(anchor.x, anchor.y, anchor.z);
       model.rotation.y = anchor.rotY;
+      model.userData.contactTexture = contact;
       parent.add(model);
+      refreshEquipmentContact(parent);
       // clearActiveSignage owns geometry/material disposal after attachment.
       scene.fixtureContext().requestShadowRefresh();
       scene.requestRender();

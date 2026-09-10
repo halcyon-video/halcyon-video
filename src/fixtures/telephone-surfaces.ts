@@ -1,6 +1,7 @@
 // The embedded bake receiver transfers geometry-derived occlusion to the real
 // worktop. No overlay, additional draw, lighting change or per-frame pass.
 import * as THREE from 'three';
+import { refreshEquipmentContact } from './counter-equipment-contact.ts';
 
 export function finishTelephone(model: THREE.Group): THREE.Texture | null {
   addGrain(model);
@@ -62,6 +63,11 @@ export function applyTelephoneContact(model: THREE.Group, counter: THREE.Object3
 export function refreshTelephoneContact(parent: THREE.Object3D): void {
   let root = parent;
   while (root.parent) root = root.parent;
+  // Keep the original single-phone projection and cost in the public store.
+  if (root.getObjectByName('counter-cash-housing-model')?.userData.contactTexture) {
+    refreshEquipmentContact(parent);
+    return;
+  }
   const phone = root.getObjectByName('counter-telephone-model') as THREE.Group | undefined;
   const counter = root.getObjectByName('checkout-counter-model');
   if (!phone || !counter || counter.userData.telephoneContactApplied) return;

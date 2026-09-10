@@ -50,6 +50,8 @@ export function installCounterModel(
     // disposal. Release this loader's resources at that boundary as well.
     const disposeModel = () => {
       parent.removeEventListener('removed', disposeModel);
+      // Restore shared finishes before collecting this model's owned materials.
+      model.userData.equipmentContactCleanup?.();
       const ownedMaterials = new Set<THREE.Material>();
       model.traverse((object) => {
         if (!(object instanceof THREE.Mesh)) return;
