@@ -13,5 +13,11 @@
     "triangles": 1024,
     "meshes": 4,
     "nonManifoldEdges": 0
+  },
+  "arcade-window-bay": {
+    "triangles": 452,
+    "meshes": 6,
+    "trimBottom": 1.6,
+    "nonManifoldEdges": 0
   }
 }

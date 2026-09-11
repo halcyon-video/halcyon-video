@@ -211,18 +211,32 @@ for style in ['gabled-brick','flat-parapet','arcaded-brick']:
 
 # The arch spans TWO of the store's fixed four-foot window panes. Masonry
 # spandrels cover the unused glass corners; the trimmed arch is an opening.
+# Its upright trim begins on the masonry knee, just like the black window
+# frames behind it.  Letting these strips reach the pavement visually cuts
+# each continuous brick footer into separate pieces.
 before=set(bpy.context.scene.objects)
+window_knee=1.6
 inner=[(3.62*math.cos(k*math.pi/32),6.05+2.8*math.sin(k*math.pi/32)) for k in range(33)]
 prism('Arch spandrel',[(-4,8.9),(4,8.9),(4,6.05)]+inner+[(-4,6.05)],.01,.72,0)
 outer=[(3.86*math.cos(k*math.pi/32),6.05+3.04*math.sin(k*math.pi/32)) for k in range(33)]
 prism('Masonry arch trim',outer+list(reversed(inner)),.73,.91,2)
 for s in [-1,1]:
     x0,x1=sorted([s*3.62,s*4])
-    box('Arcade pier',x0,x1,0,6.05,.05,.82,2)
+    box('Arcade pier',x0,x1,window_knee,6.05,.05,.82,2)
     box('Pier capital',x0-.08,x1+.08,5.7,6.05,.02,.98,2)
 objects=[o for o in bpy.context.scene.objects if o not in before]
 for obj in objects:
     bm=bmesh.new();bm.from_mesh(obj.data);assert all(e.is_manifold for e in bm.edges),obj.name;bm.free()
+for obj in objects:
+    if obj.name.startswith('Arcade pier'):
+        assert min(v.co.z for v in obj.data.vertices) >= window_knee-.00001, obj.name
+for obj in objects:obj.data.calc_loop_triangles()
+metrics['arcade-window-bay']={
+    'triangles':sum(len(o.data.loop_triangles) for o in objects),
+    'meshes':len(objects),
+    'trimBottom':window_knee,
+    'nonManifoldEdges':0,
+}
 export('storefront-arch-bay.glb',objects)
 collection=bpy.data.collections.new('Arcade window module');bpy.context.scene.collection.children.link(collection)
 for obj in objects:
