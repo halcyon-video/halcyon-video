@@ -30,12 +30,10 @@ import {
   MediaDateKey,
 } from './media-date-screen';
 import {
-  MEDIA_RELEASE_DATE_KEY,
-  activeMediaCutoff,
-  clearMediaReleasePin,
   loadMediaReleasePin,
-  saveMediaReleasePin,
 } from './media-release-date';
+import { applyMediaReleasePin } from './media-release-pin-change';
+import { flushConfigPush } from './store-config-sync';
 
 /** Rows that open a CRT sub-screen instead of running a power action. */
 export const MEDIA_DATE_BUTTON_ID = 'btn-media-date';
@@ -174,31 +172,21 @@ async function savePin(s: MediaDateScreenState): Promise<void> {
   if (!deps) return;
   const p = (n: number) => n.toString().padStart(2, '0');
   const date = `${s.year}-${p(s.month)}-${p(s.day)}`;
-  saveMediaReleasePin({
+  const pin = {
     mediaReleaseDate: date,
     pinnedAt: new Date().toISOString(),
     ...(s.matchEra ? { matchEra: true } : {}),
-  });
+  };
   deps.log(`[Terminal] Media Release Date pinned to ${date}${s.matchEra ? ' — store era follows the pin' : ''}. Restocking...`);
   counterTerminalClose();
-  await deps.rebuild();
+  await applyMediaReleasePin(pin, { saveConfig: flushConfigPush, rebuild: deps.rebuild });
 }
 
 async function clearPin(): Promise<void> {
   if (!deps) return;
-  const hadPin = !!loadMediaReleasePin()
-    || (typeof localStorage !== 'undefined' && !!localStorage.getItem(MEDIA_RELEASE_DATE_KEY))
-    || !!activeMediaCutoff();
-  clearMediaReleasePin();
-  if (hadPin) {
-    deps.log('[Terminal] Media Release Date pin cleared — catalog is live. Restocking...');
-    counterTerminalClose();
-    await deps.rebuild();
-  } else {
-    // Nothing pinned — walk back to the menu.
-    leaveDateScreen();
-    render();
-  }
+  deps.log('[Terminal] Media Release Date pin cleared — catalog is live. Restocking...');
+  counterTerminalClose();
+  await applyMediaReleasePin(null, { saveConfig: flushConfigPush, rebuild: deps.rebuild });
 }
 
 /**
