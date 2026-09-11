@@ -75,3 +75,12 @@ and finish variation using a separate UV channel; authored colour and normal
 maps, printed art, luminous screens and transparent glass are preserved.
 Plastic is dielectric. Small detail maps are allocated on installation and
 released with their owning model or fixture group.
+
+## Reference geometry reconstruction and equipment bays (#308)
+
+The checkout millwork reconstruction aligns internal cabinet structure and equipment support bays with primary reference photography:
+- **Terminal recesses**: Primary and secondary register stations (`mount_terminal_0`, `mount_terminal_1`) align along the clerk-side inner worktop at 2.82 ft elevation, with station 0 defining the operator transaction focus and search origin.
+- **Cash-housing support**: Discrete mounting anchors (`mount_housing_0`, `mount_housing_1`) support period till enclosures beneath each register terminal. Installing a till housing dynamically elevates its station group by the housing's exact exported height (`supportHeight`).
+- **Staff drawer and cupboard bank**: The clerk-side joinery profile establishes an integrated work surface below the 3.54 ft customer-facing counter ledge, maintaining clear foot kicks and staff service access.
+- **Receipt printer bay**: The extended inner worktop supports the receipt printer to the left of station 0 (`mount_printer`), preserving functional reach and equipment contact occlusion.
+- **Reference confidence**: Exterior customer-facing millwork, counter heights, and equipment placement match primary photographic references; unexposed internal carcass joinery and hidden structural partitions remain estimated.

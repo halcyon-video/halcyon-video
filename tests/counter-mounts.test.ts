@@ -18,3 +18,45 @@ test('support mount follows a rotated installation and a differently transformed
   assert.ok(equipment.getWorldQuaternion(new THREE.Quaternion()).angleTo(node.getWorldQuaternion(new THREE.Quaternion())) < 1e-7);
   assert.equal(counterMount(model, 'missing'), null);
 });
+
+test('equipment bay mounts resolve all standard millwork support anchors', () => {
+  const model = new THREE.Group();
+  const bayNames = [
+    'mount_terminal_0',
+    'mount_terminal_1',
+    'mount_housing_0',
+    'mount_housing_1',
+    'mount_printer',
+    'mount_telephone',
+    'mount_bag',
+  ];
+
+  for (let i = 0; i < bayNames.length; i++) {
+    const node = new THREE.Object3D();
+    node.name = bayNames[i];
+    node.userData.counterMount = bayNames[i];
+    node.position.set(i * 1.5 - 4.5, 2.82, -1.0);
+    node.rotation.y = (i % 2 === 0 ? 0 : Math.PI);
+    model.add(node);
+  }
+
+  for (const bay of bayNames) {
+    const mount = counterMount(model, bay);
+    assert.ok(mount !== null, `Expected mount ${bay} to be found`);
+    assert.equal(mount.y, 2.82);
+  }
+
+  // Verify terminal resting directly on shelf vs elevated on cash-housing mount
+  const stationDirect = new THREE.Group();
+  const stationElevated = new THREE.Group();
+  const termMount = counterMount(model, 'mount_terminal_0')!;
+
+  placeOnCounterMount(stationDirect, termMount, 0);
+  const housingDeckHeight = 0.54; // typical cash-housing deck lift
+  placeOnCounterMount(stationElevated, termMount, housingDeckHeight);
+
+  assert.equal(stationDirect.position.y, 2.82);
+  assert.equal(stationElevated.position.y, 2.82 + housingDeckHeight);
+  assert.equal(stationDirect.position.x, stationElevated.position.x);
+  assert.equal(stationDirect.position.z, stationElevated.position.z);
+});
