@@ -190,17 +190,17 @@ export function buildCheckoutCounter(
   counterLamRough.repeat.set(4, 4);
   const counterWhite = new THREE.MeshStandardMaterial({
     color: new THREE.Color(theme.palette.counterBody), map: counterLamTex,
-    normalMap: counterLamNorm, normalScale: new THREE.Vector2(0.25, 0.25),
-    // The map averages 0.65: 0.69 keeps the former 0.45 satin finish while
+    normalMap: counterLamNorm, normalScale: new THREE.Vector2(0.4, 0.4),
+    // The map averages 0.65: 0.62 gives a satin finish near 0.40 while
     // allowing subtle wipe/grain variation in reflected highlights.
-    roughnessMap: counterLamRough, roughness: 0.69, metalness: 0.02,
+    roughnessMap: counterLamRough, roughness: 0.62, metalness: 0,
   });
   const counterTopBlue = new THREE.MeshStandardMaterial({
     color: new THREE.Color(theme.palette.counterTop), map: counterLamTex,
-    normalMap: counterLamNorm, normalScale: new THREE.Vector2(0.25, 0.25),
-    roughness: 0.28, metalness: 0.03,
+    normalMap: counterLamNorm, normalScale: new THREE.Vector2(0.4, 0.4),
+    roughnessMap: counterLamRough, roughness: 0.55, metalness: 0,
   });
-  const counterStripe = new THREE.MeshStandardMaterial({ color: new THREE.Color(theme.palette.secondary), roughness: 0.32, metalness: 0.05 });
+  const counterStripe = new THREE.MeshStandardMaterial({ color: new THREE.Color(theme.palette.secondary), map: counterLamTex, normalMap: counterLamNorm, normalScale: new THREE.Vector2(0.2, 0.2), roughnessMap: counterLamRough, roughness: 0.6, metalness: 0 });
   const innerTopMat = counterTopMaterial(spec.counterTop, counterWhite);
 
   const bandH = 3.4;
@@ -539,7 +539,9 @@ export function buildCheckoutCounter(
   const pFront1 = deskFront
     ? deskFront.clone()
     : straightFront ? new THREE.Vector2(cx, innerFrontZ) : P_in[2].clone();
-  const pFront0X = cx - islandHalf;
+  // Extend the left worktop toward the staff entry for the receipt printer.
+  // The same endpoints drive visible fallback geometry and clerk obstacles.
+  const pFront0X = cx - islandHalf - (desk ? 0 : usquare ? 0.25 : 0.6);
   const pFront0Y = straightFront
     ? innerFrontZ
     : P_in[1].y + (pFront0X - P_in[1].x) * (P_in[2].y - P_in[1].y) / (P_in[2].x - P_in[1].x);

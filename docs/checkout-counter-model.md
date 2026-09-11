@@ -58,3 +58,20 @@ The optional installation retains theme finish roles and equipment contact AO.
 The loader releases detached results and its owned materials, textures and
 geometry on removal. Public fallback geometry, local source, and per-installation
 reference confidence remain separate concerns.
+
+## Receipt printer worktop and finishes
+
+The shield worktop extends 0.6 feet farther left in world X (about 0.77 feet
+along its angled run); the half-square extends 0.25 feet within its existing
+surround. The same endpoints generate the loading fallback, authored cabinet
+and clerk-navigation obstacles. The printer rests on the inner worktop left
+of station zero: along-counter offsets -5.65 and -4.7 feet respectively.
+Optional installations can publish the corresponding `mount_printer` support.
+The independent shop desk retains its existing footprint.
+
+Laminate body, perimeter and inlay retain albedo and normal detail and now
+share roughness variation. Molded equipment gains physically scaled grain
+and finish variation using a separate UV channel; authored colour and normal
+maps, printed art, luminous screens and transparent glass are preserved.
+Plastic is dielectric. Small detail maps are allocated on installation and
+released with their owning model or fixture group.

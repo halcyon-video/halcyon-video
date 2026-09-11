@@ -1,3 +1,4 @@
+import { finishEquipmentSurfaces } from './equipment-surfaces';
 // Optional, locally installed counter equipment. Units: feet, floor at y=0,
 // controls face +Z. The existing counter owns placement and navigation.
 import * as THREE from 'three';
@@ -59,7 +60,7 @@ export function buildImpactPrinter93(
   const load = (index: number) => {
     if (!isAttached() || index >= candidates.length) return;
     new GLTFLoader().load(assetUrl(candidates[index]), ({ scene: model }) => {
-      const textures = new Set<THREE.Texture>();
+      const textures = new Set<THREE.Texture>(finishEquipmentSurfaces(model));
       const materials = new Set<THREE.Material>();
       const geometries = new Set<THREE.BufferGeometry>();
       model.traverse(object => {

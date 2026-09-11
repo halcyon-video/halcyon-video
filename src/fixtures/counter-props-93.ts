@@ -1,3 +1,4 @@
+import { finishEquipmentSurfaces } from './equipment-surfaces';
 import { selfLit } from '../material-lighting';
 // 1993 checkout-counter dressing, straight from the store footage: the
 // customer-facing VFD pole display, a cluster of latex balloons tied to the
@@ -118,7 +119,7 @@ export function buildCounterProps93(scene: StoreScene): void {
 
   const cx = inner.x;
   const matte = (color: number, roughness = 0.6) =>
-    new THREE.MeshStandardMaterial({ color, roughness, metalness: 0.05 });
+    new THREE.MeshStandardMaterial({ color, roughness, metalness: 0 });
   const printed = (tex: THREE.CanvasTexture) => {
     const m = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.6, metalness: 0.0 });
     return m;
@@ -283,10 +284,9 @@ export function buildCounterProps93(scene: StoreScene): void {
 
   // 4. Dot-matrix printer with fanfold paper, back of the inner counter.
   {
-    // Keep the printer between the VFD (-1.5) and the membership frame (+0.8).
-    // At +0.9 that frame's post ran through the printer and its paper feed.
-    // The centre-left top supports the feet on either island profile.
-    const a = entrance.getCounterTopAnchorAt(-.3)!;
+    // Left of the first register, on the extended inner worktop.
+    const printerOffset = scene.storefrontSpec.counterShape === 'usquare' ? -4.7 : -5.65;
+    const a = entrance.getCounterTopAnchorAt(scene.storefrontSpec.counterShape === 'desk' ? -.3 : printerOffset)!;
     buildImpactPrinter93(scene, group, a, fanfoldTex());
 
     // Beige corded desk phone beside the station — every register in the
@@ -405,4 +405,11 @@ export function buildCounterProps93(scene: StoreScene): void {
       group.add(pack);
     });
   }
+  const surfaceTextures = finishEquipmentSurfaces(group);
+  const releaseSurfaces = () => {
+    group.removeEventListener('removed', releaseSurfaces);
+    surfaceTextures.forEach(texture => texture.dispose());
+  };
+  group.addEventListener('removed', releaseSurfaces);
+
 }

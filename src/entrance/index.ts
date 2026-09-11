@@ -1,3 +1,4 @@
+import { finishEquipmentSurfaces } from '../fixtures/equipment-surfaces';
 import { disposeDetachedModel } from '../model-resources';
 import { selfLit } from '../material-lighting';
 // Front entrance vestibule + walk-in checkout desk, modelled on the classic
@@ -959,15 +960,15 @@ export class EntranceCheckout implements StoreFixture {
     // instead and keep the maps.
     type RoleTint = { color: number; roughness: number; emissive?: number };
     const MONITOR_TINTS: Record<string, RoleTint> = {
-      CabinetABS: { color: 0xd9cdb2, roughness: 0.62 },
-      BezelABS: { color: 0xcfc3a8, roughness: 0.58 },
+      CabinetABS: { color: 0xd9cdb2, roughness: 0.42 },
+      BezelABS: { color: 0xcfc3a8, roughness: 0.4 },
       TrimDark: { color: 0x2b2a2a, roughness: 0.6 },
       CableRubber: { color: 0x232323, roughness: 0.72 },
       PowerLed: { color: 0x2c6a3a, roughness: 0.4, emissive: 0x2dff5a },
     };
     const KEYBOARD_TINTS: Record<string, RoleTint> = {
-      KeyboardShell: { color: 0xc4b89e, roughness: 0.68 },
-      KeyCaps: { color: 0xd6cbb1, roughness: 0.55 },
+      KeyboardShell: { color: 0xc4b89e, roughness: 0.46 },
+      KeyCaps: { color: 0xd6cbb1, roughness: 0.42 },
       KeyCapsDark: { color: 0x9a917c, roughness: 0.62 },
       TrimDark: { color: 0x2b2a2a, roughness: 0.6 },
       CableRubber: { color: 0x232323, roughness: 0.72 },
@@ -991,7 +992,7 @@ export class EntranceCheckout implements StoreFixture {
           const c = m.clone();
           c.color.setHex(tint.color);
           c.roughness = tint.roughness;
-          c.metalness = 0.03;
+          c.metalness = 0;
           if (tint.emissive !== undefined) {
             c.emissive.setHex(tint.emissive);
             c.emissiveIntensity = 1.4;
@@ -1072,6 +1073,7 @@ export class EntranceCheckout implements StoreFixture {
           }
         });
         finishModel(monitor, MONITOR_TINTS, beige, monitorFinish);
+        finishEquipmentSurfaces(monitor, true);
         tubeMeshes.forEach((m) => { m.material = crtFaceMat; });
         // The model's own curved glass pane becomes REAL glass — an ADDITIVE
         // reflection of the store off the baked environment (glass-reflection.ts),
@@ -1196,6 +1198,7 @@ export class EntranceCheckout implements StoreFixture {
         // (KEYBOARD_TINTS) — a flat one-colour pass turned the old model into
         // a featureless wedge (feedback/046).
         finishModel(kb, KEYBOARD_TINTS, beigeDark, keyboardFinish);
+        finishEquipmentSurfaces(kb, true);
         // The model's low front edge faces its -Z; spin it to face the clerk
         // like the monitor screen does (feedback/046 "looks backwards").
         kb.rotation.y = Math.PI;

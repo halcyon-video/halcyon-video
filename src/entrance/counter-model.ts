@@ -1,3 +1,4 @@
+import { finishEquipmentSurfaces } from '../fixtures/equipment-surfaces';
 // Optional authored millwork and supports within the counter ground-plan envelope.
 import * as THREE from 'three';
 import { refreshTelephoneContact } from '../fixtures/telephone-surfaces';
@@ -47,6 +48,7 @@ export function installCounterModel(
           ? object.material.map(replace) : replace(object.material);
         object.castShadow = object.receiveShadow = true;
       });
+      if (!detached) finishEquipmentSurfaces(model).forEach(texture => textures.add(texture));
       replacedMaterials.forEach((material) => material.dispose());
       if (detached) { textures.forEach(texture => texture.dispose()); resolve(null); return; }
       model.name = 'checkout-counter-model';

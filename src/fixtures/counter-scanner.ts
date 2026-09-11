@@ -1,3 +1,4 @@
+import { finishEquipmentSurfaces } from './equipment-surfaces';
 // Optional local reference-derived equipment. The public/failed-load fallback
 // remains the existing undecorated desk; this adds no interaction target.
 import * as THREE from 'three';
@@ -24,7 +25,7 @@ export function installCounterScanner(scene: StoreScene, parent: THREE.Group): v
     new GLTFLoader().load(assetUrl(candidates[i]), ({ scene: model }) => {
       const geometries = new Set<THREE.BufferGeometry>();
       const materials = new Set<THREE.Material>();
-      const textures = new Set<THREE.Texture>();
+      const textures = new Set<THREE.Texture>(finishEquipmentSurfaces(model));
       model.traverse(object => {
         if (!(object instanceof THREE.Mesh)) return;
         geometries.add(object.geometry);

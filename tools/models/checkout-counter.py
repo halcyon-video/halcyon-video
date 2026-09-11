@@ -180,8 +180,8 @@ def shield():
     t = (points[2]-points[1]).normalized()
     n = Vector((-t.y,t.x))
     apex = Vector((0,-14.1 + 1.5/n.y))
-    left = Vector((-6, apex.y + 6*7.76/9.8))
-    right = Vector((6,left.y))
+    left = Vector((-6.6, apex.y + 6.6*7.76/9.8))
+    right = Vector((6,apex.y + 6*7.76/9.8))
     return [path], [left,apex,right]
 
 
@@ -192,7 +192,7 @@ for shape in ['shield', 'usquare', 'desk']:
     elif shape == 'usquare':
         paths = [[(-6.8,-5.2),(-6.8,-12.1),(6.8,-12.1),(6.8,-.11)],
                  [(-6.8,-.11),(-6.8,-3.0)]]
-        island = [(-5,-10.6),(5,-10.6)]
+        island = [(-5.25,-10.6),(5,-10.6)]
     else:
         paths, island = [], [(-3,0),(3,0)]
     for style in ['laminate', 'rounded']:
