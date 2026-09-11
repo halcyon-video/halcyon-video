@@ -55,7 +55,7 @@ const DESIGN_W = 1000;
 const MASK_LONG_EDGE = 640;
 const MASK_PAD = 2;          // transparent apron so edge-touching art still closes
 const SIMPLIFY_EPS = 0.45;   // mask pixels: kills stairsteps, keeps curves
-const MIN_LOOP_AREA = 1.5;   // mask px²: drop speck contours (anti-alias crumbs)
+const MIN_LOOP_AREA = 1.0;   // mask px²: drop speck contours (anti-alias crumbs)
 
 /** The three brand inks a layer can name, resolved from the active spec. */
 export interface EmblemColors { body: string; text: string; border: string }

@@ -221,12 +221,107 @@ export function orientLoop(loop: TracePoint[], sign: 1 | -1): TracePoint[] {
 }
 
 /**
+ * Parse an SVG path data string into discrete polygon point loops, preserving
+ * multiple subpaths (e.g. multi-contour letters, disjoint elements, and holes).
+ */
+export function flattenSvgPath(d: string, curveSegs = 16): TracePoint[][] {
+  const tokens = d.match(/[a-df-zA-DF-Z]|-?(?:\d+\.?\d*|\.\d+)(?:[eE]-?\d+)?/g) ?? [];
+  const loops: TracePoint[][] = [];
+  let pts: TracePoint[] = [];
+  let i = 0;
+  let cx = 0, cy = 0, sx = 0, sy = 0;
+  let pcx: number | null = null, pcy: number | null = null; // previous cubic ctrl2 (for S)
+  let cmd = '';
+  const num = () => parseFloat(tokens[i++]);
+  const cubic = (x1: number, y1: number, x2: number, y2: number, x: number, y: number) => {
+    for (let k = 1; k <= curveSegs; k++) {
+      const t = k / curveSegs, u = 1 - t;
+      pts.push({
+        x: u * u * u * cx + 3 * u * u * t * x1 + 3 * u * t * t * x2 + t * t * t * x,
+        y: u * u * u * cy + 3 * u * u * t * y1 + 3 * u * t * t * y2 + t * t * t * y,
+      });
+    }
+    pcx = x2; pcy = y2; cx = x; cy = y;
+  };
+  while (i < tokens.length) {
+    const t = tokens[i];
+    if (/^[a-zA-Z]$/.test(t)) { cmd = t; i++; }
+    const rel = cmd === cmd.toLowerCase();
+    switch (cmd.toLowerCase()) {
+      case 'm': {
+        const x = num(), y = num();
+        cx = rel ? cx + x : x; cy = rel ? cy + y : y;
+        sx = cx; sy = cy;
+        if (pts.length > 1) loops.push(pts);
+        pts = [{ x: cx, y: cy }];
+        cmd = rel ? 'l' : 'L'; // subsequent pairs are implicit linetos
+        pcx = pcy = null;
+        break;
+      }
+      case 'l': {
+        const x = num(), y = num();
+        cx = rel ? cx + x : x; cy = rel ? cy + y : y;
+        pts.push({ x: cx, y: cy });
+        pcx = pcy = null;
+        break;
+      }
+      case 'h': { const x = num(); cx = rel ? cx + x : x; pts.push({ x: cx, y: cy }); pcx = pcy = null; break; }
+      case 'v': { const y = num(); cy = rel ? cy + y : y; pts.push({ x: cx, y: cy }); pcx = pcy = null; break; }
+      case 'c': {
+        const x1 = num(), y1 = num(), x2 = num(), y2 = num(), x = num(), y = num();
+        if (rel) cubic(cx + x1, cy + y1, cx + x2, cy + y2, cx + x, cy + y);
+        else cubic(x1, y1, x2, y2, x, y);
+        break;
+      }
+      case 's': {
+        const x2 = num(), y2 = num(), x = num(), y = num();
+        // Reflect the previous cubic's second control point (or start flat).
+        const rx1 = pcx !== null && pcy !== null ? 2 * cx - pcx : cx;
+        const ry1 = pcx !== null && pcy !== null ? 2 * cy - pcy : cy;
+        if (rel) cubic(rx1, ry1, cx + x2, cy + y2, cx + x, cy + y);
+        else cubic(rx1, ry1, x2, y2, x, y);
+        break;
+      }
+      case 'z': {
+        cx = sx; cy = sy;
+        if (pts.length > 1) loops.push(pts);
+        pts = [];
+        pcx = pcy = null;
+        break;
+      }
+      default:
+        while (i < tokens.length && !/^[a-zA-Z]$/.test(tokens[i])) i++;
+    }
+  }
+  if (pts.length > 1) loops.push(pts);
+  return loops;
+}
+
+/**
+ * Test whether `inner` loop is contained inside `outer` loop.
+ * Samples multiple vertices of `inner` to avoid false negatives from ray-vertex
+ * coincidences or precision issues on boundary tests.
+ */
+export function isLoopInside(inner: TracePoint[], outer: TracePoint[]): boolean {
+  if (inner.length === 0 || outer.length === 0) return false;
+  const samples = Math.min(5, inner.length);
+  const step = Math.max(1, Math.floor(inner.length / samples));
+  let inCount = 0;
+  let tested = 0;
+  for (let k = 0; k < inner.length && tested < samples; k += step) {
+    if (pointInLoop(inner[k], outer)) inCount++;
+    tested++;
+  }
+  return inCount > tested / 2;
+}
+
+/**
  * Sort traced contours into outers and the holes that belong to each.
  *
  * Containment nesting: even depth = outer outline, odd depth = counter hole,
  * assigned to its SMALLEST containing outer (so a hole inside an island inside
  * a hole lands on the island). Contours from marching squares are disjoint, so
- * testing one vertex is exact.
+ * testing vertices across the candidate loop is robust.
  *
  * This is what three.js needs — THREE.Shape carries its holes as separate
  * THREE.Path objects, and a hole handed over as a sibling shape extrudes as a
@@ -236,7 +331,7 @@ export function nestLoops(loops: TracePoint[][]): NestedLoop[] {
   const depths = loops.map((loop, i) => {
     let d = 0;
     for (let j = 0; j < loops.length; j++) {
-      if (i !== j && pointInLoop(loop[0], loops[j])) d++;
+      if (i !== j && isLoopInside(loop, loops[j])) d++;
     }
     return d;
   });
@@ -252,12 +347,23 @@ export function nestLoops(loops: TracePoint[][]): NestedLoop[] {
     if (depths[i] % 2 !== 1) return;
     let best = -1, bestArea = Infinity;
     loops.forEach((cand, j) => {
-      if (depths[j] % 2 === 0 && pointInLoop(loop[0], cand)) {
+      if (depths[j] % 2 === 0 && isLoopInside(loop, cand)) {
         const a = loopArea(cand);
         if (a < bestArea) { bestArea = a; best = j; }
       }
     });
-    if (best >= 0) outers[outerIdx.get(best)!].holes.push(loop);
+    if (best < 0) {
+      // Fallback: check pointInLoop for any vertex if sample test was ambiguous
+      loops.forEach((cand, j) => {
+        if (depths[j] % 2 === 0 && loop.some((p) => pointInLoop(p, cand))) {
+          const a = loopArea(cand);
+          if (a < bestArea) { bestArea = a; best = j; }
+        }
+      });
+    }
+    if (best >= 0 && outerIdx.has(best)) {
+      outers[outerIdx.get(best)!].holes.push(loop);
+    }
   });
   return outers;
 }

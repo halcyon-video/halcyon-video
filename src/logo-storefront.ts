@@ -154,10 +154,12 @@ function buildExtrudedEmblem(spec: LogoSpec, anchor: FacadeLogoAnchor): Storefro
   const faceCtx = faceCanvas.getContext('2d')!;
   faceCtx.fillStyle = spec.bodyColor;
   faceCtx.fillRect(0, 0, FRAME_W, FRAME_H);
-  // A composed emblem's artwork lives on the BODY layer (see drawGeneric), so
-  // the cap has to take both passes or the sign extrudes the right shape and
+  // A composed or dropped emblem's artwork lives on the BODY layer (see drawGeneric),
+  // so the cap has to take both passes or the sign extrudes the right shape and
   // wears none of the art.
-  if (spec.emblem) drawStorefrontLogoLayer(faceCtx, spec, 'body');
+  if (spec.emblem || spec.shape === 'image' || spec.shape === 'path') {
+    drawStorefrontLogoLayer(faceCtx, spec, 'body');
+  }
   drawStorefrontTextLayer(faceCtx, spec);
   const faceTex = toSignTexture(faceCanvas);
 
@@ -168,12 +170,12 @@ function buildExtrudedEmblem(spec: LogoSpec, anchor: FacadeLogoAnchor): Storefro
   const glowCtx = glowCanvas.getContext('2d')!;
   glowCtx.fillStyle = BODY_GLOW_BG;
   glowCtx.fillRect(0, 0, FRAME_W, FRAME_H);
-  // A COMPOSED emblem's whole face is artwork, and at the lettering's emissive
+  // A COMPOSED or DROPPED emblem's whole face is artwork, and at the lettering's emissive
   // strength it would read as a white slab after dark. The face goes on at a
   // lit-lightbox level instead — EMBLEM_GLOW_ALPHA x EMISSIVE_INTENSITY lands
   // it near 1.0, in the brand's own colours — and the wordmark over it keeps
   // full strength, so the store's NAME is what actually glows.
-  if (spec.emblem) {
+  if (spec.emblem || spec.shape === 'image') {
     glowCtx.globalAlpha = EMBLEM_GLOW_ALPHA;
     drawStorefrontLogoLayer(glowCtx, spec, 'body');
     glowCtx.globalAlpha = 1;

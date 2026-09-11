@@ -733,12 +733,32 @@ function drawGeneric(ctx: CanvasRenderingContext2D, spec: LogoSpec, opts: DrawLo
   }
 
   if (wantBody && emblemImg && emblemImg.width > 0 && emblemImg.height > 0) {
-    // Contain, never stretch: brand art with the wrong aspect reads as a
-    // rendering fault. Centred in the emblem box, under the text layer.
-    const s = Math.min(ew / emblemImg.width, eh / emblemImg.height);
-    const iw = emblemImg.width * s;
-    const ih = emblemImg.height * s;
-    ctx.drawImage(emblemImg, -iw / 2, -ih / 2, iw, ih);
+    if (spec.pathD) {
+      const fit = logoShapeFitRect(spec, ew, eh);
+      const f = getCustomPath(spec.pathD, spec.pathTiltDeg ?? 0).frame;
+      if (f.w > 0 && f.h > 0) {
+        ctx.save();
+        ctx.translate(-ew / 2 + fit.x, -eh / 2 + fit.y);
+        ctx.scale(fit.w / f.w, fit.h / f.h);
+        ctx.translate(-f.minX, -f.minY);
+        if (f.rot) ctx.rotate(f.rot);
+        ctx.translate(-f.px, -f.py);
+        ctx.drawImage(emblemImg, 0, 0);
+        ctx.restore();
+      } else {
+        const s = Math.min(ew / emblemImg.width, eh / emblemImg.height);
+        const iw = emblemImg.width * s;
+        const ih = emblemImg.height * s;
+        ctx.drawImage(emblemImg, -iw / 2, -ih / 2, iw, ih);
+      }
+    } else {
+      // Contain, never stretch: brand art with the wrong aspect reads as a
+      // rendering fault. Centred in the emblem box, under the text layer.
+      const s = Math.min(ew / emblemImg.width, eh / emblemImg.height);
+      const iw = emblemImg.width * s;
+      const ih = emblemImg.height * s;
+      ctx.drawImage(emblemImg, -iw / 2, -ih / 2, iw, ih);
+    }
   }
 
   // A traced emblem's own lettering/pinstripe vectors, in pathD's coordinate

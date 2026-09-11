@@ -42,7 +42,7 @@
 import type { LogoArtLayer, LogoSpec } from './logo-spec';
 import type { BrandPackManifest } from './brand-pack';
 import {
-  loopArea, nestLoops, orientLoop, simplifyLoop, traceAlphaContours,
+  flattenSvgPath, loopArea, nestLoops, orientLoop, simplifyLoop, traceAlphaContours,
 } from './alpha-trace.ts';
 
 /** The folder candidates, relative to public/user-assets/. */
@@ -205,8 +205,41 @@ function sampleSvgShapes(svgText: string): SampledShape[] {
       const box = el.getBBox();
       if (!(box.width > 0) && !(box.height > 0)) continue;
       const ctm = el.getCTM();
-      // Sample density: enough that a 1024-unit circle stays smooth, capped so
-      // a hairy trace can't balloon the manifest.
+      const style = typeof getComputedStyle === 'function' ? getComputedStyle(el) : null;
+      const fill = parseColor(el.getAttribute('fill') ?? style?.fill ?? null);
+      const sx = ctm ? Math.hypot(ctm.a, ctm.b) : 1;
+      const sy = ctm ? Math.hypot(ctm.c, ctm.d) : 1;
+
+      // If this is a path element with an authored 'd' attribute, parse its subpaths directly
+      // so multi-contour letters, disjoint elements, and internal counter holes are preserved
+      // without inserting connecting chords between disjoint subpaths.
+      const rawD = el.getAttribute('d');
+      if (rawD && typeof rawD === 'string') {
+        const subLoops = flattenSvgPath(rawD);
+        if (subLoops.length > 0) {
+          for (const loop of subLoops) {
+            if (loop.length < 3) continue;
+            let d = '';
+            for (let i = 0; i < loop.length; i++) {
+              const p = loop[i];
+              const x = ctm ? ctm.a * p.x + ctm.c * p.y + ctm.e : p.x;
+              const y = ctm ? ctm.b * p.x + ctm.d * p.y + ctm.f : p.y;
+              d += `${i === 0 ? 'M' : 'L'}${x.toFixed(2)} ${y.toFixed(2)}`;
+            }
+            d += 'Z';
+            const area = loopArea(loop.map((p) => ({
+              x: ctm ? ctm.a * p.x + ctm.c * p.y + ctm.e : p.x,
+              y: ctm ? ctm.b * p.x + ctm.d * p.y + ctm.f : p.y,
+            })));
+            if (area > 0) {
+              out.push({ d, area, fill });
+            }
+          }
+          continue;
+        }
+      }
+
+      // Sample density fallback for other geometry elements or mock environments
       const steps = Math.max(24, Math.min(320, Math.round(len / 3)));
       let d = '';
       for (let i = 0; i <= steps; i++) {
@@ -216,12 +249,6 @@ function sampleSvgShapes(svgText: string): SampledShape[] {
         d += `${i === 0 ? 'M' : 'L'}${x.toFixed(2)} ${y.toFixed(2)}`;
       }
       d += 'Z';
-      const style = getComputedStyle(el);
-      const fill = parseColor(el.getAttribute('fill') ?? style.fill);
-      // Transformed bbox area: what the shape covers on the page, which is the
-      // right ranking for "which of these is the body".
-      const sx = ctm ? Math.hypot(ctm.a, ctm.b) : 1;
-      const sy = ctm ? Math.hypot(ctm.c, ctm.d) : 1;
       out.push({ d, area: box.width * sx * box.height * sy, fill });
     }
   } finally {
@@ -250,15 +277,15 @@ export function tracedAlphaPathD(
     for (let x = 0; x < w; x++) {
       const a = alpha[y * w + x];
       field[(y + 1) * gw + x + 1] = a;
-      if (a > 128) opaque++;
+      if (a >= 128) opaque++;
     }
   }
   const cover = opaque / (w * h);
-  if (cover > 0.97 || cover < 0.01) return null;
+  if (cover > 0.98 || opaque === 0) return null;
 
   const loops = traceAlphaContours(field, gw, gh, 128)
     .map((loop) => simplifyLoop(loop, 0.6))
-    .filter((loop) => loopArea(loop) > 4);
+    .filter((loop) => loopArea(loop) > 1.0);
   if (!loops.length) return null;
 
   // Preserve every disconnected piece of the mark, with counters wound
@@ -285,7 +312,7 @@ function traceAlphaContour(img: HTMLImageElement): { d: string; w: number; h: nu
   if (typeof document === 'undefined') return null;
   const long = Math.max(img.width, img.height);
   if (!long) return null;
-  const s = Math.min(1, 160 / long);
+  const s = Math.min(1, 480 / long);
   const w = Math.max(2, Math.round(img.width * s));
   const h = Math.max(2, Math.round(img.height * s));
   const canvas = document.createElement('canvas');
@@ -480,18 +507,31 @@ export async function detectBrandDrop(
     if (!shapes.length) {
       notes.push('no drawable geometry in the SVG — using a plain board');
     } else {
-      // The biggest drawable is the body; everything else is lettering/detail
-      // riding in the SAME coordinate space (LogoSpec.artLayers), which is how
-      // a lockup keeps its own proportions instead of being re-fitted.
       shapes.sort((a, b) => b.area - a.area);
       const bodyShape = shapes[0];
       logo.shape = 'path';
-      logo.pathD = bodyShape.d;
       logo.pathTiltDeg = 0;
       // A dropped file is a MARK, not a sign blank: keep the proportions the
       // user drew rather than stretching them onto each surface's box.
       logo.pathFit = 'contain';
       silhouette = 'outline';
+
+      // Convert all sampled shapes into loops and nest them so all disjoint outer contours
+      // and internal holes are gathered and wound (+1 outer, -1 holes) into a unified composite silhouette.
+      const allLoops = shapes.flatMap((s) => flattenSvgPath(s.d));
+      const nested = nestLoops(allLoops);
+      let compositeD = '';
+      const appendLoop = (loop: { x: number; y: number }[]) => {
+        loop.forEach((p, i) => {
+          compositeD += `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)} ${p.y.toFixed(1)}`;
+        });
+        compositeD += 'Z';
+      };
+      for (const { outer, holes } of nested) {
+        appendLoop(orientLoop(outer, 1));
+        for (const hole of holes) appendLoop(orientLoop(hole, -1));
+      }
+      logo.pathD = compositeD || shapes.map((s) => s.d).join(' ');
       const inks = pickInks(shapes.map((s) => ({
         n: Math.max(1, Math.round(s.area)), c: s.fill ?? [0, 0, 0],
       })).filter((s) => s.c));
