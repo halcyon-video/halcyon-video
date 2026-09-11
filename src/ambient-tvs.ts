@@ -33,6 +33,26 @@ import { connectionForTitle } from './media-sources';
 import type { ProviderSession } from './providers/media-source-provider';
 import type { PlaybackRequestOptions } from './providers/media-source-provider';
 import { getSegmentFixLoader } from './hls-segment-fix';
+import { showClerkToast } from './carried-tapes';
+import {
+  type AmbientTvSource,
+  type AmbientTvStatus,
+  type AmbientTvFallbackPreference,
+  getAmbientTvStatus,
+  updateAmbientTvStatus,
+  formatAmbientTvStatus,
+  getTvFallbackPreference,
+} from './ambient-tv-status';
+
+export {
+  type AmbientTvSource,
+  type AmbientTvStatus,
+  type AmbientTvFallbackPreference,
+  getAmbientTvStatus,
+  updateAmbientTvStatus,
+  formatAmbientTvStatus,
+  getTvFallbackPreference,
+};
 
 // Media-server position unit: 100ns ticks, the currency PlaybackRequestOptions
 // speaks in (Jellyfin StartTimeTicks; the Plex adapter divides back down to the
@@ -259,7 +279,8 @@ export class AmbientTvs implements StoreFixture {
   // server's; 'loop' = the bundled promo clip; 'dead' = nothing, tubes dark.
   // The fallback ladder only ever descends, so this doubles as the guard that
   // keeps a late error from re-running a step already taken.
-  private pictureSource: 'stream' | 'loop' | 'dead' = 'dead';
+  private pictureSource: AmbientTvSource = 'dead';
+  private lastFailureReason: string | null = null;
   private streamWatchdog: ReturnType<typeof setTimeout> | null = null;
   // Fast decoder-liveness timer — see DECODE_LIVENESS_MS / armDecodeLivenessCheck.
   private livenessWatchdog: ReturnType<typeof setTimeout> | null = null;
@@ -357,6 +378,17 @@ export class AmbientTvs implements StoreFixture {
       videoTex = this.makeVideoTexture(movie, seekSec);
       if (videoTex) {
         this.playingMovie = movie;
+        let backend = 'jellyfin';
+        try {
+          backend = localStorage.getItem('provider_kind') ?? 'jellyfin';
+        } catch { /* no storage */ }
+        updateAmbientTvStatus({
+          source: 'stream',
+          ok: true,
+          title: movie.title,
+          lastFailureReason: null,
+          backend,
+        });
         this.ctx.log(`[System] CRT TVs: "${movie.title}" from ~${Math.round(seekSec / 60)}min`, 'system');
       }
     } else if (pool.length > 0) {
@@ -373,12 +405,40 @@ export class AmbientTvs implements StoreFixture {
       // action (jump to the box of what's playing) working offline; the loop is
       // house promo footage, not that title, exactly as the test card was.
       this.playingMovie = this.pickPoolTitle(null);
-      // bb_tv_testcard wins when set: the static card is the DETERMINISTIC
-      // stand-in the screenshot rigs pin the tube treatment against, and a
-      // moving picture would make those shots differ frame to frame.
-      if (localStorage.getItem('bb_tv_testcard') !== '1' && demoLoopEnabled()) {
+      const fallbackPref = getTvFallbackPreference();
+      if (fallbackPref === 'testcard' || localStorage.getItem('bb_tv_testcard') === '1') {
+        this.pictureSource = 'dead';
+        updateAmbientTvStatus({
+          source: 'dead',
+          ok: true,
+          title: 'SMPTE Test Card',
+          lastFailureReason: null,
+        });
+      } else if (fallbackPref !== 'dark' && demoLoopEnabled()) {
         videoTex = this.makeDemoLoopTexture();
+        updateAmbientTvStatus({
+          source: 'loop',
+          ok: true,
+          title: 'Big Buck Bunny',
+          lastFailureReason: null,
+        });
+      } else {
+        this.pictureSource = 'dead';
+        updateAmbientTvStatus({
+          source: 'dead',
+          ok: true,
+          title: null,
+          lastFailureReason: null,
+        });
       }
+    } else {
+      this.pictureSource = 'dead';
+      updateAmbientTvStatus({
+        source: 'dead',
+        ok: false,
+        title: null,
+        lastFailureReason: 'no movies in library pool',
+      });
     }
     this.buildHardware(videoTex);
   }
@@ -457,11 +517,13 @@ export class AmbientTvs implements StoreFixture {
       // ended up on the glass, decided by a decoded frame rather than by
       // configuration. Cheap, and it is the one question a support log about
       // the ceiling TVs always has to answer first.
-      (window as any).__tvStream = {
+      updateAmbientTvStatus({
         ok: true,
         source: this.pictureSource,
-        title: this.playingMovie?.title ?? null,
-      };
+        title: this.pictureSource === 'stream'
+          ? (this.playingMovie?.title ?? null)
+          : (this.pictureSource === 'loop' ? 'Big Buck Bunny' : null),
+      });
       this.armDecodeLivenessCheck(video);
     });
 
@@ -528,6 +590,13 @@ export class AmbientTvs implements StoreFixture {
     }
     const next = this.pickPoolTitle(this.playingMovie);
     this.playingMovie = next;
+    this.lastFailureReason = null;
+    updateAmbientTvStatus({
+      source: 'stream',
+      ok: true,
+      title: next.title,
+      lastFailureReason: null,
+    });
     const seekSec = tvStartOffsetSec(next);
     this.ctx.log(`[System] CRT TVs: "${next.title}" from ~${Math.round(seekSec / 60)}min`, 'system');
     this.armStreamWatchdog();
@@ -551,7 +620,7 @@ export class AmbientTvs implements StoreFixture {
       this.streamWatchdog = null;
       const video = this.video;
       if (video && video.readyState >= 2) return; // a picture arrived; nothing to do
-      this.giveUpOnStream(`no picture after ${Math.round(STREAM_WATCHDOG_MS / 1000)}s`);
+      this.giveUpOnStream(`transcode watchdog timeout after ${Math.round(STREAM_WATCHDOG_MS / 1000)}s`);
     }, STREAM_WATCHDOG_MS);
   }
 
@@ -655,6 +724,7 @@ export class AmbientTvs implements StoreFixture {
     if (this.disposed || this.pictureSource !== 'stream') return;
     this.clearStreamWatchdog();
     this.clearLivenessWatchdog();
+    this.lastFailureReason = reason;
     let backend = 'unknown backend';
     try {
       backend = localStorage.getItem('provider_kind') ?? 'jellyfin';
@@ -663,7 +733,6 @@ export class AmbientTvs implements StoreFixture {
       `[ambient-tvs] ${backend}: the configured server produced no picture for ` +
       `"${this.playingMovie?.title ?? 'the chosen title'}" (${reason}) — falling back.`
     );
-    (window as any).__tvStream = { backend, ok: false, reason, title: this.playingMovie?.title ?? null };
     this.ctx.log(`[System] CRT TVs: no picture from the server (${reason}).`, 'system');
     // The encode is abandoned NOW, not at teardown — the server is still
     // burning CPU on a stream nobody will ever read.
@@ -673,6 +742,9 @@ export class AmbientTvs implements StoreFixture {
       this.hls = null;
     }
     const video = this.video;
+    const movieTitle = this.playingMovie?.title ?? 'the chosen title';
+    const fallbackPref = getTvFallbackPreference();
+
     // decoderFault (#72) skips the demo-loop rung entirely: every OTHER
     // reason this method runs is about THIS stream (a bad URL, a refused
     // connection, a manifest that never arrived), so trying a different
@@ -681,12 +753,40 @@ export class AmbientTvs implements StoreFixture {
     // same broken pipeline another video and keep a dead decoder attached to
     // the page, which is precisely what starved Remote Play's canvas capture
     // to zero frames while the store rendered fine.
-    if (opts.decoderFault || !video || !demoLoopEnabled()) {
-      this.goDeadGlass(reason);
+    if (opts.decoderFault || !video || fallbackPref === 'dark' || !demoLoopEnabled()) {
+      showClerkToast(
+        `Overhead TVs: Stream failed for "${movieTitle}" (${reason}) — screens dark`,
+        6000,
+        'OVERHEAD TV',
+      );
+      this.goDeadGlass(reason, { backend });
       return;
     }
+
+    if (fallbackPref === 'testcard') {
+      showClerkToast(
+        `Overhead TVs: Stream failed for "${movieTitle}" (${reason}) — test card on`,
+        6000,
+        'OVERHEAD TV',
+      );
+      this.showTestCardFallback(reason, { backend });
+      return;
+    }
+
     this.ctx.log('[System] CRT TVs: running the in-store promo loop instead.', 'system');
     this.pictureSource = 'loop';
+    updateAmbientTvStatus({
+      source: 'loop',
+      ok: false,
+      title: 'Big Buck Bunny',
+      lastFailureReason: reason,
+      backend,
+    });
+    showClerkToast(
+      `Overhead TVs: Stream failed for "${movieTitle}" (${reason}) — playing fallback loop`,
+      6000,
+      'OVERHEAD TV',
+    );
     this.playDemoLoop(video);
   }
 
@@ -697,9 +797,17 @@ export class AmbientTvs implements StoreFixture {
    * empty VideoTexture. They are not the same thing to look at: one is a switched
    * -off television catching the room, the other is a hole cut in the set.
    */
-  private goDeadGlass(reason: string): void {
+  private goDeadGlass(reason: string, opts: { backend?: string } = {}): void {
     if (this.disposed || this.pictureSource === 'dead') return;
     this.pictureSource = 'dead';
+    this.lastFailureReason = reason;
+    updateAmbientTvStatus({
+      source: 'dead',
+      ok: false,
+      title: null,
+      lastFailureReason: reason,
+      backend: opts.backend,
+    });
     console.warn(`[ambient-tvs] ${reason} — screens stay dark`);
     this.teardownVideo();
     const dead = makeDeadTubeMaterial();
@@ -708,6 +816,27 @@ export class AmbientTvs implements StoreFixture {
     // so the one just detached would otherwise never be freed.
     this.pictureMat?.dispose();
     this.pictureMat = dead;
+    this.ctx.requestRender();
+  }
+
+  private showTestCardFallback(reason: string, opts: { backend?: string } = {}): void {
+    if (this.disposed || this.pictureSource === 'dead') return;
+    this.pictureSource = 'dead';
+    this.lastFailureReason = reason;
+    updateAmbientTvStatus({
+      source: 'dead',
+      ok: false,
+      title: 'SMPTE Test Card',
+      lastFailureReason: reason,
+      backend: opts.backend,
+    });
+    console.warn(`[ambient-tvs] ${reason} — showing test card fallback`);
+    this.teardownVideo();
+    this.testCardTex ??= makeCrtTestCardTexture();
+    const testCardMat = selfLit(new THREE.MeshBasicMaterial({ map: this.testCardTex }), 'light-source');
+    for (const mesh of this.screenMeshes) mesh.material = testCardMat;
+    this.pictureMat?.dispose();
+    this.pictureMat = testCardMat;
     this.ctx.requestRender();
   }
 
@@ -967,7 +1096,7 @@ export class AmbientTvs implements StoreFixture {
     // exact material path the video uses. Zero per-frame cost (no <video>,
     // isPlaying() stays false, update() early-outs).
     let screenTex: THREE.Texture | null = videoTex;
-    if (!screenTex && localStorage.getItem('bb_tv_testcard') === '1') {
+    if (!screenTex && (localStorage.getItem('bb_tv_testcard') === '1' || getTvFallbackPreference() === 'testcard')) {
       this.testCardTex = makeCrtTestCardTexture();
       screenTex = this.testCardTex;
     }
@@ -1480,6 +1609,21 @@ export class AmbientTvs implements StoreFixture {
   // action to jump to that title's box.
   getPlayingMovie(): Movie | null {
     return this.playingMovie;
+  }
+
+  /** Live inspectable status structure for overhead TV playback diagnostics. */
+  getStatus(): AmbientTvStatus {
+    return getAmbientTvStatus();
+  }
+
+  /** Last stream failure reason, if any. */
+  getLastFailureReason(): string | null {
+    return this.lastFailureReason;
+  }
+
+  /** Current picture source ('stream' | 'loop' | 'dead'). */
+  getPictureSource(): AmbientTvSource {
+    return this.pictureSource;
   }
 
   // Per-frame: sync the Web Audio listener with the camera, and force the

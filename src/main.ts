@@ -86,6 +86,7 @@ import {
 } from './boot-flow';
 import { setupTerminalInput } from './store-setup-flow';
 import { registerLibraryToggles } from './library-settings';
+import { formatAmbientTvStatus } from './ambient-tv-status';
 import { getActiveTheme, applyThemeCssVars, THEMES, resolveThemeId } from './themes';
 import { runDeviceGate, detectGateReason } from './device-gate';
 import {
@@ -1363,9 +1364,12 @@ function generateSettingsDrawer() {
         if (def.subpage) {
           if (!subpagesSeen.has(def.subpage)) {
             subpagesSeen.add(def.subpage);
+            const subpageHint = def.subpage === 'Overhead TVs'
+              ? `Ceiling CRT TV status: ${formatAmbientTvStatus()}. Configure library feeds and fallback.`
+              : SUBPAGE_HINTS[def.subpage];
             groupEl.appendChild(makeRow(
               SETTINGS_SUBPAGE_PREFIX + def.subpage, def.subpage,
-              SUBPAGE_HINTS[def.subpage], '›'));
+              subpageHint, '›'));
           }
           continue;
         }
@@ -1402,6 +1406,15 @@ function refreshSettingsValues() {
   for (const def of allSettings()) {
     const el = document.getElementById(`setting-value-${def.key}`);
     if (el) el.textContent = currentValueLabel(def.key);
+    const rowEl = document.getElementById(`setting-row-${def.key}`);
+    if (rowEl) {
+      const hint = resolveHint(def);
+      if (hint) rowEl.dataset.hint = hint;
+    }
+  }
+  const tvSubpageRow = document.getElementById(`setting-row-${SETTINGS_SUBPAGE_PREFIX}Overhead TVs`);
+  if (tvSubpageRow) {
+    tvSubpageRow.dataset.hint = `Ceiling CRT TV status: ${formatAmbientTvStatus()}. Configure library feeds and fallback.`;
   }
 }
 
@@ -1482,6 +1495,9 @@ function activateSetting(key: string, dir: number) {
   }
   const def = allSettings().find((d) => d.key === key);
   if (!def) return;
+  if (def.kind === 'readout') {
+    return; // Readout rows are informational and cannot be toggled
+  }
 
   if (def.kind === 'toggle') {
     setSetting(key, !getSetting<boolean>(key));
@@ -1725,6 +1741,13 @@ async function finishConnectionEditsAndReload() {
   settingsPendingAuthReset = false;
   setTimeout(() => location.reload(), 400);
 }
+
+window.addEventListener('halcyon:tv-status', () => {
+  if (ui.isSettingsDrawerOpen) {
+    refreshSettingsValues();
+    updateSettingsCrtChrome();
+  }
+});
 
 // ─── Feedback Pin (F8) ────────────────────────────────────────────────────────
 // Lets a user who can't read code flag a visual bug in place: F8 grabs the

@@ -54,8 +54,9 @@ import { ALL_DEFAULT_STREAMING_SERVICES_CSV } from './streaming-catalog';
 import { getSeerrValidationStatus } from './seerr-service-status';
 import type { StoreScene } from './three-scene';
 import type { JellyfinLibrary } from './jellyfin';
+import { getAmbientTvStatus, formatAmbientTvStatus } from './ambient-tv-status';
 
-export type SettingKind = 'toggle' | 'cycle' | 'text' | 'secret';
+export type SettingKind = 'toggle' | 'cycle' | 'text' | 'secret' | 'readout';
 export type ApplyMode = 'live' | 'rebuild-scene' | 'reload';
 export type SettingGroup = 'Connection' | 'Store Look' | 'Store Brand' | 'Playback' | 'Performance' | 'Video Games';
 
@@ -228,6 +229,10 @@ export function currentValueLabel(key: string): string {
   if (def.kind === 'cycle') {
     const cur = String(getSetting(key));
     return decorate(def.values?.find((v) => v.id === cur)?.label ?? cur);
+  }
+  if (def.kind === 'readout') {
+    const val = getSetting<string>(key);
+    return decorate(val || '');
   }
   const val = getSetting<string>(key);
   if (def.kind === 'secret') return decorate(val ? '••••••••' : '(not set)');
@@ -831,6 +836,51 @@ export function registerCoreSettings(): void {
     default: false,
     applyMode: 'live',
     hint: 'Start every movie with subtitles showing.',
+  });
+
+  // Overhead TVs (issue #307) ---------------------------------------------------
+  // Live CRT stream status & diagnostics, plus fallback configuration.
+  registerSetting({
+    key: 'bb_tv_status',
+    label: 'Stream Status',
+    kind: 'readout',
+    group: 'Playback',
+    subpage: 'Overhead TVs',
+    default: '',
+    applyMode: 'live',
+    valueLabel: () => formatAmbientTvStatus(),
+    hint: () => {
+      const status = getAmbientTvStatus();
+      if (status.source === 'stream') {
+        return status.title
+          ? `Active stream: "${status.title}" from media server library.`
+          : 'Active stream from media server library.';
+      }
+      if (status.source === 'loop') {
+        return status.lastFailureReason
+          ? `Fallback active: server stream failed (${status.lastFailureReason}).`
+          : 'Playing bundled promo loop (Big Buck Bunny).';
+      }
+      return status.lastFailureReason
+        ? `Overhead TVs off: ${status.lastFailureReason}.`
+        : 'Overhead TVs are off.';
+    },
+  });
+
+  registerSetting({
+    key: 'bb_tv_fallback',
+    label: 'Fallback Mode',
+    kind: 'cycle',
+    group: 'Playback',
+    subpage: 'Overhead TVs',
+    values: [
+      { id: 'loop', label: 'Demo Loop (Big Buck Bunny)' },
+      { id: 'dark', label: 'Dark Tubes (Turn Off)' },
+      { id: 'testcard', label: 'Test Card (SMPTE)' },
+    ],
+    default: 'loop',
+    applyMode: 'rebuild-scene',
+    hint: 'When server stream fails: play demo, keep tubes dark, or show test card.',
   });
 
   // Tone mapping (research-driven, see three-scene initThree): AgX is the

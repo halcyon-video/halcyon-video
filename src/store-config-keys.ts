@@ -72,6 +72,7 @@ const SKIP_KEYS = new Set([
   'bb_harness_cast',
   'bb_tv_testcard',
   'bb_tv_demo_loop',
+  'bb_tv_status',
   'bb_promo_date',
   // This module's own bookkeeping (below).
   'bb_config_pins',
