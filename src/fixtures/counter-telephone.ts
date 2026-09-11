@@ -3,6 +3,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { assetUrl } from '../asset-url';
+import { counterMount, placeOnCounterMount } from '../entrance/counter-mounts';
 import { brandPackDir } from '../brand-pack';
 import { finishTelephone, refreshTelephoneContact } from './telephone-surfaces';
 import type { StoreScene } from '../three-scene';
@@ -55,6 +56,15 @@ export function installCounterTelephone(
       model.position.copy(origin);
       model.rotation.y = yaw;
       parent.add(model);
+      void scene.entrance?.whenCounterModelReady().then(counter => {
+        const mount = counter && counterMount(counter, 'mount_telephone');
+        if (!mount || !attached()) return;
+        model.userData.contactCleanup?.();
+        placeOnCounterMount(model, mount);
+        refreshTelephoneContact(parent);
+        scene.fixtureContext().requestShadowRefresh();
+        scene.requestRender();
+      });
       model.userData.contactTexture = contact;
       refreshTelephoneContact(parent);
       fallback.visible = false;

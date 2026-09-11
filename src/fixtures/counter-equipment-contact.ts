@@ -8,9 +8,11 @@ export function refreshEquipmentContact(parent: THREE.Object3D): void {
   while (root.parent) root = root.parent;
   const counter = root.getObjectByName('checkout-counter-model');
   if (!counter) return;
-  const sources = ['counter-telephone-model', 'counter-cash-housing-model']
-    .map(name => root.getObjectByName(name))
-    .filter((model): model is THREE.Object3D => !!model?.userData.contactTexture);
+  const sources: THREE.Object3D[] = [];
+  root.traverse(model => {
+    if ((model.name === 'counter-telephone-model' || model.name === 'counter-cash-housing-model' || model.userData.counterContactSource)
+      && model.userData.contactTexture) sources.push(model);
+  });
   if (!sources.length) return;
   counter.userData.equipmentContactCleanup?.();
   // Retire the original single-phone receiver if it arrived first.

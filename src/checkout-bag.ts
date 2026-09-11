@@ -522,6 +522,16 @@ export class CheckoutBag {
     return this.shown;
   }
 
+  /** Update the physical support and every transform used by checkout motion. */
+  setRestPose(x: number, y: number, z: number, yaw: number): void {
+    this.baseGroupPos.set(x, y, z);
+    this.baseGroupQuat.setFromEuler(new THREE.Euler(0, yaw, 0));
+    this.laidQuat.copy(this.baseGroupQuat).multiply(new THREE.Quaternion().setFromAxisAngle(_xAxis, -Math.PI / 2));
+    this.mouthWorld.set(x, y + BODY_H * .78, z);
+    this.group.position.copy(this.baseGroupPos);
+    this.group.quaternion.copy(this.baseGroupQuat);
+  }
+
   /** Reveal the bag in its rest pose (checkout flourish start). */
   show(): void {
     if (this.shown) return;

@@ -40,6 +40,7 @@ export interface CounterFrame {
 }
 
 export interface CounterBuildResult {
+  modelReady: Promise<THREE.Group | null>;
   // The counter's store-facing point Z (frames the checkout camera move).
   // Kept for the front-facing shapes, whose "apex" really is a Z; a side-wall
   // desk faces across the room, so anything positional should read `frame`
@@ -672,14 +673,14 @@ export function buildCheckoutCounter(
     facingYaw: deskPlan ? deskPlan.facingYaw : Math.PI,
   };
 
-  installCounterModel(ctx, parent, group, spec.counterShape, rounded,
+  const modelReady = installCounterModel(ctx, parent, group, spec.counterShape, rounded,
     deskFront
       ? { x: deskFront.x, z: deskFront.y, yaw: Math.atan2(-windU.y, windU.x) }
       : { x: cx, z: backZ, yaw: 0 },
     { body: counterWhite, top: counterTopBlue, inlay: counterStripe, worktop: innerTopMat });
 
   return {
-    deskApexZ, cx, innerH, innerDepth: innerD, getInnerCounterSpine,
+    modelReady, deskApexZ, cx, innerH, innerDepth: innerD, getInnerCounterSpine,
     frame, spineAt, standingAt,
     navFootprints, registerStanding, getTerminalStanding,
   };

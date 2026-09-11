@@ -51,6 +51,7 @@ import { facadeEntryGlazing, facadeStyle } from '../storefront-architecture';
 import { vestibuleCeilingY } from '../ceiling-soffit';
 import { WINDOW_HEAD_Y } from '../storefront-facade';
 import { buildVestibuleDoor, updateVestibuleDoors, VestibuleDoor } from './doors';
+import { counterMount, placeOnCounterMount } from './counter-mounts';
 import { buildCheckoutCounter, ClerkStanding, CounterFrame } from './counter';
 import { buildCounterTv } from './counter-tv';
 import { Footprint } from '../layout-validator';
@@ -79,6 +80,27 @@ export class EntranceCheckout implements StoreFixture {
   // 'counter-top' MountSurface (src/mount-surfaces.ts) off actual build()
   // output rather than a second hardcoded copy of these numbers. Populated by
   // build(); null until then.
+  private counterModelReady: Promise<THREE.Group | null> = Promise.resolve(null);
+  whenCounterModelReady() { return this.counterModelReady; }
+
+  /** Re-seat complete terminal groups, including their live screen and dock. */
+  seatCounterTerminals(model: THREE.Group): void {
+    for (let i = 0; i < this.terminalStations.length; i++) {
+      const mount = counterMount(model, `mount_terminal_${i}`);
+      const station = this.ctx.scene.getObjectByName(`counter-terminal-station-${i}`);
+      if (!mount || !station) continue;
+      const housing = this.ctx.scene.getObjectByName(`counter-cash-housing-${i}`);
+      placeOnCounterMount(station, mount, Number(housing?.userData.supportHeight ?? 0));
+      station.getWorldPosition(this.terminalStations[i]);
+      if (i === 0) {
+        this.searchStationOrigin.copy(this.terminalStations[i]);
+        this.searchStationRotY = mount.rotY;
+      }
+    }
+    this.ctx.requestShadowRefresh();
+    this.ctx.requestRender();
+  }
+
   private counterTopInfo: {
     cx: number;
     topY: number;
@@ -575,6 +597,17 @@ export class EntranceCheckout implements StoreFixture {
     // the counterStyle/counterTop variants — the footprint below is identical
     // across styles so every anchor below is unaffected by which style is active.
     const counterResult = buildCheckoutCounter(this.ctx, group, cx, backZ, spec, this.ctx.storeWidth);
+    this.counterModelReady = counterResult.modelReady;
+    void this.counterModelReady.then(model => {
+      if (!model) return;
+      this.seatCounterTerminals(model);
+      const bag = counterMount(model, 'mount_bag');
+      if (bag && this.bag) {
+        this.bag.setRestPose(bag.x, bag.y, bag.z, bag.rotY);
+        this.bagBaseWorld?.set(bag.x, bag.y, bag.z);
+        this.bagRestYaw = bag.rotY;
+      }
+    });
     this.deskApexZ = counterResult.deskApexZ;
     const { getInnerCounterSpine, spineAt, standingAt, innerH, innerDepth } = counterResult;
     this.counterTopInfo = {
@@ -597,7 +630,7 @@ export class EntranceCheckout implements StoreFixture {
       // Same anchors the terminal props are built at, below.
       terminals: spec.counterShape === 'desk'
         ? [standingAt(1.3)]
-        : [standingAt(-4.0), standingAt(4.0)],
+        : [standingAt(spec.counterShape === 'usquare' ? -3.5 : -4), standingAt(spec.counterShape === 'usquare' ? 3.5 : 4)],
     };
 
     // Anchor offsets ALONG the inner island, in feet from its centre. The
@@ -978,8 +1011,9 @@ export class EntranceCheckout implements StoreFixture {
       });
     };
 
-    const stationGroups = stations.map((st) => {
+    const stationGroups = stations.map((st, index) => {
       const g = new THREE.Group();
+      g.name = `counter-terminal-station-${index}`;
       g.position.set(st.x, st.y, st.z);
       g.rotation.y = st.rotY;
       // Keep the whole terminal out of the GTAO G-buffer (feedback/004): the

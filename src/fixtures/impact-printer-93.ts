@@ -3,6 +3,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { assetUrl } from '../asset-url';
+import { counterMount, placeOnCounterMount } from '../entrance/counter-mounts';
 import { brandPackDir } from '../brand-pack';
 import type { StoreScene } from '../three-scene';
 import { markSignMesh } from '../sign-builders';
@@ -18,6 +19,14 @@ export function buildImpactPrinter93(
   group.position.set(anchor.x, anchor.y, anchor.z);
   group.rotation.y = anchor.rotY;
   parent.add(group);
+  void scene.entrance?.whenCounterModelReady().then(counter => {
+    const mount = counter && counterMount(counter, 'mount_printer');
+    if (mount && group.parent) {
+      placeOnCounterMount(group, mount);
+      scene.fixtureContext().requestShadowRefresh();
+      scene.requestRender();
+    }
+  });
   const fallback = new THREE.Group();
   fallback.name = 'impact-printer-fallback';
   group.add(fallback);

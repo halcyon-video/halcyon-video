@@ -36,3 +36,25 @@ replaced with the active theme's finishes at load time. UVs follow the run and
 the millwork section. Neutral plinth/reveal finishes stay with the model. The
 loader refreshes shadows after installation and releases model resources if
 the entrance is removed, including requests finishing after a rebuild.
+
+Optional local installations use
+`public/user-assets/fixtures/checkout-counter/<theme>-<shape>-<profile>.glb`
+(`laminate` or `rounded`). An active brand pack has precedence over the flat
+local directory; missing or invalid files fall through to the original model,
+then the procedural counter. These assets must fit the existing ground-plan
+and staff-access envelope. They may replace the internal cabinet construction.
+No local geometry or imagery is required by the public app.
+
+GLB empty nodes with the `counterMount` extra publish support points:
+`mount_terminal_0/1`, `mount_housing_0/1`, `mount_printer`, `mount_telephone`,
+and `mount_bag`. Their world position and local +Z supply surface height and
+facing. Terminal groups include the screen and camera dock. A loaded housing
+raises its terminal by the housing's actual exported height; without a housing,
+the terminal rests on its cabinet shelf. Bag placement updates its resting,
+mouth and checkout-motion transforms together. Missing mount nodes keep the
+existing corresponding placement. No new settings or interaction targets.
+
+The optional installation retains theme finish roles and equipment contact AO.
+The loader releases detached results and its owned materials, textures and
+geometry on removal. Public fallback geometry, local source, and per-installation
+reference confidence remain separate concerns.

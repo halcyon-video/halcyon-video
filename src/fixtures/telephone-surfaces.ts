@@ -64,7 +64,7 @@ export function refreshTelephoneContact(parent: THREE.Object3D): void {
   let root = parent;
   while (root.parent) root = root.parent;
   // Keep the original single-phone projection and cost in the public store.
-  if (root.getObjectByName('counter-cash-housing-model')?.userData.contactTexture) {
+  if ((root.getObjectByName('counter-cash-housing-model') ?? root.getObjectByName('counter-cash-housing-0'))?.userData.contactTexture) {
     refreshEquipmentContact(parent);
     return;
   }

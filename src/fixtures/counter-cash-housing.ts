@@ -3,6 +3,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { assetUrl } from '../asset-url';
+import { counterMount, placeOnCounterMount } from '../entrance/counter-mounts';
 import { brandPackDir } from '../brand-pack';
 import { extractHousingContact, refreshEquipmentContact } from './counter-equipment-contact';
 import type { StoreScene } from '../three-scene';
@@ -21,7 +22,7 @@ export function installCounterCashHousing(scene: StoreScene, parent: THREE.Group
     while (root.parent) root = root.parent;
     return root === scene.scene;
   };
-  const load = (i: number) => {
+  const load = (i: number, counter: THREE.Group | null) => {
     if (!attached() || i === candidates.length) return;
     new GLTFLoader().load(assetUrl(candidates[i]), ({ scene: model }) => {
       const contact = extractHousingContact(model);
@@ -48,16 +49,39 @@ export function installCounterCashHousing(scene: StoreScene, parent: THREE.Group
         textures.forEach(t => t.dispose());
       };
       parent.addEventListener('removed', release);
-      model.name = 'counter-cash-housing-model';
-      model.position.set(anchor.x, anchor.y, anchor.z);
-      model.rotation.y = anchor.rotY;
-      model.userData.contactTexture = contact;
-      parent.add(model);
+      const mounts = counter ? [0, 1].map(i => counterMount(counter, `mount_housing_${i}`)) : [];
+      const supportHeight = new THREE.Box3().setFromObject(model).max.y;
+      if (mounts.length && mounts.every(Boolean)) {
+        // Clone before adding Texture objects to userData (Object3D.clone uses JSON).
+        const second = model.clone(true);
+        second.traverse(object => {
+          if (object instanceof THREE.Mesh) {
+            object.geometry = object.geometry.clone();
+            object.material = Array.isArray(object.material) ? object.material.map(m => m.clone()) : object.material.clone();
+          }
+        });
+        [model, second].forEach((housing, index) => {
+          housing.name = `counter-cash-housing-${index}`;
+          housing.userData.supportHeight = supportHeight;
+          housing.userData.counterContactSource = true;
+          housing.userData.contactTexture = contact;
+          parent.add(housing);
+          placeOnCounterMount(housing, mounts[index]!);
+        });
+        scene.entrance?.seatCounterTerminals(counter!);
+      } else {
+        model.name = 'counter-cash-housing-model';
+        model.position.set(anchor.x, anchor.y, anchor.z);
+        model.rotation.y = anchor.rotY;
+        model.userData.counterContactSource = true;
+        model.userData.contactTexture = contact;
+        parent.add(model);
+      }
       refreshEquipmentContact(parent);
       // clearActiveSignage owns geometry/material disposal after attachment.
       scene.fixtureContext().requestShadowRefresh();
       scene.requestRender();
-    }, undefined, () => load(i + 1));
+    }, undefined, () => load(i + 1, counter));
   };
-  load(0);
+  void scene.entrance!.whenCounterModelReady().then(counter => load(0, counter));
 }
