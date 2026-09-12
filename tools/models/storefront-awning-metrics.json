@@ -11,19 +11,33 @@
     },
     {
       "name": "AwningSoffit",
-      "triangles": 12,
+      "triangles": 96,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "AwningFrame",
+      "triangles": 688,
       "nonManifoldEdges": 0
     },
     {
       "name": "AwningBinding",
       "triangles": 2064,
       "nonManifoldEdges": 0
-    },
-    {
-      "name": "AwningFrame",
-      "triangles": 504,
-      "nonManifoldEdges": 0
     }
   ],
-  "bytes": 174536
+  "textures": 0,
+  "boundsAxes": "Blender X, negative store depth, height",
+  "bounds": [
+    [
+      -15.020000457763672,
+      -3.2780001163482666,
+      0.004999999888241291
+    ],
+    [
+      15.020000457763672,
+      0.05000000074505806,
+      3.5899999141693115
+    ]
+  ],
+  "bytes": 192656
 }

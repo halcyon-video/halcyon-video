@@ -1,0 +1,134 @@
+{
+  "parts": {
+    "TopChannel": {
+      "triangles": 28,
+      "bounds_blender": [
+        [
+          -0.5,
+          -0.03200000151991844,
+          -0.02199999988079071
+        ],
+        [
+          0.5,
+          0.03200000151991844,
+          0.03200000151991844
+        ]
+      ],
+      "material": "MountChannel",
+      "uv": true,
+      "manifold": true
+    },
+    "CeilingClip": {
+      "triangles": 60,
+      "bounds_blender": [
+        [
+          -0.07999999821186066,
+          -0.07000000029802322,
+          -0.04800000041723251
+        ],
+        [
+          0.07999999821186066,
+          0.07000000029802322,
+          0.0
+        ]
+      ],
+      "material": "MountSteel",
+      "uv": true,
+      "manifold": true
+    },
+    "AttachmentEye": {
+      "triangles": 128,
+      "bounds_blender": [
+        [
+          -0.03400000184774399,
+          -0.008999999612569809,
+          0.03200000151991844
+        ],
+        [
+          0.03400000184774399,
+          0.008999999612569809,
+          0.10000000149011612
+        ]
+      ],
+      "material": "MountSteel",
+      "uv": true,
+      "manifold": true
+    },
+    "WireConnector": {
+      "triangles": 192,
+      "bounds_blender": [
+        [
+          -0.01899999938905239,
+          -0.01899999938905239,
+          0.08799999952316284
+        ],
+        [
+          0.01899999938905239,
+          0.01899999938905239,
+          0.1599999964237213
+        ]
+      ],
+      "material": "MountSteel",
+      "uv": true,
+      "manifold": true
+    },
+    "SuspensionWire": {
+      "triangles": 28,
+      "bounds_blender": [
+        [
+          -0.0035000001080334187,
+          -0.0035000001080334187,
+          0.0
+        ],
+        [
+          0.0035000001080334187,
+          0.0035000001080334187,
+          1.0
+        ]
+      ],
+      "material": "MountSteel",
+      "uv": true,
+      "manifold": true
+    },
+    "RigidDrop": {
+      "triangles": 12,
+      "bounds_blender": [
+        [
+          -0.014000000432133675,
+          -0.014000000432133675,
+          0.0
+        ],
+        [
+          0.014000000432133675,
+          0.014000000432133675,
+          1.0
+        ]
+      ],
+      "material": "MountChannel",
+      "uv": true,
+      "manifold": true
+    },
+    "Fastener": {
+      "triangles": 168,
+      "bounds_blender": [
+        [
+          -0.017999999225139618,
+          -0.017999999225139618,
+          0.0
+        ],
+        [
+          0.017999999225139618,
+          0.017999999225139618,
+          0.02500000037252903
+        ]
+      ],
+      "material": "MountSteel",
+      "uv": true,
+      "manifold": true
+    }
+  },
+  "triangles": 616,
+  "bytes": 43960,
+  "materials": 2,
+  "textures": 0
+}

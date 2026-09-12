@@ -307,6 +307,13 @@ export function moveLeftInternal(scene: StoreScene) {
             exitGenreEndcapToShelf(scene, fixture!, 'prevBack');
             return;
           }
+          // A corner club has only two adjacent public faces; its outer ends
+          // stop at the room walls instead of browsing invisible rear stock.
+          if (fixture?.placement.kind === 'clubhouse') {
+            if (scene.selectedSide === 'front') return;
+            scene.selectedSide = 'front'; scene.selectedCol = scene.colsCount - 1;
+            scene.updateCameraTarget(); return;
+          }
           // Step around the corner to the face on the viewer's left; you
           // arrive at that face's screen-RIGHT end, which is its LAST col.
           if (scene.selectedSide === 'front') scene.selectedSide = 'left';
@@ -464,6 +471,11 @@ export function moveRightInternal(scene: StoreScene) {
           if (isEndcapKind(fixture?.placement.kind)) {
             exitGenreEndcapToShelf(scene, fixture!, 'lineFront');
             return;
+          }
+          if (fixture?.placement.kind === 'clubhouse') {
+            if (scene.selectedSide === 'right') return;
+            scene.selectedSide = 'right'; scene.selectedCol = 0;
+            scene.updateCameraTarget(); return;
           }
           // Step around the corner to the face on the viewer's right; you
           // arrive at that face's screen-LEFT end, which is col 0.

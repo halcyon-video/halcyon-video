@@ -26,6 +26,7 @@
 // case is swallowed. Event-time work allocates freely; update() is
 // allocation-free (scratch objects only).
 import * as THREE from 'three';
+import { installReturnSlotModel } from './return-slot-model';
 import type { Movie } from '../jellyfin';
 import { FixtureContext } from '../fixtures';
 import { getActiveTheme } from '../themes';
@@ -121,6 +122,7 @@ export class ReturnSlot {
 
   private group = new THREE.Group();
   private drops: Drop[] = [];
+  private model: ReturnType<typeof installReturnSlotModel> | null = null;
   private dropStart = 0;
   // Harness (`--state return --x <ms>`): pin the ritual at a fixed elapsed.
   private frozenElapsed: number | null = null;
@@ -137,6 +139,7 @@ export class ReturnSlot {
   private readonly _p = new THREE.Vector3();
 
   constructor(private ctx: FixtureContext, parent: THREE.Group, anchor: { x: number; z: number }, faceYaw: number) {
+    this.group.name = 'interior-return-chute';
     parent.add(this.group);
     this.group.position.set(anchor.x, 0, anchor.z);
     this.group.rotation.y = faceYaw;
@@ -232,7 +235,9 @@ export class ReturnSlot {
     box(CHUTE_W - 0.2, CHUTE_H - 0.15, depth - FRONT_T - 0.1, 0, (CHUTE_H - 0.15) / 2, midZ - (FRONT_T + 0.1) / 2, darkMat, false);
 
     // "▼ RETURN TAPES HERE ▼" across the top panel, theme gold on body blue.
+    const fallback = [...this.group.children];
     this.buildLettering(zFace, slotTop, blueHex, goldHex);
+    this.model = installReturnSlotModel(ctx, this.group, fallback, blueHex);
   }
 
   /**
@@ -472,6 +477,7 @@ export class ReturnSlot {
 
   /** Per-frame (only does work while a ritual is live). Zero allocations. */
   update(now: number): void {
+    this.model?.setOpen(this.drops.length > 0);
     if (this.drops.length === 0) return;
     const elapsed = this.frozenElapsed ?? (now - this.dropStart);
     let pending = 0;
@@ -513,6 +519,8 @@ export class ReturnSlot {
   }
 
   dispose(): void {
+    this.model?.dispose();
+    this.model = null;
     this.clearDrops();
     this.group.parent?.remove(this.group);
     for (const g of this.ownedGeoms) g.dispose();

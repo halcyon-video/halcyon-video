@@ -389,47 +389,34 @@ export class BackRoom {
     this.doorUnlocked = unlocked;
   }
 
-  /**
-   * The GLB is Kenney's "Table Coffee Glass" — a dark frame with a GLASS top,
-   * which in this room's single-lamp light read as pale celadon laminate
-   * rather than glass (owner call, 2026-08-07: dark blonde wood instead).
-   *
-   * Re-materialled here rather than by swapping the model: the mesh is the
-   * right shape and size, and this keeps the CC0 asset as-shipped instead of
-   * forking it. Every surface takes the same board, pane included — a glass
-   * top over wood legs is the thing being replaced, not a look worth half of.
-   *
-   * The grain is a real photo scan SHIPPED IN THE REPO at
-   * public/textures/surfaces/table-wood (ambientCG WoodFloor043, CC0 — see its
-   * NOTES.md), so every install gets it; a user-assets drop-in of the same name
-   * still wins. Only when both are absent does the flat lit board colour stand
-   * in, and it is a colour, not a procedural grain. Owner call after three
-   * procedural attempts: drawn strokes read as corduroy, radial growth rings
-   * as sand ripples, warped straight grain as burl. The GLB's UVs tile hard
-   * across the top, which sets a scale none of them survived. Flat and
-   * correctly lit beats invented grain.
+  /** Original oak frame with seated glazing. Only the oak finish is replaced;
+   * the prop cache owns glass, hardware, geometry and embedded PBR textures.
+   * Legacy/custom models and the primitive fallback keep the all-wood finish.
    */
   private placeCoffeeTable(table: PropInstance): number {
+    const authored = !!table.object.getObjectByName('TableOakAssembly');
     const wood = new THREE.MeshStandardMaterial({
       color: 0xb08a55, roughness: 0.62, metalness: 0.0,
     });
+    wood.name = 'TableOak';
     this.tableWood = wood;
 
-    // Below 1: the model's UVs already tile heavily across the top, so a
-    // repeat of 1 lays ~20 boards across it. This puts roughly one plank run
-    // over the surface, which is what a coffee table actually is.
+    // Authored UVs use feet / 3.5. Legacy UVs need the historical correction.
     const fit = (tex: THREE.Texture) => {
       tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-      tex.repeat.set(0.16, 0.16);
+      tex.repeat.set(authored ? 1 : 0.16, authored ? 1 : 0.16);
       tex.anisotropy = 8;
     };
     tryLoadUserAssetTexture('surfaces/table-wood/color.png', (tex) => {
+      if (this.disposed) { tex.dispose(); return; }
       fit(tex); wood.map = tex; wood.color.setHex(0xffffff); wood.needsUpdate = true;
     });
     tryLoadUserAssetTexture('surfaces/table-wood/normal.png', (tex) => {
+      if (this.disposed) { tex.dispose(); return; }
       fit(tex); wood.normalMap = tex; wood.normalScale.set(0.5, 0.5); wood.needsUpdate = true;
     }, { srgb: false });
     tryLoadUserAssetTexture('surfaces/table-wood/roughness.png', (tex) => {
+      if (this.disposed) { tex.dispose(); return; }
       fit(tex); wood.roughnessMap = tex; wood.needsUpdate = true;
     }, { srgb: false });
 
@@ -438,7 +425,9 @@ export class BackRoom {
       if (!m.isMesh) return;
       // The GLB's own materials belong to the prop cache; dropping our
       // reference to them here is all this does.
-      m.material = wood;
+      if (!authored || (m.material instanceof THREE.Material && m.material.name === 'TableOak')) {
+        m.material = wood;
+      }
       m.castShadow = true;
       m.receiveShadow = true;
     });

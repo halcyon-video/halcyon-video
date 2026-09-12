@@ -282,6 +282,30 @@ export class CarriedTapes {
   }
 
   /**
+   * Remove a tape from the stack immediately without a shelf flight (used when
+   * backing out of streaming checkout). If movieId is given, removes that movie;
+   * otherwise removes the top tape. Returns the dropped movie, or null.
+   */
+  drop(movieId?: string): Movie | null {
+    if (this.entries.length === 0) return null;
+    const idx = movieId != null
+      ? this.entries.findIndex((e) => e.movie.id === movieId)
+      : this.entries.length - 1;
+    if (idx === -1) return null;
+    const [entry] = this.entries.splice(idx, 1);
+    this.disposeEntry(entry);
+    if (this.entries.length === 0 && typeof localStorage !== 'undefined') {
+      localStorage.removeItem(CARRY_STORAGE_KEY);
+    } else {
+      this.persist();
+    }
+    this.settleUntil = performance.now() + 600;
+    this.relayout();
+    this.onChange?.();
+    return entry.movie;
+  }
+
+  /**
    * Run the checkout flourish: each case hops from the hand onto a counter
    * spot (staggered), then one by one into the bag. Hooks fire as cases land;
    * onComplete fires once with the item ids — the owner then calls

@@ -58,7 +58,7 @@ export class ShelfModelBatch {
         (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => ownedMats.add(m));
       });
       try {
-        if (disposed || ['Deck', 'Rail', 'Wire', 'Bracket', 'Slat', 'Upright', 'Spine', 'Standard', 'Foot', 'EndPanel'].some(name => !kit.has(name))) return;
+        if (disposed || ['Deck', 'Rail', 'Wire', 'Bracket', 'Slat', 'Upright', 'Spine', 'Standard', 'Foot', 'EndPanel', 'RailClip', 'RailEndStop'].some(name => !kit.has(name))) return;
         const fittedCaps = new Set<THREE.BufferGeometry>();
         for (const entry of entries) {
           const { fallback, material } = entry;
@@ -175,7 +175,12 @@ function modelPart(kit: Map<string, THREE.BufferGeometry>, p: ShelfPart): THREE.
     g.translate(p.x ?? 0, p.y ?? 0, p.z ?? 0);
     result.push(g);
   } else if (p.kind === 'rail') {
-    place('Rail', 1, 1, p.length);
+    place('Rail', 1, 1, p.length - .024);
+    for (const z of [-1, 1]) place('RailEndStop', 1, 1, 1, 0, 0, z * (p.length / 2 - .006));
+    const clips = Math.max(2, Math.ceil(p.length / 2));
+    for (let i = 0; i < clips; i++) {
+      place('RailClip', 1, 1, 1, 0, 0, -p.length / 2 + .12 + i * (p.length - .24) / (clips - 1));
+    }
   } else if (p.kind === 'slat') {
     const height = p.height!;
     const count = Math.ceil(height / .25);

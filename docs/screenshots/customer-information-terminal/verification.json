@@ -1,0 +1,50 @@
+{
+  "success": {
+    "loaded": true,
+    "fallbackHidden": true,
+    "screen": "CustomerInformationScreen",
+    "defaultPlacements": 0,
+    "footprint": null,
+    "counters": {
+      "renderRequests": 13,
+      "shadowRequests": 2,
+      "colliders": 0
+    },
+    "bounds": {
+      "min": [
+        -0.8600000143051147,
+        0,
+        -0.42000001668930054
+      ],
+      "max": [
+        0.9299999475479126,
+        2.009999990463257,
+        0.020999999716877937
+      ],
+      "size": [
+        1.7899999618530273,
+        2.009999990463257,
+        0.4410000164061785
+      ]
+    },
+    "draws": 9,
+    "triangles": 14768,
+    "expectedDisposal": {
+      "geometry": 13,
+      "material": 8,
+      "texture": 3
+    },
+    "disposed": {
+      "geometry": 13,
+      "material": 8,
+      "texture": 3
+    },
+    "detached": true,
+    "gateClosed": true
+  },
+  "errorFallback": true,
+  "lateLoadDetached": true,
+  "pageErrors": [],
+  "publicUserAssets": "README.md only",
+  "installation": "Not enabled: no confirmed floor/counter anchor. Eye view is a crop-relative viewing study, not an installed photograph."
+}

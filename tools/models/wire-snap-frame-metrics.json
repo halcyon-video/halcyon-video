@@ -1,0 +1,104 @@
+{
+  "parts": [
+    {
+      "name": "TopSnapRail",
+      "triangles": 36,
+      "closed": true,
+      "uv": true
+    },
+    {
+      "name": "LeftSnapRail",
+      "triangles": 36,
+      "closed": true,
+      "uv": true
+    },
+    {
+      "name": "BottomSnapRail",
+      "triangles": 36,
+      "closed": true,
+      "uv": true
+    },
+    {
+      "name": "RightSnapRail",
+      "triangles": 36,
+      "closed": true,
+      "uv": true
+    },
+    {
+      "name": "RemovableBacking",
+      "triangles": 12,
+      "closed": true,
+      "uv": true
+    },
+    {
+      "name": "ArtworkSurface",
+      "triangles": 2,
+      "closed": false,
+      "uv": true
+    },
+    {
+      "name": "NonSlipSole",
+      "triangles": 28,
+      "closed": true,
+      "uv": true
+    },
+    {
+      "name": "WeightedFoot",
+      "triangles": 44,
+      "closed": true,
+      "uv": true
+    },
+    {
+      "name": "FootSocket",
+      "triangles": 160,
+      "closed": true,
+      "uv": true
+    },
+    {
+      "name": "LowerPostSleeve",
+      "triangles": 128,
+      "closed": true,
+      "uv": true
+    },
+    {
+      "name": "TelescopingUpperPost",
+      "triangles": 128,
+      "closed": true,
+      "uv": true
+    },
+    {
+      "name": "HeightLockCollar",
+      "triangles": 192,
+      "closed": true,
+      "uv": true
+    },
+    {
+      "name": "RearLockThumbwheel",
+      "triangles": 224,
+      "closed": true,
+      "uv": true
+    },
+    {
+      "name": "RearPostSaddle",
+      "triangles": 12,
+      "closed": true,
+      "uv": true
+    },
+    {
+      "name": "SaddleScrew-0.022",
+      "triangles": 80,
+      "closed": true,
+      "uv": true
+    },
+    {
+      "name": "SaddleScrew0.022",
+      "triangles": 80,
+      "closed": true,
+      "uv": true
+    }
+  ],
+  "triangles": 1234,
+  "materials": 5,
+  "textures": 0,
+  "bytes": 85200
+}

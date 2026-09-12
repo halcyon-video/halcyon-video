@@ -23,7 +23,7 @@ import { SP_HERO, CT_HERO, updatedMeshes } from './scene-shared';
 import { getGoldCaseMaterials } from './fixtures/gold-clamshell';
 import type { StoreScene } from './three-scene';
 import { counterFrame } from './counter-anchors';
-import { isStreamingChoiceActive, startStreamingServiceChoice, confirmStreamingServiceChoice, getStreamingChoiceKey } from './streaming-checkout';
+import { isStreamingChoiceActive, startStreamingServiceChoice, confirmStreamingServiceChoice, cancelStreamingServiceChoice, getStreamingChoiceKey } from './streaming-checkout';
 
 // Whether the current hero back materials are the NR gold case — part of the
 // ensureHeroCases rebuild key alongside heroMovieId, so stepping between an
@@ -554,6 +554,9 @@ export function toggleFlip(scene: StoreScene) {
     // case, same as a boxset.
     if (scene.slotsByPosition.get(scene.getActiveSlotKey())?.noRentalCase) {
       scene.isFlipped = !scene.isFlipped;
+      if (!scene.isFlipped && isStreamingChoiceActive(scene.getSelectedMovie())) {
+        cancelStreamingServiceChoice(scene);
+      }
       scene.heroSpine = false;
       scene.selectedBackCoverRegionIdx = scene.isFlipped ? 0 : -1;
       scene.updateBackCoverHighlight();

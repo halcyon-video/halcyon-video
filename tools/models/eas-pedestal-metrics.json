@@ -1,0 +1,22 @@
+{
+  "triangles": 2724,
+  "source_parts": 15,
+  "materials": [
+    "MoldedIvory",
+    "SeamElastomer",
+    "BasePolymer",
+    "FastenerSteel"
+  ],
+  "textures": [
+    "128x128 normal",
+    "128x128 roughness"
+  ],
+  "dimensions_feet": [
+    0.62,
+    3.43,
+    0.5
+  ],
+  "closed_manifold_parts": true,
+  "glb_bytes": 205256,
+  "blender": "5.2.0 LTS"
+}

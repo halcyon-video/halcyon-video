@@ -1,0 +1,142 @@
+[
+  {
+    "part": "Shirt_open_hem_cuffs_neck",
+    "vertices": 2860,
+    "nonmanifold_edges": 0
+  },
+  {
+    "part": "Neck_rib-1",
+    "vertices": 520,
+    "nonmanifold_edges": 0
+  },
+  {
+    "part": "Neck_rib1",
+    "vertices": 520,
+    "nonmanifold_edges": 0
+  },
+  {
+    "part": "Hem-1",
+    "vertices": 136,
+    "nonmanifold_edges": 0
+  },
+  {
+    "part": "Hem1",
+    "vertices": 136,
+    "nonmanifold_edges": 0
+  },
+  {
+    "part": "Right_cuff-1",
+    "vertices": 136,
+    "nonmanifold_edges": 0
+  },
+  {
+    "part": "Right_cuff1",
+    "vertices": 136,
+    "nonmanifold_edges": 0
+  },
+  {
+    "part": "Left_cuff-1",
+    "vertices": 136,
+    "nonmanifold_edges": 0
+  },
+  {
+    "part": "Left_cuff1",
+    "vertices": 136,
+    "nonmanifold_edges": 0
+  },
+  {
+    "part": "Cap_six_panel_crown",
+    "vertices": 1538,
+    "nonmanifold_edges": 0
+  },
+  {
+    "part": "Crown_felled_seam_0",
+    "vertices": 256,
+    "nonmanifold_edges": 0
+  },
+  {
+    "part": "Crown_felled_seam_1",
+    "vertices": 256,
+    "nonmanifold_edges": 0
+  },
+  {
+    "part": "Crown_felled_seam_2",
+    "vertices": 256,
+    "nonmanifold_edges": 0
+  },
+  {
+    "part": "Crown_felled_seam_3",
+    "vertices": 256,
+    "nonmanifold_edges": 0
+  },
+  {
+    "part": "Crown_felled_seam_4",
+    "vertices": 256,
+    "nonmanifold_edges": 0
+  },
+  {
+    "part": "Crown_felled_seam_5",
+    "vertices": 256,
+    "nonmanifold_edges": 0
+  },
+  {
+    "part": "Cap_curved_laminated_visor",
+    "vertices": 594,
+    "nonmanifold_edges": 0
+  },
+  {
+    "part": "Visor_edge_binding",
+    "vertices": 264,
+    "nonmanifold_edges": 0
+  },
+  {
+    "part": "Cap_inner_sweatband",
+    "vertices": 512,
+    "nonmanifold_edges": 0
+  },
+  {
+    "part": "Cap_rear_hanging_strap",
+    "vertices": 24,
+    "nonmanifold_edges": 0
+  },
+  {
+    "part": "Glass_suction_pad",
+    "vertices": 160,
+    "nonmanifold_edges": 0
+  },
+  {
+    "part": "Nickel_J_hook",
+    "vertices": 40,
+    "nonmanifold_edges": 0
+  },
+  {
+    "part": "Shoulder_pin_clip",
+    "vertices": 32,
+    "nonmanifold_edges": 0
+  },
+  {
+    "part": "Glass_suction_pad.001",
+    "vertices": 160,
+    "nonmanifold_edges": 0
+  },
+  {
+    "part": "Nickel_J_hook.001",
+    "vertices": 40,
+    "nonmanifold_edges": 0
+  },
+  {
+    "part": "Shoulder_pin_clip.001",
+    "vertices": 32,
+    "nonmanifold_edges": 0
+  },
+  {
+    "part": "Glass_suction_pad.002",
+    "vertices": 160,
+    "nonmanifold_edges": 0
+  },
+  {
+    "part": "Nickel_J_hook.002",
+    "vertices": 40,
+    "nonmanifold_edges": 0
+  }
+]

@@ -1,0 +1,24 @@
+{
+  "bytes": 214804,
+  "triangles": 6360,
+  "primitives": 3,
+  "materials": [
+    "BalloonCord",
+    "BalloonLatex"
+  ],
+  "images": 4,
+  "allPrimitivesHaveUV": true,
+  "manifoldParts": 3,
+  "authoredBoundsFeet": [
+    [
+      -0.44999998807907104,
+      -0.45067501068115234,
+      -0.00011732913844753057
+    ],
+    [
+      0.44999998807907104,
+      0.44932499527931213,
+      2.6029999256134033
+    ]
+  ]
+}

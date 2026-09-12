@@ -49,6 +49,25 @@ export interface LayoutViolation {
   message: string;               // human sentence WITH numbers, e.g. "overlaps by 0.42 ft"
 }
 
+/** An opening is free floor space, not one large ground collider. Its lowest
+ * soffit and highest surface still need explicit vertical validation. */
+export function validateHeadroom(
+  openings: Array<{ label: string; undersideY: number; topY: number }>,
+  ceilingY: number,
+  minimum = 6.667,
+): LayoutViolation[] {
+  return openings.flatMap(o => {
+    const issues: LayoutViolation[] = [];
+    if (![o.undersideY, o.topY, ceilingY].every(Number.isFinite) || o.topY < o.undersideY)
+      issues.push({ severity: 'error', a: o.label, message: 'invalid vertical bounds' });
+    if (o.undersideY < minimum)
+      issues.push({ severity: 'error', a: o.label, message: `only ${o.undersideY.toFixed(2)} ft headroom (min ${minimum.toFixed(2)} ft)` });
+    if (o.topY > ceilingY)
+      issues.push({ severity: 'error', a: o.label, message: `top ${o.topY.toFixed(2)} ft exceeds ceiling ${ceilingY.toFixed(2)} ft` });
+    return issues;
+  });
+}
+
 // Rectangles that are merely touching (shelving units chained short-end to
 // short-end are DESIGNED to have zero gap — see store-plan.ts's fillField)
 // must not read as an "overlap" once floating-point noise is folded in.

@@ -26,12 +26,12 @@ import type { Movie } from './jellyfin.ts';
 import {
   type StreamingServiceDef, type RawDiscoverItem,
   resolveEnabledServices, matchProviderId, ingestStreamingResults, STREAMING_CAP_PER_SERVICE,
+  resolveStreamingWatchRegion,
 } from './streaming-catalog.ts';
 
 const TMDB_API_BASE = 'https://api.themoviedb.org/3';
-// TMDB's watch-provider data is region-keyed; matches jellyseerr.ts's
-// fetchStreamingMovies hardcoded default until a settings UI exists to pick
-// one (GH #86 follow-up).
+// TMDB's watch-provider data is region-keyed; defaults to US unless a region
+// is provided (GH #86, GH #330).
 const STREAMING_WATCH_REGION = 'US';
 const STREAMING_FETCH_CONCURRENCY = 8;
 const REQUEST_TIMEOUT_MS = 15_000;
@@ -167,14 +167,18 @@ export function normalizeDiscoverItem(raw: TmdbDiscoverItemRaw): RawDiscoverItem
  * anything in the region's provider list is logged once (not per-title) so a
  * TMDB rename shows up on the boot console instead of a silently empty aisle.
  */
-export async function fetchStreamingMoviesFromTmdb(servicesOverrideCsv?: string | null): Promise<Movie[]> {
+export async function fetchStreamingMoviesFromTmdb(
+  servicesOverrideCsv?: string | null,
+  region: string = STREAMING_WATCH_REGION
+): Promise<Movie[]> {
   const config = getTmdbConfig();
   if (!config) return [];
 
+  const watchRegion = resolveStreamingWatchRegion(region);
   const wanted = resolveEnabledServices(servicesOverrideCsv);
   let providers: { id: number; name: string }[] = [];
   try {
-    const list = await tmdbRequest(config, '/watch/providers/movie', { watch_region: STREAMING_WATCH_REGION });
+    const list = await tmdbRequest(config, '/watch/providers/movie', { watch_region: watchRegion });
     const results: TmdbProviderRaw[] = Array.isArray(list?.results) ? list.results : [];
     providers = results
       .filter((p) => typeof p?.provider_id === 'number' && typeof p?.provider_name === 'string')
@@ -193,7 +197,7 @@ export async function fetchStreamingMoviesFromTmdb(servicesOverrideCsv?: string 
   }
   if (unmatched.length > 0) {
     console.warn(
-      `[TMDB] Streaming: no provider match in region ${STREAMING_WATCH_REGION} for: ${unmatched.join(', ')}` +
+      `[TMDB] Streaming: no provider match in region ${watchRegion} for: ${unmatched.join(', ')}` +
       ' -- check the name against TMDB\'s own watch-provider list (a rename on TMDB\'s side, most likely).'
     );
   }
@@ -207,7 +211,7 @@ export async function fetchStreamingMoviesFromTmdb(servicesOverrideCsv?: string 
       try {
         const data = await tmdbRequest(config, '/discover/movie', {
           with_watch_providers: String(providerId),
-          watch_region: STREAMING_WATCH_REGION,
+          watch_region: watchRegion,
           with_watch_monetization_types: 'flatrate',
           page: '1',
         });

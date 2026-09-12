@@ -1,3 +1,4 @@
+import { installCounterTvModel } from './counter-tv-model';
 import { selfLit } from '../material-lighting';
 // Small set on a wall-style bracket behind the checkout counter (GH #110): the
 // "something to watch" a format without ceiling headroom for AmbientTvs still
@@ -23,9 +24,13 @@ export function buildCounterTv(
   rotY: number,
 ): void {
   const g = new THREE.Group();
+  g.name = 'counter-tv';
   g.position.set(x, mountY, z);
   g.rotation.y = rotY;
   parent.add(g);
+  const fallback = new THREE.Group();
+  fallback.name = 'counter-tv-fallback';
+  g.add(fallback);
 
   const armMat = new THREE.MeshStandardMaterial({ color: 0x3c3f43, roughness: 0.4, metalness: 0.75 });
   const bodyMat = new THREE.MeshStandardMaterial({ color: 0xc3c7cb, roughness: 0.55, metalness: 0.04 });
@@ -37,12 +42,12 @@ export function buildCounterTv(
   const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.055, armLen, 8), armMat);
   arm.position.y = armLen / 2;
   arm.castShadow = true;
-  g.add(arm);
+  fallback.add(arm);
   ctx.addCollider(arm);
 
   const knuckle = new THREE.Mesh(new THREE.SphereGeometry(0.09, 10, 8), armMat);
   knuckle.position.y = armLen;
-  g.add(knuckle);
+  fallback.add(knuckle);
 
   const bodyW = 1.05, bodyH = 0.82, bodyD = 0.85;
   const screenW = 0.8, screenH = 0.6;
@@ -53,13 +58,15 @@ export function buildCounterTv(
   const body = new THREE.Mesh(new THREE.BoxGeometry(bodyW, bodyH, bodyD), bodyMat);
   body.castShadow = true;
   body.receiveShadow = true;
-  tvG.add(body);
+  body.position.y = tvG.position.y;
+  fallback.add(body);
   ctx.addCollider(body);
 
   const bezel = new THREE.Mesh(new THREE.BoxGeometry(bodyW - 0.06, bodyH - 0.06, 0.04), bezelMat);
   bezel.position.z = bodyD / 2 + 0.02;
   bezel.castShadow = true;
-  tvG.add(bezel);
+  bezel.position.y = tvG.position.y;
+  fallback.add(bezel);
 
   const bulge = 0.04;
   const screenTex = makeCrtTestCardTexture();
@@ -76,4 +83,6 @@ export function buildCounterTv(
   gloss.position.z = scan.position.z + 0.002;
   gloss.renderOrder = 1;
   tvG.add(gloss);
+  tvG.name = 'counter-tv-static-screen';
+  installCounterTvModel(ctx, parent, g, fallback);
 }

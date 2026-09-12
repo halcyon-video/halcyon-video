@@ -1,0 +1,113 @@
+[
+  {
+    "width": 32,
+    "bounds": [
+      {
+        "min": [
+          -17.775,
+          0,
+          16.225
+        ],
+        "max": [
+          -17.025,
+          3,
+          16.975
+        ]
+      },
+      {
+        "min": [
+          17.025,
+          0,
+          16.225
+        ],
+        "max": [
+          17.775,
+          3,
+          16.975
+        ]
+      }
+    ],
+    "uniqueResources": 8,
+    "sharedGeometry": true,
+    "exactlyOnceDisposal": true,
+    "refreshes": 1
+  },
+  {
+    "width": 46,
+    "bounds": [
+      {
+        "min": [
+          -24.775,
+          0,
+          16.225
+        ],
+        "max": [
+          -24.025,
+          3,
+          16.975
+        ]
+      },
+      {
+        "min": [
+          24.025,
+          0,
+          16.225
+        ],
+        "max": [
+          24.775,
+          3,
+          16.975
+        ]
+      }
+    ],
+    "uniqueResources": 8,
+    "sharedGeometry": true,
+    "exactlyOnceDisposal": true,
+    "refreshes": 1
+  },
+  {
+    "width": 70,
+    "bounds": [
+      {
+        "min": [
+          -36.775,
+          0,
+          16.225
+        ],
+        "max": [
+          -36.025,
+          3,
+          16.975
+        ]
+      },
+      {
+        "min": [
+          36.025,
+          0,
+          16.225
+        ],
+        "max": [
+          36.775,
+          3,
+          16.975
+        ]
+      }
+    ],
+    "uniqueResources": 8,
+    "sharedGeometry": true,
+    "exactlyOnceDisposal": true,
+    "refreshes": 1
+  },
+  {
+    "mode": "failure",
+    "passed": true
+  },
+  {
+    "mode": "late",
+    "passed": true
+  },
+  {
+    "mode": "detached",
+    "passed": true
+  }
+]

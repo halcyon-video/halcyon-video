@@ -1,18 +1,95 @@
 {
   "gabled-brick": {
-    "triangles": 436,
+    "triangles": 876,
     "meshes": 5,
-    "nonManifoldEdges": 0
+    "nonManifoldEdges": 0,
+    "bytes": 59600,
+    "units": "feet",
+    "textures": 0,
+    "bounds": [
+      [
+        -10.449999809265137,
+        -6.579999923706055,
+        0.0
+      ],
+      [
+        10.449999809265137,
+        0.18000000715255737,
+        23.516319274902344
+      ]
+    ],
+    "boundsAxes": "Blender X, negative store depth, height",
+    "materialRoles": [
+      "FacadeBrick",
+      "FacadeCoping",
+      "FacadeSoldierBrick",
+      "FacadeTile",
+      "FacadeSoffit"
+    ],
+    "uvLayers": [
+      "FourFootTiles"
+    ]
   },
   "flat-parapet": {
     "triangles": 304,
     "meshes": 5,
-    "nonManifoldEdges": 0
+    "nonManifoldEdges": 0,
+    "bytes": 24432,
+    "units": "feet",
+    "textures": 0,
+    "bounds": [
+      [
+        -10.869999885559082,
+        -6.699999809265137,
+        0.0
+      ],
+      [
+        10.869999885559082,
+        0.18000000715255737,
+        22.380001068115234
+      ]
+    ],
+    "boundsAxes": "Blender X, negative store depth, height",
+    "materialRoles": [
+      "FacadeBrick",
+      "FacadeSoldierBrick",
+      "FacadeTrim",
+      "FacadeCoping",
+      "FacadeTile"
+    ],
+    "uvLayers": [
+      "FourFootTiles"
+    ]
   },
   "arcaded-brick": {
     "triangles": 1024,
     "meshes": 4,
-    "nonManifoldEdges": 0
+    "nonManifoldEdges": 0,
+    "bytes": 64800,
+    "units": "feet",
+    "textures": 0,
+    "bounds": [
+      [
+        -11.369999885559082,
+        -6.699999809265137,
+        0.0
+      ],
+      [
+        11.369999885559082,
+        0.18000000715255737,
+        20.979999542236328
+      ]
+    ],
+    "boundsAxes": "Blender X, negative store depth, height",
+    "materialRoles": [
+      "FacadeBrick",
+      "FacadeSoldierBrick",
+      "FacadeTrim",
+      "FacadeCoping"
+    ],
+    "uvLayers": [
+      "FourFootTiles"
+    ]
   },
   "arcade-window-bay": {
     "triangles": 452,

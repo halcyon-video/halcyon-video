@@ -147,7 +147,7 @@
   box-shadow:
     0 4px 24px rgba(0, 0, 0, 0.7),
     0 1px 0 rgba(255, 255, 255, 0.05);
-  background: #081231;
+  background: linear-gradient(180deg, #030927, #101e60 55%, #050c29);
 }
 
 .flat-awning-bg {

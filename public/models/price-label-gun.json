@@ -1,0 +1,21 @@
+{
+  "bytes": 539604,
+  "triangles": 5892,
+  "draws": 5,
+  "source_mesh_parts": 46,
+  "bounds_runtime": {
+    "min": [
+      -0.3400000035762787,
+      0.0,
+      -0.3136613368988037
+    ],
+    "max": [
+      0.40194010734558105,
+      0.2849999964237213,
+      0.29481035470962524
+    ]
+  },
+  "units": "feet",
+  "source_maps": "7 original 128x128 runtime images: five albedos, shared normal and roughness",
+  "manifold_solids": true
+}

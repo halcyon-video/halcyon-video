@@ -2,6 +2,7 @@
 // Displays sections based on the selected platform list, showing the top 20
 // games for each platform.
 import * as THREE from 'three';
+import { ShelfModelBatch } from '../shelf-model';
 import { Movie } from '../jellyfin';
 import { FixturePlacement, shelfTitleCompare, BOX_SPACING, UNIT_DEPTH, UNIT_TOP_DEPTH, LEAN_ANGLE } from '../store-layout';
 import { FixtureContext, SlottedFixture, FixtureSlot } from '../fixtures';
@@ -203,6 +204,7 @@ export class GameSection implements SlottedFixture {
   build(): void {
     this.initMovies();
 
+    const shelfModels = new ShelfModelBatch();
     const cols = this.cols;
     const shelfLength = (cols - 1) * BOX_SPACING + 1.0;
     const unitDepth = UNIT_DEPTH;
@@ -291,6 +293,9 @@ export class GameSection implements SlottedFixture {
       shelf.castShadow = true;
       this.group!.add(shelf);
       this.ctx.addCollider(shelf);
+      shelfModels.add(shelf, [{ kind: isWireFrame ? 'wire' : 'deck',
+        depth: isWireFrame ? shelfDepth : shelfDepth - .088, length: shelfLength }],
+        isWireFrame ? stripMat : baseShelfMat);
 
       // Pricing strips along the lips. STRIP_EPS keeps the bar's outer face and
       // end faces off the board's own planes — stamped flush they z-fight along
@@ -314,6 +319,16 @@ export class GameSection implements SlottedFixture {
       stripBack.receiveShadow = true;
       this.group!.add(stripBack);
       this.ctx.addCollider(stripBack);
+      for (const [strip, side] of [[stripFront, 1], [stripBack, -1]] as const) {
+        shelfModels.add(strip, [{ kind: 'rail', depth: 0, length: shelfLength - .012,
+          x: side * (shelfDepth / 2 - .018) - strip.position.x,
+          y: -.032, yaw: side < 0 ? Math.PI : 0 }]);
+      }
+    });
+
+    shelfModels.finish(() => {
+      this.ctx.requestShadowRefresh();
+      this.ctx.requestRender();
     });
 
     // 4. Section Dividers — present in every theme, matching the movie

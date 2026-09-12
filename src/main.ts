@@ -104,7 +104,7 @@ import { brandString, loadBrandPack } from './brand-pack';
 import type { StoreScene } from './three-scene';
 import { InputManager, type InputCallbacks } from './input';
 import { installStoreTouchControls, isTouchInputActive, touchHUDText, touchMovieHUDText } from './store-touch';
-import { isStreamingChoiceActive, cancelStreamingServiceChoice, getStreamingCheckoutMovie, clearStreamingCheckoutMovie, setStreamingStockResolver } from './streaming-checkout';
+import { isStreamingChoiceActive, cancelStreamingServiceChoice, setStreamingStockResolver } from './streaming-checkout';
 setStreamingStockResolver(getStreamingMovies);
 import { triggerHostedWelcome, isWelcomeActive, dismissWelcome, welcomeHUDText } from './store-welcome';
 import { showClerkToast } from './carried-tapes';
@@ -1757,7 +1757,7 @@ window.addEventListener('halcyon:tv-status', () => {
 // middleware in vite.config.ts, which writes it to feedback/NNN/.
 const FEEDBACK_CONFIG_KEYS = [
   'bb_theme', 'bb_medium', 'bb_arrangement', 'bb_outside', 'bb_corner',
-  'bb_ceiling', 'bb_storefront', 'bb_render_mode', 'bb_quality', 'bb_walldecor',
+  'bb_ceiling', 'bb_ceiling_structure', 'bb_storefront', 'bb_render_mode', 'bb_quality', 'bb_walldecor',
 ] as const;
 
 let feedbackOverlayEl: HTMLDivElement | null = null;
@@ -2581,16 +2581,12 @@ async function initializeStoreScene(preservePosterCache = false) {
     await calibrateQualityIfNeeded();
 
     const { StoreScene } = await import('./three-scene');
-    // The constructor below is one uninterrupted stretch of main thread — floor
-    // plan, every fixture, every case, and the first bind of each shader
-    // program — and nothing on screen can change until it returns. Measured at
-    // 9.5s for a 6000-title catalog on a fast desktop GPU, and the shader links
-    // in it are far slower on integrated graphics. So name the wait BEFORE
-    // entering it: this line is the last thing the boot log can say for a
-    // while, and silence here is what makes a slow open look like a hang.
-    const plannedTitles = storeLibraries.reduce((n, l) => n + l.movies.length, 0);
+    // Every carried library belongs on the floor. Keep stock construction
+    // batched and offscreen shelves culled without paging away departments.
+    const plannedTitles = storeLibraries.reduce((sum, lib) => sum + lib.movies.length, 0) + storeGameMovies.length;
     logToConsole(`[System] Planning the store floor for ${plannedTitles} title(s)...`, 'system');
-    const scene = new StoreScene(canvasContainer, storeLibraries, logToConsole, jfUrl, jfToken, storeComingSoon, storeDiscovery, storeGameMovies, staffPicks);
+    const scene = new StoreScene(canvasContainer, storeLibraries, logToConsole, jfUrl, jfToken, storeComingSoon.slice(0, 100), storeDiscovery.slice(0, 100), storeGameMovies, staffPicks, { libraries: storeLibraries, games: storeGameMovies });
+    try { await scene.ready; } catch (error) { scene.destroy(); throw error; }
     armQualityBackstop();
     // A fresh attempt is underway — any earlier give-up no longer applies (it
     // could only be reached again via a brand-new page load, which is a fresh
@@ -4084,10 +4080,6 @@ async function main() {
       if (storeScene && cancelStreamingServiceChoice(storeScene)) {
         updateMovieHUD(storeScene.getSelectedMovie() || null);
         return;
-      }
-      if (storeScene && storeScene.mode === 'checkout' && getStreamingCheckoutMovie(storeScene)) {
-        storeScene.carried?.clearAll(false);
-        clearStreamingCheckoutMovie(storeScene);
       }
       const handled = storeScene?.backAction();
       if (handled) {

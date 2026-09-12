@@ -1,0 +1,29 @@
+{
+  "units": "feet",
+  "triangles": 8368,
+  "bytes": 3015604,
+  "materialRoles": [
+    "WarmAshLaminate",
+    "BinderBookcloth",
+    "CradleLaminate",
+    "PaperEdges",
+    "CatalogPrint",
+    "BrushedNickel"
+  ],
+  "boundsBlender": [
+    [
+      -1.5,
+      -1.0,
+      0.0
+    ],
+    [
+      1.5,
+      1.0,
+      3.2308506965637207
+    ]
+  ],
+  "closedPartsManifold": true,
+  "intentionalOpenSurfaces": "two curved printed top leaves",
+  "inclineDegrees": 20,
+  "tableHeight": 2.5
+}

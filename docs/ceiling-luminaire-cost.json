@@ -1,0 +1,42 @@
+{
+  "dome": {
+    "triangles": 3108,
+    "parts": 7,
+    "material_primitives": 8,
+    "bytes": 94316,
+    "bounds_blender_feet": [
+      [
+        -0.75,
+        -0.75,
+        -1.9600000381469727
+      ],
+      [
+        0.75,
+        0.75,
+        0.0
+      ]
+    ],
+    "all_parts_manifold": true,
+    "all_parts_uv": true
+  },
+  "directional": {
+    "triangles": 3120,
+    "parts": 9,
+    "material_primitives": 10,
+    "bytes": 100332,
+    "bounds_blender_feet": [
+      [
+        -0.3700000047683716,
+        -0.41985753178596497,
+        -1.3170180320739746
+      ],
+      [
+        0.3700000047683716,
+        0.5128335356712341,
+        0.0
+      ]
+    ],
+    "all_parts_manifold": true,
+    "all_parts_uv": true
+  }
+}

@@ -1,3 +1,4 @@
+import { buildEntranceBollards } from './entrance-bollards';
 import { selfLit } from './material-lighting';
 // T15 exterior/environment pass: everything beyond the storefront glass that
 // exists purely to be *seen* through it — sidewalk/curb, street furniture,
@@ -14,9 +15,12 @@ import { selfLit } from './material-lighting';
 // system this hooks into; this module owns no lighting of its own beyond a
 // couple of purely cosmetic emissive materials (lamp heads, glow decals).
 import * as THREE from 'three';
+import { installParkingLampModels } from './parking-lamp-model';
 import { installCommercialStreetscape } from './commercial-streetscape';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { createLightPoolTexture, createSoftShadowTexture, createConcreteSidewalkTexture } from './canvas-textures';
+import { installExteriorReturnKiosk } from './exterior-return-kiosk';
+import { installCurbKit } from './curb-kit';
 import { buildExteriorRoad } from './exterior-road';
 import { tryLoadUserAssetTexture } from './user-assets';
 import { assetUrl } from './asset-url';
@@ -75,8 +79,13 @@ export function buildExteriorEnvironment(scene: THREE.Scene, storeWidth: number,
   const rightEdgeX = centerX + storeWidth / 2;
   const frontZ = FRONT_GLASS_Z; // matches the storefront glass line in three-scene.ts
 
-  const disposables: Array<{ dispose(): void }> = [];
-  const track = <T extends { dispose(): void }>(x: T): T => { disposables.push(x); return x; };
+  let disposed = false;
+  const disposables = new Set<{ dispose(): void }>();
+  const track = <T extends { dispose(): void }>(x: T): T => {
+    if (disposed) x.dispose();
+    else disposables.add(x);
+    return x;
+  };
 
   // ─── Curb + sidewalk band ────────────────────────────────────────────────
   // Flush with the interior floor (no trip hazard at the threshold), running
@@ -89,7 +98,7 @@ export function buildExteriorEnvironment(scene: THREE.Scene, storeWidth: number,
   sidewalkTex.repeat.set((storeWidth + 8) / 4.5, 1);
   const sidewalkMat = track(new THREE.MeshStandardMaterial({ map: sidewalkTex, roughness: 0.9, metalness: 0.0 }));
   const sidewalk = new THREE.Mesh(
-    new THREE.BoxGeometry(storeWidth + 8, 0.08, sidewalkDepth),
+    track(new THREE.BoxGeometry(storeWidth + 8, 0.08, sidewalkDepth)),
     sidewalkMat,
   );
   sidewalk.position.set(centerX, -0.04, frontZ + sidewalkDepth / 2);
@@ -122,7 +131,7 @@ export function buildExteriorEnvironment(scene: THREE.Scene, storeWidth: number,
 
   const curbMat = track(new THREE.MeshStandardMaterial({ color: CURB_COLOR, roughness: 0.85, metalness: 0.0 }));
   const curb = new THREE.Mesh(
-    new THREE.BoxGeometry(storeWidth + 8, 0.14, 0.4),
+    track(new THREE.BoxGeometry(storeWidth + 8, 0.14, 0.4)),
     curbMat,
   );
   curb.position.set(centerX, -0.03, frontZ + sidewalkDepth + 0.05);
@@ -130,30 +139,20 @@ export function buildExteriorEnvironment(scene: THREE.Scene, storeWidth: number,
   group.add(curb);
 
   // ─── Bollards flanking the entrance ─────────────────────────────────────
-  const bollardMat = track(new THREE.MeshStandardMaterial({ color: '#2b2b2e', roughness: 0.5, metalness: 0.4 }));
-  const bollardBandMat = track(new THREE.MeshStandardMaterial({ color: '#ffcc33', roughness: 0.4, metalness: 0.2 }));
-  [leftEdgeX - 1.4, rightEdgeX + 1.4].forEach((bx) => {
-    const bollard = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.15, 0.9, 12), bollardMat);
-    bollard.position.set(bx, 0.45, frontZ + 1.6);
-    bollard.castShadow = true;
-    bollard.receiveShadow = true;
-    group.add(bollard);
-    const band = new THREE.Mesh(new THREE.CylinderGeometry(0.135, 0.135, 0.1, 12), bollardBandMat);
-    band.position.set(bx, 0.65, frontZ + 1.6);
-    group.add(band);
-  });
+  track(buildEntranceBollards(scene, group, [leftEdgeX - 1.4, rightEdgeX + 1.4], frontZ + 1.6, requestRender));
 
-  // ─── Newspaper/rental-return box prop, off to the side of the entrance ──
+  // ─── Exterior return kiosk: original prop retained as loading fallback ──
   const boxMat = track(new THREE.MeshStandardMaterial({ color: '#8a1f1f', roughness: 0.55, metalness: 0.1 }));
   const boxSlotMat = track(new THREE.MeshStandardMaterial({ color: '#111111', roughness: 0.8 }));
-  const newsBox = new THREE.Mesh(new THREE.BoxGeometry(1.3, 3.2, 1.3), boxMat);
+  const newsBox = new THREE.Mesh(track(new THREE.BoxGeometry(1.3, 3.2, 1.3)), boxMat);
   newsBox.position.set(rightEdgeX + 2.6, 1.6, frontZ + 1.3);
   newsBox.castShadow = true;
   newsBox.receiveShadow = true;
   group.add(newsBox);
-  const slot = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.15, 0.05), boxSlotMat);
+  const slot = new THREE.Mesh(track(new THREE.BoxGeometry(0.7, 0.15, 0.05)), boxSlotMat);
   slot.position.set(rightEdgeX + 2.6, 2.5, frontZ + 1.3 + 0.66);
   group.add(slot);
+  track(installExteriorReturnKiosk(scene, group, [newsBox, slot], rightEdgeX + 2.6, frontZ + 1.3, requestRender));
 
   // ─── Street lamps with fake pooled light ────────────────────────────────
   // "Fake" per the ticket: no real THREE.Light, just an emissive head plus a
@@ -178,26 +177,37 @@ export function buildExteriorEnvironment(scene: THREE.Scene, storeWidth: number,
   // Every head/pool shares one material each, so flipping lampHeadMat/poolMat
   // in setOutsideMode() below updates all of them at once — no per-instance
   // bookkeeping needed.
-  lampPositions.forEach(([lx, lz]) => {
-    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.11, 13, 8), poleMat);
-    pole.position.set(lx, 6.5, lz);
+  const lampAnchors = lampPositions.map(([lx, lz], i) => {
+    const root = new THREE.Group();
+    root.name = `parking-lamp-${i}`;
+    root.position.set(lx, 0, lz);
+    group.add(root);
+    const fallback = new THREE.Group();
+    fallback.name = 'parking-lamp-fallback';
+    root.add(fallback);
+    const pole = new THREE.Mesh(track(new THREE.CylinderGeometry(0.09, 0.11, 13, 8)), poleMat);
+    pole.position.y = 6.5;
     pole.castShadow = true; // prebaked shadow map — a static pole is free
     pole.receiveShadow = true;
-    group.add(pole);
+    fallback.add(pole);
 
-    const head = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.4, 0.7), lampHeadMat);
-    head.position.set(lx, 13.1, lz);
-    group.add(head);
+    const head = new THREE.Mesh(track(new THREE.BoxGeometry(0.7, 0.4, 0.7)), lampHeadMat);
+    head.position.y = 13.1;
+    fallback.add(head);
 
-    const pool = new THREE.Mesh(new THREE.PlaneGeometry(18, 18), poolMat);
+    const pool = new THREE.Mesh(track(new THREE.PlaneGeometry(18, 18)), poolMat);
+    pool.name = `parking-lamp-pool-${i}`;
     pool.rotation.x = -Math.PI / 2;
     pool.position.set(lx, -0.02, lz);
     group.add(pool);
+    return { root, fallback };
   });
+  track(installParkingLampModels(scene, lampAnchors, assetUrl('models/parking-lamp.glb'),
+    poleMat, lampHeadMat, requestRender));
 
   // ─── Parked cars: real low-poly GLB models in a row of stalls ──────────
-  // CC0 low-poly cars from Poly Pizza (Quaternius / Kay Lousberg — see
-  // public/models/ATTRIBUTION.md), cycled across the stalls for variety.
+  // Original editable hatchback plus CC0 sedan/sports cars from Poly Pizza
+  // (see public/models/ATTRIBUTION.md), cycled across the stalls for variety.
   // Loaded async; each is normalized to a fixed length, seated on the ground
   // and centered on its stall. A box fallback keeps a stall from going empty
   // if a model ever fails to fetch.
@@ -264,6 +274,10 @@ export function buildExteriorEnvironment(scene: THREE.Scene, storeWidth: number,
           const mat = mesh.material as THREE.Material | THREE.Material[];
           (Array.isArray(mat) ? mat : [mat]).forEach((m) => {
             track(m);
+            // GLTF textures belong to this load, including the legacy car atlas.
+            Object.values(m).forEach((value) => {
+              if (value instanceof THREE.Texture) track(value);
+            });
             // Cars arrive async, after StoreScene's dimEnvOutside traversal —
             // apply the same exterior env clamp here (the baked environment is
             // an interior capture whose display gain is per-mode; divide it
@@ -276,20 +290,24 @@ export function buildExteriorEnvironment(scene: THREE.Scene, storeWidth: number,
           });
           if (mesh.geometry) track(mesh.geometry);
         });
+        if (disposed) return; // late loads release resources without adoption
         stall.add(model);
+        requestRender();
       },
       undefined,
       (err) => {
+        if (disposed) return;
         console.warn('[exterior] car model failed to load, using box fallback:', url, err);
         const mat = track(new THREE.MeshStandardMaterial({
           color: CAR_COLORS[i % CAR_COLORS.length], roughness: 0.5, metalness: 0.3,
           envMapIntensity: 0.22, // async fallback — same exterior clamp as the GLB path
         }));
-        const body = new THREE.Mesh(new THREE.BoxGeometry(4.0, 2.2, CAR_LEN), mat);
+        const body = new THREE.Mesh(track(new THREE.BoxGeometry(4.0, 2.2, CAR_LEN)), mat);
         body.position.y = 1.1;
         body.castShadow = true;
         body.receiveShadow = true;
         stall.add(body);
+        requestRender();
       },
     );
   });
@@ -331,6 +349,11 @@ export function buildExteriorEnvironment(scene: THREE.Scene, storeWidth: number,
     farZ: PARKING_STALLS.rowFrontZ + PARKING_STALLS.depth,
     initialGroundColor: new THREE.Color(0x3a3a3a),
   }));
+  track(installCurbKit(group, {
+    centerX, minX:centerX-lotHalfWidth, maxX:centerX+lotHalfWidth, frontZ,
+    farZ:PARKING_STALLS.rowFrontZ+PARKING_STALLS.depth,
+  }, storeWidth+8, sidewalkDepth, [sidewalk,curb,exteriorRoad.edgeFallback], sidewalkMat, requestRender));
+
   function setGroundColor(color: THREE.Color) {
     exteriorRoad.setGroundColor(color);
   }
@@ -351,7 +374,10 @@ export function buildExteriorEnvironment(scene: THREE.Scene, storeWidth: number,
   setOutsideMode('day');
 
   function dispose() {
+    if (disposed) return;
+    disposed = true;
     disposables.forEach((d) => d.dispose());
+    disposables.clear();
     scene.remove(group);
   }
 

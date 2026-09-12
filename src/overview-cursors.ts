@@ -134,6 +134,7 @@ export class OverviewCursors {
   private chevronMat: THREE.MeshBasicMaterial;
   private labelGeo: THREE.PlaneGeometry;
   private labels: { mesh: THREE.Mesh; mat: THREE.MeshBasicMaterial; tex: THREE.CanvasTexture }[] = [];
+  private unsubs: (() => void)[] = [];
 
   // Chevron tints derived from the active theme's palette. Built once in the
   // constructor — setColorAt reuses these, no per-frame allocs.
@@ -186,7 +187,7 @@ export class OverviewCursors {
       const tex = new THREE.CanvasTexture(canvas);
       tex.colorSpace = THREE.SRGBColorSpace;
       tex.anisotropy = 4;
-      registerBrandRepaint(tex, paint);
+      this.unsubs.push(registerBrandRepaint(tex, paint));
       const mat = selfLit(new THREE.MeshBasicMaterial({
         map: tex,
         transparent: true,
@@ -309,6 +310,8 @@ export class OverviewCursors {
 
   /** Detach from the scene and release every GPU resource this class created. */
   dispose(scene: THREE.Scene): void {
+    this.unsubs.forEach((unsub) => unsub());
+    this.unsubs.length = 0;
     scene.remove(this.group);
     this.chevronGeo.dispose();
     this.chevronMat.dispose();

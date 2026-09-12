@@ -1,0 +1,33 @@
+{
+  "units": "feet",
+  "bounds": [
+    -2.57,
+    2.57,
+    -0.25,
+    0.25,
+    0,
+    10.25
+  ],
+  "triangles": 12460,
+  "uniqueTriangles": 7520,
+  "meshObjects": 9,
+  "materials": [
+    "ArchPaint",
+    "PostPaint",
+    "JointPaint"
+  ],
+  "textures": 0,
+  "spanInsidePosts": 4.2,
+  "springHeight": 7.5,
+  "apexHeight": 10.25,
+  "postWidth": 0.3,
+  "archBreadth": 0.5,
+  "archDepth": 0.25,
+  "assumptions": [
+    "full span",
+    "height",
+    "return depth",
+    "opposite support",
+    "floor fastening"
+  ]
+}

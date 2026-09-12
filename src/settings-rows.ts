@@ -23,7 +23,8 @@
 // routes to whichever panel is currently built — the drawer regenerates its DOM
 // on every page change, so exactly one is live at a time.
 
-import { HALCYON_BLUE, HALCYON_CREAM } from './logo-spec';
+const HALCYON_BLUE = '#2544ae';
+const HALCYON_CREAM = '#f5f5f7';
 
 export interface RowKitHooks {
   /** Add a row to the drawer's flat nav list; returns its selection index. */
@@ -269,47 +270,65 @@ export class SettingsRowKit {
     return row;
   }
 
-  /** Colour row: hex readout plus the native picker. */
+  /** Colour row: hex readout plus the 100-shade palette grid picker. */
   color(id: string, label: string, hint: string, get: () => string, set: (v: string) => void): HTMLElement {
     const wrap = document.createElement('span');
     wrap.className = 'brand-color-wrap';
     const hex = document.createElement('span');
     hex.className = 'brand-color-hex';
-    const input = document.createElement('input');
-    input.type = 'color';
-    input.setAttribute('aria-label', `${label}: custom colour`);
-    input.id = `setting-input-${this.opts.prefix}${id}`;
+    const swatch = document.createElement('button');
+    swatch.type = 'button';
+    swatch.className = 'brand-color-swatch-btn';
+    swatch.setAttribute('aria-label', `${label}: choose colour`);
+    swatch.id = `setting-input-${this.opts.prefix}${id}`;
+
     const sync = () => {
-      input.value = toHexColor(get());
-      hex.textContent = COLOUR_SWATCHES.find((c) => c.id === input.value)?.label ?? 'Custom';
+      const current = toHexColor(get());
+      swatch.style.backgroundColor = current;
+      const found = COLOR_GRID_100.find((c) => c.id.toLowerCase() === current.toLowerCase());
+      hex.textContent = found ? found.label : current.toUpperCase();
     };
     sync();
-    // Live preview while scrubbing the picker; persist on close (change).
-    input.addEventListener('input', () => {
-      set(input.value);
-      hex.textContent = COLOUR_SWATCHES.find((c) => c.id === input.value)?.label ?? 'Custom';
-      this.opts.preview();
-    });
-    input.addEventListener('change', () => {
-      set(input.value);
-      this.opts.commit();
-    });
-    input.addEventListener('click', (e) => e.stopPropagation());
-    wrap.appendChild(hex);
-    wrap.appendChild(input);
-    // Remote arrows browse named inks without opening an OS colour dialog.
-    // A pointer can still click the swatch for an exact custom colour.
-    const activate = (dir: number) => {
-      const idx = COLOUR_SWATCHES.findIndex((c) => c.id === toHexColor(get()));
-      const next = (idx + dir + COLOUR_SWATCHES.length) % COLOUR_SWATCHES.length;
-      set(COLOUR_SWATCHES[next].id);
-      sync();
-      this.opts.commit();
+
+    const openPicker = () => {
+      const initial = toHexColor(get());
+      openColorGridPicker({
+        title: label,
+        initialColor: initial,
+        onPreview: (colorHex) => {
+          set(colorHex);
+          sync();
+          this.opts.preview();
+        },
+        onSelect: (colorHex) => {
+          set(colorHex);
+          sync();
+          this.opts.commit();
+        },
+        onCancel: () => {
+          set(initial);
+          sync();
+          this.opts.preview();
+        },
+      });
     };
+
+    swatch.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openPicker();
+    });
+
+    wrap.appendChild(hex);
+    wrap.appendChild(swatch);
+
+    const activate = () => {
+      openPicker();
+    };
+
     const row = this.rowShell(id, label, hint, activate);
     row.appendChild(wrap);
     row.addEventListener('click', (e) => {
-      if (e.target !== input) activate(1);
+      if (e.target !== swatch) openPicker();
     });
     this.syncFns.push(sync);
     return row;
@@ -497,18 +516,384 @@ export function setRowEnabled(row: HTMLElement, enabled: boolean): void {
   }
 }
 
-const COLOUR_SWATCHES = [
-  { id: HALCYON_BLUE, label: 'House blue' }, { id: HALCYON_CREAM, label: 'House white' },
-  { id: '#ffffff', label: 'White' }, { id: '#17263e', label: 'Midnight' },
-  { id: '#234c40', label: 'Evergreen' }, { id: '#782f40', label: 'Burgundy' },
-  { id: '#b65e3c', label: 'Terracotta' }, { id: '#d6b77a', label: 'Sand' },
-  { id: '#71a6b3', label: 'Sea glass' }, { id: '#727889', label: 'Slate' },
-  { id: '#302e35', label: 'Charcoal' }, { id: '#111111', label: 'Black' },
+export interface PaletteColor {
+  id: string;
+  label: string;
+}
+
+export const COLOR_GRID_100: PaletteColor[] = [
+  // Row 1: Neutrals & Monochromes
+  { id: '#ffffff', label: 'Pure White' },
+  { id: HALCYON_CREAM, label: 'House White' },
+  { id: '#f2e8c9', label: 'Parchment' },
+  { id: '#d6b77a', label: 'Sand' },
+  { id: '#9e9a8e', label: 'Warm Gray' },
+  { id: '#727889', label: 'Slate' },
+  { id: '#4a4e5a', label: 'Cool Charcoal' },
+  { id: '#302e35', label: 'Charcoal' },
+  { id: '#1a1e24', label: 'Midnight Slate' },
+  { id: '#000000', label: 'Pure Black' },
+
+  // Row 2: Reds & Crimson
+  { id: '#4a151e', label: 'Dark Maroon' },
+  { id: '#782f40', label: 'Burgundy' },
+  { id: '#8c1d28', label: 'Brick Red' },
+  { id: '#a61c2e', label: 'Crimson' },
+  { id: '#c92a2a', label: 'Cardinal Red' },
+  { id: '#e63946', label: 'Cherry Red' },
+  { id: '#ff4d4d', label: 'Bright Red' },
+  { id: '#f25f5c', label: 'Coral' },
+  { id: '#d16b78', label: 'Dusty Rose' },
+  { id: '#fce2e6', label: 'Soft Rose' },
+
+  // Row 3: Oranges & Terracotta
+  { id: '#4e200c', label: 'Dark Espresso' },
+  { id: '#733211', label: 'Rust' },
+  { id: '#b65e3c', label: 'Terracotta' },
+  { id: '#c85a17', label: 'Burnt Orange' },
+  { id: '#d96b27', label: 'Vintage Orange' },
+  { id: '#e85d04', label: 'Tangerine' },
+  { id: '#f48c06', label: 'Bright Orange' },
+  { id: '#faa307', label: 'Amber' },
+  { id: '#ffb703', label: 'Golden Honey' },
+  { id: '#ffe3c4', label: 'Peach Cream' },
+
+  // Row 4: Golds & Yellows (includes Classic Rental Yellow & Hollywood Gold)
+  { id: '#57410d', label: 'Bronze' },
+  { id: '#7d5e13', label: 'Dark Gold' },
+  { id: '#a47e1b', label: 'Antique Gold' },
+  { id: '#e5a823', label: 'Hollywood Gold' },
+  { id: '#e0a91b', label: 'Marigold' },
+  { id: '#f6d42a', label: 'Classic Yellow' },
+  { id: '#ffd24a', label: 'CRT Gold' },
+  { id: '#ffea00', label: 'Lemon Yellow' },
+  { id: '#fff176', label: 'Canary' },
+  { id: '#fff9c4', label: 'Pale Butter' },
+
+  // Row 5: Lime & Chartreuse
+  { id: '#2b3609', label: 'Deep Olive' },
+  { id: '#475b0f', label: 'Olive' },
+  { id: '#607c14', label: 'Moss Green' },
+  { id: '#7c9d18', label: 'Army Olive' },
+  { id: '#97c01b', label: 'Chartreuse' },
+  { id: '#aacc00', label: 'Lime' },
+  { id: '#b5e000', label: 'Bright Lime' },
+  { id: '#ccff00', label: 'Electric Lime' },
+  { id: '#dcf7a1', label: 'Celery' },
+  { id: '#f0fce1', label: 'Honeydew' },
+
+  // Row 6: Forest & Pure Greens
+  { id: '#0d2818', label: 'Deep Pine' },
+  { id: '#1b4332', label: 'Forest Green' },
+  { id: '#234c40', label: 'Evergreen' },
+  { id: '#2d6a4f', label: 'Hunter Green' },
+  { id: '#40916c', label: 'Emerald' },
+  { id: '#52b788', label: 'Jade' },
+  { id: '#74c69d', label: 'Mint' },
+  { id: '#95d5b2', label: 'Seafoam' },
+  { id: '#b7e4c7', label: 'Pale Sage' },
+  { id: '#d8f3dc', label: 'Soft Mint' },
+
+  // Row 7: Teals & Cyans (includes Hollywood Teal)
+  { id: '#0b252c', label: 'Abyss Teal' },
+  { id: '#006666', label: 'Hollywood Teal' },
+  { id: '#133e48', label: 'Dark Teal' },
+  { id: '#1c5866', label: 'Deep Petrol' },
+  { id: '#2a7485', label: 'Sea Glass' },
+  { id: '#3890a5', label: 'Ocean Teal' },
+  { id: '#48a9c5', label: 'Retro Cyan' },
+  { id: '#5bc0eb', label: 'Sky Cyan' },
+  { id: '#00e5ff', label: 'Electric Cyan' },
+  { id: '#80deea', label: 'Ice Blue' },
+
+  // Row 8: Blues & Navy (includes Classic Video Blue)
+  { id: '#001489', label: 'Classic Video Blue' },
+  { id: '#0b132b', label: 'Midnight Navy' },
+  { id: '#17263e', label: 'Midnight' },
+  { id: '#1c3166', label: 'Deep Royal' },
+  { id: HALCYON_BLUE, label: 'House Blue' },
+  { id: '#3a59d1', label: 'Cobalt' },
+  { id: '#4361ee', label: 'Royal Blue' },
+  { id: '#5c7cfa', label: 'Periwinkle' },
+  { id: '#748ffc', label: 'Cornflower' },
+  { id: '#a5d8ff', label: 'Powder Blue' },
+
+  // Row 9: Violets & Purples (includes Hollywood Purple)
+  { id: '#1a0c2e', label: 'Dark Night' },
+  { id: '#2e1065', label: 'Deep Indigo' },
+  { id: '#3d1a56', label: 'Imperial Purple' },
+  { id: '#4a154b', label: 'Hollywood Purple' },
+  { id: '#561d6e', label: 'Royal Purple' },
+  { id: '#7209b7', label: 'Vibrant Violet' },
+  { id: '#8f2dda', label: 'Electric Purple' },
+  { id: '#a370f7', label: 'Bright Lilac' },
+  { id: '#b892ff', label: 'Soft Violet' },
+  { id: '#d0bfff', label: 'Lavender' },
+
+  // Row 10: Magentas & Pinks (includes Hollywood Wine & Hollywood Magenta)
+  { id: '#3b092b', label: 'Dark Wine' },
+  { id: '#660033', label: 'Hollywood Wine' },
+  { id: '#800040', label: 'Hollywood Magenta' },
+  { id: '#7a1159', label: 'Plum' },
+  { id: '#9b1771', label: 'Magenta' },
+  { id: '#b5179e', label: 'Vivid Fuchsia' },
+  { id: '#d91b8a', label: 'Hot Pink' },
+  { id: '#f72585', label: 'Neon Rose' },
+  { id: '#ff4d80', label: 'Bubblegum' },
+  { id: '#ff85a1', label: 'Carnation Pink' },
 ];
+
+export const COLOUR_SWATCHES = COLOR_GRID_100;
+
+export interface ColorGridPickerOpts {
+  title: string;
+  initialColor: string;
+  onPreview: (hex: string) => void;
+  onSelect: (hex: string) => void;
+  onCancel: () => void;
+}
+
+/**
+ * Open a 100-shade retro color picker grid modal.
+ * Supports arrow navigation, hover previews with a prominent large preview square,
+ * Select/Enter confirmation, and Cancel/Back/Esc reversion.
+ */
+export function openColorGridPicker(opts: ColorGridPickerOpts): () => void {
+  document.getElementById('color-grid-overlay')?.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'color-grid-overlay';
+  overlay.className = 'color-grid-overlay';
+
+  const modal = document.createElement('div');
+  modal.className = 'color-grid-modal';
+
+  const header = document.createElement('div');
+  header.className = 'color-grid-header';
+  const titleSpan = document.createElement('span');
+  titleSpan.className = 'color-grid-title';
+  titleSpan.textContent = `${opts.title.toUpperCase()} — SELECT COLOUR`;
+
+  const closeBtn = document.createElement('button');
+  closeBtn.type = 'button';
+  closeBtn.className = 'color-grid-close-btn';
+  closeBtn.innerHTML = '&times;';
+  closeBtn.setAttribute('aria-label', 'Close');
+  header.appendChild(titleSpan);
+  header.appendChild(closeBtn);
+  modal.appendChild(header);
+
+  const body = document.createElement('div');
+  body.className = 'color-grid-body';
+
+  const swatchesContainer = document.createElement('div');
+  swatchesContainer.className = 'color-grid-swatches';
+  swatchesContainer.setAttribute('role', 'grid');
+
+  const previewPanel = document.createElement('div');
+  previewPanel.className = 'color-grid-preview-panel';
+
+  const previewLabel = document.createElement('span');
+  previewLabel.className = 'color-grid-preview-label';
+  previewLabel.textContent = 'Preview';
+
+  const largeSquare = document.createElement('div');
+  largeSquare.className = 'color-grid-large-square';
+
+  const previewName = document.createElement('div');
+  previewName.className = 'color-grid-preview-name';
+
+  const previewHex = document.createElement('div');
+  previewHex.className = 'color-grid-preview-hex';
+
+  const comparisonRow = document.createElement('div');
+  comparisonRow.className = 'color-grid-comparison-row';
+  comparisonRow.innerHTML = `
+    <div class="color-grid-comp-item">
+      <span class="color-grid-comp-label">ORIGINAL</span>
+      <div class="color-grid-comp-swatch" style="background-color: ${toHexColor(opts.initialColor)};"></div>
+    </div>
+    <div class="color-grid-comp-arrow">&rarr;</div>
+    <div class="color-grid-comp-item">
+      <span class="color-grid-comp-label">NEW</span>
+      <div class="color-grid-comp-swatch color-grid-comp-new" style="background-color: ${toHexColor(opts.initialColor)};"></div>
+    </div>
+  `;
+
+  previewPanel.appendChild(previewLabel);
+  previewPanel.appendChild(largeSquare);
+  previewPanel.appendChild(previewName);
+  previewPanel.appendChild(previewHex);
+  previewPanel.appendChild(comparisonRow);
+
+  body.appendChild(swatchesContainer);
+  body.appendChild(previewPanel);
+  modal.appendChild(body);
+
+  const footer = document.createElement('div');
+  footer.className = 'color-grid-footer';
+
+  const hints = document.createElement('span');
+  hints.className = 'color-grid-hints';
+  hints.textContent = '◄▲▼► Navigate · OK/Click Select · Esc/Back Cancel';
+
+  const actions = document.createElement('div');
+  actions.className = 'color-grid-actions';
+
+  const cancelBtn = document.createElement('button');
+  cancelBtn.type = 'button';
+  cancelBtn.className = 'color-grid-btn color-grid-btn-cancel';
+  cancelBtn.textContent = 'CANCEL';
+
+  const selectBtn = document.createElement('button');
+  selectBtn.type = 'button';
+  selectBtn.className = 'color-grid-btn color-grid-btn-select';
+  selectBtn.textContent = 'SELECT';
+
+  actions.appendChild(cancelBtn);
+  actions.appendChild(selectBtn);
+  footer.appendChild(hints);
+  footer.appendChild(actions);
+  modal.appendChild(footer);
+
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+
+  const normalizedInitial = toHexColor(opts.initialColor).toLowerCase();
+  let selectedIndex = COLOR_GRID_100.findIndex((c) => c.id.toLowerCase() === normalizedInitial);
+  if (selectedIndex < 0) selectedIndex = 0;
+
+  const buttons: HTMLButtonElement[] = [];
+
+  const updatePreview = (idx: number, triggerCallback = true) => {
+    selectedIndex = idx;
+    const color = COLOR_GRID_100[idx];
+    buttons.forEach((btn, i) => {
+      btn.classList.toggle('focused', i === idx);
+    });
+    largeSquare.style.backgroundColor = color.id;
+    previewName.textContent = color.label;
+    previewHex.textContent = color.id.toUpperCase();
+    const newComp = comparisonRow.querySelector('.color-grid-comp-new') as HTMLElement | null;
+    if (newComp) newComp.style.backgroundColor = color.id;
+
+    if (triggerCallback) {
+      opts.onPreview(color.id);
+    }
+  };
+
+  COLOR_GRID_100.forEach((color, i) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'color-grid-cell';
+    btn.style.backgroundColor = color.id;
+    btn.title = `${color.label} (${color.id})`;
+    btn.setAttribute('aria-label', color.label);
+    if (color.id.toLowerCase() === normalizedInitial) {
+      btn.classList.add('selected-committed');
+    }
+
+    btn.addEventListener('pointerenter', () => {
+      updatePreview(i, true);
+    });
+
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      confirmSelection(i);
+    });
+
+    buttons.push(btn);
+    swatchesContainer.appendChild(btn);
+  });
+
+  updatePreview(selectedIndex, false);
+
+  let closed = false;
+  const cleanup = () => {
+    if (closed) return;
+    closed = true;
+    window.removeEventListener('keydown', handleKeyDown, true);
+    overlay.remove();
+  };
+
+  const cancelSelection = () => {
+    cleanup();
+    opts.onCancel();
+  };
+
+  const confirmSelection = (idx = selectedIndex) => {
+    const color = COLOR_GRID_100[idx];
+    cleanup();
+    opts.onSelect(color.id);
+  };
+
+  cancelBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    cancelSelection();
+  });
+  closeBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    cancelSelection();
+  });
+  selectBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    confirmSelection();
+  });
+
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) {
+      cancelSelection();
+    }
+  });
+
+  const handleKeyDown = (e: KeyboardEvent) => {
+    if (closed) return;
+    const COLS = 10;
+    const ROWS = 10;
+    let handled = true;
+
+    if (e.key === 'ArrowLeft') {
+      const row = Math.floor(selectedIndex / COLS);
+      const col = selectedIndex % COLS;
+      const nextCol = (col - 1 + COLS) % COLS;
+      updatePreview(row * COLS + nextCol);
+    } else if (e.key === 'ArrowRight') {
+      const row = Math.floor(selectedIndex / COLS);
+      const col = selectedIndex % COLS;
+      const nextCol = (col + 1) % COLS;
+      updatePreview(row * COLS + nextCol);
+    } else if (e.key === 'ArrowUp') {
+      const row = Math.floor(selectedIndex / COLS);
+      const col = selectedIndex % COLS;
+      const nextRow = (row - 1 + ROWS) % ROWS;
+      updatePreview(nextRow * COLS + col);
+    } else if (e.key === 'ArrowDown') {
+      const row = Math.floor(selectedIndex / COLS);
+      const col = selectedIndex % COLS;
+      const nextRow = (row + 1) % ROWS;
+      updatePreview(nextRow * COLS + col);
+    } else if (e.key === 'Enter' || e.key === ' ') {
+      confirmSelection();
+    } else if (e.key === 'Escape' || e.key === 'Backspace') {
+      cancelSelection();
+    } else {
+      handled = false;
+    }
+
+    if (handled) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  };
+
+  window.addEventListener('keydown', handleKeyDown, true);
+
+  return cleanup;
+}
 
 let scratchCtx: CanvasRenderingContext2D | null = null;
 
-/** Normalize any CSS colour to #rrggbb for <input type=color>. */
+/** Normalize any CSS colour to #rrggbb. */
 export function toHexColor(c: string): string {
   if (/^#[0-9a-fA-F]{6}$/.test(c)) return c.toLowerCase();
   scratchCtx ??= document.createElement('canvas').getContext('2d');
@@ -518,3 +903,4 @@ export function toHexColor(c: string): string {
   const v = String(scratchCtx.fillStyle);
   return /^#[0-9a-fA-F]{6}$/.test(v) ? v : '#000000';
 }
+

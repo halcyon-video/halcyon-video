@@ -1,11 +1,17 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { facadeDimensions, resolveFacadeStyle, type FacadeStyle } from '../src/storefront-architecture.ts';
+import { facadeDimensions, resolveFacadeStyle, resolveConeCanopyFinish, type FacadeStyle, type ConeCanopyFinish } from '../src/storefront-architecture.ts';
 
 test('old and unknown settings keep the gabled facade', () => {
   for (const value of [null, '', 'standard', 'unknown']) assert.equal(resolveFacadeStyle(value), 'gabled-brick');
   assert.equal(resolveFacadeStyle('flat-parapet'), 'flat-parapet');
   assert.equal(resolveFacadeStyle('arcaded-brick'), 'arcaded-brick');
+  assert.equal(resolveFacadeStyle('cone-canopy'), 'cone-canopy');
+});
+
+test('cone canopy finish resolves brand-accent by default and full-slate on request', () => {
+  for (const value of [null, '', 'unknown', 'brand-accent']) assert.equal(resolveConeCanopyFinish(value), 'brand-accent');
+  assert.equal(resolveConeCanopyFinish('full-slate'), 'full-slate');
 });
 
 test('the gabled storefront uses a modest peak above its low parapet', () => {
@@ -44,4 +50,14 @@ for (const style of ['gabled-brick', 'flat-parapet', 'arcaded-brick'] as FacadeS
   assert(d.pierFront > d.pierBack+1.5, 'pillars retain physical depth');
   assert(d.pierFront+.1 < d.sidewalkDepth, 'the pillar base remains on the sidewalk');
   assert(d.frontProjection >= d.pierBack && d.frontProjection <= d.pierFront);
+});
+
+test('cone canopy extends eleven and a half feet while keeping the sign above doors', () => {
+  const d = facadeDimensions(13.5, 7.9, 'cone-canopy');
+  assert.equal(d.frontProjection, 11.5);
+  assert(d.sidewalkDepth > d.pierFront+.5);
+  assert(d.pierBack > 8);
+  assert(d.logoY-2.7 > d.headerBottom);
+  assert(d.logoY+2.7 < d.pierTop);
+  assert.equal(d.gableHeight, 0);
 });

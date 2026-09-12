@@ -1,0 +1,26 @@
+{
+  "units": "feet",
+  "nonManifoldEdges": 0,
+  "materialRoles": [
+    "FacadeSlate",
+    "FacadeCoping",
+    "FacadeSoffit",
+    "FacadeDownlight"
+  ],
+  "sourceMeshes": 19,
+  "bytes": 230252,
+  "sourceTriangles": 4860,
+  "exportedTriangles": 6780,
+  "boundsStoreFeet": [
+    [
+      -11.16,
+      0,
+      -0.18
+    ],
+    [
+      11.16,
+      18.2,
+      11.56
+    ]
+  ]
+}

@@ -1,0 +1,72 @@
+{
+  "bytes": 103916,
+  "textures": 0,
+  "parts": [
+    {
+      "name": "Snap rail Bottom",
+      "triangles": 44,
+      "materials": [
+        "LetterboardAluminium"
+      ],
+      "uv": true
+    },
+    {
+      "name": "Snap rail Right",
+      "triangles": 44,
+      "materials": [
+        "LetterboardAluminium"
+      ],
+      "uv": true
+    },
+    {
+      "name": "Snap rail Top",
+      "triangles": 44,
+      "materials": [
+        "LetterboardAluminium"
+      ],
+      "uv": true
+    },
+    {
+      "name": "Snap rail Left",
+      "triangles": 44,
+      "materials": [
+        "LetterboardAluminium"
+      ],
+      "uv": true
+    },
+    {
+      "name": "Grooved insert and rear sheet",
+      "triangles": 1340,
+      "materials": [
+        "LetterboardLiveFace",
+        "LetterboardBacking"
+      ],
+      "uv": true
+    },
+    {
+      "name": "Level counter contact sole",
+      "triangles": 12,
+      "materials": [
+        "LetterboardContact"
+      ],
+      "uv": true
+    },
+    {
+      "name": "Rear glass contact L",
+      "triangles": 12,
+      "materials": [
+        "LetterboardContact"
+      ],
+      "uv": true
+    },
+    {
+      "name": "Rear glass contact R",
+      "triangles": 12,
+      "materials": [
+        "LetterboardContact"
+      ],
+      "uv": true
+    }
+  ],
+  "triangles": 1552
+}

@@ -1,0 +1,21 @@
+{
+  "triangles": 440,
+  "parts": 2,
+  "material_roles": [
+    "RubberBacking",
+    "CompressedPile"
+  ],
+  "textures": 2,
+  "texture_dimensions": [
+    512,
+    512
+  ],
+  "footprint": [
+    1,
+    1
+  ],
+  "max_height_ft": 0.024000000208616257,
+  "glb_bytes": 657848,
+  "blender_version": "5.2.0 LTS",
+  "manifold": true
+}

@@ -21,6 +21,7 @@ import { activeSuggestionWindow, titleInWindow, windowGteParam, windowLteParam }
 import {
   type StreamingServiceDef, type RawDiscoverItem,
   resolveEnabledServices, matchProviderId, ingestStreamingResults, STREAMING_CAP_PER_SERVICE,
+  resolveStreamingWatchRegion,
 } from './streaming-catalog';
 
 // Re-exported under the historical name so existing importers are untouched.
@@ -841,8 +842,8 @@ export async function requestMovie(tmdbId: number): Promise<boolean> {
 // (with_watch_monetization_types=flatrate) -- this proxy has no equivalent
 // param. See streaming-catalog.ts's resolveStreamingSource for the ladder.
 
-// TMDB's watch-provider data is region-keyed; a hardcoded US default until a
-// settings UI exists to pick one (GH #86 follow-up).
+// TMDB's watch-provider data is region-keyed; defaults to US unless a region
+// is provided (GH #86, GH #330).
 const STREAMING_WATCH_REGION = 'US';
 // Round-trip fan-out for the per-service discover calls, matching the
 // collection-gap loader's GAP_FETCH_CONCURRENCY -- Jellyseerr proxies TMDB
@@ -860,15 +861,19 @@ const STREAMING_FETCH_CONCURRENCY = 8;
  * anything in the region's provider list is logged once (not per-title) so a
  * TMDB rename shows up on the boot console instead of a silently empty aisle.
  */
-export async function fetchStreamingMovies(servicesOverrideCsv?: string | null): Promise<Movie[]> {
+export async function fetchStreamingMovies(
+  servicesOverrideCsv?: string | null,
+  region: string = STREAMING_WATCH_REGION
+): Promise<Movie[]> {
   const config = getJellyseerrConfig();
   if (!config) return [];
 
+  const watchRegion = resolveStreamingWatchRegion(region);
   const wanted = resolveEnabledServices(servicesOverrideCsv);
   let providers: { id: number; name: string }[] = [];
   try {
     const list = await jellyseerrRequest(
-      config, `/api/v1/watchproviders/movies?watchRegion=${STREAMING_WATCH_REGION}`
+      config, `/api/v1/watchproviders/movies?watchRegion=${encodeURIComponent(watchRegion)}`
     );
     providers = Array.isArray(list) ? list : [];
   } catch (e) {
@@ -885,7 +890,7 @@ export async function fetchStreamingMovies(servicesOverrideCsv?: string | null):
   }
   if (unmatched.length > 0) {
     console.warn(
-      `[Jellyseerr] Streaming: no provider match in region ${STREAMING_WATCH_REGION} for: ${unmatched.join(', ')}` +
+      `[Jellyseerr] Streaming: no provider match in region ${watchRegion} for: ${unmatched.join(', ')}` +
       ' -- check the name against Jellyseerr\'s own watch-provider list (a rename on TMDB\'s side, most likely).'
     );
   }
@@ -899,7 +904,7 @@ export async function fetchStreamingMovies(servicesOverrideCsv?: string | null):
       try {
         const data = await jellyseerrRequest(
           config,
-          `/api/v1/discover/movies?watchProviders=${providerId}&watchRegion=${STREAMING_WATCH_REGION}&page=1`
+          `/api/v1/discover/movies?watchProviders=${providerId}&watchRegion=${encodeURIComponent(watchRegion)}&page=1`
         );
         const items: RawDiscoverItem[] = Array.isArray(data?.results) ? data.results : [];
         return ingestStreamingResults(items, def, { dismissed, cap: STREAMING_CAP_PER_SERVICE });

@@ -1,0 +1,39 @@
+{
+  "units": "feet",
+  "triangles": 10168,
+  "glbBytes": 2077884,
+  "runtimeMeshes": 13,
+  "materialRoles": [
+    "VitrineLaminate",
+    "VitrineAnodizedAluminum",
+    "VitrineGasket",
+    "VitrineCarton",
+    "VitrinePaper",
+    "VitrineGlass"
+  ],
+  "textures": 18,
+  "textureSize": [
+    256,
+    256
+  ],
+  "boundsBlender": [
+    [
+      -1.75,
+      -0.8500000238418579,
+      0.0
+    ],
+    [
+      1.75,
+      0.9040001034736633,
+      3.482499837875366
+    ]
+  ],
+  "closedPartsManifold": true,
+  "exception": null,
+  "shelfTopHeights": [
+    0.64,
+    1.43,
+    2.32
+  ],
+  "merchandiseCartons": 12
+}

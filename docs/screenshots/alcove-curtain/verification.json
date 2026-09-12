@@ -1,0 +1,256 @@
+[
+  {
+    "action": "right",
+    "passageHits": 0,
+    "colliders": 4,
+    "footprint": {
+      "label": "structure:curtained-alcove",
+      "kind": "structure",
+      "cx": 25,
+      "cz": -27,
+      "w": 8,
+      "d": 6,
+      "yaw": 0
+    },
+    "meshes": [
+      {
+        "name": "AlcoveSupportRail",
+        "count": 1,
+        "triangles": 108,
+        "uv": true,
+        "role": "CurtainSupportWood"
+      },
+      {
+        "name": "AlcoveBeadBarrel_instances",
+        "count": 572,
+        "triangles": 112,
+        "uv": true,
+        "role": "BeadAmberAcrylic"
+      },
+      {
+        "name": "AlcoveBeadFacet_instances",
+        "count": 191,
+        "triangles": 80,
+        "uv": true,
+        "role": "BeadAmberAcrylic"
+      },
+      {
+        "name": "AlcoveEyelet_instances",
+        "count": 15,
+        "triangles": 156,
+        "uv": true,
+        "role": "AttachmentAgedBrass"
+      },
+      {
+        "name": "AlcoveCord_instances",
+        "count": 15,
+        "triangles": 20,
+        "uv": true,
+        "role": "StrandBraidedCord"
+      },
+      {
+        "name": "AlcoveCordKnot_instances",
+        "count": 30,
+        "triangles": 60,
+        "uv": true,
+        "role": "StrandBraidedCord"
+      }
+    ],
+    "bounds": {
+      "min": [
+        20.89906806871295,
+        0.0038796793669462204,
+        -27.35
+      ],
+      "max": [
+        21.10943489149213,
+        6.860000133514404,
+        -24.35
+      ]
+    },
+    "positionError": 2.384185648907078e-8,
+    "fallbackVisible": false,
+    "refresh": 2,
+    "render": 1,
+    "expected": {
+      "geometry": 15,
+      "material": 10,
+      "instance": 6
+    },
+    "disposed": {
+      "geometry": 15,
+      "material": 10,
+      "instance": 6
+    },
+    "remaining": 0
+  },
+  {
+    "action": "left",
+    "passageHits": 0,
+    "colliders": 4,
+    "footprint": {
+      "label": "structure:curtained-alcove",
+      "kind": "structure",
+      "cx": -3,
+      "cz": -27,
+      "w": 8,
+      "d": 6,
+      "yaw": 0
+    },
+    "meshes": [
+      {
+        "name": "AlcoveSupportRail",
+        "count": 1,
+        "triangles": 108,
+        "uv": true,
+        "role": "CurtainSupportWood"
+      },
+      {
+        "name": "AlcoveBeadBarrel_instances",
+        "count": 572,
+        "triangles": 112,
+        "uv": true,
+        "role": "BeadAmberAcrylic"
+      },
+      {
+        "name": "AlcoveBeadFacet_instances",
+        "count": 191,
+        "triangles": 80,
+        "uv": true,
+        "role": "BeadAmberAcrylic"
+      },
+      {
+        "name": "AlcoveEyelet_instances",
+        "count": 15,
+        "triangles": 156,
+        "uv": true,
+        "role": "AttachmentAgedBrass"
+      },
+      {
+        "name": "AlcoveCord_instances",
+        "count": 15,
+        "triangles": 20,
+        "uv": true,
+        "role": "StrandBraidedCord"
+      },
+      {
+        "name": "AlcoveCordKnot_instances",
+        "count": 30,
+        "triangles": 60,
+        "uv": true,
+        "role": "StrandBraidedCord"
+      }
+    ],
+    "bounds": {
+      "min": [
+        0.8905655257403851,
+        0.0038796793669462204,
+        -27.35
+      ],
+      "max": [
+        1.1009319312870502,
+        6.860000133514404,
+        -24.35
+      ]
+    },
+    "positionError": 2.384185648907078e-8,
+    "fallbackVisible": false,
+    "refresh": 2,
+    "render": 1,
+    "expected": {
+      "geometry": 15,
+      "material": 10,
+      "instance": 6
+    },
+    "disposed": {
+      "geometry": 15,
+      "material": 10,
+      "instance": 6
+    },
+    "remaining": 0
+  },
+  {
+    "action": "low-ceiling",
+    "passageHits": 0,
+    "colliders": 0,
+    "footprint": null,
+    "meshes": [],
+    "bounds": null,
+    "positionError": 0,
+    "refresh": 0,
+    "render": 0,
+    "expected": {
+      "geometry": 0,
+      "material": 0,
+      "instance": 0
+    },
+    "disposed": {
+      "geometry": 0,
+      "material": 0,
+      "instance": 0
+    },
+    "remaining": 0
+  },
+  {
+    "action": "failure",
+    "passageHits": 0,
+    "colliders": 4,
+    "footprint": {
+      "label": "structure:curtained-alcove",
+      "kind": "structure",
+      "cx": 25,
+      "cz": -27,
+      "w": 8,
+      "d": 6,
+      "yaw": 0
+    },
+    "meshes": [],
+    "bounds": null,
+    "positionError": 0,
+    "fallbackVisible": true,
+    "refresh": 1,
+    "render": 0,
+    "expected": {
+      "geometry": 9,
+      "material": 6,
+      "instance": 1
+    },
+    "disposed": {
+      "geometry": 9,
+      "material": 6,
+      "instance": 1
+    },
+    "remaining": 0
+  },
+  {
+    "action": "late",
+    "passageHits": 0,
+    "colliders": 4,
+    "footprint": {
+      "label": "structure:curtained-alcove",
+      "kind": "structure",
+      "cx": 25,
+      "cz": -27,
+      "w": 8,
+      "d": 6,
+      "yaw": 0
+    },
+    "meshes": [],
+    "bounds": null,
+    "positionError": 0,
+    "fallbackVisible": true,
+    "refresh": 1,
+    "render": 0,
+    "expected": {
+      "geometry": 15,
+      "material": 10,
+      "instance": 1
+    },
+    "disposed": {
+      "geometry": 15,
+      "material": 10,
+      "instance": 1
+    },
+    "remaining": 0
+  }
+]

@@ -1,0 +1,19 @@
+{
+  "bytes": 458760,
+  "triangles": 6524,
+  "draws": 6,
+  "roles": [
+    "FramePaint",
+    "HeaderPaint",
+    "PanelLaminate",
+    "EdgePaint",
+    "CabinetLaminate",
+    "WallPoster"
+  ],
+  "height": 10.6,
+  "envelope": [
+    15.2,
+    15.2
+  ],
+  "uv": true
+}

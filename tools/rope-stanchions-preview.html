@@ -1,0 +1,69 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Rope stanchions · construction views</title>
+<style>
+  body { margin: 0; background: #202831; color: #eef1f4; font: 15px sans-serif; }
+  aside { position: absolute; top: 20px; left: 24px; max-width: 580px; }
+  h1 { font-size: 20px; margin: 0 0 10px; }
+  button { margin: 0 8px 8px 0; padding: 6px 12px; }
+</style>
+<aside><h1>Rope queue stanchions</h1>
+  <p>Estimated scale · 3¼ ft posts · 14 in bases · 5 ft spans · 20% sag</p>
+  <button data-view="front">Front</button><button data-view="side">Side</button>
+  <button data-view="rear">Rear / supports</button><button data-view="eye">Eye level</button>
+  <button data-view="supports">Base / underside</button>
+  <p id="status">Loading…</p>
+</aside>
+<script type="module">
+import * as THREE from 'three';
+import { createFixture } from '/src/fixture-registry.ts';
+import { DEFAULT_FIXTURE_PLACEMENTS } from '/src/store-fixtures-config.ts';
+import { THEMES } from '/src/themes.ts';
+
+localStorage.clear();
+const placement = { ...DEFAULT_FIXTURE_PLACEMENTS.find(p => p.kind === 'rope-stanchions'), position: { x: 0, z: 0 } };
+const scene = new THREE.Scene(); scene.background = new THREE.Color('#202831');
+const camera = new THREE.PerspectiveCamera(38, innerWidth / innerHeight, .01, 100);
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setSize(innerWidth, innerHeight); renderer.setPixelRatio(1);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+document.body.append(renderer.domElement);
+scene.add(new THREE.HemisphereLight('#f2f6ff', '#65717d', 2));
+for (const [x,y,z,power] of [[-3,5,4,50],[3,3,-3,35]]) {
+  const light = new THREE.PointLight('#ffffff', power); light.position.set(x,y,z); scene.add(light);
+}
+// Construction view uses the real fixture factory and a neutral floor.
+const grid = new THREE.GridHelper(20, 20, '#6b7a89', '#35404b'); grid.position.y = -.01; scene.add(grid);
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(40,40), new THREE.MeshStandardMaterial({color:'#424953',roughness:.9})); floor.rotation.x=-Math.PI/2; floor.position.y=-.02; scene.add(floor);
+let renderRequests = 0, shadowRequests = 0, colliders = 0;
+const logs = [];
+const render = () => { renderRequests++; renderer.render(scene, camera); };
+const ctx = { scene, camera, activeTheme: THEMES['bb-1990'], libraries: [],
+  requestRender: render, requestShadowRefresh: () => { shadowRequests++; render(); },
+  addCollider: () => { colliders++; }, log: message => logs.push(message),
+};
+const fixture = createFixture(placement, ctx);
+fixture.build();
+const views = { front:[0,5,21], side:[17,5,2], rear:[-9,6,-17], eye:[-8,5.5,14], supports:[-5,1.0,2.4] };
+window.setView = name => {
+ camera.position.set(...views[name]); camera.lookAt(name === 'supports' ? -5 : 0,name === 'supports' ? .35 : 1.4,0); render();
+};
+document.querySelectorAll('button').forEach(b => b.onclick = () => window.setView(b.dataset.view));
+window.setView('front');
+window.preview = { scene, fixture, ctx, renderer, logs, createFixture,
+  placement,
+  defaults: DEFAULT_FIXTURE_PLACEMENTS,
+  counters: () => ({ renderRequests, shadowRequests, colliders }),
+  bounds: () => {
+    const b = new THREE.Box3().setFromObject(scene.getObjectByName('display-model'));
+    return { min: b.min.toArray(), max: b.max.toArray(), size: b.getSize(new THREE.Vector3()).toArray() };
+  },
+};
+const timer = setInterval(() => {
+  if (scene.getObjectByName('display-model')) {
+    document.getElementById('status').textContent = '11⅙ ft barrier · 1 ft grid · floor origin · no reference imagery';
+    render(); clearInterval(timer); window.preview.ready = true;
+  }
+}, 50);
+</script>

@@ -3,7 +3,7 @@
 import * as THREE from 'three';
 import { OVERVIEW_POS } from './scene-shared.ts';
 import { BACK_WALL_UNIT_IDX, BROWSE_WINDOW_SIZE, type MovieSlot } from './store-layout.ts';
-import { handleStreamingBackTap } from './streaming-checkout.ts';
+import { handleStreamingBackTap, cancelStreamingServiceChoice } from './streaming-checkout.ts';
 import { subNavSelect } from './store-subnav.ts';
 import type { StoreScene } from './three-scene.ts';
 
@@ -189,13 +189,16 @@ export function mobileStoreTap(scene: StoreScene, e: PointerEvent): boolean {
     const matched = row0.find(i => {
       if (picked!.source === 'fixture') {
         const fix = scene.slottedFixtures[i.fixtureIdx];
-        return i.kind === 'fixture' && fix?.placement?.id === picked!.fixtureId;
+        return (i.kind === 'fixture' || i.kind === 'endcap') && fix?.placement?.id === picked!.fixtureId;
       }
       if (picked!.unitIdx === BACK_WALL_UNIT_IDX) {
         return i.kind === 'new-releases';
       }
-      return i.kind === 'library' && i.libraryIdx === picked!.libraryIdx;
-    });
+      if (i.kind === 'genre' && i.libraryIdx === picked!.libraryIdx) {
+        return i.unitIdxInLibrary === picked!.unitIdx && i.side === picked!.side;
+      }
+      return false;
+    }) ?? row0.find(i => i.kind === 'library' && i.libraryIdx === picked!.libraryIdx);
     if (matched) {
       scene.subNavRootFocus = { row: 0, label: matched.label };
     }
@@ -203,6 +206,7 @@ export function mobileStoreTap(scene: StoreScene, e: PointerEvent): boolean {
 
   if (!picked) return true;
   const wasBrowse = scene.mode === 'browse';
+  cancelStreamingServiceChoice(scene);
   scene.hideOverviewVisuals();
   scene.hideHeroCases();
   selectSlot(scene, picked);

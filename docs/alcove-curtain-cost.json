@@ -1,0 +1,84 @@
+{
+  "parts": [
+    {
+      "part": "AlcoveBeadBarrel",
+      "triangles": 112,
+      "vertices": 56,
+      "uv": true,
+      "manifold": true,
+      "dimensions": [
+        0.10000000149011612,
+        0.10000000149011612,
+        0.09799999743700027
+      ],
+      "material": "BeadAmberAcrylic"
+    },
+    {
+      "part": "AlcoveBeadFacet",
+      "triangles": 80,
+      "vertices": 40,
+      "uv": true,
+      "manifold": true,
+      "dimensions": [
+        0.10000000149011612,
+        0.10000000149011612,
+        0.10199999809265137
+      ],
+      "material": "BeadAmberAcrylic"
+    },
+    {
+      "part": "AlcoveCordKnot",
+      "triangles": 60,
+      "vertices": 30,
+      "uv": true,
+      "manifold": true,
+      "dimensions": [
+        0.02800000086426735,
+        0.02424871176481247,
+        0.017999999225139618
+      ],
+      "material": "StrandBraidedCord"
+    },
+    {
+      "part": "AlcoveCord",
+      "triangles": 20,
+      "vertices": 12,
+      "uv": true,
+      "manifold": true,
+      "dimensions": [
+        0.007794228382408619,
+        0.008999999612569809,
+        1.0
+      ],
+      "material": "StrandBraidedCord"
+    },
+    {
+      "part": "AlcoveSupportRail",
+      "triangles": 108,
+      "vertices": 56,
+      "uv": true,
+      "manifold": true,
+      "dimensions": [
+        0.18000000715255737,
+        3.0,
+        0.11999988555908203
+      ],
+      "material": "CurtainSupportWood"
+    },
+    {
+      "part": "AlcoveEyelet",
+      "triangles": 156,
+      "vertices": 78,
+      "uv": true,
+      "manifold": true,
+      "dimensions": [
+        0.06599999964237213,
+        0.018000006675720215,
+        0.1465001106262207
+      ],
+      "material": "AttachmentAgedBrass"
+    }
+  ],
+  "glbBytes": 40192,
+  "textures": 0
+}

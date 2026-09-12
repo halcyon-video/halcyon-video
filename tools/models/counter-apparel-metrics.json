@@ -1,0 +1,18 @@
+{
+  "bounds_blender": [
+    [
+      -1.8970706462860107,
+      -0.7892922163009644,
+      -0.00800000224262476
+    ],
+    [
+      1.5723291635513306,
+      0.0,
+      2.375
+    ]
+  ],
+  "triangles": 19600,
+  "materials": 5,
+  "glb_bytes": 676184,
+  "textures": "eight 256x256 images: three cloth albedos, two shared normals, three roughness maps (export ORM)"
+}

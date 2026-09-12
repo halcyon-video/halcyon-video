@@ -1,0 +1,52 @@
+{
+  "window": {
+    "aperture": [
+      2.5,
+      3.75
+    ],
+    "bounds": [
+      -1.57,
+      1.57,
+      -2.195,
+      2.195,
+      -0.11,
+      0.11
+    ],
+    "triangles": 220,
+    "runtime_meshes": 3,
+    "material_roles": [
+      "FrameFinish",
+      "GlazingSeat",
+      "Backing"
+    ],
+    "texture_images": 0,
+    "bytes": 17212,
+    "manifold": true,
+    "uv": true
+  },
+  "wall": {
+    "aperture": [
+      3.1333333333333333,
+      4.7
+    ],
+    "bounds": [
+      -1.6566666666666667,
+      1.6566666666666667,
+      -2.44,
+      2.44,
+      -0.025,
+      0.055
+    ],
+    "triangles": 220,
+    "runtime_meshes": 3,
+    "material_roles": [
+      "FrameFinish",
+      "GlazingSeat",
+      "Backing"
+    ],
+    "texture_images": 0,
+    "bytes": 17200,
+    "manifold": true,
+    "uv": true
+  }
+}

@@ -491,7 +491,7 @@ export function newReleasesLeftWallCols(unitSpace: number): number {
 // the corner insets in three-scene.ts, so the left-wall unit and back-wall
 // Run 1 always butt flush at the back-left corner whatever the store
 // dimensions are.
-export const NR_WALL_SHELF_DEPTH = 0.3;  // shelf-board depth (ft) — buildShelfRun's backWallShelfDepth
+export const NR_WALL_SHELF_DEPTH = 0.70;  // shelf-board depth (ft) — buildShelfRun's backWallShelfDepth
 // Assembly back face stand-off from the room wall plane. Must clear the
 // walls' navy baseboards (0.04 ft thick, standing 0.02 off the wall — see
 // bbBack et al. in buildStore): at the old 0.02 the backing panel and the
@@ -500,6 +500,9 @@ export const NR_WALL_SHELF_DEPTH = 0.3;  // shelf-board depth (ft) — buildShel
 export const NR_WALL_CLEARANCE = 0.08;
 // Built depth of a wall run: room wall plane -> shelf/end-panel front face.
 export const NR_RUN_DEPTH = NR_WALL_CLEARANCE + NR_WALL_SHELF_DEPTH;
+// Front cover hinge, shared by the stock transform and sloped support plane.
+export const NR_WALL_STOCK_OFFSET = NR_RUN_DEPTH - .14;
+export const NR_WALL_SLOPE = Math.tan(5 * Math.PI / 180);
 export const NR_LEFT_UNIT_STANDOFF = 0.1; // left-wall unit group origin off the wall mesh
 
 // A title the store has no physical stock of: a Jellyseerr-synthesized

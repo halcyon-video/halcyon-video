@@ -215,7 +215,7 @@ export function buildEmblemControls(
   );
 
   const colorRow = kit.color(
-    'color', 'Custom colour', 'Left or Right chooses a named ink. Click the swatch for an exact colour.',
+    'color', 'Custom colour', 'OK or click opens the 100-shade palette grid.',
     () => layer()?.color ?? '#ffffff',
     (v) => { const sel = layer(); if (sel) sel.color = v; },
   );

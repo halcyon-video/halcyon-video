@@ -5,7 +5,7 @@ import type { FixtureContext } from '../fixtures';
 
 /** One fixture owns this load and its geometry; supplied finishes belong to its fallback. */
 export function installDisplayModel(
-  ctx: FixtureContext,
+  ctx: Pick<FixtureContext, 'scene' | 'requestShadowRefresh' | 'requestRender' | 'log'>,
   parent: THREE.Group,
   fallback: THREE.Group,
   file: string,
@@ -17,12 +17,15 @@ export function installDisplayModel(
   let cancelled = false;
   let installed: THREE.Group | null = null;
   const ownedMaterials = new Set<THREE.Material>();
+  const ownedTextures = new Set<THREE.Texture>();
   const release = (model: THREE.Group) => {
     const geometries = new Set<THREE.BufferGeometry>();
     model.traverse((o) => { if (o instanceof THREE.Mesh) geometries.add(o.geometry); });
     geometries.forEach((g) => g.dispose());
     ownedMaterials.forEach((m) => m.dispose());
     ownedMaterials.clear();
+    ownedTextures.forEach((t) => t.dispose());
+    ownedTextures.clear();
     model.removeFromParent();
   };
   new GLTFLoader().load(assetUrl(file), ({ scene: model }) => {
@@ -33,6 +36,11 @@ export function installDisplayModel(
     model.traverse((o) => {
       if (!(o instanceof THREE.Mesh)) return;
       const replace = (m: THREE.Material) => {
+        // Imported maps belong to this load, including maps on replaced roles.
+        // Collect before substituting fixture-owned finishes; never dispose those.
+        Object.values(m).forEach((value) => {
+          if (value instanceof THREE.Texture) ownedTextures.add(value);
+        });
         if (detached) { ownedMaterials.add(m); return m; }
         if (finishes[m.name]) { replaced.add(m); return finishes[m.name]; }
         ownedMaterials.add(m); return m;

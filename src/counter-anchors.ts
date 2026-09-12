@@ -27,3 +27,12 @@ export function counterFrame(scene: StoreScene): CounterFrame {
   return scene.entrance?.getCounterFrame()
     ?? { fx: STORE_CENTER_X, fz: scene.deskApexZ(), ux: 1, uz: 0, nx: 0, nz: 1, facingYaw: Math.PI };
 }
+
+/** Compact tub on the shield's left worktop, between terminal (-4) and VFD (-1.5).
+ * Other shapes have different equipment spacing and do not inherit this addition.
+ * Tub envelope is 1.08 × .805 ft; support comes from the real countertop spine.
+ */
+export function previouslyViewedTubAnchor(scene: StoreScene) {
+  if (scene.storefrontSpec.counterShape !== 'shield') return null;
+  return scene.entrance?.getCounterTopAnchorAt(-2.65) ?? null;
+}

@@ -1,4 +1,5 @@
 import { selfLit } from '../material-lighting';
+import { installDisplayModel } from './display-model';
 // The store's security camera — the 1993 footage has a beige camera watching
 // the floor from up high, and our library-select mode has always been the
 // "security cam" view. This prop closes the loop: a camera body hangs from
@@ -23,6 +24,8 @@ export function buildSecurityCamera93(scene: StoreScene, mountYAt?: (x: number, 
 
   const group = new THREE.Group();
   group.name = 'security-camera-93';
+  const fallback = new THREE.Group();
+  group.add(fallback);
 
   const beige = new THREE.MeshStandardMaterial({ color: 0xdfd8c6, roughness: 0.5, metalness: 0.1 });
   const dark = new THREE.MeshStandardMaterial({ color: 0x1c1c20, roughness: 0.3, metalness: 0.4 });
@@ -30,10 +33,10 @@ export function buildSecurityCamera93(scene: StoreScene, mountYAt?: (x: number, 
   // Drop arm from the ceiling.
   const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.9, 8), dark);
   arm.position.set(0, -0.45, 0);
-  group.add(arm);
+  fallback.add(arm);
   const plate = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.03, 12), dark);
   plate.position.set(0, -0.015, 0);
-  group.add(plate);
+  fallback.add(plate);
 
   // Camera body + lens hood, aimed with the overview's default look: across
   // the floor toward the shelf field.
@@ -60,12 +63,38 @@ export function buildSecurityCamera93(scene: StoreScene, mountYAt?: (x: number, 
   const target = new THREE.Vector3(11.0, 3.0, -6.0);
   const camPos = new THREE.Vector3(x, ceilingY - 0.95, z);
   const dir = target.clone().sub(camPos);
+  head.rotation.order = 'YXZ'; // yaw after local pitch: -X maps exactly onto dir
   head.rotation.y = Math.atan2(dir.z, -dir.x); // yaw turning the local -X lens onto dir (XZ)
   head.rotation.z = -Math.asin(dir.y / dir.length()); // then pitch the lens down
   head.traverse(o => { o.castShadow = true; });
-  group.add(head);
+  fallback.add(head);
 
   group.position.set(x, ceilingY, z);
   scene.scene.add(group);
   scene.activeSignageObjects.push(group);
+  const stop = installDisplayModel(scene.fixtureContext(), group, fallback,
+    'models/security-camera.glb', {}, undefined, model => {
+      const opticalHead = model.getObjectByName('CameraHead');
+      const mount = model.getObjectByName('CameraMount');
+      if (opticalHead) {
+        opticalHead.position.copy(head.position);
+        opticalHead.quaternion.copy(head.quaternion);
+      }
+      if (mount) mount.rotation.y = head.rotation.y;
+      model.traverse(o => {
+        if (!(o instanceof THREE.Mesh)) return;
+        for (const m of Array.isArray(o.material) ? o.material : [o.material]) {
+          if (m.name === 'RecordIndicator' && m instanceof THREE.MeshStandardMaterial) {
+            m.emissive.setHex(0xdd2222); m.emissiveIntensity = 1.2;
+            selfLit(m, 'light-source'); o.userData.bakeEmissiveOff = true;
+          }
+        }
+      });
+    });
+  // clearActiveSignage removes the root before disposing its fallback. Release
+  // the loaded tree here and cancel late loads through the shared installer.
+  group.addEventListener('removed', function retire() {
+    group.removeEventListener('removed', retire);
+    stop();
+  });
 }

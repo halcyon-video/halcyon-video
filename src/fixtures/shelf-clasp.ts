@@ -21,6 +21,7 @@
 // store, and the whole set costs a single canvas. Nothing here is emissive;
 // the plaque is lit by the room and goes dark with it at night.
 import * as THREE from 'three';
+import { installClaspHardware } from './clasp-hardware';
 import { BB_ARCHIVO_BLACK } from '../bundled-fonts';
 
 /** Face: 0.95ft x 0.19ft — a small plaque, not a shelf-talker card. */
@@ -99,6 +100,8 @@ export class ShelfClasps {
   private hotEdgeMaterial: THREE.MeshPhysicalMaterial;
   private texture: THREE.CanvasTexture;
   private focused: THREE.Mesh | null = null;
+  private hitMaterial = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false, colorWrite: false });
+  private retireHardware: (() => void) | null = null;
   private prompt: HTMLDivElement | null = null;
   /** Last prompt rendered, so the walk-mode frame hook isn't rebuilding DOM. */
   private promptSig = '';
@@ -149,10 +152,10 @@ export class ShelfClasps {
   setFocused(mesh: THREE.Mesh | null, promptText: string | null = null, key = 'E'): void {
     if (this.focused !== mesh) {
       if (this.focused) {
-        this.focused.material = this.materials(false);
+        (this.focused.getObjectByName('clasp-card') as THREE.Mesh).material = this.materials(false);
       }
       if (mesh) {
-        mesh.material = this.materials(true);
+        (mesh.getObjectByName('clasp-card') as THREE.Mesh).material = this.materials(true);
       }
       this.focused = mesh;
     }
@@ -255,17 +258,16 @@ export class ShelfClasps {
   }
 
   add(p: ClaspPlacement): void {
-    const mesh = new THREE.Mesh(this.geometry, this.materials());
+    const mesh = new THREE.Mesh(this.geometry, this.hitMaterial);
+    mesh.name = 'clasp-click-target';
+    const card = new THREE.Mesh(this.geometry, this.materials());
+    card.name = 'clasp-card';
+    card.receiveShadow = true;
+    mesh.add(card);
     mesh.position.set(p.x, p.y, p.z);
     mesh.rotation.y = p.rotY;
-    // The "ASK FOR RECOMMENDATIONS!" plaques were removed from the store (user:
-    // they didn't look good). Each placement stays only as an INVISIBLE,
-    // un-raycastable section marker: the clerk's walk-up recommendations still
-    // scope to the aisle you're standing in via nearestTo (localRecommendPool),
-    // but nothing renders and no input path can hit or focus one — see the
-    // count getter (reports 0 so hover / walk-prompt / browse-cursor all skip).
-    mesh.visible = false;
-    mesh.raycast = () => {}; // never intersect any raycaster (click / walk-up)
+    // Stable pick object and metadata; printed card and authored jaws are children.
+    // Keep the click object present even if the optional model cannot load.
     mesh.castShadow = false;
     mesh.userData.excludeFromSSAO = true;
     mesh.userData.claspCategory = p.category;
@@ -274,12 +276,14 @@ export class ShelfClasps {
     this.clasps.push(mesh);
   }
 
-  /** Number of INTERACTIVE clasps — always 0 now the plaques are removed. The
-   *  entries in `clasps` are invisible section markers (see add()); code that
-   *  gates hover / walk-prompt / cursor-entry on count therefore skips them,
-   *  while nearestTo / firstTarget still read the markers for the clerk flow. */
+  /** Install shared hardware after all gated aisle placements are registered. */
+  finish(wake: () => void): void {
+    this.retireHardware?.();
+    this.retireHardware = installClaspHardware(this.clasps, this.edgeMaterial, wake);
+  }
+
   get count(): number {
-    return 0;
+    return this.clasps.length;
   }
 
   /** Meshes to hand a raycaster for click selection. */
@@ -307,6 +311,9 @@ export class ShelfClasps {
   }
 
   dispose(): void {
+    this.retireHardware?.();
+    this.retireHardware = null;
+    this.hitMaterial.dispose();
     for (const clasp of this.clasps) clasp.parent?.remove(clasp);
     this.clasps.length = 0;
     this.focused = null;

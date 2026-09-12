@@ -2,13 +2,13 @@
   "frame": {
     "triangles": 628,
     "materials": 2,
-    "bytes": 29796,
+    "bytes": 29528,
     "textures": 0
   },
   "tray": {
-    "triangles": 492,
+    "triangles": 612,
     "materials": 1,
-    "bytes": 25596,
+    "bytes": 30600,
     "textures": 0
   }
 }

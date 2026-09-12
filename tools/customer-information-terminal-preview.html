@@ -1,0 +1,69 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Customer information surround — unplaced study</title>
+<style>
+  body { margin: 0; background: #202831; color: #eef1f4; font: 15px sans-serif; }
+  aside { position: absolute; top: 20px; left: 24px; max-width: 580px; }
+  h1 { font-size: 20px; margin: 0 0 10px; }
+  button { margin: 0 8px 8px 0; padding: 6px 12px; }
+</style>
+<aside><h1>Customer information surround · unplaced study</h1>
+  <p>Estimated dimensions · no base or floor height established · generic display envelope</p>
+  <button data-view="front">Front</button><button data-view="side">Side</button>
+  <button data-view="rear">Rear / supports</button><button data-view="eye">Viewing height study</button>
+  <button data-view="supports">Display removed / bracket</button>
+  <p id="status">Loading…</p>
+</aside>
+<script type="module">
+import * as THREE from 'three';
+import { createFixture } from '/src/fixture-registry.ts';
+import { CUSTOMER_INFORMATION_TERMINAL_PREVIEW, DEFAULT_FIXTURE_PLACEMENTS } from '/src/store-fixtures-config.ts';
+import { THEMES } from '/src/themes.ts';
+
+localStorage.clear();
+const scene = new THREE.Scene(); scene.background = new THREE.Color('#202831');
+const camera = new THREE.PerspectiveCamera(38, innerWidth / innerHeight, .01, 100);
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setSize(innerWidth, innerHeight); renderer.setPixelRatio(1);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+document.body.append(renderer.domElement);
+scene.add(new THREE.HemisphereLight('#f2f6ff', '#65717d', 2));
+for (const [x,y,z,power] of [[-3,5,4,50],[3,3,-3,35]]) {
+  const light = new THREE.PointLight('#ffffff', power); light.position.set(x,y,z); scene.add(light);
+}
+// No floor, pedestal or invented installation: local crop datum only.
+const grid = new THREE.GridHelper(4, 16, '#6b7a89', '#35404b'); grid.position.y = -.04; scene.add(grid);
+let renderRequests = 0, shadowRequests = 0, colliders = 0;
+const logs = [];
+const render = () => { renderRequests++; renderer.render(scene, camera); };
+const ctx = { scene, camera, activeTheme: THEMES['bb-1990'], libraries: [],
+  requestRender: render, requestShadowRefresh: () => { shadowRequests++; render(); },
+  addCollider: () => { colliders++; }, log: message => logs.push(message),
+};
+const fixture = createFixture(CUSTOMER_INFORMATION_TERMINAL_PREVIEW, ctx);
+fixture.build();
+const views = { front: [0, 1.15, 5.2], side: [5.2,1.5,.15], rear: [-3.7,2.4,-4.7], eye: [2.4,1.3,4.8], supports: [2.4,2.1,4.8] };
+window.setView = name => {
+  const display = scene.getObjectByName('mount_display');
+  if (display) display.visible = name !== 'supports';
+  camera.position.set(...views[name]); camera.lookAt(0,1.1,-.15); render();
+};
+document.querySelectorAll('button').forEach(b => b.onclick = () => window.setView(b.dataset.view));
+window.setView('front');
+window.preview = { scene, fixture, ctx, renderer, logs, createFixture,
+  placement: CUSTOMER_INFORMATION_TERMINAL_PREVIEW,
+  defaults: DEFAULT_FIXTURE_PLACEMENTS,
+  counters: () => ({ renderRequests, shadowRequests, colliders }),
+  bounds: () => {
+    const b = new THREE.Box3().setFromObject(scene.getObjectByName('display-model'));
+    return { min: b.min.toArray(), max: b.max.toArray(), size: b.getSize(new THREE.Vector3()).toArray() };
+  },
+};
+const timer = setInterval(() => {
+  if (scene.getObjectByName('display-model')) {
+    document.getElementById('status').textContent = '1.79 × 0.441 × 2.01 ft surround · ¼ ft grid · datum is NOT the floor';
+    render(); clearInterval(timer); window.preview.ready = true;
+  }
+}, 50);
+</script>

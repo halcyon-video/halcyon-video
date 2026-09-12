@@ -17,7 +17,7 @@ export function candyStockMatrix(matrix: THREE.Matrix4, x: number, y: number, z:
 /** Every request owns its geometry/materials; repeated trays share within this rack. */
 export function installCandyRackModel(
   ctx: FixtureContext, parent: THREE.Group, fallback: THREE.Group,
-  width: number, depth: number, rows: number, steel: THREE.Material,
+  width: number, depth: number, rows: number, steel: THREE.MeshStandardMaterial,
 ): () => void {
   let disposed = false;
   let hardware: THREE.Group | undefined;
@@ -61,19 +61,27 @@ export function installCandyRackModel(
     }
     const [frame, tray] = results.map(r => r.status === 'fulfilled' ? r.value.scene : new THREE.Group());
     hardware = new THREE.Group(); hardware.name = 'candy-rack-model';
-    frame.scale.set(width / 3, Math.max(4, .6 + (rows - 1) * .7 + .6) / 4, depth / (privateHardware ? 1.6 : .7));
+    frame.scale.set(width / 3, Math.max(4, .6 + (rows - 1) * .7 + .6) / 4, depth / 1.6);
     hardware.add(frame);
     for (let r = 0; r < rows; r++) {
       const shelf = tray.clone(true);
       shelf.name = `candy-rack-tray-${r}`;
-      shelf.scale.set(width / 3, 1, depth / (privateHardware ? 1.6 : .7));
+      shelf.scale.set(width / 3, 1, depth / 1.6);
       shelf.rotation.x = CANDY_TRAY_ANGLE;
       shelf.position.y = .6 + r * .7 + .015;
       hardware.add(shelf);
     }
     hardware.traverse(object => {
       if (!(object instanceof THREE.Mesh)) return;
-      const replace = (m: THREE.Material) => m.name === 'RackSteel' ? steel : m;
+      const replace = (m: THREE.Material) => {
+        if (m.name === 'RackSteel') return steel;
+        if (m.name === 'RackFeet' && m instanceof THREE.MeshStandardMaterial) {
+          m.color.setRGB(.09, .09, .09);
+          m.bumpMap = steel.bumpMap; m.bumpScale = .0012;
+          m.roughnessMap = steel.roughnessMap;
+        }
+        return m;
+      };
       object.material = Array.isArray(object.material) ? object.material.map(replace) : replace(object.material);
       object.castShadow = object.receiveShadow = true;
     });

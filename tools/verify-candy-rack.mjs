@@ -16,6 +16,7 @@ try {
   }
   browser = await puppeteer.launch({ args: ['--no-sandbox'] });
   const page = await browser.newPage();
+  page.on('pageerror', error => console.error('PAGE', error.message));
   await page.setRequestInterception(true);
   let mode = 'success';
   const privateMode = process.env.CANDY_CHECK_PRIVATE === '1';
@@ -31,10 +32,13 @@ try {
   });
   await page.goto(`http://localhost:${port}/__candy_check`);
   await page.evaluate(async () => {
-    const THREE = await import('/node_modules/.vite/deps/three.js');
+    // Vite may resolve a shared/symlinked node_modules outside this worktree.
+    const source = await (await fetch('/src/fixtures/candy-rack-model.ts')).text();
+    const threeUrl = source.match(/from ["']([^"']*three[^"']*)["']/)[1];
+    const THREE = await import(threeUrl);
     const { CandyDisplay } = await import('/src/fixtures/period-fixtures.ts');
-    window.check = { THREE, CandyDisplay, deletedGeometry: new Set(), deletedMaterial: new Set() };
-    for (const [prototype, set] of [[THREE.BufferGeometry.prototype, window.check.deletedGeometry], [THREE.Material.prototype, window.check.deletedMaterial]]) {
+    window.check = { THREE, CandyDisplay, deletedGeometry: new Set(), deletedMaterial: new Set(), deletedTexture: new Set() };
+    for (const [prototype, set] of [[THREE.BufferGeometry.prototype, window.check.deletedGeometry], [THREE.Material.prototype, window.check.deletedMaterial], [THREE.Texture.prototype, window.check.deletedTexture]]) {
       const original = prototype.dispose;
       prototype.dispose = function () { set.add(this.uuid); original.call(this); };
     }
@@ -50,7 +54,7 @@ try {
     await page.evaluate(options => window.makeRack(options), options);
     await page.waitForFunction(() => window.rack.renders === 1);
     const result = await page.evaluate(() => {
-      const { THREE, deletedGeometry, deletedMaterial } = window.check;
+      const { THREE, deletedGeometry, deletedMaterial, deletedTexture } = window.check;
       const { fixture, scene, colliders } = window.rack;
       const group = scene.children[0], model = group.getObjectByName('candy-rack-model');
       const stock = group.children.filter(o => o.isInstancedMesh);
@@ -75,8 +79,8 @@ try {
         }
         }
       });
-      const geometries = new Set(), materials = new Set();
-      model.traverse(o => { if (o.isMesh) { geometries.add(o.geometry.uuid); materials.add(o.material.uuid); } });
+      const geometries = new Set(), materials = new Set(), textures = new Set();
+      model.traverse(o => { if (o.isMesh) { geometries.add(o.geometry.uuid); materials.add(o.material.uuid); for (const t of Object.values(o.material)) if (t?.isTexture) textures.add(t.uuid); if (o.material.name === 'RackSteel' && (!o.material.bumpMap || !o.material.roughnessMap)) throw Error('Missing physical grain finish'); } });
       const rows = fixture.rows.map(r => ({ ...r }));
       const footprint = fixture.getFootprint();
       const source = model.userData.source || 'public';
@@ -84,7 +88,7 @@ try {
       const hidden = !group.getObjectByName('candy-rack-fallback').visible;
       fixture.dispose();
       return { source, bounds: { min: bounds.min.toArray(), max: bounds.max.toArray() }, rows, footprint, colliders, hidden, stock: stock.map(s => s.count), maxContactError,
-        detached: scene.children.length === 0, released: [...geometries].every(id => deletedGeometry.has(id)) && [...materials].every(id => deletedMaterial.has(id)) };
+        detached: scene.children.length === 0, textures: textures.size, released: [...textures].every(id => deletedTexture.has(id)) && [...geometries].every(id => deletedGeometry.has(id)) && [...materials].every(id => deletedMaterial.has(id)) };
     });
     assert.equal(result.source, privateMode ? 'user-assets' : 'public');
     assert.equal(result.rows.length, options.rows || 5);

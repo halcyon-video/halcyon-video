@@ -71,6 +71,9 @@ export function buildNewReleaseToppers(runs: NrTopperRun[]): THREE.Mesh[] {
     for (let s = 0; s < sections; s++) {
       const startCol = s * SECTION_COLS;
       const endCol = Math.min(runCols - 1, startCol + SECTION_COLS - 1);
+      // A short corner remainder cannot support a full-width topper. Its
+      // neighbour already names the same ribbon; do not crowd the wall turn.
+      if ((endCol - startCol + 1) * BOX_SPACING < TICKET_BOARD_W + .25) continue;
       const centerCol = (startCol + endCol) / 2;
       const x = -run.length / 2 + margin + (centerCol + 0.5) * BOX_SPACING;
       const card = markSignMesh(

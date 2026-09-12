@@ -1,0 +1,31 @@
+{
+  "bytes": 250836,
+  "textures": 0,
+  "modules": {
+    "Post": {
+      "triangles": 5600,
+      "vertices": 2800,
+      "material_roles": [
+        "FloorRubber",
+        "WeightedCore",
+        "BrushedBrass"
+      ]
+    },
+    "Rope": {
+      "triangles": 1900,
+      "vertices": 956,
+      "material_roles": [
+        "BrushedBrass",
+        "RopeFabric"
+      ]
+    },
+    "Runner": {
+      "triangles": 216,
+      "vertices": 112,
+      "material_roles": [
+        "FloorRubber",
+        "RunnerPile"
+      ]
+    }
+  }
+}

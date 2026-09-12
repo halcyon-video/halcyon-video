@@ -1,0 +1,74 @@
+{
+  "units": "feet",
+  "origin": "underside of feet; X across, Y up, +Z clerk side after glTF export",
+  "parts": [
+    {
+      "name": "Bent_front_base_rear_3mm",
+      "triangles": 540,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "Left_solvent_bonded_end_3mm",
+      "triangles": 268,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "Right_solvent_bonded_end_3mm",
+      "triangles": 268,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "Folded_price_card_pocket",
+      "triangles": 220,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "Removable_price_card",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "Silicone_foot_-0.43_-0.28",
+      "triangles": 188,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "Silicone_foot_-0.43_0.28",
+      "triangles": 188,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "Silicone_foot_0.43_-0.28",
+      "triangles": 188,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "Silicone_foot_0.43_0.28",
+      "triangles": 188,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    }
+  ],
+  "boundsBlender": {
+    "min": [
+      -0.5400000214576721,
+      -0.38999998569488525,
+      0.0
+    ],
+    "max": [
+      0.5400000214576721,
+      0.41499999165534973,
+      0.41999998688697815
+    ]
+  },
+  "triangles": 2156,
+  "glbBytes": 220960
+}

@@ -1,0 +1,377 @@
+{
+  "units": "feet",
+  "leafWidth": 2.95,
+  "leafHeight": 6.955,
+  "leafThickness": 0.146,
+  "textures": 0,
+  "parts": [
+    {
+      "name": "Interior hollow metal leaf",
+      "triangles": 108,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Interior hinge jamb",
+      "triangles": 36,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Interior compression seal -1",
+      "triangles": 12,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Interior strike jamb",
+      "triangles": 36,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Interior compression seal 1",
+      "triangles": 12,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Interior pressed head",
+      "triangles": 36,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Interior sweep",
+      "triangles": 12,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Exterior hollow metal leaf",
+      "triangles": 108,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Exterior hinge jamb",
+      "triangles": 36,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Exterior compression seal -1",
+      "triangles": 12,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Exterior strike jamb",
+      "triangles": 36,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Exterior compression seal 1",
+      "triangles": 12,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Exterior pressed head",
+      "triangles": 36,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Exterior sweep",
+      "triangles": 12,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Hinge 0 leaf plate",
+      "triangles": 108,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Hinge 0 frame plate",
+      "triangles": 108,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Hinge 0 knuckle 0",
+      "triangles": 28,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Hinge 0 knuckle 1",
+      "triangles": 28,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Hinge 0 knuckle 2",
+      "triangles": 28,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Hinge 0 knuckle 3",
+      "triangles": 28,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Hinge 0 knuckle 4",
+      "triangles": 28,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Hinge screw",
+      "triangles": 28,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Hinge screw.001",
+      "triangles": 28,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Hinge screw.002",
+      "triangles": 28,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Hinge screw.003",
+      "triangles": 28,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Hinge 1 leaf plate",
+      "triangles": 108,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Hinge 1 frame plate",
+      "triangles": 108,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Hinge 1 knuckle 0",
+      "triangles": 28,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Hinge 1 knuckle 1",
+      "triangles": 28,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Hinge 1 knuckle 2",
+      "triangles": 28,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Hinge 1 knuckle 3",
+      "triangles": 28,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Hinge 1 knuckle 4",
+      "triangles": 28,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Hinge screw.004",
+      "triangles": 28,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Hinge screw.005",
+      "triangles": 28,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Hinge screw.006",
+      "triangles": 28,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Hinge screw.007",
+      "triangles": 28,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Hinge 2 leaf plate",
+      "triangles": 108,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Hinge 2 frame plate",
+      "triangles": 108,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Hinge 2 knuckle 0",
+      "triangles": 28,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Hinge 2 knuckle 1",
+      "triangles": 28,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Hinge 2 knuckle 2",
+      "triangles": 28,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Hinge 2 knuckle 3",
+      "triangles": 28,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Hinge 2 knuckle 4",
+      "triangles": 28,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Hinge screw.008",
+      "triangles": 28,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Hinge screw.009",
+      "triangles": 28,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Hinge screw.010",
+      "triangles": 28,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Hinge screw.011",
+      "triangles": 28,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Panic carrier",
+      "triangles": 108,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Panic end housing",
+      "triangles": 108,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Panic end housing.001",
+      "triangles": 108,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Rounded push pad",
+      "triangles": 20,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Rim latch bolt",
+      "triangles": 108,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Strike keeper",
+      "triangles": 108,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Exterior escutcheon",
+      "triangles": 108,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Lever spindle",
+      "triangles": 28,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Returned lever grip",
+      "triangles": 28,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Lever return",
+      "triangles": 28,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Key cylinder",
+      "triangles": 28,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Key slot",
+      "triangles": 12,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Closer body",
+      "triangles": 108,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Closer spindle",
+      "triangles": 28,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Closer main arm",
+      "triangles": 28,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Closer forearm",
+      "triangles": 28,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Closer frame shoe",
+      "triangles": 108,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Saddle threshold",
+      "triangles": 36,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Threshold traction flute",
+      "triangles": 12,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Threshold traction flute.001",
+      "triangles": 12,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Threshold traction flute.002",
+      "triangles": 12,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Threshold traction flute.003",
+      "triangles": 12,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Threshold traction flute.004",
+      "triangles": 12,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Threshold traction flute.005",
+      "triangles": 12,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Threshold traction flute.006",
+      "triangles": 12,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Threshold traction flute.007",
+      "triangles": 12,
+      "nonManifoldEdges": 0
+    }
+  ],
+  "triangles": 3132,
+  "draws": 4,
+  "bytes": 212052
+}

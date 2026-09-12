@@ -9,6 +9,7 @@ Window awnings have their own toggle. The small shop keeps its own facade.
 | Gabled Brick | Low parapet, central gable on freestanding pillars, tiled bands, and separate entry/exit doors |
 | Flat Parapet | Raised rectangular entrance pavilion on freestanding pillars, framed sign field, and a returned cornice |
 | Arcaded Brick | Open entrance arch on substantial pillars, dentil cornice, and trimmed window arches |
+| Slate Cone Canopy | Deep charcoal panel canopy, inverted conical corner supports, ring capitals and narrow plinths |
 
 The flat entrance rises to 22.2 feet in the standard store, with a rectangular
 sign tower carried by 2.75-foot pillars. The arcaded entrance rises to 20.8 feet
@@ -91,10 +92,102 @@ arches. Higher ceilings retain roof clearance without moving the door head.
 Named finish roles allow the active brand to recolor the tile and fabric;
 the normal logo renderer supplies all lettering.
 
-The gabled export contains 436 triangles across five material groups. The
+The gabled export contains 876 triangles across five material groups. The
 source checks every solid part for manifoldness. Unit checks cover aligned
 mortar courses and door clearance; the in-app navigation rig covers both roots.
 
 See [Window awning model](storefront-awning-model.md) for canopy construction,
 lighting, and material details. Reference photographs are retained privately;
 the runtime assets contain original meshes and no photographic signage.
+
+
+## Tower construction update (#254)
+
+The gabled roof has two raised, mitered standing seams with finished ends,
+a folded rear abutment apron, and eight recessed soffit pans. The soffit uses
+neutral coated metal (`FacadeSoffit`) rather than a masonry texture overhead.
+Existing piers, open passage, band positions and replaceable sign planes remain.
+The wing awnings have corresponding wall flashing, mounting shoes, underside
+access pans and folded end closures; see the awning notes.
+
+The construction is original scripted mesh authoring, based on the existing
+scene dimensions and inspected before views. New sheet thicknesses and join
+sizes are design estimates, not a surveyed chain-store replica. No downloaded
+geometry, owner imagery or real-chain artwork was added.
+The existing facade silhouette is retained rather than claiming new historical
+accuracy. Runtime artwork still comes from the normal brand renderer.
+
+The source uses feet (`scale_length = 0.3048` for Blender's unit display).
+Numeric Blender `(x, -depth, height)` exports as Three.js `(x, height, depth)`;
+the loader uses these numeric feet directly. Origin is entrance ground center
+at the glass line, installed at `(11, 0, 15)`. The authored gabled masonry
+mass is 15.2 ft wide, with a 14.4 ft rear opening and 2.75 ft piers.
+The header underside stays at 9.15 ft (soffit face 9.10 ft), front face at
+6.2 ft, and the original masonry peak at 23.103 ft. Including the seams,
+exported bounds are `[-10.45, 0, -0.18]` to `[10.45, 23.51632, 6.58]`
+in Three.js axes. There are no moving parts or new navigation proxies.
+
+`storefront-entry-fit.ts` fits the lower glazing independently from the upper
+gable, preserving divider and sidelight widths. Roof slopes now remain straight
+as vestibules change, with their peak following `facadeDimensions`, also used
+by the sign envelope in `storefront-facade.ts` / `logo-storefront.ts`.
+The sign builders and their disposal contracts need no changes.
+
+The gabled GLB is 59,600 bytes, up from 33,524: 876 triangles instead of 436,
+still five meshes/material draws. Its five roles are brick, soldier brick,
+tile, coping and soffit. No embedded textures or additional runtime texture
+allocations are introduced. UVs cover every vertex and masonry UVs are
+regenerated in world feet after fitting. The Blender script checks every solid
+for manifold edges, then batches by finish, retaining named part vertex groups.
+Other entrance runtime exports are unchanged.
+
+Verification uses `node tools/verify-storefront-tower.mjs OUT before|after|checks`.
+Before/after labels capture the currently checked-out assets; they do not
+simulate an old model using the fallback. The harness uses the real StoreScene,
+with deliberate clean settings, and records front, side, roof, passage soffit,
+rear roof and awning end/underside views. `checks` exercises all three entrance
+styles, 70/86.8/110 ft wings, variable vestibules and ceiling heights,
+UVs/normals, absent assets, removal during loading and repeated cleanup.
+The two fit regression tests cover glazing anchors and the straight roof/sign
+envelope. Inspected screenshots, cost JSON, integration results and successful
+`npm test && npm run build` logs are delivered in the task outbox.
+
+## Slate cone canopy
+
+`bb_facade=cone-canopy` selects the new style. Its 11.5 ft projection is supported
+by two turned inverted cones at depth 10 ft, on a 12.2 ft sidewalk. The underside
+is 9.15 ft above grade; the standard canopy top is 18.2 ft. Each shaft grows
+from radius .43 ft to 1.08 ft and ends in stepped concentric capitals up to
+1.45 ft radius. The circular plinth radius is .58 ft. Room resizing preserves
+these circular profiles and the door opening; only the overhead mass rises
+with tall ceilings.
+
+The active brand's ticket is anchored on the front at depth 11.55 ft and height
+13.65 ft, with up to 13 × 7.8 ft of sign area. Channel-letter mode instead mounts
+two rows directly on the upper building wall at depth .8 ft. The fields flank
+the canopy, clear the actual front-corner margins, and begin at height 13.4 ft
+to clear optional window awnings. Theme changes leave the charcoal finish intact;
+existing sign lighting and warm soffit lenses respond to day/sunset/night.
+
+Editable source: `tools/models/storefront-entry-cone-canopy.blend`; regenerate
+with `blender -b -P <absolute-project-path>/tools/models/storefront-entry-cone-canopy.py`.
+Runtime: `public/models/storefront-entry-cone-canopy.glb` (230,252 bytes,
+6,780 exported triangles, 19 meshes, no image textures). Parts have manifold
+closed geometry, mapped UVs, eased cladding edges, continuous folded corner
+panels, recessed horizontal joints, and separate soffit pans. Material roles:
+`FacadeSlate`, `FacadeCoping`, `FacadeSoffit`, `FacadeDownlight`. Feet and origin
+follow the existing entry contract: Blender `(x, -depth, height)` exports to
+Three.js `(x, height, depth)`, placed at store centre/glass line/ground.
+The source includes editable sign-anchor empties; branding remains runtime-owned.
+The shared profile JSON drives the Blender turnings and the Three.js fallback.
+
+The taper, ring capitals, panel seams, and sign locations adapt a historical
+storefront silhouette to the requested depth and live store. Dimensions are
+design estimates, not surveyed measurements. No reference image, private source
+locator, or chain artwork is embedded in the asset.
+
+Verification: `npm test && npm run build`; browser geometry/lifecycle checks via
+`node tools/verify-storefront-tower.mjs <outbox> checks`. In-scene views use
+`node tools/verify-storefront-tower.mjs <outbox> canopy cone-canopy`, or `letters`
+in place of `canopy` for both wall-mounted letter rows. These also photograph
+night lighting and the procedural fallback.

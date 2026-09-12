@@ -692,4 +692,5 @@ def main():
     print(f'[counter-terminal] saved {BLEND}')
 
 
-main()
+if __name__ == '__main__':
+    main()

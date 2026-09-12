@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { registerSignMount } from './sign-mount';
 import { createExtrudedMaterials, create3DExtrudedSign } from '../sign-builders';
 
 const backTextureCache = new WeakMap<THREE.Texture, THREE.Texture>();
@@ -333,6 +334,7 @@ export function ceilingHangingSign(
     group.add(chip);
   }
 
+  const supports = new THREE.Group();
   // 2. Twin ceiling hanger wires
   const wireMat = new THREE.MeshStandardMaterial({
     color: 0x666666, // metallic steel wire
@@ -351,13 +353,15 @@ export function ceilingHangingSign(
   const wireLeft = new THREE.Mesh(wireGeo, wireMat);
   wireLeft.position.set(-width / 2 + 0.4, wireCenterY, 0);
   wireLeft.castShadow = true;
-  group.add(wireLeft);
+  supports.add(wireLeft);
 
   // Right Wire
   const wireRight = new THREE.Mesh(wireGeo, wireMat);
   wireRight.position.set(width / 2 - 0.4, wireCenterY, 0);
   wireRight.castShadow = true;
-  group.add(wireRight);
+  supports.add(wireRight);
+
+  registerSignMount(group, supports, { width, topY: signTopY, ceilingY, rigid: false, skew: (opts.skew ?? 0) * height / 2 });
 
   return group;
 }

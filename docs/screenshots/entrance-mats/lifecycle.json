@@ -1,0 +1,68 @@
+[
+  {
+    "width": 2.49,
+    "bounds": [
+      {
+        "min": [
+          11.879999999999999,
+          0,
+          9.15
+        ],
+        "max": [
+          14.370000000000001,
+          0.024000000208616257,
+          14.450000000000001
+        ]
+      },
+      {
+        "min": [
+          7.63,
+          0,
+          9.15
+        ],
+        "max": [
+          10.120000000000001,
+          0.024000000208616257,
+          14.450000000000001
+        ]
+      }
+    ],
+    "uniqueResources": 10,
+    "sharedGeometry": true,
+    "exactlyOnceDisposal": true,
+    "refreshes": 1
+  },
+  {
+    "width": 4,
+    "bounds": [
+      {
+        "min": [
+          9,
+          0,
+          9.15
+        ],
+        "max": [
+          13,
+          0.024000000208616257,
+          14.450000000000001
+        ]
+      }
+    ],
+    "uniqueResources": 10,
+    "sharedGeometry": true,
+    "exactlyOnceDisposal": true,
+    "refreshes": 1
+  },
+  {
+    "mode": "failure",
+    "passed": true
+  },
+  {
+    "mode": "late",
+    "passed": true
+  },
+  {
+    "mode": "detached",
+    "passed": true
+  }
+]

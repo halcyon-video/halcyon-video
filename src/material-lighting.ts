@@ -26,8 +26,10 @@ export function auditStoreMaterials(root: THREE.Object3D): MaterialLightingAudit
       if (seen.has(material)) continue;
       seen.add(material);
       report.materials++;
-      const m = material as THREE.MeshStandardMaterial;
-      if (m.map || m.normalMap || m.roughnessMap || m.bumpMap) report.textured++;
+      const m = material as THREE.MeshPhysicalMaterial;
+      if (m.map || m.normalMap || m.roughnessMap || m.bumpMap ||
+        m.clearcoatMap || m.clearcoatNormalMap || m.clearcoatRoughnessMap ||
+        m.sheenColorMap || m.sheenRoughnessMap) report.textured++;
       const role: LightingRole | undefined = (obj as THREE.Object3D & { isReflector?: boolean }).isReflector
         ? 'reflection' : material.userData.lightingRole;
       if (role) { report.exceptions[role] = (report.exceptions[role] ?? 0) + 1; continue; }

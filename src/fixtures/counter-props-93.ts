@@ -1,3 +1,4 @@
+import { buildPreviouslyViewedTub } from './period-fixtures';
 import { finishEquipmentSurfaces } from './equipment-surfaces';
 import { selfLit } from '../material-lighting';
 // 1993 checkout-counter dressing, straight from the store footage: the
@@ -207,6 +208,7 @@ export function buildCounterProps93(scene: StoreScene): void {
   }
 
   // 2. Balloon cluster tied to the band top near the left register.
+  // .66-foot ring clears the authored pear shoulders at both height tiers.
   // Ring layout with alternating heights: balloons can't interpenetrate
   // (user report: the random cluster clipped). Positions are shared by both
   // render paths below.
@@ -219,9 +221,9 @@ export function buildCounterProps93(scene: StoreScene): void {
       const jit = (seededRandom01(`bal-${i}`) - 0.5) * 0.1;
       return {
         color,
-        x: tie.x + Math.cos(angle) * 0.52 + jit,
+        x: tie.x + Math.cos(angle) * 0.66 + jit,
         y: tie.y + 2.35 + (i % 2) * 0.75 + jit,
-        z: tie.z + Math.sin(angle) * 0.52,
+        z: tie.z + Math.sin(angle) * 0.66,
         yaw: seededRandom01(`bal-yaw-${i}`) * Math.PI * 2,
       };
     });
@@ -236,6 +238,7 @@ export function buildCounterProps93(scene: StoreScene): void {
           transparent: true, opacity: 0.88, // latex translucency
           clearcoat: 0.6, clearcoatRoughness: 0.2,
         }));
+        balloon.name = 'balloon-fallback';
         balloon.position.set(s.x, s.y, s.z);
         balloon.scale.set(1, 1.18, 1);
         balloon.castShadow = true;
@@ -251,33 +254,74 @@ export function buildCounterProps93(scene: StoreScene): void {
       });
     };
 
-    // Real GLB path ("Balloon", Poly by Google — see props.ts): one shared
-    // geometry, per-color tinted material clones, the model's own knot +
-    // curly string replacing the taut cylinders. loadProp caches, so scene
-    // rebuilds resolve instantly; guard against a rebuild having torn the
-    // group down while the very first load was in flight.
+    // Shared authored shell, instance-owned latex finishes and posed cord.
+    // Detach before signage's traversal so it never disposes cached resources.
+    const owned: { inst: THREE.Group; cord: THREE.BufferGeometry[]; mats: THREE.Material[] }[] = [];
+    group.addEventListener('removed', () => {
+      for (const entry of owned) {
+        entry.inst.removeFromParent();
+        entry.cord.forEach(g => g.dispose());
+        entry.mats.forEach(m => m.dispose());
+      }
+      owned.length = 0;
+    });
     loadProp('balloon').then((handle) => {
-      if (!handle) { buildPrimitiveBalloons(); return; }
       if (!group.parent) return;
-      const h = handle.size.y;
+      if (!handle) {
+        buildPrimitiveBalloons();
+        scene.fixtureContext().requestShadowRefresh();
+        scene.requestRender();
+        return;
+      }
       spots.forEach((s) => {
         const inst = handle.instantiate();
+        const entry = { inst, cord: [] as THREE.BufferGeometry[], mats: [] as THREE.Material[] };
+        const tinted = new Map<THREE.Material, THREE.Material>();
         inst.traverse((o) => {
           const mesh = o as THREE.Mesh;
           if (!mesh.isMesh) return;
           const tint = (m: THREE.Material): THREE.Material => {
-            const t = new THREE.MeshPhysicalMaterial({ color: s.color, roughness: 0.15, metalness: 0, clearcoat: 0.6, clearcoatRoughness: 0.2 });
-            const src = m as THREE.MeshStandardMaterial; if (src.map) t.map = src.map;
+            if (m.name !== 'BalloonLatex') return m;
+            let t = tinted.get(m);
+            if (!t) {
+              t = m.clone();
+              (t as THREE.MeshStandardMaterial).color.setHex(s.color);
+              tinted.set(m, t); entry.mats.push(t);
+            }
             return t;
           };
           mesh.material = Array.isArray(mesh.material) ? mesh.material.map(tint) : tint(mesh.material);
         });
-        // Prepped model: bbox bottom (string end) at y=0, balloon at the
-        // top — seat it so the balloon body sits at the ring spot.
-        inst.position.set(s.x, s.y - (h - 0.5), s.z);
+        // Keep the established .9-foot shell envelope and alternating heights.
         inst.rotation.y = s.yaw;
         group.add(inst);
+        inst.updateWorldMatrix(true, true);
+        const body = inst.getObjectByName('mount_body')!;
+        inst.position.add(new THREE.Vector3(s.x, s.y, s.z).sub(body.getWorldPosition(new THREE.Vector3())));
+        inst.updateWorldMatrix(true, true);
+        const end = inst.getObjectByName('mount_tie')!.getWorldPosition(new THREE.Vector3());
+        const neck = inst.getObjectByName('mount_neck')!.getWorldPosition(new THREE.Vector3());
+        const delta = tie.clone().sub(end);
+        const cord = inst.getObjectByName('ContinuousCottonString') as THREE.Mesh;
+        cord.geometry = cord.geometry.clone(); entry.cord.push(cord.geometry);
+        const pos = cord.geometry.getAttribute('position');
+        const v = new THREE.Vector3();
+        for (let i = 0; i < pos.count; i++) {
+          v.fromBufferAttribute(pos, i); cord.localToWorld(v);
+          const t = THREE.MathUtils.clamp((neck.y - v.y) / (neck.y - end.y), 0, 1);
+          // Smooth endpoint blend leaves the knot wrap and its tangent intact.
+          v.addScaledVector(delta, t * t * (3 - 2 * t)); cord.worldToLocal(v);
+          pos.setXYZ(i, v.x, v.y, v.z);
+        }
+        pos.needsUpdate = true;
+        cord.geometry.computeVertexNormals();
+        cord.geometry.computeBoundingBox(); cord.geometry.computeBoundingSphere();
+        const tieMount = inst.getObjectByName('mount_tie')!;
+        tieMount.position.copy(tieMount.parent!.worldToLocal(tie.clone()));
+        inst.userData.tiePoint = tie.toArray();
+        owned.push(entry);
       });
+      scene.fixtureContext().requestShadowRefresh();
       scene.requestRender();
     });
   }
@@ -405,6 +449,7 @@ export function buildCounterProps93(scene: StoreScene): void {
       group.add(pack);
     });
   }
+  buildPreviouslyViewedTub(scene, group);
   const surfaceTextures = finishEquipmentSurfaces(group);
   const releaseSurfaces = () => {
     group.removeEventListener('removed', releaseSurfaces);

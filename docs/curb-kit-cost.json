@@ -1,0 +1,93 @@
+{
+  "CurbSpan": {
+    "vertices": 12,
+    "triangles": 20,
+    "material": "CurbConcrete",
+    "manifold": true,
+    "bounds": [
+      [
+        0,
+        -0.1,
+        0
+      ],
+      [
+        1,
+        0.04,
+        0.4
+      ]
+    ]
+  },
+  "GutterSpan": {
+    "vertices": 10,
+    "triangles": 16,
+    "material": "GutterConcrete",
+    "manifold": true,
+    "bounds": [
+      [
+        0,
+        -0.1,
+        0
+      ],
+      [
+        1,
+        -0.03,
+        1.6
+      ]
+    ]
+  },
+  "SidewalkSpan": {
+    "vertices": 10,
+    "triangles": 16,
+    "material": "SidewalkConcrete",
+    "manifold": true,
+    "bounds": [
+      [
+        0,
+        -0.08,
+        0
+      ],
+      [
+        1,
+        0,
+        4.7
+      ]
+    ]
+  },
+  "CurbJunction": {
+    "vertices": 28,
+    "triangles": 52,
+    "material": "CurbConcrete",
+    "manifold": true,
+    "bounds": [
+      [
+        0,
+        -0.1,
+        0
+      ],
+      [
+        0.4,
+        0.04,
+        0.4
+      ]
+    ]
+  },
+  "SidewalkReturn": {
+    "vertices": 17,
+    "triangles": 30,
+    "material": "SidewalkConcrete",
+    "manifold": true,
+    "bounds": [
+      [
+        0,
+        -0.08,
+        0
+      ],
+      [
+        0.2,
+        0,
+        4.7
+      ]
+    ]
+  },
+  "glb_bytes": 12864
+}

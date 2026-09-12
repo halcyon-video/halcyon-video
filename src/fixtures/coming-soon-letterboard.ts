@@ -41,6 +41,7 @@
 //
 // Viewable alone: `npm run assetshot -- --kind fixture --name coming-soon-letterboard`.
 import * as THREE from 'three';
+import { installDisplayModel } from './display-model';
 import { FixturePlacement } from '../store-layout';
 import { FixtureContext, StoreFixture } from '../fixtures';
 import { Footprint } from '../layout-validator';
@@ -177,7 +178,8 @@ const GRID = {
   squeezeMin: 0.62,
   rightLimit: 0.955,
   areaTop: 0.356,
-  areaBottom: 0.986,
+  // Keep the last live row above the physical inner lip (at 0.979 H).
+  areaBottom: 0.976,
 };
 // Header stack. `x0..x1` is the MEASURED ink extent of the real line and
 // `refChars` its character count — together they give the header kit's tab
@@ -466,6 +468,7 @@ export class ComingSoonLetterboard implements StoreFixture {
 
   private ctx: FixtureContext;
   private group: THREE.Group | null = null;
+  private releaseModel: (() => void) | null = null;
   private disposables: Array<{ dispose(): void }> = [];
   // Face material + the texture THIS fixture owns (null while the material is
   // showing the shared, module-cached front.png verbatim).
@@ -587,6 +590,8 @@ export class ComingSoonLetterboard implements StoreFixture {
     board.position.z = -(BOARD_H / 2) * Math.sin(LEAN);
     board.rotation.x = -LEAN;    // top edge back toward the glass, face to the queue
     group.add(board);
+    const fallback = new THREE.Group();
+    board.add(fallback);
 
     // SINGLE-faced: the real board's reverse was never dressed, so the
     // carcass's other five sides are plain navy. One box, two materials —
@@ -611,7 +616,7 @@ export class ComingSoonLetterboard implements StoreFixture {
       new THREE.Mesh(coreGeo, [navyMat, navyMat, navyMat, navyMat, faceMat, navyMat]),
       { casts: true },
     );
-    board.add(core);
+    fallback.add(core);
 
     // Snap-frame lip: four bars standing proud of the face on the exact band
     // the art paints its own frame into, so the printed frame is covered by
@@ -643,10 +648,34 @@ export class ComingSoonLetterboard implements StoreFixture {
     lip.instanceMatrix.needsUpdate = true;
     lip.castShadow = true;
     lip.receiveShadow = true;
-    board.add(lip);
+    fallback.add(lip);
 
     this.ctx.scene.add(group);
     this.ctx.addCollider(core);
+    const contactMat = new THREE.MeshStandardMaterial({ color: '#252629', roughness: 0.85 });
+    this.disposables.push(contactMat);
+    this.releaseModel = installDisplayModel(this.ctx, board, fallback,
+      'models/coming-soon-letterboard.glb', {
+        LetterboardAluminium: lipMat,
+        LetterboardBacking: navyMat,
+        LetterboardLiveFace: faceMat,
+        LetterboardContact: contactMat,
+      }, new THREE.Vector3(1, 1, 1), (model) => {
+        // The authored level sole fills this lift. Keep the original collision
+        // box fixed; only the installed hardware moves clear of the counter.
+        model.position.set(0, 0.018 * Math.cos(LEAN), 0.018 * Math.sin(LEAN));
+        // glTF exports top-down V. Convert only the live insert back to the
+        // BoxGeometry convention so the shared CanvasTexture retains flipY.
+        model.traverse((o) => {
+          if (!(o instanceof THREE.Mesh)) return;
+          if (o.material === faceMat) {
+            const uv = o.geometry.getAttribute('uv');
+            for (let i = 0; i < uv.count; i++) uv.setY(i, 1 - uv.getY(i));
+            uv.needsUpdate = true;
+          }
+          markSignMesh(o, { casts: true });
+        });
+      });
     this.ctx.requestShadowRefresh();
 
     // One order-book listener for the whole module, pointed at whichever board
@@ -686,6 +715,8 @@ export class ComingSoonLetterboard implements StoreFixture {
 
   dispose(): void {
     if (activeBoard === this) activeBoard = null;
+    this.releaseModel?.();
+    this.releaseModel = null;
     if (this.group) {
       this.ctx.scene.remove(this.group);
       this.group = null;

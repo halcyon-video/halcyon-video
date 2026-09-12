@@ -161,7 +161,7 @@ test('omitting the kind still falls back to the install-wide backend', async () 
 test('Emby playback follows the title source even when the primary server differs', async () => {
   useBackend('plex');
   const direct = new URL(directStreamUrl('http://emby.local/base', 'emby-token', 'film', 'source', 'emby'));
-  assert.equal(direct.pathname, '/base/emby/Videos/film/stream');
+  assert.equal(direct.pathname, '/base/Videos/film/stream');
   assert.equal(direct.searchParams.get('api_key'), 'emby-token');
   assert.equal(direct.searchParams.get('MediaSourceId'), 'source');
   const hls = new URL(transcodeStreamUrlSync('http://emby.local/base/emby', 'emby-token', 'film', { mediaSourceId: 'source', startPositionTicks: 600000000 }, 'emby'));

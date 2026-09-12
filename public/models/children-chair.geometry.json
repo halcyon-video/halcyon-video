@@ -1,0 +1,29 @@
+{
+  "bytes": 172444,
+  "triangles": 6438,
+  "drawsPerChair": 1,
+  "materials": [
+    "ChairPlastic"
+  ],
+  "images": 0,
+  "blenderBoundsFeet": [
+    [
+      -0.5656589269638062,
+      -0.5414632558822632,
+      0.0
+    ],
+    [
+      0.5658341646194458,
+      0.5488207936286926,
+      1.791832447052002
+    ]
+  ],
+  "storeDimensionsFeet": [
+    1.131493091583252,
+    1.791832447052002,
+    1.0902840495109558
+  ],
+  "allPrimitivesHaveUV": true,
+  "manifold": true,
+  "seatSupportFeet": 0.8928862912207842
+}

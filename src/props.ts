@@ -96,7 +96,7 @@ const PROP_SPECS: Record<PropSlot, PropSpec> = {
     glassFrac: { x0: 0.10, x1: 0.90, y0: 0.14, y1: 0.90, inset: -0.02 },
     fallback: { w: 2.2, h: 1.85, d: 1.9, color: 0x2b2b30, screen: { w: 1.75, h: 1.3, yOffset: 0.12 } },
   },
-  // "Table Coffee Glass" — Kenney, CC0 (committed).
+  // Original editable oak/glass table; see docs/coffee-table-model.md.
   coffee_table: {
     file: 'coffee_table.glb', targetWidth: 3.5, yawFix: 0, screenMatch: null, glassFrac: null,
     fallback: { w: 3.5, h: 1.35, d: 1.8, color: 0x7a5636 },
@@ -113,8 +113,8 @@ const PROP_SPECS: Record<PropSlot, PropSpec> = {
     fallback: { w: 1.4, h: 0.18, d: 0.85, color: 0xc3c6cb,
       screen: { w: 0.245, h: 0.05, xOffset: -0.36, yOffset: 0.015 } },
   },
-  // "Balloon" — Poly by Google, CC-BY 3.0. Single 11-inch latex balloon with
-  // knot + curly string below; consumers tint per instance (counter-props-93).
+  // Original editable latex balloon. BalloonLatex is tinted per instance;
+  // BalloonCord stays cotton. Named mounts drive tether poses (counter-props-93).
   balloon: {
     file: 'balloon.glb', targetWidth: 0.9, yawFix: 0, screenMatch: null, glassFrac: null,
     fallback: { w: 0.9, h: 2.6, d: 0.9, color: 0xd23036 },

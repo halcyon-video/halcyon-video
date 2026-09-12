@@ -185,6 +185,58 @@ test('fetchStreamingMoviesFromTmdb: discover call is scoped to flatrate/region/p
   assert.ok(discoverCall.includes('with_watch_monetization_types=flatrate'));
 });
 
+test('fetchStreamingMoviesFromTmdb: forwards configured region to provider list and discover calls', async () => {
+  const calls: string[] = [];
+  const fetchImpl = async (url: string) => {
+    calls.push(url);
+    if (url.includes('/watch/providers/movie')) {
+      return jsonResponse({ results: [{ provider_id: 8, provider_name: 'Netflix' }] });
+    }
+    if (url.includes('/discover/movie')) {
+      return jsonResponse({
+        results: [
+          {
+            id: 603, title: 'The Matrix', release_date: '1999-03-31',
+            poster_path: '/p.jpg', overview: 'x', vote_average: 8.7, genre_ids: [28],
+          },
+        ],
+      });
+    }
+    throw new Error(`unexpected url ${url}`);
+  };
+  await withEnv({ tmdb_apikey: 'abcd' }, fetchImpl, async () => {
+    const movies = await fetchStreamingMoviesFromTmdb('Netflix', 'gb');
+    assert.equal(movies.length, 1);
+  });
+  const providerCall = calls.find((u) => u.includes('/watch/providers/movie'))!;
+  assert.ok(providerCall.includes('watch_region=GB'), `expected watch_region=GB in ${providerCall}`);
+  const discoverCall = calls.find((u) => u.includes('/discover/movie'))!;
+  assert.ok(discoverCall.includes('watch_region=GB'), `expected watch_region=GB in ${discoverCall}`);
+});
+
+test('fetchStreamingMoviesFromTmdb: unmatched provider warning names the requested watch region', async () => {
+  const warnings: unknown[][] = [];
+  const originalWarn = console.warn;
+  console.warn = (...args: unknown[]) => { warnings.push(args); };
+  const fetchImpl = async (url: string) => {
+    if (url.includes('/watch/providers/movie')) {
+      return jsonResponse({ results: [{ provider_id: 8, provider_name: 'Netflix' }] });
+    }
+    return jsonResponse({ results: [] });
+  };
+  try {
+    await withEnv({ tmdb_apikey: 'abcd' }, fetchImpl, async () => {
+      await fetchStreamingMoviesFromTmdb('Hulu', 'ca');
+    });
+  } finally {
+    console.warn = originalWarn;
+  }
+  const serialized = warnings
+    .map((a) => a.map((x) => (x instanceof Error ? x.message : String(x))).join(' '))
+    .join('\n');
+  assert.ok(serialized.includes('region CA'), `expected warning to mention region CA, got: ${serialized}`);
+});
+
 test('fetchStreamingMoviesFromTmdb: a service absent from the region provider list is skipped (no discover call), never throws', async () => {
   const discoverCalls: string[] = [];
   const fetchImpl = async (url: string) => {

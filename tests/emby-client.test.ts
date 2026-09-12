@@ -18,7 +18,14 @@ test('Emby auth carries independent protocol and normalizes proxy prefixes exact
     return json({ AccessToken: 'fake', User: { Id: 'u', Name: 'Alice' } });
   });
   assert.deepEqual(await emby.authenticateUser('https://server.test/proxy/emby///', 'Alice', 'test-only'), { accessToken: 'fake', userId: 'u', userName: 'Alice' });
-  assert.equal(emby.normalizeUrl('server.test/proxy'), 'http://server.test/proxy/emby');
+  assert.equal(emby.normalizeUrl('server.test/proxy'), 'http://server.test/proxy');
+});
+
+test('a scheme with nothing after it is a blank address, not an address', () => {
+  for (const v of ['http://', 'https://', 'http:///', 'https:///', '  http://  ', 'http:', 'https:', '']) {
+    assert.equal(jellyfin.normalizeUrl(v), '', `jellyfin: ${JSON.stringify(v)}`);
+    assert.equal(emby.normalizeUrl(v), '', `emby: ${JSON.stringify(v)}`);
+  }
 });
 
 test('interleaved backends and sessions never exchange token headers or route prefixes', async (t) => {
@@ -29,7 +36,7 @@ test('interleaved backends and sessions never exchange token headers or route pr
     return json({});
   });
   await Promise.all([emby.validateToken('https://first.test', 'e1'), jellyfin.validateToken('https://native.test', 'j'), emby.validateToken('https://second.test/base', 'e2')]);
-  assert.deepEqual(seen.map(([url]) => url), ['https://first.test/emby/System/Info', 'https://native.test/Users/Me', 'https://second.test/base/emby/System/Info']);
+  assert.deepEqual(seen.map(([url]) => url), ['https://first.test/System/Info', 'https://native.test/Users/Me', 'https://second.test/base/System/Info']);
   assert.equal(seen[0][1]['X-Emby-Token'], 'e1');
   assert.match(seen[1][1].Authorization, /^MediaBrowser .*Token="j"$/);
   assert.equal(seen[1][1]['X-Emby-Token'], undefined);
@@ -39,12 +46,12 @@ test('interleaved backends and sessions never exchange token headers or route pr
 test('only rejected credentials invalidate sessions; transient and malformed responses fail', async (t) => {
   for (const status of [401, 403, 500]) {
     t.mock.method(globalThis, 'fetch', async () => json({ secret: 'must-not-leak' }, status));
-    if (status < 500) assert.equal(await emby.validateToken('https://server.test', 'fake'), false);
-    else await assert.rejects(emby.validateToken('https://server.test', 'fake'), /^Error: HTTP error 500: Media server request failed$/);
+    if (status < 500) assert.equal(await emby.validateToken('https://server.test/emby', 'fake'), false);
+    else await assert.rejects(emby.validateToken('https://server.test/emby', 'fake'), /^Error: HTTP error 500: Media server request failed$/);
     t.mock.restoreAll();
   }
   t.mock.method(globalThis, 'fetch', async () => json({}));
-  await assert.rejects(emby.authenticateUser('https://server.test', 'Alice'), /Invalid response payload/);
+  await assert.rejects(emby.authenticateUser('https://server.test/emby', 'Alice'), /Invalid response payload/);
 });
 
 test('catalog pagination, conversion, watch state, artwork and exclusion use Emby routes', async (t) => {
@@ -60,27 +67,27 @@ test('catalog pagination, conversion, watch state, artwork and exclusion use Emb
     const count = start === 0 ? 500 : 1;
     return json({ Items: Array.from({ length: count }, (_, i) => ({ Id: String(start+i), Name: `Film ${start+i}`, Type: 'Movie', ProductionYear: 2000, Genres: ['Drama'], UserData: { Played: true, PlayCount: 2, PlaybackPositionTicks: 123 }, MediaSources: [{ Id: `opaque-${start+i}`, Container: 'mp4', MediaStreams: [{Type:'Video',Codec:'h264'}, {Type:'Audio',Codec:'aac',Index:1}] }] })), TotalRecordCount: 501 });
   });
-  const libs = await emby.fetchJellyfinLibrariesAndMovies('https://server.test', 'fake', 'u');
-  assert.equal(new URL(emby.buildHlsStreamUrl('https://server.test', 'fake', '0')).searchParams.get('MediaSourceId'), 'opaque-0');
-  assert.equal(new URL(emby.buildHlsStreamUrl('https://server.test', 'another-user', '0')).searchParams.get('MediaSourceId'), null);
+  const libs = await emby.fetchJellyfinLibrariesAndMovies('https://server.test/emby', 'fake', 'u');
+  assert.equal(new URL(emby.buildHlsStreamUrl('https://server.test/emby', 'fake', '0')).searchParams.get('MediaSourceId'), 'opaque-0');
+  assert.equal(new URL(emby.buildHlsStreamUrl('https://server.test/emby', 'another-user', '0')).searchParams.get('MediaSourceId'), null);
   assert.deepEqual(starts, [0, 500]);
   assert.equal(libs[0].movies.length, 501);
   assert.equal(libs[0].movies[0].resumePositionTicks, 123);
   assert.equal(libs[0].movies[0].played, true);
   assert.equal(libs[0].movies[0].mediaPlaybackInfo?.videoCodec, 'h264');
   assert.match(libs[0].movies[0].posterUrl!, /\/emby\/Items\/0\/Images\/Primary/);
-  assert.deepEqual(await emby.fetchJellyfinLibrariesAndMovies('https://server.test', 'fake', 'u', undefined, { excludeLibraryIds: new Set(['films']) }), []);
+  assert.deepEqual(await emby.fetchJellyfinLibrariesAndMovies('https://server.test/emby', 'fake', 'u', undefined, { excludeLibraryIds: new Set(['films']) }), []);
   assert.deepEqual(starts, [0, 500]);
 });
 
 test('playback URLs retain proxy path, encode tokens and select versions with unique sessions', async () => {
-  const direct = new URL(emby.buildStaticStreamUrl('https://server.test/base', 'a&b', 'film', 'v2'));
+  const direct = new URL(emby.buildStaticStreamUrl('https://server.test/base/emby', 'a&b', 'film', 'v2'));
   assert.equal(direct.pathname, '/base/emby/Videos/film/stream');
   assert.equal(direct.searchParams.get('api_key'), 'a&b');
   assert.equal(direct.searchParams.get('MediaSourceId'), 'v2');
   const options = { mediaSourceId:'v2', audioStreamIndex:2, subtitleStreamIndex:3, startPositionTicks:123, maxWidth:720 };
-  const first = new URL(emby.buildHlsStreamUrl('https://server.test/base', 'fake', 'film', options));
-  const second = new URL(emby.buildHlsStreamUrl('https://server.test/base', 'fake', 'film', options));
+  const first = new URL(emby.buildHlsStreamUrl('https://server.test/base/emby', 'fake', 'film', options));
+  const second = new URL(emby.buildHlsStreamUrl('https://server.test/base/emby', 'fake', 'film', options));
   assert.notEqual(first.searchParams.get('PlaySessionId'), second.searchParams.get('PlaySessionId'));
   assert.equal(first.searchParams.get('AudioStreamIndex'), '2');
   assert.equal(first.searchParams.get('SubtitleStreamIndex'), '3');
@@ -92,10 +99,10 @@ test('playback URLs retain proxy path, encode tokens and select versions with un
 test('playback reports and cancellation carry the explicit source token', async (t) => {
   const calls: Array<[string, RequestInit]> = [];
   t.mock.method(globalThis, 'fetch', async (input: string, opts: RequestInit) => { calls.push([input, opts]); return new Response(null, {status:204}); });
-  await emby.reportPlaybackStart('https://server.test', 'fake', 'film');
-  await emby.reportPlaybackProgress('https://server.test', 'fake', 'film', 123, true);
-  await emby.reportPlaybackStopped('https://server.test', 'fake', 'film', 456);
-  await emby.stopActiveEncoding('session', undefined, {url:'https://server.test',token:'fake'});
+  await emby.reportPlaybackStart('https://server.test/emby', 'fake', 'film');
+  await emby.reportPlaybackProgress('https://server.test/emby', 'fake', 'film', 123, true);
+  await emby.reportPlaybackStopped('https://server.test/emby', 'fake', 'film', 456);
+  await emby.stopActiveEncoding('session', undefined, {url:'https://server.test/emby',token:'fake'});
   const progress = JSON.parse(String(calls[1][1].body));
   assert.equal(progress.ItemId, 'film');
   assert.equal(progress.PositionTicks, 123);
@@ -114,7 +121,7 @@ test('episodes retain season ordering, resume positions and Emby artwork', async
     assert.equal(u.searchParams.get('SortBy'), 'ParentIndexNumber,IndexNumber');
     return json({Items:[{Id:'episode',Name:'Pilot',SeriesName:'Series',ParentIndexNumber:1,IndexNumber:1,SeasonId:'season',UserData:{PlaybackPositionTicks:789}}]});
   });
-  const episodes = await emby.fetchSeriesEpisodes('https://server.test','fake','u','series');
+  const episodes = await emby.fetchSeriesEpisodes('https://server.test/emby','fake','u','series');
   assert.equal(episodes[0].seasonNumber,1);
   assert.equal(episodes[0].resumePositionTicks,789);
   assert.match(episodes[0].seasonPrimaryUrl!, /\/emby\/Items\/season\/Images/);
@@ -122,10 +129,10 @@ test('episodes retain season ordering, resume positions and Emby artwork', async
 
 test('transport errors and malformed pages cannot masquerade as a valid empty Emby catalog', async (t) => {
   t.mock.method(globalThis, 'fetch', async () => { throw new Error('offline'); });
-  await assert.rejects(emby.validateToken('https://server.test', 'fake'), /offline/);
+  await assert.rejects(emby.validateToken('https://server.test/emby', 'fake'), /offline/);
   t.mock.restoreAll();
   t.mock.method(globalThis, 'fetch', async () => json({Items:'not an array'}));
-  await assert.rejects(emby.fetchMediaCatalog('https://server.test','fake','u'), /invalid items page/);
+  await assert.rejects(emby.fetchMediaCatalog('https://server.test/emby','fake','u'), /invalid items page/);
 });
 
 test('Emby provider exposes registered backend capabilities and uses protocol-specific playback', async () => {
@@ -133,7 +140,7 @@ test('Emby provider exposes registered backend capabilities and uses protocol-sp
   const provider = new EmbyProvider();
   assert.equal(provider.id, 'emby');
   assert.equal(provider.capabilities.userConfigStorage, true);
-  const source = await provider.resolvePlaybackSource('https://server.test', {accessToken:'fake',userId:'u',userName:'Alice'}, 'film', {kind:'transcode',mediaSourceId:'opaque'});
+  const source = await provider.resolvePlaybackSource('https://server.test/emby', {accessToken:'fake',userId:'u',userName:'Alice'}, 'film', {kind:'transcode',mediaSourceId:'opaque'});
   assert.equal(new URL(source.url).pathname, '/emby/Videos/film/master.m3u8');
   assert.equal(new URL(source.url).searchParams.get('MediaSourceId'), 'opaque');
   assert.equal(new URL(source.url).searchParams.get('PlaySessionId'), source.sessionId);
@@ -171,12 +178,12 @@ test('Emby episode paths cache opaque sources before local playback and subtitle
     assert.match(new URL(input).searchParams.get('Fields')!, /MediaSources/);
     return json({Items:[{Id:'ep',Path:'/test/episode.mp4',MediaSources:[{Id:'opaque-episode'}]}]});
   });
-  await client.fetchFirstEpisodeOfSeries('https://server.test','first','u','series');
-  await client.fetchSeriesEpisodes('https://server.test','second','u','series');
+  await client.fetchFirstEpisodeOfSeries('https://server.test/emby','first','u','series');
+  await client.fetchSeriesEpisodes('https://server.test/emby','second','u','series');
   for(const token of ['first','second']) {
-    const subtitle=client.buildSubtitleTrackUrl('https://server.test',token,'ep',2);
+    const subtitle=client.buildSubtitleTrackUrl('https://server.test/emby',token,'ep',2);
     assert.match(subtitle,/\/ep\/opaque-episode\/Subtitles/);
-    const hls=client.buildHlsStreamUrl('https://server.test',token,'ep');
+    const hls=client.buildHlsStreamUrl('https://server.test/emby',token,'ep');
     assert.equal(new URL(hls).searchParams.get('MediaSourceId'),'opaque-episode');
   }
 });
@@ -188,8 +195,41 @@ test('metadata arriving after direct URL creation completes the existing report 
     if(opts.method==='POST') { report=JSON.parse(String(opts.body)); return new Response(null,{status:204}); }
     return json({Id:'ep',MediaSources:[{Id:'late-source'}]});
   });
-  client.buildStaticStreamUrl('https://server.test','fake','ep');
-  await client.fetchItemPlaybackInfo('https://server.test','fake','u','ep');
-  await client.reportPlaybackStart('https://server.test','fake','ep');
+  client.buildStaticStreamUrl('https://server.test/emby','fake','ep');
+  await client.fetchItemPlaybackInfo('https://server.test/emby','fake','u','ep');
+  await client.reportPlaybackStart('https://server.test/emby','fake','ep');
   assert.equal(report.MediaSourceId,'late-source');
 });
+
+// A proxy may expose Emby at the origin, /emby, or an arbitrary path. Every
+// phase must use the same base, even when catalog sync creates a new client.
+for (const prefix of ['', '/emby', '/media', '/proxy/emby']) {
+  test(`Emby reverse proxy preserves ${prefix || 'root'} from login through stocking`, async (t) => {
+    const base = `https://media.example.test${prefix}`;
+    const setup = createMediaBrowserClient('emby');
+    assert.equal(setup.normalizeUrl(` ${base}/// `), base);
+    const calls: string[] = [];
+    t.mock.method(globalThis, 'fetch', async (input: string) => {
+      const url = new URL(input);
+      assert.equal(url.origin, 'https://media.example.test');
+      assert.ok(url.pathname.startsWith(`${prefix}/`));
+      const route = url.pathname.slice(prefix.length);
+      calls.push(route);
+      if (route === '/Users/AuthenticateByName') return json({AccessToken:'fake', User:{Id:'u', Name:'Alice'}});
+      if (route === '/System/Info') return json({});
+      if (route === '/Users/u/Views') return json({Items:[{Id:'films',Name:'Films',Type:'CollectionFolder',CollectionType:'movies'}]});
+      if (route === '/Users/u/Items') return json({Items: url.searchParams.get('IncludeItemTypes') === 'BoxSet' ? [] : [{Id:'film',Name:'Film',Type:'Movie',ImageTags:{Primary:'cover'}}], TotalRecordCount:1});
+      assert.fail(`Unexpected proxy route: ${route}`);
+    });
+    const session = await setup.authenticateUser(base, 'Alice', 'test-only');
+    assert.equal(await setup.validateToken(base, session.accessToken), true);
+    assert.equal((await setup.fetchLibraryList(base, session.accessToken, session.userId)).length, 1);
+    const catalog = createMediaBrowserClient('emby');
+    const libs = await catalog.fetchJellyfinLibrariesAndMovies(base, session.accessToken, session.userId);
+    assert.equal(libs[0].movies.length, 1);
+    assert.equal(new URL(libs[0].movies[0].posterUrl!).pathname, `${prefix}/Items/film/Images/Primary`);
+    assert.equal(new URL(catalog.buildStaticStreamUrl(base, 'fake', 'film')).pathname, `${prefix}/Videos/film/stream`);
+    assert.equal(new URL(catalog.buildHlsStreamUrl(base, 'fake', 'film')).pathname, `${prefix}/Videos/film/master.m3u8`);
+    assert.ok(calls.includes('/Users/u/Items'));
+  });
+}

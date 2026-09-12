@@ -1,0 +1,51 @@
+{
+  "TBar": {
+    "triangles": 60,
+    "vertices": 32,
+    "manifold": true,
+    "dimensions_store_xyz_feet": [
+      1.0,
+      0.1850000023841858,
+      0.1080000028014183
+    ]
+  },
+  "EdgeAngle": {
+    "triangles": 24,
+    "vertices": 14,
+    "manifold": true,
+    "dimensions_store_xyz_feet": [
+      1.0,
+      0.15700000524520874,
+      0.07400000095367432
+    ]
+  },
+  "CrossTee": {
+    "triangles": 84,
+    "vertices": 44,
+    "manifold": true,
+    "dimensions_store_xyz_feet": [
+      0.1080000028014183,
+      0.1850000023841858,
+      0.1080000028014183
+    ]
+  },
+  "TileRim": {
+    "triangles": 28,
+    "vertices": 16,
+    "manifold": true,
+    "dimensions_store_xyz_feet": [
+      4.880000114440918,
+      0.0729999989271164,
+      2.380000114440918
+    ]
+  },
+  "resources": {
+    "glb_bytes": 14960,
+    "grain_bytes": 111159,
+    "texture_size": [
+      256,
+      256
+    ],
+    "material_roles": 2
+  }
+}

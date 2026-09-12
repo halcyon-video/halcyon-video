@@ -293,11 +293,13 @@ async function jellyfinRequest(
 
 function normalizeUrl(url: string): string {
   let cleaned = (url || '').trim().replace(/\/+$/, "");
-  if (!cleaned) return '';
+  if (!cleaned || /^https?:$/i.test(cleaned)) return '';
   if (!/^https?:\/\//i.test(cleaned)) {
     cleaned = `http://${cleaned}`;
   }
-  if (dialect === 'emby' && cleaned && !/\/emby$/i.test(cleaned)) cleaned += '/emby';
+  // The configured address is the API base, including any reverse-proxy path.
+  // Emby also serves root routes; inventing an /emby suffix can escape the
+  // proxy's mapping. Keep an explicitly supplied /emby path unchanged.
   return cleaned;
 }
 

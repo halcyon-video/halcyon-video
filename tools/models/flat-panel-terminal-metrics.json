@@ -1,0 +1,24 @@
+{
+  "bytes": 273008,
+  "triangles": 4502,
+  "editable_parts": 11,
+  "material_roles": [
+    "LCDBezelABS",
+    "LCDShellABS",
+    "LCDInsetABS",
+    "LCDScreen",
+    "LCDPowerLed",
+    "LCDCableRubber"
+  ],
+  "dimensions_blender_feet": [
+    1.3992916345596313,
+    0.7469278573989868,
+    1.5496457815170288
+  ],
+  "all_parts_uv": true,
+  "closed_parts_manifold": "Checked in Part.finish; LiveScreenSurface intentionally open",
+  "texture_sources": [
+    "ABS grain normal 128x128",
+    "roughness 128x128"
+  ]
+}

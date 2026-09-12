@@ -8,7 +8,7 @@ test('shelf construction kit retains its stampable local profiles and complete U
   const bytes = await readFile(new URL('../public/models/shelf-components.glb', import.meta.url));
   assert.ok(bytes.length < 100_000);
   const { scene } = await new GLTFLoader().parseAsync(bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength),'');
-  const names = ['Deck','Rail','Wire','Bracket','Slat','Upright','Spine','Standard','Foot','EndPanel'];
+  const names = ['Deck','Rail','Wire','Bracket','Slat','Upright','Spine','Standard','Foot','EndPanel','RailClip','RailEndStop','ClaspCarrier','ClaspJaw'];
   for (const name of names) {
     const mesh = scene.getObjectByName(name) as THREE.Mesh;
     assert.ok(mesh?.isMesh, `runtime stamping requires ${name}`);

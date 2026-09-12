@@ -1,3 +1,5 @@
+import { installCeilingGrid } from './ceiling-grid.ts';
+import { polygonGridPlan } from './ceiling-grid-plan.ts';
 import { selfLit } from './material-lighting.ts';
 import { installDownlightModels, DOWNLIGHT_APERTURE_RADIUS } from './downlight-model.ts';
 // Front-of-store dropped ceilings — the cash-wrap soffit and the vestibule cap.
@@ -282,6 +284,7 @@ export interface FrontSoffitParams {
    * not carry the mirror either.
    */
   plainWhite?: boolean;
+  refresh?: () => void;
 }
 
 export interface FrontSoffitResult {
@@ -396,6 +399,14 @@ export function buildFrontSoffit(params: FrontSoffitParams): FrontSoffitResult {
   slab.rotation.x = Math.PI / 2;
   slab.receiveShadow = true;
   group.add(slab);
+  if (!plainWhite) {
+    const phase = soffitTrofferCenters()[0];
+    installCeilingGrid({
+      parent: group, y: soffitY,
+      plan: polygonGridPlan(lidPoly, { x: phase.x - tileX / 2, z: phase.z - tileZ / 2 }, tileX, tileZ),
+      paint: trofferFrameMaterial, refresh: params.refresh ?? (() => {}),
+    });
+  }
 
   // ── Flank returns over the entrance strip ────────────────────────────────
   // Where the lid runs on past the band it leaves the space above it open at

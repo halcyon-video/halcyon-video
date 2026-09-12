@@ -1,5 +1,6 @@
 import './flat.css';
 import awningFilmStrip from '../assets/awning-film-strip.png';
+import authoredReelCollage from '../assets/awning-projection-reel.png';
 import { JellyfinLibrary, Movie } from '../jellyfin';
 import { activeProvider as provider } from '../providers/active-provider';
 import type { StoreTheme } from '../themes';
@@ -29,7 +30,9 @@ function buildAwning(): HTMLElement {
   // Film-strip collage image (rendered PNG with reels, strips, glow)
   const img = document.createElement('img');
   img.className = 'flat-awning-bg';
-  img.src = awningFilmStrip;
+  // Shared Blender source poses; no reel fixture is added to the 3D store.
+  img.addEventListener('error', () => { img.src = awningFilmStrip; }, { once: true });
+  img.src = authoredReelCollage;
   img.alt = '';
   awning.appendChild(img);
 

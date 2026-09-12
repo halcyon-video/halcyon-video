@@ -583,6 +583,13 @@ export function registerCoreSettings(): void {
   });
 
   registerSetting({
+    key: 'bb_ceiling_structure', label: 'Ceiling Structure', kind: 'cycle', group: 'Store Look',
+    values: [{id:'tile',label:'Acoustic tile'}, {id:'exposed',label:'Exposed joists & pendants'}],
+    default: 'tile', applyMode: 'rebuild-scene', subpage: 'Building & Storefront',
+    hint: 'Industrial pendants in corporate stores at standard or high ceiling height.',
+  });
+
+  registerSetting({
     key: 'bb_ceiling',
     label: 'Ceiling Height',
     kind: 'cycle',
@@ -711,10 +718,26 @@ export function registerCoreSettings(): void {
       { id: 'gabled-brick', label: 'Gabled Brick' },
       { id: 'flat-parapet', label: 'Flat Parapet' },
       { id: 'arcaded-brick', label: 'Arcaded Brick' },
+      { id: 'cone-canopy', label: 'Slate Cone Canopy' },
     ],
     default: 'gabled-brick',
     applyMode: 'rebuild-scene',
     hint: 'The large store’s exterior architecture, independent of its era and brand.',
+  });
+
+  registerSetting({
+    key: 'bb_cone_canopy_finish',
+    label: 'Cone canopy finish',
+    kind: 'cycle',
+    group: 'Store Look',
+    subpage: 'Building & Storefront',
+    values: [
+      { id: 'brand-accent', label: 'Brand Accent' },
+      { id: 'full-slate', label: 'Full Slate' },
+    ],
+    default: 'brand-accent',
+    applyMode: 'rebuild-scene',
+    hint: 'Center canopy and pillars finish for the Slate Cone Canopy facade: brand accent or full slate.',
   });
 
   registerSetting({
@@ -1595,11 +1618,11 @@ export function buildStoreBrandPanel(container: HTMLElement, hooks: BrandPanelHo
     if (restore.builtin !== previous.builtin) hooks.onNeedsReload?.();
   });
 
-  kit.color('body', 'Background colour', 'Left or Right chooses a named ink. Click the swatch for a custom colour.',
+  kit.color('body', 'Background colour', 'OK or click opens the 100-shade palette grid.',
     () => working.bodyColor, (v) => { working.bodyColor = v; });
-  kit.color('text', 'Lettering colour', 'Left or Right chooses a named ink.',
+  kit.color('text', 'Lettering colour', 'OK or click opens the 100-shade palette grid.',
     () => working.textColor, (v) => { working.textColor = v; });
-  kit.color('border', 'Outline colour', 'Left or Right chooses a named ink for the outline and sign sides.',
+  kit.color('border', 'Outline colour', 'OK or click opens the 100-shade palette grid for outline and sign sides.',
     () => working.borderColor, (v) => { working.borderColor = v; });
   kit.toggle('outline', 'Inset outline', 'A fine border inside the emblem background.',
     () => working.innerBorder, (v) => { working.innerBorder = v; });

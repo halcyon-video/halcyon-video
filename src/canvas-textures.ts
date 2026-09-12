@@ -523,6 +523,7 @@ export function createCategorySignTexture(
   ribbon = false,
   faceAspect = 4.0,
   blade = false,
+  ink?: string,
 ): THREE.Texture {
   // 1993 ERA ONLY, and ceiling-nav only (`ribbon` is passed solely by the
   // ceiling-nav catalog entry so endcap placards etc. never restyle):
@@ -556,7 +557,7 @@ export function createCategorySignTexture(
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     drawTicketSign(
       ctx, canvas.width, canvas.height, categoryName,
-      pal.primary, pal.secondary, getActiveLogoSpec().textColor, blade,
+      pal.primary, pal.secondary, ink ?? getActiveLogoSpec().textColor, blade,
     );
   };
   paint();
@@ -1570,14 +1571,91 @@ export function createBrickTexture(bond: 'running' | 'soldier' = 'running'): {
 // Full one-texture emblem (body + wordmark on a transparent background) for
 // the protruding entrance sign panel — drawLogo's 'all' layer, same legacy
 // compositions as the split body/yellow boards.
-export function createEntranceTicketLogoTexture(theme = getActiveTheme()): THREE.Texture {
+export function createSlateTexture(): {
+  map: THREE.CanvasTexture;
+  normalMap: THREE.CanvasTexture;
+  roughnessMap: THREE.CanvasTexture;
+} {
+  const SIZE = 512;
+  const canvas = document.createElement("canvas");
+  canvas.width = SIZE; canvas.height = SIZE;
+  const ctx = canvas.getContext('2d')!;
+  ctx.fillStyle = "#555d66";
+  ctx.fillRect(0, 0, SIZE, SIZE);
+
+  let seed = 2026;
+  const rnd = () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; };
+
+  for (let y = 0; y < SIZE; y += 2) {
+    const v = (rnd() - 0.5) * 22;
+    ctx.fillStyle = v > 0 ? `rgba(255,255,255,${(v / 70).toFixed(3)})` : `rgba(0,0,0,${(-v / 65).toFixed(3)})`;
+    ctx.fillRect(0, y, SIZE, 2);
+  }
+
+  for (let i = 0; i < 36; i++) {
+    const x = rnd() * SIZE, y = rnd() * SIZE, r = 20 + rnd() * 60;
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, rnd() > 0.5 ? "rgba(120,130,140,0.25)" : "rgba(50,56,62,0.25)");
+    g.addColorStop(1, "rgba(0,0,0,0)");
+    stampTiled(ctx, SIZE, (c) => { c.fillStyle = g; c.fillRect(x - r, y - r, r * 2, r * 2); });
+  }
+
+  for (let i = 0; i < 1800; i++) {
+    const x = rnd() * SIZE, y = rnd() * SIZE;
+    const bright = rnd() > 0.7;
+    ctx.fillStyle = bright ? "rgba(255,255,255,0.18)" : "rgba(30,35,40,0.15)";
+    ctx.fillRect(x, y, 1.2, 1.2);
+  }
+
+  const map = new THREE.CanvasTexture(canvas);
+  map.colorSpace = THREE.SRGBColorSpace;
+  map.wrapS = map.wrapT = THREE.RepeatWrapping;
+  map.anisotropy = aniso(8);
+
+  const hCanvas = document.createElement("canvas");
+  hCanvas.width = SIZE; hCanvas.height = SIZE;
+  const hCtx = hCanvas.getContext('2d')!;
+  hCtx.fillStyle = "#808080";
+  hCtx.fillRect(0, 0, SIZE, SIZE);
+
+  for (let y = 0; y < SIZE; y += 3) {
+    const d = (rnd() - 0.5) * 45;
+    hCtx.fillStyle = d > 0 ? `rgba(255,255,255,${(d / 110).toFixed(3)})` : `rgba(0,0,0,${(-d / 90).toFixed(3)})`;
+    hCtx.fillRect(0, y, SIZE, 3);
+  }
+
+  const normalMap = heightToNormalTexture(hCanvas, 0.85);
+  normalMap.wrapS = normalMap.wrapT = THREE.RepeatWrapping;
+  normalMap.anisotropy = aniso(8);
+
+  const rCanvas = document.createElement("canvas");
+  rCanvas.width = SIZE; rCanvas.height = SIZE;
+  const rCtx = rCanvas.getContext('2d')!;
+  rCtx.fillStyle = "#c5c5c5";
+  rCtx.fillRect(0, 0, SIZE, SIZE);
+  for (let i = 0; i < 24; i++) {
+    const x = rnd() * SIZE, y = rnd() * SIZE, r = 25 + rnd() * 75;
+    const rg = rCtx.createRadialGradient(x, y, 0, x, y, r);
+    rg.addColorStop(0, rnd() > 0.5 ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.12)");
+    rg.addColorStop(1, "rgba(0,0,0,0)");
+    stampTiled(rCtx, SIZE, (c) => { c.fillStyle = rg; c.fillRect(x - r, y - r, r * 2, r * 2); });
+  }
+
+  const roughnessMap = new THREE.CanvasTexture(rCanvas);
+  roughnessMap.wrapS = roughnessMap.wrapT = THREE.RepeatWrapping;
+
+  return { map, normalMap, roughnessMap };
+}
+
+export function createEntranceTicketLogoTexture(theme = getActiveTheme(), secondary = false): THREE.Texture {
   const canvas = document.createElement('canvas');
   canvas.width = 1000;
   canvas.height = 600;
   const ctx = canvas.getContext('2d')!;
   ctx.clearRect(0, 0, 1000, 600);
 
-  drawLogo(ctx, getActiveLogoSpec(theme), {
+  const spec = getActiveLogoSpec(theme);
+  drawLogo(ctx, secondary ? { ...spec, bodyColor: theme.palette.secondary, textColor: theme.palette.primary, borderColor: theme.palette.primary } : spec, {
     x: 0, y: 0, w: 1000, h: 600, layer: 'all',
     pinstripeWidth: 5, // this panel always wore the thin interior-style stroke
   });

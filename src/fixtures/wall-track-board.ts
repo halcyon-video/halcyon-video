@@ -14,6 +14,7 @@ import { FixturePlacement } from '../store-layout';
 import { FixtureContext, StoreFixture } from '../fixtures';
 import { getActiveTheme } from '../themes';
 import { assetUrl } from '../asset-url';
+import { mapDisplayFaceUVs } from './display-face-uv';
 import { tryLoadUserAssetTexture } from '../user-assets';
 
 export type WallTrackBoardFormat = 'tall' | 'long';
@@ -59,15 +60,14 @@ const DEFAULT_TALL_STRIPS: string[] = [
 ];
 
 const DEFAULT_LONG_STRIPS: string[] = [
-  'HALCYON VIDEO — GENERAL RENTAL TERMS & MEMBERSHIP AGREEMENT',
-  '1. MEMBERSHIP: VALID DRIVER\'S LICENSE & MAJOR CREDIT CARD REQUIRED FOR ALL RENTALS',
-  '2. RENTAL PERIOD: NEW RELEASES DUE BY 6:00 PM ON SECOND DAY; CATALOG DUE ON FIFTH DAY',
-  '3. EXTENDED VIEWING: ADDITIONAL DAYS CHARGED AT STANDARD RATE UP TO 7 CONSECUTIVE DAYS',
-  '4. REWIND POLICY: VHS CASSETTES MUST BE FULLY REWOUND; $1.00 SERVICE CHARGE APPLIES',
-  '5. LATE RETURNS: $1.50 PER DAY LATE FEE ACCRUES AUTOMATICALLY UPON MISSED CUTOFF',
-  '6. DAMAGED / LOST MEDIA: REPLACEMENT COST PLUS $5.00 RE-PROCESSING APPLIED TO ACCOUNT',
-  '7. FAST RETURN: DROP BOX AVAILABLE AT FRONT FOR CONVENIENT AFTER-HOURS DEPOSIT',
-  '8. PARENTAL GUIDANCE: ADULT SIGNATURE REQUIRED FOR RESTRICTED TITLES & GAME RATINGS',
+  'RENTAL TERMS',
+  '',
+  '',
+  '',
+  '',
+  '',
+  '',
+  '',
 ];
 
 export class WallTrackBoard implements StoreFixture {
@@ -170,8 +170,13 @@ export class WallTrackBoard implements StoreFixture {
   }
 
   private createStripTexture(format: WallTrackBoardFormat, rows: number, customStrips?: string[]): THREE.CanvasTexture {
-    const w = 1024;
-    const h = format === 'tall' ? 1024 : 512;
+    // Square artwork on a tall board and 2:1 artwork on an 8:1 board
+    // stretched every letter. Match the actual printed face's dimensions.
+    const opts = (this.placement.options ?? {}) as WallTrackBoardOptions;
+    const width = opts.width ?? (format === 'tall' ? DEFAULT_TALL_WIDTH : DEFAULT_LONG_WIDTH);
+    const height = opts.height ?? (format === 'tall' ? DEFAULT_TALL_HEIGHT : DEFAULT_LONG_HEIGHT);
+    const w = format === 'tall' ? 768 : 2048;
+    const h = Math.round(w * height / width);
     const canvas = document.createElement('canvas');
     canvas.width = w;
     canvas.height = h;
@@ -449,6 +454,9 @@ export class WallTrackBoard implements StoreFixture {
       this.hardwareGroup = gltf.scene;
       this.hardwareGroup.name = `wall-track-board-hardware-${format}`;
 
+      // The model's packed UV islands describe hardware, not printed art.
+      // Project one continuous face across all strips and one onto the poster.
+      mapDisplayFaceUVs(this.hardwareGroup, ['TrackStripFace', 'PosterFace']);
       this.hardwareGroup.traverse((object) => {
         if (!(object instanceof THREE.Mesh)) return;
         this.disposables.push({ geo: object.geometry });

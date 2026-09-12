@@ -18,6 +18,7 @@ import { buildGroundBlend } from './ground-blend';
 
 export interface ExteriorRoad {
   group: THREE.Group;
+  edgeFallback: THREE.Group;
   setGroundColor(color: THREE.Color): void;
   dispose(): void;
 }
@@ -59,6 +60,9 @@ export function buildExteriorRoad(parent: THREE.Object3D, opts: ExteriorRoadOpti
   const disposables: Array<{ dispose(): void }> = [];
   const track = <T extends { dispose(): void }>(x: T): T => { disposables.push(x); return x; };
 
+  const edgeFallback = new THREE.Group(); edgeFallback.name = 'Road edge fallback';
+  group.add(edgeFallback);
+
   const lotDepth = farZ - frontZ;
   const roadMinX = minX - ROAD_OVERHANG;
   const roadMaxX = maxX + ROAD_OVERHANG;
@@ -69,27 +73,27 @@ export function buildExteriorRoad(parent: THREE.Object3D, opts: ExteriorRoadOpti
   // (not just the lot's) so there's no gap at the corners where the side
   // curbs meet it.
   const curbMat = track(new THREE.MeshStandardMaterial({ color: CURB_COLOR, roughness: 0.85, metalness: 0.0 }));
-  const farCurb = new THREE.Mesh(new THREE.BoxGeometry(roadWidth, CURB_HEIGHT, CURB_DEPTH), curbMat);
+  const farCurb = new THREE.Mesh(track(new THREE.BoxGeometry(roadWidth, CURB_HEIGHT, CURB_DEPTH)), curbMat);
   farCurb.position.set(centerX, -0.03, farZ + CURB_DEPTH / 2);
   farCurb.receiveShadow = true;
-  group.add(farCurb);
+  edgeFallback.add(farCurb);
 
   const sideCurbGeo = track(new THREE.BoxGeometry(CURB_DEPTH, CURB_HEIGHT, lotDepth + CURB_DEPTH));
   [minX, maxX].forEach((x) => {
     const sideCurb = new THREE.Mesh(sideCurbGeo, curbMat);
     sideCurb.position.set(x, -0.03, frontZ + lotDepth / 2);
     sideCurb.receiveShadow = true;
-    group.add(sideCurb);
+    edgeFallback.add(sideCurb);
   });
 
   // ─── Gutter pan: flat concrete strip between the curb and the road surface.
   const gutterMat = track(new THREE.MeshStandardMaterial({ color: GUTTER_COLOR, roughness: 0.9, metalness: 0.0 }));
   const gutterZ = farZ + CURB_DEPTH;
-  const gutter = new THREE.Mesh(new THREE.PlaneGeometry(roadWidth, GUTTER_DEPTH), gutterMat);
+  const gutter = new THREE.Mesh(track(new THREE.PlaneGeometry(roadWidth, GUTTER_DEPTH)), gutterMat);
   gutter.rotation.x = -Math.PI / 2;
   gutter.position.set(centerX, -0.03, gutterZ + GUTTER_DEPTH / 2);
   gutter.receiveShadow = true;
-  group.add(gutter);
+  edgeFallback.add(gutter);
 
   // ─── Road surface: the lot's own asphalt generator with the parking-stall
   // side lines suppressed (a through street has no stall markings).
@@ -98,7 +102,7 @@ export function buildExteriorRoad(parent: THREE.Object3D, opts: ExteriorRoadOpti
   const roadTex = track(createAsphaltTexture(0, 0));
   roadTex.repeat.set(roadWidth / ROAD_TILE_FT, ROAD_DEPTH / ROAD_TILE_FT);
   const roadMat = track(new THREE.MeshStandardMaterial({ map: roadTex, roughness: 0.95, metalness: 0.0 }));
-  const road = new THREE.Mesh(new THREE.PlaneGeometry(roadWidth, ROAD_DEPTH), roadMat);
+  const road = new THREE.Mesh(track(new THREE.PlaneGeometry(roadWidth, ROAD_DEPTH)), roadMat);
   road.rotation.x = -Math.PI / 2;
   road.position.set(centerX, -0.03, roadStartZ + ROAD_DEPTH / 2);
   road.receiveShadow = true;
@@ -156,5 +160,5 @@ export function buildExteriorRoad(parent: THREE.Object3D, opts: ExteriorRoadOpti
     parent.remove(group);
   }
 
-  return { group, setGroundColor, dispose };
+  return { group, edgeFallback, setGroundColor, dispose };
 }

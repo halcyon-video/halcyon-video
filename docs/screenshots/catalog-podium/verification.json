@@ -1,0 +1,89 @@
+{
+  "metrics": {
+    "layoutViolations": [],
+    "bounds": {
+      "min": [
+        -6.5,
+        0,
+        -4
+      ],
+      "max": [
+        -3.5,
+        3.2308506965637207,
+        -2
+      ]
+    },
+    "triangles": 8368,
+    "draws": 6,
+    "textures": 18,
+    "surfaces": [
+      {
+        "material": "WarmAshLaminate",
+        "uv": true,
+        "map": true,
+        "normal": true,
+        "roughness": true
+      },
+      {
+        "material": "BinderBookcloth",
+        "uv": true,
+        "map": true,
+        "normal": true,
+        "roughness": true
+      },
+      {
+        "material": "CradleLaminate",
+        "uv": true,
+        "map": true,
+        "normal": true,
+        "roughness": true
+      },
+      {
+        "material": "PaperEdges",
+        "uv": true,
+        "map": true,
+        "normal": true,
+        "roughness": true
+      },
+      {
+        "material": "CatalogPrint",
+        "uv": true,
+        "map": true,
+        "normal": true,
+        "roughness": true
+      },
+      {
+        "material": "BrushedNickel",
+        "uv": true,
+        "map": true,
+        "normal": true,
+        "roughness": true
+      }
+    ],
+    "fallbackHidden": true
+  },
+  "lifecycle": {
+    "expected": 42,
+    "disposed": 42,
+    "detached": true,
+    "footprint": {
+      "label": "fixture:test-podium",
+      "kind": "fixture",
+      "cx": 0,
+      "cz": 0,
+      "w": 3,
+      "d": 2,
+      "yaw": 1.5707963267948966,
+      "clearance": 1.5
+    },
+    "disposedColliderHits": 0,
+    "gate": {
+      "bb-1993": true,
+      "bb-2000": true,
+      "bb-2010": true
+    }
+  },
+  "errorFallback": true,
+  "lateLoadDetached": true,
+  "pageErrors": []
+}

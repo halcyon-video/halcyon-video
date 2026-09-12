@@ -42,8 +42,8 @@ const serviceRowRegions = new Map<string, RowRegion[]>();
 
 /**
  * Discover all available streaming services for a given movie.
- * Queries primary service on the movie object, matching titles across loaded streaming stock,
- * and falls back to default service list. Deduplicates services by id.
+ * Queries primary service on the movie object and matching titles across loaded streaming stock.
+ * Deduplicates services by id.
  */
 export function getAvailableStreamingServices(movie: Movie, additionalStock?: Movie[]): StreamingServiceChoice[] {
   const choices: StreamingServiceChoice[] = [];
@@ -91,12 +91,6 @@ export function getAvailableStreamingServices(movie: Movie, additionalStock?: Mo
     }
   }
 
-  // 3. Fallback: if none resolved yet, synthesize from default services
-  if (choices.length === 0) {
-    const def = DEFAULT_STREAMING_SERVICES[0];
-    addChoice(def.id, def.name, buildStreamingUrl(def, movie.title, movie.tmdbId ?? 0));
-  }
-
   return choices;
 }
 
@@ -118,6 +112,10 @@ export function getStreamingChoiceKey(movie: Movie | null): string {
 
 export function startStreamingServiceChoice(scene: StoreScene, movie: Movie): boolean {
   const services = getAvailableStreamingServices(movie);
+  if (services.length === 0) {
+    scene.onConsoleLog('[System] No streaming services currently available for this title.', 'system');
+    return false;
+  }
   const state: StreamingServiceChoiceState = {
     movie,
     services,
@@ -202,6 +200,14 @@ export function getStreamingCheckoutMovie(scene: StoreScene): Movie | null {
 }
 
 export function clearStreamingCheckoutMovie(scene: StoreScene): void {
+  const movie = checkoutMovies.get(scene);
+  if (movie && scene.carried) {
+    if (typeof scene.carried.drop === 'function') {
+      scene.carried.drop(movie.id);
+    } else {
+      scene.carried.clearAll(true);
+    }
+  }
   checkoutMovies.delete(scene);
 }
 

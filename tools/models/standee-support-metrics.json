@@ -1,0 +1,122 @@
+{
+  "header": {
+    "parts": [
+      {
+        "name": "header_Left_EaselWeb",
+        "triangles": 28,
+        "manifold": true,
+        "uv": true
+      },
+      {
+        "name": "header_GlueFlange_-1",
+        "triangles": 12,
+        "manifold": true,
+        "uv": true
+      },
+      {
+        "name": "header_ScoredFoot_-1",
+        "triangles": 72,
+        "manifold": true,
+        "uv": true
+      },
+      {
+        "name": "header_Right_EaselWeb",
+        "triangles": 28,
+        "manifold": true,
+        "uv": true
+      },
+      {
+        "name": "header_GlueFlange_1",
+        "triangles": 12,
+        "manifold": true,
+        "uv": true
+      },
+      {
+        "name": "header_ScoredFoot_1",
+        "triangles": 72,
+        "manifold": true,
+        "uv": true
+      },
+      {
+        "name": "header_ShoulderedLockingBridge",
+        "triangles": 44,
+        "manifold": true,
+        "uv": true
+      },
+      {
+        "name": "header_ExposedFootFlute_-1",
+        "triangles": 196,
+        "manifold": true,
+        "uv": true
+      },
+      {
+        "name": "header_ExposedFootFlute_1",
+        "triangles": 196,
+        "manifold": true,
+        "uv": true
+      }
+    ],
+    "triangles": 660,
+    "bytes": 49404
+  },
+  "floor": {
+    "parts": [
+      {
+        "name": "floor_Left_EaselWeb",
+        "triangles": 28,
+        "manifold": true,
+        "uv": true
+      },
+      {
+        "name": "floor_GlueFlange_-1",
+        "triangles": 12,
+        "manifold": true,
+        "uv": true
+      },
+      {
+        "name": "floor_ScoredFoot_-1",
+        "triangles": 72,
+        "manifold": true,
+        "uv": true
+      },
+      {
+        "name": "floor_Right_EaselWeb",
+        "triangles": 28,
+        "manifold": true,
+        "uv": true
+      },
+      {
+        "name": "floor_GlueFlange_1",
+        "triangles": 12,
+        "manifold": true,
+        "uv": true
+      },
+      {
+        "name": "floor_ScoredFoot_1",
+        "triangles": 72,
+        "manifold": true,
+        "uv": true
+      },
+      {
+        "name": "floor_ShoulderedLockingBridge",
+        "triangles": 44,
+        "manifold": true,
+        "uv": true
+      },
+      {
+        "name": "floor_ExposedFootFlute_-1",
+        "triangles": 196,
+        "manifold": true,
+        "uv": true
+      },
+      {
+        "name": "floor_ExposedFootFlute_1",
+        "triangles": 196,
+        "manifold": true,
+        "uv": true
+      }
+    ],
+    "triangles": 660,
+    "bytes": 49308
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "bytes": 179568,
+  "textures": 0,
+  "source_parts": 35,
+  "roles": {
+    "ParkingLamp_SealRubber": {
+      "triangles": 418,
+      "vertices": 213,
+      "uv": true
+    },
+    "ParkingLamp_PoleFinish": {
+      "triangles": 1344,
+      "vertices": 684,
+      "uv": true
+    },
+    "ParkingLamp_FastenerMetal": {
+      "triangles": 728,
+      "vertices": 408,
+      "uv": true
+    },
+    "ParkingLamp_LampLens": {
+      "triangles": 108,
+      "vertices": 56,
+      "uv": true
+    }
+  },
+  "blender_bounds": {
+    "min": [
+      -0.38999998569488525,
+      -0.32499998807907104,
+      0.0
+    ],
+    "max": [
+      0.38999998569488525,
+      1.721500039100647,
+      13.283499717712402
+    ]
+  }
+}

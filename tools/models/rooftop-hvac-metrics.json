@@ -1,0 +1,39 @@
+{
+  "units": "feet",
+  "textures": 0,
+  "meshes": [
+    {
+      "name": "HVACCabinet",
+      "triangles": 1088,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "HVACCoil",
+      "triangles": 588,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "HVACHardware",
+      "triangles": 3088,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "HVACCurb",
+      "triangles": 156,
+      "nonManifoldEdges": 0
+    }
+  ],
+  "blenderBounds": [
+    [
+      -3.2325000762939453,
+      -1.8350000381469727,
+      0.0
+    ],
+    [
+      3.2290000915527344,
+      2.065000057220459,
+      3.8239998817443848
+    ]
+  ],
+  "bytes": 277924
+}

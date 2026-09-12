@@ -160,19 +160,9 @@ export interface AisleShelvingDeps {
   suppressFrontCapLineIds?: Set<number>;
 }
 
-/**
- * Which shelf lip carries the clasps: the band just ABOVE the top row — at the
- * walk-mode eye height (5.5ft) the one you read without moving your head, and
- * the one the browse cursor reaches by pressing Up off the top shelf.
- *
- * This was written against the OLD 4-row heights ([1.0, 2.1, 3.2, 4.3], where
- * 4.3 was the top row itself); the measured pitch (2e4eadf) moved the top row
- * to AISLE_SHELF_HEIGHTS's last entry and left this literal floating. The
- * clearance below keeps the current position exactly where it is today while
- * making sure a future pitch change can never sink the clasp BELOW the top row
- * and bury it in that row's stock.
- */
-const CLASP_SHELF_Y = Math.max(4.3, AISLE_SHELF_HEIGHTS[AISLE_SHELF_HEIGHTS.length - 1] + 0.45);
+/** The actual top deck carries the jaws. The former invisible section marker
+ * floated above this row; visible clip hardware must follow its physical lip. */
+const CLASP_SHELF_Y = AISLE_SHELF_HEIGHTS[AISLE_SHELF_HEIGHTS.length - 1];
 
 // Populate shelves dynamically for each library's freestanding shelving units.
 // Each island is parented to its own pivot group, positioned at the island's

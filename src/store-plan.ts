@@ -25,6 +25,7 @@ import {
   // parse a real (non-type-only) import it would have to resolve at runtime
   // through a bare specifier like the un-stripped original.
 } from './store-layout.ts';
+import { CLUBHOUSE, clubhouseEligible, clubhouseHost, familyStock, type ClubhouseHost } from './fixtures/clubhouse-layout.ts';
 import { activeStoreFormat } from './store-format.ts';
 import type { Footprint } from './layout-validator.ts';
 
@@ -67,6 +68,7 @@ export class StorePlan {
   public shelvingUnits: ShelvingUnit[] = [];
   // Z of the back wall: a clear margin behind the deepest planned island.
   public backWallZ = -35.0;
+  public clubhouse: ClubhouseHost | null = null;
   // Pivot Z for the diagonal aisle rotation (centre of the aisle cluster).
   public aislePivotZ = 0;
 
@@ -100,7 +102,7 @@ export class StorePlan {
   // keeps its libraryIdx / unitIdxInLibrary so a library reads as a contiguous
   // segment of the runs, and the camera/box baking just follow each unit's stored
   // transform. This is the single source of truth for placement AND orientation.
-  plan() {
+  plan(theme = '', ceiling = 13.5) {
     this.buildLibraryLayouts();
     this.planRuns();
 
@@ -121,6 +123,19 @@ export class StorePlan {
         minZ = cornerZ - backClear;
       }
     });
+    this.clubhouse = null;
+    const familyTitles = familyStock(this.libraries.flatMap(l => l.movies)).length;
+    if (clubhouseEligible(theme, FORMAT.id, this.getStoreWidth(), ceiling, familyTitles)) {
+      const left = STORE_CENTER_X - this.getStoreWidth() / 2;
+      // Reserve the corner before shell, NR shelving, slots and navigation build.
+      // Deepen only as needed; every existing aisle/stock transform is preserved.
+      for (const fp of this.getUnitFootprints()) {
+        const hx = Math.abs(Math.cos(fp.yaw))*fp.w/2 + Math.abs(Math.sin(fp.yaw))*fp.d/2;
+        const hz = Math.abs(Math.sin(fp.yaw))*fp.w/2 + Math.abs(Math.cos(fp.yaw))*fp.d/2;
+        if (fp.cx - hx < left + CLUBHOUSE.reserve) minZ = Math.min(minZ, fp.cz - hz - CLUBHOUSE.reserve);
+      }
+      this.clubhouse = clubhouseHost(left, minZ, familyTitles);
+    }
     this.backWallZ = minZ;
 
     // Pivot the diagonal aisle rotation about the centre of the aisle cluster so the

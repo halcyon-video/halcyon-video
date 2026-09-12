@@ -1,0 +1,15 @@
+{
+  "bytes": 599652,
+  "triangles": 7304,
+  "primitives": 8,
+  "materials": [
+    "PowderCoatedSteel",
+    "VentAndControlRecess",
+    "ZincFasteners",
+    "GraphiteBezel",
+    "WarmGrayABS"
+  ],
+  "images": 6,
+  "manifoldSourceParts": 49,
+  "allPrimitivesHaveUV": true
+}

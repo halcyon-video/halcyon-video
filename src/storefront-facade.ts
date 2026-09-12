@@ -1,5 +1,8 @@
+import { buildWallCourtesyTelephone } from './fixtures/wall-courtesy-telephone';
+import { installDisplayModel } from './fixtures/display-model';
+import { buildRooftopHVAC } from './rooftop-hvac';
 import { selfLit } from './material-lighting';
-// Exterior envelope shared by three architectural styles. Window openings,
+// Exterior envelope shared by the architectural styles. Window openings,
 // service-door placement and masonry tiling follow the store's live plan.
 // Fitted entrance portals and canopies are authored in Blender; none of this
 // exterior dressing changes the walkable entrance or its door animations.
@@ -10,7 +13,7 @@ import { buildFacadeEntryModel } from './storefront-entry-model';
 import { onBrandChange } from './brand-live';
 import { getActiveTheme } from './themes';
 import { createFacadeTileMaterial, mapFacadeUV } from './facade-masonry';
-import { createBrickTexture } from './canvas-textures';
+import { createBrickTexture, createSlateTexture } from './canvas-textures';
 import { WINDOW_BAY_TARGET_WIDTH, FRONT_WINDOW_CORNER_MARGIN, STORE_CENTER_X, FRONT_GLASS_Z } from './store-layout';
 
 export interface FacadeBuildParams {
@@ -55,6 +58,8 @@ export interface FacadeLogoAnchor {
   // that outgrow the gable lay out along this band instead — the
   // "letters across the whole front" placement.
   fascia: { width: number; bottomY: number; topY: number };
+  /** Optional wall-mounted channel-letter fields on either side of the canopy. */
+  wallBands?: { x: number; z: number; width: number; bottomY: number; topY: number }[];
 }
 
 export interface StorefrontFacade {
@@ -169,7 +174,22 @@ export function buildStorefrontFacade(params: FacadeBuildParams): StorefrontFaca
     group.add(m);
     return m;
   };
-  const masonry = brickMaterial(1, 1);
+  const slateTex = style === 'cone-canopy' ? createSlateTexture() : null;
+  const slateVeneer = slateTex ? new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    map: slateTex.map,
+    normalMap: slateTex.normalMap,
+    roughnessMap: slateTex.roughnessMap,
+    roughness: 0.85,
+    metalness: 0.08,
+  }) : null;
+  const masonry = slateVeneer ?? brickMaterial(1, 1);
+  if (slateTex && slateVeneer) {
+    group.addEventListener('removed', () => {
+      [slateTex.map, slateTex.normalMap, slateTex.roughnessMap].forEach(t => t?.dispose());
+      slateVeneer.dispose();
+    });
+  }
   const brickBox = (w: number, h: number, d: number, x: number, y: number, z: number) => {
     const mesh = addBox(w, h, d, x, y, z, masonry);
     mapFacadeUV(mesh.geometry, mesh.position);
@@ -306,6 +326,14 @@ export function buildStorefrontFacade(params: FacadeBuildParams): StorefrontFaca
     const hardwareMat = new THREE.MeshStandardMaterial({ color: 0xb9bec5, roughness: 0.25, metalness: 0.9 });
     const stoopMat = new THREE.MeshStandardMaterial({ color: 0x9a938a, roughness: 0.95, metalness: 0.0 });
 
+    const door = new THREE.Group();
+    door.name = 'serviceDoor';
+    door.position.set(rightEdgeX, 0, doorZ);
+    group.add(door);
+    const fallback = new THREE.Group();
+    door.add(fallback);
+    const firstDoorChild = group.children.length;
+
     // Exterior, proud of the brick veneer (veneer outer face ≈ wall + 0.625).
     const exFrameX = rightEdgeX + 0.66;
     [-1, 1].forEach((s) => {
@@ -327,6 +355,20 @@ export function buildStorefrontFacade(params: FacadeBuildParams): StorefrontFaca
     addBox(0.12, 0.2, DOOR_W + 0.4, inFrameX, DOOR_H + 0.1, doorZ, frameMat);            // head
     addBox(0.08, DOOR_H, DOOR_W, rightEdgeX - 0.06, DOOR_H / 2, doorZ, leafMat);          // leaf
     addBox(0.1, 0.14, DOOR_W - 0.7, rightEdgeX - 0.16, 3.3, doorZ, hardwareMat);          // crash bar
+
+    // Preserve the existing stoop and drip cap; replace only door construction.
+    for (const child of group.children.slice(firstDoorChild)) {
+      if (!(child instanceof THREE.Mesh) || child.material === stoopMat || child.material === coping) continue;
+      child.position.sub(door.position);
+      fallback.add(child);
+    }
+    const releaseDoor = installDisplayModel(params.context, door, fallback, 'models/service-door.glb', {
+      ServiceLeaf: leafMat, ServiceFrame: frameMat, ServiceHardware: hardwareMat,
+    });
+    door.userData.dispose = releaseDoor;
+    group.addEventListener('removed', releaseDoor);
+    // Independent static wall prop; door/frame and exit/navigation stay unchanged.
+    buildWallCourtesyTelephone(params.context, group, rightEdgeX, rightSideDoorZone(sideRibbon)!.z0);
 
     // EXIT sign above the door, built to real US exit-sign proportions: a
     // 15.5in x 8.75in face (aspect ~1.78) carrying RED "EXIT" at the NFPA 101 /
@@ -378,10 +420,16 @@ export function buildStorefrontFacade(params: FacadeBuildParams): StorefrontFaca
     frontCornerMargin, brickMaterial, primary: stripeColor,
   }));
 
+  const rooftop = buildRooftopHVAC(params.context, storeWidth, backWallZ, ceilingY);
+  group.add(rooftop);
+  group.addEventListener('removed', () => rooftop.userData.dispose?.());
+
   // The brand cabinet sits over the entry, below the peak. Separate gable
   // and fascia bounds also keep optional freestanding letters inside the wall.
-  const logoWidth = Math.min(9.0, entryHalfWidth * 1.05);
+  const logoWidth = style === 'cone-canopy' ? Math.min(13, entryHalfWidth*1.65) : Math.min(9.0, entryHalfWidth * 1.05);
   const logoHeight = logoWidth * 0.6;
+  const wallInner = dimensions.massHalf + dimensions.pierWidth + .3;
+  const wallOuter = storeWidth/2 - frontCornerMargin;
   const logoAnchor: FacadeLogoAnchor = {
     x: CX,
     y: dimensions.logoY,
@@ -392,6 +440,10 @@ export function buildStorefrontFacade(params: FacadeBuildParams): StorefrontFaca
       ? { baseY: gableBase, halfWidth: massHalf-1, height: gableH }
       : { baseY: 13.4, halfWidth: massHalf, height: dimensions.pierTop-13.4 },
     fascia: { width: storeWidth, bottomY: WINDOW_HEAD_Y, topY: parapetTop },
+    ...(style === 'cone-canopy' ? { wallBands: [-1,1].map(sign => ({
+      x: CX+sign*(wallInner+wallOuter)/2, z: FRONT_Z+.8,
+      width: Math.max(1,wallOuter-wallInner), bottomY: 13.4, topY: parapetTop-.4,
+    })) } : {}),
   };
 
   return { group, logoAnchor };

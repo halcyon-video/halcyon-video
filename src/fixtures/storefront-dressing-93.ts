@@ -23,6 +23,7 @@
 // static geometry in one group registered in scene.activeSignageObjects so
 // the signage rebuild path tears it down.
 import * as THREE from 'three';
+import { installEasPedestals } from './eas-pedestal-model';
 import type { StoreScene } from '../three-scene';
 import { getStorefrontSpec, ENTRANCE_SIDELIGHT_WIDTH } from '../store-layout';
 import { facadeEntryGlazing, facadeStyle } from '../storefront-architecture';
@@ -154,6 +155,9 @@ export function buildStorefrontDressing93(scene: StoreScene): void {
   // sensible to gate them off instead: one door in a plain wall has no
   // sidelight to hang a notice on and no side-door choke point to gate.
   if (vest && vest.hasChamber) {
+    const fallback = new THREE.Group();
+    fallback.name = 'eas-pedestal-fallback';
+    group.add(fallback);
     const pedestalShape = new THREE.Shape();
     const pw = 0.5, ph = 3.4, r = 0.24;
     pedestalShape.moveTo(-pw / 2, 0);
@@ -187,12 +191,13 @@ export function buildStorefrontDressing93(scene: StoreScene): void {
       ped.position.set(g.x, 0.03, g.z);
       ped.castShadow = true;
       ped.receiveShadow = true;
-      group.add(ped);
+      fallback.add(ped);
       scene.fixtureContext().addCollider(ped);
       const base = new THREE.Mesh(baseGeo, cream);
       base.position.set(g.x, 0.03, g.z);
       base.receiveShadow = true;
-      group.add(base);
+      fallback.add(base);
     }
+    installEasPedestals(scene, group, fallback, gates);
   }
 }

@@ -107,12 +107,19 @@ export function rehydrateCarried(scene: StoreScene): void {
     // Source-aware (GH #84): the stored id may be qualified, and a bare one
     // from an older build still resolves. findSlotKeyForMovie takes the BARE
     // id — the shelf slot is the server's own item.
-    const movie = findTitleByCarryId(scene.libraries, id)
-      ?? scene.gameMovies.find((g) => g.id === id);
-    if (movie) carried.take(movie, scene.findSlotKeyForMovie(movie.id), null, now);
+    const movie = findTitleByCarryId(scene.catalogLibraries, id)
+      ?? scene.catalogGames.find((g) => g.id === id);
+    if (movie) {
+      if (movie.streaming) continue;
+      carried.take(movie, scene.findSlotKeyForMovie(movie.id), null, now);
+    }
   }
   if (carried.count > 0) {
     scene.onConsoleLog(`[System] Still carrying ${carried.count} tape(s) from last visit.`, 'system');
+  } else {
+    try {
+      localStorage.removeItem(CARRY_STORAGE_KEY);
+    } catch { /* storage restricted */ }
   }
 }
 
@@ -342,7 +349,7 @@ export function confirmCheckout(scene: StoreScene): boolean {
         scene.onConsoleLog(`[System] Couldn't open the link for "${streamingMovie.title}" (popup blocked?).`, 'system');
       }
     }
-    scene.carried?.clearAll(false);
+    scene.carried?.clearAll(true);
     clearStreamingCheckoutMovie(scene);
     scene.clerk?.releaseFromRegister();
     if (scene.overviewStart) {

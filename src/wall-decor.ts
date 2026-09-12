@@ -1,3 +1,4 @@
+import { installPosterFrame } from './poster-frame-model';
 // Actor-portrait wall + floating film-strip ribbon — pin 052 rebuild
 // (feedback/052, GitHub issue #25), widened 2026-08 to span all three back
 // walls (feedback: "the actor posters... are supposed to span the entire
@@ -440,8 +441,14 @@ export function buildWallDecor(scene: StoreScene, storeWidth: number, backWallZ:
     group.rotation.y = rotY;
 
     const frame = markSignMesh(new THREE.Mesh(new THREE.PlaneGeometry(PORTRAIT_FRAMED_W, PORTRAIT_FRAMED_H), frameMat));
-    frame.position.z = FRAME_STANDOFF; // proud of the strip AND of the wall lettering (local +Z -> into the room)
-    group.add(frame);
+    const hardware = new THREE.Group();
+    hardware.position.z = PORTRAIT_STANDOFF;
+    group.add(hardware);
+    const fallback = new THREE.Group();
+    hardware.add(fallback);
+    frame.position.z = FRAME_STANDOFF - PORTRAIT_STANDOFF;
+    fallback.add(frame);
+    installPosterFrame(scene, hardware, fallback, 'wall', frameMat, PORTRAIT_W, PORTRAIT_H);
 
     // Neutral placeholder fill until the real portrait decodes; never a
     // broken/missing-texture look.

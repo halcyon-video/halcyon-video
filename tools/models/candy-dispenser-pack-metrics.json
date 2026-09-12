@@ -1,0 +1,16 @@
+{
+  "triangles": 1064,
+  "primitives": 5,
+  "bytes": 76792,
+  "textures": 0,
+  "dimensionsFeet": [
+    0.20833333333333334,
+    0.5833333333333334,
+    0.065
+  ],
+  "pegHoleFeet": [
+    0,
+    0.55,
+    0
+  ]
+}

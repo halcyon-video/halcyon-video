@@ -112,3 +112,12 @@ export function posterShortfallLines(shortfall: number, layerBudget: number): st
     `(YOUR GPU CAPS COVERS AT ${layerBudget} TITLES)`,
   ];
 }
+
+/** A mixed CRT/LCD desk belongs to the late DVD-era chain store only.
+ * Reuses #176's keyboard and counter-top station attachment; no new target.
+ */
+export function counterMonitorAsset(themeId: string, stationIndex: number, stationCount: number): string {
+  return themeId === 'bb-2010' && stationCount > 1 && stationIndex === 0
+    ? 'models/flat-panel-terminal.glb'
+    : 'models/rental-terminal.glb';
+}

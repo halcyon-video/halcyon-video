@@ -1,0 +1,110 @@
+{
+  "lifecycle-3x1.6": {
+    "bounds": {
+      "min": [
+        1.3779999930411577,
+        0.8149999380111694,
+        -0.6899999864399433
+      ],
+      "max": [
+        1.4999999478459358,
+        3.8649998903274536,
+        0.6899999864399433
+      ]
+    },
+    "footprint": {
+      "label": "fixture:candy-display-front",
+      "kind": "fixture",
+      "cx": 0,
+      "cz": 0,
+      "w": 3,
+      "d": 1.6,
+      "yaw": 0
+    },
+    "rows": 5,
+    "draws": 10,
+    "triangles": 13164,
+    "trayGap": 0.0019999732449651475,
+    "detached": true,
+    "disposed": true
+  },
+  "lifecycle-4x1": {
+    "bounds": {
+      "min": [
+        1.8779999930411577,
+        0.8149999380111694,
+        -0.45000000670552254
+      ],
+      "max": [
+        1.9999999478459358,
+        3.8649998903274536,
+        0.45000000670552254
+      ]
+    },
+    "footprint": {
+      "label": "fixture:candy-display-front",
+      "kind": "fixture",
+      "cx": 0,
+      "cz": 0,
+      "w": 4,
+      "d": 1,
+      "yaw": 0
+    },
+    "rows": 5,
+    "draws": 10,
+    "triangles": 13164,
+    "trayGap": 0.006999973244965041,
+    "detached": true,
+    "disposed": true
+  },
+  "failureFallback": true,
+  "lateLoadReleased": true,
+  "usquare-counter": {
+    "eye": [
+      13,
+      5.5,
+      -7.25
+    ],
+    "target": [
+      10.4,
+      2.5,
+      -4.45
+    ],
+    "footprintUnchanged": true,
+    "ceilingFeet": 13.5,
+    "candyLayoutViolations": [],
+    "clerkPath": true,
+    "clerkAudit": {
+      "seconds": 420,
+      "violations": [],
+      "stockSeconds": 8.133333333333315,
+      "typeSeconds": 233.29999999998932,
+      "walkSeconds": 43.16666666666678,
+      "counterShare": 0.555476190476165
+    }
+  },
+  "standard": {
+    "eye": [
+      7.208589430340096,
+      5.5,
+      -7.1510054443099484
+    ],
+    "target": [
+      6.908271096963068,
+      2.5,
+      -3.341831137634335
+    ],
+    "footprintUnchanged": true,
+    "ceilingFeet": 13.5,
+    "candyLayoutViolations": [],
+    "clerkPath": true,
+    "clerkAudit": {
+      "seconds": 420,
+      "violations": [],
+      "stockSeconds": 12.999999999999964,
+      "typeSeconds": 244.33333333332203,
+      "walkSeconds": 37.16666666666712,
+      "counterShare": 0.5817460317460048
+    }
+  }
+}

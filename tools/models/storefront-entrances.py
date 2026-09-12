@@ -11,6 +11,9 @@ import bmesh
 
 ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT/'public/models'
+bpy.context.preferences.filepaths.save_version = 0
+bpy.context.scene.unit_settings.system = 'IMPERIAL'
+bpy.context.scene.unit_settings.scale_length = .3048
 bpy.ops.object.select_all(action='SELECT')
 bpy.ops.object.delete(use_global=False)
 MATS = []
@@ -151,6 +154,18 @@ for style in ['gabled-brick','flat-parapet','arcaded-brick']:
         roof=[(m,spring),(m-1,spring),(0,peak),(-m+1,spring),(-m,spring)] if style=='gabled-brick' else [(m,18.6),(-m,18.6)]
         prism('Continuous masonry portal',profile+roof,.10,projection,0)
         crown('Folded portal coping',list(reversed(roof)),.02,projection)
+        # Raised, closed standing seams divide the broad metal roof into
+        # serviceable sheets. Each follows the same welded miter at the ridge.
+        for z in [2.08, 4.16]:
+            crown('Roof standing seam', [(x,y+.17) for x,y in reversed(roof)], z-.018,z+.018)
+        # Rear apron bridges the roof/wall junction, with an upstand and drip.
+        # This is generic construction detail, not an exact period replica.
+        side=[(-.12,16.40),(-.12,16.92),(.18,16.92),(.38,16.80),
+              (.38,16.70),(.33,16.70),(.33,16.77),(.16,16.86),(-.07,16.86),(-.07,16.40)]
+        verts=[(x,y,z) for x in [-m,m] for z,y in side];n=len(side)
+        mesh('Rear abutment counterflashing',verts,
+             [tuple(reversed(range(n))),tuple(range(n,2*n))]+
+             [(i,(i+1)%n,(i+1)%n+n,i+n) for i in range(n)],3)
         for s in [-1,1]:
             x0,x1=sorted([s*m,s*(m+pier_width)])
             h=17.9 if style=='gabled-brick' else 18.6
@@ -173,7 +188,13 @@ for style in ['gabled-brick','flat-parapet','arcaded-brick']:
                 box('Pier soldier capital',x0,x1,15.45,h,.10,pier_front,6)
                 j0,j1=sorted([s*opening,s*m])
                 box('Rear entry jamb',j0,j1,0,9.15,-.18,.25,0)
-        box('Recessed entry soffit',-opening,opening,9.10,9.15,.10,projection-.04,4)
+        # Folded pan soffit, recessed joints and returned edges visible from
+        # the open passage. Panels butt without overlapping coplanar faces.
+        for i in range(8):
+            x0=-opening+i*(2*opening/8);x1=x0+2*opening/8
+            profile=[(x0,9.15),(x1,9.15),(x1,9.13),(x1-.035,9.13),
+                     (x1-.035,9.10),(x0+.035,9.10),(x0+.035,9.13),(x0,9.13)]
+            prism('Folded soffit pan %02d'%i,profile,.10,projection-.04,4)
         if style=='gabled-brick':
             # The upper tile band on the entrance sits BELOW the wing stripe,
             # as it does on the building; it does not cut through the gable.
@@ -208,6 +229,15 @@ for style in ['gabled-brick','flat-parapet','arcaded-brick']:
     for obj in objects:obj.data.calc_loop_triangles()
     metrics[style]={'triangles':sum(len(o.data.loop_triangles) for o in objects),'meshes':len(objects),'nonManifoldEdges':0}
     export('storefront-entry-'+style+'.glb',objects)
+    metrics[style].update({
+        'bytes': (OUT/('storefront-entry-'+style+'.glb')).stat().st_size,
+        'units': 'feet', 'textures': 0,
+        'bounds': [[min(v.co[k] for o in objects for v in o.data.vertices) for k in range(3)],
+                   [max(v.co[k] for o in objects for v in o.data.vertices) for k in range(3)]],
+        'boundsAxes': 'Blender X, negative store depth, height',
+        'materialRoles': [o.data.materials[0].name for o in objects],
+        'uvLayers': sorted({u.name for o in objects for u in o.data.uv_layers}),
+    })
 
 # The arch spans TWO of the store's fixed four-foot window panes. Masonry
 # spandrels cover the unused glass corners; the trimmed arch is an opening.
@@ -243,6 +273,10 @@ for obj in objects:
     for c in list(obj.users_collection):c.objects.unlink(obj)
     collection.objects.link(obj)
 
+# Open the editable source on the commissioned variant; other variants stay
+# available in their named collections without obscuring it.
+for obj in bpy.context.scene.objects:
+    obj.hide_set(obj.users_collection[0].name != 'gabled-brick')
 for area in bpy.context.screen.areas:
     if area.type=='VIEW_3D':
         area.spaces.active.region_3d.view_distance=42

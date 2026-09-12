@@ -8,8 +8,11 @@ import { brandPackDir } from '../brand-pack';
 import type { StoreScene } from '../three-scene';
 
 export function installCounterScanner(scene: StoreScene, parent: THREE.Group): void {
-  if (scene.activeTheme.id !== 'bb-2010') return;
-  const offset = scene.storefrontSpec.counterShape === 'usquare' ? -2.35 : -2.85;
+  // The reference is a late chain checkout. A theme alone must not put the
+  // scanner on the independent shop's shorter, single-computer desk.
+  if (scene.activeTheme.id !== 'bb-2010' || scene.storefrontSpec.counterShape === 'desk') return;
+  // Clear station zero on the shield and the pole-display base on the half-square.
+  const offset = scene.storefrontSpec.counterShape === 'usquare' ? -2.50 : -2.75;
   const anchor = scene.entrance?.getCounterTopAnchorAt(offset);
   if (!anchor) return;
   const rel = 'fixtures/late-era-fixtures-2012/scanner/model.glb';

@@ -119,8 +119,8 @@ export async function loadStreamingMovies(): Promise<void> {
   const TIMEOUT_MS = 15_000;
   const timeoutPromise = new Promise<Movie[]>((resolve) => setTimeout(() => resolve([]), TIMEOUT_MS));
   const source = resolveStreamingSource(!!getTmdbConfig(), !!getJellyseerrConfig());
-  const fetchPromise = source === 'tmdb' ? fetchStreamingMoviesFromTmdb(servicesOverride)
-    : source === 'jellyseerr' ? fetchStreamingMovies(servicesOverride)
+  const fetchPromise = source === 'tmdb' ? fetchStreamingMoviesFromTmdb(servicesOverride, region)
+    : source === 'jellyseerr' ? fetchStreamingMovies(servicesOverride, region)
     : fetchStreamingMoviesFromSnapshot(servicesOverride);
   let rawMovies: Movie[] = [];
   try {

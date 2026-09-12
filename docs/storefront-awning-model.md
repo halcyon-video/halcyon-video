@@ -13,8 +13,8 @@ its own exterior. The existing entry and window openings remain clear.
 
 Rebuild with `blender -b --python tools/models/storefront-awning.py`.
 The source contains named vertex groups for the fitted panels, rails, seams,
-and brackets. The export joins parts by finish into four meshes: 3,032
-triangles and approximately 171 KiB. Every solid part is checked for manifold
+and brackets. The export joins parts by finish into four meshes: 3,300
+triangles and approximately 188 KiB. Every solid part is checked for manifold
 edges before export.
 
 ## Placement contract
@@ -26,6 +26,7 @@ Three.js `(x, height, depth)`.
 | --- | ---: |
 | Nominal run | 30 |
 | Height, hem to crown | 3.30 |
+| Top of wall flashing | 3.59 |
 | Projection from mounting plane | 3.25 |
 | Hem above window head | 0.25 |
 | Mounting plane beyond front glass | 0.80 |
@@ -54,3 +55,22 @@ the lettering texture.
 
 Architectural reference photographs and comparison material remain in the
 private reference library; none are bundled with this model.
+
+
+The #254 construction update adds a folded wall counterflashing with upstand
+and kick-out, nine bracket mounting shoes, eight separate underside access
+pans and returned end closure channels. These retain the existing rounded
+fabric profile and its lettering plane. All parts are closed solids with UVs;
+part names survive as vertex groups in the four finish batches. Authoring uses
+Blender 5.2 with feet displayed (`scale_length = .3048`); GLB coordinates remain
+numeric scene feet. These are original generic construction details with
+estimated sheet thicknesses, using no external model or branded artwork.
+
+Export cost is 192,656 bytes (previously 174,536), 3,300 triangles per wing
+(previously 3,032), four material draws and zero embedded textures. Bounds in
+Three.js feet are `[-15.02, .005, -.05]` to `[15.02, 3.59, 3.278]`.
+The existing loader scales the run to each wing; height/depth remain fixed.
+The shared 2048×512 dynamic lettering canvas is retained (4 MiB RGBA base
+level; about 5.33 MiB with mipmaps), with no new texture allocations.
+In-store checks and photography are described in the
+[architecture delivery notes](storefront-architecture.md#tower-construction-update-254).

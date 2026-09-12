@@ -104,4 +104,6 @@ export interface StoreFixture {
   // every fixture occupies its own floor footprint — e.g. TapeRewinder sits on
   // the checkout counter); null means "no floor footprint to validate".
   getFootprint?(): Footprint | null;
+  /** Separate feet keep an architectural opening out of floor obstacles. */
+  getFootprints?(): Footprint[];
 }

@@ -1,0 +1,23 @@
+{
+  "triangles": 4992,
+  "primitives": 4,
+  "bytes": 640376,
+  "textureImages": 3,
+  "textureResolution": [
+    256,
+    256
+  ],
+  "boundsFeet": {
+    "min": [
+      -1.4700000286102295,
+      0.0,
+      -0.7900000810623169
+    ],
+    "max": [
+      1.4700000286102295,
+      4.470000267028809,
+      0.7900000214576721
+    ]
+  },
+  "stock": "Existing five catalog rows, 175 cartons; unchanged geometry and transforms"
+}

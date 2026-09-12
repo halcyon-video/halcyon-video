@@ -1,0 +1,21 @@
+{
+  "triangles": 12020,
+  "materials": 6,
+  "draws": 6,
+  "bytes": 656004,
+  "source_closed_parts": 30,
+  "bounds_runtime": {
+    "min": [
+      -0.2849999964237213,
+      -1.290054202079773,
+      -0.0
+    ],
+    "max": [
+      0.2849999964237213,
+      0.5099999904632568,
+      0.3829159736633301
+    ]
+  },
+  "textures": "128-square normal + exporter-packed metallic/roughness per finish",
+  "units": "feet"
+}

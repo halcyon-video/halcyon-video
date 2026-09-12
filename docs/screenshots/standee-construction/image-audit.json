@@ -1,0 +1,57 @@
+{
+  "alpha-front": {
+    "mode": "RGBA",
+    "alphaBounds": [
+      255,
+      40,
+      645,
+      840
+    ],
+    "transparentBackground": true,
+    "detailCrop": false
+  },
+  "alpha-edge": {
+    "mode": "RGBA",
+    "alphaBounds": [
+      427,
+      102,
+      474,
+      836
+    ],
+    "transparentBackground": true,
+    "detailCrop": false
+  },
+  "alpha-back": {
+    "mode": "RGBA",
+    "alphaBounds": [
+      259,
+      53,
+      628,
+      844
+    ],
+    "transparentBackground": true,
+    "detailCrop": false
+  },
+  "floor-rear": {
+    "mode": "RGBA",
+    "alphaBounds": [
+      313,
+      122,
+      599,
+      812
+    ],
+    "transparentBackground": true,
+    "detailCrop": false
+  },
+  "floor-lock": {
+    "mode": "RGBA",
+    "alphaBounds": [
+      13,
+      0,
+      900,
+      900
+    ],
+    "transparentBackground": true,
+    "detailCrop": true
+  }
+}

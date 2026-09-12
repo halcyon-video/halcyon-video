@@ -6,6 +6,7 @@ import {
   isKnownSignageSlotId,
   validateSignageConfig
 } from '../signage-config';
+import { installSignMount } from './sign-mount';
 import { buildCategoryPlate1993 } from './category-plate-1993';
 import {
   acrylicTentSign,
@@ -27,6 +28,7 @@ import { dressing93Active } from '../genre-colors';
 import { getActiveTheme } from '../themes';
 import { createExtrudedMaterials, create3DDoubleLayeredSign, create3DExtrudedSign } from '../sign-builders';
 import { SECTION_COLS, BOX_SPACING } from '../store-layout';
+import { installWireSnapFrame } from './wire-snap-frame-model';
 
 export interface SignSlot {
   id: string;
@@ -42,7 +44,7 @@ export interface SignSlot {
   // wall itself continues past it (e.g. the right wall).
   fit?: boolean;
   // Ceiling height the hanger wires reach up to, for ceiling-hanging slots
-  // under the dropped cash-wrap soffit (default: the 13.5 ft main deck).
+  // under the dropped cash-wrap soffit (default: the live main deck).
   ceilingY?: number;
 }
 
@@ -398,14 +400,14 @@ export function buildSignage(ctx: FixtureContext, slots: SignSlot[], activeSigna
         fixtureMesh = acrylicTentSign(texture, w, h);
         break;
       case 'ceiling-hanging': {
-        // 1993 ceiling-nav category plates are SOLID rounded die-cut bodies
+        // 1993 ceiling-nav category plates are SOLID equilateral wedge bodies
         // (fixtures/category-plate-1993.ts — owner rulings feedback/049 +
         // 2026-08-09). Promo hangers and other themes stay rectangular
         // framed boxes.
         const nav93 = dressing93Active() && slot.category === 'ceiling-nav';
         fixtureMesh = nav93
-          ? buildCategoryPlate1993(texture, w, h, slot.ceilingY ?? 13.5)
-          : ceilingHangingSign(texture, w, h, slot.ceilingY ?? 13.5, slot.pos.y);
+          ? buildCategoryPlate1993(texture, w, h, slot.ceilingY ?? ctx.ceilingY)
+          : ceilingHangingSign(texture, w, h, slot.ceilingY ?? ctx.ceilingY, slot.pos.y);
         break;
       }
       case 'shelf-topper':
@@ -445,7 +447,9 @@ export function buildSignage(ctx: FixtureContext, slots: SignSlot[], activeSigna
         fixtureMesh.rotation.y = slot.yaw;
       }
 
+      fixtureMesh.name = `signage:${slot.id}`;
       ctx.scene.add(fixtureMesh);
+      if (fixtureMesh instanceof THREE.Group) installSignMount(ctx, fixtureMesh);
       activeSignageObjects.push(fixtureMesh);
 
       // Register collision for interactable/obstacle countertop signs
@@ -455,6 +459,9 @@ export function buildSignage(ctx: FixtureContext, slots: SignSlot[], activeSigna
             ctx.addCollider(child);
           }
         });
+      }
+      if (signDef.fixture === 'wire-frame') {
+        installWireSnapFrame(ctx, fixtureMesh as THREE.Group, w, h, slot.category === 'register');
       }
     }
   });

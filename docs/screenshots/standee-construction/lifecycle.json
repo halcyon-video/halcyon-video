@@ -1,0 +1,30 @@
+{
+  "loader": [
+    {
+      "mode": "success",
+      "passed": true,
+      "renders": 4,
+      "shadows": 1
+    },
+    {
+      "mode": "failure",
+      "passed": true,
+      "renders": 3,
+      "shadows": 0
+    },
+    {
+      "mode": "late",
+      "passed": true,
+      "renders": 3,
+      "shadows": 0
+    },
+    {
+      "mode": "detached",
+      "passed": true,
+      "renders": 3,
+      "shadows": 0
+    }
+  ],
+  "seasonGate": true,
+  "silhouetteReplacement": true
+}

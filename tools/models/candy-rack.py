@@ -8,12 +8,16 @@ for block in list(bpy.data.materials): bpy.data.materials.remove(block)
 def material(name, color, metal, rough):
  m=bpy.data.materials.new(name); m.diffuse_color=(*color,1); m.use_nodes=True
  p=m.node_tree.nodes.get('Principled BSDF'); p.inputs['Base Color'].default_value=(*color,1); p.inputs['Metallic'].default_value=metal; p.inputs['Roughness'].default_value=rough
+ # Editable physical surface; runtime uses fixture-owned deterministic grain maps.
+ noise=m.node_tree.nodes.new('ShaderNodeTexNoise'); noise.name='Fine_powdercoat_grain'; noise.inputs['Scale'].default_value=380
+ bump=m.node_tree.nodes.new('ShaderNodeBump'); bump.inputs['Strength'].default_value=.18; bump.inputs['Distance'].default_value=.0012
+ m.node_tree.links.new(noise.outputs['Fac'],bump.inputs['Height']); m.node_tree.links.new(bump.outputs['Normal'],p.inputs['Normal'])
  return m
-steel=material('RackSteel',(0.025,0.025,0.025),0.75,0.45)
-rubber=material('RackFeet',(0.012,0.012,0.012),0,0.85)
+steel=material('RackSteel',(0.09,0.095,0.105),0.25,0.58)
+rubber=material('RackFeet',(0.09,0.09,0.09),0,0.85)
 # Author in (store x, -store z, store height); Y-up glTF becomes store xyz.
 def wire(name, points, radius, mat=steel, sides=8):
- pts=[Vector((x,-z,y)) for x,y,z in points]; vertices=[]; faces=[]; previous_u=None
+ pts=[Vector((x,-z*1.6/.7,y)) for x,y,z in points]; vertices=[]; faces=[]; previous_u=None
  for i,p in enumerate(pts):
   tangent=(pts[min(i+1,len(pts)-1)]-pts[max(i-1,0)]).normalized()
   u=tangent.cross(Vector((0,0,1)))
@@ -44,7 +48,7 @@ frame.append(wire('Rear_diagonal_brace',[(-1.43,.25,.27),(1.43,3.70,.27)],.016))
 tray=[]
 # Thin sheet support with rounded folded edge; retainers are actual bent wires.
 bpy.ops.mesh.primitive_cube_add(size=1,location=(0,0,-.013))
-ob=bpy.context.object; ob.name='Folded_tray_deck'; ob.dimensions=(2.84,.54,.026)
+ob=bpy.context.object; ob.name='Folded_tray_deck'; ob.dimensions=(2.84,.54*1.6/.7,.026)
 bpy.ops.object.transform_apply(location=False,rotation=False,scale=True)
 bevel=ob.modifiers.new('Rolled_sheet_edges','BEVEL'); bevel.width=.009; bevel.segments=2
 bpy.context.view_layer.objects.active=ob; bpy.ops.object.modifier_apply(modifier=bevel.name); ob.data.materials.append(steel); tray.append(ob)
@@ -60,6 +64,10 @@ for x in [-1.38,-.92,-.46,0,.46,.92,1.38]:
  tray.append(wire('Retainer_welded_stanchion',[(x,-.012,-.25),(x,.10,-.25)],.009,sides=6))
 for x in [-1.38,1.38]:
  tray.append(wire('Rear_return_leg',[(x,-.012,.24),(x,.10,.24)],.012))
+# Underside bearer rails terminate at the side hoop legs; seat the sheet physically.
+for x in [-1.36,1.36]:
+ outer=math.copysign(1.43,x)
+ tray.append(wire('Tray_underside_bearer',[(outer,-.04,-.28),(x,-.04,-.25),(x,-.04,.25),(outer,-.04,.28)],.014))
 # Smart UVs, named source parts remain editable; export merges by material only.
 for ob in frame+tray:
  bpy.ops.object.select_all(action='DESELECT'); ob.select_set(True); bpy.context.view_layer.objects.active=ob
@@ -75,7 +83,7 @@ for r in range(5):
   from mathutils import Matrix
   copy.matrix_world=Matrix.Translation((0,0,.615+r*.7)) @ Matrix.Rotation(-math.pi/15,4,'X') @ ob.matrix_world
   preview.append(copy)
-for ob in tray: ob.hide_set(True)
+for ob in tray: ob.hide_set(True); ob.hide_render=True
 for area in bpy.context.screen.areas:
  if area.type=='VIEW_3D':
   area.spaces.active.region_3d.view_distance=7
@@ -88,10 +96,11 @@ for ob in frame+tray:
  bm.free()
  assert ob.data.uv_layers.active is not None, ob.name
 source=ROOT/'tools/models/candy-rack.blend'
-bpy.context.scene.unit_settings.system='NONE'
+bpy.context.scene.unit_settings.system='IMPERIAL'
+bpy.context.scene.unit_settings.scale_length=.3048
 bpy.ops.wm.save_as_mainfile(filepath=str(source))
 for ob in preview: bpy.data.objects.remove(ob,do_unlink=True)
-for ob in tray: ob.hide_set(False)
+for ob in tray: ob.hide_set(False); ob.hide_render=False
 metrics={}
 for name,parts in [('frame',frame),('tray',tray)]:
  bpy.ops.object.select_all(action='DESELECT')

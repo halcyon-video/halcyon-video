@@ -473,7 +473,20 @@ export function buildStorefrontLogo3D(
   anchor: FacadeLogoAnchor,
   spec: LogoSpec = getActiveLogoSpec(),
 ): StorefrontLogo3D | null {
-  if (spec.storefront.mode === 'letters') return buildFreestandingLetters(spec, anchor);
+  if (spec.storefront.mode === 'letters') {
+    if (anchor.wallBands) {
+      const group = new THREE.Group(); group.name = 'storefrontLogo3D';
+      // Each flank uses its own flat wall field and mounting depth.
+      const rows = anchor.wallBands.map(band => buildFreestandingLetters(spec, {
+        ...anchor, x: band.x, z: band.z, fascia: band,
+        gable: { baseY: band.bottomY, halfWidth: 0, height: 1 },
+      })).filter((row): row is StorefrontLogo3D => row !== null);
+      if (!rows.length) return null;
+      rows.forEach((row, index) => { row.group.name = `storefrontWallLetters${index}`; group.add(row.group); });
+      return { group, dispose: () => rows.forEach(row => row.dispose()) };
+    }
+    return buildFreestandingLetters(spec, anchor);
+  }
   if (spec.storefront.extrudeDepth > 0) return buildExtrudedEmblem(spec, anchor);
   return null;
 }

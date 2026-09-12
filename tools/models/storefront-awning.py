@@ -14,6 +14,9 @@ import bpy
 
 ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / 'public/models'
+bpy.context.preferences.filepaths.save_version = 0
+bpy.context.scene.unit_settings.system = 'IMPERIAL'
+bpy.context.scene.unit_settings.scale_length = .3048
 bpy.ops.object.select_all(action='SELECT')
 bpy.ops.object.delete(use_global=False)
 
@@ -93,7 +96,20 @@ extrude_profile('Vinyl crown and face', outer+inner, -15, 15, 0)
 end_profile = [(0, .07)] + outer + [(3.19, .07)]
 extrude_profile('Left fitted end', end_profile, -15, -14.95, 0)
 extrude_profile('Right fitted end', end_profile, 14.95, 15, 0)
-extrude_profile('Translucent soffit', [(.04, .02), (3.19, .02), (3.19, .07), (.04, .07)], -14.96, 14.96, 3)
+# Recessed access pans sit in continuous edge channels; the small gaps read
+# from the sidewalk, while the binding rails close the perimeter.
+for i in range(8):
+    x0=-14.95+i*29.9/8
+    extrude_profile('Soffit access pan %02d'%i,
+                    [(.07,.025),(3.16,.025),(3.16,.075),(.07,.075)],x0+.015,x0+29.9/8-.015,3)
+# Folded wall flashing laps over the crown. Its kick-out sheds water onto
+# the canopy; the upstand is fitted to the existing masonry mounting plane.
+extrude_profile('Wall counterflashing',
+    [(-.05,3.13),(-.05,3.59),(.015,3.59),(.015,3.39),(.40,3.36),
+     (.43,3.29),(.38,3.28),(.36,3.31),(0,3.34),(0,3.13)],-15,15,2)
+for x in [-14.99,14.94]:
+    extrude_profile('End soffit closure channel',
+                    [(.035,.01),(3.20,.01),(3.20,.11),(3.15,.11),(3.15,.06),(.035,.06)],x,x+.05,2)
 
 # Bound vertical seams and curved crown seams, one per fabric panel. These
 # have thickness and remain visible in oblique light, rather than painted ribs.
@@ -104,6 +120,7 @@ for j in range(9):
     extrude_profile(f'Panel seam {j+1:02}', seam, x-.016, x+.016, 1)
     # Real wall brackets behind the fabric, clear of the window heads.
     bracket_x = max(-14.88, min(14.88, x))
+    extrude_profile(f'Wall mounting shoe {j+1:02}', [(-.04,.02),(.04,.02),(.04,.52),(-.04,.52)], bracket_x-.12,bracket_x+.12,2)
     tube(f'Standoff {j+1:02}', (bracket_x, .13, .10), (bracket_x, .13, 3.12), .045)
     tube(f'Brace {j+1:02}', (bracket_x, 2.9, .10), (bracket_x, .13, 3.12), .035)
 
@@ -136,8 +153,15 @@ for obj in bpy.context.scene.objects:
     metrics['meshes'].append({'name': obj.name, 'triangles': len(obj.data.loop_triangles), 'nonManifoldEdges': bad})
 
 OUT.mkdir(exist_ok=True)
+for area in bpy.context.screen.areas:
+    if area.type == 'VIEW_3D':
+        area.spaces.active.region_3d.view_distance = 36
+        area.spaces.active.region_3d.view_location = (0, -1.6, 1.8)
 bpy.ops.wm.save_as_mainfile(filepath=str(ROOT / 'tools/models/storefront-awning.blend'))
 bpy.ops.export_scene.gltf(filepath=str(OUT / 'storefront-awning.glb'), export_format='GLB', export_yup=True, export_apply=True)
+metrics['textures'] = 0
+metrics['boundsAxes'] = 'Blender X, negative store depth, height'
+metrics['bounds'] = [[min(v.co[k] for o in bpy.context.scene.objects if o.type == 'MESH' for v in o.data.vertices) for k in range(3)], [max(v.co[k] for o in bpy.context.scene.objects if o.type == 'MESH' for v in o.data.vertices) for k in range(3)]]
 metrics['bytes'] = (OUT / 'storefront-awning.glb').stat().st_size
 (ROOT / 'tools/models/storefront-awning-metrics.json').write_text(json.dumps(metrics, indent=2)+'\n')
 print(json.dumps(metrics))

@@ -1,3 +1,12 @@
+import { buildClubhouseSoffit, clubhouseSoffitPolygon } from './clubhouse-soffit';
+import { CLUBHOUSE } from './fixtures/clubhouse-layout';
+import { NR_RUN_DEPTH } from './store-layout';
+import { installCeilingGrid } from './ceiling-grid';
+import { moduleGridPlan } from './ceiling-grid-plan';
+import { installMarqueeModel } from './marquee-bulb-model';
+import { installPosterFrame } from './poster-frame-model';
+import { exposedCeilingEnabled, aimLuminaire, installCeilingLuminaires, buildLuminaireStructure, type LuminaireAnchor } from './ceiling-luminaire';
+import { NrWallModelBatch } from './nr-wall-model';
 import { selfLit, auditStoreMaterials } from './material-lighting';
 // Store shell builder — the room and its exterior, extracted from StoreScene
 // (three-scene.ts keeps one-line delegating stubs): sky dome + facade + parking
@@ -26,12 +35,12 @@ import { windowBayLayout } from './storefront-window-layout';
 import { facadeDimensions, facadeStyle } from './storefront-architecture';
 import { addGlassReflectionPane } from './glass-reflection';
 import { buildExteriorEnvironment, PARKING_STALLS, lotWidth } from './exterior-environment';
-import { NR_WALL_SHELF_DEPTH, NR_WALL_CLEARANCE, NR_LEFT_UNIT_STANDOFF, WALL_SHELF_HEIGHTS, BOX_SPACING, SECTION_COLS, UNIT_SECTIONS, seededRandom01, getStorefrontSpec, vestibuleHalfWidth, posterBayIndices, entranceOpeningHalfWidth, mapWallSegmentUV, STORE_CENTER_X, FRONT_GLASS_Z } from './store-layout';
+import { NR_WALL_SLOPE, NR_WALL_SHELF_DEPTH, NR_WALL_CLEARANCE, NR_LEFT_UNIT_STANDOFF, WALL_SHELF_HEIGHTS, BOX_SPACING, SECTION_COLS, UNIT_SECTIONS, seededRandom01, getStorefrontSpec, vestibuleHalfWidth, posterBayIndices, entranceOpeningHalfWidth, mapWallSegmentUV, CENTER_WALKWAY, STORE_CENTER_X, FRONT_GLASS_Z } from './store-layout';
 import { buildFrontSoffit, frontSoffitLidPolygon, frontSoffitPolygon, frontSoffitY, pointInSoffit, soffitConnectHalf, soffitTrofferCenters, tileOverlapsSoffit } from './ceiling-soffit';
 import { createFixture } from './fixture-registry';
 import { CandyDisplay } from './fixtures/period-fixtures';
 import { TipJar } from './fixtures/tip-jar';
-import { DEFAULT_FIXTURE_PLACEMENTS, gameSectionPlacements, counterAnchoredPlacements, promoStandPlacements, admitFixturePlacements, curtainedAlcovePlacements, momAndPopPlantPlacements } from './store-fixtures-config';
+import { departmentArchPlacements, DEFAULT_FIXTURE_PLACEMENTS, gameSectionPlacements, counterAnchoredPlacements, promoStandPlacements, admitFixturePlacements, curtainedAlcovePlacements, momAndPopPlantPlacements } from './store-fixtures-config';
 import { activeStoreFormat } from './store-format';
 import { resolveOverviewVantage } from './scene-shared';
 import { formatCarpetTextures, formatCarpetHex, formatWallTextures, formatWallIsPrefinished, formatShelfWood } from './format-surfaces';
@@ -54,7 +63,7 @@ import { buildPreownedPreorderGamesSigns } from './fixtures/preowned-preorder-ga
 import { buildNewReleaseToppers, type NrTopperRun } from './fixtures/new-release-toppers';
 import { StoreClerk, ClerkDest } from './clerk';
 import { ClerkNavGrid, NavRect } from './clerk-nav';
-import { neutralizeScanTexture, createBrandLogoBodyTexture, createBrandLogoTextTexture, createNewReleasesSignTexture, createPromoSignTexture, createCeilingTileTexture, createBrickTexture, createStuccoTexture, createStorefrontLogoYellowTexture, createAsphaltTexture, createParkingStainsTexture, createShelfTextures, createShelfBayShadeTexture, createWireMeshTexture, useCheapMaterials, createGlassSurfaceNormalMap, createAcousticPanelTexture, createTrofferLensTexture, createHvacVentTexture } from './canvas-textures';
+import { neutralizeScanTexture, createBrandLogoBodyTexture, createBrandLogoTextTexture, createNewReleasesSignTexture, createPromoSignTexture, createCeilingTileTexture, createBrickTexture, createStuccoTexture, createSlateTexture, createStorefrontLogoYellowTexture, createAsphaltTexture, createParkingStainsTexture, createShelfTextures, createShelfBayShadeTexture, createWireMeshTexture, useCheapMaterials, createGlassSurfaceNormalMap, createAcousticPanelTexture, createTrofferLensTexture, createHvacVentTexture } from './canvas-textures';
 import { getActiveTheme, themeTrimDarkHex, themeKneeGoldHex, WALL_PAINT_OPTIONS } from './themes';
 import { getSetting } from './settings';
 import { tryLoadUserAssetTexture, loadUserAssetSurface } from './user-assets';
@@ -364,8 +373,30 @@ export function buildStore(scene: StoreScene) {
   // stucco cladding, not the chain's brick — this knee veneer (built here,
   // independently of buildStorefrontFacade below) follows the same choice.
   const isShopFacade = activeStoreFormat().facadeStyle === 'storefront';
+  const isConeCanopy = facadeStyle() === 'cone-canopy';
   const stuccoSrc = createStuccoTexture();
+  const slateSrc = isConeCanopy ? createSlateTexture() : null;
   const kneeVeneerMaterial = (repX: number, repY: number): THREE.MeshStandardMaterial => {
+    if (isConeCanopy && slateSrc) {
+      const map = slateSrc.map.clone();
+      const normalMap = slateSrc.normalMap.clone();
+      const roughnessMap = slateSrc.roughnessMap.clone();
+      [map, normalMap, roughnessMap].forEach((t) => {
+        t.wrapS = t.wrapT = THREE.RepeatWrapping;
+        t.repeat.set(repX, repY);
+        t.needsUpdate = true;
+      });
+      const mat = new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        map,
+        normalMap,
+        roughnessMap,
+        roughness: 0.85,
+        metalness: 0.08,
+      });
+      brickMats.push(mat);
+      return mat;
+    }
     if (!isShopFacade) return brickMaterial(repX, repY);
     const map = stuccoSrc.map.clone();
     const normalMap = stuccoSrc.normalMap.clone();
@@ -549,7 +580,12 @@ export function buildStore(scene: StoreScene) {
   // Also builds the GH #144 ground-blend ring (see exterior-environment.ts)
   // that fades the lot's exposed edges into whatever ground the current sky
   // pano shows there — recolored live via the listener below as panos load.
-  scene.exterior = buildExteriorEnvironment(scene.scene, storeWidth, sidewalkDepth, scene.effectiveQuality === 'high', () => scene.requestRender(), scene.backWallZ);
+  scene.exterior = buildExteriorEnvironment(scene.scene, storeWidth, sidewalkDepth, scene.effectiveQuality === 'high', () => {
+    // Async exterior meshes must enter the next on-demand shadow bake too.
+    scene.renderer.shadowMap.needsUpdate = true;
+    scene.queueStructuralShadowRefresh();
+    scene.requestRender();
+  }, scene.backWallZ);
   scene.exterior.setOutsideMode(scene.outdoor.outsideMode);
   scene.exterior.setGroundColor(scene.outdoor.getGroundColor());
   scene.outdoor.setGroundColorListener((color) => {
@@ -698,6 +734,8 @@ export function buildStore(scene: StoreScene) {
   const backWallZ = scene.backWallZ;
   const floorY = 0.0;
   const ceilingY = scene.ceilingY;
+  const exposed = exposedCeilingEnabled(activeStoreFormat().id, ceilingY, typeof localStorage === 'undefined' ? null : localStorage.getItem('bb_ceiling_structure'));
+  const luminaireAnchors: LuminaireAnchor[] = [];
   const roomHeight = ceilingY - floorY;
   const wallCenterY = (floorY + ceilingY) / 2;
 
@@ -745,6 +783,7 @@ export function buildStore(scene: StoreScene) {
   ceiling.position.set(STORE_CENTER_X, ceilingY, sideWallZ);
   ceiling.rotation.x = Math.PI / 2; // Facing down
   ceiling.receiveShadow = true;
+  ceiling.visible = !exposed;
   scene.scene.add(ceiling);
 
   // Opaque roof slab above the drop ceiling. The ceiling plane is a one-sided,
@@ -881,12 +920,16 @@ export function buildStore(scene: StoreScene) {
     scene.storefrontSpec, storeWidth, CORNICE_WALL_GAP, CORNICE_BAND,
   );
 
+  const clubSoffitPoly = scene.plan.clubhouse ? clubhouseSoffitPolygon(leftEdge, backWallZ) : [];
   const numCols = Math.floor(storeWidth / TILE_X);
   const numRows = Math.floor(floorCeilLen / TILE_Z);
   const panelSpots: { x: number; z: number }[] = [];
+  const gridSpots: { x: number; z: number }[] = [];
+  const gridFallback: THREE.Object3D[] = [];
+  let gridColors: THREE.InstancedBufferAttribute | null = null;
   const ventSpots: { x: number; z: number }[] = [];
   const sprinklerSpots: { x: number; z: number }[] = [];
-  for (let k = 0; k < numCols; k++) {
+  for (let k = 0; k < numCols && !exposed; k++) {
     const tx = leftEdge + TILE_X * (k + 0.5);
     if (tx - TILE_X / 2 < safeXMin || tx + TILE_X / 2 > safeXMax) continue;
     for (let m = 0; m < numRows; m++) {
@@ -901,7 +944,9 @@ export function buildStore(scene: StoreScene) {
       if (scene.hasStep && tx + TILE_X/2 > scene.stepX - cornerMargin &&
           tz - TILE_Z/2 < backWallZ + scene.stepDepth + cornerMargin) continue;
 
-      const overSoffit = tileOverlapsSoffit(tx, tz, TILE_X / 2, TILE_Z / 2, soffitPoly);
+      gridSpots.push({ x: tx, z: tz });
+      const overSoffit = tileOverlapsSoffit(tx, tz, TILE_X / 2, TILE_Z / 2, soffitPoly) ||
+        tileOverlapsSoffit(tx, tz, TILE_X / 2, TILE_Z / 2, clubSoffitPoly);
       const isLight = !overSoffit &&
         (((k % 4 === 0) && (m % 4 === 0)) || ((k % 4 === 2) && (m % 4 === 2)));
       if (isLight) {
@@ -909,6 +954,7 @@ export function buildStore(scene: StoreScene) {
         frame.castShadow = frame.receiveShadow = true;
         frame.position.set(tx, ceilingY - 0.03, tz);
         scene.scene.add(frame);
+        gridFallback.push(frame);
         const panel = new THREE.Mesh(trofferPanelGeo, trofferMat);
         panel.position.set(tx, ceilingY - 0.06, tz);
         scene.scene.add(panel);
@@ -967,6 +1013,8 @@ export function buildStore(scene: StoreScene) {
     if (panelFaceMesh.instanceColor) panelFaceMesh.instanceColor.needsUpdate = true;
     scene.scene.add(panelFrameMesh);
     scene.scene.add(panelFaceMesh);
+    gridFallback.push(panelFrameMesh, panelFaceMesh);
+    gridColors = panelFaceMesh.instanceColor;
   }
 
   // HVAC diffuser modules (see ventSpots above): T-bar frame + a slotted
@@ -1007,7 +1055,15 @@ export function buildStore(scene: StoreScene) {
     ventFaceMesh.instanceMatrix.needsUpdate = true;
     scene.scene.add(ventFrameMesh);
     scene.scene.add(ventFaceMesh);
+    gridFallback.push(ventFrameMesh);
   }
+
+  if (gridSpots.length) installCeilingGrid({
+    parent: scene.scene, plan: moduleGridPlan(gridSpots, TILE_X, TILE_Z), y: ceilingY,
+    paint: trofferFrameMat, fiber: panelMat, tiles: panelSpots,
+    fallback: gridFallback, colors: gridColors,
+    refresh: () => { scene.queueStructuralShadowRefresh(); scene.requestRender(); },
+  });
 
   // Sprinkler heads: a short chrome drop with a brass deflector disc,
   // scattered sparsely across the plain tiles. Two instanced meshes total.
@@ -1131,14 +1187,23 @@ export function buildStore(scene: StoreScene) {
     let trofferIndex = 0;
     for (let c = 0; c < cols; c++) {
       for (let r = 0; r < rows; r++) {
-        const kx = leftEdge + storeWidth * ((c + 0.5) / cols);
-        const kz = backWallZ + floorCeilLen * ((r + 0.5) / rows);
+        // The corner's first key belongs to the actual lower diffuser.
+        // The room grid can otherwise fall outside the enclosed nook, leaving
+        // its fascia to block every direct light reaching the interior.
+        const clubhouseKey = !!scene.plan.clubhouse && c === 0 && r === 0;
+        const kx = clubhouseKey ? leftEdge + 5 : leftEdge + storeWidth * ((c + 0.5) / cols);
+        const kz = clubhouseKey ? backWallZ + 5 : backWallZ + floorCeilLen * ((r + 0.5) / rows);
         // A key that lands over the checkout zone belongs to the soffit's
         // troffers, not the deck's: left at deck height its cone would start
         // ABOVE the lid and be clipped by the fascia, leaving the counter —
         // the one spot in the store with a customer standing at it — the
         // only unlit floor. Drop it to the lower lid.
-        const ky = pointInSoffit(kx, kz, soffitPoly) ? frontSoffitY(ceilingY) - 0.2 : keyY;
+        // Include the shade footprint so an edge bay cannot clip the soffit.
+        const overKeySoffit = exposed
+          ? tileOverlapsSoffit(kx, kz, .8, .8, soffitPoly)
+          : pointInSoffit(kx, kz, soffitPoly);
+        const ky = pointInSoffit(kx,kz,clubSoffitPoly) ? CLUBHOUSE.height-.2 :
+          overKeySoffit ? frontSoffitY(ceilingY) - 0.2 : keyY;
         // Physical units (candela, decay 2), and NO distance cutoff. The
         // cutoff is the trap here: three.js multiplies the inverse-square
         // term by pow2(saturate(1 - pow4(d / cutoff))), which is not a
@@ -1159,6 +1224,26 @@ export function buildStore(scene: StoreScene) {
         // parallel to the shadow camera's up vector. Same offset on every
         // spot so all the pools lean the same way.
         key.target.position.set(kx + 0.7, floorY, kz - 0.5);
+        if (exposed && !overKeySoffit &&
+            !(scene.hasStep && kx > scene.stepX - 1 && kz < backWallZ + scene.stepDepth + 1)) {
+          const anchor: LuminaireAnchor = {x: kx, y: ceilingY, z: kz, variant: c === 0 ? 'directional' : 'dome'};
+          // Keep the suspension assemblies clear of the two hanging CRT rigs
+          // and the genre-sign wires (panels themselves are below the shades).
+          const tvZ = FRONT_GLASS_Z - floorCeilLen * .30;
+          const tvXs = [(leftEdge + 7.5 + STORE_CENTER_X - CENTER_WALKWAY/2)/2,
+            (STORE_CENTER_X + CENTER_WALKWAY/2 + rightWallX - 7.5)/2];
+          if (getActiveTheme().id !== 'bb-2000' && tvXs.some(x => Math.abs(kx-x)<2.5 && Math.abs(kz-tvZ)<2.5)) continue;
+          const lines = [...new Set(scene.plan.shelvingUnits.map(u=>u.lineId))];
+          if (lines.some(id => {
+            const units=scene.plan.shelvingUnits.filter(u=>u.lineId===id);
+            const x=units.reduce((n,u)=>n+u.xCenter,0)/units.length;
+            const z=units.reduce((n,u)=>n+scene.plan.aisleZCenter(u),0)/units.length;
+            // 4.2 ft sign half-width + .75 ft shade radius, rounded up.
+            return Math.hypot(kx-x,kz-z)<3;
+          })) continue;
+          luminaireAnchors.push(anchor); aimLuminaire(key, anchor);
+          scene.troffers.push({x:kx,z:kz});
+        }
         key.castShadow = shadowPicks.has(trofferIndex++);
         key.shadow.mapSize.width = trofferMapSize;
         key.shadow.mapSize.height = trofferMapSize;
@@ -1177,6 +1262,13 @@ export function buildStore(scene: StoreScene) {
         scene.trofferKeyLights.push(key);
       }
     }
+  }
+
+  if (exposed) {
+    buildLuminaireStructure(scene.scene, luminaireAnchors, leftEdge, rightWallX);
+    installCeilingLuminaires(scene.scene, luminaireAnchors, () => {
+      scene.queueStructuralShadowRefresh(); scene.requestRender();
+    });
   }
 
   // 1.6 The cash-wrap soffit — the dropped lit ceiling over the checkout
@@ -1234,12 +1326,18 @@ export function buildStore(scene: StoreScene) {
       // bb-2000: all-white soffit body + inset circular can lights, no mirror
       // ring (the perimeter cornice is dropped for that store — user).
       plainWhite: !wantsCeilingCornice,
+      refresh: () => { scene.queueStructuralShadowRefresh(); scene.requestRender(); },
     });
     // Keep the register of panel centres complete. Nothing reads it today —
     // the emitters reach the bake as scene geometry, not through this list —
     // but it is the store's inventory of ceiling lights, and a future reader
     // wanting "every troffer" would silently miss the checkout zone entirely.
     scene.troffers.push(...soffit.troffers);
+  }
+
+  if (scene.plan.clubhouse) {
+    const clubSoffit=buildClubhouseSoffit(leftEdge,backWallZ,ceilingY,trofferMat,trofferFrameMat);
+    scene.scene.add(clubSoffit);
   }
 
   // 2. The floor covering the active FORMAT is laid with: photoreal loop pile
@@ -1632,7 +1730,14 @@ export function buildStore(scene: StoreScene) {
     posterMesh.position.set(0, posterCenterY, 0);
     posterGroup.add(posterMesh);
 
-    // Thin chrome frame surrounding the pane (shared geometries/material).
+    // Window groups face inward; the print's extra rotation only serves its UVs.
+    const hardware = new THREE.Group();
+    hardware.position.copy(posterMesh.position);
+    hardware.name = 'window-poster-hardware';
+    posterGroup.add(hardware);
+    const fallback = new THREE.Group();
+    hardware.add(fallback);
+    // Retain the existing chrome bars until the authored profile loads.
     const frameBars: Array<[THREE.BoxGeometry, number, number]> = [
       [posterFrameHGeo, 0, posterCenterY + posterH / 2 + frameT / 2],
       [posterFrameHGeo, 0, posterCenterY - posterH / 2 - frameT / 2],
@@ -1641,10 +1746,12 @@ export function buildStore(scene: StoreScene) {
     ];
     for (const [geo, fx, fy] of frameBars) {
       const bar = new THREE.Mesh(geo, posterFrameMat);
-      bar.position.set(fx, fy, 0);
+      bar.position.set(fx, fy - posterCenterY, 0);
       bar.receiveShadow = true;
-      posterGroup.add(bar);
+      fallback.add(bar);
     }
+
+    installPosterFrame(scene, hardware, fallback, 'window', posterFrameMat, posterW, posterH);
 
     // Load movie poster or fallback
     if (movie && movie.posterUrl) {
@@ -1676,12 +1783,12 @@ export function buildStore(scene: StoreScene) {
     // T13: record this poster as a marquee-bulb frame anchor. posterGroup
     // itself carries no rotation of its own (only its parent window group
     // does), so once the parent's matrixWorld is up to date, decomposing
-    // posterGroup.matrixWorld gives the poster's true world position + facing
+    // hardware.matrixWorld gives the poster's true world position + facing
     // — buildMarqueeBulbs() uses this to ring each poster with bulbs after
     // every window (and its posters) has been added to the scene.
     // Ring dimensions land on the centreline of the frame bars, so the bulbs
     // sit ON the frame rather than floating outside it.
-    scene.posterMarqueeFrames.push({ anchor: posterMesh, width: posterW + frameT, height: posterH + frameT });
+    scene.posterMarqueeFrames.push({ anchor: hardware, width: posterW + frameT, height: posterH + frameT });
 
     return posterGroup;
   };
@@ -1866,66 +1973,17 @@ export function buildStore(scene: StoreScene) {
     ? new THREE.MeshStandardMaterial({ color: 0x2e333a, roughness: 0.55, metalness: 0.2 })
     : new THREE.MeshStandardMaterial({ color: 0xd6d0c5, roughness: 0.55, metalness: 0.05 });
 
-  // Back wall shelf geometries reused by the right gold-wall unit below.
-  //
-  // #130/#131/#132 all touch this same front-face profile, so they're
-  // handled together:
-  //  - WALL_CLEARANCE holds the whole assembly's back face a hair off the
-  //    physical room wall (which sits at local Z=0) so the backing panel
-  //    and the wall mesh don't exactly coincide and z-fight (#131).
-  //  - NR_TAPER gives the uprights (end panels + dividers) and the shelf
-  //    boards a shared, subtle taper — wider at the floor, narrower at the
-  //    top shelf (#132) — real furniture detailing, kept small (~0.6"
-  //    swing over the 6ft run from the bottom shelf to the top one).
-  //  - The divider geometry no longer stops short of the shelf's own front
-  //    lip (#130): it used to sit recessed backWallShelfDepth-0.1 deep
-  //    while the shelf/end-panel used the full backWallShelfDepth, leaving
-  //    a sliver gap at the front edge you could see straight through.
-  const WALL_CLEARANCE = NR_WALL_CLEARANCE; // ft — keeps the backing off the room wall plane
-  const NR_TAPER = 0.025; // ft — half-swing; ~0.6" wider at the floor than the top shelf
-  const NR_TAPER_BOTTOM_Y = WALL_SHELF_HEIGHTS[0];
-  const NR_TAPER_TOP_Y = WALL_SHELF_HEIGHTS[WALL_SHELF_HEIGHTS.length - 1];
-  const nrTaperT = (yPos: number): number =>
-    Math.min(1, Math.max(0, (yPos - NR_TAPER_BOTTOM_Y) / (NR_TAPER_TOP_Y - NR_TAPER_BOTTOM_Y)));
-  // Depth (how far a shelf board sticks out from the wall) at a given shelf height.
-  const nrDepthAt = (yPos: number): number => backWallShelfDepth + NR_TAPER * (1 - 2 * nrTaperT(yPos));
-  // Local Z of a shelf board's own center, given its (tapered) depth.
-  const nrCenterZAt = (yPos: number): number => WALL_CLEARANCE + nrDepthAt(yPos) / 2;
-  // Local Z of a shelf board's front lip (where the pricing strip/promo tag mount).
-  const nrFrontZAt = (yPos: number): number => WALL_CLEARANCE + nrDepthAt(yPos);
-  // Full-height upright (end panel / divider) anchor: same back face as the
-  // shelves (WALL_CLEARANCE off the wall); the taper itself is baked into
-  // the geometry's front-face vertices below, not into this Z offset.
+  // #311: straight laminate carcass with eight independently sloped trays.
+  // Keep the established floor-to-eight-foot panel and local +Z wall anchors.
+  const WALL_CLEARANCE = NR_WALL_CLEARANCE;
+  const nrDepthAt = (_yPos: number): number => backWallShelfDepth;
+  const nrCenterZAt = (_yPos: number): number => WALL_CLEARANCE + backWallShelfDepth / 2;
+  const nrFrontZAt = (_yPos: number): number => WALL_CLEARANCE + backWallShelfDepth;
   const NR_ANCHOR_Z = WALL_CLEARANCE + backWallShelfDepth / 2;
-
-  // Tapers the FRONT face (local +Z, the room-facing side) of a full-height
-  // upright box: wider at the bottom (world Y = centerY - height/2),
-  // narrower at the top, linearly in between. The back face (local -Z,
-  // against the wall) is left alone so the taper never digs the upright
-  // into the wall behind it.
-  const taperUprightFront = (geo: THREE.BoxGeometry, centerY: number) => {
-    const posAttr = geo.attributes.position;
-    for (let i = 0; i < posAttr.count; i++) {
-      const z = posAttr.getZ(i);
-      if (z > 0) {
-        const worldY = posAttr.getY(i) + centerY;
-        posAttr.setZ(i, z + NR_TAPER * (1 - 2 * nrTaperT(worldY)));
-      }
-    }
-    posAttr.needsUpdate = true;
-    geo.computeVertexNormals();
-  };
-
-  // Uprights (and the backing panel below) span Y 0..8.0 — resting ON the
-  // floor. They used to be 8.1 tall centered at 3.95 (Y -0.1..8.0), sinking
-  // 0.1 ft through the carpet (user-reported clipping at the unit's foot).
   const NR_PANEL_H = 8.0;
   const NR_PANEL_CY = NR_PANEL_H / 2;
   const backSidePanelGeo = new THREE.BoxGeometry(0.04, NR_PANEL_H, backWallShelfDepth);
   const backDividerGeo = new THREE.BoxGeometry(0.04, NR_PANEL_H, backWallShelfDepth);
-  taperUprightFront(backSidePanelGeo, NR_PANEL_CY);
-  taperUprightFront(backDividerGeo, NR_PANEL_CY);
-
 
   // Left-wall unit shelf width, sized from the ADAPTIVE column count
   // (the layout calc already shrank it to fit behind the side-window
@@ -2027,19 +2085,28 @@ export function buildStore(scene: StoreScene) {
   // stands one "New Releases" ticket card on each of its sections (bb-1990
   // only — see fixtures/new-release-toppers.ts).
   const shelfModels = new ShelfModelBatch();
+  const nrWallModels = new NrWallModelBatch();
   const nrTopperRuns: NrTopperRun[] = [];
   const buildShelfRun =(length: number, centerPos: THREE.Vector3, rotationY: number, globalColStart: number) => {
     const group = new THREE.Group();
+    const nrFallback: THREE.Mesh[] = [];
+    const nrPanels: number[] = [];
 
     WALL_SHELF_HEIGHTS.forEach((yPos) => {
       const depth = nrDepthAt(yPos);
-      const shelf = new THREE.Mesh(new THREE.BoxGeometry(length, 0.04, depth), sharedShelfMat);
+      const shelfGeo = new THREE.BoxGeometry(length, .0625, depth);
+      const positions = shelfGeo.getAttribute('position');
+      for (let i = 0; i < positions.count; i++) {
+        positions.setY(i, positions.getY(i) - .01125 + NR_WALL_SLOPE * (positions.getZ(i) - depth / 2));
+      }
+      shelfGeo.computeVertexNormals();
+      const shelf = new THREE.Mesh(shelfGeo, sharedShelfMat);
       shelf.position.set(0, yPos, nrCenterZAt(yPos));
       shelf.receiveShadow = true;
       shelf.castShadow = true;
       group.add(shelf);
       scene.shelves.push(shelf);
-      shelfModels.add(shelf, [{ kind: 'deck', depth: depth - .044, length, yaw: Math.PI / 2, z: -.022 }]);
+      nrFallback.push(shelf);
 
       const strip = new THREE.Mesh(new THREE.BoxGeometry(length, 0.03, 0.02), nrClaspMat);
       strip.position.set(0, yPos + 0.02, nrFrontZAt(yPos) + 0.01);
@@ -2048,7 +2115,8 @@ export function buildStore(scene: StoreScene) {
       strip.receiveShadow = true;
       group.add(strip);
       scene.shelves.push(strip);
-      shelfModels.add(strip, [{ kind: 'rail', depth: 0, length, yaw: -Math.PI / 2, y: -.032, z: -.028 }]);
+      shelfModels.add(strip, [{ kind: 'rail', depth: 0, length: length - .012,
+        y: -.017, z: .012, yaw: -Math.PI / 2 }]);
 
       if (Math.abs(yPos - 4.7) < 0.01 && scene.promoSignMat && scene.promoSignRedMat) {
         const runCols = Math.floor((length - 1.0) / BOX_SPACING);
@@ -2090,12 +2158,14 @@ export function buildStore(scene: StoreScene) {
     backBacking.castShadow = true;
     group.add(backBacking);
     scene.shelves.push(backBacking);
+    nrFallback.push(backBacking);
 
     // End panels — lit like the dividers (they had no shadow flags at all,
     // so they rendered as flat uniform slabs that ignored the room light).
     [-length / 2 - 0.02, length / 2 + 0.02].forEach((xEnd) => {
       const panel = new THREE.Mesh(backSidePanelGeo, sharedShelfMat);
       panel.position.set(xEnd, NR_PANEL_CY, NR_ANCHOR_Z);
+      nrFallback.push(panel); nrPanels.push(xEnd);
       panel.receiveShadow = true;
       panel.castShadow = true;
       group.add(panel);
@@ -2116,6 +2186,7 @@ export function buildStore(scene: StoreScene) {
       const xDiv = -length / 2 + margin + colDivider * BOX_SPACING;
       const div = new THREE.Mesh(backDividerGeo, sharedShelfMat);
       div.position.set(xDiv, NR_PANEL_CY, NR_ANCHOR_Z);
+      nrFallback.push(div); nrPanels.push(xDiv);
       div.receiveShadow = true;
       div.castShadow = true;
       group.add(div);
@@ -2125,12 +2196,12 @@ export function buildStore(scene: StoreScene) {
     group.position.copy(centerPos);
     group.rotation.y = rotationY;
     scene.scene.add(group);
+    if (!shelfWood) nrWallModels.add(group, length, nrFallback, nrPanels);
     nrTopperRuns.push({
       parent: group,
       length,
       topY: NR_PANEL_H,
-      // The uprights taper in toward the top, so the deck the cards stand on
-      // is the shelf profile's front lip AT that height, not at the floor.
+      // Cards retain the established top-of-carcass sign anchor.
       frontZ: nrFrontZAt(NR_PANEL_H),
       sideMaterial: sharedShelfMat,
     });
@@ -2142,8 +2213,10 @@ export function buildStore(scene: StoreScene) {
   // only exist when there's a notch; their lengths are 0 otherwise, so guard
   // them to avoid building zero/negative-length shelf runs.
   const midStepZ = (backWallZ + stepWallZ) / 2;
-  buildShelfRun(scene.stepX - scene.nrBackLeftX,
-    new THREE.Vector3((scene.nrBackLeftX + scene.stepX) / 2, 0, backWallZ), 0,
+  // End before the connector's projecting shelf so the two runs do not
+  // intersect at the inside corner or hide each other's last case column.
+  buildShelfRun(scene.nrBackRun1EndX - scene.nrBackLeftX,
+      new THREE.Vector3((scene.nrBackLeftX + scene.nrBackRun1EndX) / 2, 0, backWallZ), 0,
     scene.nrLeftWallCols);
   if (scene.hasStep) {
     buildShelfRun(scene.stepDepth,
@@ -2222,6 +2295,14 @@ export function buildStore(scene: StoreScene) {
       : undefined,
     suppressFrontCapLineIds: endcapHostLineIds,
   });
+  nrWallModels.finish(() => {
+    scene.renderer.shadowMap.needsUpdate = true;
+    scene.requestRender();
+  });
+  scene.shelfClasps.finish(() => {
+    scene.renderer.shadowMap.needsUpdate = true;
+    scene.requestRender();
+  });
   shelfModels.finish(() => {
     scene.renderer.shadowMap.needsUpdate = true;
     scene.requestRender();
@@ -2239,6 +2320,9 @@ export function buildStore(scene: StoreScene) {
   // on, so those never reach the build loop at all (see admitFixturePlacements).
   const fixturePlacements = admitFixturePlacements([
     ...DEFAULT_FIXTURE_PLACEMENTS,
+    ...(scene.plan.clubhouse ? [
+      { id: 'clubhouse', kind: 'clubhouse', position: scene.plan.clubhouse.center, yaw: 0, options: { admitted: true } },
+    ] : []),
     // Promo floor stands: the third one exists only in a store deep enough for
     // it (see promoStandPlacements), and any stand whose campaign chain comes
     // up empty builds nothing.
@@ -2305,6 +2389,7 @@ export function buildStore(scene: StoreScene) {
     fixture.build();
     const footprint = fixture.getFootprint?.();
     if (footprint) fixtureFootprints.push(footprint);
+    fixtureFootprints.push(...(fixture.getFootprints?.() ?? []));
     const slotted = 'getSlots' in fixture && typeof (fixture as any).getSlots === 'function'
       ? (fixture as SlottedFixture) : null;
     // A fixture that DECLINED to build is not on the floor: an era-gated POP
@@ -2332,6 +2417,20 @@ export function buildStore(scene: StoreScene) {
       scene.tipJars.push(fixture);
     }
   });
+  const archPlacements = departmentArchPlacements({
+    format: activeStoreFormat().id, ceiling: ceilingY, exposed,
+    bay: { wallX: STORE_CENTER_X - storeWidth / 2,
+      frontZ: leftWallZCenter + leftWallShelfWidth / 2 + .04,
+      depth: NR_LEFT_UNIT_STANDOFF + NR_RUN_DEPTH,
+      length: scene.nrLeftWallCols > 0 ? leftWallShelfWidth : 0 },
+    bounds: { minX: STORE_CENTER_X - storeWidth / 2, maxX: STORE_CENTER_X + storeWidth / 2,
+      minZ: backWallZ, maxZ: FRONT_GLASS_Z },
+    obstacles: [...fixtureFootprints, ...scene.plan.getUnitFootprints()],
+  });
+  for (const placement of archPlacements) {
+    const fixture = createFixture(placement, scene.fixtureContext());
+    fixture.build(); fixtureFootprints.push(...(fixture.getFootprints?.() ?? []));
+  }
   scene.validateStoreLayout(fixtureFootprints, storeWidth, backWallZ);
 
   // 5. (Movie Poster Marquee removed)
@@ -2575,8 +2674,8 @@ export function buildStore(scene: StoreScene) {
   // register reads every aisle sign head-on.
   const counterMidZ = scene.deskApexZ();
   // ...on the formats that hang an overhead wayfinding programme at all
-  // (StoreFormatSpec.overheadSignage). The panel y and its `?? 13.5` deck are
-  // chain-ceiling numbers, so under a 9 ft lid the whole programme built into
+  // (StoreFormatSpec.overheadSignage). The panel y is a chain-ceiling number;
+  // under a 9 ft lid the original overhead programme built into
   // the roof void — and a shop four aisles wide has its unit signboards to say
   // what each run holds (GH #114). Empty list: nothing to place, nothing to
   // tally, no genre pass over the shelving lines.
@@ -2593,7 +2692,8 @@ export function buildStore(scene: StoreScene) {
         category: 'ceiling-nav',
         pos: new THREE.Vector3(xCenterAvg, 9.75, zCenterAvg),
         yaw: Math.atan2(STORE_CENTER_X - xCenterAvg, counterMidZ - zCenterAvg),
-        genreName
+        genreName,
+        ceilingY: pointInSoffit(xCenterAvg, zCenterAvg, soffitPoly) ? frontSoffitY(ceilingY) : ceilingY
       });
     });
     // GAMES wedge (owner, 2026-08-09): the games department gets its own
@@ -2608,6 +2708,7 @@ export function buildStore(scene: StoreScene) {
         category: 'ceiling-nav',
         pos: new THREE.Vector3(gx, 9.75, gz),
         yaw: Math.atan2(STORE_CENTER_X - gx, counterMidZ - gz),
+        ceilingY: pointInSoffit(gx, gz, soffitPoly) ? frontSoffitY(ceilingY) : ceilingY,
         genreName: 'GAMES'
       });
     }
@@ -2836,7 +2937,14 @@ function ceilingCornicePoints(scene: StoreScene, storeWidth: number, backWallZ: 
   const plan = [
     {x: STORE_CENTER_X-connect, z:zFront-band},
     {x:leftEdge+band,z:zFront-band},
-    {x:leftEdge+band,z:zBack+band},
+    ...(scene.plan.clubhouse ? [
+      // The fitted cornice caps the dropped soffit edge. The clubhouse
+      // meets the lid below it; adjacent wall shelves share this ceiling.
+      {x:leftEdge+band,z:backWallZ+19},
+      {x:wallLeft+9,z:backWallZ+19},
+      {x:wallLeft+19,z:backWallZ+9},
+      {x:wallLeft+19,z:zBack+band},
+    ] : [{x:leftEdge+band,z:zBack+band}]),
     {x:sx-band,z:zBack+band},
   ];
   if(scene.hasStep) plan.push({x:sx-band,z:sz+band},{x:rightEdge-band,z:sz+band});
@@ -2924,14 +3032,20 @@ export function buildMarqueeBulbs(scene: StoreScene, storeWidth: number, backWal
   const bulbSpacing = 0.5;
   const bulbRadius = 0.045;
   const spots: THREE.Vector3[] = [];
-  const addLine = (from: THREE.Vector3, to: THREE.Vector3) => {
+  const rotations: THREE.Quaternion[] = [];
+  const addLine = (from: THREE.Vector3, to: THREE.Vector3, normal: THREE.Vector3) => {
+    const rotation = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), normal);
     const count = Math.max(2, Math.round(from.distanceTo(to) / bulbSpacing));
-    for (let i = 0; i < count; i++) spots.push(from.clone().lerp(to, (i + 0.5) / count));
+    for (let i = 0; i < count; i++) {
+      spots.push(from.clone().lerp(to, (i + 0.5) / count));
+      rotations.push(rotation);
+    }
   };
   const rim = corniceOffset(ceilingCornicePoints(scene, storeWidth, backWallZ), 0.12);
   for (let i = 0; i < rim.length; i++) {
     const a = rim[i], b = rim[(i + 1) % rim.length];
-    addLine(new THREE.Vector3(a.x, bulbY, a.z), new THREE.Vector3(b.x, bulbY, b.z));
+    addLine(new THREE.Vector3(a.x, bulbY, a.z), new THREE.Vector3(b.x, bulbY, b.z),
+      new THREE.Vector3(-(b.z-a.z), 0, b.x-a.x).normalize());
   }
 
   // Window poster frames: a bulb ring around each poster's rectangle, in the
@@ -2954,10 +3068,10 @@ export function buildMarqueeBulbs(scene: StoreScene, storeWidth: number, backWal
     const tr = center.clone().addScaledVector(right, hw).addScaledVector(up, hh);
     const bl = center.clone().addScaledVector(right, -hw).addScaledVector(up, -hh);
     const br = center.clone().addScaledVector(right, hw).addScaledVector(up, -hh);
-    addLine(tl, tr);
-    addLine(tr, br);
-    addLine(br, bl);
-    addLine(bl, tl);
+    addLine(tl, tr, normal);
+    addLine(tr, br, normal);
+    addLine(br, bl, normal);
+    addLine(bl, tl, normal);
   }
 
   if (spots.length === 0) return;
@@ -2994,7 +3108,7 @@ totalEmissiveRadiance *= vColor.rgb;
 
   const m4 = new THREE.Matrix4();
   spots.forEach((pos, i) => {
-    m4.makeTranslation(pos.x, pos.y, pos.z);
+    m4.compose(pos, rotations[i], new THREE.Vector3(1, 1, 1));
     mesh.setMatrixAt(i, m4);
   });
   mesh.instanceMatrix.needsUpdate = true;
@@ -3004,6 +3118,7 @@ totalEmissiveRadiance *= vColor.rgb;
 
   scene.scene.add(mesh);
   scene.marqueeBulbsMesh = mesh;
+  installMarqueeModel(mesh, () => scene.requestRender());
 
   const anim = (localStorage.getItem('bb_marquee_anim') || 'steady') as 'off' | 'steady' | 'chase';
   scene.setMarqueeAnimMode(anim);

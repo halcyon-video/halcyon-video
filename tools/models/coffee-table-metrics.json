@@ -1,0 +1,19 @@
+{
+  "bytes": 1977612,
+  "triangles": 2844,
+  "primitives": 4,
+  "materials": [
+    "TableBrassPins",
+    "TableGlazing",
+    "TableOak",
+    "TableResilientSeats"
+  ],
+  "images": 6,
+  "dimensionsFeet": [
+    3.5,
+    2.0125,
+    3.5
+  ],
+  "manifoldParts": 21,
+  "allPrimitivesHaveUV": true
+}

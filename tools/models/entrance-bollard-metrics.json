@@ -1,0 +1,19 @@
+{
+  "triangles": 2144,
+  "source_vertices": 1084,
+  "material_roles": [
+    "PostPaint",
+    "SafetyBand",
+    "FixingSteel"
+  ],
+  "textures": 0,
+  "dimensions_feet": [
+    0.75,
+    3,
+    0.75
+  ],
+  "source_parts": 10,
+  "closed_manifold_parts": true,
+  "blender_version": "5.2.0 LTS",
+  "glb_bytes": 76348
+}

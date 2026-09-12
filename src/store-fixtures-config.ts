@@ -1,3 +1,6 @@
+import { fitDepartmentArch, type DepartmentArchHost } from './fixtures/department-arch-layout';
+// Service-wall dressing follows the live facade/door datum, not a fixed floor placement.
+export { WALL_COURTESY_PHONE } from './fixtures/wall-courtesy-telephone';
 import { FixturePlacement, BOX_SPACING, STORE_CENTER_X } from './store-layout';
 import { activeStoreFormat, type CounterShape } from './store-format';
 import { registerFixtureKind } from './fixture-registry';
@@ -12,7 +15,26 @@ import { deskGroundPlan } from './entrance/desk-plan';
 // lives with the config that declares its rectangles.
 registerFixtureKind('structure-footprint', (placement) => new StructureFootprint(placement));
 
+// #280 has no confirmed hinge/base or floor/counter anchor. Tooling may inspect
+// this crop-relative asset, but it MUST NOT enter DEFAULT_FIXTURE_PLACEMENTS.
+export const CUSTOMER_INFORMATION_TERMINAL_PREVIEW: FixturePlacement = {
+  id: 'customer-information-terminal-preview', kind: 'customer-information-terminal',
+  position: { x: 0, z: 0 }, yaw: 0, options: { assetViewer: true },
+};
+
 export const DEFAULT_FIXTURE_PLACEMENTS: FixturePlacement[] = [
+  // Original glass retail case beside the left checkout queue. Kept forward
+  // of the shelf field and clear of the early catalog podium and service cart.
+  { id: 'queue-vitrine-checkout', kind: 'queue-vitrine', position: { x: 0, z: -3.6 }, yaw: 0 },
+  // Original early paper lookup table, right of checkout (entrance side).
+  // Directory book is dormant at the owner's request (2026-09-12).
+  // Keep its registered fixture and model available for later reactivation.
+  // Neutral 1993 apparel on the existing rear vestibule glazing. Height and
+  // glass datum are resolved by the fixture; no floor or stock footprint.
+  { id: 'counter-apparel', kind: 'counter-apparel', position: { x: 15.5, z: 8.54 }, yaw: Math.PI },
+  // Open entrance foreground, before the aisle ends. Parallel to the runner;
+  // neither end closes the entrance. #222 continues to own vestibule mats.
+  { id: 'rope-queue-entrance', kind: 'rope-stanchions', position: { x: -4.9, z: 8.5 }, yaw: 0 },
   // Reserved left checkout bay, opposite the sale table; clear of the queue.
   { id: 'release-cart-checkout', kind: 'release-cart', position: { x: -5, z: 3 }, yaw: 0, options: { noRentalCase: true } },
   // Floor displays are SPREAD down the store's open central corridor (the
@@ -233,7 +255,7 @@ export const DEFAULT_FIXTURE_PLACEMENTS: FixturePlacement[] = [
     yaw: Math.PI,
     options: {
       format: 'long',
-      themes: ['bb-1993', 'bb-2000', 'bb-2010'],
+      themes: ['bb-2000'],
       width: 11.5,
       height: 1.45,
       surfaceY: 9.10,
@@ -424,12 +446,15 @@ export function promoStandPlacements(backWallZ: number): FixturePlacement[] {
 // mom-and-pop spec (GH #33) bans them outright: "less floor space around the
 // runs, no big open areas, no floor displays".
 const FLOOR_DISPLAY_KINDS = new Set([
+  'queue-vitrine',
+  'catalog-podium',
   'four-sided-display',      // promo floor stands
   'bargain-bin',             // dump tub
   'pv-drape-table',          // previously-viewed drape table
   'mirror-column',           // clad structural pillar
   'previously-viewed-bin',
   'gold-clamshell',
+  'rope-stanchions',
 ]);
 
 // Fixture kinds that mount ON the checkout counter's walk-in BAND — its blue
@@ -437,6 +462,7 @@ const FLOOR_DISPLAY_KINDS = new Set([
 // is a standalone desk (counterShape 'desk') has no band, so these have nothing
 // to sit on and would hang in mid-air over the clerk's strip of floor.
 const COUNTER_BAND_KINDS = new Set([
+  'queue-vitrine',
   'coming-soon-letterboard',
   'candy-display',
   'tape-cleaner-display',
@@ -646,7 +672,7 @@ export function counterAnchoredPlacements(
         kind: 'candy-display',
         position: { x: 9.0, z: -4.45 }, // keep rear edge clear of band at z=-3.6
         yaw: 0,
-        options: { rows: 5, footprintWidth: 3.0 }
+        options: { rows: 5, footprintWidth: 3.0, dispenserPacks: true, powerWing: true }
       },
       {
         id: 'tape-rewinder-counter',
@@ -729,7 +755,7 @@ export function counterAnchoredPlacements(
       kind: 'candy-display',
       position: { x: 5.81066, z: -2.47278 },
       yaw: 0.6697,
-      options: { rows: 5, footprintWidth: 3.0 }
+      options: { rows: 5, footprintWidth: 3.0, dispenserPacks: true, powerWing: true }
     },
     // Rewinder on the inner rental counter's top — z matches counter.ts's
     // getInnerCounterSpine(13.9), yaw matches that segment's rotY. See
@@ -827,3 +853,25 @@ export function gameSectionPlacements(storeWidth: number): FixturePlacement[] {
     }
   ];
 }
+
+/** Office kit rests entirely on the shield's rear band. Other shapes have no
+ * rear worktop/partition support. Datum follows Entrance's actual backZ. */
+export function counterOfficeKitAnchor(shape: CounterShape, cx: number, backZ: number) {
+  return shape === 'shield' ? { x: cx + 2.1, y: 3.54, z: backZ - .85 } : null;
+}
+
+/** Proposed 1993 dressing on the shield rear band's unused left end.
+ * Origin is the resting side at the shared laminate/rounded worktop datum. */
+export function priceLabelGunAnchor(shape: CounterShape, cx: number, backZ: number, theme: string) {
+  return shape === 'shield' && theme === 'bb-1993'
+    ? { x: cx - 3.9, y: 3.54, z: backZ - .75 } : null;
+}
+
+/** A fitted full-height concept-store portal at the side-wall department end. */
+export function departmentArchPlacements(host: DepartmentArchHost): FixturePlacement[] {
+  const fit = fitDepartmentArch(host);
+  return fit ? [{ id: 'department-arch', kind: 'department-arch', position: fit, yaw: 0,
+    options: { admitted: true } }] : [];
+}
+
+export { childrenChairPlacements } from './fixtures/clubhouse-layout';

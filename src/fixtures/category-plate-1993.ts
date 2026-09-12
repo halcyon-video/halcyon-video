@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { registerSignMount } from './sign-mount';
 import { BB_ARCHIVO_BLACK } from '../bundled-fonts';
 import { getBackTexture, registerBackTexture } from './sign-fixtures';
 
@@ -297,16 +298,18 @@ export function buildCategoryPlate1993(
   }
 
   // Mount per feedback/049: a short bar on the ceiling, two rigid drops.
+  const supports = new THREE.Group();
   const mountMat = new THREE.MeshStandardMaterial({ color: 0x2a2a2e, roughness: 0.5, metalness: 0.35 });
   const bar = new THREE.Mesh(new THREE.BoxGeometry(w * 0.55, 0.045, Math.min(0.18, s * 0.25)), mountMat);
   bar.position.y = ceilingY - 0.0225;
   bar.receiveShadow = true;
-  group.add(bar);
+  supports.add(bar);
   for (const sx of [-1, 1]) {
     const strap = new THREE.Mesh(new THREE.BoxGeometry(0.035, DROP + 0.02, 0.035), mountMat);
     strap.position.set(sx * w * 0.24, ceilingY - 0.045 - (DROP + 0.02) / 2 + 0.02, 0);
     strap.receiveShadow = true;
-    group.add(strap);
+    supports.add(strap);
   }
+  registerSignMount(group, supports, { width: w, topY: yTop, ceilingY, rigid: true });
   return group;
 }

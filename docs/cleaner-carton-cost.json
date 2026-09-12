@@ -1,0 +1,36 @@
+{
+  "dimensionsFeet": [
+    0.365,
+    0.667,
+    0.082
+  ],
+  "paperThicknessFeet": 0.0015,
+  "parts": [
+    {
+      "name": "Sleeve_with_scored_spines",
+      "vertices": 32,
+      "triangles": 64,
+      "manifold": true
+    },
+    {
+      "name": "Top_folded_tuck_closure",
+      "vertices": 16,
+      "triangles": 28,
+      "manifold": true
+    },
+    {
+      "name": "Bottom_folded_tuck_closure",
+      "vertices": 16,
+      "triangles": 28,
+      "manifold": true
+    },
+    {
+      "name": "Interior_glue_lap",
+      "vertices": 8,
+      "triangles": 12,
+      "manifold": true
+    }
+  ],
+  "triangles": 132,
+  "glbBytes": 83956
+}

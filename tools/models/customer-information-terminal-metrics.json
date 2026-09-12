@@ -1,0 +1,26 @@
+{
+  "units": "feet",
+  "triangles": 14704,
+  "materialRoles": [
+    "EnclosurePowderCoat",
+    "MountHardware",
+    "ProgramBackboard",
+    "PromotionalBadge"
+  ],
+  "textures": 0,
+  "bytes": 733560,
+  "boundsBlender": [
+    [
+      -0.8600000143051147,
+      -0.020999999716877937,
+      0.0
+    ],
+    [
+      0.9299999475479126,
+      0.42000001668930054,
+      2.009999990463257
+    ]
+  ],
+  "placementConfirmed": false,
+  "closedPartsManifold": true
+}

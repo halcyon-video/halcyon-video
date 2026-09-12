@@ -1,0 +1,40 @@
+{
+  "units": "feet",
+  "nominalDiameter": 1.25,
+  "overallDepth": 0.156,
+  "parts": [
+    {
+      "part": "RearStampedFlange",
+      "triangles": 10500,
+      "vertices": 5240,
+      "material": "StampedAluminum",
+      "uv": true,
+      "manifold": true
+    },
+    {
+      "part": "FrontStampedFlange",
+      "triangles": 10500,
+      "vertices": 5240,
+      "material": "StampedAluminum",
+      "uv": true,
+      "manifold": true
+    },
+    {
+      "part": "BoredCentralHub",
+      "triangles": 1536,
+      "vertices": 768,
+      "material": "HubMachinedMetal",
+      "uv": true,
+      "manifold": true
+    },
+    {
+      "part": "OptionalFilmPack",
+      "triangles": 1024,
+      "vertices": 512,
+      "material": "OptionalWoundFilm",
+      "uv": true,
+      "manifold": true
+    }
+  ],
+  "glbBytes": 630544
+}

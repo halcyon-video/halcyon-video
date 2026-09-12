@@ -9,9 +9,9 @@ for (const part of ['frame','tray']) test(`candy rack ${part}: exported bounds, 
   const gltf = await new GLTFLoader().parseAsync(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), '');
   const box = new THREE.Box3().setFromObject(gltf.scene);
   const dimensions = box.getSize(new THREE.Vector3());
-  assert.ok(dimensions.x <= 3 && dimensions.z <= .7);
+  assert.ok(dimensions.x <= 3 && dimensions.z <= 1.6);
   if (part === 'frame') { assert.ok(box.min.y >= -1e-6 && box.max.y > 4 && box.max.y < 4.04); }
-  else { assert.ok(Math.abs(box.min.y + .026) < 1e-6 && box.max.y < .12); }
+  else { assert.ok(Math.abs(box.min.y + .054) < 1e-6 && box.max.y < .12); }
   let triangles = 0, meshes = 0;
   gltf.scene.traverse(object => {
     if (!(object instanceof THREE.Mesh)) return;
@@ -23,9 +23,11 @@ for (const part of ['frame','tray']) test(`candy rack ${part}: exported bounds, 
       assert.ok([...geometry.attributes[name].array].every(Number.isFinite));
     }
     assert.ok(['RackSteel','RackFeet'].includes(object.material.name));
-    assert.equal(object.material.map, null);
+    assert.equal(object.material.map, null); // Runtime fixture owns grain textures.
+    assert.ok(Math.min(...object.material.color.toArray()) >= .08);
+    assert.ok(object.material.roughness >= .5);
   });
   assert.equal(meshes, part === 'frame' ? 2 : 1);
-  assert.ok(triangles <= (part === 'frame' ? 650 : 500));
-  assert.ok(bytes.length < 32000);
+  assert.ok(triangles <= (part === 'frame' ? 650 : 630));
+  assert.ok(bytes.length < 38000);
 });

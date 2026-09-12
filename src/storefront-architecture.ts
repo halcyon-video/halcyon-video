@@ -1,12 +1,22 @@
 /** Exterior style is independent of doors, counter shape, era, and branding. */
-export type FacadeStyle = 'gabled-brick' | 'flat-parapet' | 'arcaded-brick';
+export type FacadeStyle = 'gabled-brick' | 'flat-parapet' | 'arcaded-brick' | 'cone-canopy';
 
 export function resolveFacadeStyle(value: string | null): FacadeStyle {
-  return value === 'flat-parapet' || value === 'arcaded-brick' ? value : 'gabled-brick';
+  return value === 'flat-parapet' || value === 'arcaded-brick' || value === 'cone-canopy' ? value : 'gabled-brick';
 }
 
 export function facadeStyle(): FacadeStyle {
   return resolveFacadeStyle(typeof localStorage === 'undefined' ? null : localStorage.getItem('bb_facade'));
+}
+
+export type ConeCanopyFinish = 'brand-accent' | 'full-slate';
+
+export function resolveConeCanopyFinish(value: string | null): ConeCanopyFinish {
+  return value === 'full-slate' ? 'full-slate' : 'brand-accent';
+}
+
+export function coneCanopyFinish(): ConeCanopyFinish {
+  return resolveConeCanopyFinish(typeof localStorage === 'undefined' ? null : localStorage.getItem('bb_cone_canopy_finish'));
 }
 
 /** Separate entry/exit leaves flank the gabled store's masonry divider. */
@@ -29,19 +39,19 @@ export function facadeDimensions(ceilingY: number, entryHalfWidth: number, style
   const gableBase = parapetTop + .3;
   return {
     parapetTop, massHalf, gableBase,
-    frontProjection: 6.2,
-    sidewalkDepth: 6.7,
+    frontProjection: style === 'cone-canopy' ? 11.5 : 6.2,
+    sidewalkDepth: style === 'cone-canopy' ? 12.2 : 6.7,
     // The pillars support the front canopy, with daylight behind them.
-    pierBack: 4.75,
-    pierFront: 6.48,
+    pierBack: style === 'cone-canopy' ? 8.55 : 4.75,
+    pierFront: style === 'cone-canopy' ? 11.45 : 6.48,
     gableHeight: style === 'gabled-brick' ? (entryHalfWidth - 1) * .87 : 0,
-    pierWidth: style === 'arcaded-brick' ? 3.25 : 2.75,
-    pierTop: style === 'gabled-brick' ? gableBase + .8 : parapetTop + (style === 'flat-parapet' ? 5.4 : 4),
+    pierWidth: style === 'cone-canopy' ? 3.2 : style === 'arcaded-brick' ? 3.25 : 2.75,
+    pierTop: style === 'cone-canopy' ? parapetTop + 1.4 : style === 'gabled-brick' ? gableBase + .8 : parapetTop + (style === 'flat-parapet' ? 5.4 : 4),
     headerBottom: 9.15,
     headerTop: 10.2,
     towerStripeTop: 13.4,
     stripeHeight: 1.05,
     stripeTop: parapetTop - 1.5,
-    logoY: (style === 'gabled-brick' ? 15.65 : style === 'flat-parapet' ? 17.6 : 17.1) + Math.max(0, parapetTop-16.8),
+    logoY: (style === 'gabled-brick' ? 15.65 : style === 'cone-canopy' ? 13.65 : style === 'flat-parapet' ? 17.6 : 17.1) + Math.max(0, parapetTop-16.8),
   };
 }
