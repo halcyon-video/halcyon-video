@@ -16,7 +16,7 @@
 // two modules don't form a cycle.
 
 import * as THREE from 'three';
-import { perfTrace, perfSlot } from './perf-trace';
+import { perfTrace, perfSlot } from './perf-trace.ts';
 
 const SP_UPLOAD = perfSlot('texUploadMs');  // uploadTextureNow (initTexture + mipmaps)
 const CT_UPLOAD = perfSlot('texUploadN');
