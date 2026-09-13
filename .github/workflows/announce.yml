@@ -239,7 +239,9 @@ jobs:
           # The screenshot is optional (see the header) — attach it only if a
           # shot actually landed.
           ASSETS=()
-          if [ -f release-shot.png ]; then ASSETS+=(release-shot.png); fi
+          if [ -n "${{ steps.shot.outputs.path }}" ] && [ -f "${{ steps.shot.outputs.path }}" ]; then
+            ASSETS+=("${{ steps.shot.outputs.path }}")
+          fi
           gh release create "${{ github.ref_name }}" \
             --repo "${{ github.repository }}" \
             --title "${{ github.ref_name }}" \
