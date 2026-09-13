@@ -9,7 +9,7 @@ bpy.ops.object.select_all(action='SELECT'); bpy.ops.object.delete(use_global=Fal
 bpy.context.preferences.filepaths.save_version=0
 bpy.context.scene.unit_settings.system='IMPERIAL'; bpy.context.scene.unit_settings.scale_length=.3048
 mats={}
-for name,color,rough,metal in [('FacadeSlate',(.060,.070,.080,1),.88,.08),('FacadeCoping',(.023,.027,.032,1),.52,.35),('FacadeSoffit',(.48,.47,.42,1),.72,.15),('FacadeDownlight',(1,.86,.66,1),.45,0)]:
+for name,color,rough,metal in [('FacadeSlate',(.060,.070,.080,1),.88,.08),('FacadeCanopy',(.060,.070,.080,1),.88,.08),('FacadeCoping',(.023,.027,.032,1),.52,.35),('FacadeSoffit',(.48,.47,.42,1),.72,.15),('FacadeDownlight',(1,.86,.66,1),.45,0)]:
     m=bpy.data.materials.new(name);m.diffuse_color=color;m.use_nodes=True
     bs=m.node_tree.nodes.get('Principled BSDF');bs.inputs['Base Color'].default_value=color;bs.inputs['Roughness'].default_value=rough;bs.inputs['Metallic'].default_value=metal
     mats[name]=m
@@ -42,7 +42,7 @@ box('Recessed canopy structural core',-w+.1,w-.1,b+.12,t-.15,.1,f-.1,'FacadeCopi
 outline=[(-w,.1),(-w,f),(w,f),(w,.1),(w-.1,.1),(w-.1,f-.1),(-w+.1,f-.1),(-w+.1,.1)]
 for row in range(3):
     lo=b+.12+row*(t-b-.27)/3; hi=b+.12+(row+1)*(t-b-.27)/3-.035
-    prism('Slate folded cladding course %d'%(row+1),outline,lo,hi,'FacadeSlate')
+    prism('Slate folded cladding course %d'%(row+1),outline,lo,hi,'FacadeCanopy')
 box('Overhanging folded coping',-w-.06,w+.06,t-.15,t,.02,f+.06,'FacadeCoping')
 # Eight individual folded soffit pans, with recessed rather than painted joints.
 for i in range(8):
@@ -61,7 +61,7 @@ for s in [-1,1]:
         for j in range(n):
             k=(j+1)%n
             faces.append((a[0],c[k],c[j]) if len(a)==1 else (a[j],a[k],c[0]) if len(c)==1 else (a[j],a[k],c[k],c[j]))
-    obj=mesh(('Left' if s<0 else 'Right')+' turned cone with integral plinth and ring capital',verts,faces,'FacadeSlate',True)
+    obj=mesh(('Left' if s<0 else 'Right')+' turned cone with integral plinth and ring capital',verts,faces,'FacadeCanopy',True)
     # Cylindrical seam at the rear of each turned profile. Smooth around its
     # circumference; split normals across horizontal beads and plinth shoulders.
     for poly in obj.data.polygons:

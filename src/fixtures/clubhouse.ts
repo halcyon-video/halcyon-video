@@ -21,7 +21,7 @@ export class Clubhouse implements SlottedFixture {
   private proxies: THREE.Mesh[] = [];
   private chairs: ChildrenChair | null = null;
   readonly cols = 10;
-  readonly shelfHeights = [.45,2.1,3.75];
+  readonly shelfHeights = [0.5, 1.38, 2.26];
   readonly capacity = 80;
   readonly genre = 'Family';
   constructor(public placement: FixturePlacement, private ctx: FixtureContext) {}

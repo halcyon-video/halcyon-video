@@ -1580,65 +1580,62 @@ export function createSlateTexture(): {
   const canvas = document.createElement("canvas");
   canvas.width = SIZE; canvas.height = SIZE;
   const ctx = canvas.getContext('2d')!;
-  ctx.fillStyle = "#555d66";
+  ctx.fillStyle = "#555d66"; // Grey base color matching 1993 slate facade
   ctx.fillRect(0, 0, SIZE, SIZE);
 
-  let seed = 2026;
-  const rnd = () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; };
-
-  for (let y = 0; y < SIZE; y += 2) {
-    const v = (rnd() - 0.5) * 22;
-    ctx.fillStyle = v > 0 ? `rgba(255,255,255,${(v / 70).toFixed(3)})` : `rgba(0,0,0,${(-v / 65).toFixed(3)})`;
-    ctx.fillRect(0, y, SIZE, 2);
-  }
-
-  for (let i = 0; i < 36; i++) {
-    const x = rnd() * SIZE, y = rnd() * SIZE, r = 20 + rnd() * 60;
+  // Large-scale tonal variation (soft lighting gradients / paint unevenness)
+  for (let i = 0; i < 30; i++) {
+    const x = Math.random() * SIZE, y = Math.random() * SIZE, r = 80 + Math.random() * 180;
     const g = ctx.createRadialGradient(x, y, 0, x, y, r);
-    g.addColorStop(0, rnd() > 0.5 ? "rgba(120,130,140,0.25)" : "rgba(50,56,62,0.25)");
-    g.addColorStop(1, "rgba(0,0,0,0)");
+    g.addColorStop(0, Math.random() > 0.5 ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.12)');
+    g.addColorStop(1, 'rgba(0,0,0,0)');
     stampTiled(ctx, SIZE, (c) => { c.fillStyle = g; c.fillRect(x - r, y - r, r * 2, r * 2); });
   }
 
-  for (let i = 0; i < 1800; i++) {
-    const x = rnd() * SIZE, y = rnd() * SIZE;
-    const bright = rnd() > 0.7;
-    ctx.fillStyle = bright ? "rgba(255,255,255,0.18)" : "rgba(30,35,40,0.15)";
-    ctx.fillRect(x, y, 1.2, 1.2);
+  // Fine stipple grain matching createWallTextures()
+  for (let i = 0; i < 4000; i++) {
+    const col = Math.random() > 0.5 ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.15)';
+    const x = Math.random() * SIZE, y = Math.random() * SIZE;
+    stampTiled(ctx, SIZE, (c) => { c.fillStyle = col; c.fillRect(x, y, 1.5, 1.5); });
   }
 
   const map = new THREE.CanvasTexture(canvas);
   map.colorSpace = THREE.SRGBColorSpace;
   map.wrapS = map.wrapT = THREE.RepeatWrapping;
-  map.anisotropy = aniso(8);
+  map.anisotropy = aniso(16);
 
+  // Orange-peel height -> normal map matching createWallTextures()
   const hCanvas = document.createElement("canvas");
   hCanvas.width = SIZE; hCanvas.height = SIZE;
   const hCtx = hCanvas.getContext('2d')!;
   hCtx.fillStyle = "#808080";
   hCtx.fillRect(0, 0, SIZE, SIZE);
-
-  for (let y = 0; y < SIZE; y += 3) {
-    const d = (rnd() - 0.5) * 45;
-    hCtx.fillStyle = d > 0 ? `rgba(255,255,255,${(d / 110).toFixed(3)})` : `rgba(0,0,0,${(-d / 90).toFixed(3)})`;
-    hCtx.fillRect(0, y, SIZE, 3);
+  for (let i = 0; i < 2500; i++) {
+    const x = Math.random() * SIZE, y = Math.random() * SIZE, r = 2 + Math.random() * 5;
+    const v = 110 + Math.floor(Math.random() * 70);
+    const g = hCtx.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, `rgba(${v},${v},${v},0.6)`);
+    g.addColorStop(1, 'rgba(128,128,128,0)');
+    stampTiled(hCtx, SIZE, (c) => { c.fillStyle = g; c.fillRect(x - r, y - r, r * 2, r * 2); });
   }
 
-  const normalMap = heightToNormalTexture(hCanvas, 0.85);
+  const normalMap = heightToNormalTexture(hCanvas, 1.0);
   normalMap.wrapS = normalMap.wrapT = THREE.RepeatWrapping;
-  normalMap.anisotropy = aniso(8);
+  normalMap.anisotropy = aniso(16);
 
+  // Sheen / roughness variation matching createWallTextures()
   const rCanvas = document.createElement("canvas");
   rCanvas.width = SIZE; rCanvas.height = SIZE;
   const rCtx = rCanvas.getContext('2d')!;
   rCtx.fillStyle = "#c5c5c5";
   rCtx.fillRect(0, 0, SIZE, SIZE);
-  for (let i = 0; i < 24; i++) {
-    const x = rnd() * SIZE, y = rnd() * SIZE, r = 25 + rnd() * 75;
-    const rg = rCtx.createRadialGradient(x, y, 0, x, y, r);
-    rg.addColorStop(0, rnd() > 0.5 ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.12)");
-    rg.addColorStop(1, "rgba(0,0,0,0)");
-    stampTiled(rCtx, SIZE, (c) => { c.fillStyle = rg; c.fillRect(x - r, y - r, r * 2, r * 2); });
+  for (let i = 0; i < 22; i++) {
+    const x = Math.random() * SIZE, y = Math.random() * SIZE, r = 50 + Math.random() * 140;
+    const g = rCtx.createRadialGradient(x, y, 0, x, y, r);
+    const glossier = Math.random() > 0.45;
+    g.addColorStop(0, glossier ? 'rgba(140,140,140,0.4)' : 'rgba(210,210,210,0.35)');
+    g.addColorStop(1, 'rgba(197,197,197,0)');
+    stampTiled(rCtx, SIZE, (c) => { c.fillStyle = g; c.fillRect(x - r, y - r, r * 2, r * 2); });
   }
 
   const roughnessMap = new THREE.CanvasTexture(rCanvas);

@@ -21,9 +21,12 @@ color=img('Kraft_fiber_albedo',np.stack([.61+fibers*.10,.43+fibers*.09,.25+fiber
 rough=img('Kraft_fiber_roughness',np.repeat((.76+fibers*.15)[:,:,None],3,axis=2)); rough.colorspace_settings.name='Non-Color'
 dx=np.roll(fibers,1,axis=1)-np.roll(fibers,-1,axis=1); dy=np.roll(fibers,1,axis=0)-np.roll(fibers,-1,axis=0)
 normal=img('Kraft_fiber_normal',np.stack([.5+dx*.2,.5+dy*.2,np.full((n,n),.99)],axis=2)); normal.colorspace_settings.name='Non-Color'
-def mat(name,base,roughness,metal=0,textured=False):
+def mat(name,base,roughness,metal=0,textured=False,emissive=False):
  m=bpy.data.materials.new(name);m.diffuse_color=(*base,1);m.use_nodes=True
  ns=m.node_tree.nodes; links=m.node_tree.links;p=ns.get('Principled BSDF');p.inputs['Base Color'].default_value=(*base,1);p.inputs['Roughness'].default_value=roughness;p.inputs['Metallic'].default_value=metal
+ if emissive:
+  p.inputs['Emission Color'].default_value=(*base,1)
+  p.inputs['Emission Strength'].default_value=0.8
  if textured:
   for im,socket in [(color,'Base Color'),(rough,'Roughness')]:
    t=ns.new('ShaderNodeTexImage');t.image=im;links.new(t.outputs['Color'],p.inputs[socket])
@@ -32,7 +35,7 @@ def mat(name,base,roughness,metal=0,textured=False):
 kraft=mat('CorrugatedKraft',(.65,.48,.3),.86,textured=True)
 edge=mat('ExposedFlute',(.36,.24,.13),.94,textured=True)
 steel=mat('AttachmentSteel',(.24,.27,.3),.42,.7)
-art=mat('HeaderPrint',(.85,.72,.39),.8,textured=True)
+art=mat('HeaderPrint',(.85,.72,.39),.8,textured=True,emissive=True)
 parts=[]
 def box(name,pos,size,material,tilt=0):
  x,y,z=pos; w,h,d=size

@@ -36,5 +36,5 @@ test('cone canopy export has grounded tapered supports, UVs and named finishes',
   });
   assert.equal(cones,2);
   assert(triangles<8000);
-  assert.deepEqual([...roles].sort(),['FacadeCoping','FacadeDownlight','FacadeSlate','FacadeSoffit']);
+  assert.deepEqual([...roles].sort(),['FacadeCanopy','FacadeCoping','FacadeDownlight','FacadeSlate','FacadeSoffit']);
 });

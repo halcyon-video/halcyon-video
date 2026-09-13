@@ -3,12 +3,13 @@
   "nonManifoldEdges": 0,
   "materialRoles": [
     "FacadeSlate",
+    "FacadeCanopy",
     "FacadeCoping",
     "FacadeSoffit",
     "FacadeDownlight"
   ],
   "sourceMeshes": 19,
-  "bytes": 230252,
+  "bytes": 230476,
   "sourceTriangles": 4860,
   "exportedTriangles": 6780,
   "boundsStoreFeet": [

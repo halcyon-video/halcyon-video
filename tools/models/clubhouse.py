@@ -43,7 +43,8 @@ def box_cutter(name,x,z,w,d,lo,hi):return create_cutter(name,[(x-w/2,z-d/2),(x+w
 def box(name,x,z,w,d,lo,hi,role,bevel=.012,cutters=None):return slab(name,[(x-w/2,z-d/2),(x+w/2,z-d/2),(x+w/2,z+d/2),(x-w/2,z+d/2)],lo,hi,role,bevel,cutters)
 
 # Joined perimeter fascia is a single closed U-shaped extrusion with mitered turns.
-outer=[(-7,-7),(7,-7),(7,1),(1,7),(-7,7)]
+# Outer edge extends to (-7.2, -7.2) to meet store walls without gaps.
+outer=[(-7.2,-7.2),(7,-7.2),(7,1),(1,7),(-7.2,7)]
 inner=[(-6.65,-6.65),(6.65,-6.65),(6.65,.855),(.855,6.65),(-6.65,6.65)]
 # Ring faces use matching corner topology, then beveled edge joins.
 def ring(name,lo,hi,role):
@@ -54,8 +55,9 @@ def ring(name,lo,hi,role):
  bm=bmesh.new();bm.from_mesh(me);bmesh.ops.recalc_face_normals(bm,faces=list(bm.faces));assert all(e.is_manifold for e in bm.edges);bm.to_mesh(me);bm.free()
  bpy.context.view_layer.objects.active=o;o.select_set(True);bpy.ops.object.mode_set(mode='EDIT');bpy.ops.mesh.select_all(action='SELECT');bpy.ops.uv.smart_project(island_margin=.015);bpy.ops.object.mode_set(mode='OBJECT');o.select_set(False)
 ring('Mitered broad fascia',9.15,12.7,'HeaderPaint');ring('Upper fascia cap',13.08,13.5,'HeaderPaint');ring('Upper accent band',12.7,13.08,'EdgePaint');ring('Lintel lower return',8.5,9.15,'FramePaint')
-box('Rear liner',0,-6.9,13.5,.2,0,9.15,'PanelLaminate')
-box('Left liner',-6.9,0,.2,14,0,9.15,'PanelLaminate')
+# Solid wall-contiguous millwork liners extending to store corner walls at -7.2
+box('Rear liner',-0.1,-7.0,14.2,0.4,0,9.15,'PanelLaminate')
+box('Left liner',-7.0,-0.1,0.4,14.2,0,9.15,'PanelLaminate')
 # Open flanking windows: unified continuous millwork via boolean diff.
 for side in ['front','right']:
  def face(name,u,v,w,d,lo,hi,role,cutters=None):
@@ -66,13 +68,13 @@ for side in ['front','right']:
  face('low accent',-3.2,7.03,7.4,.05,4.05,4.45,'EdgePaint')
 # Entrance jambs support the diagonal header without a sill/trip edge.
 for x,z in [(.75,6.85),(6.85,.75)]:box('Entry jamb',x,z,.5,.5,0,8.5,'FramePaint')
-# TV console: triangular wedge nestled into the corner apex (-6.65, -6.65).
-poly_horiz = [(-6.65, -6.65), (-3.15, -6.65), (-6.65, -3.15)]
+# TV console: triangular wedge nestled into the corner apex (-6.8, -6.8) against solid liners.
+poly_horiz = [(-6.8, -6.8), (-3.15, -6.8), (-6.8, -3.15)]
 for y in [.18,1.15,2.18]:slab('Console horizontal', poly_horiz, y, y+.12, 'CabinetLaminate')
-poly_toe = [(-6.65, -6.65), (-3.45, -6.65), (-6.65, -3.45)]
+poly_toe = [(-6.8, -6.8), (-3.45, -6.8), (-6.8, -3.45)]
 slab('Console recessed toe', poly_toe, 0, .18, 'CabinetLaminate')
-slab('Console left side', [(-6.65, -6.65), (-6.53, -6.65), (-6.53, -3.27), (-6.65, -3.15)], .18, 2.18, 'CabinetLaminate')
-slab('Console rear side', [(-6.65, -6.65), (-6.65, -6.53), (-3.27, -6.53), (-3.15, -6.65)], .18, 2.18, 'CabinetLaminate')
+slab('Console left side', [(-6.8, -6.8), (-6.68, -6.8), (-6.68, -3.27), (-6.8, -3.15)], .18, 2.18, 'CabinetLaminate')
+slab('Console rear side', [(-6.8, -6.8), (-6.8, -6.68), (-3.27, -6.68), (-3.15, -6.8)], .18, 2.18, 'CabinetLaminate')
 
 # Wall posters mounted along the kids clubhouse interior walls at authentic youth movie proportions.
 box('Poster L1', -6.79, 0.0, 0.02, 2.25, 3.34, 6.66, 'WallPoster', 0.0)
@@ -89,7 +91,7 @@ for side in ['front','right']:
   for x in [center-1.8,center+1.8]:shelf('shelf upright',x,7.6,.1,1.2,.08,4.3,'PanelLaminate')
   shelf('shelf back',center,7.08,3.5,.12,.08,4.3,'PanelLaminate')
   shelf('recessed plinth',center,7.5,3.5,.9,0,.25,'FramePaint')
-  for y in [.45,2.1,3.75]:
+  for y in [0.5, 1.38, 2.26]:
    shelf('tray',center,7.6,3.5,1.2,y,y+.08,'PanelLaminate')
    shelf('retaining lip',center,8.17,3.5,.06,y+.08,y+.18,'EdgePaint')
 # The upper construction fits the dropped lid, retaining low shelf/chair scale.

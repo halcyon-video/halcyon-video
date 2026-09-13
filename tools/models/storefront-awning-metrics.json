@@ -10,11 +10,6 @@
       "nonManifoldEdges": 0
     },
     {
-      "name": "AwningSoffit",
-      "triangles": 96,
-      "nonManifoldEdges": 0
-    },
-    {
       "name": "AwningFrame",
       "triangles": 688,
       "nonManifoldEdges": 0
@@ -39,5 +34,5 @@
       3.5899999141693115
     ]
   ],
-  "bytes": 192656
+  "bytes": 184912
 }

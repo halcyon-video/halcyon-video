@@ -25,7 +25,8 @@ export const CUSTOMER_INFORMATION_TERMINAL_PREVIEW: FixturePlacement = {
 export const DEFAULT_FIXTURE_PLACEMENTS: FixturePlacement[] = [
   // Original glass retail case beside the left checkout queue. Kept forward
   // of the shelf field and clear of the early catalog podium and service cart.
-  { id: 'queue-vitrine-checkout', kind: 'queue-vitrine', position: { x: 0, z: -3.6 }, yaw: 0 },
+  // Dormant at the owner's request (2026-09-12). Keep its registered fixture
+  // and model available for later reactivation.
   // Original early paper lookup table, right of checkout (entrance side).
   // Directory book is dormant at the owner's request (2026-09-12).
   // Keep its registered fixture and model available for later reactivation.

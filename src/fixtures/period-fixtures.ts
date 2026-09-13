@@ -160,7 +160,16 @@ export class CandyDisplay implements StoreFixture {
       const label = labels[r % labels.length];
       const bg = palette[r % palette.length];
       const tex = createLabelTexture(label, bg, '#ffffff');
-      const boxMat = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.65, metalness: 0.05 });
+      const boxMat = new THREE.MeshStandardMaterial({
+        map: tex,
+        roughness: 0.65,
+        metalness: 0.05,
+        ...(powerWing ? {
+          emissiveMap: tex,
+          emissive: new THREE.Color(0xffffff),
+          emissiveIntensity: 0.15,
+        } : {}),
+      });
       this.disposables.push({ mat: boxMat, tex });
 
       const perRow = Math.max(3, Math.floor((width - 0.3) / 0.36));

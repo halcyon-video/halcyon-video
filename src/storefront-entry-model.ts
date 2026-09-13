@@ -64,7 +64,8 @@ export function buildFacadeEntryModel(ctx: FixtureContext, p: EntryParams): THRE
   });
   const downlight = selfLit(new THREE.MeshStandardMaterial({ color: 0xffefd4, emissive: 0xffdfab, emissiveIntensity: 0 }), 'light-source');
   const finishes = {
-    FacadeSlate: p.style === 'cone-canopy' && finishMode === 'full-slate' ? slate : canopy,
+    FacadeSlate: slate,
+    FacadeCanopy: p.style === 'cone-canopy' && finishMode === 'full-slate' ? slate : canopy,
     FacadeDownlight: downlight,
     FacadeBrick: brick,
     FacadeSoldierBrick: soldier,
@@ -73,7 +74,6 @@ export function buildFacadeEntryModel(ctx: FixtureContext, p: EntryParams): THRE
     FacadeCoping: coping,
     // The early brick portal continues its masonry under the header.
     FacadeSoffit: p.style === 'gabled-brick' ? brick : soffit,
-    FacadeCanopy: canopy,
   };
   const releases: (() => void)[] = [];
   const fallback = new THREE.Group();

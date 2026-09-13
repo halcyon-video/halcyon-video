@@ -32,6 +32,7 @@ export function buildWindowAwnings(ctx: FixtureContext, entryHalfWidth: number):
   const finishes = { AwningFabric: fabric, AwningBinding: binding, AwningFrame: frame, AwningSoffit: soffit };
   const releases: (() => void)[] = [];
   const labels: { mesh: THREE.Mesh; maxWidth: number }[] = [];
+  const downlights: THREE.PointLight[] = [];
   let disposed = false;
 
   // Keep the canopy's full cross-section as stores grow: only the horizontal
@@ -66,14 +67,23 @@ export function buildWindowAwnings(ctx: FixtureContext, entryHalfWidth: number):
     const hem = new THREE.Mesh(new THREE.BoxGeometry(width, .08, .08), binding);
     hem.position.set(0, .08, 3.23);
     fallback.add(hem);
-    const underside = new THREE.Mesh(new THREE.BoxGeometry(width, .04, 3.15), soffit);
-    underside.position.set(0, .04, 1.62);
-    fallback.add(underside);
     const bracket = new THREE.Mesh(new THREE.BoxGeometry(width, .08, .08), frame);
     bracket.position.set(0, 3.2, .08);
     fallback.add(bracket);
     wing.add(fallback);
     releases.push(installDisplayModel(ctx, wing, fallback, 'models/storefront-awning.glb', finishes, new THREE.Vector3(width / 30, 1, 1)));
+
+    // Internal downlights inside the hollow awning cavity
+    const numLights = Math.max(2, Math.round(width / 7.5));
+    for (let i = 0; i < numLights; i++) {
+      const lx = -width / 2 + (i + 0.5) * (width / numLights);
+      const dl = new THREE.PointLight(0xffdfab, 0, 16, 2);
+      dl.position.set(lx, 1.2, 1.6);
+      dl.name = `awningDownlight_${sign < 0 ? 'L' : 'R'}_${i}`;
+      wing.add(dl);
+      downlights.push(dl);
+    }
+
     const label = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), lettering);
     label.name = 'awningBrandLettering';
     label.position.set(0, 1.32, 3.273);
@@ -130,6 +140,9 @@ export function buildWindowAwnings(ctx: FixtureContext, entryHalfWidth: number):
     fabric.emissiveIntensity = level * .85;
     soffit.emissiveIntensity = level * .75;
     lettering.emissiveIntensity = level * 1.45;
+    for (const dl of downlights) {
+      dl.intensity = level * 14;
+    }
   };
   const dispose = () => {
     if (disposed) return;

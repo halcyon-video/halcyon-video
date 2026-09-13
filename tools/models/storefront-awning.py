@@ -96,12 +96,7 @@ extrude_profile('Vinyl crown and face', outer+inner, -15, 15, 0)
 end_profile = [(0, .07)] + outer + [(3.19, .07)]
 extrude_profile('Left fitted end', end_profile, -15, -14.95, 0)
 extrude_profile('Right fitted end', end_profile, 14.95, 15, 0)
-# Recessed access pans sit in continuous edge channels; the small gaps read
-# from the sidewalk, while the binding rails close the perimeter.
-for i in range(8):
-    x0=-14.95+i*29.9/8
-    extrude_profile('Soffit access pan %02d'%i,
-                    [(.07,.025),(3.16,.025),(3.16,.075),(.07,.075)],x0+.015,x0+29.9/8-.015,3)
+# Soffit access pans removed so awning underside is hollow.
 # Folded wall flashing laps over the crown. Its kick-out sheds water onto
 # the canopy; the upstand is fitted to the existing masonry mounting plane.
 extrude_profile('Wall counterflashing',
@@ -131,6 +126,8 @@ for y, z in [(.08, 3.23), (.12, .07), (3.27, .05)]:
 # the editable source through named vertex groups.
 for mat in MATERIALS:
     objects = [o for o in bpy.context.scene.objects if o.type == 'MESH' and o.data.materials[0] == mat]
+    if not objects:
+        continue
     bpy.ops.object.select_all(action='DESELECT')
     for obj in objects:
         group = obj.vertex_groups.new(name=obj.name)
