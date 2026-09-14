@@ -27,15 +27,35 @@ Need help or want to show your store? Join the
 [Discord community](https://discord.gg/SN6FnJgQe) for setup help, release
 notes, and the `#your-store` gallery.
 
+## A look inside version 0.19.0
+
+Version 0.19.0 brings a more compact independent shop, revised checkout
+counters and shelving, updated Kids Club details, and balanced interior and
+exterior lighting. The default signs now use a level, rounded white-on-blue
+emblem throughout the store. Phone browsing follows continuous swipes through
+the overview and along the shelves.
+
+![The compact independent video shop at sunset](docs/screenshots/v019/14-independent-sunset.jpg)
+
+![Inside the independent shop, with close-set wooden shelves and its own counter](docs/screenshots/v019/15-independent-interior.jpg)
+
+See the **[full screenshot tour](docs/screenshot-tour.md)** for 32 current views:
+the four chain-store eras, independent shop, building facades, cases, checkout,
+custom branding, and phone screens. Read the
+[0.19.0 release notes](https://github.com/halcyon-video/halcyon-video/releases/tag/v0.19.0)
+for the full change list.
+
 ## A media library you can walk through
 
-![The sales floor from the entrance](docs/screenshots/overview.jpg)
+![The current Halcyon sales floor, with stocked aisles and its destination cursor](docs/screenshots/v019/01-chain-overview.jpg)
 
 The room is built from your catalog. Libraries become aisles, genres become
 sections, popular titles get deeper stock, and multiple quality versions
 collapse into one box. Choose VHS or DVD cases, three shelf arrangements,
 four period fit-outs, day through night lighting, and one of several modeled
 storefronts without changing the library underneath.
+
+![The later-era store and its revised counter layout](docs/screenshots/v019/12-2010-sales-floor.jpg)
 
 Halcyon is meant to be used from the couch. A keyboard, gamepad, TV remote,
 or phone can drive the same remote-first interface. First-person walk mode
@@ -52,6 +72,8 @@ compact independent shop with wood shelves and a lower ceiling. Switch
 between modeled building facades, and see the windows and exterior in
 daylight, at sunset, or after dark.
 
+![Kids Club shelving and its in-store television](docs/screenshots/v019/06-kids-club.jpg)
+
 **Choose when it is.** The manager terminal's media release-date pin limits
 the shelves to titles released by your chosen store date. That date advances
 with real time; an optional setting also matches the store's era to it. Your
@@ -61,7 +83,7 @@ underlying media library stays intact.
 
 ### Browse, inspect, and search
 
-![Browsing a section](docs/screenshots/browse-aisle.jpg)
+![Browsing VHS cases along a stocked shelf](docs/screenshots/v019/02-shelf-browse.jpg)
 
 Shelf browsing moves case by case without duplicate dead ends. Pick up a
 title to see its real cover on a correctly proportioned rental shell, then
@@ -69,11 +91,13 @@ flip it for synopsis, cast, runtime, ratings, and a technical table generated
 from the file's media streams. TV seasons use box sets, and the clerk's CRT
 searches by title, director, or genre.
 
-![Inspecting a rental case](docs/screenshots/inspect.jpg)
+![Inspecting a VHS rental case](docs/screenshots/v019/03-vhs-case.jpg)
+
+![The back of a rental case, with its synopsis and movie information](docs/screenshots/v019/04-case-back.jpg)
 
 ### Rent it, return it, or take it home
 
-![The rental bag waiting at checkout](docs/screenshots/checkout-ritual.jpg)
+![The current checkout counter and filled rental bag](docs/screenshots/v019/05-checkout-bag.jpg)
 
 Carry several tapes to the counter and the clerk bags them in soft-body
 plastic that deforms around the cases. The checkout sequence ends in a
@@ -82,6 +106,8 @@ VCR. Optional rental mode adds period due dates and a lockout until the tapes
 are returned through the counter chute.
 
 ### A clerk who knows the shelves
+
+![A conversation with the clerk at the counter](docs/screenshots/v019/07-clerk-conversation.jpg)
 
 The clerk is rendered from an original Blender character model into a
 directional sprite atlas. She walks the actual floor plan, restocks, works the
@@ -104,7 +130,9 @@ an emulator.
 
 ### Make the store yours
 
-![A store in custom livery](docs/screenshots/brand-store-banana.jpg)
+![A coordinated green-and-gold store, including its carpet](docs/screenshots/v019/26-green-gold-interior.jpg)
+
+![Building an original emblem in Emblem Studio](docs/screenshots/v019/29-emblem-studio.jpg)
 
 The fictional Halcyon identity is data, not hard-coded scenery. Build an
 emblem from editable layers in Emblem Studio, then see that same mark on
@@ -256,6 +284,14 @@ and renders nothing when the store is still. Halcyon is designed to remain on
 for days rather than burn the GPU behind an unchanged frame.
 
 ## TV, phone, and low-power screens
+
+On a phone, start in the whole-store overview. Swipe to move the destination
+cursor, tap it to enter a shelf, and drag along the cases to browse. Streaming
+service choices appear when you check out a title. Choose a service and the
+counter hands you off to its site.
+
+<img src="docs/screenshots/v019/30-phone-overview.jpg" alt="Halcyon store overview in a portrait phone viewport" width="300"> <img src="docs/screenshots/v019/31-phone-case.jpg" alt="Inspecting a rental case in a portrait phone viewport" width="300">
+
 
 **Remote Play** streams the live canvas and audio over WebRTC while control
 returns through the same connection. A shared mirror follows the living-room
