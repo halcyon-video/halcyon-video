@@ -5,6 +5,14 @@ All notable changes to Halcyon Video, generated from commit history by
 it on every version tag push. Deterministic and offline: no entry here was
 written by a model.
 
+## [v0.20.2] — 2026-09-16
+
+### CHANGELOG
+- V0.20.1
+
+### General
+- Fix Jellyfin media authentication and rejected HLS startup
+
 ## [v0.20.1] — 2026-09-15
 
 ### CHANGELOG
