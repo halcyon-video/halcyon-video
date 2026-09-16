@@ -87,13 +87,13 @@ test('the sidecar URL points at the VTT converter for the right source', () => {
   const url = buildSubtitleTrackUrl('http://jf:8096', 'tok en', 'item-1', 3, 'src-9');
   assert.equal(
     url,
-    'http://jf:8096/Videos/item-1/src-9/Subtitles/3/0/Stream.vtt?api_key=tok%20en',
+    'http://jf:8096/Videos/item-1/src-9/Subtitles/3/0/Stream.vtt?ApiKey=tok%20en',
   );
 });
 
 test('the sidecar URL falls back to the item as its own media source', () => {
   const url = buildSubtitleTrackUrl('http://jf:8096', 't', 'item-1', 2);
-  assert.equal(url, 'http://jf:8096/Videos/item-1/item-1/Subtitles/2/0/Stream.vtt?api_key=t');
+  assert.equal(url, 'http://jf:8096/Videos/item-1/item-1/Subtitles/2/0/Stream.vtt?ApiKey=t');
 });
 
 test('a trailing slash on the server address does not double up', () => {

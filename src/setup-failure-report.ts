@@ -161,7 +161,7 @@ export function scrubText(text: string, extraSensitive: string[] = []): string {
   // 2. Query param tokens (X-Plex-Token, Token, api_key, etc.)
   out = out.replace(/X-Plex-Token=[^&\s"'`)]+/gi, 'X-Plex-Token=***');
   out = out.replace(/Token="[^"]*"/gi, 'Token="***"');
-  out = out.replace(/api_key=[^&\s"'`)]+/gi, 'api_key=***');
+  out = out.replace(/api_?key=[^&\s"'`)]+/gi, 'api_key=***');
   out = out.replace(/Bearer\s+[A-Za-z0-9._~+/-]+=*/gi, 'Bearer ***');
 
   // 3. Plex direct target hostnames (*.plex.direct)

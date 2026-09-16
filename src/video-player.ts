@@ -1016,6 +1016,13 @@ export class VideoPlayer {
         if (data.fatal) {
           console.warn('[VideoPlayer] HLS fatal error:', data.type, data.details);
           this.log(`[Player] HLS error: ${data.type}/${data.details}`);
+          // Retrying rejected credentials cannot repair them. In particular,
+          // startLoad() cannot restart a failed initial manifest, leaving a
+          // paused video outside the stall watchdog and buffering forever.
+          if (data.response?.code === 401 || data.response?.code === 403) {
+            this.tryNextSource();
+            return;
+          }
           if (data.type === HlsClass.ErrorTypes.MEDIA_ERROR || data.type === HlsClass.ErrorTypes.NETWORK_ERROR) {
             if (this.hlsRecoveryAttempts < 3) {
               this.hlsRecoveryAttempts++;

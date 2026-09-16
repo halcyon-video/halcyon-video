@@ -16,14 +16,14 @@ const TOKEN = 'abc123';
 test('poster URL matches what the catalog sync built inline', () => {
   assert.equal(
     buildItemImageUrl(SERVER, TOKEN, 'item-1', 'poster'),
-    `${SERVER}/Items/item-1/Images/Primary?api_key=${TOKEN}`
+    `${SERVER}/Items/item-1/Images/Primary?ApiKey=${TOKEN}`
   );
 });
 
 test('backdrop takes the indexed Backdrop/0 path, not Primary', () => {
   assert.equal(
     buildItemImageUrl(SERVER, TOKEN, 'item-1', 'backdrop'),
-    `${SERVER}/Items/item-1/Images/Backdrop/0?api_key=${TOKEN}`
+    `${SERVER}/Items/item-1/Images/Backdrop/0?ApiKey=${TOKEN}`
   );
 });
 
@@ -32,7 +32,7 @@ test('a person portrait is a Primary image of the person item', () => {
   // Items, not a separate People endpoint.
   assert.equal(
     buildItemImageUrl(SERVER, TOKEN, 'person-7', 'person'),
-    `${SERVER}/Items/person-7/Images/Primary?api_key=${TOKEN}`
+    `${SERVER}/Items/person-7/Images/Primary?ApiKey=${TOKEN}`
   );
 });
 
@@ -41,7 +41,7 @@ test('maxWidth is appended only when asked for', () => {
   // poster must NOT inherit that cap or every case loses its art's detail.
   assert.equal(
     buildItemImageUrl(SERVER, TOKEN, 'ep-3', 'poster', 400),
-    `${SERVER}/Items/ep-3/Images/Primary?api_key=${TOKEN}&maxWidth=400`
+    `${SERVER}/Items/ep-3/Images/Primary?ApiKey=${TOKEN}&maxWidth=400`
   );
   assert.ok(!buildItemImageUrl(SERVER, TOKEN, 'ep-3', 'poster').includes('maxWidth'));
 });
@@ -51,7 +51,7 @@ test('a trailing slash on the server address does not double up', () => {
   // here and this must not depend on who cleaned it.
   assert.equal(
     buildItemImageUrl(`${SERVER}/`, TOKEN, 'item-1', 'poster'),
-    `${SERVER}/Items/item-1/Images/Primary?api_key=${TOKEN}`
+    `${SERVER}/Items/item-1/Images/Primary?ApiKey=${TOKEN}`
   );
 });
 

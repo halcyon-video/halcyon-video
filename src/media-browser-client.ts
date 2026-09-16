@@ -61,6 +61,10 @@ export type SubtitleDelivery =
 
 /** Explicit, instance-scoped protocol; no active-server globals or URL inference. */
 export function createMediaBrowserClient(dialect: "jellyfin" | "emby") {
+// Jellyfin 10.11 can disable legacy authorization, including api_key. Media
+// elements cannot attach headers, so use its supported query credential on
+// playlists, direct streams, subtitles and artwork. Emby keeps its own wire form.
+const mediaTokenParameter = dialect === 'jellyfin' ? 'ApiKey' : 'api_key';
 // randomUUID is secure-context-only; ordinary LAN HTTP pages still expose
 // getRandomValues. Session ids are identifiers, never authentication secrets.
 function newPlaybackSessionId(): string {
@@ -401,7 +405,7 @@ function buildItemImageUrl(
   const url = normalizeUrl(jellyfinUrl);
   const path = kind === 'backdrop' ? 'Images/Backdrop/0' : 'Images/Primary';
   const width = maxWidth ? `&maxWidth=${maxWidth}` : '';
-  return `${url}/Items/${itemId}/${path}?api_key=${encodeURIComponent(token)}${width}`;
+  return `${url}/Items/${itemId}/${path}?${mediaTokenParameter}=${encodeURIComponent(token)}${width}`;
 }
 
 function buildUserAvatarUrl(jellyfinUrl: string, userId: string, primaryImageTag?: string): string | null {
@@ -1456,7 +1460,7 @@ function buildStaticStreamUrl(jellyfinUrl: string, token: string, itemId: string
   mediaSourceId = selectedSource(url, token, itemId, mediaSourceId);
   if (dialect === "emby") playbackSessions.set(playbackKey(url, token, itemId), { PlaySessionId: newPlaybackSessionId(), MediaSourceId: mediaSourceId, PlayMethod: "DirectPlay" });
   const sourceParam = mediaSourceId ? `&MediaSourceId=${encodeURIComponent(mediaSourceId)}` : "";
-  return `${url}/Videos/${itemId}/stream?static=true&api_key=${encodeURIComponent(token)}${sourceParam}`;
+  return `${url}/Videos/${itemId}/stream?static=true&${mediaTokenParameter}=${encodeURIComponent(token)}${sourceParam}`;
 }
 
 /**
@@ -1521,7 +1525,7 @@ function buildSubtitleTrackUrl(
   const url = normalizeUrl(jellyfinUrl);
   const source = selectedSource(url, token, itemId, mediaSourceId) ?? itemId;
   return `${url}/Videos/${itemId}/${encodeURIComponent(source)}/Subtitles/${streamIndex}/0/Stream.vtt`
-       + `?api_key=${encodeURIComponent(token)}`;
+       + `?${mediaTokenParameter}=${encodeURIComponent(token)}`;
 }
 
 /** Track/quality overrides for buildHlsStreamUrl (the player's track picker). */
@@ -1594,7 +1598,7 @@ function buildHlsStreamUrl(jellyfinUrl: string, token: string, itemId: string, o
     (opts?.sourceVideoCodec === "hevc" || opts?.sourceVideoCodec === "h265");
   const segmentContainer = hevcCopy ? "mp4" : "ts";
   const params = new URLSearchParams({
-    api_key: token,
+    [mediaTokenParameter]: token,
     ...(selectedSource(url, token, itemId, opts?.mediaSourceId) ? { MediaSourceId: selectedSource(url, token, itemId, opts?.mediaSourceId)! } : {}),
     DeviceId: jellyfinDeviceId(),
     PlaySessionId: playSessionId,
