@@ -34,7 +34,7 @@ export async function seerrUserHeaders(service, token, fetchImpl, signal) {
   const settings = await getSeerr('/api/v1/settings/jellyfin');
   const serverId = guid(settings.serverId);
   if (!serverId || typeof settings.ip !== 'string' || !settings.ip
-      || /[\s/@?#\\]/.test(settings.ip) || !Number.isInteger(settings.port)
+      || /[\s/@?#\\]/.test(settings.ip) || !Number.isInteger(+settings.port)
       || settings.port < 1 || settings.port > 65535) {
     throw new SeerrIdentityError(403, 'The request service must be connected to your Jellyfin server.');
   }
