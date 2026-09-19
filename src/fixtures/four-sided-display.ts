@@ -105,7 +105,7 @@ export class FourSidedDisplay implements SlottedFixture {
     // panes blend by mesh sort order instead of popping against each other.
     const theme = getActiveTheme();
     const featureFilm = this.campaign?.id.startsWith('feature-title:') ? this.campaign.faces[0]?.movies[0] : undefined;
-    const darkDisplay = Boolean(this.profile?.dark || featureFilm);
+    const opaqueShelves = Boolean(this.profile?.dark && !featureFilm);
     const acrylicMat = new THREE.MeshPhysicalMaterial({
       color: 0xf4f8ff,
       transparent: true,
@@ -126,7 +126,7 @@ export class FourSidedDisplay implements SlottedFixture {
     acrylicMat.userData.envGainTarget = 0.76;
 
     // Single-film promotional stands use neutral black; other campaigns follow the store brand.
-    if (darkDisplay) acrylicMat.dispose();
+    if (opaqueShelves) acrylicMat.dispose();
 
     const coreMat = new THREE.MeshStandardMaterial({
       color: new THREE.Color(featureFilm ? 0x111111 : this.profile?.dark ? themeTrimDarkHex(theme) : theme.palette.primary),
@@ -174,7 +174,7 @@ export class FourSidedDisplay implements SlottedFixture {
     const createSideShelves = () => {
       const group = new THREE.Group();
       this.shelfHeights.forEach((yPos, row) => {
-        const shelf = new THREE.Mesh(displayShelfGeo, darkDisplay ? plinthMat : acrylicMat);
+        const shelf = new THREE.Mesh(displayShelfGeo, opaqueShelves ? plinthMat : acrylicMat);
         shelf.position.set(0, yPos, this.profile?.shelfCenters[row] ?? coreDepth / 2 + shelfDepth / 2);
         shelf.rotation.x = rotationX;
         group.add(shelf);
@@ -197,12 +197,8 @@ export class FourSidedDisplay implements SlottedFixture {
     leftShelves.rotation.y = -Math.PI / 2;
     furniture.add(leftShelves);
 
-    // Per-face header: the campaign's label for that face (faces 0..3 =
-    // front/right/back/left, matching getSlots()'s side order), on the 1993
-    // fascia blade in every theme — see promo-topper.ts. Not a billboard:
-    // this carried a 2.25 ft backdrop-and-poster lightbox per face, four to a
-    // stand, which was bigger than anything the real store hung over a floor
-    // fixture and read as a kiosk rather than a display.
+    // Film promotions use landscape metadata artwork when available, otherwise
+    // a bare flat top. Other campaigns retain their existing fascia labels.
     this.topperFactory = featureFilm ? createFeatureFilmTopper(featureFilm, this.ctx) : createPromoTopperFactory();
     this.buildGeneration++; // orphan any in-flight art callbacks from a prior build
     const topperY = coreHeight + 0.01;
@@ -231,7 +227,7 @@ export class FourSidedDisplay implements SlottedFixture {
     if (this.profile || (footprintSize === 2 && this.shelfHeights.join(',') === '1.5,2.4,3.3')) {
       this.disposeModel = installDisplayModel(this.ctx, this.group, furniture,
         this.profile?.model ?? 'models/four-sided-merchandiser.glb',
-        { DisplayBody: coreMat, DisplayShelf: darkDisplay ? plinthMat : acrylicMat, DisplayTrim: bandMat, DisplayHardware: plinthMat });
+        { DisplayBody: coreMat, DisplayShelf: opaqueShelves ? plinthMat : acrylicMat, DisplayTrim: bandMat, DisplayHardware: plinthMat });
     }
   }
 
