@@ -399,13 +399,13 @@ function buildItemImageUrl(
   jellyfinUrl: string,
   token: string,
   itemId: string,
-  kind: 'poster' | 'backdrop' | 'person',
+  kind: 'poster' | 'backdrop' | 'person' | 'logo',
   maxWidth?: number
 ): string {
   const url = normalizeUrl(jellyfinUrl);
-  const path = kind === 'backdrop' ? 'Images/Backdrop/0' : 'Images/Primary';
+  const path = kind === 'backdrop' ? 'Images/Backdrop/0' : kind === 'logo' ? 'Images/Logo' : 'Images/Primary';
   const width = maxWidth ? `&maxWidth=${maxWidth}` : '';
-  return `${url}/Items/${itemId}/${path}?${mediaTokenParameter}=${encodeURIComponent(token)}${width}`;
+  return `${url}/Items/${itemId}/${path}?${mediaTokenParameter}=${encodeURIComponent(token)}${width}${kind === 'logo' ? '&format=png' : ''}`;
 }
 
 function buildUserAvatarUrl(jellyfinUrl: string, userId: string, primaryImageTag?: string): string | null {
@@ -731,6 +731,7 @@ async function fetchMediaCatalog(
         localPath: item.Path || '',
         posterUrl: buildItemImageUrl(url, token, item.Id, 'poster'),
         backdropUrl: item.BackdropImageTags && item.BackdropImageTags.length > 0 ? buildItemImageUrl(url, token, item.Id, 'backdrop') : undefined,
+        titleLogoUrl: item.ImageTags?.Logo ? `${buildItemImageUrl(url, token, item.Id, 'logo', 1024)}&tag=${encodeURIComponent(item.ImageTags.Logo)}` : undefined,
         dateCreated: item.DateCreated || "",
         is4k: checkIs4k(item),
         communityRating: typeof item.CommunityRating === 'number' ? item.CommunityRating : undefined,
@@ -1107,6 +1108,7 @@ async function fetchJellyfinLibrariesAndMovies(
             localPath: item.Path || '',
             posterUrl: buildItemImageUrl(url, token, item.Id, 'poster'),
             backdropUrl: item.BackdropImageTags && item.BackdropImageTags.length > 0 ? buildItemImageUrl(url, token, item.Id, 'backdrop') : undefined,
+            titleLogoUrl: item.ImageTags?.Logo ? `${buildItemImageUrl(url, token, item.Id, 'logo', 1024)}&tag=${encodeURIComponent(item.ImageTags.Logo)}` : undefined,
             dateCreated: item.DateCreated || "",
             isSeries: item.Type === "Series",
             is4k: checkIs4k(item),

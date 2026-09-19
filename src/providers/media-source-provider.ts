@@ -35,6 +35,8 @@ export interface Title {
   localPath: string;
   posterUrl?: string;
   backdropUrl?: string;
+  /** Transparent, stylized title artwork supplied by the media provider. */
+  titleLogoUrl?: string;
   dateCreated?: string;
   isSeries?: boolean;
   is4k?: boolean;

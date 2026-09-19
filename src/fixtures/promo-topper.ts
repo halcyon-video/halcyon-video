@@ -1,5 +1,5 @@
 // General campaign headers for four-sided promo floor stands.
-// Single-film stands use feature-film-topper.ts: compact 16:9 metadata backdrops,
+// Single-film stands use feature-film-topper.ts: cropped metadata backdrops,
 // or a bare top when landscape artwork is unavailable.
 //
 // These used to be 2.25 ft 16:9 billboards — a Jellyfin backdrop, a poster

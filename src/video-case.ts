@@ -3583,7 +3583,8 @@ function decodeToBitmap(img: HTMLImageElement, maxWidth: number): Promise<Cached
 
 // Shared loader body: blob-path decode with <img> fallback, then `finish`
 // stores the art and flushes waiter callbacks.
-function loadArt(url: string, maxWidth: number, finish: (art: CachedArt | null) => void) {
+/** Decode a caller-owned image; callers must close returned ImageBitmaps. */
+export function loadArt(url: string, maxWidth: number, finish: (art: CachedArt | null) => void) {
   fetchArtBitmap(url, maxWidth).then((bitmap) => {
     if (bitmap) {
       finish(bitmap);
