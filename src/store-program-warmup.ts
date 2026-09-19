@@ -4,18 +4,27 @@ import type { Movie } from './providers/media-source-provider';
 import { CASE_MEDIUM, posterPixelCache, createProgramWarmupMaterials } from './video-case';
 import { isWhiteClamshell } from './packaging-formats';
 import { retailAudio } from './audio';
+import { isPublicDemo } from './demo-mode';
 import { compileProgramsInStages, yieldForPrograms } from './program-warmup';
 
 export async function warmupRuntimePrograms(scene: StoreScene) {
   if (scene.warmedPrograms) return;
   scene.warmedPrograms = true;
   const signal = scene.programWarmupController.signal;
+  // Explicit High keeps the complete depth-of-field/hero draw preparation.
+  // Automatic phone tiers can prepare inspection materials after room entry.
+  const background = isPublicDemo && scene.effectiveQuality !== 'high';
   let geo: THREE.BoxGeometry | undefined;
   let warmScene: THREE.Group | undefined;
   const bokehEnabled = scene.bokehPass?.enabled;
   try {
+    // Let the newly interactive public overview paint before allocating probes.
+    if (background) await yieldForPrograms(signal);
     geo = new THREE.BoxGeometry(0.01, 0.01, 0.01);
     warmScene = new THREE.Group();
+    // The public animation loop is already running. Probe objects must never
+    // enter a visible render while Three compiles them cooperatively.
+    warmScene.visible = !background;
     let firstWithPoster: Movie | null = null;
     let firstSeries: Movie | null = null;
     let firstAnimated: Movie | null = null;
@@ -29,6 +38,7 @@ export async function warmupRuntimePrograms(scene: StoreScene) {
     }
     const movie = firstWithPoster ?? scene.libraries[0]?.movies[0];
     if (!movie) {
+      if (background) return;
       await compileProgramsInStages(scene.renderer, scene.scene, scene.camera,
         scene.composer?.readBuffer ?? null, signal);
       return;
@@ -71,7 +81,13 @@ export async function warmupRuntimePrograms(scene: StoreScene) {
     }
     const t0 = performance.now();
     await compileProgramsInStages(scene.renderer, scene.scene, scene.camera,
-      scene.composer?.readBuffer ?? null, signal);
+      scene.composer?.readBuffer ?? null, signal, background ? warmScene : scene.scene);
+    if (background) {
+      // Do not bind, show or hide the visitor's hero cases, or force a composer
+      // draw: they may already be browsing or inspecting while this completes.
+      console.log(`[warmup] background inspection programs compiled in ${(performance.now() - t0).toFixed(0)}ms`);
+      return;
+    }
     await yieldForPrograms(signal);
     if (scene.composer) {
       if (scene.bokehPass) scene.bokehPass.enabled = true; // DOF programs compile on first inspect otherwise
@@ -113,8 +129,8 @@ export async function warmupRuntimePrograms(scene: StoreScene) {
   } finally {
     if (warmScene) scene.scene.remove(warmScene);
     geo?.dispose();
-    if (scene.bokehPass && bokehEnabled !== undefined) scene.bokehPass.enabled = bokehEnabled;
-    scene.hideHeroCases();
+    if (!background && scene.bokehPass && bokehEnabled !== undefined) scene.bokehPass.enabled = bokehEnabled;
+    if (!background) scene.hideHeroCases();
   }
 }
 

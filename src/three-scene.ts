@@ -1580,7 +1580,14 @@ export class StoreScene {
       }
     }
 
-    await this.warmupRuntimePrograms();
+    // The public overview needs the room's shaders, not dry-run inspections.
+    // Inspection variants prepare after main.ts has wired input and revealed it.
+    if (isPublicDemo && this.effectiveQuality !== 'high') {
+      await compileProgramsInStages(this.renderer, this.scene, this.camera,
+        this.composer?.readBuffer ?? null, this.programWarmupController.signal);
+    } else {
+      await this.warmupRuntimePrograms();
+    }
     if (this.programWarmupController.signal.aborted || this.renderer.getContext().isContextLost()) return;
     this.animate();
 
