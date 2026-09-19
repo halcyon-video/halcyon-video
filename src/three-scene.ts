@@ -1,5 +1,6 @@
 import { compileProgramsInStages, yieldForPrograms } from './program-warmup';
 import * as programWarmup from './store-program-warmup';
+import { DeferredModelLoads } from './deferred-model-loads';
 import { ABOVE_R_LIBRARY_ID, partitionAboveRRoom } from './above-r-room';
 import { createNrBayWash } from './nr-bay-wash';
 import { STORE_CENTER_X, FRONT_GLASS_Z } from './store-layout';
@@ -1087,6 +1088,7 @@ export class StoreScene {
   public catalogLibraries: JellyfinLibrary[];
   public catalogGames: Movie[];
   public ready: Promise<void>;
+  public detailLoads: DeferredModelLoads | null = null;
 
   constructor(
     container: HTMLDivElement,
@@ -1460,6 +1462,9 @@ export class StoreScene {
     // (Floor plan already computed above, before the NR wall derivation.)
 
     this.initThree();
+    if (isPublicDemo && this.effectiveQuality !== 'high') {
+      this.detailLoads = new DeferredModelLoads(this.programWarmupController.signal);
+    }
     if (isPublicDemo) {
       // A settings rebuild may preserve case caches from the outgoing scene.
       // Until this room's deferred bake, use its live bootstrap environment
@@ -1670,6 +1675,7 @@ export class StoreScene {
   // Everything a swappable fixture (ambient TVs, entrance, ...) needs from the
   // scene, bundled so fixture classes never hold a reference to StoreScene.
   public fixtureContext(): FixtureContext {
+    const detailLoads = this.detailLoads;
     const roomIds = new Set(this.libraries.find(lib => lib.id === ABOVE_R_LIBRARY_ID)?.movies.map(movie => movie.id));
     return {
       scene: this.scene,
@@ -1690,6 +1696,7 @@ export class StoreScene {
         this.queueStructuralShadowRefresh();
       },
       requestRender: () => this.requestRender(),
+      scheduleDetailLoad: detailLoads ? start => detailLoads.enqueue(start) : undefined,
       activeTheme: this.activeTheme,
       gondolaMaterials: this.gondolaMaterials,
       wallSurface: this.wallSurface,

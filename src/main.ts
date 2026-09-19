@@ -2851,7 +2851,10 @@ async function initializeStoreScene(preservePosterCache = false) {
       // overlay drops, so the player wakes already at the terminal.
       maybeOpenSetupTerminal();
       hideBootOverlay();
-      if (isPublicDemo) void scene.warmupRuntimePrograms();
+      if (isPublicDemo) {
+        void scene.warmupRuntimePrograms().finally(() => scene.detailLoads?.release())
+          .catch(error => console.warn('[warmup] Hosted preparation failed:', error));
+      }
       // You've just come in through the doors — ring the entry chime. (May stay
       // silent if the browser hasn't seen a user gesture yet; that's fine.)
       scene.playDoorChime();
