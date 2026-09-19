@@ -731,6 +731,16 @@ export function shelfFileKey(m: Movie): string {
   return shelfSortTitle(base);
 }
 
+// Alphabetical organization files each film by its own title, even when it
+// belongs to a collection. Natural number order puts Part 2 before Part 10;
+// remakes and matching titles use year then id for a stable catalog order.
+const alphabeticalCollator = new Intl.Collator('en', { numeric: true, sensitivity: 'base' });
+export function alphabeticalTitleCompare(a: Movie, b: Movie): number {
+  return alphabeticalCollator.compare(shelfSortTitle(a.title.trim()), shelfSortTitle(b.title.trim()))
+    || a.year - b.year
+    || a.id.localeCompare(b.id, 'en');
+}
+
 export function shelfTitleCompare(a: Movie, b: Movie): number {
   const byKey = shelfFileKey(a).localeCompare(shelfFileKey(b));
   if (byKey !== 0) return byKey;

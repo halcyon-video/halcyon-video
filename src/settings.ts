@@ -561,6 +561,20 @@ export function registerCoreSettings(): void {
   }
 
   registerSetting({
+    key: 'bb_library_organization',
+    label: 'Library Organization',
+    kind: 'cycle',
+    group: 'Store Look',
+    values: [
+      { id: 'genre', label: 'Genre' },
+      { id: 'alphabetical', label: 'Alphabetical' },
+    ],
+    default: 'genre',
+    applyMode: 'rebuild-scene',
+    hint: 'Alphabetical files each library by title, ignoring A, An and The; numbered titles use natural order.',
+  });
+
+  registerSetting({
     key: 'bb_arrangement',
     label: 'Shelf Arrangement',
     kind: 'cycle',

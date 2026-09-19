@@ -1764,7 +1764,7 @@ window.addEventListener('halcyon:tv-status', () => {
 // this textarea collects what looks wrong. Saved via the vite dev-server
 // middleware in vite.config.ts, which writes it to feedback/NNN/.
 const FEEDBACK_CONFIG_KEYS = [
-  'bb_theme', 'bb_store_format', 'bb_browse_camera', 'bb_medium', 'bb_arrangement', 'bb_outside', 'bb_corner',
+  'bb_theme', 'bb_store_format', 'bb_browse_camera', 'bb_medium', 'bb_arrangement', 'bb_library_organization', 'bb_outside', 'bb_corner',
   'bb_ceiling', 'bb_ceiling_structure', 'bb_storefront', 'bb_render_mode', 'bb_quality', 'bb_reflections', 'bb_walldecor',
 ] as const;
 

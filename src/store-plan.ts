@@ -12,7 +12,7 @@ import {
   LIBRARY_X_SPACING, FIELD_Z_FRONT, CENTER_WALKWAY, AISLE_ANGLE, HERRINGBONE_AISLE_ANGLE, BOX_SPACING,
   MAX_SHELF_COLS, UNIT_CAPACITY, UNIT_SIDE_CAPACITY, MAX_RUN_UNITS, RUN_BREAK_GAP, UNIT_SECTIONS,
   SECTION_CAPACITY, TINY_LIBRARY_MOVIES, MIN_CATEGORY_TITLES,
-  STORE_CATEGORY_ORDER, shelfTitleCompare, sectionFillCopies, columnFillCount,
+  STORE_CATEGORY_ORDER, shelfTitleCompare, alphabeticalTitleCompare, sectionFillCopies, columnFillCount,
   collectionCategoryCandidates, shelfCategoryCandidatesOf,
   type LibraryLayout, type ArrangementId, type ShelvingUnit,
   type OverflowPolicy, DEFAULT_OVERFLOW_POLICY, isOverflowTitle,
@@ -65,6 +65,12 @@ export class StorePlan {
   // stands. Persisted like `arrangement` so a reload keeps the same store.
   public overflowPolicy: OverflowPolicy =
     ((typeof localStorage !== 'undefined' && localStorage.getItem('bb_overflow')) as OverflowPolicy) || DEFAULT_OVERFLOW_POLICY;
+
+  // Read afresh with each scene rebuild, like the aisle arrangement. Unknown
+  // saved values keep the established genre layout.
+  public organization: 'genre' | 'alphabetical' =
+    typeof localStorage !== 'undefined' && localStorage.getItem('bb_library_organization') === 'alphabetical'
+      ? 'alphabetical' : 'genre';
 
   public shelvingUnits: ShelvingUnit[] = [];
   // Z of the back wall: a clear margin behind the deepest planned island.
@@ -337,7 +343,13 @@ export class StorePlan {
       const seenIds = new Set<string>();
       const movies = lib.movies
         .filter((m) => (seenIds.has(m.id) ? false : (seenIds.add(m.id), true)))
-        .sort(shelfTitleCompare);
+        .sort(this.organization === 'alphabetical' ? alphabeticalTitleCompare : shelfTitleCompare);
+      if (this.organization === 'alphabetical') {
+        // One continuous run per library, with no category resets or face-out
+        // filler copies interrupting the title order. Series stay single cases;
+        // their season/episode grouping remains inside inspection.
+        return { entries: movies, sectionLabels: new Map<string, string>(), categorized: false };
+      }
       const hasTvShows = movies.some((m) => m.isSeries);
       const fitsOnThreeUnits = movies.length <= 3 * UNIT_CAPACITY;
       // A games-only platform library (games-only.ts) or a streaming-service
