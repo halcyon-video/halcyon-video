@@ -1,0 +1,10 @@
+{
+  "boundsFeet": [
+    15.5,
+    2.5,
+    3.25
+  ],
+  "parts": 21,
+  "triangles": 2408,
+  "allSolidPartsManifold": true
+}

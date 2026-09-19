@@ -1,3 +1,4 @@
+import { buildExitReturnCounter } from './exit-return-counter';
 import { buildWalkOffMats } from './walk-off-mats';
 import { installCounterOfficeKit } from '../fixtures/counter-office-kit';
 import { installPriceLabelGun } from '../fixtures/price-label-gun';
@@ -652,6 +653,8 @@ export class EntranceCheckout implements StoreFixture {
         ? [standingAt(1.3)]
         : [standingAt(spec.counterShape === 'usquare' ? -3.5 : -4), standingAt(spec.counterShape === 'usquare' ? 3.5 : 4)],
     };
+
+    this.clerkNavInfo.footprints.push(...buildExitReturnCounter(this.ctx, group, this.vestibuleInfo));
 
     // Anchor offsets ALONG the inner island, in feet from its centre. The
     // usquare counter's island is shorter (±5.0 vs the shield's ±6.0 — see

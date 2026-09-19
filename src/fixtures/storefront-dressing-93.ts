@@ -159,7 +159,7 @@ export function buildStorefrontDressing93(scene: StoreScene): void {
     fallback.name = 'eas-pedestal-fallback';
     group.add(fallback);
     const pedestalShape = new THREE.Shape();
-    const pw = 0.5, ph = 3.4, r = 0.24;
+    const pw = 1.12, ph = 4.24, r = 0.24;
     pedestalShape.moveTo(-pw / 2, 0);
     pedestalShape.lineTo(pw / 2, 0);
     pedestalShape.lineTo(pw / 2, ph - r);
@@ -170,7 +170,7 @@ export function buildStorefrontDressing93(scene: StoreScene): void {
     const geo = new THREE.ExtrudeGeometry(pedestalShape, { depth: 0.09, bevelEnabled: false });
     geo.translate(0, 0, -0.045);
     const cream = new THREE.MeshStandardMaterial({ color: 0xe9e4d6, roughness: 0.5, metalness: 0.02 });
-    const baseGeo = new THREE.BoxGeometry(0.62, 0.06, 0.5);
+    const baseGeo = new THREE.BoxGeometry(1.26, 0.06, 0.5);
     // Gate half-span: clear of the leaf's own opening (doorW/2) plus enough
     // that an opening leaf sweeps between the panels, never into one.
     const gateHalf = vest.doorW / 2 + 0.55;
@@ -178,7 +178,7 @@ export function buildStorefrontDressing93(scene: StoreScene): void {
     // chamber there is no room for this gate: the near pedestal would have to
     // stand at z = sideDoorZ - gateHalf = 8.45, which is through the
     // vestibule's own back glass at z = backZ.
-    const standOff = 0.62;
+    const standOff = 0.82;
     const gates: { x: number; z: number }[] = [];
     for (const dz of [-gateHalf, gateHalf]) {
       gates.push({ x: vest.xL - standOff, z: vest.sideDoorZ + dz }); // walk-out door only

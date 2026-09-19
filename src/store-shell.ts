@@ -1,3 +1,4 @@
+import { exitReturnLayout } from './exit-return-layout';
 import { RETAIL_FIXTURE_SPECS } from './retail-fixture-specs';
 import { floorPromotionPlacements, frontRefreshmentPlacements } from './floor-merchandising';
 import { placeStockCart } from './fixtures/stock-cart-layout';
@@ -2381,7 +2382,13 @@ export function buildStore(scene: StoreScene) {
   fixturePlacements.forEach(buildFixture);
   if (activeStoreFormat().floorDisplays) {
     const existing = scene.slottedFixtures.filter(f => f.placement.kind === 'four-sided-display').length;
+    const returnCounter=exitReturnLayout(storeWidth,{
+      xL:STORE_CENTER_X-vestibuleHalfWidth(scene.storefrontSpec)+.2,frontZ:FRONT_GLASS_Z,
+      sideDoorZ:FRONT_GLASS_Z-scene.storefrontSpec.doorWidth*1.5+.4,
+      doorW:scene.storefrontSpec.doorWidth,hasChamber:scene.storefrontSpec.entryStyle==='vestibule',
+    });
     const reserved: Footprint[] = [
+      ...(returnCounter?[{...returnCounter,clearance:1.5}]:[]),
       { label: 'checkout circulation', kind: 'structure', cx: STORE_CENTER_X, cz: 4.5, w: 23, d: 21, yaw: 0 },
       ...(scene.plan.clubhouse ? [{ label: 'clubhouse approach', kind: 'structure' as const,
         cx: STORE_CENTER_X - storeWidth / 2 + 10, cz: backWallZ + 10, w: 20, d: 20, yaw: 0 }] : []),
