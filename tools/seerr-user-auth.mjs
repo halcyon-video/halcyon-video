@@ -33,9 +33,11 @@ export async function seerrUserHeaders(service, token, fetchImpl, signal) {
   const getSeerr = path => privateJson(fetchImpl, service.url + path, seerrHeaders, signal);
   const settings = await getSeerr('/api/v1/settings/jellyfin');
   const serverId = guid(settings.serverId);
+  const port = Number.isInteger(settings.port) ? settings.port
+    : (typeof settings.port === 'string' && /^\d+$/.test(settings.port) ? Number(settings.port) : null);
   if (!serverId || typeof settings.ip !== 'string' || !settings.ip
-      || /[\s/@?#\\]/.test(settings.ip) || !Number.isInteger(settings.port)
-      || settings.port < 1 || settings.port > 65535) {
+      || /[\s/@?#\\]/.test(settings.ip) || !port
+      || port < 1 || port > 65535) {
     throw new SeerrIdentityError(403, 'The request service must be connected to your Jellyfin server.');
   }
   const basePath = settings.urlBase || '';
@@ -44,7 +46,7 @@ export async function seerrUserHeaders(service, token, fetchImpl, signal) {
     throw new SeerrIdentityError(502, 'Invalid request service connection.');
   }
   const host = settings.ip.includes(':') && !settings.ip.startsWith('[') ? `[${settings.ip}]` : settings.ip;
-  const jellyfin = new URL(`${settings.useSsl ? 'https' : 'http'}://${host}:${settings.port}${basePath.replace(/\/+$/, '')}/Users/Me`);
+  const jellyfin = new URL(`${settings.useSsl ? 'https' : 'http'}://${host}:${port}${basePath.replace(/\/+$/, '')}/Users/Me`);
   const me = await privateJson(fetchImpl, jellyfin.href,
     { accept: 'application/json', 'x-emby-token': token }, signal);
   const userId = guid(me.Id);
