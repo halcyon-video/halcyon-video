@@ -346,32 +346,32 @@
         </div>
       </div>
 
-      <!-- Screensaver Overlay: bouncing 3D rotator — a rental VHS
-           clamshell or, some of the time, a DVD disc. src/screensaver.ts
-           picks the object, steps the rotation (~12fps, deliberately chunky)
-           and drives the bounce. The ticket logo lives once in <defs> at the
-           top of <body> and is stamped onto the disc face via <use>. -->
+      <!-- Screensaver Overlay: bouncing 3D rotator — paired rental
+           shell clamshell and actual library movie box. src/screensaver.ts
+           swaps titles on bounce and drives multi-axis tumbling. -->
       <div id="screensaver-overlay">
         <div class="screensaver-content">
-          <div class="screensaver-logo mode-vhs" id="screensaver-logo">
+          <div class="screensaver-logo" id="screensaver-logo">
             <div class="ss-rotor" id="ss-rotor">
-              <!-- Faces are bare: screensaver.ts crops the real rental-wrap
-                   scan (video-case.ts) onto front/back/left-spine; the other
-                   faces read as black molded clamshell. -->
-              <div class="ss-vhs">
-                <div class="ss-vhs-face ss-vhs-front"></div>
-                <div class="ss-vhs-face ss-vhs-back"></div>
-                <div class="ss-vhs-face ss-vhs-right"></div>
-                <div class="ss-vhs-face ss-vhs-left"></div>
-                <div class="ss-vhs-face ss-vhs-top"></div>
-                <div class="ss-vhs-face ss-vhs-bottom"></div>
-              </div>
-              <div class="ss-disc">
-                <div class="ss-disc-face ss-disc-label">
-                  <svg class="ss-disc-logo" viewBox="0 0 640 400"><use href="#bb-ticket-logo"/></svg>
-                  <span class="ss-disc-text">DVD VIDEO</span>
+              <div class="ss-pair">
+                <!-- Rental Clamshell Case -->
+                <div class="ss-case ss-vhs">
+                  <div class="ss-case-face ss-case-front ss-vhs-front"></div>
+                  <div class="ss-case-face ss-case-back ss-vhs-back"></div>
+                  <div class="ss-case-face ss-case-right ss-vhs-right"></div>
+                  <div class="ss-case-face ss-case-left ss-vhs-left"></div>
+                  <div class="ss-case-face ss-case-top ss-vhs-top"></div>
+                  <div class="ss-case-face ss-case-bottom ss-vhs-bottom"></div>
                 </div>
-                <div class="ss-disc-face ss-disc-data"></div>
+                <!-- Library Movie Box -->
+                <div class="ss-case ss-movie">
+                  <div class="ss-case-face ss-case-front ss-movie-front"></div>
+                  <div class="ss-case-face ss-case-back ss-movie-back"></div>
+                  <div class="ss-case-face ss-case-right ss-movie-right"></div>
+                  <div class="ss-case-face ss-case-left ss-movie-left"></div>
+                  <div class="ss-case-face ss-case-top ss-movie-top"></div>
+                  <div class="ss-case-face ss-case-bottom ss-movie-bottom"></div>
+                </div>
               </div>
             </div>
           </div>
