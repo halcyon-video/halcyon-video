@@ -1,0 +1,79 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync, existsSync } from 'node:fs';
+import * as THREE from 'three';
+import { prepareRetailModel } from '../src/fixtures/retail-model.ts';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { frontRefreshmentPlacements } from '../src/floor-merchandising.ts';
+import { RETAIL_FIXTURE_SPECS, retailFixtureFootprint, type RetailFixtureKind } from '../src/retail-fixture-specs.ts';
+import { validateLayout, type Footprint } from '../src/layout-validator.ts';
+
+const kinds = Object.keys(RETAIL_FIXTURE_SPECS) as RetailFixtureKind[];
+for (const kind of kinds) test(`${kind}: real export fits collider, has normals/UVs and bounded resources`, async () => {
+  const bytes = readFileSync(new URL(`../public/models/${kind}.glb`, import.meta.url));
+  const metrics = JSON.parse(readFileSync(new URL(`../tools/models/${kind}-metrics.json`, import.meta.url), 'utf8'));
+  assert.equal(bytes.length, metrics.glbBytes); assert.ok(bytes.length < 1_300_000);
+  assert.ok(existsSync(new URL(`../tools/models/${kind}.blend`, import.meta.url)));
+  assert.ok(existsSync(new URL(`../tools/models/${kind}.py`, import.meta.url)));
+  const { scene } = await new GLTFLoader().parseAsync(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), '');
+  if (kind === 'rotating-merchandiser') scene.position.y = -.055;
+  const bounds = new THREE.Box3().setFromObject(scene), spec = RETAIL_FIXTURE_SPECS[kind];
+  assert.ok(bounds.min.x >= -spec.w / 2 - 1e-5 && bounds.max.x <= spec.w / 2 + 1e-5);
+  assert.ok(bounds.min.z >= -spec.d / 2 - 1e-5 && bounds.max.z <= spec.d / 2 + 1e-5);
+  assert.ok(Math.abs(bounds.min.y) < 1e-5 && bounds.max.y <= spec.h + 1e-5);
+  let transparentBefore = 0;
+  scene.traverse(o => { if (o instanceof THREE.Mesh && !Array.isArray(o.material) && o.material.transparent) transparentBefore++; });
+  prepareRetailModel(scene);
+  const mergedBounds = new THREE.Box3().setFromObject(scene);
+  assert.ok(mergedBounds.min.distanceTo(bounds.min) < 1e-5 && mergedBounds.max.distanceTo(bounds.max) < 1e-5, 'batching preserves installed geometry bounds');
+  let triangles = 0, draws = 0, transparentAfter = 0;
+  scene.traverse(o => {
+    if (!(o instanceof THREE.Mesh)) return;
+    if (!Array.isArray(o.material) && o.material.transparent) transparentAfter++;
+    draws++; triangles += (o.geometry.index?.count ?? o.geometry.attributes.position.count) / 3;
+    for (const attribute of ['position', 'normal', 'uv']) {
+      const a = o.geometry.getAttribute(attribute);
+      assert.ok(a && Array.from(a.array).every(Number.isFinite));
+      assert.equal(a.count, o.geometry.attributes.position.count);
+    }
+    o.geometry.dispose();
+    for (const m of Array.isArray(o.material) ? o.material : [o.material]) m.dispose();
+  });
+  assert.equal(transparentAfter, transparentBefore, 'glass panes keep independent sorting');
+  assert.equal(triangles, metrics.triangles);
+  // Cooler retains 24 transparent bottles and two door panes for sorting.
+  assert.ok(triangles < 18000 && draws <= (kind === 'two-door-cooler' ? 40 : 25));
+});
+
+const checkout: Footprint = { label: 'checkout approach', kind: 'structure', cx: 11, cz: 4.5, w: 23, d: 21, yaw: 0 };
+for (const width of [28, 42, 62, 90]) test(`front zone follows a ${width}-foot store without blocking checkout or crossing walls`, () => {
+  const bounds = { minX: 11 - width / 2, maxX: 11 + width / 2, minZ: -60, maxZ: 15 };
+  const plan = frontRefreshmentPlacements([checkout], bounds);
+  const footprints = plan.map(p => retailFixtureFootprint(p.kind as RetailFixtureKind, p));
+  assert.deepEqual(validateLayout([...footprints, checkout], bounds).filter(v => v.a !== checkout.label || v.b), []);
+  assert.equal(new Set(plan.map(p => p.kind)).size, plan.length);
+  // These wall-facing placements are quarter-turned axis-aligned rectangles.
+  // Independently measure the actual edge gap, including exact-touch cases
+  // that the general chained-shelf validator intentionally permits.
+  for (const fp of footprints) {
+    const dx = Math.max(0, Math.abs(fp.cx - checkout.cx) - (fp.d + checkout.w) / 2);
+    const dz = Math.max(0, Math.abs(fp.cz - checkout.cz) - (fp.w + checkout.d) / 2);
+    assert.ok(Math.hypot(dx, dz) >= 1.5 - 1e-6, 'customer approach stays clear of the counter');
+    assert.ok(fp.cx - fp.d / 2 - bounds.minX >= 1.5 - 1e-6);
+    assert.ok(bounds.maxX - fp.cx - fp.d / 2 >= 1.5 - 1e-6);
+  }
+  if (width >= 42) assert.equal(plan.length, 4);
+  if (width === 28) assert.equal(plan.length, 0);
+});
+
+test('fully obstructed front zone declines fixtures', () => {
+  assert.deepEqual(frontRefreshmentPlacements([{ label:'occupied', kind:'structure',cx:11,cz:0,w:62,d:30,yaw:0 }],
+    {minX:-20,maxX:42,minZ:-60,maxZ:15}), []);
+});
+
+test('every admitted new kind is registered and excluded from independent-store floor displays', () => {
+  const registry = readFileSync(new URL('../src/fixture-registry.ts', import.meta.url), 'utf8');
+  const config = readFileSync(new URL('../src/store-fixtures-config.ts', import.meta.url), 'utf8');
+  const excluded = config.match(/const FLOOR_DISPLAY_KINDS = new Set\(\[([\s\S]*?)\]\);/)![1];
+  for (const kind of kinds) { assert.ok(registry.includes(`'${kind}'`)); assert.ok(excluded.includes(`'${kind}'`)); }
+});

@@ -1,4 +1,5 @@
-import { floorPromotionPlacements } from './floor-merchandising';
+import { RETAIL_FIXTURE_SPECS } from './retail-fixture-specs';
+import { floorPromotionPlacements, frontRefreshmentPlacements } from './floor-merchandising';
 import { placeStockCart } from './fixtures/stock-cart-layout';
 import { buildNrBayLighting } from './nr-bay-lighting';
 import { NR_BAY_WIDTH, nrColumnX } from './nr-run-layout';
@@ -2346,6 +2347,7 @@ export function buildStore(scene: StoreScene) {
     }
     const fixture = createFixture(placement, scene.fixtureContext());
     fixture.build();
+    if (placement.kind in RETAIL_FIXTURE_SPECS) scene.retailFixtures.push(fixture);
     const footprint = fixture.getFootprint?.();
     if (footprint) fixtureFootprints.push(footprint);
     fixtureFootprints.push(...(fixture.getFootprints?.() ?? []));
@@ -2384,6 +2386,9 @@ export function buildStore(scene: StoreScene) {
       ...(scene.plan.clubhouse ? [{ label: 'clubhouse approach', kind: 'structure' as const,
         cx: STORE_CENTER_X - storeWidth / 2 + 10, cz: backWallZ + 10, w: 20, d: 20, yaw: 0 }] : []),
     ];
+    frontRefreshmentPlacements([...scene.plan.getUnitFootprints(), ...fixtureFootprints, ...reserved],
+      { minX: STORE_CENTER_X - storeWidth / 2, maxX: STORE_CENTER_X + storeWidth / 2,
+        minZ: backWallZ, maxZ: FRONT_GLASS_Z }).forEach(buildFixture);
     floorPromotionPlacements(scene.fixtureContext().libraries, [...scene.plan.getUnitFootprints(), ...fixtureFootprints, ...reserved],
       { minX: STORE_CENTER_X - storeWidth / 2, maxX: STORE_CENTER_X + storeWidth / 2,
         minZ: backWallZ, maxZ: FRONT_GLASS_Z }, existing).forEach(buildFixture);

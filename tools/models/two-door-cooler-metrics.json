@@ -1,0 +1,698 @@
+{
+  "units": "feet",
+  "origin": "floor-centred; X across, Y in-depth, Z up (Blender)",
+  "parts": [
+    {
+      "name": "CabinetLeftWall",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CabinetRightWall",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CabinetTopSlab",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CabinetBottomBase",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CabinetBackWall",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CompressorInteriorDeck",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CompressorLowerFrontFrame",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "IntakeLouver_0",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "IntakeLouver_1",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "IntakeLouver_2",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "IntakeLouver_3",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "IntakeLouver_4",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "HeaderDividerShelf",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "HeaderBacklitSign",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "HeaderBezelTop",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "HeaderBezelBottom",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CenterDoorMullion",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "WireShelfDeck_0",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "WireShelfLip_0",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkCanFront_0_0",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkCanMid_0_0",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottleRear_0_0",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkCanFront_0_1",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkCanMid_0_1",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottleRear_0_1",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkCanFront_0_2",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkCanMid_0_2",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottleRear_0_2",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkCanFront_0_3",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkCanMid_0_3",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottleRear_0_3",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkCanFront_0_4",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkCanMid_0_4",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottleRear_0_4",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkCanFront_0_5",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkCanMid_0_5",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottleRear_0_5",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "WireShelfDeck_1",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "WireShelfLip_1",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkCanFront_1_0",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkCanMid_1_0",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottleRear_1_0",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkCanFront_1_1",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkCanMid_1_1",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottleRear_1_1",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkCanFront_1_2",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkCanMid_1_2",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottleRear_1_2",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkCanFront_1_3",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkCanMid_1_3",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottleRear_1_3",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkCanFront_1_4",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkCanMid_1_4",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottleRear_1_4",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkCanFront_1_5",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkCanMid_1_5",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottleRear_1_5",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "WireShelfDeck_2",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "WireShelfLip_2",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkCanFront_2_0",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkCanMid_2_0",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottleRear_2_0",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkCanFront_2_1",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkCanMid_2_1",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottleRear_2_1",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkCanFront_2_2",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkCanMid_2_2",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottleRear_2_2",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkCanFront_2_3",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkCanMid_2_3",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottleRear_2_3",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkCanFront_2_4",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkCanMid_2_4",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottleRear_2_4",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkCanFront_2_5",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkCanMid_2_5",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottleRear_2_5",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "WireShelfDeck_3",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "WireShelfLip_3",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkCanFront_3_0",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkCanMid_3_0",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottleRear_3_0",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkCanFront_3_1",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkCanMid_3_1",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottleRear_3_1",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkCanFront_3_2",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkCanMid_3_2",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottleRear_3_2",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkCanFront_3_3",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkCanMid_3_3",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottleRear_3_3",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkCanFront_3_4",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkCanMid_3_4",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottleRear_3_4",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkCanFront_3_5",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkCanMid_3_5",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottleRear_3_5",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "LeftDoorFrameTop",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "LeftDoorFrameBottom",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "LeftDoorFrameLeft",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "LeftDoorFrameRight",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "LeftDoorGlass",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "LeftDoorHandle",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "LeftHandleMountTop",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "LeftHandleMountBottom",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "RightDoorFrameTop",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "RightDoorFrameBottom",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "RightDoorFrameLeft",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "RightDoorFrameRight",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "RightDoorGlass",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "RightDoorHandle",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "RightHandleMountTop",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "RightHandleMountBottom",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    }
+  ],
+  "boundsBlender": {
+    "min": [
+      -2.0,
+      -1.2549999952316284,
+      0.0
+    ],
+    "max": [
+      2.0,
+      1.149999976158142,
+      6.5
+    ]
+  },
+  "triangles": 16348,
+  "glbBytes": 1193664
+}

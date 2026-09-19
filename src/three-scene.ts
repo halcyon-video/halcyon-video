@@ -48,7 +48,7 @@ import { BokehPass } from 'three/examples/jsm/postprocessing/BokehPass.js';
 import { Reflector } from 'three/examples/jsm/objects/Reflector.js';
 import * as mirrors from './store-mirrors';
 import { BeautyPass, PartialComposite } from './partial-composite';
-import { FixtureContext, SlottedFixture } from './fixtures';
+import { FixtureContext, SlottedFixture, StoreFixture } from './fixtures';
 import { disposeRooftopHVAC } from './rooftop-hvac';
 import { setWindowAwningLighting, disposeWindowAwnings } from './storefront-awning';
 import { setFacadeEntryLighting, disposeFacadeEntry } from './storefront-entry-model';
@@ -733,6 +733,7 @@ export class StoreScene {
     };
   } | null = null;
   public slottedFixtures: SlottedFixture[] = [];
+  public retailFixtures: StoreFixture[] = [];
   // T19: candy-rack fixtures aren't slotted (no movie slots), so they're not
   // covered by slottedFixtures above -- kept separately so the candy
   // checkout screen can read their real-product rows.
@@ -5959,6 +5960,8 @@ export class StoreScene {
     this.clerk?.dispose(); this.clerk = null; // tear down her DOM prompt/dialog and GPU textures/materials
     this.entrance?.dispose();
     this.entrance = null;
+    this.retailFixtures.forEach(f => f.dispose());
+    this.retailFixtures = [];
     this.slottedFixtures.forEach(f => f.dispose());
     this.slottedFixtures = [];
     this.candyDisplays.forEach(f => f.dispose());

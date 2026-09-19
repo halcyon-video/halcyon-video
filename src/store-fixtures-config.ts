@@ -402,6 +402,12 @@ const FLOOR_DISPLAY_KINDS = new Set([
   'previously-viewed-bin',
   'gold-clamshell',
   'rope-stanchions',
+  'acrylic-popcorn-bin',
+  'rotating-merchandiser',
+  'two-door-cooler',
+  'chest-freezer',
+  'candy-wall-gondola',
+  'secondary-service-counter',
 ]);
 
 // Fixture kinds that mount ON the checkout counter's walk-in BAND — its blue

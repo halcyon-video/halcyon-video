@@ -1,0 +1,182 @@
+{
+  "units": "feet",
+  "origin": "floor-centred; X across, Y in-depth, Z up (Blender)",
+  "parts": [
+    {
+      "name": "PedestalToeKick",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PedestalCarcass",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PedestalTopDeck",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "BinBasePlate",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "BinBackWall",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "BinLeftWall",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "BinRightWall",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "BinFrontWall",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "BinTopHeader",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "BinClearLid",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PopcornCarton_0",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PopcornCarton_1",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PopcornCarton_2",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PopcornCarton_3",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PopcornCarton_4",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PopcornCarton_5",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PopcornCarton_6",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PopcornCarton_7",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PopcornCarton_8",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PopcornCarton_9",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PopcornCarton_10",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PopcornTubBody_0",
+      "triangles": 236,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PopcornTubRim_0",
+      "triangles": 236,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PopcornTubBody_1",
+      "triangles": 236,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PopcornTubRim_1",
+      "triangles": 236,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PopcornTubBody_2",
+      "triangles": 236,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PopcornTubRim_2",
+      "triangles": 236,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    }
+  ],
+  "boundsBlender": {
+    "min": [
+      -0.9100000262260437,
+      -0.9100000262260437,
+      0.0
+    ],
+    "max": [
+      0.9100000262260437,
+      0.9100000262260437,
+      4.0
+    ]
+  },
+  "triangles": 3684,
+  "glbBytes": 296184
+}
