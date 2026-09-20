@@ -9,9 +9,9 @@ test('angled returns export preserves its floor origin, worktop height and bound
   const metrics=JSON.parse(readFileSync(new URL('../tools/models/exit-return-counter-metrics.json',import.meta.url),'utf8'));
   const {scene}=await new GLTFLoader().parseAsync(bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength),'');
   const box=new THREE.Box3().setFromObject(scene);
-  assert.ok(Math.abs(box.min.y)<1e-5 && Math.abs(box.max.y-3.54)<1e-5);
+  assert.ok(Math.abs(box.min.y)<1e-5 && Math.abs(box.max.y-4.2)<1e-5);
   assert.ok(box.min.x>=-7.75-1e-5 && box.max.x<=7.75+1e-5);
-  assert.ok(box.min.z>=-11.5-1e-5 && box.max.z<=1e-5);
+  assert.ok(box.min.z>=-11.5-1e-5 && box.max.z<=.23+1e-5);
   assert.ok(box.min.z<-11.3,'projecting point is present');
   let triangles=0,meshes=0;
   const materials=new Set<THREE.Material>();

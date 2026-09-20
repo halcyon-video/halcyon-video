@@ -482,7 +482,7 @@ export class EntranceCheckout implements StoreFixture {
         buildGlazedWall('Z', 0, 0, wall.length, [wall.doorAlong], {frontSillY:2,singlePanels:true});
         for (const child of group.children.slice(first)) assembly.add(child);
         const door = buildVestibuleDoor(this.ctx, assembly, doorMats, spec, 0, wall.doorAlong,
-          doorH, false, true, 1.4, noFrame);
+          doorH, false, false, -1.4, noFrame);
         assembly.position.set(wall.x, 0, wall.z); assembly.rotation.y = wall.yaw;
         group.add(assembly);
         door.center.set(wall.doorX, door.center.y, wall.doorZ);
@@ -523,7 +523,19 @@ export class EntranceCheckout implements StoreFixture {
         outline.closePath();
         const capGeo = new THREE.ExtrudeGeometry(outline,{depth:capH,bevelEnabled:false});
         capGeo.rotateX(-Math.PI/2);
-        if (wallSurf) mapWallSegmentUV(capGeo, boxW, capH, wallH, wallSurf.storeWidth, wallSurf.roomHeight);
+        if (wallSurf) {
+          // Extrusion UVs are already in feet, unlike the normalized box UVs.
+          // Project each vertical face along its tangent at the wall texture density.
+          const pos = capGeo.getAttribute('position'), normal = capGeo.getAttribute('normal');
+          const uv = capGeo.getAttribute('uv');
+          for (let i = 0; i < pos.count; i++) {
+            const u = pos.getX(i) * normal.getZ(i) - pos.getZ(i) * normal.getX(i);
+            if (Math.abs(normal.getY(i)) > .5) {
+              uv.setXY(i,pos.getX(i)/wallSurf.storeWidth,-pos.getZ(i)/wallSurf.roomHeight);
+            } else uv.setXY(i, u / wallSurf.storeWidth, (pos.getY(i) + wallH) / wallSurf.roomHeight);
+          }
+          uv.needsUpdate = true;
+        }
         const cap = new THREE.Mesh(capGeo, capMat);
         cap.name = 'vestibule-solid-cap';
         cap.position.set(cx, wallH, 0);

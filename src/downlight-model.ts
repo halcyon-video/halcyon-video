@@ -24,6 +24,7 @@ export function installDownlightModels(
   positions: DownlightPlacement[],
   fallbackGroup?: THREE.Group,
   onLoaded?: () => void,
+  lampIntensity = 2.2,
 ): () => void {
   let disposed = false;
   let hardware: THREE.Group | undefined;
@@ -60,6 +61,12 @@ export function installDownlightModels(
       const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
       for (const m of mats) {
         materials.add(m);
+        // The deep bowl hides its small lens off-axis. Approximate only the
+        // lamp's local bounce inside that reflector, without another light.
+        if (lampIntensity>2.2 && m.name==='DownlightReflector' && m instanceof THREE.MeshStandardMaterial) {
+          m.emissive.set(0xfff3df);m.emissiveIntensity=.28;
+        }
+        if (m.name === 'DownlightLamp' && m instanceof THREE.MeshStandardMaterial) m.emissiveIntensity=lampIntensity;
         if (m.name === 'DownlightLamp' || (m as THREE.MeshStandardMaterial).emissive?.getHex()) {
           selfLit(m, 'light-source');
         }

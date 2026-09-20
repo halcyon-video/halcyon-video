@@ -22,12 +22,12 @@ export function exitReturnSegments(f: Footprint): Footprint[] {
     return {label:'structure:return-'+label,kind:'structure',cx:f.cx+(a[0]+b[0])*sx/2+nx*depth/2,
       cz:back+(a[1]+b[1])*sz/2+nz*depth/2,w:length,d:depth,yaw:-Math.atan2(dz,dx)};
   };
-  return [segment([7.75,-3.2],[7.75,0],.8,'vestibule-stub'),
+  return [segment([7.75,-2.4],[7.75,0],.8,'vestibule-stub'),
     segment([7.75,0],[-7.75,0],.8,'back'),
     segment([-7.75,0],[-7.75,-5.75],.8,'left'),
     segment([-7.75,-5.75],[-2,-11.5],.8,'outer-angle'),
     segment([-2,-11.5],[3.25,-6.25],.8,'front-angle'),
-    segment([3.5,-.8],[-6.95,-.8],1.4,'window-worktop'),
+    segment([6.95,-.8],[-6.95,-.8],1.4,'window-worktop'),
     segment([-6.95,-5.35],[-2,-10.3],1.3,'inner-worktop-left'),
     segment([-2,-10.3],[2.4,-5.9],1.3,'inner-worktop-right')];
 }
