@@ -37,7 +37,7 @@ bpy.context.view_layer.objects.active=parts[0]
 for screen in bpy.data.screens:
  for area in screen.areas:
   if area.type=='VIEW_3D':area.spaces.active.region_3d.view_distance=22;area.spaces.active.region_3d.view_location=(0,3.5,1.6)
-metrics={'boundsFeet':[15.5,11.73,4.2],'parts':len(parts),'triangles':sum(len(p.vertices)-2 for ob in parts for p in ob.data.polygons),'allSolidPartsManifold':True,'worktopHeightFeet':2.82,'staffOpeningFeet':6.23,'staffOpeningSide':'vestibule (+X)'}
+metrics={'boundsFeet':[15.5,11.73,4.2],'parts':len(parts),'triangles':sum(len(p.vertices)-2 for ob in parts for p in ob.data.polygons),'allSolidPartsManifold':True,'worktopHeightFeet':2.82,'staffOpeningFeet':round(math.hypot(7.75-3.25,6.25-2.4),2),'staffOpeningSide':'vestibule (+X)'}
 (ROOT/'tools/models/exit-return-counter-metrics.json').write_text(json.dumps(metrics,indent=2)+'\n')
 bpy.ops.wm.save_as_mainfile(filepath=str(ROOT/'tools/models/exit-return-counter.blend'),compress=True)
 bpy.ops.object.join();bpy.context.object.name='ExitReturnCounter'
