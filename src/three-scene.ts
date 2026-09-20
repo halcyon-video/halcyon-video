@@ -1,3 +1,4 @@
+import { capturePinPng } from './feedback-image';
 import { compileProgramsInStages, yieldForPrograms } from './program-warmup';
 import * as programWarmup from './store-program-warmup';
 import { DeferredModelLoads } from './deferred-model-loads';
@@ -3982,14 +3983,14 @@ export class StoreScene {
    */
   public debugClerkPathAudit(seconds = 420): boolean { return clerkFlow.debugClerkPathAudit(this, seconds); }
 
-  // Feedback pin (F8, see main.ts): a user who can't read code flags a visual
+  // Feedback pin (C, see main.ts): a user who can't read code flags a visual
   // bug in-app. Captures the exact replayable view PLUS a screenshot in one
   // shot, before the camera can move. preserveDrawingBuffer is off, so the
   // canvas must be forced to paint and read back in the same tick -- no
   // waiting on the next animate() frame. The walk string is the inverse of
   // teleportWalk() above: extract a 'YXZ' Euler from the camera's current
   // orientation instead of setting rotation from yaw/pitch.
-  public captureFeedbackSnapshot(): { walk: string; png: string } {
+  public captureFeedbackSnapshot(maxEdge?: number): { walk: string; png: string } {
     if (this.composer) {
       this.composer.render();
     } else {
@@ -4000,7 +4001,7 @@ export class StoreScene {
     const pitchDeg = (euler.x * 180) / Math.PI;
     const pos = this.camera.position;
     const walk = `${pos.x.toFixed(2)},${pos.z.toFixed(2)},${yawDeg.toFixed(2)},${pitchDeg.toFixed(2)},${pos.y.toFixed(2)}`;
-    const png = this.renderer.domElement.toDataURL('image/png');
+    const png = capturePinPng(this.renderer.domElement, maxEdge);
     return { walk, png };
   }
 

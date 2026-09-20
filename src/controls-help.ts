@@ -107,8 +107,12 @@ const HELP_SECTIONS: HelpSection[] = [
         hint: 'First-person stroll. F again returns to the shelves.',
       },
       {
-        id: 'carry', control: 'C · R · X', action: 'Carry shortcuts',
-        hint: 'C check out carried tapes · R put one back · X not interested.',
+        id: 'carry', control: 'R · X', action: 'Carry shortcuts',
+        hint: 'R put one back · X not interested.',
+      },
+      {
+        id: 'feedback', control: 'C', action: 'Leave a feedback pin',
+        hint: 'Attach this view and a note. Ctrl+Enter saves; Escape cancels.',
       },
       {
         id: 'shareplace', control: 'F9', action: 'Copy a link to this view',

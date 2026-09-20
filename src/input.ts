@@ -269,14 +269,6 @@ export class InputManager {
             this.callbacks.onToggleWalkAround();
           }
           break;
-        case 'c':
-        case 'C':
-          // T22: carry-mode checkout shortcut (no-op when unwired/disabled).
-          if (this.callbacks.onCheckout) {
-            e.preventDefault();
-            this.callbacks.onCheckout();
-          }
-          break;
         case 'r':
         case 'R':
           // T22: put the top carried tape back.

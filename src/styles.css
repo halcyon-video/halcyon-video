@@ -2641,7 +2641,7 @@ html, body {
    canvas + StoreScene.enterSearchMode()/setTerminalText()) -- no DOM overlay
    or CSS needed here anymore. */
 
-/* Feedback Pin Overlay (F8, see main.ts openFeedbackPin) -- styled to match
+/* Feedback Pin Overlay (C, see main.ts openFeedbackPin) -- styled to match
    the episode-card / candy-card family. The overlay element itself is built
    in TS (buildFeedbackOverlay), not baked into index.html. */
 #feedback-pin-overlay {

@@ -130,7 +130,7 @@ function numericSubdirIds(dir: string): number[] {
     .map((d: any) => parseInt(d.name, 10));
 }
 
-// Local-server endpoint backing the F8 "feedback pin" in-app hotkey (see
+// Local-server endpoint backing the C "feedback pin" in-app hotkey (see
 // src/main.ts openFeedbackPin/saveFeedbackPin): a user who can't read code
 // flags a visual bug in place. Saves their comment + the exact replayable
 // camera coords + a screenshot to feedback/NNN/, so the coding agent can

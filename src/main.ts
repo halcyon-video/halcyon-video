@@ -782,7 +782,7 @@ let searchResultIndex = 0;
 // ─── UI Helpers ───────────────────────────────────────────────────────────────
 
 const MAX_LOG_ENTRIES = 200;
-// Ring buffer of recent log lines, attached to F8 feedback pins (saved as
+// Ring buffer of recent log lines, attached to C feedback pins (saved as
 // log.txt next to the pin) so playback narration reaches disk even when the
 // on-screen log is hidden behind the video overlay.
 const recentLogLines: string[] = [];
@@ -1757,8 +1757,8 @@ window.addEventListener('halcyon:tv-status', () => {
   }
 });
 
-// ─── Feedback Pin (F8) ────────────────────────────────────────────────────────
-// Lets a user who can't read code flag a visual bug in place: F8 grabs the
+// ─── Feedback Pin (C) ────────────────────────────────────────────────────────
+// Lets a user who can't read code flag a visual bug in place: C grabs the
 // exact camera pose + a screenshot via StoreScene.captureFeedbackSnapshot()
 // (called before this overlay can show, so the camera hasn't moved yet), then
 // this textarea collects what looks wrong. Saved via the vite dev-server
@@ -1795,7 +1795,7 @@ function buildFeedbackOverlay(): HTMLDivElement {
   textarea.addEventListener('keydown', (e) => {
     // Mirror makeTextRow's edit-mode pattern (settings drawer text inputs):
     // stopPropagation so the keystroke doesn't also reach the window-level
-    // F8/InputManager listeners.
+    // C/InputManager listeners.
     if (e.key === 'Escape') {
       e.preventDefault();
       e.stopPropagation();
@@ -1820,7 +1820,7 @@ function openFeedbackPin() {
   if (!storeScene || ui.isFeedbackOpen) return;
   // Capture BEFORE the overlay paints, so the screenshot is the view the user
   // was actually looking at, not the feedback card.
-  feedbackSnapshot = storeScene.captureFeedbackSnapshot();
+  feedbackSnapshot = storeScene.captureFeedbackSnapshot(1600);
   if (!feedbackOverlayEl) feedbackOverlayEl = buildFeedbackOverlay();
   const status = document.getElementById('feedback-pin-status');
   if (status) status.textContent = '';
@@ -3783,20 +3783,21 @@ async function main() {
     openSearchWithQuery(e.key);
   });
 
-  // Feedback pin (F8): works in every render mode / camera state, unlike the
+  // Feedback pin (C): works in every render mode / camera state, unlike the
   // listener above. Ignored while an input/textarea has focus (so it doesn't
   // fire mid-typing elsewhere, e.g. the settings drawer's text rows) or while
   // the login overlay is up (no scene to screenshot yet).
   window.addEventListener('keydown', (e) => {
-    if (e.key !== 'F8') return;
-    if (ui.isLoginOpen || ui.isFeedbackOpen) return;
-    // Only text-entry fields block F8. A plain tag check would also match the
+    if (e.key.toLowerCase() !== 'c' || e.ctrlKey || e.metaKey || e.altKey || e.repeat || e.isComposing) return;
+    if (!storeScene || ui.isLoginOpen || ui.isFeedbackOpen) return;
+    // Only text-entry fields block C. A plain tag check would also match the
     // video player's volume slider (<input type=range>), which keeps focus
-    // after a click and made F8 dead for the rest of playback.
+    // after a click and made C dead for the rest of playback.
     if (textEntryHasFocus()) return;
     e.preventDefault();
+    e.stopImmediatePropagation();
     openFeedbackPin();
-  });
+  }, true);
 
   // Demo mode: hide logout/exit and reveal the standing project link route (#133).
   if (isDemoMode) {

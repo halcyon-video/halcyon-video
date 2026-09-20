@@ -52,7 +52,7 @@ export function initSharedPlace(
   }
 }
 
-// The diegetic sibling of the F8 feedback pin (#137): copies a URL that
+// The diegetic sibling of the C feedback pin (#137): copies a URL that
 // reopens the store right where the visitor is standing, or on the case
 // they're inspecting, instead of the cold entrance every other link drops
 // them at. Pure clipboard write — no dev-server endpoint, so it works on the
