@@ -1,3 +1,4 @@
+import { constrainWalkObstacles } from './walk-collision';
 import { vestibuleSide, vestibuleStraightSide, clampVestibuleSide, vestibuleBackHalf } from './vestibule-layout';
 // First-person walk-around mode — extracted from StoreScene (three-scene.ts
 // keeps one-line delegating stubs): pointer-lock acquisition, walk clicks
@@ -164,7 +165,7 @@ export function getSlotFromIntersection(scene: StoreScene, object: THREE.Object3
   return null;
 }
 
-export function constrainWalkPosition(scene: StoreScene, oldX: number, oldZ: number, newX: number, newZ: number, storeWidth: number, minZ: number): { x: number; z: number } {
+function constrainWalkStructure(scene: StoreScene, oldX: number, oldZ: number, newX: number, newZ: number, storeWidth: number, minZ: number): { x: number; z: number } {
   const r = 1.5;
   const r_door = 0.5;
   const minX = 11.0 - storeWidth / 2 + r;
@@ -261,6 +262,20 @@ export function constrainWalkPosition(scene: StoreScene, oldX: number, oldZ: num
   scene._constrainedWalk.x = x;
   scene._constrainedWalk.z = z;
   return scene._constrainedWalk;
+}
+
+const walkObstacleBounds = { minX: 0, maxX: 0, minZ: 0, maxZ: 43 };
+
+export function constrainWalkPosition(scene: StoreScene, oldX: number, oldZ: number, newX: number, newZ: number, storeWidth: number, minZ: number): { x: number; z: number } {
+  const structural = constrainWalkStructure(scene, oldX, oldZ, newX, newZ, storeWidth, minZ);
+  walkObstacleBounds.minX = 11 - storeWidth / 2 + 1.5;
+  walkObstacleBounds.maxX = 11 + storeWidth / 2 - 1.5;
+  walkObstacleBounds.minZ = minZ;
+  const result = constrainWalkObstacles(oldX, oldZ, structural.x, structural.z,
+    scene.clerkNavRects, scene._constrainedWalk, .45, walkObstacleBounds);
+  // A rotated slide or start-inside recovery must not cross the room shell
+  // or the closed part of a doorway after its original structural clamp.
+  return constrainWalkStructure(scene, oldX, oldZ, result.x, result.z, storeWidth, minZ);
 }
 
 export function updateWalkHUD(scene: StoreScene) {
