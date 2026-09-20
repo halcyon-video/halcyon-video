@@ -575,13 +575,6 @@ function originalCounterAnchoredPlacements(
         options: { footprintWidth: 1.5, footprintDepth: 10.5 }
       },
       {
-        id: 'candy-display-front',
-        kind: 'candy-display',
-        position: { x: 9.0, z: -4.45 }, // keep rear edge clear of band at z=-3.6
-        yaw: 0,
-        options: { rows: 5, footprintWidth: 3.0, dispenserPacks: true }
-      },
-      {
         id: 'tape-rewinder-counter',
         kind: 'tape-rewinder',
         position: { x: 13.5, z: -1.3 }, // inner island spine (front -2.1 + innerD/2)
@@ -638,17 +631,7 @@ function originalCounterAnchoredPlacements(
       yaw: 0,
       options: { footprintWidth: 9.6, footprintDepth: 1.5 }
     },
-    // Candy display (#60): queue-line rack abutting the STORE-side face of
-    // the left 45-degree front band segment,
-    // pushed out along the band's store-side normal by bandD/2 + rackDepth/2
-    // + 0.05 ft so its footprint sits just clear of the band footprint.
-    {
-      id: 'candy-display-front',
-      kind: 'candy-display',
-      position: { x: 6.1 - .95*Math.SQRT1_2, z: -.95*Math.SQRT1_2 },
-      yaw: Math.PI/4,
-      options: { rows: 5, footprintWidth: 3.0, dispenserPacks: true }
-    },
+    // Pin 170: queue candy now belongs to the shared concessions run.
     // Rewinder on the inner rental counter's top — z matches counter.ts's
     // getInnerCounterSpine(13.9), yaw matches that segment's rotY. See
     // TapeRewinder's build() for why these are constants, not a live anchor.
@@ -724,9 +707,9 @@ export function gameSectionPlacements(storeWidth: number): FixturePlacement[] {
     {
       id: 'game-section-w',
       kind: 'game-section',
-      position: { x: 10.5, z: 8.95 },
-      yaw: Math.PI / 2,
-      options: { genre: 'Video Games', relativeToLeftWall: true, units: 1, unit: 0 }
+      position: { x: storeWidth - .3, z: 6.8 },
+      yaw: Math.PI,
+      options: { genre: 'Video Games', relativeToLeftWall: true, units: 1, unit: 0, faces: 'front', sectionsPerSide: 4 }
     }
   ];
 }

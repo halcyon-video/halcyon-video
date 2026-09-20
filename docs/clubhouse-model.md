@@ -18,8 +18,9 @@ Scene units are feet. Blender (X, -store Z, height) exports to runtime
 (X, height, store Z). The origin is the enclosure center; rear is -Z and left
 is -X. The enlarged enclosure is 14 by 14, with a diagonal cut between local
 (1,7) and (7,1). Each shoulder is 8 feet long, up from 6 in the superseded draft.
-Two 3.7-foot shelf bays per shoulder give 60 interactive family-title slots:
-five columns per bay, three tiers. The total fixture envelope is 15.2 square.
+Two shelf bays on both faces of each shoulder give 120 interactive family-title slots:
+five columns per bay, three tiers, four stocked faces. Exterior bays are 3.7 feet;
+the inner corner bay is 3.4 feet to clear the adjoining liner. The total fixture envelope is 15.2 square.
 The center is 7.2 feet inward from each adjoining wall, leaving .2 feet for
 installation. Shelves, not just the header, occupy the corner reservation.
 
@@ -166,3 +167,12 @@ ray-tested against the exported top. Ten narrow collision rectangles follow
 the triangle, keeping the chairs and central turning area open. The room's
 paint strip stops at the clubhouse's contiguous liner, eliminating the
 coplanar fragment visible at the left wall join.
+
+## September 20 fixture feedback
+
+The entrance jambs now share the shoulder wall's quarter-foot thickness and
+6.9-foot plane; no projecting jamb or window sill interrupts the blue body.
+The low yellow strips and yellow window reveals are removed. Both inside faces
+carry the same three-tier white shelving as the outside, with real catalog
+stock and separate `back` and `left` browsing faces. The existing turning circle,
+TV support, window sightlines and approach route still pass their geometry tests.

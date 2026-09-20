@@ -312,13 +312,6 @@ export function moveLeftInternal(scene: StoreScene) {
             exitGenreEndcapToShelf(scene, fixture!, 'prevBack');
             return;
           }
-          // A corner club has only two adjacent public faces; its outer ends
-          // stop at the room walls instead of browsing invisible rear stock.
-          if (fixture?.placement.kind === 'clubhouse') {
-            if (scene.selectedSide === 'front') return;
-            scene.selectedSide = 'front'; scene.selectedCol = scene.colsCount - 1;
-            scene.updateCameraTarget(); return;
-          }
           if (fixture?.placement.kind === 'pv-drape-table') {
             const toSide = scene.selectedSide === 'front' ? 'back' : 'front';
             if (fixture.getSlots().some(slot => slot.side === toSide)) {
@@ -489,11 +482,6 @@ export function moveRightInternal(scene: StoreScene) {
           if (isEndcapKind(fixture?.placement.kind)) {
             exitGenreEndcapToShelf(scene, fixture!, 'lineFront');
             return;
-          }
-          if (fixture?.placement.kind === 'clubhouse') {
-            if (scene.selectedSide === 'right') return;
-            scene.selectedSide = 'right'; scene.selectedCol = 0;
-            scene.updateCameraTarget(); return;
           }
           if (fixture?.placement.kind === 'pv-drape-table') {
             const toSide = scene.selectedSide === 'front' ? 'back' : 'front';

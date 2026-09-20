@@ -1,4 +1,4 @@
-import { RETAIL_FIXTURE_SPECS, retailFixtureFootprint, type RetailFixtureKind } from './retail-fixture-specs.ts';
+import { RETAIL_FIXTURE_SPECS, type RetailFixtureKind } from './retail-fixture-specs.ts';
 import { buildPromoCampaign } from './promo-campaigns.ts';
 import { validateLayout, type Footprint } from './layout-validator.ts';
 import type { FixturePlacement } from './store-layout.ts';
@@ -64,7 +64,7 @@ const FLOOR_PROMOTION_BLUEPRINTS: PromotionBlueprint[] = [
     id: 'floor-promotion-pv-drape-table',
     kind: 'pv-drape-table',
     options: { colorway: 'purple', noRentalCase: true },
-    w: 6.2, d: 2.7, clearance: 3,
+    w: 6.2, d: 2.7, clearance: 5,
   },
   {
     id: 'floor-promotion-popcorn-bin',
@@ -118,7 +118,7 @@ export function floorPromotionPlacements(
     const bp = FLOOR_PROMOTION_BLUEPRINTS[index];
     if (!viable.includes(bp) || result.length >= needed) continue;
     const candidates: Footprint[] = [];
-    for (let z = bounds.minZ + 8; z <= Math.min(-9, bounds.maxZ - 24); z += 1.5) {
+    for (let z = bp.kind === 'pv-drape-table' ? Math.max(-18, bounds.minZ + 8) : bounds.minZ + 8; z <= Math.min(-9, bounds.maxZ - 24); z += 1.5) {
       for (let x = bounds.minX + 6; x <= bounds.maxX - 6; x += 1.5) {
         const fp: Footprint = { label: `fixture:${bp.id}`, kind: 'fixture',
           cx: x, cz: z, w: bp.w, d: bp.d, yaw: 0, clearance: bp.clearance };
@@ -159,7 +159,11 @@ function fits(fp: Footprint, obstacles: Footprint[], bounds: Bounds): boolean {
 export function frontRefreshmentPlacements(obstacles: Footprint[], bounds: Bounds): FixturePlacement[] {
   const yaw = Math.PI / 4, c = Math.cos(yaw), s = Math.sin(yaw);
   const kinds: RetailFixtureKind[] = ['candy-wall-gondola', 'acrylic-popcorn-bin', 'two-door-cooler'];
-  const width = kinds.reduce((sum,k)=>sum+RETAIL_FIXTURE_SPECS[k].w,0), depth=2.6;
+  const queueWidth=3, queueDepth=1.6;
+  const width=kinds.reduce((sum,kind)=>sum+(kind==='two-door-cooler'
+    ? RETAIL_FIXTURE_SPECS[kind].d : RETAIL_FIXTURE_SPECS[kind].w),queueWidth);
+  const depth=Math.max(queueDepth,...kinds.map(kind=>kind==='two-door-cooler'
+    ? RETAIL_FIXTURE_SPECS[kind].w : 2*RETAIL_FIXTURE_SPECS[kind].d));
   let run: Footprint | undefined;
   for(let offset=0;offset<=8 && !run;offset+=.5) for(const dz of [0,-.5,.5,-1,1,-1.5,1.5]) {
     const x=1-offset, z=-7+dz;
@@ -167,13 +171,18 @@ export function frontRefreshmentPlacements(obstacles: Footprint[], bounds: Bound
     if(fits(fp,obstacles,bounds)) {run=fp;break;}
   }
   if(!run) return [];
-  let along=-width/2;
-  const result:FixturePlacement[]=kinds.map(kind=>{
-    const spec=RETAIL_FIXTURE_SPECS[kind], u=along+spec.w/2;
-    // Flush fronts, joined ends: this is one retail run, not three aisles.
-    const v=(depth-spec.d)/2; along+=spec.w;
-    return {id:`${kind}-front`,kind,position:{x:run!.cx+u*c+v*s,z:run!.cz-u*s+v*c},yaw};
-  });
+  let along=-width/2+queueWidth;
+  const result: FixturePlacement[] = [];
+  const point = (u:number,v:number) => ({x:run!.cx+u*c+v*s,z:run!.cz-u*s+v*c});
+  for (const kind of kinds) {
+    const spec=RETAIL_FIXTURE_SPECS[kind], rotated=kind==='two-door-cooler';
+    const span=rotated?spec.d:spec.w, u=along+span/2; along+=span;
+    if (rotated) result.push({id:`${kind}-front`,kind,position:point(u,0),yaw:yaw+Math.PI/2});
+    else for (const side of [1,-1]) result.push({id:`${kind}-${side===1?'front':'rear'}`,kind,
+      position:point(u,side*spec.d/2),yaw:yaw+(side===1?0:Math.PI)});
+  }
+  result.push({id:'candy-display-front',kind:'candy-display',position:point(-width/2+queueWidth/2,queueDepth/2),yaw,
+    options:{rows:5,footprintWidth:queueWidth,footprintDepth:queueDepth,dispenserPacks:true}});
   const placed=[...obstacles,run];
   for(const [index,id] of ['bargain-bin-1','floor-promotion-bargain-bin'].entries()) {
     let chosen:Footprint|undefined;
@@ -193,19 +202,13 @@ export function frontRefreshmentPlacements(obstacles: Footprint[], bounds: Bound
       placed.push(chosen);
     }
   }
-  // The additional freezer keeps a separate pocket outside the sketched run.
-  freezer: for(const offset of [4,8,12]) for(let z=6;z>=-8;z-=.5) {
-    const p:FixturePlacement={id:'chest-freezer-front',kind:'chest-freezer',
-      position:{x:run.cx-width/2-offset,z},yaw:Math.PI/2};
-    const fp={...retailFixtureFootprint('chest-freezer',p),clearance:3};
-    if(fits(fp,placed,bounds)) {result.push(p);break freezer;}
-  }
+  // Pin 169: chest freezer remains registered but is not placed.
   return result;
 }
 
 /** Keep the era-specific sale table, but admit it against the live counters. */
 export function placeFloorSaleTable(placement: FixturePlacement, obstacles: Footprint[], bounds: Bounds): FixturePlacement | null {
-  for (let z = 6; z >= bounds.minZ + 6; z -= 1.5) {
+  for (let z = 6; z >= Math.max(-18, bounds.minZ + 6); z -= 1.5) {
     for (const x of [-11, 33, -18, 40, 11]) {
       const fp: Footprint = {label: placement.id,kind:'fixture',cx:x,cz:z,w:6.2,d:2.7,yaw:0,clearance:3};
       if (fits(fp,obstacles,bounds)) return {...placement,position:{x,z}};

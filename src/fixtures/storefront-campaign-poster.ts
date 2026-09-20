@@ -23,6 +23,7 @@
 // lightbox hanging in front of the campaign banner was the first thing the
 // user flagged.
 import * as THREE from 'three';
+import { windowBayLayout } from '../storefront-window-layout';
 import type { StoreScene } from '../three-scene';
 import { vestibuleHalfWidth, getStorefrontSpec, FRONT_WINDOW_CORNER_MARGIN } from '../store-layout';
 import { markSignMesh } from '../sign-builders';
@@ -91,8 +92,18 @@ export function campaignBannerSpan(scene: StoreScene): { x0: number; x1: number 
   const wingLeft = 11.0 - storeWidth / 2 + FRONT_WINDOW_CORNER_MARGIN;
   const wingRight = 11.0 - vestHalf;
   if (wingRight - wingLeft < POSTER_W_FT + 0.5) return null; // storefront too narrow
-  const cx = (wingLeft + wingRight) / 2;
-  return { x0: cx - POSTER_W_FT / 2, x1: cx + POSTER_W_FT / 2 };
+  const spec=scene.storefrontSpec ?? getStorefrontSpec(storeWidth);
+  const candidates=windowBayLayout(spec.windowBays,{center:0,halfWidth:vestHalf}).panes
+    .flatMap((pane,i)=>spec.windowBays[i].hasCenterMullion
+      ? [{lo:pane.lo,hi:(pane.lo+pane.hi)/2},{lo:(pane.lo+pane.hi)/2,hi:pane.hi}] : [pane])
+    .map(pane=>({lo:11-pane.hi,hi:11-pane.lo}))
+    .filter(pane=>pane.hi<=wingRight+.01 && pane.hi-pane.lo>=2.8);
+  // Keep the campaign in the display wing, clear of the projecting entrance pier.
+  const desired=(wingLeft+wingRight)/2;
+  const pane=candidates.sort((a,b)=>Math.abs((a.lo+a.hi)/2-desired)-Math.abs((b.lo+b.hi)/2-desired))[0];
+  if(!pane)return null;
+  const cx=(pane.lo+pane.hi)/2, width=Math.min(POSTER_W_FT,pane.hi-pane.lo-.4);
+  return {x0:cx-width/2,x1:cx+width/2};
 }
 
 export function buildStorefrontCampaignPoster(scene: StoreScene): void {
@@ -110,11 +121,12 @@ export function buildStorefrontCampaignPoster(scene: StoreScene): void {
     metalness: 0.0,
     side: THREE.FrontSide, // the printed face looks OUT through the glass
   });
-  const geo = new THREE.PlaneGeometry(POSTER_W_FT, POSTER_H_FT);
+  const width=span.x1-span.x0, height=width*POSTER_H_FT/POSTER_W_FT;
+  const geo = new THREE.PlaneGeometry(width, height);
   const px = (span.x0 + span.x1) / 2;
   // Top edge just under the 9 ft glass head — where the reference photo
   // hangs it in the pane.
-  const py = 8.5 - POSTER_H_FT / 2;
+  const py = 8.5 - height / 2;
   const poster = new THREE.Mesh(geo, mat);
   poster.position.set(px, py, 15.0 - 0.07);
   markSignMesh(poster);

@@ -120,11 +120,22 @@ for i, sz in enumerate(shelf_heights):
         else:
             # Hanging snack pouches (#277)
             mat_p = [m_pouch_green, m_pouch_purple][(i + c) % 2]
-            bpy.ops.mesh.primitive_cube_add(size=1, location=(cx, -0.15, sz + 0.14))
-            pouch = bpy.context.object
-            pouch.dimensions = (0.40, 0.45, 0.15)
-            pouch.rotation_euler = (tray_angle, 0, 0)
-            finish(pouch, f'SnackPouch_{i}_{c}', mat_p, bevel=0.002)
+            rings=[(-.225,.18,.012),(-.19,.20,.045),(0,.20,.09),(.19,.19,.04),(.225,.17,.012)]
+            vs=[(cx+hw*math.cos(k*math.tau/8),-.15+yy,sz+.18+hd*math.sin(k*math.tau/8)) for yy,hw,hd in rings for k in range(8)]
+            fs=[tuple(reversed(range(8))),tuple(range(32,40))]+[(q*8+k,q*8+(k+1)%8,(q+1)*8+(k+1)%8,(q+1)*8+k) for q in range(4) for k in range(8)]
+            mesh=bpy.data.meshes.new('Sealed snack pouch');mesh.from_pydata(vs,[],fs);mesh.update()
+            pouch=bpy.data.objects.new('Snack pouch',mesh);scene.collection.objects.link(pouch)
+            finish(pouch,f'SnackPouch_{i}_{c}',mat_p,bevel=.003)
+            for yy in [-.365,.065]:box(f'PouchCrimp_{i}_{c}_{yy}',(cx,yy,sz+.18),(.34,.018,.025),mat_p,bevel=.002)
+# Flat packaging faces retain the full printed panel instead of packed UV islands.
+for o in parts:
+ if o.name.startswith(('CandyCarton_','SnackPouch_')):
+  uv=o.data.uv_layers.active
+  xs=[v.co.x for v in o.data.vertices];ys=[v.co.y for v in o.data.vertices]
+  for face in o.data.polygons:
+   for li in face.loop_indices:
+    v=o.data.vertices[o.data.loops[li].vertex_index].co
+    uv.data[li].uv=((v.x-min(xs))/(max(xs)-min(xs)),(v.y-min(ys))/(max(ys)-min(ys)))
 
 metrics = {
     'units': 'feet',

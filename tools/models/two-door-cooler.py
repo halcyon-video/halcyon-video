@@ -40,6 +40,8 @@ m_handle = make_mat('CoolerHandleMetal', (0.75, 0.78, 0.82), 0.15, metal=0.95)
 m_glass = make_mat('CoolerGlass', (0.85, 0.93, 0.95), 0.05, alpha=0.15)
 m_wire = make_mat('CoolerWireShelf', (0.88, 0.90, 0.92), 0.25, metal=0.40)
 m_header = make_mat('CoolerHeaderSign', (0.95, 0.95, 0.90), 0.20)
+m_lid = make_mat('DrinkAluminum', (.64,.66,.68), .24, metal=.92)
+m_cap = make_mat('BottleCap', (.88,.88,.84), .48)
 m_can_red = make_mat('DrinkCanRed', (0.85, 0.08, 0.10), 0.30, metal=0.60)
 m_can_blue = make_mat('DrinkCanBlue', (0.08, 0.25, 0.85), 0.30, metal=0.60)
 m_can_green = make_mat('DrinkCanGreen', (0.10, 0.75, 0.20), 0.30, metal=0.60)
@@ -55,7 +57,7 @@ def finish(o, name, m, bevel=0.004):
     if bevel:
         mod = o.modifiers.new('Bevel', 'BEVEL')
         mod.width = bevel
-        mod.segments = 2
+        mod.segments = 1
         bpy.ops.object.modifier_apply(modifier=mod.name)
     bm = bmesh.new()
     bm.from_mesh(o.data)
@@ -131,16 +133,29 @@ box('CenterDoorMullion', (0, -1.11, 3.25), (0.10, 0.08, 4.64), m_frame, bevel=0.
 shelf_heights = [1.85, 2.80, 3.75, 4.70]
 for s_idx, sh_z in enumerate(shelf_heights):
     # Main shelf wire deck
-    box(f'WireShelfDeck_{s_idx}', (0, 0.05, sh_z), (3.74, 1.95, 0.03), m_wire, bevel=0.002)
+    for wire in range(20):
+        box(f'WireShelfDeck_{s_idx}_{wire}', (-1.82+wire*3.64/19, .05, sh_z), (.018,1.95,.024), m_wire, bevel=0)
     # Front wire retaining lip
     box(f'WireShelfLip_{s_idx}', (0, -0.92, sh_z + 0.04), (3.74, 0.02, 0.06), m_wire, bevel=0.002)
 
-    # Cans and bottles on each shelf
-    for d_idx, dx in enumerate([-1.4, -0.9, -0.4, 0.4, 0.9, 1.4]):
-        mat_can = [m_can_red, m_can_blue, m_can_green][(s_idx + d_idx) % 3]
-        cylinder(f'DrinkCanFront_{s_idx}_{d_idx}', (dx, -0.65, sh_z + 0.22), 0.12, 0.40, mat_can, verts=14, bevel=0.002)
-        cylinder(f'DrinkCanMid_{s_idx}_{d_idx}', (dx, -0.15, sh_z + 0.22), 0.12, 0.40, mat_can, verts=14, bevel=0.002)
-        cylinder(f'DrinkBottleRear_{s_idx}_{d_idx}', (dx, 0.40, sh_z + 0.32), 0.13, 0.60, m_bottle, verts=14, bevel=0.002)
+    # Rolled aluminum rims, recessed lids and pull tabs make cans read as packaging.
+    for d_idx,dx in enumerate([-1.4,-.9,-.4,.4,.9,1.4]):
+        mat_can=[m_can_red,m_can_blue,m_can_green][(s_idx+d_idx)%3]
+        for depth,yy in enumerate([-.65,-.15]):
+            name=f'DrinkCan_{s_idx}_{d_idx}_{depth}'
+            body=cylinder(name,(dx,yy,sh_z+.225),.12,.40,mat_can,verts=16,bevel=0)
+            for zz in [sh_z+.035,sh_z+.415]:
+                cylinder(name+'RolledRim',(dx,yy,zz),.123,.018,m_lid,verts=12,bevel=0)
+            cylinder(name+'RecessedLid',(dx,yy,sh_z+.418),.106,.008,m_lid,verts=12,bevel=0)
+            box(name+'PullTab',(dx,yy-.022,sh_z+.426),(.037,.067,.008),m_lid,bevel=0)
+        # Bottle profile includes shoulder, narrowed neck and a fitted screw cap.
+        rings=[(0,.10),(.025,.128),(.38,.128),(.47,.068),(.565,.055)]
+        verts=[(dx+radius*math.cos(k*math.tau/12),.4+radius*math.sin(k*math.tau/12),sh_z+.025+zz) for zz,radius in rings for k in range(12)]
+        faces=[tuple(reversed(range(12))),tuple(range(48,60))]+[(q*12+k,q*12+(k+1)%12,(q+1)*12+(k+1)%12,(q+1)*12+k) for q in range(4) for k in range(12)]
+        mesh=bpy.data.meshes.new('Bottle profile');mesh.from_pydata(verts,[],faces);mesh.update()
+        obj=bpy.data.objects.new('Beverage bottle',mesh);scene.collection.objects.link(obj)
+        finish(obj,f'DrinkBottleRear_{s_idx}_{d_idx}',m_bottle,bevel=0)
+        cylinder(f'BottleCap_{s_idx}_{d_idx}',(dx,.4,sh_z+.612),.061,.065,m_cap,verts=12,bevel=0)
 
 # 5. Framed Glass Double Doors (Left and Right)
 # Left door center: X=-0.95. Right door center: X=0.95.
@@ -159,6 +174,19 @@ for d_side, cx in [('Left', -0.95), ('Right', 0.95)]:
     box(f'{d_side}HandleMountTop', (hx, -1.18, 4.40), (0.04, 0.06, 0.04), m_handle, bevel=0.001)
     box(f'{d_side}HandleMountBottom', (hx, -1.18, 2.10), (0.04, 0.06, 0.04), m_handle, bevel=0.001)
 
+# Continuous wrap UVs, seam facing the rear rather than chopped smart islands.
+for o in parts:
+ if o.data.materials[0].name.startswith('DrinkCan'):
+  uv=o.data.uv_layers.active
+  for face in o.data.polygons:
+   coords=[]
+   for li in face.loop_indices:
+    v=o.data.vertices[o.data.loops[li].vertex_index].co
+    coords.append((li,(math.atan2(v.y,v.x)/math.tau+.75)%1,(v.z+.2)/.4))
+   us=[v[1] for v in coords]
+   for li,u,v in coords:
+    if max(us)-min(us)>.5 and u<.5:u+=1
+    uv.data[li].uv=(u,v)
 metrics = {
     'units': 'feet',
     'origin': 'floor-centred; X across, Y in-depth, Z up (Blender)',
