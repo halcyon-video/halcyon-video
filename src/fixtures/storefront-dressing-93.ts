@@ -1,4 +1,4 @@
-import { vestibuleSide } from '../vestibule-layout';
+import { vestibuleExitGates } from '../vestibule-layout';
 // 1993 storefront dressing, from the store footage: the STORE HOURS panel on
 // the entrance sidelight glass (moved off a chain-hung window-bay board
 // 2026-08-02 — feedback/018; see the block itself), the red evening-rental
@@ -172,18 +172,8 @@ export function buildStorefrontDressing93(scene: StoreScene): void {
     geo.translate(0, 0, -0.045);
     const cream = new THREE.MeshStandardMaterial({ color: 0xe9e4d6, roughness: 0.5, metalness: 0.02 });
     const baseGeo = new THREE.BoxGeometry(1.26, 0.06, 0.5);
-    // Gate half-span: clear of the leaf's own opening (doorW/2) plus enough
-    // that an opening leaf sweeps between the panels, never into one.
-    const gateHalf = vest.doorW / 2 + 0.55;
-    // The enlarged rear panel leaves room inside the chamber for both gates.
-    // Keep the sales-floor side free for the flush return-counter enclosure.
-    const standOff = 0.82;
-    const wall=vestibuleSide(scene.storefrontSpec,-1);
-    const gates: { x: number; z: number; yaw:number }[] = [];
-    for (const dz of [-gateHalf, gateHalf]) {
-      gates.push({ x: wall.doorX + standOff*wall.cos + dz*wall.sin,
-        z: wall.doorZ - standOff*wall.sin + dz*wall.cos, yaw:wall.yaw }); // walk-out door only
-    }
+    // One pair on the sales-floor approach between checkout and returns.
+    const gates = vestibuleExitGates(scene.storefrontSpec);
     for (const g of gates) {
       const ped = new THREE.Mesh(geo, cream);
       // Panels stand parallel to the walk line through the side door (which

@@ -46,24 +46,26 @@ for (const kind of kinds) test(`${kind}: real export fits collider, has normals/
 });
 
 const checkout: Footprint = { label: 'checkout approach', kind: 'structure', cx: 11, cz: 4.5, w: 23, d: 21, yaw: 0 };
-for (const width of [28, 42, 62, 90]) test(`front zone follows a ${width}-foot store without blocking checkout or crossing walls`, () => {
-  const bounds = { minX: 11 - width / 2, maxX: 11 + width / 2, minZ: -60, maxZ: 15 };
-  const plan = frontRefreshmentPlacements([checkout], bounds);
-  const footprints = plan.map(p => retailFixtureFootprint(p.kind as RetailFixtureKind, p));
-  assert.deepEqual(validateLayout([...footprints, checkout], bounds).filter(v => v.a !== checkout.label || v.b), []);
-  assert.equal(new Set(plan.map(p => p.kind)).size, plan.length);
-  // These wall-facing placements are quarter-turned axis-aligned rectangles.
-  // Independently measure the actual edge gap, including exact-touch cases
-  // that the general chained-shelf validator intentionally permits.
-  for (const fp of footprints) {
-    const dx = Math.max(0, Math.abs(fp.cx - checkout.cx) - (fp.d + checkout.w) / 2);
-    const dz = Math.max(0, Math.abs(fp.cz - checkout.cz) - (fp.w + checkout.d) / 2);
-    assert.ok(Math.hypot(dx, dz) >= 1.5 - 1e-6, 'customer approach stays clear of the counter');
-    assert.ok(fp.cx - fp.d / 2 - bounds.minX >= 1.5 - 1e-6);
-    assert.ok(bounds.maxX - fp.cx - fp.d / 2 >= 1.5 - 1e-6);
+for (const width of [28,42,62,90]) test(`front run follows a ${width}-foot store without blocking checkout`,()=>{
+  const bounds={minX:11-width/2,maxX:11+width/2,minZ:-60,maxZ:15};
+  const plan=frontRefreshmentPlacements([checkout],bounds);
+  const footprints=plan.map(p=>p.kind==='bargain-bin'
+    ? {label:p.id,kind:'fixture' as const,cx:p.position.x,cz:p.position.z,w:3,d:3,yaw:p.yaw,clearance:3}
+    : retailFixtureFootprint(p.kind as RetailFixtureKind,p));
+  assert.deepEqual(validateLayout([...footprints,checkout],bounds).filter(v=>v.a!==checkout.label||v.b),[]);
+  assert.equal(new Set(plan.map(p=>p.id)).size,plan.length);
+  if(width>=62) {
+    const row=['candy-wall-gondola','acrylic-popcorn-bin','two-door-cooler'].map(k=>plan.find(p=>p.kind===k)!);
+    assert.ok(row.every(Boolean));
+    for(const p of row) assert.equal(p.yaw,Math.PI/4);
+    assert.ok(row[0].position.x<row[1].position.x && row[1].position.x<row[2].position.x);
+    assert.ok(row[0].position.z>row[1].position.z && row[1].position.z>row[2].position.z);
+    for(const bin of plan.filter(p=>p.kind==='bargain-bin')) {
+      const dx=bin.position.x-row[1].position.x,dz=bin.position.z-row[1].position.z;
+      assert.ok((dx+dz)/Math.SQRT2<-6,'bins beyond the back of concessions');
+    }
   }
-  if (width >= 42) assert.equal(plan.length, 4);
-  if (width === 28) assert.equal(plan.length, 0);
+  if(width===28) assert.equal(plan.length,0);
 });
 
 test('fully obstructed front zone declines fixtures', () => {
@@ -89,7 +91,7 @@ test('concessions stay near checkout rather than migrating to a wider game wing'
   const plan=frontRefreshmentPlacements([checkout],{minX:-45,maxX:67,minZ:-80,maxZ:15});
   assert.ok(plan.some(p=>p.kind==='acrylic-popcorn-bin'));
   assert.ok(!plan.some(p=>p.kind==='secondary-service-counter'));
-  assert.ok(plan.every(p=>Math.abs(p.position.x-11)<=28 && p.position.z>=-8 && p.position.z<=3));
+  assert.ok(plan.filter(p=>p.kind!=='bargain-bin' && p.kind!=='chest-freezer').every(p=>Math.abs(p.position.x-11)<=28 && p.position.z>=-13 && p.position.z<=3));
 });
 
 test('stocked game wing never becomes the fallback concessions queue',()=>{

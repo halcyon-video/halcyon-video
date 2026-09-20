@@ -1,4 +1,4 @@
-import { retailFixtureFootprint, type RetailFixtureKind } from './retail-fixture-specs.ts';
+import { RETAIL_FIXTURE_SPECS, retailFixtureFootprint, type RetailFixtureKind } from './retail-fixture-specs.ts';
 import { buildPromoCampaign } from './promo-campaigns.ts';
 import { validateLayout, type Footprint } from './layout-validator.ts';
 import type { FixturePlacement } from './store-layout.ts';
@@ -100,6 +100,7 @@ export function floorPromotionPlacements(
     if (bp.campaign) return Boolean(buildPromoCampaign(bp.campaign, libraries, 3, 3));
     // Match the reused sale fixtures' stock contracts rather than reserving
     // floor space for an empty movie table in a series-only library.
+    if (bp.kind === 'bargain-bin' && obstacles.some(o => o.label === `fixture:${bp.id}`)) return false;
     if (bp.kind === 'bargain-bin') return libraries.some(l => l.movies.some(m => !m.isSeries));
     if (bp.kind === 'pv-drape-table') return libraries.some(l => l.movies.some(m =>
       !m.isSeries && !m.game && !m.comingSoon && !m.discovery && !m.collectionGap));
@@ -151,29 +152,52 @@ function fits(fp: Footprint, obstacles: Footprint[], bounds: Bounds): boolean {
   });
 }
 
-/** Checkout queue concessions; never fill the distant game-department wall. */
+/** A single concessions run facing checkout, with bargain bins on its far side.
+ * The owner sketch fixes the order and adjacency, not surveyed dimensions.
+ * Admit the whole run together: individual gap-filling scatters its members.
+ */
 export function frontRefreshmentPlacements(obstacles: Footprint[], bounds: Bounds): FixturePlacement[] {
-  const result: FixturePlacement[] = [];
-  const placed = [...obstacles];
-  const sides = obstacles.some(o => o.label.startsWith('fixture:game-section-')) ? [false] : [false,true];
-  const kinds: RetailFixtureKind[] = ['candy-wall-gondola', 'two-door-cooler', 'acrylic-popcorn-bin', 'chest-freezer'];
-  for (const kind of kinds) {
-    let admitted = false;
-    // A short run facing the register approach, with at least three feet
-    // between fixtures and all existing circulation reservations.
-    for (const right of sides) {
-      for (const offset of [16,19,22,25,28]) {
-      for (let z = 3; z >= -8; z -= .5) {
-        const p: FixturePlacement = { id: `${kind}-front`, kind,
-          position: { x: 11 + (right ? offset : -offset), z }, yaw: right ? -Math.PI / 2 : Math.PI / 2 };
-        const fp = {...retailFixtureFootprint(kind, p), clearance: 3};
-        if (!fits(fp, placed, bounds)) continue;
-        result.push(p); placed.push(fp); admitted = true; break;
+  const yaw = Math.PI / 4, c = Math.cos(yaw), s = Math.sin(yaw);
+  const kinds: RetailFixtureKind[] = ['candy-wall-gondola', 'acrylic-popcorn-bin', 'two-door-cooler'];
+  const width = kinds.reduce((sum,k)=>sum+RETAIL_FIXTURE_SPECS[k].w,0), depth=2.6;
+  let run: Footprint | undefined;
+  for(let z=-3;z>=-8 && !run;z-=.5) for(let x=4;x>=Math.max(bounds.minX+5,-20);x-=.5) {
+    const fp:Footprint={label:'concessions run',kind:'fixture',cx:x,cz:z,w:width,d:depth,yaw,clearance:3};
+    if(fits(fp,obstacles,bounds)) {run=fp;break;}
+  }
+  if(!run) return [];
+  let along=-width/2;
+  const result:FixturePlacement[]=kinds.map(kind=>{
+    const spec=RETAIL_FIXTURE_SPECS[kind], u=along+spec.w/2;
+    // Flush fronts, joined ends: this is one retail run, not three aisles.
+    const v=(depth-spec.d)/2; along+=spec.w;
+    return {id:`${kind}-front`,kind,position:{x:run!.cx+u*c+v*s,z:run!.cz-u*s+v*c},yaw};
+  });
+  const placed=[...obstacles,run];
+  for(const [index,id] of ['bargain-bin-1','floor-promotion-bargain-bin'].entries()) {
+    let chosen:Footprint|undefined;
+    // Across the rear aisle; slide toward the outer wall if shelves occupy
+    // the first pocket. Keep the counters and the exit side unobstructed.
+    for(const u of [0,-6.1,6.1,-12.2,12.2]) {
+      for(const v of [-6.5,-8,-9.5]) {
+        const fp:Footprint={label:`fixture:${id}`,kind:'fixture',cx:run.cx+u*c+v*s,
+          cz:run.cz-u*s+v*c,w:3,d:3,yaw,clearance:3};
+        if(fits(fp,placed,bounds)) {chosen=fp;break;}
       }
-      if (admitted) break;
-      }
-      if (admitted) break;
+      if(chosen) break;
     }
+    if(chosen) {
+      result.push({id,kind:'bargain-bin',position:{x:chosen.cx,z:chosen.cz},yaw,
+        options:{binIndex:index+1,genre:'Bargain Bin',noRentalCase:true,browseLookDown:true}});
+      placed.push(chosen);
+    }
+  }
+  // The additional freezer keeps a separate pocket outside the sketched run.
+  for(let z=6;z>=-8;z-=.5) {
+    const p:FixturePlacement={id:'chest-freezer-front',kind:'chest-freezer',
+      position:{x:run.cx-width/2-4,z},yaw:Math.PI/2};
+    const fp={...retailFixtureFootprint('chest-freezer',p),clearance:3};
+    if(fits(fp,placed,bounds)) {result.push(p);break;}
   }
   return result;
 }

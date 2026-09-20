@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { vestibuleLayout, counterDatumShift, vestibuleSide, clampVestibuleSide } from '../src/vestibule-layout.ts';
+import { vestibuleLayout, counterDatumShift, vestibuleSide, clampVestibuleSide, vestibuleExitGates } from '../src/vestibule-layout.ts';
 import { exitReturnLayout, exitReturnSegments } from '../src/exit-return-layout.ts';
 
 test('deeper vestibule provides wider front panels and carries checkout inward', () => {
@@ -29,10 +29,18 @@ test('open return end retains the back wall and a body-width side-door approach'
       const px=Math.abs(dx*c-dz*s),pz=Math.abs(dx*s+dz*c);
       assert.ok(px>=p.w/2+radius || pz>=p.d/2+radius,`${p.label} obstructs approach`);
     }
-    // Both EAS bases lie within the enlarged chamber and beyond the door swing's Z envelope.
-    for(const sign of [-1,1]) {
-      const z=v.sideDoorZ+sign*(doorW/2+.55);
-      assert.ok(z-.25>v.backZ && z+.25<15);
+    // Sensors frame the exit on the sales floor, clear of its full leaf span.
+    const spec={doorWidth:doorW,entryStyle:'vestibule' as const};
+    const wall=vestibuleSide(spec,-1);
+    for(const gate of vestibuleExitGates(spec)) {
+      const dx=gate.x-wall.doorX,dz=gate.z-wall.doorZ;
+      assert.ok(dx*wall.cos-dz*wall.sin < -1,'outside the glass');
+      assert.ok(Math.abs(dx*wall.sin+dz*wall.cos)>doorW/2+.5,'outside leaf sweep');
+      for(const p of segments) {
+        const x=gate.x-p.cx,z=gate.z-p.cz,c=Math.cos(p.yaw),s=Math.sin(p.yaw);
+        assert.ok(Math.abs(x*c-z*s)>p.w/2+.7 || Math.abs(x*s+z*c)>p.d/2+.7,
+          `${p.label} obstructs sensor base`);
+      }
     }
   }
 });

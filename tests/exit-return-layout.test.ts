@@ -27,16 +27,18 @@ test('return station opens beside the vestibule and closes the opposite end',()=
     });
     // A three-foot-wide staff approach from the vestibule side into the sorting aisle.
     const back=f.cz+f.d/2;
-    const sz=f.d/7.4;
-    for(let x=4.6;x<=8.5;x+=.1) for(let z=-3.9;z<=-.9;z+=.1)
+    const sz=f.d/11.5;
+    for(let x=4.6;x<=8.5;x+=.1) for(let z=-5.4;z<=-3.5;z+=.1)
       assert.equal(occupied(f.cx+x*f.w/15.5,back+z),false,'vestibule-side opening stays clear');
     assert.equal(occupied(f.cx-7.75*f.w/15.5+.4,back-3.25*sz),true,'old far-end opening is closed');
     assert.equal(occupied(f.cx,back-.4),true,'back wall is retained');
     // Continue from the store floor along the vestibule into that same opening.
-    for(let z=-8.5;z<=-2.8;z+=.1) for(let x=4.6;x<=7.5;x+=.1)
+    for(let z=-8.5;z<=-3.5;z+=.1) for(let x=4.6;x<=7.5;x+=.1)
       assert.equal(occupied(f.cx+x*f.w/15.5,back+z*sz),false,'approach is not blocked by the clipped corner');
     assert.equal(parts.some(p=>p.label==='structure:return-right'||p.label==='structure:return-corner'),false);
     assert.ok(parts.every(p=>Number.isFinite(p.yaw)));
     assert.ok(parts.some(p=>p.label.endsWith('window-worktop')));
+    assert.ok(parts.some(p=>p.label.endsWith('outer-angle') && Math.abs(p.yaw)>.5));
+    assert.ok(parts.some(p=>p.label.endsWith('front-angle') && Math.abs(p.yaw)>.5));
   }
 });

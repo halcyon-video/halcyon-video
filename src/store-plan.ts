@@ -790,7 +790,10 @@ export class StorePlan {
     const dx = -Math.sin(yaw), dz = -Math.cos(yaw); // front -> back along the run
     const nx = Math.cos(yaw), nz = -Math.sin(yaw);  // unit normal (run-to-run step)
     const p = LIBRARY_X_SPACING * Math.cos(yaw);    // pitch keeps the custom X-spacing
-    const Zf = FIELD_Z_FRONT;                       // front edge of the island field
+    // The exit-side front floor is the concessions/bargain zone. Reserve
+    // nine world feet before hatching its shelves; the capacity solver grows
+    // the back of this field rather than discarding any stocked titles.
+    const Zf = FIELD_Z_FRONT - (FORMAT.floorDisplays && field.xHi < STORE_CENTER_X ? 12 : 0);
     const cx = (field.xLo + field.xHi) / 2;
 
     const runsFor = (Zb: number) => {

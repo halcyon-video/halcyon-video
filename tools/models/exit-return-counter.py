@@ -10,9 +10,9 @@ ROOT=Path(__file__).resolve().parents[2]
 source=(ROOT/'tools/models/checkout-counter.py').read_text()
 exec(compile(source.split('\ndef shield(')[0],str(ROOT/'tools/models/checkout-counter.py'),'exec'))
 parts=[]
-parts.append(sweep('Continuous blue customer rim',[(7.75,0),(-7.75,0),(-7.75,-7.4),(2.75,-7.4)],.8))
+parts.append(sweep('Continuous blue customer rim',[(7.75,-3.2),(7.75,0),(-7.75,0),(-7.75,-5.5),(-2,-11.5),(3.25,-6.25)],.8))
 parts.append(sweep('Lower white window-side work shelf',[(3.5,-.8),(-6.95,-.8)],1.4,island=True))
-parts.append(sweep('Lower white inner sorting shelf',[(-6.95,-6.6),(2.0,-6.6)],1.3,island=True))
+parts.append(sweep('Lower white inner sorting shelf',[(-6.95,-5.2),(-2,-10.3),(2.4,-5.75)],1.3,island=True))
 # Generic enclosed return receiver above the window shelf: a real dark mouth,
 # sloping hood and separate lower tray. No copied lettering or graphics.
 def solid(name,outline,z0,z1,mat):
@@ -30,7 +30,7 @@ solid('Quick return receiver sill',[(-1.06,-.84),(1.06,-.84),(1.06,-1.95),(-1.06
 solid('Quick return dark interior',[(-1.06,-.86),(1.06,-.86),(1.06,-.94),(-1.06,-.94)],2.90,3.43,5)
 solid('Quick return receiver hood',[(-1.15,-.84),(1.15,-.84),(1.15,-1.95),(-1.15,-1.95)],3.43,3.52,3)
 scene=bpy.context.scene;scene.unit_settings.system='IMPERIAL';scene.unit_settings.scale_length=.3048
-scene['construction']='Enclosed returns millwork with an open vestibule-side staff aisle, lower inner worktops and generic return receiver. Original proportions; not a surveyed store.'
+scene['construction']='Enclosed returns millwork with an open vestibule-side staff aisle, lower inner worktops and generic return receiver. Angled plan follows the owner floor-plan sketch of 2026-09-20; dimensions are approximate.'
 bpy.context.preferences.filepaths.save_version=0
 for ob in bpy.context.selected_objects:ob.select_set(False)
 for ob in parts:ob.select_set(True)
@@ -38,7 +38,7 @@ bpy.context.view_layer.objects.active=parts[0]
 for screen in bpy.data.screens:
  for area in screen.areas:
   if area.type=='VIEW_3D':area.spaces.active.region_3d.view_distance=22;area.spaces.active.region_3d.view_location=(0,3.5,1.6)
-metrics={'boundsFeet':[15.5,7.4,3.54],'parts':len(parts),'triangles':sum(len(p.vertices)-2 for ob in parts for p in ob.data.polygons),'allSolidPartsManifold':True,'worktopHeightFeet':2.82,'staffOpeningFeet':5.0,'staffOpeningSide':'vestibule (+X)'}
+metrics={'boundsFeet':[15.5,11.5,3.54],'parts':len(parts),'triangles':sum(len(p.vertices)-2 for ob in parts for p in ob.data.polygons),'allSolidPartsManifold':True,'worktopHeightFeet':2.82,'staffOpeningFeet':5.43,'staffOpeningSide':'vestibule (+X)'}
 (ROOT/'tools/models/exit-return-counter-metrics.json').write_text(json.dumps(metrics,indent=2)+'\n')
 bpy.ops.wm.save_as_mainfile(filepath=str(ROOT/'tools/models/exit-return-counter.blend'),compress=True)
 bpy.ops.object.join();bpy.context.object.name='ExitReturnCounter'

@@ -41,3 +41,10 @@ export function clampVestibuleSide(point: {x:number;z:number}, old: {x:number;z:
   const clamped=oldNormal<0?Math.min(normal,-radius):Math.max(normal,radius);
   return {x:point.x+(clamped-normal)*wall.cos,z:point.z-(clamped-normal)*wall.sin};
 }
+
+/** Exit-only sensor pair on the sales-floor side of the tapered doorway. */
+export function vestibuleExitGates(spec: VestibuleSpec) {
+  const wall=vestibuleSide(spec,-1), standOff=-1.2, half=spec.doorWidth/2+.55;
+  return [-half,half].map(along=>({x:wall.doorX+standOff*wall.cos+along*wall.sin,
+    z:wall.doorZ-standOff*wall.sin+along*wall.cos,yaw:wall.yaw}));
+}

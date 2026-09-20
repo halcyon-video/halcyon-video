@@ -1,13 +1,13 @@
 {
   "boundsFeet": [
     15.5,
-    7.4,
+    11.5,
     3.54
   ],
   "parts": 8,
-  "triangles": 5744,
+  "triangles": 6244,
   "allSolidPartsManifold": true,
   "worktopHeightFeet": 2.82,
-  "staffOpeningFeet": 5.0,
+  "staffOpeningFeet": 5.43,
   "staffOpeningSide": "vestibule (+X)"
 }

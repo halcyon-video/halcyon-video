@@ -2349,7 +2349,7 @@ export function buildStore(scene: StoreScene) {
         cx: STORE_CENTER_X - storeWidth / 2 + 10, cz: backWallZ + 10, w: 20, d: 20, yaw: 0 }] : []),
     ];
   // Admit movable furniture after game shelves and other fixed fixtures.
-  const placementOrder = (p: typeof fixturePlacements[number]) => p.kind === 'release-cart' ? 2 : p.id === 'pv-drape-table-front' ? 1 : 0;
+  const placementOrder = (p: typeof fixturePlacements[number]) => p.kind === 'release-cart' ? 2 : p.id === 'pv-drape-table-front' || p.id === 'bargain-bin-1' ? 1 : 0;
   fixturePlacements.sort((a,b) => placementOrder(a)-placementOrder(b));
   const buildFixture = (placement: typeof fixturePlacements[number]) => {
     if (placement.kind === 'release-cart') {
@@ -2405,13 +2405,15 @@ export function buildStore(scene: StoreScene) {
   fixturePlacements.filter(p => placementOrder(p)===0).forEach(buildFixture);
   if (activeStoreFormat().floorDisplays) {
     const existing = scene.slottedFixtures.filter(f => f.placement.kind === 'four-sided-display').length;
-    frontRefreshmentPlacements([...scene.plan.getUnitFootprints(), ...fixtureFootprints, ...reserved],
+    const frontMerchandise = frontRefreshmentPlacements([...scene.plan.getUnitFootprints(), ...fixtureFootprints, ...reserved],
       { minX: STORE_CENTER_X - storeWidth / 2, maxX: STORE_CENTER_X + storeWidth / 2,
-        minZ: backWallZ, maxZ: FRONT_GLASS_Z }).forEach(buildFixture);
-    movable.forEach(buildFixture);
+        minZ: backWallZ, maxZ: FRONT_GLASS_Z });
+    frontMerchandise.forEach(buildFixture);
+    movable.filter(p=>!frontMerchandise.some(f=>f.id===p.id)).forEach(buildFixture);
     floorPromotionPlacements(scene.fixtureContext().libraries, [...scene.plan.getUnitFootprints(), ...fixtureFootprints, ...reserved],
       { minX: STORE_CENTER_X - storeWidth / 2, maxX: STORE_CENTER_X + storeWidth / 2,
-        minZ: backWallZ, maxZ: FRONT_GLASS_Z }, existing).forEach(buildFixture);
+        minZ: backWallZ, maxZ: FRONT_GLASS_Z },
+      existing + Number(frontMerchandise.some(p=>p.id==='floor-promotion-bargain-bin'))).forEach(buildFixture);
   }
   const archPlacements = departmentArchPlacements({
     format: activeStoreFormat().id, ceiling: ceilingY, exposed,
