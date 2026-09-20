@@ -33,6 +33,7 @@ const store = new Map<string, string>([['bb_store_format', 'mom-and-pop']]);
 };
 const { StorePlan } = await import('../src/store-plan.ts');
 const { activeStoreFormat } = await import('../src/store-format.ts');
+const { UNIT_SIDE_CAPACITY } = await import('../src/store-layout.ts');
 
 const GENRE_TAGS = ['Action', 'Comedy', 'Drama', 'Thriller', 'Horror', 'Sci-Fi', 'Family', 'Romance'];
 function mkMovie(lib: number, i: number): Movie {
@@ -150,3 +151,24 @@ for (const { counts, maximumDepth, minimumColumns } of [
     }
   });
 }
+
+test('short libraries share balanced floor rows without leaving deep empty tails', () => {
+  store.set('bb_library_organization', 'alphabetical');
+  try {
+    for (const counts of [[1500, 400, 90, 60, 40], [3000, 900, 200], [400, 100, 80, 70, 60]]) {
+      const plan = new StorePlan(counts.map((n, i) => mkLibrary(i, n)));
+      plan.plan();
+      const rows = new Map<number, number>();
+      for (const unit of plan.shelvingUnits.filter(unit => !unit.singleSided)) {
+        rows.set(unit.anchorX, (rows.get(unit.anchorX) ?? 0) + 1);
+      }
+      const lengths = [...rows.values()];
+      assert.ok(Math.max(...lengths) - Math.min(...lengths) <= 1,
+        `floor rows must differ by at most one shelf unit: ${lengths}`);
+      for (let i = 0; i < counts.length; i++) {
+        const capacity = plan.entryBlockOrder(i).length * UNIT_SIDE_CAPACITY;
+        assert.ok(capacity >= plan.layoutFor(i).entries.length, 'all library entries retain shelf space');
+      }
+    }
+  } finally { store.delete('bb_library_organization'); }
+});

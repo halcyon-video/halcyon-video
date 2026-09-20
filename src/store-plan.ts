@@ -842,7 +842,7 @@ export class StorePlan {
       while (qi + take < slice.length && take < run.cap) {
         const itemLib = slice[qi + take].lib;
         if (itemLib !== lastLib) {
-          if (uniqueLibs >= 2) {
+          if (!FORMAT.singleField && uniqueLibs >= 2) {
             break;
           }
           lastLib = itemLib;
@@ -896,7 +896,7 @@ export class StorePlan {
     }
 
     let qi = 0;
-    for (const run of runs) {
+    for (const [runIndex, run] of runs.entries()) {
       if (qi >= slice.length) break;
       // Every chunk poured from THIS run is one physical straight row split
       // only by the maxRunUnits/RUN_BREAK_GAP bookkeeping below — tag them
@@ -904,7 +904,12 @@ export class StorePlan {
       // recognise the split and treat them as one line (see rowGroupId on
       // ShelvingUnit).
       const rowGroupId = lineId;
-      const take = takeFrom(run, qi);
+      // Balance a compact shop's rows before extending any one of them.
+      // Library boundaries remain contiguous in the pour; they do not reserve
+      // empty tail space or force a third small library onto a distant row.
+      const balancedCap = FORMAT.singleField
+        ? Math.ceil((slice.length - qi) / (runs.length - runIndex)) : run.cap;
+      const take = takeFrom({ cap: Math.min(run.cap, balancedCap) }, qi);
       const fzScaled = this.scaleZ(run.fz);
       const chunks = Math.ceil(take / this.maxRunUnits);
       for (let m = 0; m < take; m++) {
