@@ -5052,7 +5052,7 @@ export class StoreScene {
       // already established none of it changes anything visible except the TV
       // texture upload, which is the entire point of the frame.
       this.nrBayLightingUpdate?.();
-    this.entrance?.update(time);
+      this.entrance?.update(time);
       this.ambientTvs?.update(time);
       for (const f of this.slottedFixtures) f.update(time);
       perfTrace.end(SP_SIM);
@@ -5446,14 +5446,14 @@ export class StoreScene {
     }
 
     // Mark matrix updates on modified InstancedMesh instances only.
-    // boundingSphere = null: three.js caches an InstancedMesh's frustum-culling
+    // Recompute in place: three.js caches an InstancedMesh's frustum-culling
     // sphere on first cull and never invalidates it when instance matrices
     // change — a sphere cached before placement (e.g. during the boot-time
     // environment bake) would cull fully-stocked shelves forever. Nulling it
-    // here recomputes it on the next cull, only for meshes that actually moved.
+    // here would allocate a fresh Sphere on every moving frame. Reuse it instead.
     for (const mesh of updatedMeshes) {
       mesh.instanceMatrix.needsUpdate = true;
-      mesh.boundingSphere = null;
+      mesh.computeBoundingSphere();
     }
 
     // Real-time reflections are handled automatically by Reflector instances

@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { assetUrl } from '../asset-url';
+import { prepareRetailModel } from './retail-model';
 import type { FixtureContext } from '../fixtures';
 
 /** One fixture owns this load and its geometry; supplied finishes belong to its fallback. */
@@ -46,11 +47,18 @@ export function installDisplayModel(
         ownedMaterials.add(m); return m;
       };
       o.material = Array.isArray(o.material) ? o.material.map(replace) : replace(o.material);
-      o.castShadow = o.receiveShadow = true;
+      const materials = Array.isArray(o.material) ? o.material : [o.material];
+      // Blended glass must not cast an opaque silhouette into the shadow map.
+      // Alpha-tested cutouts still cast their shaped shadows.
+      o.castShadow = materials.some(m => !m.transparent || m.alphaTest > 0);
+      o.receiveShadow = materials.some(m => !m.transparent);
     });
     replaced.forEach((m) => m.dispose());
     if (detached) { release(model); return; }
-    prepare?.(model);
+    // Custom preparers own named parts (screens, decals, instancing). Plain
+    // static imports can share the same opaque-material batching as retail kits.
+    if (prepare) prepare(model);
+    else prepareRetailModel(model);
     model.name = 'display-model';
     model.scale.copy(scale);
     parent.add(model);

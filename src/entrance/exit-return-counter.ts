@@ -5,6 +5,7 @@ import { onBrandChange } from '../brand-live';
 import { getActiveTheme } from '../themes';
 import type { Footprint } from '../layout-validator';
 import { installDisplayModel } from '../fixtures/display-model';
+import { prepareRetailModel } from '../fixtures/retail-model';
 import { getRentalCaseGeometry, createHeroRentalMaterials, CASE_DEPTH } from '../video-case';
 
 import { exitReturnLayout, exitReturnSegments, type ExitGeometry } from '../exit-return-layout';
@@ -41,22 +42,28 @@ export function buildExitReturnCounter(ctx: FixtureContext, parent: THREE.Group,
   const paths = [...(!hosted && pack ? [`user-assets/${pack}/${rel}`] : []),
     ...(!hosted ? [`user-assets/${rel}`] : []), 'models/exit-return-counter.glb'];
   const release = installDisplayModel(ctx,root,fallback,paths,
-    {CounterBody:body,CounterTop:top,CounterWorktop:worktop,CounterInlay:stripe,CounterPlinth:plinth},new THREE.Vector3(length/15.5,1,footprint.d/11.5));
+    {CounterBody:body,CounterTop:top,CounterWorktop:worktop,CounterInlay:stripe,CounterPlinth:plinth},new THREE.Vector3(length/15.5,1,footprint.d/11.5),prepareRetailModel);
   const titles = ctx.libraries.flatMap(l=>l.movies).filter(m=>!m.discovery&&!m.collectionGap&&!m.comingSoon&&!m.game).slice(0,5);
-  const ownedMaterials: THREE.Material[]=[];
+  const stacks: THREE.InstancedMesh[]=[];
+  const pose = new THREE.Object3D();
   const geometry = getRentalCaseGeometry(false).clone();
   titles.forEach((movie,index)=>{
-    const materials = createHeroRentalMaterials(movie).map(m=>m.clone());ownedMaterials.push(...materials);
+    // These cached shelf materials belong to video-case, including live artwork refresh.
+    const materials = createHeroRentalMaterials(movie);
     const levels = 3 + index % 3;
+    const stack = new THREE.InstancedMesh(geometry,materials,levels);
+    stack.name='Store-copy returns awaiting reshelving';
     for(let level=0;level<levels;level++) {
-      const copy = new THREE.Mesh(geometry,materials);copy.name='Store-copy returns awaiting reshelving';
       // Cases lie flat wholly on the employee half, never in the passage.
-      copy.position.set((-2.7+index*1.35)*length/15.5,2.82+CASE_DEPTH/2+level*CASE_DEPTH,-1.45*footprint.d/11.5);
-      copy.rotation.set(-Math.PI/2,0,(index%2?1:-1)*.035);copy.castShadow=copy.receiveShadow=true;root.add(copy);
+      pose.position.set((-2.7+index*1.35)*length/15.5,2.82+CASE_DEPTH/2+level*CASE_DEPTH,-1.45*footprint.d/11.5);
+      pose.rotation.set(-Math.PI/2,0,(index%2?1:-1)*.035);
+      pose.updateMatrix();stack.setMatrixAt(level,pose.matrix);
     }
+    stack.castShadow=stack.receiveShadow=true;stack.computeBoundingSphere();
+    root.add(stack);stacks.push(stack);
   });
   parent.addEventListener('removed',function retire(){
-    parent.removeEventListener('removed',retire);unsubscribe();release();geometry.dispose();ownedMaterials.forEach(m=>m.dispose());
+    parent.removeEventListener('removed',retire);unsubscribe();release();geometry.dispose();stacks.forEach(stack=>stack.dispose());
     fallback.traverse(o=>{if(o instanceof THREE.Mesh)o.geometry.dispose();});body.dispose();top.dispose();plinth.dispose();worktop.dispose();stripe.dispose();root.removeFromParent();
   });
   ctx.requestShadowRefresh();

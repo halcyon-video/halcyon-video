@@ -8,6 +8,7 @@ import ts from 'typescript';
 test('service door loader preserves fallback on failure and retires successful or cancelled loads', async () => {
   let source = await readFile(new URL('../src/fixtures/display-model.ts', import.meta.url), 'utf8');
   source = source.replace("import { assetUrl } from '../asset-url';", "const assetUrl = (s: string) => '/base/' + s;")
+    .replace("from './retail-model'", `from '${new URL('../src/fixtures/retail-model.ts', import.meta.url).href}'`)
     .replaceAll("from 'three'", `from '${import.meta.resolve('three')}'`)
     .replace("from 'three/examples/jsm/loaders/GLTFLoader.js'", `from '${import.meta.resolve('three/examples/jsm/loaders/GLTFLoader.js')}'`);
   const js = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText;
