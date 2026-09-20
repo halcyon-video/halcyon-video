@@ -114,7 +114,8 @@ setStreamingStockResolver(getStreamingMovies);
 import { triggerHostedWelcome, isWelcomeActive, dismissWelcome, welcomeHUDText } from './store-welcome';
 import { showClerkToast } from './carried-tapes';
 import { initSharedPlace } from './shared-place-ui';
-import { refreshHoldHints, setHoldCheckoutProgress, setHoldDismissProgress } from './hold-hints';
+import { canHoldToReturn } from './carry-return-state';
+import { refreshHoldHints, setHoldCheckoutProgress, setHoldDismissProgress, setHoldReturnProgress } from './hold-hints';
 import {
   setupRemotePlay, isRemoteInstance, isRemotelyDriven, reportRemoteFatal,
   clearRemoteFatal, remoteViewerCount, notifyStoreRebuilt,
@@ -4228,6 +4229,20 @@ async function main() {
       handleGapDismiss();
     },
     onHoldDownProgress: (p) => setHoldDismissProgress(p),
+    // Hold Back with a tape in hand = return the tape to the shelf. A quick tap
+    // still does Back's normal navigation on RELEASE.
+    isHoldBackArmed: () => {
+      if (!shortcutsAllowed()) return false;
+      if (videoPlayer?.isOpen) return false;
+      if (storeScene?.isWalkAroundMode) return false;
+      if (ui.isAnyOverlayOpen) return false;
+      return !!storeScene && canHoldToReturn(storeScene);
+    },
+    onHoldBack: () => {
+      setHoldReturnProgress(0);
+      storeScene?.returnCarriedTape();
+    },
+    onHoldBackProgress: (p) => setHoldReturnProgress(p),
   };
 
   const inputManager = new InputManager(inputCallbacks);

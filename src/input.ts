@@ -36,6 +36,14 @@ export interface InputCallbacks {
   isHoldDownArmed?: () => boolean;
   onHoldDown?: () => void;
   onHoldDownProgress?: (t: number) => void;
+  // Hold-BACK-to-return-tape: while this returns true (a carried tape can be
+  // put back on its shelf), pressing the back control (Escape/Backspace/Q or
+  // gamepad B) arms a hold timer instead of firing onBack immediately —
+  // a quick tap still fires onBack on RELEASE; holding for HOLD_BACK_MS
+  // fires onHoldBack (returnCarriedTape).
+  isHoldBackArmed?: () => boolean;
+  onHoldBack?: () => void;
+  onHoldBackProgress?: (t: number) => void;
 }
 
 /**
@@ -89,7 +97,12 @@ class HoldGesture {
     this.fired = false;
   }
 
-  destroy() { this.stop(); }
+  destroy() {
+    this.stop();
+    this.pending = false;
+    this.fired = false;
+    this.progress(0);
+  }
 
   private tick() {
     // Something modal may have opened mid-hold — abandon the gesture
@@ -158,10 +171,12 @@ export class InputManager {
   // is one button whether it arrives as Enter or as pad A.
   private readonly holdSelect: HoldGesture;
   private readonly holdDown: HoldGesture;
+  private readonly holdBack: HoldGesture;
   private static readonly HOLD_SELECT_MS = 650;
   // Longer than select's: crossing a title off is permanent, so the meter
   // wants a beat where you can still let go and change your mind.
   private static readonly HOLD_DOWN_MS = 900;
+  private static readonly HOLD_BACK_MS = 650;
 
   private removeGameListener: (() => void) | null = null;
 
@@ -181,10 +196,17 @@ export class InputManager {
       () => this.callbacks.onDown(),
       (p) => this.callbacks.onHoldDownProgress?.(p),
     );
+    this.holdBack = new HoldGesture(
+      InputManager.HOLD_BACK_MS,
+      () => !!(this.callbacks.onHoldBack && this.callbacks.isHoldBackArmed?.()),
+      () => this.callbacks.onHoldBack?.(),
+      () => this.callbacks.onBack(),
+      (p) => this.callbacks.onHoldBackProgress?.(p),
+    );
     this.removeGameListener = onExternalGameChange((active) => {
       if (active) {
         this.stopGamepadPolling();
-        this.holdSelect.destroy(); this.holdDown.destroy();
+        this.holdSelect.destroy(); this.holdDown.destroy(); this.holdBack.destroy();
         if (this.idleTimer !== null) { window.clearTimeout(this.idleTimer); this.idleTimer = null; }
       } else {
         this.lastButtonsState = []; this.lastAxesState = [];
@@ -270,7 +292,8 @@ export class InputManager {
         case 'q':
         case 'Q':
           e.preventDefault();
-          this.callbacks.onBack();
+          if (e.repeat) this.holdBack.repeat();
+          else this.holdBack.press();
           break;
         case 'p':
         case 'P':
@@ -319,6 +342,12 @@ export class InputManager {
         case 's':
         case 'S':
           this.holdDown.release();
+          break;
+        case 'Escape':
+        case 'Backspace':
+        case 'q':
+        case 'Q':
+          this.holdBack.release();
           break;
       }
     });
@@ -446,9 +475,15 @@ export class InputManager {
       this.holdSelect.release();
       hasActivity = true;
     }
-    // Button 1 (B) -> Back
+    // Button 1 (B) -> Back, with hold-back-to-return-tape gesture: while
+    // armed, the press starts the shared hold timer and a quick release
+    // delivers the deferred onBack (mirrors the keyboard path exactly).
     if (buttonStates[1] && !this.lastButtonsState[1]) {
-      this.callbacks.onBack();
+      this.holdBack.press();
+      hasActivity = true;
+    }
+    if (!buttonStates[1] && this.lastButtonsState[1]) {
+      this.holdBack.release();
       hasActivity = true;
     }
     // Button 2 (Y/Triangle) -> Search
@@ -637,6 +672,7 @@ export class InputManager {
     this.stopGamepadPolling();
     this.holdSelect.destroy();
     this.holdDown.destroy();
+    this.holdBack.destroy();
     if (this.idleTimer) {
       window.clearTimeout(this.idleTimer);
     }

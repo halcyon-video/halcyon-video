@@ -72,3 +72,24 @@ export function setHoldDismissProgress(p: number) {
   if (!dismissPill) return;
   dismissPill.fill.style.transform = `scaleX(${Math.max(0, Math.min(1, p))})`;
 }
+
+let returnPill: HoldPill | null = null;
+
+export function setHoldReturnProgress(p: number) {
+  if (!returnPill && p <= 0) return;
+  if (!returnPill) {
+    returnPill = makePill('hold-return-hint', '↩ HOLD TO RETURN TAPE TO SHELF', 150);
+  }
+  if (p <= 0) {
+    setShown(returnPill, false);
+    returnPill.fill.style.transform = 'scaleX(0)';
+  } else {
+    if (dismissPill && dismissPill.shown) {
+      returnPill.el.style.bottom = '204px';
+    } else {
+      returnPill.el.style.bottom = '150px';
+    }
+    setShown(returnPill, true);
+    returnPill.fill.style.transform = `scaleX(${Math.max(0, Math.min(1, p))})`;
+  }
+}

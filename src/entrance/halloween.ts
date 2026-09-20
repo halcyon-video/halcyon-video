@@ -6,7 +6,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { assetUrl } from '../asset-url';
 import { inSeason } from '../promo-campaigns';
 import { HALLOWEEN_CLING_FINISH, halloweenClingPlacements } from './halloween-layout';
-import clings from '../../public/art/halloween-clings.svg?raw';
+import clings from '/art/halloween-clings.svg?raw';
 
 interface PumpkinPose { position: THREE.Vector3; yaw: number }
 

@@ -107,8 +107,8 @@ const HELP_SECTIONS: HelpSection[] = [
         hint: 'First-person stroll. F again returns to the shelves.',
       },
       {
-        id: 'carry', control: 'R · X', action: 'Carry shortcuts',
-        hint: 'R put one back · X not interested.',
+        id: 'carry', control: 'Hold Back · R · X', action: 'Carry shortcuts',
+        hint: 'Hold Back or press R to put one back · X not interested.',
       },
       {
         id: 'feedback', control: 'C', action: 'Leave a feedback pin',
@@ -119,7 +119,7 @@ const HELP_SECTIONS: HelpSection[] = [
         hint: 'Opens right back here for whoever you send it to.',
       },
       {
-        id: 'holds', control: 'Hold OK / hold ▼', action: 'Quick checkout / pass',
+        id: 'holds', control: 'Hold OK / hold ▼ / hold Back', action: 'Quick checkout / pass / put back',
         hint: 'Keyboard & gamepad only — the remote taps instead.',
       },
     ],
@@ -128,7 +128,7 @@ const HELP_SECTIONS: HelpSection[] = [
     title: 'Gamepad',
     rows: [
       {
-        id: 'padface', control: 'A · B · Y · Start', action: 'OK · Back · Search · Menu',
+        id: 'padface', control: 'A · B · Y · Start', action: 'OK · Back (hold: put back) · Search · Menu',
         hint: 'Standard pad mapping; d-pad and left stick both navigate.',
       },
       {
