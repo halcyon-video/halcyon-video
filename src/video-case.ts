@@ -5528,13 +5528,9 @@ export function drawSeriesBrandPanel(movie: Movie, themeHex?: string | null) {
 }
 
 // ─── Series back cover: the episode selector ────────────────────────────────
-// For a series boxset the ordinary STARRING/CREDITS back is replaced by a
-// scrollable episode picker — one row per episode with a bordered still, the
-// SxxExx code + title, and a wrapped synopsis, all sized to read at inspect
-// distance. Like the side panels it's a module singleton redrawn in place (one
-// boxset inspected at a time); thumbnails stream in and re-trigger a redraw.
-const SERIES_BACK_ROWS = 4; // visible episode rows per screen
-const SERIES_SEASON_ROWS = 5; // visible season rows per screen (scrolls beyond)
+// Scrollable episode picker redrawn in place with bordered stills and synopsis.
+const SERIES_BACK_ROWS = 4, SERIES_SEASON_ROWS = 5;
+const SERIES_HIGHLIGHT_COLOR = '#ffcc00', SERIES_HIGHLIGHT_FILL = 'rgba(255, 204, 0, 0.20)';
 
 interface SeriesBackPanel {
   canvas: HTMLCanvasElement;
@@ -5627,10 +5623,10 @@ export function drawSeriesEpisodeBackCover(
     const selected = idx === selectedIdx;
 
     // Row plate + border.
-    ctx.fillStyle = selected ? `rgba(${theme.accentRgb}, 0.18)` : 'rgba(255,255,255,0.05)';
+    ctx.fillStyle = selected ? SERIES_HIGHLIGHT_FILL : 'rgba(255,255,255,0.05)';
     ctx.fillRect(24, y, W - 48, rowH);
-    ctx.strokeStyle = selected ? theme.accent : 'rgba(201,212,242,0.35)';
-    ctx.lineWidth = selected ? 4 : 2;
+    ctx.strokeStyle = selected ? SERIES_HIGHLIGHT_COLOR : 'rgba(201,212,242,0.35)';
+    ctx.lineWidth = selected ? 6 : 2;
     ctx.strokeRect(24, y, W - 48, rowH);
 
     // Bordered thumbnail (16:9), left side.
@@ -5654,14 +5650,14 @@ export function drawSeriesEpisodeBackCover(
       else { sh = img.width / ta; sy = (img.height - sh) / 2; }
       ctx.drawImage(img, sx, sy, sw, sh, thumbX, thumbY, thumbW, thumbH);
     } else {
-      ctx.fillStyle = theme.accent;
+      ctx.fillStyle = selected ? SERIES_HIGHLIGHT_COLOR : theme.accent;
       ctx.font = 'bold 34px Arial, sans-serif';
       ctx.textAlign = 'center';
       ctx.fillText('▷', thumbX + thumbW / 2, thumbY + thumbH / 2 + 12);
       ctx.textAlign = 'left';
     }
-    ctx.strokeStyle = selected ? theme.accent : 'rgba(201,212,242,0.5)';
-    ctx.lineWidth = 3;
+    ctx.strokeStyle = selected ? SERIES_HIGHLIGHT_COLOR : 'rgba(201,212,242,0.5)';
+    ctx.lineWidth = selected ? 4 : 2;
     ctx.strokeRect(thumbX, thumbY, thumbW, thumbH);
 
     // Text column, right of the thumbnail. The title row gets the full width
@@ -5675,7 +5671,7 @@ export function drawSeriesEpisodeBackCover(
     ctx.fillText(truncate(ctx, ep.name, tw), tx, thumbY + 28);
 
     // Subtitle: season/episode code + wrapped synopsis beneath.
-    ctx.fillStyle = theme.accent;
+    ctx.fillStyle = selected ? SERIES_HIGHLIGHT_COLOR : theme.accent;
     ctx.font = 'bold 22px Arial, sans-serif';
     ctx.fillText(code, tx, thumbY + 58);
     const codeW = ctx.measureText(code).width + 16; // gap after the code
@@ -5784,10 +5780,10 @@ export function drawSeriesSeasonPanel(
     const y = listTop + row * (rowH + rowGap);
     const selected = s === currentSeason;
 
-    ctx.fillStyle = selected ? `rgba(${theme.accentRgb}, 0.18)` : 'rgba(255,255,255,0.05)';
+    ctx.fillStyle = selected ? SERIES_HIGHLIGHT_FILL : 'rgba(255,255,255,0.05)';
     ctx.fillRect(8, y, W - 16, rowH);
-    ctx.strokeStyle = selected ? theme.accent : 'rgba(201,212,242,0.35)';
-    ctx.lineWidth = selected ? 4 : 2;
+    ctx.strokeStyle = selected ? SERIES_HIGHLIGHT_COLOR : 'rgba(201,212,242,0.35)';
+    ctx.lineWidth = selected ? 6 : 2;
     ctx.strokeRect(8, y, W - 16, rowH);
 
     const firstEp = episodes!.find((e) => e.seasonNumber === s);
@@ -5825,12 +5821,12 @@ export function drawSeriesSeasonPanel(
       else { sh = img.width / ta; sy = (img.height - sh) / 2; }
       ctx.drawImage(img, sx, sy, sw, sh, thumbX, thumbY, thumbW, thumbH);
     }
-    ctx.strokeStyle = selected ? theme.accent : 'rgba(201,212,242,0.5)';
-    ctx.lineWidth = 2;
+    ctx.strokeStyle = selected ? SERIES_HIGHLIGHT_COLOR : 'rgba(201,212,242,0.5)';
+    ctx.lineWidth = selected ? 4 : 2;
     ctx.strokeRect(thumbX, thumbY, thumbW, thumbH);
 
     // Season label to the right of the thumbnail.
-    ctx.fillStyle = selected ? theme.text : theme.subText;
+    ctx.fillStyle = selected ? SERIES_HIGHLIGHT_COLOR : theme.subText;
     ctx.font = 'bold 22px "Arial Narrow", Arial, sans-serif';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
