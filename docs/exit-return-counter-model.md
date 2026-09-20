@@ -1,12 +1,12 @@
 # Enclosed exit returns counter
 
-An original enclosed returns station shares the main checkout's blue/theme-colored rim, routed millwork profile, contrasting inlay and white lower worktops. The rear run sits against the front glass. A tapered end preserves the exit approach; an open left end admits staff. A plain return receiver stands on the window-side worktop. Its dimensions are design proportions, not measurements of a photographed store.
+An original enclosed returns station shares the main checkout's blue/theme-colored rim, routed millwork profile, contrasting inlay and white lower worktops. The rear run sits against the front glass. A broad rectangular enclosure with a short clipped outer corner preserves the exit approach; an open left end admits staff. A plain return receiver stands on the window-side worktop. Its dimensions are design proportions, not measurements of a photographed store.
 
 - Authoring: `tools/models/exit-return-counter.py`, using the existing checkout authoring functions before their variant-export entry point.
 - Editable source: `tools/models/exit-return-counter.blend`.
 - Runtime: `public/models/exit-return-counter.glb`.
 - Coordinates: feet, local glass plane z=0, interior extends toward negative z. Runtime shifts the glass plane 0.18 feet into the room. X scales for room width; Y and Z remain constant.
-- Envelope: 15.5 by 9.4 feet; rim height 3.54 feet, white worktop height 2.82 feet. Left staff opening 3.2 feet. Six material batches, 6,224 triangles, closed manifold construction parts, UVs and outward normals.
+- Envelope: 15.5 by 9.4 feet; rim height 3.54 feet, white worktop height 2.82 feet. Left staff opening 3.2 feet. Six material batches, see the generated metrics for triangle count, closed manifold construction parts, UVs and outward normals.
 - Theme roles are shared with checkout: CounterBody, CounterTop, CounterInlay, CounterWorktop, CounterPlinth. The dark receiver interior retains CounterReveal.
 - Placement and physical navigation segments: `src/exit-return-layout.ts`. The full envelope reserves floor space for fixtures; only the actual millwork obstructs staff navigation.
 - Display loader: brand-pack override, then local override, then public model. Hosted builds skip private probes. Missing meshes retain an enclosed procedural fallback. Return-case stacks rest on the lower window-side worktop.

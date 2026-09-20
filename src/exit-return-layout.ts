@@ -1,6 +1,6 @@
 import type { Footprint } from './layout-validator.ts';
 export interface ExitGeometry { xL: number; frontZ: number; sideDoorZ: number; doorW: number; hasChamber: boolean }
-/** Enclosed returns station against the glass; the tapered end clears the exit. */
+/** Enclosed returns station against the glass; a short clipped corner clears the exit. */
 export function exitReturnLayout(storeWidth: number,vest: ExitGeometry): Footprint | null {
   if (!vest.hasChamber) return null;
   const right=vest.xL-.58;
@@ -20,10 +20,11 @@ export function exitReturnSegments(f: Footprint): Footprint[] {
       cz:back+(a[1]+b[1])/2+nz*depth/2,w:length,d:depth,yaw:-Math.atan2(dz,dx)};
   };
   return [segment([-7.75,-4.8],[-7.75,-9.4],.8,'left'),
-    segment([-7.75,-9.4],[7.75,-1.35],.8,'front'),
-    segment([7.75,-1.35],[7.75,0],.8,'right'),
+    segment([-7.75,-9.4],[4.75,-9.4],.8,'front'),
+    segment([4.75,-9.4],[7.75,-6.4],.8,'corner'),
+    segment([7.75,-6.4],[7.75,0],.8,'right'),
     segment([7.75,0],[-7.75,0],.8,'back'),
     segment([-7.75,0],[-7.75,-1.6],.8,'rear-end'),
     segment([3.5,-.8],[-6.95,-.8],1.4,'window-worktop'),
-    segment([-6.95,-8.085],[2,-3.437],1.3,'inner-worktop')];
+    segment([-6.95,-8.6],[4,-8.6],1.3,'inner-worktop')];
 }
