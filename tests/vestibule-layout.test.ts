@@ -56,7 +56,7 @@ test('clipped-corner doors meet checkout corners and their entire clear opening 
       assert.deepEqual(clampVestibuleSide(next,old,wall,doorWidth,.4,.3),next);
     }
     assert.ok(straight.length>3);
-    assert.ok(Math.abs(Math.abs(wall.sin/wall.cos)-3.6/6.24)<1e-8);
+    assert.ok(Math.abs(Math.abs(wall.sin/wall.cos)-1)<1e-8);
     assert.ok(Math.abs(straight.z+straight.length-15)<1e-8);
     const next=point(.1,.1),old=point(.1,-.7);
     const hit=clampVestibuleSide(next,old,wall,doorWidth,.4,.3);
@@ -70,4 +70,18 @@ test('square checkout vestibule meets its wider rear corners',()=>{
   const spec={doorWidth:3.2,entryStyle:'vestibule' as const,counterShape:'usquare'};
   assert.equal(vestibuleSide(spec,-1).x,4.2);
   assert.equal(vestibuleSide(spec,1).x,17.8);
+});
+
+test('floor-plan rotations stay wall-aligned or at 45 degrees at every supported size',()=>{
+  for(const doorWidth of [3,3.2,4]) for(const storeWidth of [40,48,64,80]) {
+    const spec={doorWidth,entryStyle:'vestibule' as const};
+    const wall=vestibuleSide(spec,-1);
+    const f=exitReturnLayout(storeWidth,{xL:11-vestibuleFrontHalf(spec),frontZ:15,
+      sideDoorZ:wall.doorZ,doorW:doorWidth,hasChamber:true})!;
+    for(const part of [wall,...exitReturnSegments(f),...vestibuleExitGates(spec)]) {
+      const steps=part.yaw/(Math.PI/4);
+      assert.ok(Math.abs(steps-Math.round(steps))<1e-8,JSON.stringify(part));
+    }
+    assert.ok(Math.abs(f.w/15.5-f.d/11.5)<1e-8,'no nonuniform model scaling');
+  }
 });

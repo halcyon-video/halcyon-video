@@ -21,6 +21,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { Movie, JellyfinLibrary } from '../src/jellyfin.ts';
+import { activeStoreFormat } from '../src/store-format.ts';
 import { StorePlan } from '../src/store-plan.ts';
 import { BOX_SPACING, MAX_SHELF_COLS, RUN_BREAK_GAP, type ArrangementId, type ShelvingUnit } from '../src/store-layout.ts';
 
@@ -89,36 +90,30 @@ function findSameRowContinuations(plan: StorePlan, libIdx: number) {
   return pairs;
 }
 
-// requirePairs: whether this arrangement is expected to actually exercise a
-// same-row multi-chunk split at a scale worth unit-testing (i.e. the vacuous-
-// pass guard below is meaningful, not just "0 pairs found so trivially ok").
-// A physical row's maximum length is bounded by the field width divided by
-// sin(yaw) (how fast a tilted row drifts out of the field's X-range) — at the
-// current constants (CENTER_WALKWAY, margin, WIDTH_CAP, and each
-// arrangement's own aisle angle) that bound sits ABOVE one maxRunUnits chunk
-// for 'straight' (unbounded — a straight row never drifts in X at all) and
-// 'diagonal' (AISLE_ANGLE=40°), so both reliably need a second chunk well
-// under 25k titles. 'herringbone' tilts steeper (+10°, see
-// HERRINGBONE_AISLE_ANGLE) and that bound lands just BELOW one maxRunUnits
-// chunk instead (verified empirically up to 200k titles in a single library —
-// see scratch investigation for pin 056) — every row hits the field's own
-// X-clip before it would ever need a second chunk, so this exact failure
-// mode doesn't arise for herringbone under today's constants. The contiguity
-// check itself still runs unconditionally (harmless — and it stays a real
-// regression guard if the constants ever change and herringbone starts
-// producing multi-chunk rows too).
+// Force a short run cap in this fixture so all three layouts exercise a
+// real cross-aisle split. At 45 degrees the normal six-unit cap can reach
+// the field edge before a second chunk, even with a large catalogue.
 const CASES: { arrangement: ArrangementId; movieCount: number; requirePairs: boolean }[] = [
   { arrangement: 'straight', movieCount: 9000, requirePairs: true },
   { arrangement: 'diagonal', movieCount: 9000, requirePairs: true },
-  { arrangement: 'herringbone', movieCount: 9000, requirePairs: false },
+  { arrangement: 'herringbone', movieCount: 9000, requirePairs: true },
 ];
 
 for (const { arrangement, movieCount, requirePairs } of CASES) {
   test(`a shelf run split by RUN_BREAK_GAP stays walk-order contiguous (${arrangement})`, () => {
     const lib = buildBigLibrary(movieCount);
-    const plan = new StorePlan([lib]);
-    plan.arrangement = arrangement;
-    plan.plan();
+    const format=activeStoreFormat(), savedCap=format.maxRunUnitsCap;
+    let plan: StorePlan;
+    try {
+      format.maxRunUnitsCap=3;
+      plan = new StorePlan([lib]);
+      plan.arrangement = arrangement;
+      plan.plan();
+    } finally { format.maxRunUnitsCap=savedCap; }
+    for(const unit of plan.shelvingUnits) {
+      const steps=unit.yaw/(Math.PI/4);
+      assert.ok(Math.abs(steps-Math.round(steps))<1e-8,'aisles follow the floor-plan angle grid');
+    }
 
     const pairs = findSameRowContinuations(plan, 0);
     if (requirePairs) {

@@ -737,7 +737,7 @@ export class EntranceCheckout implements StoreFixture {
     // 90s video stores only. The face is picked per counter shape from
     // the same outline constants counter.ts builds from (mirrored here like
     // the BAND_H trio below — that file stays layout-agnostic): the shield's
-    // right shoulder edge runs (cx+9.8, zBackC-6.24) -> (cx+6.2, zBackC), the
+    // right shoulder edge runs (cx+9.8, zBackC-3.6) -> (cx+6.2, zBackC), the
     // usquare's right side sits flat at x = cx+6.8. Both faces clear the
     // vestibule glazing (z >= 8.6) and the store-side door's swing. The chute
     // protrudes into walkable floor now, so its footprint joins the clerk nav
@@ -783,7 +783,7 @@ export class EntranceCheckout implements StoreFixture {
       } else {
         // Midpoint of the shield's right shoulder edge, facing its outward
         // normal (out toward the walk-in corridor along the vestibule).
-        const ax = cx + 9.8, az = zBackC - 6.24; // shoulder vertex
+        const ax = cx + 9.8, az = zBackC - (9.8 - 6.2); // shoulder vertex
         const bx = cx + 6.2, bz = zBackC;        // back-right vertex
         anchor = { x: (ax + bx) / 2, z: (az + bz) / 2 };
         // Edge tangent (t) -> outward normal (t.z, -t.x); yaw with n = (sin, cos).

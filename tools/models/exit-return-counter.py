@@ -10,9 +10,9 @@ ROOT=Path(__file__).resolve().parents[2]
 source=(ROOT/'tools/models/checkout-counter.py').read_text()
 exec(compile(source.split('\ndef shield(')[0],str(ROOT/'tools/models/checkout-counter.py'),'exec'))
 parts=[]
-parts.append(sweep('Continuous blue customer rim',[(7.75,-3.2),(7.75,0),(-7.75,0),(-7.75,-5.5),(-2,-11.5),(3.25,-6.25)],.8))
+parts.append(sweep('Continuous blue customer rim',[(7.75,-3.2),(7.75,0),(-7.75,0),(-7.75,-5.75),(-2,-11.5),(3.25,-6.25)],.8))
 parts.append(sweep('Lower white window-side work shelf',[(3.5,-.8),(-6.95,-.8)],1.4,island=True))
-parts.append(sweep('Lower white inner sorting shelf',[(-6.95,-5.2),(-2,-10.3),(2.4,-5.75)],1.3,island=True))
+parts.append(sweep('Lower white inner sorting shelf',[(-6.95,-5.35),(-2,-10.3),(2.4,-5.9)],1.3,island=True))
 # Generic enclosed return receiver above the window shelf: a real dark mouth,
 # sloping hood and separate lower tray. No copied lettering or graphics.
 def solid(name,outline,z0,z1,mat):

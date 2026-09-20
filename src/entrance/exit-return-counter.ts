@@ -42,7 +42,7 @@ export function buildExitReturnCounter(ctx: FixtureContext, parent: THREE.Group,
   const paths = [...(!hosted && pack ? [`user-assets/${pack}/${rel}`] : []),
     ...(!hosted ? [`user-assets/${rel}`] : []), 'models/exit-return-counter.glb'];
   const release = installDisplayModel(ctx,root,fallback,paths,
-    {CounterBody:body,CounterTop:top,CounterWorktop:worktop,CounterInlay:stripe,CounterPlinth:plinth},new THREE.Vector3(length/15.5,1,footprint.d/11.5),prepareRetailModel);
+    {CounterBody:body,CounterTop:top,CounterWorktop:worktop,CounterInlay:stripe,CounterPlinth:plinth},new THREE.Vector3(length/15.5,1,length/15.5),prepareRetailModel);
   const titles = ctx.libraries.flatMap(l=>l.movies).filter(m=>!m.discovery&&!m.collectionGap&&!m.comingSoon&&!m.game).slice(0,5);
   const stacks: THREE.InstancedMesh[]=[];
   const pose = new THREE.Object3D();

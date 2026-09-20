@@ -214,8 +214,9 @@ export function buildCheckoutCounter(
   const backHalf = 6.2;
   const shoulderHalf = 9.8;
   const zBackC = backZ - 0.1;
-  const zShoulder = zBackC - 6.24;
-  const zPoint = zBackC - 14.0;
+  // Equal X/Z advances keep shoulders and customer faces exactly 45 degrees.
+  const zShoulder = zBackC - (shoulderHalf - backHalf);
+  const zPoint = zShoulder - shoulderHalf;
   // usquare: flat front run instead of a point; slightly shallower, and
   // NARROWER than the shield's shoulder span — the shield's taper is what
   // threads it between the two shelf fields' front corners (measured worst

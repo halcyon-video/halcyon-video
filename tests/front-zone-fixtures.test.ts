@@ -104,8 +104,8 @@ test('stocked game wing never becomes the fallback concessions queue',()=>{
 
 test('concessions occupy the exit-side checkout aisle instead of the returns zone',()=>{
   // Actual shield face, with the fixture-facing side toward -X/-Z.
-  const face:Footprint={label:'checkout face',kind:'structure',cx:6.1,cz:-4.0,
-    w:12.5,d:1.5,yaw:Math.atan2(7.76,9.8)};
+  const face:Footprint={label:'checkout face',kind:'structure',cx:6.1,cz:-2.4,
+    w:9.8*Math.SQRT2,d:1.5,yaw:Math.PI/4};
   const returns:Footprint={label:'returns',kind:'structure',cx:-5,cz:9,w:15.5,d:12,yaw:0};
   const plan=frontRefreshmentPlacements([face,returns],{minX:-33,maxX:55,minZ:-60,maxZ:15});
   const popcorn=plan.find(p=>p.kind==='acrylic-popcorn-bin');
@@ -115,3 +115,40 @@ test('concessions occupy the exit-side checkout aisle instead of the returns zon
   assert.ok(popcorn.position.z<-5 && popcorn.position.x>-2,
     'the run stays beside the shield face, not past the returns counter');
 });
+
+for(const name of ['exit-return-counter','checkout-counter-shield-laminate','checkout-counter-shield-rounded',
+  'checkout-counter-shield-laminate-2010','checkout-counter-shield-rounded-2010']) {
+  test(`${name}: exported vertical millwork faces follow the 45-degree floor plan`,async()=>{
+    const bytes=readFileSync(new URL(`../public/models/${name}.glb`,import.meta.url));
+    const {scene}=await new GLTFLoader().parseAsync(bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength),'');
+    let walls=0;
+    scene.traverse(o=>{
+      if(!(o instanceof THREE.Mesh))return;
+      const p=o.geometry.getAttribute('position'), n=o.geometry.getAttribute('normal');
+      assert.ok(o.geometry.getAttribute('uv'));
+      for(let i=0;i<p.count;i++) {
+        assert.ok(Number.isFinite(p.getX(i)) && Number.isFinite(p.getY(i)) && Number.isFinite(p.getZ(i)));
+        assert.ok(Number.isFinite(n.getX(i)) && Number.isFinite(n.getY(i)) && Number.isFinite(n.getZ(i)));
+      }
+      // Geometry normals establish alignment; smoothed vertex normals at a
+      // mitre intentionally interpolate between neighbouring face directions.
+      const index=o.geometry.index, count=index?.count??p.count;
+      const a=new THREE.Vector3(), b=new THREE.Vector3(), c=new THREE.Vector3();
+      for(let i=0;i<count;i+=3) {
+        a.fromBufferAttribute(p,index?index.getX(i):i);
+        b.fromBufferAttribute(p,index?index.getX(i+1):i+1);
+        c.fromBufferAttribute(p,index?index.getX(i+2):i+2);
+        b.sub(a).cross(c.sub(a));
+        if(b.length()<.16)continue; // Exclude routed joints and edge easing.
+        b.normalize();
+        if(Math.abs(b.y)>1e-5)continue;
+        const steps=Math.atan2(b.x,b.z)/(Math.PI/4);
+        assert.ok(Math.abs(steps-Math.round(steps))<1e-4,`${name}: face normal ${steps*45} degrees`);
+        walls++;
+      }
+      o.geometry.dispose();
+      for(const m of Array.isArray(o.material)?o.material:[o.material])m.dispose();
+    });
+    assert.ok(walls>10,'inspect real exported cabinet faces');
+  });
+}
