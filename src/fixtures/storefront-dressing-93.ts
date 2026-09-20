@@ -1,3 +1,4 @@
+import { vestibuleSide } from '../vestibule-layout';
 // 1993 storefront dressing, from the store footage: the STORE HOURS panel on
 // the entrance sidelight glass (moved off a chain-hung window-bay board
 // 2026-08-02 — feedback/018; see the block itself), the red evening-rental
@@ -177,22 +178,24 @@ export function buildStorefrontDressing93(scene: StoreScene): void {
     // The enlarged rear panel leaves room inside the chamber for both gates.
     // Keep the sales-floor side free for the flush return-counter enclosure.
     const standOff = 0.82;
-    const gates: { x: number; z: number }[] = [];
+    const wall=vestibuleSide(scene.storefrontSpec,-1);
+    const gates: { x: number; z: number; yaw:number }[] = [];
     for (const dz of [-gateHalf, gateHalf]) {
-      gates.push({ x: vest.xL + standOff, z: vest.sideDoorZ + dz }); // walk-out door only
+      gates.push({ x: wall.doorX + standOff*wall.cos + dz*wall.sin,
+        z: wall.doorZ - standOff*wall.sin + dz*wall.cos, yaw:wall.yaw }); // walk-out door only
     }
     for (const g of gates) {
       const ped = new THREE.Mesh(geo, cream);
       // Panels stand parallel to the walk line through the side door (which
       // runs along X), so their broad faces greet you side-on as you pass
       // between them.
-      ped.position.set(g.x, 0.03, g.z);
+      ped.position.set(g.x, 0.03, g.z); ped.rotation.y=g.yaw;
       ped.castShadow = true;
       ped.receiveShadow = true;
       fallback.add(ped);
       scene.fixtureContext().addCollider(ped);
       const base = new THREE.Mesh(baseGeo, cream);
-      base.position.set(g.x, 0.03, g.z);
+      base.position.set(g.x, 0.03, g.z); base.rotation.y=g.yaw;
       base.receiveShadow = true;
       fallback.add(base);
     }

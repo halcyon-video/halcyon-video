@@ -32,7 +32,7 @@ def make_mat(name, color, roughness, metal=0.0, alpha=1.0):
         p.inputs['Coat Roughness'].default_value = 0.05
     return m
 
-m_cabinet = make_mat('CoolerCabinet', (0.10, 0.11, 0.12), 0.35, metal=0.15)
+m_cabinet = make_mat('CoolerCabinet', (0.65, 0.025, 0.035), 0.35, metal=0.15)
 m_interior = make_mat('CoolerInteriorWhite', (0.92, 0.93, 0.94), 0.30)
 m_grille = make_mat('CoolerGrilleDark', (0.05, 0.05, 0.06), 0.70, metal=0.50)
 m_frame = make_mat('CoolerDoorFrame', (0.15, 0.16, 0.18), 0.25, metal=0.85)
@@ -94,6 +94,22 @@ box('CabinetBottomBase', (0, 0, 0.04), (4.00, 2.30, 0.08), m_cabinet, bevel=0.00
 # Back insulated wall:
 box('CabinetBackWall', (0, 1.11, 3.25), (3.84, 0.08, 6.34), m_interior, bevel=0.004)
 
+# Original white curved side stripe; no beverage logo or borrowed trade dress.
+for side in [-1,1]:
+    verts=[]
+    for i in range(17):
+        t=i/16
+        y=-1.08+2.16*t
+        z=2.0+1.8*t+.3*math.sin(t*math.pi*2)
+        for dz in [-.13,.13]: verts.append((side*2.004,y,z+dz))
+    faces=[(2*i,2*i+1,2*i+3,2*i+2) for i in range(16)]
+    mesh=bpy.data.meshes.new('SideStripeMesh');mesh.from_pydata(verts,[],faces);mesh.update()
+    o=bpy.data.objects.new('WhiteSideStripe',mesh);scene.collection.objects.link(o)
+    bpy.context.view_layer.objects.active=o;o.select_set(True)
+    solid=o.modifiers.new('PaintFilm','SOLIDIFY');solid.thickness=.002
+    bpy.ops.object.modifier_apply(modifier=solid.name)
+    finish(o,f'WhiteSideStripe_{side}',m_header,bevel=0)
+
 # 2. Lower Compressor Compartment & Intake Louvers (Z: 0.08 to 0.90 ft)
 box('CompressorInteriorDeck', (0, 0, 0.90), (3.84, 2.14, 0.06), m_interior, bevel=0.004)
 box('CompressorLowerFrontFrame', (0, -1.11, 0.49), (3.84, 0.06, 0.76), m_grille, bevel=0.003)
@@ -130,12 +146,12 @@ for s_idx, sh_z in enumerate(shelf_heights):
 # Left door center: X=-0.95. Right door center: X=0.95.
 for d_side, cx in [('Left', -0.95), ('Right', 0.95)]:
     # Outer frame
-    box(f'{d_side}DoorFrameTop', (cx, -1.13, 5.56), (1.80, 0.05, 0.08), m_frame, bevel=0.002)
-    box(f'{d_side}DoorFrameBottom', (cx, -1.13, 0.96), (1.80, 0.05, 0.08), m_frame, bevel=0.002)
-    box(f'{d_side}DoorFrameLeft', (cx - 0.86, -1.13, 3.26), (0.08, 0.05, 4.52), m_frame, bevel=0.002)
-    box(f'{d_side}DoorFrameRight', (cx + 0.86, -1.13, 3.26), (0.08, 0.05, 4.52), m_frame, bevel=0.002)
+    box(f'{d_side}DoorFrameTop', (cx, -1.13, 5.56), (1.90, 0.05, 0.08), m_frame, bevel=0.002)
+    box(f'{d_side}DoorFrameBottom', (cx, -1.13, 0.96), (1.90, 0.05, 0.08), m_frame, bevel=0.002)
+    box(f'{d_side}DoorFrameLeft', (cx - 0.91, -1.13, 3.26), (0.08, 0.05, 4.52), m_frame, bevel=0.002)
+    box(f'{d_side}DoorFrameRight', (cx + 0.91, -1.13, 3.26), (0.08, 0.05, 4.52), m_frame, bevel=0.002)
     # Double-pane glass panel
-    box(f'{d_side}DoorGlass', (cx, -1.13, 3.26), (1.64, 0.02, 4.48), m_glass, bevel=0.001)
+    box(f'{d_side}DoorGlass', (cx, -1.13, 3.26), (1.76, 0.02, 4.52), m_glass, bevel=0.001)
 
     # Vertical full-length metal handle
     hx = cx + (0.75 if d_side == 'Left' else -0.75)

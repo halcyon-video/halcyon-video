@@ -45,12 +45,11 @@ export class AcrylicPopcornBin implements StoreFixture {
       return mesh;
     };
 
-    // Pedestal base (Z: 0 to 0.8 ft)
-    box('PedestalBase', [0, 0.4, 0], [1.8, 0.8, 1.8], plinthMat);
-    // Acrylic bin walls (Z: 0.8 to 4.0 ft)
-    box('AcrylicBinBody', [0, 2.4, 0], [2.0, 3.2, 2.0], acrylicMat);
-    // Bagged / bulk popcorn contents inside bin
-    box('PopcornContents', [0, 2.0, 0], [1.85, 2.2, 1.85], popcornMat);
+    box('PedestalBase', [0, 1.1, 0], [1.8, 2.2, 1.8], plinthMat);
+    for (const z of [-.87,.87]) box('OpenTrayWall',[0,2.6,z],[1.76,.8,.02],acrylicMat);
+    for (const x of [-.87,.87]) box('OpenTrayWall',[x,2.6,0],[.02,.8,1.72],acrylicMat);
+    for (const x of [-.48,0,.48]) for (const z of [-.48,0,.48])
+      box('BaggedPopcorn',[x,2.55,z],[.4,.65,.25],popcornMat);
 
     const envelope = RETAIL_FIXTURE_SPECS['acrylic-popcorn-bin'];
     // Collision proxy box (2.2 x 4.0 x 2.2 ft)

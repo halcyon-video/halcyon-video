@@ -33,6 +33,18 @@
       "uv": true
     },
     {
+      "name": "WhiteSideStripe_-1",
+      "triangles": 132,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "WhiteSideStripe_1",
+      "triangles": 132,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
       "name": "CompressorInteriorDeck",
       "triangles": 108,
       "nonmanifoldEdges": 0,
@@ -683,16 +695,16 @@
   ],
   "boundsBlender": {
     "min": [
-      -2.0,
+      -2.003999948501587,
       -1.2549999952316284,
       0.0
     ],
     "max": [
-      2.0,
+      2.00600004196167,
       1.149999976158142,
       6.5
     ]
   },
-  "triangles": 16348,
-  "glbBytes": 1193664
+  "triangles": 16612,
+  "glbBytes": 1210928
 }

@@ -70,7 +70,7 @@ test('ten varied promotions fit without colliding with diagonal shelves or check
     { label: 'checkout', kind: 'structure', cx: 11, cz: 4.5, w: 23, d: 21, yaw: 0 },
   ];
   const plan = floorPromotionPlacements(libraries, obstacles, bounds);
-  assert.equal(plan.length, 10);
+  assert.equal(plan.length, 9);
 
   // Check the 10-object retail mix:
   // 6 four-sided displays: 2 feature titles, 2 studio features, 2 actor spotlights
@@ -86,7 +86,7 @@ test('ten varied promotions fit without colliding with diagonal shelves or check
   assert.equal(plan.filter((p) => p.kind === 'pv-drape-table').length, 1);
 
   // 1 approx 4-foot acrylic popcorn bin
-  assert.equal(plan.filter((p) => p.kind === 'acrylic-popcorn-bin').length, 1);
+  assert.equal(plan.filter((p) => p.kind === 'acrylic-popcorn-bin').length, 0);
 
   // 1 rotating impulse rack
   assert.equal(plan.filter((p) => p.kind === 'rotating-merchandiser').length, 1);
@@ -103,7 +103,7 @@ test('ten varied promotions fit without colliding with diagonal shelves or check
   }));
   assert.deepEqual(validateLayout([...obstacles, ...footprints], bounds), []);
   assert.deepEqual(plan, floorPromotionPlacements(libraries, obstacles, bounds));
-  assert.equal(floorPromotionPlacements(libraries, obstacles, bounds, 8).length, 2);
+  assert.equal(floorPromotionPlacements(libraries, obstacles, bounds, 8).length, 1);
 });
 
 test('small or fully obstructed stores decline extra displays instead of forcing ten', () => {
@@ -122,8 +122,8 @@ test('small or fully obstructed stores decline extra displays instead of forcing
 
 test('three existing towers leave room for actual fixture variety within ten', () => {
   const plan = floorPromotionPlacements(libraries, [], bounds, 3);
-  assert.equal(plan.length, 7);
-  for (const kind of ['bargain-bin', 'pv-drape-table', 'acrylic-popcorn-bin', 'rotating-merchandiser'])
+  assert.equal(plan.length, 6);
+  for (const kind of ['bargain-bin', 'pv-drape-table', 'rotating-merchandiser'])
     assert.ok(plan.some(p => p.kind === kind), kind);
   assert.equal(plan.filter(p => p.kind === 'four-sided-display').length, 3);
 });

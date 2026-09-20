@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { vestibuleLayout, counterDatumShift } from '../src/vestibule-layout.ts';
+import { vestibuleLayout, counterDatumShift, vestibuleSide, clampVestibuleSide } from '../src/vestibule-layout.ts';
 import { exitReturnLayout, exitReturnSegments } from '../src/exit-return-layout.ts';
 
 test('deeper vestibule provides wider front panels and carries checkout inward', () => {
@@ -35,4 +35,26 @@ test('open return end retains the back wall and a body-width side-door approach'
       assert.ok(z-.25>v.backZ && z+.25<15);
     }
   }
+});
+
+test('tapered doors meet checkout corners and their entire clear opening is walkable',()=>{
+  for(const doorWidth of [3,3.2,4]) for(const side of [-1,1] as const) {
+    const wall=vestibuleSide({doorWidth,entryStyle:'vestibule'},side);
+    assert.equal(wall.x,11+side*6.2);
+    assert.ok(Math.abs(wall.x+wall.sin*wall.length-(11+side*(9+2*doorWidth)/2))<1e-8);
+    const point=(along:number,normal:number)=>({x:wall.x+along*wall.sin+normal*wall.cos,z:wall.z+along*wall.cos-normal*wall.sin});
+    for(const offset of [-doorWidth/2+.5,0,doorWidth/2-.5]) {
+      const next=point(wall.doorAlong+offset,.7),old=point(wall.doorAlong+offset,-.7);
+      assert.deepEqual(clampVestibuleSide(next,old,wall,doorWidth,.4,.3),next);
+    }
+    const next=point(wall.length-1,.1),old=point(wall.length-1,-.7);
+    const hit=clampVestibuleSide(next,old,wall,doorWidth,.4,.3);
+    assert.ok(Math.abs((hit.x-wall.x)*wall.cos-(hit.z-wall.z)*wall.sin+.4)<1e-8);
+  }
+});
+
+test('square checkout vestibule meets its wider rear corners',()=>{
+  const spec={doorWidth:3.2,entryStyle:'vestibule' as const,counterShape:'usquare'};
+  assert.equal(vestibuleSide(spec,-1).x,4.2);
+  assert.equal(vestibuleSide(spec,1).x,17.8);
 });

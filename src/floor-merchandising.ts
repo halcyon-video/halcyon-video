@@ -1,10 +1,10 @@
-import { RETAIL_FIXTURE_SPECS, retailFixtureFootprint, type RetailFixtureKind } from './retail-fixture-specs.ts';
+import { retailFixtureFootprint, type RetailFixtureKind } from './retail-fixture-specs.ts';
 import { buildPromoCampaign } from './promo-campaigns.ts';
 import { validateLayout, type Footprint } from './layout-validator.ts';
 import type { FixturePlacement } from './store-layout.ts';
 import type { Library } from './providers/media-source-provider.ts';
 
-export const FLOOR_PROMOTION_TARGET = 10;
+export const FLOOR_PROMOTION_TARGET = 9;
 type Bounds = { minX: number; maxX: number; minZ: number; maxZ: number };
 
 interface PromotionBlueprint {
@@ -79,12 +79,11 @@ const FLOOR_PROMOTION_BLUEPRINTS: PromotionBlueprint[] = [
 ];
 
 /** Populate available floor pockets with a varied retail promotion programme.
- * 10-object mix:
+ * Nine movie-floor displays; popcorn belongs to the checkout queue:
  * - 2 single-film displays (feature-title:0, 1)
  * - 2 studio subjects (studio-feature:0, 1)
  * - 2 actor subjects (actor-spotlight:0, 1)
  * - 2 sale fixtures (bargain-bin, pv-drape-table)
- * - 1 approx 4-foot acrylic popcorn bin (acrylic-popcorn-bin)
  * - 1 rotating impulse rack (rotating-merchandiser / #275)
  */
 export function floorPromotionPlacements(
@@ -97,6 +96,7 @@ export function floorPromotionPlacements(
   if (!needed || !libraries.some((l) => l.movies.length)) return [];
 
   const viable = FLOOR_PROMOTION_BLUEPRINTS.filter(bp => {
+    if (bp.kind === 'acrylic-popcorn-bin') return false; // Checkout concessions, never the movie/game floor.
     if (bp.campaign) return Boolean(buildPromoCampaign(bp.campaign, libraries, 3, 3));
     // Match the reused sale fixtures' stock contracts rather than reserving
     // floor space for an empty movie table in a series-only library.
@@ -110,8 +110,8 @@ export function floorPromotionPlacements(
   const centerX = (bounds.minX + bounds.maxX) / 2;
   const placed: Footprint[] = [...obstacles];
   const result: FixturePlacement[] = [];
-  // Existing towers count toward ten. Prioritize the two sale families and
-  // both impulse fixtures, then one subject of each type before duplicates.
+  // Existing towers count toward nine. Checkout popcorn is counted separately.
+  // Prioritize sale fixtures, then distinct subjects before duplicates.
   const priority = [6, 7, 8, 9, 0, 2, 4, 1, 3, 5];
   for (const index of priority) {
     const bp = FLOOR_PROMOTION_BLUEPRINTS[index];
@@ -151,27 +151,40 @@ function fits(fp: Footprint, obstacles: Footprint[], bounds: Bounds): boolean {
   });
 }
 
-/** Original concessions studies: admit only what the actual front concourse
- * can hold. Wall-relative placement preserves the entrance/counter approaches
- * and does not assume a particular store width or historical adoption date. */
+/** Checkout queue concessions; never fill the distant game-department wall. */
 export function frontRefreshmentPlacements(obstacles: Footprint[], bounds: Bounds): FixturePlacement[] {
   const result: FixturePlacement[] = [];
   const placed = [...obstacles];
-  const kinds: RetailFixtureKind[] = ['two-door-cooler', 'candy-wall-gondola', 'chest-freezer', 'secondary-service-counter'];
+  const sides = obstacles.some(o => o.label.startsWith('fixture:game-section-')) ? [false] : [false,true];
+  const kinds: RetailFixtureKind[] = ['candy-wall-gondola', 'two-door-cooler', 'acrylic-popcorn-bin', 'chest-freezer'];
   for (const kind of kinds) {
-    const spec = RETAIL_FIXTURE_SPECS[kind];
     let admitted = false;
-    for (const right of [true, false]) {
-      const x = right ? bounds.maxX - spec.d / 2 - spec.clearance
-        : bounds.minX + spec.d / 2 + spec.clearance;
-      for (let z = bounds.maxZ - spec.w / 2 - spec.clearance; z >= Math.max(bounds.minZ + spec.w / 2 + spec.clearance, -8); z -= .5) {
-        const p: FixturePlacement = { id: `${kind}-front`, kind, position: { x, z }, yaw: right ? -Math.PI / 2 : Math.PI / 2 };
-        const fp = retailFixtureFootprint(kind, p);
+    // A short run facing the register approach, with at least three feet
+    // between fixtures and all existing circulation reservations.
+    for (const right of sides) {
+      for (const offset of [16,19,22,25,28]) {
+      for (let z = 3; z >= -8; z -= .5) {
+        const p: FixturePlacement = { id: `${kind}-front`, kind,
+          position: { x: 11 + (right ? offset : -offset), z }, yaw: right ? -Math.PI / 2 : Math.PI / 2 };
+        const fp = {...retailFixtureFootprint(kind, p), clearance: 3};
         if (!fits(fp, placed, bounds)) continue;
         result.push(p); placed.push(fp); admitted = true; break;
+      }
+      if (admitted) break;
       }
       if (admitted) break;
     }
   }
   return result;
+}
+
+/** Keep the era-specific sale table, but admit it against the live counters. */
+export function placeFloorSaleTable(placement: FixturePlacement, obstacles: Footprint[], bounds: Bounds): FixturePlacement | null {
+  for (let z = 6; z >= bounds.minZ + 6; z -= 1.5) {
+    for (const x of [-11, 33, -18, 40, 11]) {
+      const fp: Footprint = {label: placement.id,kind:'fixture',cx:x,cz:z,w:6.2,d:2.7,yaw:0,clearance:3};
+      if (fits(fp,obstacles,bounds)) return {...placement,position:{x,z}};
+    }
+  }
+  return null;
 }

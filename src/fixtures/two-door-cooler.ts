@@ -26,7 +26,7 @@ export class TwoDoorCooler implements StoreFixture {
     group.rotation.y = this.placement.yaw;
 
     const own = <T extends { dispose(): void }>(o: T): T => { this.owned.push(o); return o; };
-    const enamelMat = own(new THREE.MeshStandardMaterial({ color: '#f0f0f2', roughness: 0.25 }));
+    const enamelMat = own(new THREE.MeshStandardMaterial({ color: '#d52e35', roughness: 0.25 }));
     const plinthMat = own(new THREE.MeshStandardMaterial({ color: '#18191c', roughness: 0.7 }));
     const headerMat = own(new THREE.MeshStandardMaterial({
       color: '#e8f0fe', roughness: 0.2, emissive: '#203a70', emissiveIntensity: 0.25,

@@ -51,116 +51,164 @@
       "uv": true
     },
     {
-      "name": "BinTopHeader",
+      "name": "PopcornBag_0",
+      "triangles": 372,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "BagCrimp_0_2.24",
       "triangles": 108,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "BinClearLid",
+      "name": "BagCrimp_0_2.87",
       "triangles": 108,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "PopcornCarton_0",
+      "name": "PopcornBag_1",
+      "triangles": 372,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "BagCrimp_1_2.24",
       "triangles": 108,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "PopcornCarton_1",
+      "name": "BagCrimp_1_2.87",
       "triangles": 108,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "PopcornCarton_2",
+      "name": "PopcornBag_2",
+      "triangles": 372,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "BagCrimp_2_2.24",
       "triangles": 108,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "PopcornCarton_3",
+      "name": "BagCrimp_2_2.87",
       "triangles": 108,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "PopcornCarton_4",
+      "name": "PopcornBag_3",
+      "triangles": 372,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "BagCrimp_3_2.24",
       "triangles": 108,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "PopcornCarton_5",
+      "name": "BagCrimp_3_2.87",
       "triangles": 108,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "PopcornCarton_6",
+      "name": "PopcornBag_4",
+      "triangles": 372,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "BagCrimp_4_2.24",
       "triangles": 108,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "PopcornCarton_7",
+      "name": "BagCrimp_4_2.87",
       "triangles": 108,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "PopcornCarton_8",
+      "name": "PopcornBag_5",
+      "triangles": 372,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "BagCrimp_5_2.24",
       "triangles": 108,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "PopcornCarton_9",
+      "name": "BagCrimp_5_2.87",
       "triangles": 108,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "PopcornCarton_10",
+      "name": "PopcornBag_6",
+      "triangles": 372,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "BagCrimp_6_2.24",
       "triangles": 108,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "PopcornTubBody_0",
-      "triangles": 236,
+      "name": "BagCrimp_6_2.87",
+      "triangles": 108,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "PopcornTubRim_0",
-      "triangles": 236,
+      "name": "PopcornBag_7",
+      "triangles": 372,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "PopcornTubBody_1",
-      "triangles": 236,
+      "name": "BagCrimp_7_2.24",
+      "triangles": 108,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "PopcornTubRim_1",
-      "triangles": 236,
+      "name": "BagCrimp_7_2.87",
+      "triangles": 108,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "PopcornTubBody_2",
-      "triangles": 236,
+      "name": "PopcornBag_8",
+      "triangles": 372,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "PopcornTubRim_2",
-      "triangles": 236,
+      "name": "BagCrimp_8_2.24",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "BagCrimp_8_2.87",
+      "triangles": 108,
       "nonmanifoldEdges": 0,
       "uv": true
     }
@@ -174,9 +222,9 @@
     "max": [
       0.9100000262260437,
       0.9100000262260437,
-      4.0
+      3.0
     ]
   },
-  "triangles": 3684,
-  "glbBytes": 296184
+  "triangles": 6156,
+  "glbBytes": 592288
 }

@@ -4,7 +4,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import * as THREE from 'three';
 import { prepareRetailModel } from '../src/fixtures/retail-model.ts';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { frontRefreshmentPlacements } from '../src/floor-merchandising.ts';
+import { frontRefreshmentPlacements, placeFloorSaleTable } from '../src/floor-merchandising.ts';
 import { RETAIL_FIXTURE_SPECS, retailFixtureFootprint, type RetailFixtureKind } from '../src/retail-fixture-specs.ts';
 import { validateLayout, type Footprint } from '../src/layout-validator.ts';
 
@@ -76,4 +76,25 @@ test('every admitted new kind is registered and excluded from independent-store 
   const config = readFileSync(new URL('../src/store-fixtures-config.ts', import.meta.url), 'utf8');
   const excluded = config.match(/const FLOOR_DISPLAY_KINDS = new Set\(\[([\s\S]*?)\]\);/)![1];
   for (const kind of kinds) { assert.ok(registry.includes(`'${kind}'`)); assert.ok(excluded.includes(`'${kind}'`)); }
+});
+
+test('sale table cannot occupy the new return counter or its walking clearance',()=>{
+  const counter:Footprint={label:'return counter',kind:'structure',cx:-5,cz:10,w:15.5,d:7.4,yaw:0};
+  const bounds={minX:-35,maxX:57,minZ:-60,maxZ:15};
+  const table=placeFloorSaleTable({id:'pv-drape-table-front',kind:'pv-drape-table',position:{x:-5,z:9},yaw:0},[counter,checkout],bounds);
+  assert.ok(table);
+  assert.deepEqual(validateLayout([counter,checkout,{label:'table',kind:'fixture',cx:table.position.x,cz:table.position.z,w:6.2,d:2.7,yaw:0,clearance:3}],bounds).filter(v=>v.a==='table'||v.b==='table'),[]);
+});
+test('concessions stay near checkout rather than migrating to a wider game wing',()=>{
+  const plan=frontRefreshmentPlacements([checkout],{minX:-45,maxX:67,minZ:-80,maxZ:15});
+  assert.ok(plan.some(p=>p.kind==='acrylic-popcorn-bin'));
+  assert.ok(!plan.some(p=>p.kind==='secondary-service-counter'));
+  assert.ok(plan.every(p=>Math.abs(p.position.x-11)<=28 && p.position.z>=-8 && p.position.z<=3));
+});
+
+test('stocked game wing never becomes the fallback concessions queue',()=>{
+  const game:Footprint={label:'fixture:game-section-0',kind:'fixture',cx:40,cz:0,w:4,d:12,yaw:0};
+  const plan=frontRefreshmentPlacements([checkout,game],{minX:-35,maxX:57,minZ:-70,maxZ:15});
+  assert.ok(plan.some(p=>p.kind==='two-door-cooler'));
+  assert.ok(plan.every(p=>p.position.x<11));
 });

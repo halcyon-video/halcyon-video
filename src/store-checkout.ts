@@ -1,4 +1,4 @@
-import { vestibuleLayout } from './vestibule-layout.ts';
+import { vestibuleLayout, vestibuleSide } from './vestibule-layout.ts';
 // Checkout & carry flow — extracted from StoreScene (three-scene.ts keeps
 // one-line delegating stubs): picking tapes up into the carried stack,
 // walking them to the counter, the soft-body bag, confirm/finish checkout,
@@ -742,7 +742,9 @@ export function buildCheckoutExitPath(scene: StoreScene, stand: THREE.Vector3): 
       new THREE.Vector3(STORE_CENTER_X, 0, 15.9), // out the single front leaf
     ], false, 'centripetal');
   }
-  const { backZ, sideDoorZ } = vestibuleLayout(scene.storefrontSpec);
+  const { backZ } = vestibuleLayout(scene.storefrontSpec);
+  const exitSide = vestibuleSide(scene.storefrontSpec, -1);
+  const sideDoorZ = exitSide.doorZ;
   const xL = 11.0 - (9.0 + 2 * doorW) / 2;   // vestibule left (-X, exit-side) wall
   const exitX = STORE_CENTER_X - facadeEntryGlazing(doorW, facadeStyle()).doorCenterOffset;
   return new THREE.CatmullRomCurve3([
@@ -750,8 +752,8 @@ export function buildCheckoutExitPath(scene: StoreScene, stand: THREE.Vector3): 
     new THREE.Vector3(stand.x - 3.7, 0, stand.z + 1.9), // swing wide of the candy rack
     new THREE.Vector3(xL - 0.9, 0, stand.z + 6.0),      // round the counter's right taper
     new THREE.Vector3(xL - 1.1, 0, backZ - 4.1),        // up the exit corridor
-    new THREE.Vector3(xL - 0.45, 0, sideDoorZ + 0.1),   // at the side door
-    new THREE.Vector3(xL + 1.3, 0, sideDoorZ + 1.2),    // through, into the exit half
+    new THREE.Vector3(exitSide.doorX - .8*exitSide.cos, 0, sideDoorZ + .8*exitSide.sin),   // at the side door
+    new THREE.Vector3(exitSide.doorX + 1.3*exitSide.cos, 0, sideDoorZ - 1.3*exitSide.sin),    // through, into the exit half
     new THREE.Vector3(exitX, 0, 15.9),                  // out the front exit leaf
   ], false, 'centripetal');
 }

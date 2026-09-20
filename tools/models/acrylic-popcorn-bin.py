@@ -86,51 +86,33 @@ box('PedestalCarcass', (0, 0, 1.125), (1.76, 1.76, 1.95), m_laminate, bevel=0.00
 # Top collar/deck: 1.82 x 1.82 ft, 0.10 ft high (Z: 2.10 to 2.20)
 box('PedestalTopDeck', (0, 0, 2.15), (1.82, 1.82, 0.10), m_laminate, bevel=0.008)
 
-# 2. Acrylic Hopper / Bin (Z: 2.20 to 4.00, total height 1.80 ft)
-# Bottom acrylic plate: 1.74 x 1.74 ft, 0.02 ft thick (Z: 2.20 to 2.22)
+# Open, low acrylic tray: no canopy, lid, cartons or tubs.
 box('BinBasePlate', (0, 0, 2.21), (1.74, 1.74, 0.02), m_acrylic, bevel=0.002)
-# Back wall: 1.76 ft wide, 0.02 ft thick, 1.78 ft tall (Z: 2.22 to 4.00)
-box('BinBackWall', (0, 0.87, 3.11), (1.76, 0.02, 1.78), m_acrylic, bevel=0.002)
-# Left wall: 0.02 ft thick, 1.72 ft deep, 1.78 ft tall
-box('BinLeftWall', (-0.87, 0, 3.11), (0.02, 1.72, 1.78), m_acrylic, bevel=0.002)
-# Right wall: 0.02 ft thick, 1.72 ft deep, 1.78 ft tall
-box('BinRightWall', (0.87, 0, 3.11), (0.02, 1.72, 1.78), m_acrylic, bevel=0.002)
-# Front wall (lower access lip for customer reach): 1.76 ft wide, 0.02 ft thick, 1.25 ft tall (Z: 2.22 to 3.47)
-box('BinFrontWall', (0, -0.87, 2.845), (1.76, 0.02, 1.25), m_acrylic, bevel=0.002)
-# Top rear canopy / hinge rail: 1.76 ft wide, 0.50 ft deep, 0.02 ft thick at Z=3.99
-box('BinTopHeader', (0, 0.62, 3.99), (1.76, 0.50, 0.02), m_acrylic, bevel=0.002)
-# Hinged clear lid tilted slightly open: 1.74 ft wide, 1.25 ft deep, 0.02 ft thick
-box('BinClearLid', (0, -0.22, 3.86), (1.74, 1.25, 0.02), m_acrylic, bevel=0.002)
+for name,loc,dims in [
+    ('Back',(0,.87,2.61),(1.76,.02,.78)),
+    ('Left',(-.87,0,2.61),(.02,1.72,.78)),
+    ('Right',(.87,0,2.61),(.02,1.72,.78)),
+    ('Front',(0,-.87,2.51),(1.76,.02,.58))]:
+    box('Bin'+name+'Wall',loc,dims,m_acrylic,bevel=.002)
 
-# 3. Merchandised Stock Inside Bin (Popcorn boxes and tubs)
-carton_coords = [
-    (-0.45, -0.35, 2.38, 0.15, m_carton_yellow),
-    (0.00, -0.38, 2.38, -0.10, m_carton_red),
-    (0.45, -0.32, 2.38, 0.05, m_carton_yellow),
-    (-0.35, 0.10, 2.45, 0.28, m_carton_red),
-    (0.20, 0.15, 2.45, -0.22, m_carton_yellow),
-    (-0.10, -0.15, 2.62, 0.12, m_carton_red),
-    (0.38, -0.10, 2.62, -0.18, m_carton_yellow),
-    (-0.40, 0.45, 2.50, -0.05, m_carton_yellow),
-    (0.35, 0.48, 2.50, 0.20, m_carton_red),
-    (-0.15, 0.35, 2.75, 0.10, m_carton_yellow),
-    (0.25, 0.30, 2.75, -0.15, m_carton_red),
-]
-for i, (cx, cy, cz, rot, mat) in enumerate(carton_coords):
-    bpy.ops.mesh.primitive_cube_add(size=1, location=(cx, cy, cz))
-    o = bpy.context.object
-    o.dimensions = (0.55, 0.40, 0.20)
-    o.rotation_euler = (0.05 * (i % 3 - 1), 0.08 * (i % 2 - 1), rot)
-    finish(o, f'PopcornCarton_{i}', mat, bevel=0.003)
-
-tub_coords = [
-    (-0.30, -0.15, 2.95),
-    (0.28, -0.12, 2.95),
-    (0.00, 0.25, 3.05),
-]
-for j, (tx, ty, tz) in enumerate(tub_coords):
-    cylinder(f'PopcornTubBody_{j}', (tx, ty, tz), 0.22, 0.48, m_tub_white, verts=20, bevel=0.002)
-    cylinder(f'PopcornTubRim_{j}', (tx, ty, tz + 0.23), 0.23, 0.04, m_tub_rim, verts=20, bevel=0.002)
+# Individually sealed pillow bags: bulged shoulders and narrow crimped ends.
+for i,(x,y) in enumerate([(x,y) for y in [-.48,0,.48] for x in [-.48,0,.48]]):
+    rings=[(0,.15,.035),(.06,.21,.105),(.32,.23,.13),(.59,.20,.09),(.65,.15,.025)]
+    verts=[]
+    for z,halfwidth,halfdepth in rings:
+        for k in range(8):
+            t=2*math.pi*k/8
+            verts.append((x+halfwidth*math.cos(t),y+halfdepth*math.sin(t),2.23+z))
+    faces=[tuple(reversed(range(8)))]
+    for r in range(len(rings)-1):
+        for k in range(8):
+            faces.append((r*8+k,r*8+(k+1)%8,(r+1)*8+(k+1)%8,(r+1)*8+k))
+    faces.append(tuple(range(32,40)))
+    mesh=bpy.data.meshes.new('SealedBagMesh');mesh.from_pydata(verts,[],faces);mesh.update()
+    o=bpy.data.objects.new('PopcornBag',mesh);scene.collection.objects.link(o)
+    finish(o,f'PopcornBag_{i}',m_carton_yellow if i%2 else m_tub_white,bevel=.003)
+    for z in [2.24,2.87]:
+        box(f'BagCrimp_{i}_{z}',(x,y,z),(.31,.045,.025),m_carton_red,bevel=.002)
 
 metrics = {
     'units': 'feet',

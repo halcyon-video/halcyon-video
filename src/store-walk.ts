@@ -1,3 +1,4 @@
+import { vestibuleSide, clampVestibuleSide, vestibuleBackHalf } from './vestibule-layout';
 // First-person walk-around mode — extracted from StoreScene (three-scene.ts
 // keeps one-line delegating stubs): pointer-lock acquisition, walk clicks
 // (shelf case pick-up + inspect), slot raycast resolution, the collision
@@ -195,13 +196,12 @@ export function constrainWalkPosition(scene: StoreScene, oldX: number, oldZ: num
   // clamps 1-4 (the airlock's back/side/divider walls) don't apply, and
   // clamp 5's door gap is the single leaf instead of the paired exit/entrance.
   const hasChamber = vest ? vest.hasChamber : true;
-  const wallLeft = vest?.xL ?? 3.3, wallRight = vest?.xR ?? 18.7;
   const wallBack = vest?.backZ ?? 8.6, wallFront = vest?.frontZ ?? 15;
   const dividerX = vest?.cx ?? 11;
 
   if (hasChamber) {
     // 1. Vestibule back wall (Z = wallBack, X between wallLeft and wallRight)
-    if (x > wallLeft - r && x < wallRight + r) {
+    if (Math.abs(x-dividerX) < vestibuleBackHalf(scene.storefrontSpec)+r) {
       if (oldZ < wallBack) {
         z = Math.min(wallBack - r, z);
       } else if (oldZ >= wallBack) {
@@ -219,8 +219,6 @@ export function constrainWalkPosition(scene: StoreScene, oldX: number, oldZ: num
     }
   }
 
-  const sideDoorZ0 = vest ? vest.sideDoorZ - vest.doorW / 2 : 9.0;
-  const sideDoorZ1 = vest ? vest.sideDoorZ + vest.doorW / 2 : 12.2;
   // Single-leaf entrance: one gap centred on the door, no separate exit leaf.
   const exitFrontX0 = vest && !hasChamber ? vest.cx : (vest ? vest.cx - vest.doorW : 7.8);
   const exitFrontX1 = vest && !hasChamber ? vest.cx : (vest ? vest.cx : dividerX);
@@ -228,24 +226,10 @@ export function constrainWalkPosition(scene: StoreScene, oldX: number, oldZ: num
   const entrFrontX1 = vest && !hasChamber ? vest.cx + vest.doorW / 2 : (vest ? vest.cx + vest.doorW : 14.2);
 
   if (hasChamber) {
-    // 3. Vestibule left wall (X = wallLeft, Z between wallBack and wallFront), side door at sideDoorZ
-    const isAtLeftSideDoor = z >= sideDoorZ0 + r_door && z <= sideDoorZ1 - r_door;
-    if (z > wallBack - r && z < wallFront + r && !isAtLeftSideDoor) {
-      if (oldX < wallLeft) {
-        x = Math.min(wallLeft - r, x);
-      } else if (oldX >= wallLeft) {
-        x = Math.max(wallLeft + r, x);
-      }
-    }
-
-    // 4. Vestibule right wall (X = wallRight, Z between wallBack and wallFront), side door at sideDoorZ
-    const isAtRightSideDoor = z >= sideDoorZ0 + r_door && z <= sideDoorZ1 - r_door;
-    if (z > wallBack - r && z < wallFront + r && !isAtRightSideDoor) {
-      if (oldX > wallRight) {
-        x = Math.max(wallRight + r, x);
-      } else if (oldX <= wallRight) {
-        x = Math.min(wallRight - r, x);
-      }
+    for (const side of [-1,1] as const) {
+      const resolved=clampVestibuleSide({x,z},{x:oldX,z:oldZ},
+        vestibuleSide(scene.storefrontSpec,side,dividerX),scene.storefrontSpec.doorWidth,r,r_door);
+      x=resolved.x;z=resolved.z;
     }
   }
 

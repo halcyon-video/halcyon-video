@@ -1,5 +1,5 @@
 /** Shared entrance depth, in feet. Side glazing frames the door rather than its approach. */
-export interface VestibuleSpec { doorWidth: number; entryStyle: 'vestibule' | 'storefront-door' }
+export interface VestibuleSpec { doorWidth: number; entryStyle: 'vestibule' | 'storefront-door'; counterShape?: string }
 export function vestibuleLayout(spec: VestibuleSpec, frontZ = 15) {
   const hasChamber = spec.entryStyle === 'vestibule';
   const rearPanelDepth = hasChamber ? 1 : 0;
@@ -12,4 +12,32 @@ export function vestibuleLayout(spec: VestibuleSpec, frontZ = 15) {
 /** Existing band prop coordinates use the original 3.2-foot-door datum. */
 export function counterDatumShift(spec: VestibuleSpec): number {
   return spec.entryStyle === 'vestibule' ? vestibuleLayout(spec).backZ - 8.6 : 0;
+}
+
+export const vestibuleBackHalf = (spec: VestibuleSpec) => spec.counterShape === 'usquare' ? 6.8 : 6.2;
+
+/** Side glazing tapers from the storefront to the checkout's rear corners. */
+export function vestibuleSide(spec: VestibuleSpec, side: -1 | 1, cx = 11) {
+  const v = vestibuleLayout(spec);
+  const frontHalf = (9 + 2 * spec.doorWidth) / 2;
+  const backHalf = vestibuleBackHalf(spec);
+  const dx = side * (frontHalf - backHalf);
+  const length = Math.hypot(dx, v.depth);
+  const sin = dx / length, cos = v.depth / length;
+  const x = cx + side * backHalf, z = v.backZ;
+  const doorAlong = v.rearPanelDepth + spec.doorWidth / 2;
+  return {x,z,length,sin,cos,yaw:Math.atan2(dx,v.depth),doorAlong,
+    doorX:x+sin*doorAlong,doorZ:z+cos*doorAlong};
+}
+
+/** Resolve a walking body against one slanted wall, leaving its door open. */
+export function clampVestibuleSide(point: {x:number;z:number}, old: {x:number;z:number},
+  wall: ReturnType<typeof vestibuleSide>, doorWidth:number, radius:number, doorRadius:number) {
+  const dx=point.x-wall.x,dz=point.z-wall.z;
+  const along=dx*wall.sin+dz*wall.cos;
+  if(along < -radius || along > wall.length+radius || Math.abs(along-wall.doorAlong)<=doorWidth/2-doorRadius) return point;
+  const normal=dx*wall.cos-dz*wall.sin;
+  const oldNormal=(old.x-wall.x)*wall.cos-(old.z-wall.z)*wall.sin;
+  const clamped=oldNormal<0?Math.min(normal,-radius):Math.max(normal,radius);
+  return {x:point.x+(clamped-normal)*wall.cos,z:point.z-(clamped-normal)*wall.sin};
 }

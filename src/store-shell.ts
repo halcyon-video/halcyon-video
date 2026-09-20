@@ -1,7 +1,7 @@
 import { vestibuleLayout, counterDatumShift } from './vestibule-layout.ts';
 import { exitReturnLayout } from './exit-return-layout';
 import { RETAIL_FIXTURE_SPECS } from './retail-fixture-specs';
-import { floorPromotionPlacements, frontRefreshmentPlacements } from './floor-merchandising';
+import { floorPromotionPlacements, frontRefreshmentPlacements, placeFloorSaleTable } from './floor-merchandising';
 import { placeStockCart } from './fixtures/stock-cart-layout';
 import { buildNrBayLighting } from './nr-bay-lighting';
 import { NR_BAY_WIDTH, nrColumnX } from './nr-run-layout';
@@ -2337,7 +2337,20 @@ export function buildStore(scene: StoreScene) {
       }
     });
   };
-  fixturePlacements.sort((a, b) => Number(a.kind === 'release-cart') - Number(b.kind === 'release-cart'));
+    const returnCounter=exitReturnLayout(storeWidth,{
+      xL:STORE_CENTER_X-vestibuleHalfWidth(scene.storefrontSpec)+.2,frontZ:FRONT_GLASS_Z,
+      sideDoorZ:vestibuleLayout(scene.storefrontSpec).sideDoorZ,
+      doorW:scene.storefrontSpec.doorWidth,hasChamber:scene.storefrontSpec.entryStyle==='vestibule',
+    });
+    const reserved: Footprint[] = [
+      ...(returnCounter?[{...returnCounter,clearance:1.5}]:[]),
+      { label: 'checkout circulation', kind: 'structure', cx: STORE_CENTER_X, cz: 4.5 + counterDatumShift(scene.storefrontSpec)/2, w: 23, d: 21 - counterDatumShift(scene.storefrontSpec), yaw: 0 },
+      ...(scene.plan.clubhouse ? [{ label: 'clubhouse approach', kind: 'structure' as const,
+        cx: STORE_CENTER_X - storeWidth / 2 + 10, cz: backWallZ + 10, w: 20, d: 20, yaw: 0 }] : []),
+    ];
+  // Admit movable furniture after game shelves and other fixed fixtures.
+  const placementOrder = (p: typeof fixturePlacements[number]) => p.kind === 'release-cart' ? 2 : p.id === 'pv-drape-table-front' ? 1 : 0;
+  fixturePlacements.sort((a,b) => placementOrder(a)-placementOrder(b));
   const buildFixture = (placement: typeof fixturePlacements[number]) => {
     if (placement.kind === 'release-cart') {
       const chosen = placeStockCart([...scene.plan.getUnitFootprints(), ...fixtureFootprints,
@@ -2345,6 +2358,13 @@ export function buildStore(scene: StoreScene) {
         ...(scene.plan.clubhouse ? [{ label: 'clubhouse reserved', kind: 'structure' as const,
           cx: STORE_CENTER_X - storeWidth / 2 + 10, cz: backWallZ + 10, w: 20, d: 20, yaw: 0 }] : []),
       ], { minX: STORE_CENTER_X - storeWidth / 2, maxX: STORE_CENTER_X + storeWidth / 2, minZ: backWallZ, maxZ: FRONT_GLASS_Z });
+      if (!chosen) return;
+      placement = chosen;
+    }
+    if (placement.id === 'pv-drape-table-front') {
+      const chosen = placeFloorSaleTable(placement,
+        [...scene.plan.getUnitFootprints(), ...fixtureFootprints, ...reserved],
+        {minX:STORE_CENTER_X-storeWidth/2,maxX:STORE_CENTER_X+storeWidth/2,minZ:backWallZ,maxZ:FRONT_GLASS_Z});
       if (!chosen) return;
       placement = chosen;
     }
@@ -2381,23 +2401,14 @@ export function buildStore(scene: StoreScene) {
       scene.tipJars.push(fixture);
     }
   };
-  fixturePlacements.forEach(buildFixture);
+  const movable = fixturePlacements.filter(p => placementOrder(p)>0);
+  fixturePlacements.filter(p => placementOrder(p)===0).forEach(buildFixture);
   if (activeStoreFormat().floorDisplays) {
     const existing = scene.slottedFixtures.filter(f => f.placement.kind === 'four-sided-display').length;
-    const returnCounter=exitReturnLayout(storeWidth,{
-      xL:STORE_CENTER_X-vestibuleHalfWidth(scene.storefrontSpec)+.2,frontZ:FRONT_GLASS_Z,
-      sideDoorZ:vestibuleLayout(scene.storefrontSpec).sideDoorZ,
-      doorW:scene.storefrontSpec.doorWidth,hasChamber:scene.storefrontSpec.entryStyle==='vestibule',
-    });
-    const reserved: Footprint[] = [
-      ...(returnCounter?[{...returnCounter,clearance:1.5}]:[]),
-      { label: 'checkout circulation', kind: 'structure', cx: STORE_CENTER_X, cz: 4.5 + counterDatumShift(scene.storefrontSpec)/2, w: 23, d: 21 - counterDatumShift(scene.storefrontSpec), yaw: 0 },
-      ...(scene.plan.clubhouse ? [{ label: 'clubhouse approach', kind: 'structure' as const,
-        cx: STORE_CENTER_X - storeWidth / 2 + 10, cz: backWallZ + 10, w: 20, d: 20, yaw: 0 }] : []),
-    ];
     frontRefreshmentPlacements([...scene.plan.getUnitFootprints(), ...fixtureFootprints, ...reserved],
       { minX: STORE_CENTER_X - storeWidth / 2, maxX: STORE_CENTER_X + storeWidth / 2,
         minZ: backWallZ, maxZ: FRONT_GLASS_Z }).forEach(buildFixture);
+    movable.forEach(buildFixture);
     floorPromotionPlacements(scene.fixtureContext().libraries, [...scene.plan.getUnitFootprints(), ...fixtureFootprints, ...reserved],
       { minX: STORE_CENTER_X - storeWidth / 2, maxX: STORE_CENTER_X + storeWidth / 2,
         minZ: backWallZ, maxZ: FRONT_GLASS_Z }, existing).forEach(buildFixture);

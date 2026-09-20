@@ -119,13 +119,8 @@ export const DEFAULT_FIXTURE_PLACEMENTS: FixturePlacement[] = [
   // period hosts the kit — so on the 2008-fabric bb-2010 theme it stands, and
   // a 2012 period (or a theme with no period at all) simply doesn't get one.
   //
-  // Pin 152 places it on the EXIT (-X) side at (-5,9), out of the entrance and
-  // register flow. The table footprint spans x -8.1..-1.9 and z 7.65..10.35:
-  // 3.9 ft from the minimum-width store wall, 4.65 ft behind the front glass,
-  // and 3.7 ft edge-to-edge from the release cart at (-5,3).
-  // The counter's mirrored outer reach is x=1.2, so x=-5 clears it in X at
-  // every z; its two browse-camera standoffs, z=5.55 and 12.45, remain inside
-  // the open front floor. The vestibule begins more than five feet to its +X.
+  // Owner pin 162: the return counter now occupies the old fixed position.
+  // store-shell admits this table into a measured free pocket at build time.
   {
     id: 'pv-drape-table-front',
     kind: 'pv-drape-table',
