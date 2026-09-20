@@ -255,7 +255,7 @@ export function buildAisleShelving(deps: AisleShelvingDeps): void {
   const FLUSH_TOPPER_H = archedTopper ? 0.6 * CASE_HEIGHT : theme.id === 'bb-2010' ? 0.55 : 0.62;
   // Corner radius of the rounded top (proportional to the smaller arched plaque).
   const TOPPER_CORNER_R = archedTopper ? 0.11 : 0.15;
-  const FLUSH_TOPPER_DEPTH = 0.03; // ft — one thin extrusion per face
+  const FLUSH_TOPPER_DEPTH = archedTopper ? .006 : .03; // ft — one thin extrusion per face
   const flushTopperGeos = new Map<string, THREE.ExtrudeGeometry>();
   // Rounded-TOP-corner rectangle (bottom corners square), extruded thin. Built
   // in the XY plane with its base on y=0 so meshes sit flush on the shelf top.
@@ -732,9 +732,13 @@ export function buildAisleShelving(deps: AisleShelvingDeps): void {
     // 2.2-box-wide marker centered on the gondola top (~1.35 ft across there).
     if (archedTopper && archedSections.length) {
       const plaqueGeo = getFlushTopperGeo(2.2 * CASE_WIDTH);
-      archedSections.forEach((sec, p) => {
-        // Front (+Z) edge of section p: col (p*SECTION_COLS - 0.5).
-        const zFrontEdge = FIELD_Z_FRONT + unit.zPos - 0.5 - (p * SECTION_COLS - 0.5) * BOX_SPACING;
+      const plaqueMounts = archedSections.map((sec,p)=>({sec,z:p===0
+        ? FIELD_Z_FRONT+unit.zPos+(unit.isLineFront ? .05 : 0)
+        : FIELD_Z_FRONT+unit.zPos-.5-(p*SECTION_COLS-.5)*BOX_SPACING}));
+      if(unit.isLineBack) plaqueMounts.push({sec:archedSections[archedSections.length-1],
+        z:FIELD_Z_FRONT+unit.zPos-shelfLength-.05});
+      plaqueMounts.forEach(({sec,z:zFrontEdge}) => {
+        // Use the actual end panel or divider support, including the final end.
         const labelMat = getFlushLabelMat(sec.genre);
         // Two thin back-to-back extrusions (one per aisle direction) so BOTH
         // faces read their own un-mirrored front cap. A single mesh painted the

@@ -212,6 +212,9 @@ export class WallTrackBoard implements StoreFixture {
       const fontSize = isHeader ? Math.round(rowH * 0.44) : Math.round(rowH * 0.36);
       ctx.font = isHeader ? `700 ${fontSize}px sans-serif` : `600 ${fontSize}px sans-serif`;
       ctx.textBaseline = 'middle';
+      // Pin 202: measure inside both frame rebates; keep complete row copy.
+      const textWidth=ctx.measureText(text).width, safeWidth=w*.84;
+      if(textWidth>safeWidth) ctx.font=ctx.font.replace(`${fontSize}px`,`${fontSize*safeWidth/textWidth}px`);
 
       if (format === 'tall') {
         if (isHeader) {

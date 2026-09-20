@@ -2762,11 +2762,16 @@ export function buildStore(scene: StoreScene) {
     ...(scene.nrLeftWallCols > 0 ? [{
       id: 'wall-newrelease-left-wall',
       category: 'wall-newrelease',
-      pos: new THREE.Vector3(leftWallXCenter, 9.4, leftWallZCenter),
+      pos: new THREE.Vector3(getActiveTheme().id==='bb-2000' ? STORE_CENTER_X-storeWidth/2+.06 : leftWallXCenter, 9.4, leftWallZCenter),
       yaw: Math.PI / 2,
       length: leftWallShelfWidth,
       localZ: 0.1
     }] : []),
+    // Pin 194: the 2000 star programme continues onto the right wall too.
+    ...(getActiveTheme().id === 'bb-2000' ? scene.nrRuns.filter(run=>run.yaw < -1 && run.x > STORE_CENTER_X + storeWidth/2 - 2 && run.cols > 0).map(run=>({
+      id: 'wall-newrelease-right-wall', category: 'wall-newrelease',
+      pos: new THREE.Vector3(STORE_CENTER_X+storeWidth/2-.06,9.4,run.z), yaw:run.yaw,length:run.length,localZ:.1
+    })) : []),
     // (The red "$3 RENTAL / 2 EVENING NEW RELEASE" card that used to hang
     // here, in front of the New Releases back wall over the floor displays,
     // was removed entirely by owner request — GH #2. The slot construction
