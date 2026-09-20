@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { FixtureContext } from '../fixtures';
+import { brandPackDir } from '../brand-pack';
 import { onBrandChange } from '../brand-live';
 import { getActiveTheme } from '../themes';
 import type { Footprint } from '../layout-validator';
@@ -28,7 +29,12 @@ export function buildExitReturnCounter(ctx: FixtureContext, parent: THREE.Group,
   slab(2.88,.22,body,.014);slab(.15,3.10,top);slab(.22,0,plinth,.035);
   const unsubscribe=onBrandChange(()=>{const t=getActiveTheme();body.color.set(t.palette.counterBody);top.color.set(t.palette.counterTop);});
   ctx.addCollider(fallback);
-  const release = installDisplayModel(ctx,root,fallback,'models/exit-return-counter.glb',
+  const rel = 'fixtures/exit-return-counter/counter.glb';
+  const pack = brandPackDir();
+  const hosted = import.meta.env.VITE_DEMO === '1';
+  const paths = [...(!hosted && pack ? [`user-assets/${pack}/${rel}`] : []),
+    ...(!hosted ? [`user-assets/${rel}`] : []), 'models/exit-return-counter.glb'];
+  const release = installDisplayModel(ctx,root,fallback,paths,
     {ReturnBody:body,ReturnTop:top,ReturnWorktop:body,ReturnPlinth:plinth},new THREE.Vector3(length/15.5,1,1));
   const titles = ctx.libraries.flatMap(l=>l.movies).filter(m=>!m.discovery&&!m.collectionGap&&!m.comingSoon&&!m.game).slice(0,5);
   const ownedMaterials: THREE.Material[]=[];

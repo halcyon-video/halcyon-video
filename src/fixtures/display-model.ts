@@ -8,7 +8,7 @@ export function installDisplayModel(
   ctx: Pick<FixtureContext, 'scene' | 'requestShadowRefresh' | 'requestRender' | 'log' | 'scheduleDetailLoad'>,
   parent: THREE.Group,
   fallback: THREE.Group,
-  file: string,
+  file: string | readonly string[],
   finishes: Record<string, THREE.Material>,
   scale = new THREE.Vector3(1, 1, 1),
   prepare?: (model: THREE.Group) => void,
@@ -61,12 +61,18 @@ export function installDisplayModel(
   };
   const load = () => new Promise<void>(complete => {
     if (cancelled) { complete(); return; }
-    new GLTFLoader().load(assetUrl(file), result => {
+    const paths = typeof file === 'string' ? [file] : file;
+    const attempt = (index: number): void => {
+      if (cancelled) { complete(); return; }
+      new GLTFLoader().load(assetUrl(paths[index]), result => {
       try { install(result.scene); } finally { complete(); }
     }, undefined, error => {
+      if (!cancelled && index + 1 < paths.length) { attempt(index + 1); return; }
       if (!cancelled) ctx.log(`Display model unavailable; using built-in fixture. ${String(error)}`, 'system');
       complete();
-    });
+      });
+    };
+    attempt(0);
   });
   const cancelQueued = ctx.scheduleDetailLoad?.(load);
   if (!ctx.scheduleDetailLoad) void load();
