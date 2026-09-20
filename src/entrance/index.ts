@@ -1,3 +1,4 @@
+import { vestibuleLayout } from '../vestibule-layout.ts';
 import { buildExitReturnCounter } from './exit-return-counter';
 import { buildWalkOffMats } from './walk-off-mats';
 import { installCounterOfficeKit } from '../fixtures/counter-office-kit';
@@ -266,7 +267,8 @@ export class EntranceCheckout implements StoreFixture {
     // reveal). A second copy of the formula here is exactly how the facade
     // and the entrance would drift apart on a new format.
     const boxW = hasChamber ? 2 * vestibuleHalfWidth(spec) - 0.4 : 2 * vestibuleHalfWidth(spec);
-    const boxDepth = hasChamber ? doorW * 2 : 0;  // chamber depth = two door-widths (~6.4 ft); none otherwise
+    const chamber = vestibuleLayout(spec);
+    const boxDepth = chamber.depth;
     const frontZ = 15.0;         // street side (front glass wall)
     const backZ = frontZ - boxDepth; // store side (= counter back); == frontZ with no chamber
     const xL = cx - boxW / 2;    // -X (left) wall
@@ -342,7 +344,7 @@ export class EntranceCheckout implements StoreFixture {
     // delineate the narrow sidelights beside the door pair.
     const buildGlazedWall = (
       orient: 'X' | 'Z', fixed: number, s0: number, s1: number, gaps: number[],
-      opts?: { transomY?: number; extraMullions?: number[]; splitTransom?: boolean; sillY?: number; frontSillY?: number },
+      opts?: { transomY?: number; extraMullions?: number[]; splitTransom?: boolean; sillY?: number; frontSillY?: number; singlePanels?: boolean },
     ) => {
       // place a box whose long axis lies along the wall's run direction
       const along = (center: number, lenAlong: number, y: number, h: number, thick: number, mat: THREE.Material) => {
@@ -369,7 +371,7 @@ export class EntranceCheckout implements StoreFixture {
       // glass runs uninterrupted; only the wall's end posts run full height.
       const verts = new Set<number>([s0, s1]);
       intervals.forEach(([a, b]) => { verts.add(a); verts.add(b); });
-      if (!opts?.transomY) panels.forEach(([a, b]) => { if (b - a > 4.5) verts.add((a + b) / 2); });
+      if (!opts?.transomY && !opts?.singlePanels) panels.forEach(([a, b]) => { if (b - a > 4.5) verts.add((a + b) / 2); });
       opts?.extraMullions?.forEach((v) => verts.add(v));
       verts.forEach((v) => {
         const fullHeight = opts?.splitTransom || !opts?.transomY || Math.abs(v - s0) < 0.01 || Math.abs(v - s1) < 0.01;
@@ -401,7 +403,7 @@ export class EntranceCheckout implements StoreFixture {
       }
     };
 
-    const sideDoorZ = backZ + doorW / 2 + 0.4; // side doors sit on the store-side (inner) half
+    const sideDoorZ = chamber.sideDoorZ;
     this.vestibuleInfo = { cx, xL, xR, frontZ, backZ, doorW, sideDoorZ, hasChamber };
     const doorMats = { frameMat, glassMat, chrome };
     if (hasChamber && this.ctx.wallSurface) {
@@ -469,8 +471,8 @@ export class EntranceCheckout implements StoreFixture {
       buildGlazedWall('X', backZ, xL, xR, []);
 
       // ----- Side walls (glass), each with one door on the inner (store-side) half -----
-      buildGlazedWall('Z', xR, backZ, frontZ, [sideDoorZ], { frontSillY: 2 }); // right wall -> into store
-      buildGlazedWall('Z', xL, backZ, frontZ, [sideDoorZ], { frontSillY: 2 }); // left wall  -> exiters enter
+      buildGlazedWall('Z', xR, backZ, frontZ, [sideDoorZ], { frontSillY: 2, singlePanels: true }); // right wall -> into store
+      buildGlazedWall('Z', xL, backZ, frontZ, [sideDoorZ], { frontSillY: 2, singlePanels: true }); // left wall  -> exiters enter
       this.doors.push(buildVestibuleDoor(this.ctx, group, doorMats, spec, xR, sideDoorZ, doorH, false, true, 1.4));
       this.doors.push(buildVestibuleDoor(this.ctx, group, doorMats, spec, xL, sideDoorZ, doorH, false, true, 1.4));
 

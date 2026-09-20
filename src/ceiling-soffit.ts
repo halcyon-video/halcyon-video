@@ -1,3 +1,4 @@
+import { counterDatumShift } from './vestibule-layout.ts';
 import { installCeilingGrid } from './ceiling-grid.ts';
 import { polygonGridPlan } from './ceiling-grid-plan.ts';
 import { selfLit } from './material-lighting.ts';
@@ -129,8 +130,8 @@ export function frontSoffitPolygon(
     // same obtuse turn off the cornice, just truncated.
     return [
       { x: CX - armHalf, z: backZ },
-      { x: CX - 7.0, z: -5.5 },
-      { x: CX + 7.0, z: -5.5 },
+      { x: CX - 7.0, z: -5.5 + counterDatumShift(spec) },
+      { x: CX + 7.0, z: -5.5 + counterDatumShift(spec) },
       { x: CX + armHalf, z: backZ },
     ];
   }
@@ -143,7 +144,7 @@ export function frontSoffitPolygon(
   // corners sat at the minimum width).
   return [
     { x: CX - armHalf, z: backZ },
-    { x: CX, z: -8.0 },
+    { x: CX, z: -8.0 + counterDatumShift(spec) },
     { x: CX + armHalf, z: backZ },
   ];
 }

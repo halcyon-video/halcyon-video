@@ -1,3 +1,4 @@
+import { vestibuleLayout } from '../src/vestibule-layout.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { exitReturnLayout, exitReturnSegments } from '../src/exit-return-layout.ts';
@@ -5,7 +6,7 @@ import { validateLayout } from '../src/layout-validator.ts';
 
 test('exit counter fits small and large chain rooms, preserving a wall-side staff aisle',()=>{
   for(const width of [40,48,64,80])for(const doorW of [3,3.2,4]){
-    const vest={xL:6,frontZ:15,sideDoorZ:15-1.5*doorW+.4,doorW,hasChamber:true};
+    const vest={xL:6,frontZ:15,sideDoorZ:vestibuleLayout({doorWidth:doorW,entryStyle:'vestibule'}).sideDoorZ,doorW,hasChamber:true};
     const f=exitReturnLayout(width,vest);assert.ok(f);
     assert.deepEqual(validateLayout([f],{minX:11-width/2,maxX:11+width/2,minZ:-60,maxZ:15}),[]);
     const left=f.cx-f.w*Math.cos(f.yaw)/2-f.d*Math.abs(Math.sin(f.yaw))/2;
@@ -18,7 +19,7 @@ test('a storefront-door shop does not acquire a chain exit counter',()=>{
 
 test('enclosed return station leaves a usable staff entrance and sorting aisle',()=>{
   for(const width of [40,48,64,80]) {
-    const f=exitReturnLayout(width,{xL:6,frontZ:15,sideDoorZ:10.6,doorW:3.2,hasChamber:true})!;
+    const f=exitReturnLayout(width,{xL:6,frontZ:15,sideDoorZ:vestibuleLayout({doorWidth:3.2,entryStyle:'vestibule'}).sideDoorZ,doorW:3.2,hasChamber:true})!;
     const parts=exitReturnSegments(f);
     const occupied=(x:number,z:number)=>parts.some(p=>{
       const dx=x-p.cx,dz=z-p.cz,c=Math.cos(p.yaw),s=Math.sin(p.yaw);

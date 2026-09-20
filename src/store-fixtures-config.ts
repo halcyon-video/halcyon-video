@@ -1,3 +1,4 @@
+import { counterDatumShift } from './vestibule-layout.ts';
 import { fitDepartmentArch, type DepartmentArchHost } from './fixtures/department-arch-layout';
 // Service-wall dressing follows the live facade/door datum, not a fixed floor placement.
 export { WALL_COURTESY_PHONE } from './fixtures/wall-courtesy-telephone';
@@ -482,7 +483,7 @@ export function admitFixturePlacements(
     && (!noBand || !COUNTER_BAND_KINDS.has(p.kind)));
 }
 
-export function counterAnchoredPlacements(
+function originalCounterAnchoredPlacements(
   spec: { counterShape: CounterShape; doorWidth: number; entryStyle: 'vestibule' | 'storefront-door' },
   storeWidth: number,
 ): FixturePlacement[] {
@@ -758,3 +759,8 @@ export function departmentArchPlacements(host: DepartmentArchHost): FixturePlace
 }
 
 export { childrenChairPlacements } from './fixtures/clubhouse-layout';
+
+export function counterAnchoredPlacements(spec: { counterShape: CounterShape; doorWidth: number; entryStyle: 'vestibule' | 'storefront-door' }, storeWidth: number): FixturePlacement[] {
+  const shift = spec.counterShape === 'desk' ? 0 : counterDatumShift(spec);
+  return originalCounterAnchoredPlacements(spec, storeWidth).map(p => ({...p, position:{...p.position,z:p.position.z+shift}}));
+}

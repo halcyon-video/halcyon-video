@@ -1,3 +1,4 @@
+import { vestibuleLayout } from './vestibule-layout.ts';
 // Checkout & carry flow — extracted from StoreScene (three-scene.ts keeps
 // one-line delegating stubs): picking tapes up into the carried stack,
 // walking them to the counter, the soft-body bag, confirm/finish checkout,
@@ -741,9 +742,8 @@ export function buildCheckoutExitPath(scene: StoreScene, stand: THREE.Vector3): 
       new THREE.Vector3(STORE_CENTER_X, 0, 15.9), // out the single front leaf
     ], false, 'centripetal');
   }
-  const backZ = 15.0 - 2 * doorW;            // vestibule store-side wall
+  const { backZ, sideDoorZ } = vestibuleLayout(scene.storefrontSpec);
   const xL = 11.0 - (9.0 + 2 * doorW) / 2;   // vestibule left (-X, exit-side) wall
-  const sideDoorZ = backZ + doorW / 2 + 0.4; // exiters' door in that wall
   const exitX = STORE_CENTER_X - facadeEntryGlazing(doorW, facadeStyle()).doorCenterOffset;
   return new THREE.CatmullRomCurve3([
     new THREE.Vector3(stand.x, 0, stand.z),

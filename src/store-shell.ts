@@ -1,3 +1,4 @@
+import { vestibuleLayout, counterDatumShift } from './vestibule-layout.ts';
 import { exitReturnLayout } from './exit-return-layout';
 import { RETAIL_FIXTURE_SPECS } from './retail-fixture-specs';
 import { floorPromotionPlacements, frontRefreshmentPlacements } from './floor-merchandising';
@@ -853,7 +854,7 @@ export function buildStore(scene: StoreScene) {
   // see src/entrance/index.ts): skip any tile whose footprint would
   // intersect it rather than embedding ceiling tiles in the glass box.
   const vestHalfW = vestibuleHalfWidth(scene.storefrontSpec);
-  const vestBackZ = FRONT_GLASS_Z - 2 * scene.storefrontSpec.doorWidth; // boxDepth = doorW * 2
+  const vestBackZ = vestibuleLayout(scene.storefrontSpec).backZ;
   // The cash-wrap soffit (buildFrontSoffit, below) hangs its own lit deck
   // FRONT_SOFFIT_DROP under this one over the whole checkout zone. A troffer
   // left up here would be sealed above that lid — invisible, but still an
@@ -2270,7 +2271,8 @@ export function buildStore(scene: StoreScene) {
   // open floor for floor displays and no counter band to mount a letterboard
   // on, so those never reach the build loop at all (see admitFixturePlacements).
   const fixturePlacements = admitFixturePlacements([
-    ...DEFAULT_FIXTURE_PLACEMENTS,
+    ...DEFAULT_FIXTURE_PLACEMENTS.map(p => ['coming-soon-letterboard-counter-end', 'wall-track-board-registers'].includes(p.id)
+      ? {...p, position:{...p.position,z:p.position.z+counterDatumShift(scene.storefrontSpec)}} : p),
     ...(scene.plan.clubhouse ? [
       { id: 'clubhouse', kind: 'clubhouse', position: scene.plan.clubhouse.center, yaw: 0, options: { admitted: true } },
     ] : []),
@@ -2339,7 +2341,7 @@ export function buildStore(scene: StoreScene) {
   const buildFixture = (placement: typeof fixturePlacements[number]) => {
     if (placement.kind === 'release-cart') {
       const chosen = placeStockCart([...scene.plan.getUnitFootprints(), ...fixtureFootprints,
-        { label: 'counter and entrance', kind: 'structure', cx: STORE_CENTER_X, cz: 4.5, w: 23, d: 21, yaw: 0 },
+        { label: 'counter and entrance', kind: 'structure', cx: STORE_CENTER_X, cz: 4.5 + counterDatumShift(scene.storefrontSpec)/2, w: 23, d: 21 - counterDatumShift(scene.storefrontSpec), yaw: 0 },
         ...(scene.plan.clubhouse ? [{ label: 'clubhouse reserved', kind: 'structure' as const,
           cx: STORE_CENTER_X - storeWidth / 2 + 10, cz: backWallZ + 10, w: 20, d: 20, yaw: 0 }] : []),
       ], { minX: STORE_CENTER_X - storeWidth / 2, maxX: STORE_CENTER_X + storeWidth / 2, minZ: backWallZ, maxZ: FRONT_GLASS_Z });
@@ -2384,12 +2386,12 @@ export function buildStore(scene: StoreScene) {
     const existing = scene.slottedFixtures.filter(f => f.placement.kind === 'four-sided-display').length;
     const returnCounter=exitReturnLayout(storeWidth,{
       xL:STORE_CENTER_X-vestibuleHalfWidth(scene.storefrontSpec)+.2,frontZ:FRONT_GLASS_Z,
-      sideDoorZ:FRONT_GLASS_Z-scene.storefrontSpec.doorWidth*1.5+.4,
+      sideDoorZ:vestibuleLayout(scene.storefrontSpec).sideDoorZ,
       doorW:scene.storefrontSpec.doorWidth,hasChamber:scene.storefrontSpec.entryStyle==='vestibule',
     });
     const reserved: Footprint[] = [
       ...(returnCounter?[{...returnCounter,clearance:1.5}]:[]),
-      { label: 'checkout circulation', kind: 'structure', cx: STORE_CENTER_X, cz: 4.5, w: 23, d: 21, yaw: 0 },
+      { label: 'checkout circulation', kind: 'structure', cx: STORE_CENTER_X, cz: 4.5 + counterDatumShift(scene.storefrontSpec)/2, w: 23, d: 21 - counterDatumShift(scene.storefrontSpec), yaw: 0 },
       ...(scene.plan.clubhouse ? [{ label: 'clubhouse approach', kind: 'structure' as const,
         cx: STORE_CENTER_X - storeWidth / 2 + 10, cz: backWallZ + 10, w: 20, d: 20, yaw: 0 }] : []),
     ];

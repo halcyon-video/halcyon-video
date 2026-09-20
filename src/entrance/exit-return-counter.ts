@@ -41,7 +41,7 @@ export function buildExitReturnCounter(ctx: FixtureContext, parent: THREE.Group,
   const paths = [...(!hosted && pack ? [`user-assets/${pack}/${rel}`] : []),
     ...(!hosted ? [`user-assets/${rel}`] : []), 'models/exit-return-counter.glb'];
   const release = installDisplayModel(ctx,root,fallback,paths,
-    {CounterBody:body,CounterTop:top,CounterWorktop:worktop,CounterInlay:stripe,CounterPlinth:plinth},new THREE.Vector3(length/15.5,1,1));
+    {CounterBody:body,CounterTop:top,CounterWorktop:worktop,CounterInlay:stripe,CounterPlinth:plinth},new THREE.Vector3(length/15.5,1,footprint.d/7.4));
   const titles = ctx.libraries.flatMap(l=>l.movies).filter(m=>!m.discovery&&!m.collectionGap&&!m.comingSoon&&!m.game).slice(0,5);
   const ownedMaterials: THREE.Material[]=[];
   const geometry = getRentalCaseGeometry(false).clone();
@@ -51,7 +51,7 @@ export function buildExitReturnCounter(ctx: FixtureContext, parent: THREE.Group,
     for(let level=0;level<levels;level++) {
       const copy = new THREE.Mesh(geometry,materials);copy.name='Store-copy returns awaiting reshelving';
       // Cases lie flat wholly on the employee half, never in the passage.
-      copy.position.set((-2.7+index*1.35)*length/15.5,2.82+CASE_DEPTH/2+level*CASE_DEPTH,-1.45);
+      copy.position.set((-2.7+index*1.35)*length/15.5,2.82+CASE_DEPTH/2+level*CASE_DEPTH,-1.45*footprint.d/7.4);
       copy.rotation.set(-Math.PI/2,0,(index%2?1:-1)*.035);copy.castShadow=copy.receiveShadow=true;root.add(copy);
     }
   });

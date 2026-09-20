@@ -1,3 +1,4 @@
+import { vestibuleLayout } from '../vestibule-layout.ts';
 import * as THREE from 'three';
 import { DecalGeometry } from 'three/examples/jsm/geometries/DecalGeometry.js';
 import type { FixtureContext, StoreFixture } from '../fixtures';
@@ -21,7 +22,7 @@ export class CounterApparel implements StoreFixture {
     if (this.ctx.activeTheme.id !== 'bb-1993' || activeStoreFormat().id !== 'corporate'
       || this.ctx.storefrontSpec.entryStyle !== 'vestibule') return;
     const group = this.group = new THREE.Group(); group.name = this.placement.id;
-    group.position.set(this.placement.position.x, 4.8, 15 - 2 * this.ctx.storefrontSpec.doorWidth - .06);
+    group.position.set(this.placement.position.x, 4.8, vestibuleLayout(this.ctx.storefrontSpec).backZ - .06);
     group.rotation.y = this.placement.yaw;
     const fallback = new THREE.Group(); group.add(fallback);
     this.ctx.scene.add(group);

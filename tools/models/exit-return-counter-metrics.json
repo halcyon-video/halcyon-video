@@ -1,11 +1,11 @@
 {
   "boundsFeet": [
     15.5,
-    9.4,
+    7.4,
     3.54
   ],
   "parts": 8,
-  "triangles": 6576,
+  "triangles": 5984,
   "allSolidPartsManifold": true,
   "worktopHeightFeet": 2.82,
   "staffOpeningFeet": 3.2

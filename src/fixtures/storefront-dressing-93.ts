@@ -174,14 +174,12 @@ export function buildStorefrontDressing93(scene: StoreScene): void {
     // Gate half-span: clear of the leaf's own opening (doorW/2) plus enough
     // that an opening leaf sweeps between the panels, never into one.
     const gateHalf = vest.doorW / 2 + 0.55;
-    // Stand-off from the side wall, on the SALES-FLOOR side. Inside the
-    // chamber there is no room for this gate: the near pedestal would have to
-    // stand at z = sideDoorZ - gateHalf = 8.45, which is through the
-    // vestibule's own back glass at z = backZ.
+    // The enlarged rear panel leaves room inside the chamber for both gates.
+    // Keep the sales-floor side free for the flush return-counter enclosure.
     const standOff = 0.82;
     const gates: { x: number; z: number }[] = [];
     for (const dz of [-gateHalf, gateHalf]) {
-      gates.push({ x: vest.xL - standOff, z: vest.sideDoorZ + dz }); // walk-out door only
+      gates.push({ x: vest.xL + standOff, z: vest.sideDoorZ + dz }); // walk-out door only
     }
     for (const g of gates) {
       const ped = new THREE.Mesh(geo, cream);
