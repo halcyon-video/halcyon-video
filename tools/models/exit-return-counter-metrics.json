@@ -5,8 +5,9 @@
     3.54
   ],
   "parts": 8,
-  "triangles": 5984,
+  "triangles": 5744,
   "allSolidPartsManifold": true,
   "worktopHeightFeet": 2.82,
-  "staffOpeningFeet": 3.2
+  "staffOpeningFeet": 5.0,
+  "staffOpeningSide": "vestibule (+X)"
 }

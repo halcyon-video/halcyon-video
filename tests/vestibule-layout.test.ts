@@ -13,14 +13,15 @@ test('deeper vestibule provides wider front panels and carries checkout inward',
   }
   assert.equal(vestibuleLayout({doorWidth:3,entryStyle:'storefront-door'}).depth,0);
 });
-test('flush return side stays on front pane and leaves a body-width side-door approach',()=>{
+test('open return end retains the back wall and a body-width side-door approach',()=>{
   for(const doorW of [3,3.2,4]) for(const storeWidth of [40,48,64,80]) {
     const v=vestibuleLayout({doorWidth:doorW,entryStyle:'vestibule'});
     const vest={xL:3.3,frontZ:15,sideDoorZ:v.sideDoorZ,doorW,hasChamber:true};
     const f=exitReturnLayout(storeWidth,vest)!; assert.ok(f);
     assert.ok(Math.abs(f.cx+f.w/2-(vest.xL-.15))<1e-8);
-    const segments=exitReturnSegments(f), side=segments.find(p=>p.label==='structure:return-right')!;
-    assert.ok(side.cz-side.w/2 >= v.sideDoorZ+doorW/2-.05,'side ends at front pane');
+    const segments=exitReturnSegments(f);
+    assert.ok(segments.some(p=>p.label==='structure:return-back'),'back wall remains');
+    assert.ok(!segments.some(p=>p.label==='structure:return-right'),'vestibule side is open');
     // A person walks horizontally through the middle of the door without touching millwork.
     const radius=.5;
     for(let x=vest.xL-.6;x<=vest.xL+.5;x+=.1) for(const p of segments) {
