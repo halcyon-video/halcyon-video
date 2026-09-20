@@ -224,14 +224,9 @@ export class StoreScene {
   // default N8AO engine plugs in an adapter that maps `enabled` to a pass
   // swap (N8AOPass replaces RenderPass, so it can't just be disabled) and
   // `blendIntensity` to the AO intensity exponent. Null when AO is off.
-  private aoPass: { enabled: boolean; blendIntensity: number } | null = null;
-  // AO is the single most expensive per-frame cost (its G-buffer prepass replays
-  // every scene draw call), but this store is a static scene: the AO term only
-  // changes when the camera or a box moves. So: OFF while walking (nobody reads
-  // contact shadows mid-stride, and it's what was blowing the frame budget),
-  // faded back in over ~250ms on settle, and while the view is static the
-  // wrapped render() replays the cached AO term with two cheap quads instead of
-  // recomputing it (see the wrapper in initThree).
+  private aoPass: { enabled: boolean; blendIntensity: number; motionSafe?: boolean } | null = null;
+  // Only legacy GTAO replays geometry and needs the walk gate. N8AO resets
+  // its temporal history on camera changes and stays enabled during motion.
   private aoFadeT = 1; // 0→1 blend fade after walk motion stops
   private aoNeedsRefresh = true; // buffers resized/cleared or scene geometry moved — recompute the AO term
   private lastWalkLookTime = -Infinity; // last walk-mode mouse-look event; looking is motion too
@@ -2121,10 +2116,8 @@ export class StoreScene {
       n8aoPass.autoDetectTransparency = false;
       n8aoPass.configuration.transparencyAware = false;
       n8aoPass.configuration.intensity = 1.4;      // soft occlusion (pow exponent) — 2.0 read too heavy against the reference's evenly-lit shelves; faded via the adapter below
-      // Walk gating swaps source passes: while the feet move, AO is off and
-      // the plain RenderPass takes over (EffectComposer skips disabled
-      // passes), so NONE of the AO chain runs — same contract as the GTAO
-      // enabled toggle.
+      // Keep the beauty fallback for explicit pass disabling; N8AO itself
+      // remains active for both walking and looking.
       // Reuse N8AO's depth-owning beauty target while AO is gated off.
       const walkRenderPass = new BeautyPass(this.scene, this.camera,
         this.composer.renderTarget1, (n8aoPass as any).beautyRenderTarget);
@@ -2146,6 +2139,7 @@ export class StoreScene {
       };
       const aoBase = 1.4; // must track n8aoPass.configuration.intensity above (the enabled/blend setters reset to aoBase * blend)
       const aoCtl = {
+        motionSafe: true,
         _on: true,
         _blend: 1,
         get enabled() { return this._on; },
@@ -2564,6 +2558,7 @@ export class StoreScene {
   // Called on init, on window resize, and whenever resScale steps. Renderer
   // pixelRatio (the quality-tier cap) is untouched here — only the buffer
   // dimensions scale, so ratio and size are never multiplied together.
+  private appliedResolution = "";
   public applyRenderResolution() {
     const clientWidth = this.container.clientWidth || window.innerWidth || 1280;
     const clientHeight = this.container.clientHeight || window.innerHeight || 720;
@@ -2635,6 +2630,11 @@ export class StoreScene {
 
     const width = Math.max(1, Math.floor(clientWidth * this.resScale * this.qualityScale));
     const height = Math.max(1, Math.floor(clientHeight * this.resScale * this.qualityScale));
+
+    // Avoid clearing the canvas and reallocating pass targets for a no-op.
+    const pixelRatio = this.renderer.getPixelRatio();
+    if (this.appliedResolution === `${width}:${height}:${pixelRatio}`) return;
+    this.appliedResolution = `${width}:${height}:${pixelRatio}`;
 
     // `false` keeps the canvas CSS size at the full client size so the browser
     // upscales the (possibly smaller) drawing buffer — the standard dynamic
@@ -4681,7 +4681,7 @@ export class StoreScene {
     // render() computes the AO term once and replays it. Browse-mode camera
     // lerps keep AO on (they're ~10 frames; toggling would read as flicker).
     let aoFading = false;
-    if (this.aoPass) {
+    if (this.aoPass && !this.aoPass.motionSafe) {
       // Mouse-look pans arrive as discrete events (requestRender wakeups), not
       // held keys — hold the "in motion" verdict for 150ms past the last one so
       // AO doesn't flip-flop between event gaps mid-pan.
@@ -4846,7 +4846,8 @@ export class StoreScene {
 
     // Undersampling disabled when nothing is moving: snap resScale to full crispness.
     const idleScale = this.softwareGL ? this.resScaleMin : RES_SCALE_MAX;
-    if (!cameraMoving && !sceneChanging && this.resScale !== idleScale) {
+    if (!cameraMoving && !sceneChanging && this.resScale !== idleScale &&
+        time - this.lastCameraMotionTime >= StoreScene.QUALITY_DOWNSHIFT_MS) {
       this.resScale = idleScale;
       this.applyRenderResolution();
       mustRenderThisFrame = true;

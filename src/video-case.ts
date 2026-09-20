@@ -1654,10 +1654,7 @@ export function restampCollectionGapCase(movie: Movie): void {
     if (renderer) {
       // update*, not queue* — the queue wrappers dedupe on "already uploaded",
       // which is exactly what a restamp needs to bypass.
-      queueTextureUpload(() => {
-        textureArrayManager.updateHighRes(renderer, movie.id, stamped);
-        textureArrayManager.setHighResLoaded(movie.id, true);
-      });
+      textureArrayManager.queueHighRes(renderer, movie.id, stamped, true);
     }
     const heroTex = pinnedPosterTextures.get(movie.id)?.tex ?? heroPosterTextureLRU.get(movie.id);
     if (heroTex) {

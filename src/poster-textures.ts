@@ -17,6 +17,7 @@
 
 import * as THREE from 'three';
 import { perfTrace, perfSlot } from './perf-trace';
+import { drainUploadSteps, type UploadStep } from './upload-budget';
 
 const SP_UPLOAD = perfSlot('texUploadMs');  // uploadTextureNow (initTexture + mipmaps)
 const CT_UPLOAD = perfSlot('texUploadN');
@@ -39,8 +40,8 @@ export function setCaseMaterialUniformProvider(fn: () => any[]) {
 // poster's settle callback — and texturesReadyPromise (the boot overlay) waits
 // on those. Letting a few hundred fresh decodes sit behind a few thousand
 // re-uploads is what held the overlay up for the entire drain.
-const priorityUploadQueue: Array<() => void> = [];
-const textureUploadQueue: Array<() => void> = [];
+const priorityUploadQueue: Array<UploadStep> = [];
+const textureUploadQueue: Array<UploadStep> = [];
 const pendingUploads = () => priorityUploadQueue.length + textureUploadQueue.length;
 let isUploading = false;
 
@@ -61,9 +62,9 @@ let isUploading = false;
 // streaming wave allocates nothing per poster.
 const mipChainScratch = new Map<string, Array<{ data: Uint8Array; w: number; h: number }>>();
 
-function getMipChainScratch(w: number, h: number): Array<{ data: Uint8Array; w: number; h: number }> {
+function getMipChainScratch(w: number, h: number, cache = mipChainScratch): Array<{ data: Uint8Array; w: number; h: number }> {
   const key = `${w}x${h}`;
-  let chain = mipChainScratch.get(key);
+  let chain = cache.get(key);
   if (!chain) {
     chain = [];
     // GL level-n dimensions: max(1, floor(level0 / 2^n)) — matches the mip
@@ -74,7 +75,7 @@ function getMipChainScratch(w: number, h: number): Array<{ data: Uint8Array; w: 
       ch = Math.max(1, ch >> 1);
       chain.push({ data: new Uint8Array(cw * ch * 4), w: cw, h: ch });
     }
-    mipChainScratch.set(key, chain);
+    cache.set(key, chain);
   }
   return chain;
 }
@@ -82,8 +83,8 @@ function getMipChainScratch(w: number, h: number): Array<{ data: Uint8Array; w: 
 // 2x2 box filter (clamped at odd edges). Averages in sRGB space — technically
 // generateMipmap on an sRGB texture filters in linear space, but at poster
 // scale the difference is invisible and the table-free path stays cheap.
-function boxFilterHalf(src: Uint8Array, sw: number, sh: number, dst: Uint8Array, dw: number, dh: number) {
-  for (let y = 0; y < dh; y++) {
+function boxFilterHalf(src: Uint8Array, sw: number, sh: number, dst: Uint8Array, dw: number, dh: number, startRow = 0, endRow = dh) {
+  for (let y = startRow; y < endRow; y++) {
     const r0 = Math.min(y * 2, sh - 1) * sw;
     const r1 = Math.min(y * 2 + 1, sh - 1) * sw;
     for (let x = 0; x < dw; x++) {
@@ -174,32 +175,12 @@ export function uploadTextureNow(texture: THREE.Texture) {
   }
 }
 
-// Per-frame budget for GPU texture uploads. Each initTexture() upload + mipmap
-// build of a 320x480 poster costs real GPU/main-thread time, so we cap how much
-// of the frame we're willing to spend on it. Keeping this well under the ~16ms
-// frame leaves headroom for the scene render and keeps interactions smooth even
-// while many covers stream in.
-// Normal (interactive) limits — keeps the render loop smooth.
-const UPLOAD_BUDGET_MS = 4;
-const UPLOAD_MAX_PER_FRAME = 4;
-// Burst limits — used when the queue is large AND the user hasn't touched an
-// input recently (initial boot wave, or streaming while standing still): drain
-// fast, nobody is trying to move. Backs off automatically once the queue
-// drains below the threshold.
-const UPLOAD_BURST_BUDGET_MS = 12;
-const UPLOAD_BURST_MAX_PER_FRAME = 16;
-const UPLOAD_BURST_THRESHOLD = 20;
-// Browsing produces near-continuous input, so this cooldown effectively locks
-// the queue to the polite budget while the user is actually interacting —
-// walking into a fresh aisle used to flip the queue into burst mode and spend
-// 12ms/frame on uploads mid-walk.
-const BURST_INPUT_COOLDOWN_MS = 2000;
-let lastUserActivityTime = -Infinity;
-
-/** InputManager funnels every keyboard/mouse/gamepad activity here. */
-export function notifyUserActivity() {
-  lastUserActivityTime = performance.now();
-}
+// One small budget for both streaming and rebuilds; idle input is not permission
+// to spend 12ms in an upload burst. Driver calls remain non-preemptible.
+const UPLOAD_BUDGET_MS = 2;
+const UPLOAD_MAX_PER_FRAME = 16;
+/** Retained input hook for callers; upload budgets no longer depend on activity. */
+export function notifyUserActivity() {}
 
 // Test-harness override (see harness.ts's ?fast=1): lift the per-frame caps so a
 // headless software-GL run — where a frame can take seconds, making any per-FRAME
@@ -208,13 +189,8 @@ export function notifyUserActivity() {
 let uploadTurbo = false;
 export function setUploadTurbo(on: boolean) { uploadTurbo = on; }
 
-// Set for the duration of a no-reload scene rebuild: nothing is interactive
-// behind the boot overlay, so the queue should drain at burst rate immediately
-// rather than waiting out BURST_INPUT_COOLDOWN_MS from the keypress that
-// triggered the rebuild. Self-clearing — processUploads drops it when the
-// queue empties, so a caller can never leave it stuck on.
-let rebuildDraining = false;
-export function beginRebuildDrain() { rebuildDraining = true; }
+// Rebuilds use the same bounded upload policy as interactive streaming.
+export function beginRebuildDrain() {}
 
 /** Upload tasks still queued — for verification scripts and boot diagnostics. */
 export function pendingTextureUploads(): number { return pendingUploads(); }
@@ -222,46 +198,15 @@ export function pendingTextureUploads(): number { return pendingUploads(); }
 function processUploads() {
   if (pendingUploads() === 0) {
     isUploading = false;
-    rebuildDraining = false;
     return;
   }
   isUploading = true;
 
-  // During a no-reload rebuild the store sits behind the boot overlay and the
-  // user cannot interact with anything, so the polite interactive budget only
-  // makes them wait longer. The input-idle test can't work that out on its own:
-  // the keypress that closed the settings drawer is recent, so it would pin the
-  // queue to 4/frame through the first two seconds of exactly the drain we want
-  // to rush. Cleared in the empty branch above.
-  const burst = rebuildDraining ||
-    (pendingUploads() > UPLOAD_BURST_THRESHOLD &&
-      performance.now() - lastUserActivityTime > BURST_INPUT_COOLDOWN_MS);
-  const budget = uploadTurbo ? 1000 : burst ? UPLOAD_BURST_BUDGET_MS : UPLOAD_BUDGET_MS;
-  const maxPerFrame = uploadTurbo ? Infinity : burst ? UPLOAD_BURST_MAX_PER_FRAME : UPLOAD_MAX_PER_FRAME;
-
-  const start = performance.now();
-  let count = 0;
-  // Drain tasks until we exceed the time budget or the per-frame count cap.
-  // Because the upload tasks now call uploadTextureNow() (initTexture), the
-  // performance.now() check genuinely reflects GPU upload cost and throttles it.
-  while (
-    pendingUploads() > 0 &&
-    count < maxPerFrame &&
-    (count === 0 || performance.now() - start < budget)
-  ) {
-    const task = priorityUploadQueue.length > 0 ? priorityUploadQueue.shift() : textureUploadQueue.shift();
-    // A task may throw (e.g. initTexture on a lost/exhausted GL context). It must
-    // not propagate out of the loop: that would skip the reschedule below and
-    // leave isUploading stuck true, permanently wedging every later upload so
-    // those posters never load. Isolate each task so one failure is survivable.
-    if (task) {
-      try {
-        task();
-      } catch (err) {
-        console.warn('Texture upload task failed:', err);
-      }
-    }
-    count++;
+  const deadline = performance.now() + (uploadTurbo ? 1000 : UPLOAD_BUDGET_MS);
+  const maxSteps = uploadTurbo ? Infinity : UPLOAD_MAX_PER_FRAME;
+  const count = drainUploadSteps(priorityUploadQueue, () => performance.now(), deadline, maxSteps);
+  if (priorityUploadQueue.length === 0) {
+    drainUploadSteps(textureUploadQueue, () => performance.now(), deadline, maxSteps - count);
   }
 
   // Both lanes, not just the bulk one: the loop above drains PRIORITY first,
@@ -277,7 +222,7 @@ function processUploads() {
   }
 }
 
-export function queueTextureUpload(task: () => void, lane: 'bulk' | 'priority' = 'bulk') {
+export function queueTextureUpload(task: UploadStep, lane: 'bulk' | 'priority' = 'bulk') {
   (lane === 'priority' ? priorityUploadQueue : textureUploadQueue).push(task);
   if (!isUploading) {
     // Defer the drain to the next rAF instead of running synchronously:
@@ -310,14 +255,15 @@ function updateTextureArrayLayerImpl(
   renderer: THREE.WebGLRenderer,
   arrayTexture: THREE.DataArrayTexture,
   layerIndex: number,
-  pixelData: Uint8Array
+  pixelData: Uint8Array,
+  mipLevel = -1
 ) {
   // Always update the JS memory backing array first!
   // If Three.js hasn't allocated the GPU texture yet, our texSubImage3D call will fail, 
   // but Three.js will use this JS memory when it eventually allocates the texture.
   const layerSize = arrayTexture.image.width * arrayTexture.image.height * 4;
   const byteOffset = layerIndex * layerSize;
-  if (arrayTexture.image.data) {
+  if (mipLevel <= 0 && arrayTexture.image.data) {
     arrayTexture.image.data.set(pixelData, byteOffset);
   }
 
@@ -359,12 +305,12 @@ function updateTextureArrayLayerImpl(
   try {
     gl.texSubImage3D(
       gl.TEXTURE_2D_ARRAY,
-      0, // lod level
+      Math.max(0, mipLevel), // lod level
       0, // xoffset
       0, // yoffset
       layerIndex, // zoffset
-      arrayTexture.image.width,
-      arrayTexture.image.height,
+      Math.max(1, arrayTexture.image.width >> Math.max(0, mipLevel)),
+      Math.max(1, arrayTexture.image.height >> Math.max(0, mipLevel)),
       1, // depth
       gl.RGBA,
       gl.UNSIGNED_BYTE,
@@ -376,7 +322,7 @@ function updateTextureArrayLayerImpl(
     // (there is no per-layer generateMipmap in WebGL). Box-filter this layer's
     // chain on the CPU and upload each level explicitly instead; the layer is
     // then renderable at every distance the moment this call returns.
-    if (arrayTexture.generateMipmaps) {
+    if (arrayTexture.generateMipmaps && mipLevel < 0) {
       const chain = getMipChainScratch(arrayTexture.image.width, arrayTexture.image.height);
       let src = pixelData;
       let sw = arrayTexture.image.width;
@@ -408,6 +354,35 @@ function updateTextureArrayLayerImpl(
 
   // Restore Three.js state cache so it can re-bind textures correctly
   renderer.resetState();
+}
+
+// Each continuation does either a bounded CPU filter slice or one mip upload.
+// The bulk queue retains its continuation at the head until complete, so only
+// one streamed layer owns this scratch. Keep it separate from synchronous uploads.
+const streamMipScratch = new Map<string, Array<{ data: Uint8Array; w: number; h: number }>>();
+let streamBaseScratch: Uint8Array | null = null;
+function* streamHighResLayer(renderer: THREE.WebGLRenderer, array: THREE.DataArrayTexture,
+  index: number, pixels: Uint8Array): Generator<void> {
+  let data = (streamBaseScratch ??= new Uint8Array(160 * 240 * 4));
+  data.set(downsample320To160(pixels));
+  let w = array.image.width, h = array.image.height;
+  const chain = getMipChainScratch(w, h, streamMipScratch);
+  yield;
+  for (let level = 0; ; level++) {
+    perfTrace.count(CT_ARRAYUP);
+    perfTrace.begin(SP_ARRAYUP);
+    try { updateTextureArrayLayerImpl(renderer, array, index, data, level); }
+    finally { perfTrace.end(SP_ARRAYUP); }
+    yield;
+    if (!array.generateMipmaps || (w === 1 && h === 1)) break;
+    const dw = Math.max(1, w >> 1), dh = Math.max(1, h >> 1);
+    const next = chain[level].data;
+    for (let row = 0; row < dh; row += 16) {
+      boxFilterHalf(data, w, h, next, dw, dh, row, Math.min(dh, row + 16));
+      yield;
+    }
+    data = next; w = dw; h = dh;
+  }
 }
 
 // ── Low-res atlas tile writer ───────────────────────────────────────────────
@@ -985,19 +960,35 @@ class TextureArrayManager {
     });
   }
 
-  public queueHighRes(_renderer: THREE.WebGLRenderer, movieId: string, pixelData: Uint8Array) {
+  public queueHighRes(_renderer: THREE.WebGLRenderer, movieId: string, pixelData: Uint8Array, force = false) {
     const idx = this.getIndex(movieId);
     if (!this.hasLayer(movieId)) return;
     // An overflow-bank title has no high-res layer; its cover is painted by
     // the low-res path from the same decoded pixels (see updateLowRes's
     // caller in store-stock), so this is not a dropped poster.
     if (!this.isHighBank(idx)) return;
-    if (this.highResQueued.has(idx)) return;
-    if (this.loadedFlags && this.loadedFlags[idx] >= 255) return;
+    if (!force && this.highResQueued.has(idx)) return;
+    if (!force && this.loadedFlags && this.loadedFlags[idx] >= 255) return;
     this.highResQueued.add(idx);
+    let stream: Generator<void> | null = null;
+    let target: THREE.DataArrayTexture | null = null;
+    let owner: THREE.WebGLRenderer | null = null;
+    let layer = -1;
     queueTextureUpload(() => {
       const r = getUploadRenderer();
-      if (r) this.updateHighRes(r, movieId, pixelData);
+      // Rebuilds can replace the renderer/array between slices. Restart against
+      // the current allocation and resolve the movie index again, never publish
+      // a loaded flag for an incomplete or obsolete chain.
+      if (!r || !this.highResArray || !this.hasLayer(movieId)) {
+        this.highResQueued.delete(idx);
+        return;
+      }
+      if (!stream || target !== this.highResArray || owner !== r || layer !== this.getIndex(movieId)) {
+        target = this.highResArray; owner = r;
+        layer = this.getIndex(movieId);
+        stream = streamHighResLayer(r, target, layer, pixelData);
+      }
+      if (!stream.next().done) return false;
       this.setHighResLoaded(movieId, true);
     });
   }
@@ -1021,9 +1012,8 @@ class TextureArrayManager {
     }
   }
 
-  // Flag flips are immediate: updateTextureArrayLayer uploads the full mip
-  // chain, so a layer is renderable at every distance the moment its upload
-  // returns. (These used to be deferred behind the batched mipmap regen —
+  // Streamed uploads flip flags only after the final mip, so partially
+  // uploaded chains never replace the low-resolution preview. (These used to be deferred behind the batched mipmap regen —
   // flipping early made distant boxes sample allocation-time zeros, pitch
   // black, until the next whole-array generateMipmap.)
   private setFlag(movieId: string, value: number, low: boolean) {
