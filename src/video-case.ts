@@ -491,6 +491,7 @@ const CASE_DIMS: Record<CaseMedium, { w: number; h: number; d: number }> = {
 // systems, ARCADE) is treated as cartridge — the generic clamshell is what a
 // store would actually put an odd cart in.
 const DISC_PLATFORMS = new Set<string>([
+  'PC GAMES', // Steam display and rental copies always use DVD cases.
   'PLAYSTATION',
   'PLAYSTATION 2',
   'GAMECUBE',

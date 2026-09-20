@@ -6,7 +6,7 @@ export interface CaseDimensions { w: number; h: number; d: number; family?: Case
 export const WHITE_CLAMSHELL_DIMS: CaseDimensions = Object.freeze({ w: 5.5 / 12, h: 8.75 / 12, d: 1.25 / 12, family: 'vhs-white' });
 export const JEWEL_FAT_DEPTH_IN = 0.72;
 const JEWEL = new Set(['PLAYSTATION', 'SEGA SATURN', 'SEGA CD', 'DREAMCAST']);
-const KEEP = new Set(['PLAYSTATION 2', 'GAMECUBE', 'XBOX', 'NINTENDO 3DS', 'NINTENDO DSI', 'NINTENDO SWITCH', 'PSP', 'WII U']);
+const KEEP = new Set(['PC GAMES', 'PLAYSTATION 2', 'GAMECUBE', 'XBOX', 'NINTENDO 3DS', 'NINTENDO DSI', 'NINTENDO SWITCH', 'PSP', 'WII U']);
 export function isJewelCasePlatform(platform?: string): boolean { return !!platform && JEWEL.has(platform); }
 export function isWhiteClamshell(movie: { game?: boolean; isSeries?: boolean; packaging?: PackagingFormat; libraryName?: string }, medium: string): boolean {
   if (medium !== 'vhs' || movie.game || movie.isSeries) return false;
@@ -39,6 +39,8 @@ export const GAME_BOX_IN: Record<string, [number, number, number]> = {
   'TURBOGRAFX-16': [5.5, 4.9, 0.9],
   'ARCADE': [5.0, 7.0, 1.0],             // Neo Geo AES cartons are far larger;
                                          // a rental store sleeved odd carts.
+  // Steam's PC shelf always uses DVD keep cases, independent of store era.
+  'PC GAMES': [5.3, 7.5, 0.55],
   // Optical era — jewel cases and keep cases.
   'PLAYSTATION': [5.6, 4.9, 0.4],        // CD jewel case, landscape
   'SEGA SATURN': [4.9, 5.6, 0.4],        // CD jewel case, portrait
