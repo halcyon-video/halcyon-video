@@ -1,16 +1,15 @@
-// Lightweight idle animation: the store's real rental shell travels beside a
-// movie box selected from stocked library titles. Every wall contact selects
-// another title and applies a small edge-derived impulse to its three-axis
-// tumble. The loop retains the original 30fps movement / 12fps rotation caps.
+// Lightweight idle animation: the store's rental VHS clamshell tumbles and
+// bounces off viewport walls. Every wall contact applies a small edge-derived
+// impulse to its three-axis tumble. The loop retains the 30fps movement /
+// 12fps rotation caps.
 
-import { drawJellyfinBack, fitFontPx, leftmostColorCache, rentalWrapFaceImages } from './video-case';
+import { rentalWrapFaceImages } from './video-case';
 import type { Movie } from './jellyfin';
 
 const HIT_COLORS = ['#00f0ff', '#ff007f', '#ffaa00', '#00ff66', '#a855f7'];
 const STYLE_INTERVAL_MS = 1000 / 30;
 const ROT_INTERVAL_MS = 1000 / 12;
-const ART_CACHE_LIMIT = 12;
-const PROJECTED_PAIR_BOX_PX = 340;
+const PROJECTED_BOX_PX = 240;
 const VIEWPORT_MARGIN_PX = 12;
 
 let x = 100;
@@ -26,23 +25,20 @@ let omegaZ = -18;
 let bounceCount = 0;
 let rafId: number | null = null;
 let animationGeneration = 0;
-let faceGeneration = 0;
 
-let boxW = PROJECTED_PAIR_BOX_PX;
-let boxH = PROJECTED_PAIR_BOX_PX;
+let boxW = PROJECTED_BOX_PX;
+let boxH = PROJECTED_BOX_PX;
 let pairScale = 1;
 let parentW = 0;
 let parentH = 0;
-let customMovies: Movie[] | null = null;
-let currentMovie: Movie | null = null;
 
 export function screensaverBoxMetrics(width: number, height: number) {
   const available = Math.max(1, Math.min(
-    PROJECTED_PAIR_BOX_PX,
+    PROJECTED_BOX_PX,
     width - VIEWPORT_MARGIN_PX * 2,
     height - VIEWPORT_MARGIN_PX * 2,
   ));
-  return { side: available, scale: Math.min(1, available / PROJECTED_PAIR_BOX_PX) };
+  return { side: available, scale: Math.min(1, available / PROJECTED_BOX_PX) };
 }
 
 function measure() {
@@ -62,7 +58,7 @@ function measure() {
   y = Math.min(Math.max(y, 0), Math.max(0, parentH - boxH));
 }
 
-// The generic shell always uses the existing rental-wrap renderer. There is
+// The rental shell always uses the existing rental-wrap renderer. There is
 // no second brand literal or fallback drawing in this module.
 const VHS_BOX_H_PX = 200;
 let wrapPromise: Promise<void> | null = null;
@@ -88,179 +84,12 @@ export function applyWrapFaces(): Promise<void> {
   return wrapPromise;
 }
 
-interface MovieArt {
-  backUrl: string;
-  spineUrl: string;
-}
-
-const artCache = new Map<string, MovieArt>();
-
-function rememberArt(id: string, art: MovieArt) {
-  artCache.delete(id);
-  artCache.set(id, art);
-  while (artCache.size > ART_CACHE_LIMIT) {
-    const oldest = artCache.keys().next().value as string | undefined;
-    if (!oldest) break;
-    artCache.delete(oldest);
-  }
-}
-
-function stockedMovie(movie: Movie | null | undefined): movie is Movie {
-  return !!movie?.id && !movie.isSeries && !movie.game
-    && !movie.comingSoon && !movie.discovery && !movie.collectionGap;
-}
-
-function uniqueStock(libraries: Array<{ movies?: Movie[] }> | undefined): Movie[] {
-  if (!libraries) return [];
-  const result: Movie[] = [];
-  const seen = new Set<string>();
-  for (const library of libraries) {
-    for (const movie of library.movies ?? []) {
-      if (!stockedMovie(movie) || seen.has(movie.id)) continue;
-      seen.add(movie.id);
-      result.push(movie);
-    }
-  }
-  return result;
-}
-
-export function getScreensaverMovies(): Movie[] {
-  if (customMovies !== null) return customMovies.filter(stockedMovie);
-  if (typeof window === 'undefined') return [];
-  const app = window as typeof window & {
-    storeScene?: { libraries?: Array<{ movies?: Movie[] }>; slotsByPosition?: Map<unknown, { movie?: Movie }> };
-    store?: { libraries?: Array<{ movies?: Movie[] }>; slotsByPosition?: Map<unknown, { movie?: Movie }> };
-    librariesList?: Array<{ movies?: Movie[] }>;
-  };
-  const scene = app.storeScene ?? app.store;
-  const fromLibraries = uniqueStock(scene?.libraries);
-  if (fromLibraries.length) return fromLibraries;
-  if (scene?.slotsByPosition instanceof Map) {
-    const seen = new Set<string>();
-    const fromShelves: Movie[] = [];
-    for (const slot of scene.slotsByPosition.values()) {
-      const movie = slot?.movie;
-      if (!stockedMovie(movie) || seen.has(movie.id)) continue;
-      seen.add(movie.id);
-      fromShelves.push(movie);
-    }
-    if (fromShelves.length) return fromShelves;
-  }
-  return uniqueStock(app.librariesList);
-}
-
-export function chooseNextScreensaverMovie(
-  movies: Movie[], currentId: string | null, randomValue = Math.random(),
-): Movie | null {
-  const stock = movies.filter(stockedMovie);
-  if (!stock.length) return null;
-  const alternatives = stock.filter((movie) => movie.id !== currentId);
-  const pool = alternatives.length ? alternatives : stock;
-  const bounded = Math.max(0, Math.min(.999999, randomValue));
-  return pool[Math.floor(bounded * pool.length)];
-}
-
-export function pickNextScreensaverMovie(): Movie | null {
-  return chooseNextScreensaverMovie(getScreensaverMovies(), currentMovie?.id ?? null);
-}
-
-function drawMovieSpine(ctx: CanvasRenderingContext2D, w: number, h: number, movie: Movie) {
-  const spineBg = leftmostColorCache.get(movie.id) || '#24262a';
-  ctx.fillStyle = spineBg;
-  ctx.fillRect(0, 0, w, h);
-  ctx.fillStyle = 'rgba(255,255,255,.18)';
-  ctx.fillRect(0, 0, 2, h);
-  ctx.fillStyle = 'rgba(0,0,0,.35)';
-  ctx.fillRect(w - 2, 0, 2, h);
-  const title = movie.title.toUpperCase();
-  const size = fitFontPx(ctx, title, 22, 'bold', h - 90, 12, 'Arial, sans-serif');
-  ctx.save();
-  ctx.translate(w / 2, 24);
-  ctx.rotate(Math.PI / 2);
-  ctx.font = `bold ${size}px Arial, sans-serif`;
-  ctx.fillStyle = '#fff';
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(title, 0, 0);
-  ctx.restore();
-  ctx.fillStyle = 'rgba(255,255,255,.82)';
-  ctx.font = 'bold 11px Arial, sans-serif';
-  ctx.textAlign = 'center';
-  ctx.fillText([movie.rating, movie.year].filter(Boolean).join(' · '), w / 2, h - 18);
-}
-
-// Every cache entry owns its canvas closure. A late backdrop callback can only
-// repaint that entry; it can never read pixels from a canvas reused by a newer
-// title. Evicted entries silently ignore their late callbacks.
-function renderMovieArt(movie: Movie, onUpdate?: (art: MovieArt) => void): MovieArt {
-  const cached = artCache.get(movie.id);
-  if (cached) {
-    rememberArt(movie.id, cached);
-    return cached;
-  }
-  const backCanvas = document.createElement('canvas');
-  backCanvas.width = 320;
-  backCanvas.height = 480;
-  const backCtx = backCanvas.getContext('2d')!;
-  const spineCanvas = document.createElement('canvas');
-  spineCanvas.width = 60;
-  spineCanvas.height = 480;
-  drawMovieSpine(spineCanvas.getContext('2d')!, 60, 480, movie);
-  const art: MovieArt = { backUrl: '', spineUrl: spineCanvas.toDataURL('image/png') };
-  rememberArt(movie.id, art);
-  drawJellyfinBack(backCtx, 320, 480, movie, undefined, () => {
-    if (artCache.get(movie.id) !== art) return;
-    art.backUrl = backCanvas.toDataURL('image/png');
-    onUpdate?.(art);
-  });
-  art.backUrl = backCanvas.toDataURL('image/png');
-  return art;
-}
-
-function clearMovieFaces(movieEl: HTMLElement) {
-  for (const face of movieEl.querySelectorAll<HTMLElement>('.ss-case-face')) face.style.backgroundImage = '';
-}
-
-export function applyMovieFaces(movie: Movie | null) {
-  currentMovie = movie;
-  const generation = ++faceGeneration;
-  const pair = document.querySelector<HTMLElement>('.ss-pair');
-  const movieEl = document.querySelector<HTMLElement>('.ss-movie');
-  if (!pair || !movieEl) return;
-  pair.classList.toggle('no-movie', !movie);
-  if (!movie) {
-    clearMovieFaces(movieEl);
-    return;
-  }
-  const front = movieEl.querySelector<HTMLElement>('.ss-movie-front');
-  const back = movieEl.querySelector<HTMLElement>('.ss-movie-back');
-  const spine = movieEl.querySelector<HTMLElement>('.ss-movie-left');
-  const art = renderMovieArt(movie, (updated) => {
-    if (faceGeneration === generation && currentMovie?.id === movie.id && back) {
-      back.style.backgroundImage = `url(${updated.backUrl})`;
-    }
-  });
-  if (back) back.style.backgroundImage = `url(${art.backUrl})`;
-  if (spine) spine.style.backgroundImage = `url(${art.spineUrl})`;
-  if (front) {
-    front.style.backgroundImage = '';
-    if (movie.posterUrl) {
-      const image = new Image();
-      image.decoding = 'async';
-      image.onload = () => {
-        if (faceGeneration === generation && currentMovie?.id === movie.id) {
-          front.style.backgroundImage = `url(${movie.posterUrl})`;
-        }
-      };
-      image.onerror = () => {};
-      image.src = movie.posterUrl;
-    }
-  }
-}
-
-export function swapMovie(specificMovie?: Movie | null) {
-  applyMovieFaces(specificMovie === undefined ? pickNextScreensaverMovie() : specificMovie);
-}
+// Backwards-compatible stubs for external callers/tests
+export function getScreensaverMovies(): Movie[] { return []; }
+export function chooseNextScreensaverMovie(_movies: Movie[], _currentId: string | null): Movie | null { return null; }
+export function pickNextScreensaverMovie(): Movie | null { return null; }
+export function applyMovieFaces(_movie: Movie | null): void {}
+export function swapMovie(_specificMovie?: Movie | null): void {}
 
 export function spinTo(degXOrDeg: number, degY?: number, degZ?: number) {
   if (degY === undefined || degZ === undefined) {
@@ -307,7 +136,6 @@ export function startScreensaverAnimation() {
   omegaY = (Math.random() > .5 ? 1 : -1) * (40 + Math.random() * 35);
   omegaZ = (Math.random() > .5 ? 1 : -1) * (20 + Math.random() * 20);
   void applyWrapFaces();
-  swapMovie();
   measure();
   logo.style.left = '0px';
   logo.style.top = '0px';
@@ -339,7 +167,6 @@ export function startScreensaverAnimation() {
     const hit = left || right || top || bottom;
     if (hit) {
       bounceCount++;
-      swapMovie();
       applyBounceImpulse(left, right, top, bottom);
     }
     if (timeSinceDraw >= STYLE_INTERVAL_MS) {
@@ -377,19 +204,14 @@ if (typeof window !== 'undefined') {
     stop: stopScreensaverAnimation,
     setMode: (_mode: string) => { void applyWrapFaces(); measure(); },
     spinTo,
-    setMovie: (movie: Movie | null) => applyMovieFaces(movie),
-    setMovies: (movies: Movie[] | null) => { customMovies = movies; },
-    getCurrentMovie: () => currentMovie,
-    swapMovie,
+    setMovie: (_movie: Movie | null) => {},
+    setMovies: (_movies: Movie[] | null) => {},
+    getCurrentMovie: () => null,
+    swapMovie: () => {},
     forceBounce,
     getBounces: () => bounceCount,
     getTumble: () => ({ rotX, rotY, rotZ, omegaX, omegaY, omegaZ, vx, vy, x, y, boxW, boxH, pairScale }),
-    getArtDebug: () => {
-      const cached = currentMovie ? artCache.get(currentMovie.id) : null;
-      const background = document.querySelector<HTMLElement>('.ss-movie-back')?.style.backgroundImage ?? '';
-      return { cacheSize: artCache.size, cacheIds: [...artCache.keys()],
-        currentBackMatchesCache: !currentMovie || (!!cached && background.includes(cached.backUrl)) };
-    },
+    getArtDebug: () => ({ cacheSize: 0, cacheIds: [], currentBackMatchesCache: true }),
     isRunning: () => rafId !== null,
     applyWrapFaces,
   };

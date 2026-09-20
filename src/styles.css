@@ -1571,8 +1571,8 @@ html, body {
   position: absolute;
   top: 0;
   left: 0;
-  width: 340px;
-  height: 340px;
+  width: 240px;
+  height: 240px;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -1601,14 +1601,6 @@ html, body {
   transform: scale(var(--ss-pair-scale, 1));
 }
 
-.ss-pair.no-movie .ss-vhs {
-  transform: translate3d(0, 0, 0);
-}
-
-.ss-pair.no-movie .ss-movie {
-  display: none;
-}
-
 .ss-case-face {
   position: absolute;
   top: 0;
@@ -1629,7 +1621,7 @@ html, body {
   height: 200px;
   top: -100px;
   left: calc(-1 * var(--vhsW) / 2);
-  transform: translate3d(-52px, 0, -12px);
+  transform: translate3d(0, 0, 0);
   transform-style: preserve-3d;
 }
 
@@ -1668,55 +1660,6 @@ html, body {
 .ss-vhs-top { transform: rotateX(90deg) translateZ(100px); }
 .ss-vhs-bottom { transform: rotateX(-90deg) translateZ(100px); }
 
-/* ── Library movie box: retail cover slipcase paired alongside the rental clamshell ── */
-.ss-movie {
-  --movieW: 110px;
-  --movieD: 26px;
-  position: absolute;
-  width: var(--movieW);
-  height: 200px;
-  top: -100px;
-  left: calc(-1 * var(--movieW) / 2);
-  transform: translate3d(52px, 0, 12px);
-  transform-style: preserve-3d;
-}
-
-.ss-movie-front,
-.ss-movie-back {
-  width: var(--movieW);
-  height: 200px;
-  border-radius: 2px;
-  background-color: #0f172a;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
-}
-
-.ss-movie-front { transform: translateZ(calc(var(--movieD) / 2)); }
-.ss-movie-back { transform: rotateY(180deg) translateZ(calc(var(--movieD) / 2)); }
-
-.ss-movie-left,
-.ss-movie-right {
-  width: var(--movieD);
-  height: 200px;
-  left: calc((var(--movieW) - var(--movieD)) / 2);
-  background-color: #0f172a;
-}
-
-.ss-movie-left { transform: rotateY(-90deg) translateZ(calc(var(--movieW) / 2)); }
-.ss-movie-right {
-  transform: rotateY(90deg) translateZ(calc(var(--movieW) / 2));
-  background-image: linear-gradient(180deg, #1b1d22 0%, #121417 100%);
-}
-
-.ss-movie-top,
-.ss-movie-bottom {
-  width: var(--movieW);
-  height: var(--movieD);
-  top: calc(100px - var(--movieD) / 2);
-  background-image: linear-gradient(90deg, #1b1d22 0%, #121417 100%);
-}
-
-.ss-movie-top { transform: rotateX(90deg) translateZ(100px); }
-.ss-movie-bottom { transform: rotateX(-90deg) translateZ(100px); }
 
 /* Animations */
 @keyframes flicker {
