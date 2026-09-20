@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { markSignMesh } from '../sign-builders';
 import type { Movie } from '../jellyfin';
 import type { FixtureContext } from '../fixtures';
 import { getBackdropArt, loadArt } from '../video-case';
@@ -16,8 +17,8 @@ export function createFeatureFilmTopper(movie: Movie, ctx: FixtureContext): Prom
     const backing = new THREE.Mesh(new THREE.BoxGeometry(w + .04, h + .04, .035),
       new THREE.MeshStandardMaterial({ color: 0x111111, roughness: .85 }));
     backing.position.y = h / 2; backing.castShadow = backing.receiveShadow = true;
-    const print = new THREE.Mesh(new THREE.PlaneGeometry(w, h),
-      new THREE.MeshStandardMaterial({ map: texture, roughness: .72 }));
+    const print = markSignMesh(new THREE.Mesh(new THREE.PlaneGeometry(w, h),
+      new THREE.MeshStandardMaterial({ map: texture, roughness: .85 })));
     print.name = 'feature-backdrop'; print.position.set(0, h / 2, .019);
     root.add(backing, print);
   };

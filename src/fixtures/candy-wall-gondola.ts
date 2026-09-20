@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { retailPackaging } from './retail-packaging';
 import type { FixtureContext, StoreFixture } from '../fixtures';
 import type { FixturePlacement } from '../store-layout';
 import type { Footprint } from '../layout-validator';
@@ -66,7 +67,7 @@ export class CandyWallGondola implements StoreFixture {
 
     this.ctx.scene.add(group);
     this.ctx.addCollider(proxy);
-    this.removeModel = installDisplayModel(this.ctx, group, fallback, 'models/candy-wall-gondola.glb', {}, new THREE.Vector3(1, 1, 1), prepareRetailModel);
+    this.removeModel = installDisplayModel(this.ctx, group, fallback, 'models/candy-wall-gondola.glb', retailPackaging(own, () => { if(this.group) this.ctx.requestRender(); }), new THREE.Vector3(1, 1, 1), prepareRetailModel);
     this.ctx.requestShadowRefresh();
     this.ctx.requestRender();
   }

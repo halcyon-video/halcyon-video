@@ -22,3 +22,19 @@ Fixed fixtures and game shelves are built first, then concessions, then movable 
 The existing model loader owns installation and cancellation. The scene retains these fixture instances and disposes them before renderer teardown, so late loads cannot attach to a discarded scene. The service counter's imported accent finish uses the active store palette and follows live brand edits. Generic package geometry represents visual stock, not purchasable inventory.
 
 Validation covers actual GLB bounds, normals, UVs, triangle counts, transparent-part preservation and runtime draw budgets; several store widths and blocked layouts; loaded/failed/pending model teardown; live brand updates; independent-store exclusion; and mobile scene, navigation and touch checks. Historical identification, adoption dates and any further reference-fidelity model work remain open.
+
+## September 20 concessions revision
+
+The queue candy rack joins the concessions line instead of facing it across
+an obstructed checkout aisle. The shelf and popcorn display each have a
+back-to-back partner, and the cooler turns 90 degrees counterclockwise.
+The aggregate admission envelope includes every member and preserves the
+three-foot customer approach. The chest freezer is dormant. Sale tables only
+use front-half pockets, and the supplemental table requires five-foot clearance.
+
+The cooler export includes rolled can rims, recessed lids, pull tabs, profiled
+bottle shoulders, necks and caps, plus open wire decks. Gondola snack pouches
+have sealed ends and bulged profiles rather than solid cartons. Runtime original
+product wraps distinguish soda, candy and popcorn; clear acrylic/glass keeps
+stock visible. Existing object scale, origin and collision envelopes are retained.
+The authoring scripts and editable Blender sources reproduce the public exports.

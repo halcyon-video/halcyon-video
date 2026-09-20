@@ -12,7 +12,7 @@ def linear_hex(hex):
  return tuple(v/12.92 if v<=.04045 else ((v+.055)/1.055)**2.4 for v in rgb)
 def canonical(name):return linear_hex(re.search(r"export const "+name+r" = '(#[0-9a-fA-F]{6})'",canon).group(1))
 roles={}
-for name,color in [('FramePaint',canonical('HALCYON_BLUE')),('HeaderPaint',canonical('HALCYON_BLUE')),('PanelLaminate',linear_hex('#eeeae0')),('ShelfLaminate',linear_hex('#f8f2e8')),('ShelfEdge',linear_hex('#d6d0c5')),('Baseboard',linear_hex('#262626')),('EdgePaint',canonical('HALCYON_CREAM')),('CabinetLaminate',linear_hex('#282722')),('WallPoster',linear_hex('#ffffff'))]:
+for name,color in [('FramePaint',canonical('HALCYON_BLUE')),('HeaderPaint',canonical('HALCYON_BLUE')),('PanelLaminate',linear_hex('#eeeae0')),('ShelfLaminate',linear_hex('#f8f2e8')),('ShelfEdge',linear_hex('#d6d0c5')),('Baseboard',linear_hex('#262626')),('EdgePaint',canonical('HALCYON_WHITE')),('CabinetLaminate',linear_hex('#282722')),('WallPoster',linear_hex('#ffffff'))]:
  m=bpy.data.materials.new(name);m.diffuse_color=(*color,1);m.use_nodes=True;bsdf=m.node_tree.nodes['Principled BSDF'];bsdf.inputs['Base Color'].default_value=(*color,1);bsdf.inputs['Roughness'].default_value=.72 if 'Laminate' in name else .76;roles[name]=m
 parts=[]
 def slab(name,poly,lo,hi,role,bevel=.012,cutters=None):
@@ -29,7 +29,7 @@ def slab(name,poly,lo,hi,role,bevel=.012,cutters=None):
    bpy.data.objects.remove(c, do_unlink=True)
   bm=bmesh.new();bm.from_mesh(me);bmesh.ops.recalc_face_normals(bm,faces=list(bm.faces));bm.to_mesh(me);bm.free()
  if bevel > 0:
-  mod=o.modifiers.new('Eased finished edges','BEVEL');mod.width=bevel;mod.segments=2;bpy.ops.object.modifier_apply(modifier=mod.name)
+  mod=o.modifiers.new('Eased finished edges','BEVEL');mod.width=bevel;mod.segments=1;bpy.ops.object.modifier_apply(modifier=mod.name)
  bpy.ops.object.mode_set(mode='EDIT');bpy.ops.mesh.select_all(action='SELECT');bpy.ops.uv.smart_project(island_margin=.025);bpy.ops.object.mode_set(mode='OBJECT')
  o.select_set(False);return o
 def create_cutter(name,poly,lo,hi):
@@ -44,8 +44,9 @@ def box(name,x,z,w,d,lo,hi,role,bevel=.012,cutters=None):return slab(name,[(x-w/
 
 # Joined perimeter fascia is a single closed U-shaped extrusion with mitered turns.
 # Outer edge extends to (-7.2, -7.2) to meet store walls without gaps.
-outer=[(-7.2,-7.2),(7,-7.2),(7,1),(1,7),(-7.2,7)]
-inner=[(-6.65,-6.65),(6.65,-6.65),(6.65,.855),(.855,6.65),(-6.65,6.65)]
+outer=[(-7.2,-7.2),(7.025,-7.2),(7.025,1),(1,7.025),(-7.2,7.025)]
+inner_corner=8.025-math.sqrt(2)*.25-6.775
+inner=[(-6.8,-6.8),(6.775,-6.8),(6.775,inner_corner),(inner_corner,6.775),(-6.8,6.775)]
 # Ring faces use matching corner topology, then beveled edge joins.
 def ring(name,lo,hi,role):
  n=5;poly=outer+inner;vs=[(x,-z,y) for y in [lo,hi] for x,z in poly];fs=[]
@@ -65,9 +66,23 @@ for side in ['front','right']:
  c_d = 1.0; c_w = 5.0
  cutter = box_cutter(side+' window cutter', -3.2 if side=='front' else 6.9, 6.9 if side=='front' else -3.2, c_w if side=='front' else c_d, c_d if side=='front' else c_w, 3.5, 8.72)
  face('wall',-3.2,6.9,7.4,.25,.12,9.15,'FramePaint',cutters=[cutter])
- face('low accent',-3.2,7.03,7.4,.05,3.05,3.45,'EdgePaint')
+ # Pin 179: uninterrupted blue millwork; no low accent strip.
 # Entrance jambs support the diagonal header without a sill/trip edge.
-for x,z in [(.75,6.85),(6.85,.75)]:box('Entry jamb',x,z,.5,.5,0,8.5,'FramePaint')
+for x,z,w,d in [(.75,6.9,.5,.25),(6.9,.75,.25,.5)]:box('Entry jamb',x,z,w,d,0,8.5,'FramePaint')
+# Front/right fascia, window wall and jamb share both exposed quarter-foot planes.
+for side in ['front','right']:
+ axis=1 if side=='front' else 0
+ def store_coordinate(v):return -v.co.y if axis==1 else v.co.x
+ side_wall=next(o for o in parts if o.name==side+' wall')
+ coords=[store_coordinate(v) for v in side_wall.data.vertices]
+ assert abs(min(coords)-6.775)<1e-5 and abs(max(coords)-7.025)<1e-5
+ jamb=next(o for o in parts if o.name.startswith('Entry jamb') and
+   abs(sum(store_coordinate(v) for v in o.data.vertices)/len(o.data.vertices)-6.9)<1e-5)
+ coords=[store_coordinate(v) for v in jamb.data.vertices]
+ assert abs(min(coords)-6.775)<1e-5 and abs(max(coords)-7.025)<1e-5
+ assert outer[3 if side=='front' else 1][axis]==7.025
+ assert inner[3 if side=='front' else 1][axis]==6.775
+print('FLUSH BODY: exposed front/right wall, jamb and all fascia rings share6.775..7.025; rear/left liners and fascia share-7.2..-6.8')
 # TV console: triangular wedge nestled into the corner apex (-6.8, -6.8) against solid liners.
 poly_horiz = [(-6.8, -6.8), (-3.15, -6.8), (-6.8, -3.15)]
 for y in [.18,1.15,2.18]:slab('Console horizontal', poly_horiz, y, y+.12, 'CabinetLaminate')
@@ -85,18 +100,22 @@ for o in parts:
 
 # Wall posters mounted along the kids clubhouse interior walls at authentic youth movie proportions.
 # Fitted right-window sill and inner jamb liners; keep the eye-level opening.
-box('Right window sill',6.98,-3.05,.56,6.85,3.45,3.57,'PanelLaminate')
-for z in [-6.47,.37]:box('Right window reveal',6.9,z,.3,.08,3.57,8.72,'EdgePaint',.006)
-# Low family shelving, shallow slanted trays with integral raised lips.
+box('Right window sill',6.9,-3.2,.25,5,3.45,3.5,'FramePaint')
+# The opening has the same blue paint as its continuous surrounding wall.
+# Matching low shelves on both faces of each flanking wall.
 for side in ['front','right']:
- def shelf(name,x,z,w,d,lo,hi,role):return box(side+' '+name,x if side=='front' else z,z if side=='front' else x,w if side=='front' else d,d if side=='front' else w,lo,hi,role)
- for center in [-5.1,-1.4]:
-  for x in [center-1.8,center+1.8]:shelf('shelf upright',x,7.6,.1,1.2,.08,3.4,'ShelfLaminate')
-  shelf('shelf back',center,7.08,3.5,.12,.08,3.4,'ShelfLaminate')
-  shelf('recessed plinth',center,7.5,3.5,.9,0,.25,'FramePaint')
-  for y in [0.5, 1.38, 2.26]:
-   shelf('tray',center,7.6,3.5,1.2,y,y+.08,'ShelfLaminate')
-   shelf('retaining lip',center,8.17,3.5,.06,y+.08,y+.18,'ShelfEdge')
+ for inward in [False,True]:
+  center_z=6.15 if inward else 7.6
+  facing=-1 if inward else 1
+  def shelf(name,x,z,w,d,lo,hi,role):return box(side+(' inner ' if inward else ' outer ')+name,x if side=='front' else z,z if side=='front' else x,w if side=='front' else d,d if side=='front' else w,lo,hi,role)
+  for center in ([-4.95,-1.4] if inward else [-5.1,-1.4]):
+   width=3.4 if inward and center==-4.95 else 3.7
+   for x in [center-width/2+.05,center+width/2-.05]:shelf('shelf upright',x,center_z,.1,1.2,.08,3.4,'ShelfLaminate')
+   shelf('shelf back',center,center_z-facing*.52,width-.2,.12,.08,3.4,'ShelfLaminate')
+   shelf('recessed plinth',center,center_z-facing*.1,width-.2,.9,0,.25,'FramePaint')
+   for y in [0.5,1.38,2.26]:
+    shelf('tray',center,center_z,width-.2,1.2,y,y+.08,'ShelfLaminate')
+    shelf('retaining lip',center,center_z+facing*.57,width-.2,.06,y+.08,y+.18,'ShelfEdge')
 # The upper construction fits the dropped lid, retaining low shelf/chair scale.
 # 4.5 -> 13.5 is remapped to 4.5 -> 10.6 feet; all joints share this datum.
 for o in parts:

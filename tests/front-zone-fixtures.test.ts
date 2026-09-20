@@ -51,13 +51,18 @@ for (const width of [28,42,62,90]) test(`front run follows a ${width}-foot store
   const plan=frontRefreshmentPlacements([checkout],bounds);
   const footprints=plan.map(p=>p.kind==='bargain-bin'
     ? {label:p.id,kind:'fixture' as const,cx:p.position.x,cz:p.position.z,w:3,d:3,yaw:p.yaw,clearance:3}
+    : p.kind==='candy-display' ? {label:p.id,kind:'fixture' as const,cx:p.position.x,cz:p.position.z,w:3,d:1.6,yaw:p.yaw,clearance:1.5}
     : retailFixtureFootprint(p.kind as RetailFixtureKind,p));
   assert.deepEqual(validateLayout([...footprints,checkout],bounds).filter(v=>v.a!==checkout.label||v.b),[]);
   assert.equal(new Set(plan.map(p=>p.id)).size,plan.length);
   if(width>=62) {
     const row=['candy-wall-gondola','acrylic-popcorn-bin','two-door-cooler'].map(k=>plan.find(p=>p.kind===k)!);
     assert.ok(row.every(Boolean));
-    for(const p of row) assert.equal(p.yaw,Math.PI/4);
+    for(const p of row) assert.equal(p.yaw,Math.PI/4+(p.kind==='two-door-cooler'?Math.PI/2:0));
+    assert.equal(plan.filter(p=>p.kind==='candy-wall-gondola').length,2);
+    assert.equal(plan.filter(p=>p.kind==='acrylic-popcorn-bin').length,2);
+    assert.equal(plan.filter(p=>p.kind==='candy-display').length,1);
+    assert.ok(plan.every(p=>p.kind!=='chest-freezer'));
     assert.ok(row[0].position.x<row[1].position.x && row[1].position.x<row[2].position.x);
     assert.ok(row[0].position.z>row[1].position.z && row[1].position.z>row[2].position.z);
     for(const bin of plan.filter(p=>p.kind==='bargain-bin')) {

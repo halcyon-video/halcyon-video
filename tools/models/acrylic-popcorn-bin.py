@@ -114,6 +114,18 @@ for i,(x,y) in enumerate([(x,y) for y in [-.48,0,.48] for x in [-.48,0,.48]]):
     for z in [2.24,2.87]:
         box(f'BagCrimp_{i}_{z}',(x,y,z),(.31,.045,.025),m_carton_red,bevel=.002)
 
+# Each side of the bag carries one upright print, including its folded shoulders.
+# Smart-packed islands cut the product name into unrelated fragments.
+for o in parts:
+ if not o.name.startswith('PopcornBag_'):continue
+ uv=o.data.uv_layers.active
+ xs=[v.co.x for v in o.data.vertices];zs=[v.co.z for v in o.data.vertices]
+ for face in o.data.polygons:
+  for li in face.loop_indices:
+   v=o.data.vertices[o.data.loops[li].vertex_index].co
+   u=(v.x-min(xs))/(max(xs)-min(xs))
+   uv.data[li].uv=(1-u if face.normal.y>0 else u,(v.z-min(zs))/(max(zs)-min(zs)))
+
 metrics = {
     'units': 'feet',
     'origin': 'floor-centred; X across, Y in-depth, Z up (Blender)',

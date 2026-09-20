@@ -25,7 +25,7 @@ export class Clubhouse implements SlottedFixture {
   private wallPaints: THREE.MeshStandardMaterial[] = [];
   readonly cols = 10;
   readonly shelfHeights = [0.5, 1.38, 2.26];
-  readonly capacity = 60;
+  readonly capacity = 120;
   readonly genre = 'Family';
   constructor(public placement: FixturePlacement, private ctx: FixtureContext) {}
   private host() { const h=clubhouseHost(0,0,1);h.center=this.placement.position;return h; }
@@ -53,8 +53,8 @@ export class Clubhouse implements SlottedFixture {
       const h=shelf?3.4:tv?2.3:panel?3.5:7.65;
       if(shelf){
         const g=new THREE.Group();g.position.set(x,0,z);g.rotation.y=f.yaw;fallback.add(g);
-        box(g,0,1.7,-.54,3.7,3.4,.12,finishes.ShelfLaminate);
-        for(const y of this.shelfHeights){box(g,0,y+.04,0,3.7,.08,1.2,finishes.ShelfLaminate);box(g,0,y+.13,.57,3.7,.1,.06,finishes.ShelfEdge);}
+        box(g,0,1.7,-.54,f.w,3.4,.12,finishes.ShelfLaminate);
+        for(const y of this.shelfHeights){box(g,0,y+.04,0,f.w,.08,1.2,finishes.ShelfLaminate);box(g,0,y+.13,.57,f.w,.1,.06,finishes.ShelfEdge);}
       } else if(tv){
         const cabinet=new THREE.Group();cabinet.position.set(x,0,z);cabinet.rotation.y=f.yaw;fallback.add(cabinet);
         box(cabinet,0,1.15,0,f.w,2.3,f.d,finishes.CabinetLaminate);
@@ -68,16 +68,15 @@ export class Clubhouse implements SlottedFixture {
     }
     for (const [lo,hi,m] of [[7.21,9.933333,finishes.HeaderPaint],
       [9.933333,10.266667,finishes.EdgePaint],[10.266667,10.6,finishes.HeaderPaint]] as const) {
-      box(fallback,4,(lo+hi)/2,4,8.5,hi-lo,.35,m,Math.PI/4);
-      box(fallback,-3,(lo+hi)/2,6.9,8,hi-lo,.3,m);
-      box(fallback,6.9,(lo+hi)/2,-3,.3,hi-lo,8,m);
+      box(fallback,3.9241,(lo+hi)/2,3.9241,8.52,hi-lo,.25,m,Math.PI/4);
+      box(fallback,-3,(lo+hi)/2,6.9,8,hi-lo,.25,m);
+      box(fallback,6.9,(lo+hi)/2,-3,.25,hi-lo,8,m);
     }
     box(fallback,-.03,.16,-6.765,13.53,.32,.07,finishes.Baseboard);
     box(fallback,-6.765,.16,-.03,.07,.32,13.53,finishes.Baseboard);
     box(fallback,-3.2,.16,6.735,7.4,.32,.07,finishes.Baseboard);
     box(fallback,6.735,.16,-3.2,.07,.32,7.4,finishes.Baseboard);
-    box(fallback,6.98,3.51,-3.05,.56,.12,6.85,finishes.PanelLaminate);
-    for(const z of [-6.47,.37])box(fallback,6.9,5.44,z,.3,3.74,.08,finishes.EdgePaint);
+    box(fallback,6.9,3.475,-3.2,.25,.05,5,finishes.FramePaint);
     fallback.traverse(o=>{if(o instanceof THREE.Mesh && o.material===wall)mapClubhouseWall(o,this.ctx);});
     // Colored paint retains the same plaster relief as the room.
     this.wallPaints=[finishes.FramePaint,finishes.HeaderPaint,finishes.EdgePaint];
@@ -127,13 +126,16 @@ export class Clubhouse implements SlottedFixture {
     if(!this.root)return [];
     const stock=familyStock(this.ctx.libraries.flatMap(l=>l.movies));if(!stock.length)return [];
     const slots:FixtureSlot[]=[];
-    for(const side of ['front','right'] as const) for(let row=0;row<3;row++) for(let col=0;col<this.cols;col++){
+    for(const side of ['front','right','back','left'] as const) for(let row=0;row<3;row++) for(let col=0;col<this.cols;col++){
+      const inner=side==='back'||side==='left', front=side==='front'||side==='back';
       const bay=Math.floor(col/5),within=col%5;
-      const u=[-5.1,-1.4][bay]+(within-2)*BOX_SPACING,v=7.82;
+      const reversed=side==='right'||side==='back', b=reversed?1-bay:bay, c=reversed?4-within:within;
+      const u=(inner?[-4.95,-1.4]:[-5.1,-1.4])[b]+(c-2)*BOX_SPACING,v=inner?5.93:7.82;
       slots.push({movie:stock[slots.length%stock.length],side,shelfIdx:row,col,depth:CASE_DEPTH,
-        restingX:this.placement.position.x+(side==='front'?u:v),restingZ:this.placement.position.z+(side==='front'?v:[-1.4,-5.1][bay]-(within-2)*BOX_SPACING),
+        restingX:this.placement.position.x+(front?u:v),restingZ:this.placement.position.z+(front?v:u),
         restingY:this.shelfHeights[row]+.08+CASE_HEIGHT/2*Math.cos(.2)+CASE_DEPTH/2*Math.sin(.2)+.03,
-        restingRotY:side==='front'?0:Math.PI/2,restingRotX:-.2,key:`fixture_${this.placement.id}_side_${side}_shelf_${row}_col_${col}`});
+        restingRotY:front?(inner?Math.PI:0):(inner?-Math.PI/2:Math.PI/2),restingRotX:-.2,
+        key:`fixture_${this.placement.id}_side_${side}_shelf_${row}_col_${col}`});
     }
     return slots;
   }

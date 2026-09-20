@@ -21,9 +21,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { assetUrl } from '../asset-url';
 import type { StoreScene } from '../three-scene';
 import { seededRandom01 } from '../store-layout';
-import { markSignMesh } from '../sign-builders';
 import { loadProp } from '../props';
-import { BB_ARCHIVO_BLACK } from '../bundled-fonts';
 import { buildImpactPrinter93 } from './impact-printer-93';
 import { installCounterTelephone } from './counter-telephone';
 import { installCounterScanner } from './counter-scanner';
@@ -65,25 +63,6 @@ function vfdTex(): THREE.CanvasTexture {
   });
 }
 
-function rentAGameTex(): THREE.CanvasTexture {
-  return cachedTex('rentagame', 512, 320, (ctx, w, h) => {
-    ctx.fillStyle = '#14092a';
-    ctx.fillRect(0, 0, w, h);
-    ctx.textAlign = 'center';
-    ctx.fillStyle = '#ff4fa0';
-    ctx.font = `italic 900 64px ${BB_ARCHIVO_BLACK}, sans-serif`;
-    ctx.fillText('RENT A GAME', w / 2, 84);
-    ctx.fillStyle = '#39e6d0';
-    ctx.fillText('GET A CARD', w / 2, 158);
-    ctx.fillStyle = '#ffd54a';
-    ctx.font = '700 34px Arial, sans-serif';
-    ctx.fillText("COLLECT 'EM  •  TRADE 'EM", w / 2, 222);
-    ctx.fillStyle = '#ffffff';
-    ctx.font = '700 26px Arial, sans-serif';
-    ctx.fillText('COLLECT ALL 50', w / 2, 270);
-  });
-}
-
 function fanfoldTex(): THREE.CanvasTexture {
   return cachedTex('fanfold', 256, 512, (ctx, w, h) => {
     ctx.fillStyle = '#fbfaf4';
@@ -121,10 +100,6 @@ export function buildCounterProps93(scene: StoreScene): void {
   const cx = inner.x;
   const matte = (color: number, roughness = 0.6) =>
     new THREE.MeshStandardMaterial({ color, roughness, metalness: 0 });
-  const printed = (tex: THREE.CanvasTexture) => {
-    const m = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.6, metalness: 0.0 });
-    return m;
-  };
   // Along-the-counter tangent for a given yaw (the direction sign anchors
   // space themselves along the band).
   const tangent = (yaw: number) => new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
@@ -414,41 +389,7 @@ export function buildCounterProps93(scene: StoreScene): void {
     installCounterTelephone(scene, group, phoneFallback, pOrigin, pYaw);
   }
 
-  // 6. RENT A GAME / GET A CARD counter display — only when the game
-  // department actually exists, because the card it promises comes with a
-  // game rental.
-  if (bandLeft && scene.gameMovies.length > 0) {
-    const pos = bandLeft.pos.clone().add(tangent(bandLeft.yaw).multiplyScalar(-1.35));
-    const yaw = bandLeft.yaw; // sign-anchor yaw already faces the customer
-    const base = new THREE.Mesh(new THREE.BoxGeometry(0.66, 0.24, 0.46), matte(0xf0eee8, 0.7));
-    base.position.set(pos.x, pos.y + 0.12, pos.z);
-    base.rotation.y = yaw;
-    base.castShadow = true;
-    base.receiveShadow = true;
-    group.add(base);
-    const header = new THREE.Mesh(
-      new THREE.BoxGeometry(0.62, 0.4, 0.025),
-      [matte(0x14092a), matte(0x14092a), matte(0x14092a), matte(0x14092a), printed(rentAGameTex()), matte(0x14092a)]
-    );
-    header.position.set(pos.x, pos.y + 0.45, pos.z).add(normal(yaw).multiplyScalar(-0.2));
-    header.rotation.y = yaw;
-    header.rotation.x = -0.08;
-    markSignMesh(header, { casts: true });
-    group.add(header);
-    // Loose card packs on the base.
-    const packGeo = new THREE.BoxGeometry(0.13, 0.02, 0.18);
-    const packColors = [0x2f86d4, 0xe23a2e, 0x27ae60, 0xf4c400, 0x8e44ad, 0x39e6d0];
-    packColors.forEach((color, i) => {
-      const pack = new THREE.Mesh(packGeo, matte(color, 0.4));
-      const px = (i % 3 - 1) * 0.17;
-      const pz = (Math.floor(i / 3) - 0.5) * 0.2;
-      pack.position.set(pos.x, pos.y + 0.25, pos.z)
-        .add(tangent(yaw).multiplyScalar(px))
-        .add(normal(yaw).multiplyScalar(pz));
-      pack.rotation.y = yaw + (seededRandom01(`pack-${i}`) - 0.5) * 0.5;
-      group.add(pack);
-    });
-  }
+  // Pin 185: the trading-card promotion is retired.
   buildPreviouslyViewedTub(scene, group);
   const surfaceTextures = finishEquipmentSurfaces(group);
   const releaseSurfaces = () => {
