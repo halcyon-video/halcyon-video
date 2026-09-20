@@ -1,3 +1,7 @@
+import { buildSteamControls } from './steam-settings';
+import { loadSteamGames } from './providers/steam-provider';
+import { isExternalGameActive, onExternalGameChange } from './external-game-state.ts';
+import { playSteamGame } from './steam-playback';
 import { invoke } from '@tauri-apps/api/core';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { measureDisplayHz } from './display-hz';
@@ -61,8 +65,8 @@ import {
 } from './jellyseerr';
 import { reportError } from './error-telemetry';
 import { verifySeerrCredentialsLive } from './seerr-service-status';
-import { fetchGames, launchGame } from './romm';
-import { isGamesOnly, storeCatalog } from './games-only';
+import { fetchGames, launchGame, getRommConfig } from './romm';
+import { storeCatalog } from './games-only';
 import { buildStreamingLibraries, resolveEnabledServices } from './streaming-catalog';
 import {
   getStreamingMovies,
@@ -600,57 +604,18 @@ async function mergeCollectionGaps(libraries: JellyfinLibrary[]): Promise<number
  * configured, so the section has to be gated here rather than on config alone.
  */
 async function loadGameMovies(): Promise<void> {
-  // Like the Jellyseerr loader, always leave ONE console line saying where
-  // the VIDEO GAMES department stands — an empty corner with no explanation
-  // reads as a layout bug (feedback pin 010), not an integration state.
-  if (!getSetting<boolean>('bb_games_enabled')) {
-    gameMovies = [];
-    logToConsole('[System] Video games: off — enable in Settings to build the department.', 'system');
-    return;
-  }
-  // Games-only asks Romm for the WHOLE library rather than a 192-case slice —
-  // measured at ~7k roms / ~45 MB of JSON on this store, which does not fit in
-  // the department's 20s budget. The timeout is a never-block-boot guard, not a
-  // performance target, so widen it in proportion instead of half-loading the
-  // only catalog the store has.
-  // Must exceed romm.ts's own per-request ceiling, or this race would fire
-  // first and the per-request budget could never do its job — the whole
-  // catalog would be discarded for one slow platform.
-  const TIMEOUT_MS = isGamesOnly() ? 240_000 : 20_000;
-  const TIMED_OUT = Symbol('romm-timeout');
-  const timeoutPromise = new Promise<typeof TIMED_OUT>((resolve) =>
-    setTimeout(() => resolve(TIMED_OUT), TIMEOUT_MS)
-  );
-  try {
-    const result = await Promise.race([fetchGames(), timeoutPromise]);
-    // On timeout, leave gameMovies as whatever it already held rather than
-    // wiping a previously-successful fetch to [] — this matters on a settings
-    // rebuild, where a hung refetch shouldn't blank out the games shelf.
-    if (result === TIMED_OUT) {
-      logToConsole(
-        `[System] Video games: Romm timed out after ${TIMEOUT_MS / 1000}s — keeping ${gameMovies.length} loaded title(s).`,
-        'system'
-      );
-    } else {
-      gameMovies = result;
-      // Games-only owns the whole floor plan, so an empty fetch is not a bare
-      // corner — it's a store with nothing in it. storeCatalog() keeps the
-      // movies up in that case; say so rather than leaving the user to wonder
-      // why the toggle did nothing.
-      logToConsole(
-        gameMovies.length > 0
-          ? `[System] Video games: ${gameMovies.length} title(s) from Romm${isGamesOnly() ? ' — GAMES ONLY: the whole store is the game store.' : '.'}`
-          : isGamesOnly()
-          ? '[System] Video games: GAMES ONLY is on but Romm returned no titles (check romm_url) — keeping the movie shelves.'
-          : '[System] Video games: enabled, but Romm returned no titles (check romm_url and platform toggles) — no department built.',
-        'system'
-      );
-    }
-  } catch (e) {
-    console.warn('[Romm] Failed to load games:', e);
-    gameMovies = [];
-    logToConsole('[System] Video games: Romm fetch failed — no department built (see browser console).', 'system');
-  }
+  if (!getSetting<boolean>('bb_games_enabled')) { gameMovies = []; return; }
+  const steamEnabled = localStorage.getItem('steam_enabled') === '1';
+  // Both optional sources own their timeouts. Steam review scanning can take
+  // longer than the small Romm department and reports its progress in settings.
+  const [romm, steam] = await Promise.allSettled([
+    !getRommConfig() && (steamEnabled || localStorage.getItem('steam_configured') === '1') ? Promise.resolve([] as Movie[]) : fetchGames(),
+    loadSteamGames(),
+  ]);
+  gameMovies = [...(romm.status === 'fulfilled' ? romm.value : []), ...(steam.status === 'fulfilled' ? steam.value : [])];
+  if (romm.status === 'rejected') logToConsole('[System] Romm could not refresh its games.', 'system');
+  if (steam.status === 'rejected') logToConsole('[System] Steam needs attention in Video Games settings.', 'system');
+  logToConsole(`[System] Video games: ${gameMovies.length} titles loaded.`, 'system');
 }
 
 /**
@@ -751,6 +716,11 @@ let settingsPendingReload = false;
 // rebuild-scene setting (theme/arrangement/medium/...) reuses the in-memory
 // gameMovies list instead of paying a network round trip to redraw the wall.
 let settingsPendingGameRefetch = false;
+window.addEventListener('steam-catalog-changed', () => {
+  gameMovies = gameMovies.filter(movie => !movie.steamAppId);
+  settingsPendingGameRefetch = true;
+  settingsPendingRebuild = true;
+});
 // Connection edits made in the drawer: a new Jellyfin password typed there is
 // held here (never persisted — checkCredentialsAndLoad purges any plaintext
 // password at boot) and exchanged for a fresh token on drawer close; a
@@ -979,6 +949,7 @@ let browseHudVisible: boolean | null = null;
 let browseHudName: string | null = null;
 
 function updateBrowseHUDVisibility() {
+  if (isExternalGameActive()) return;
   refreshHoldCheckoutHint(); // piggyback on the same 200ms poll (cheap when unchanged)
   const locator = document.getElementById('browse-locator');
   const hint = document.getElementById('browse-hint');
@@ -1041,6 +1012,7 @@ function updateBrowseHUDVisibility() {
  * what let `c` open the checkout counter underneath a live jump index.
  */
 function shortcutsAllowed(): boolean {
+  if (isExternalGameActive()) return false;
   return !!storeScene && !ui.isAnyOverlayOpen && !ui.isPlaybackActive
     && !ui.isScreensaverActive && !storeScene.isNavOverlayOpen()
     && !hasReachableFocusedControl();
@@ -1317,6 +1289,11 @@ function generateSettingsDrawer() {
         groupEl.appendChild(makeRow(def.key, def.label, resolveHint(def), '', `setting-value-${def.key}`));
       }
     };
+    if (settingsPage === 'Video Games' && settingsSubpage === null) buildSteamControls(groupEl, {
+      registerRow: (key) => { settingsRowKeys.push(key); return settingsRowKeys.length - 1; },
+      selectRow: setSettingsSelection,
+      dirty: () => { settingsPendingGameRefetch = true; settingsPendingRebuild = true; refreshSettingsValues(); updateSettingsStatus(); },
+    });
     if (settingsPage === 'Store Brand') {
       for (const def of settingsInGroup('Store Brand')) appendDefRow(def);
       // Custom LogoSpec editor page (live preview, presets, pickers/sliders) —
@@ -1553,7 +1530,7 @@ function activateSetting(key: string, dir: number) {
     // a fresh Romm fetch; every other rebuild-scene setting can reuse gameMovies.
     // GAMES ONLY changes it the most of all — it swaps a 192-case budgeted
     // slice for the entire Romm library (and back) — so it refetches too.
-    if (key.startsWith('bb_platform_') || key === 'bb_games_only') settingsPendingGameRefetch = true;
+    if (key.startsWith('bb_platform_') || key === 'bb_games_only' || key === 'bb_steam_review_tier') settingsPendingGameRefetch = true;
   } else if (def.applyMode === 'reload') {
     settingsPendingReload = true;
   }
@@ -2400,7 +2377,7 @@ function applyLiveSettings(scene: StoreScene) {
  * changes on close.
  */
 async function rebuildStoreScene() {
-  if (librariesList.length === 0 && gameMovies.length === 0 && getStreamingMovies().length === 0 && storeLibraries.length === 0 && !streamingStockIsStale()) return; // nothing loaded yet
+  if (!settingsPendingGameRefetch && librariesList.length === 0 && gameMovies.length === 0 && getStreamingMovies().length === 0 && storeLibraries.length === 0 && !streamingStockIsStale()) return; // nothing loaded yet
   logToConsole('[System] Applying store changes (rebuilding scene, no reload)...', 'system');
   showBootOverlay();
   // Nothing is interactive behind the overlay — drain texture uploads at burst
@@ -3091,6 +3068,7 @@ function handleGapDismiss() {
  * Plays checkout chime when rental goes through. Never throws.
  */
 async function handleGameLaunch(movie: Movie, startHidden = false) {
+  if (movie.steamAppId) { await playSteamGame(movie, (message) => logToConsole(`[Steam] ${message}`, 'system')); return; }
   if (isDemoMode) {
     openDemoPlaybackOverlay(movie.title, startHidden, 'game');
     return;
@@ -3195,6 +3173,7 @@ function expireSession(reason: string) {
 }
 
 async function wakeRefresh() {
+  if (isExternalGameActive()) return;
   if (wakeRefreshInFlight) return;
   const url = localStorage.getItem('jellyfin_url');
   const token = localStorage.getItem('jellyfin_token');
@@ -4154,6 +4133,7 @@ async function main() {
       openSearch();
     },
     onActivity: () => {
+      if (isExternalGameActive()) return;
       if (isWelcomeActive()) dismissWelcome();
       if (ui.isScreensaverActive) {
         ui.isScreensaverActive = false;
@@ -4174,6 +4154,7 @@ async function main() {
       }
     },
     onIdle: () => {
+      if (isExternalGameActive()) return;
       // An abandoned exit-confirm must not pin the renderer/audio awake
       // forever (onIdle fires ONCE per idle period, so bailing here meant the
       // screensaver never engaged until the next input). The dialog is
@@ -4250,6 +4231,27 @@ async function main() {
   };
 
   const inputManager = new InputManager(inputCallbacks);
+  onExternalGameChange((active) => {
+    if (active) {
+      isOccluded = true;
+      stopScreensaverAnimation();
+      retailAudio.suspendForIdle();
+      storeScene?.suspendChimeForIdle();
+      storeScene?.pauseAmbientTvs();
+      storeScene?.pauseRendering();
+      if (aisleIndicatorInterval !== null) { clearInterval(aisleIndicatorInterval); aisleIndicatorInterval = null; }
+    } else {
+      // Let ordinary focus/visibility rules decide when sound and video wake.
+      ui.isScreensaverActive = false;
+      document.getElementById('screensaver-overlay')?.classList.remove('visible');
+      if (document.visibilityState !== 'hidden' && document.hasFocus()) {
+        isOccluded = true;
+        onReveal();
+      }
+      if (aisleIndicatorInterval === null) aisleIndicatorInterval = window.setInterval(updateBrowseHUDVisibility, 200);
+    }
+  });
+
 
   // Touch layer for the 3D store (issue #126) — a no-op DOM-wise on anything
   // but a touch-primary device. See src/store-touch.ts for why this calls
@@ -4287,6 +4289,7 @@ async function main() {
     storeScene?.pauseRendering();
   }
   function onReveal() {
+    if (isExternalGameActive()) return;
     if (!isOccluded) return;
     isOccluded = false;
     if (ui.isScreensaverActive) {
@@ -4334,6 +4337,7 @@ async function main() {
     // front-end to pick up library changes. A localStorage date stamp guarantees
     // at most one reload per calendar day so the minute-poll can't loop.
     window.setInterval(() => {
+      if (isExternalGameActive()) return;
       const now = new Date();
       if (now.getHours() !== 4) return;
       if (!ui.isScreensaverActive || ui.isPlaybackActive) return;

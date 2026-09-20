@@ -73,6 +73,8 @@ export interface Title {
   // Tauri build launches the configured emulator on `launchPath`; the browser
   // build shows a "take it to the counter" toast.
   game?: boolean;
+  steamAppId?: number;
+  steamReviewScore?: number;
   platform?: string;
   launchPath?: string;
   // Flat scan art for the case's OTHER faces (back panel / spine / disc

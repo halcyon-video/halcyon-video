@@ -1,3 +1,4 @@
+import { isExternalGameActive, onExternalGameChange } from './external-game-state.ts';
 // ─── Poster GPU upload pipeline ────────────────────────────────────────────
 //
 // Everything between "decoded poster pixels exist on the CPU" and "the shelf
@@ -196,6 +197,7 @@ export function beginRebuildDrain() {}
 export function pendingTextureUploads(): number { return pendingUploads(); }
 
 function processUploads() {
+  if (isExternalGameActive()) { isUploading = false; return; }
   if (pendingUploads() === 0) {
     isUploading = false;
     return;
@@ -224,7 +226,7 @@ function processUploads() {
 
 export function queueTextureUpload(task: UploadStep, lane: 'bulk' | 'priority' = 'bulk') {
   (lane === 'priority' ? priorityUploadQueue : textureUploadQueue).push(task);
-  if (!isUploading) {
+  if (!isUploading && !isExternalGameActive()) {
     // Defer the drain to the next rAF instead of running synchronously:
     // completions arriving one-per-event (e.g. 8 decode workers finishing a
     // wave in a single event-loop turn) used to each drain their own task
@@ -1147,3 +1149,5 @@ class TextureArrayManager {
 }
 
 export const textureArrayManager = new TextureArrayManager();
+
+onExternalGameChange(active => { if (!active && !isUploading && pendingUploads() > 0) { isUploading = true; requestAnimationFrame(processUploads); } });

@@ -1,3 +1,4 @@
+import { waitForExternalGame } from './external-game-state.ts';
 import * as THREE from 'three';
 import { isPublicDemo } from './demo-mode';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
@@ -1545,7 +1546,9 @@ class WorkerPool {
     // metadata so box art loads wherever the catalog does — even when the saved
     // Jellyfin URL points at a host the webview can't reach directly (e.g.
     // localhost while accessing from another Tailscale node).
+    await waitForExternalGame();
     const buffer = await fetchPosterBytes(url);
+    await waitForExternalGame();
 
     return new Promise((resolve, reject) => {
       const id = this.messageId++;

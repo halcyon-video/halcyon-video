@@ -1,3 +1,4 @@
+import { isExternalGameActive } from './external-game-state.ts';
 // Small procedural sound engine for the store's immersion audio pass.
 //
 // Original material contacts and register tones, synthesized with WebAudio (oscillators +
@@ -27,7 +28,7 @@ class RetailAudio {
   private remoteDest: MediaStreamAudioDestinationNode | null = null;
 
   private ensureCtx(): AudioContext | null {
-    if (this.idleSuspended) return null; // discard hidden triggers; never queue a burst for wake
+    if (this.idleSuspended || isExternalGameActive()) return null; // discard hidden triggers; never queue a burst for wake
     try {
       if (!this.ctx) this.ctx = new AudioContext();
       if (this.ctx.state === 'suspended' && !this.idleSuspended) this.ctx.resume().catch(() => {});
@@ -78,6 +79,7 @@ class RetailAudio {
     if (this.ctx && this.ctx.state === 'running') this.ctx.suspend().catch(() => {});
   }
   public resumeFromIdle() {
+    if (isExternalGameActive()) return;
     this.idleSuspended = false;
     if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume().catch(() => {});
   }

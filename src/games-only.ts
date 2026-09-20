@@ -1,3 +1,4 @@
+import { expandedSteamCatalog } from './steam-catalog';
 // GAMES ONLY mode: the whole store turns into the video game store.
 //
 // Normally the Romm catalog is a DEPARTMENT — a fixed 2x2 block of game-section
@@ -69,6 +70,7 @@ export function storeCatalog(
   libraries: JellyfinLibrary[],
   games: Movie[]
 ): { libraries: JellyfinLibrary[]; games: Movie[] } {
+  if (!isGamesOnly() && getSetting<string>('bb_steam_shelving') === 'full') return expandedSteamCatalog(libraries, games);
   if (!isGamesOnly() || games.length === 0) return { libraries, games };
   if (catalogCache?.games !== games) {
     catalogCache = { games, libraries: buildGameLibraries(games) };

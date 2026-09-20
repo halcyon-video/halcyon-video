@@ -1,3 +1,4 @@
+import { STEAM_REVIEW_TIERS } from './steam-catalog';
 // ─── Schema-driven settings registry ───────────────────────────────────────
 //
 // The single source of truth for every user-facing configuration knob and how
@@ -1253,6 +1254,14 @@ export function registerCoreSettings(): void {
     applyMode: 'reload',
     hint: 'Adds a Video Games shelf stocked from Romm (or demo).',
   });
+
+  registerSetting({ key: 'bb_steam_review_tier', label: 'Steam review tier', kind: 'cycle', group: 'Video Games', default: 'all',
+    values: STEAM_REVIEW_TIERS, applyMode: 'rebuild-scene', hint: 'An exact Steam rating tier, or Everything. Refresh the Steam library after changing this.',
+    visibleWhen: () => typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__ });
+  registerSetting({ key: 'bb_steam_shelving', label: 'Steam shelving', kind: 'cycle', group: 'Video Games', default: 'realistic',
+    values: [{ id: 'realistic', label: 'Realistic front shelves' }, { id: 'full', label: 'Full library alongside movies' }], applyMode: 'rebuild-scene',
+    hint: 'Realistic uses the existing front game department. Full adds aisles for every matching Steam game and keeps your movies.',
+    visibleWhen: () => typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__ });
 
   // The native launch path (romm.ts launchGame -> Tauri's launch_game) has
   // always read this key, but nothing ever registered it — so the only way to

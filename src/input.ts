@@ -1,3 +1,4 @@
+import { isExternalGameActive, onExternalGameChange } from './external-game-state.ts';
 // HTPC Input Management System for Project Blue Ticket
 import { gamepadEverConnected } from './gamepad-tracker';
 import { notifyUserActivity } from './video-case';
@@ -162,6 +163,8 @@ export class InputManager {
   // wants a beat where you can still let go and change your mind.
   private static readonly HOLD_DOWN_MS = 900;
 
+  private removeGameListener: (() => void) | null = null;
+
   constructor(callbacks: InputCallbacks) {
     this.callbacks = callbacks;
     this.holdSelect = new HoldGesture(
@@ -178,6 +181,18 @@ export class InputManager {
       () => this.callbacks.onDown(),
       (p) => this.callbacks.onHoldDownProgress?.(p),
     );
+    this.removeGameListener = onExternalGameChange((active) => {
+      if (active) {
+        this.stopGamepadPolling();
+        this.holdSelect.destroy(); this.holdDown.destroy();
+        if (this.idleTimer !== null) { window.clearTimeout(this.idleTimer); this.idleTimer = null; }
+      } else {
+        this.lastButtonsState = []; this.lastAxesState = [];
+        this.repeatDirection = null;
+        if (gamepadEverConnected) this.startGamepadPolling();
+        this.resetIdleTimer();
+      }
+    });
     this.setupKeyboardListeners();
     this.setupMouseListeners();
     this.setupGamepadListeners();
@@ -187,6 +202,7 @@ export class InputManager {
   // Keyboard navigation mappings
   private setupKeyboardListeners() {
     window.addEventListener('keydown', (e: KeyboardEvent) => {
+      if (isExternalGameActive()) return;
       this.handleActivity();
 
       // Ignore HTPC shortcuts if user is focused on form inputs
@@ -291,6 +307,7 @@ export class InputManager {
     // Release side of the hold gestures: a tap (released before the hold
     // threshold) fires the normal action it deferred.
     window.addEventListener('keyup', (e: KeyboardEvent) => {
+      if (isExternalGameActive()) return;
       switch (e.key) {
         case 'Enter':
         case ' ':
@@ -342,7 +359,7 @@ export class InputManager {
   }
 
   private startGamepadPolling() {
-    if (this.gamepadPollInterval) return;
+    if (this.gamepadPollInterval || isExternalGameActive()) return;
 
     // Poll gamepad inputs every 16ms (~60Hz) for responsive UI feel; the idle
     // downshift (see setGamepadPollIdle) swaps this for a slow heartbeat.
@@ -569,6 +586,7 @@ export class InputManager {
   // timer ever firing. The downstream handler is a cheap guarded no-op when
   // there is nothing to heal.
   private handleActivity() {
+    if (isExternalGameActive()) return;
     // Texture uploads back off from burst to the polite per-frame budget
     // while the user is actually interacting (see processUploads in
     // video-case.ts).
@@ -585,6 +603,7 @@ export class InputManager {
   }
 
   private resetIdleTimer() {
+    if (isExternalGameActive()) return;
     if (this.idleTimer) {
       window.clearTimeout(this.idleTimer);
     }
@@ -614,6 +633,7 @@ export class InputManager {
 
   // Clean up listeners
   public destroy() {
+    this.removeGameListener?.();
     this.stopGamepadPolling();
     this.holdSelect.destroy();
     this.holdDown.destroy();

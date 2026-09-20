@@ -1,3 +1,4 @@
+import { isExternalGameActive } from './external-game-state.ts';
 import { capturePinPng } from './feedback-image';
 import { compileProgramsInStages, yieldForPrograms } from './program-warmup';
 import * as programWarmup from './store-program-warmup';
@@ -4042,7 +4043,7 @@ export class StoreScene {
   // played whenever the entrance or exit doors are passed. No synth fallback:
   // if the sample has not loaded yet the pass retries the fetch and rings as
   // soon as it lands; if WebAudio is unavailable the doors open silently.
-  public playDoorChime() {
+  public playDoorChime() { if (isExternalGameActive()) return;
     try {
       if (!this.chimeCtx) this.chimeCtx = new AudioContext();
       const ctx = this.chimeCtx;
@@ -4379,7 +4380,7 @@ export class StoreScene {
 
   // Animation render loop
   private animate = () => {
-    if (!this.isRendering) return;
+    if (isExternalGameActive()) { this.pauseRendering(); return; } if (!this.isRendering) return;
     
     this.rafId = requestAnimationFrame(this.animate);
     this.frameCount++;
@@ -5605,7 +5606,7 @@ export class StoreScene {
     this.ambientTvs?.pause();
   }
 
-  public resumeAmbientTvs(): void {
+  public resumeAmbientTvs(): void { if (isExternalGameActive()) return;
     this.ambientTvs?.resume();
   }
 
@@ -5620,7 +5621,7 @@ export class StoreScene {
   }
 
   // Resume rendering loop on playback end
-  public resumeRendering() {
+  public resumeRendering() { if (isExternalGameActive()) return;
     if (!this.isRendering) {
       this.isRendering = true;
       this.requestRender(); // draw a real frame immediately, don't wait for the idle heartbeat
