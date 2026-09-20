@@ -32,8 +32,8 @@ test('interior chute: fitted bounds, textured roles, open throat and hinged clea
   const { scene } = await new GLTFLoader().parseAsync(container.buffer.slice(container.byteOffset, container.byteOffset + container.length), '');
   scene.updateMatrixWorld(true);
   const b = new THREE.Box3().setFromObject(scene);
-  assert.ok(b.min.distanceTo(new THREE.Vector3(-1.2, 0, -1.49)) < .001);
-  assert.ok(b.max.distanceTo(new THREE.Vector3(1.2, 3.85, .907)) < .001);
+  assert.ok(b.min.distanceTo(new THREE.Vector3(-1.6, 0, -1.49)) < .001);
+  assert.ok(b.max.distanceTo(new THREE.Vector3(1.6, 3.85, .907)) < .001);
   let triangles = 0; const roles = new Set<string>();
   scene.traverse(o => {
     if (!(o instanceof THREE.Mesh)) return;
@@ -42,16 +42,19 @@ test('interior chute: fitted bounds, textured roles, open throat and hinged clea
     for (const key of ['position', 'normal', 'uv']) assert.ok([...o.geometry.attributes[key].array].every(Number.isFinite));
   });
   assert.deepEqual([...roles].sort(), ['ChuteLaminate', 'ChuteReveal', 'ChuteSteel']);
-  assert.ok(triangles < 2500); assert.ok(bytes.length < 400000);
-  const ray = new THREE.Raycaster(new THREE.Vector3(-.5, 2.55, 1.1), new THREE.Vector3(0, 0, -1));
-  assert.equal(ray.intersectObject(scene.getObjectByName('ChuteLaminate')!, true).length, 0, 'shell aperture passes through');
+  assert.ok(triangles < 3500); assert.ok(bytes.length < 450000);
+  const ray = new THREE.Raycaster(new THREE.Vector3(-.9, 2.55, 1.1), new THREE.Vector3(0, 0, -1));
+  for (const x of [-.9,.9]) {
+    const mouth = new THREE.Raycaster(new THREE.Vector3(x,2.55,1.1),new THREE.Vector3(0,0,-1));
+    assert.equal(mouth.intersectObject(scene.getObjectByName('ChuteLaminate')!,true).length,0,'both shell apertures pass through');
+  }
   const roof = new THREE.Raycaster(new THREE.Vector3(0, 4.3, -.8), new THREE.Vector3(0, -1, 0), 0, 1).intersectObject(scene, true);
   assert.ok(roof.length > 0, 'continuous top covers the collection cavity');
   assert.ok(Math.abs(roof[0].point.y - 3.85) < .01);
   const rear = new THREE.Raycaster(new THREE.Vector3(.6, 2, -.8), new THREE.Vector3(0, 0, -1), 0, .8);
   assert.equal(rear.intersectObject(scene, true).length, 0, 'hollow receiver remains accessible from the rear');
   const flap = scene.getObjectByName('ChuteFlap')!;
-  assert.ok(flap.position.distanceTo(new THREE.Vector3(-.5, 2.665, .743)) < .0001);
+  assert.ok(flap.position.distanceTo(new THREE.Vector3(-.9, 2.665, .743)) < .0001);
   flap.rotation.x += Math.PI / 2 - .24; scene.updateMatrixWorld(true);
   const hits = ray.intersectObject(scene, true);
   assert.ok(hits.length > 0);

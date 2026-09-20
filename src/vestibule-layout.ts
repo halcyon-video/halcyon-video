@@ -3,7 +3,7 @@ export interface VestibuleSpec { doorWidth: number; entryStyle: 'vestibule' | 's
 export function vestibuleLayout(spec: VestibuleSpec, frontZ = 15) {
   const hasChamber = spec.entryStyle === 'vestibule';
   const rearPanelDepth = hasChamber ? 1 : 0;
-  const frontPanelDepth = hasChamber ? spec.doorWidth + 1.4 : 0;
+  const frontPanelDepth = hasChamber ? (spec.doorWidth + 1) * Math.SQRT1_2 - 1 : 0;
   const depth = hasChamber ? rearPanelDepth + spec.doorWidth + frontPanelDepth : 0;
   const backZ = frontZ - depth;
   const sideDoorZ = hasChamber ? backZ + rearPanelDepth + spec.doorWidth / 2 : frontZ;

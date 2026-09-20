@@ -36,7 +36,7 @@ export function installReturnSlotModel(
     const b = new THREE.Box3().setFromObject(model);
     flap = model.getObjectByName('ChuteFlap');
     if (!valid || !flap || !['ChuteLaminate', 'ChuteSteel', 'ChuteReveal'].every(r => roles.has(r))
-      || Math.abs(b.min.x + 1.2) > .01 || Math.abs(b.max.x - 1.2) > .01
+      || Math.abs(b.min.x + 1.6) > .01 || Math.abs(b.max.x - 1.6) > .01
       || Math.abs(b.min.y) > .01 || Math.abs(b.max.y - 3.85) > .01
       || Math.abs(b.min.z + 1.49) > .01 || Math.abs(b.max.z - .907) > .01) {
       flap = undefined; disposeDetachedModel(model); return;

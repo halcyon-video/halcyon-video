@@ -43,7 +43,7 @@ import { facadeDimensions, facadeStyle } from './storefront-architecture';
 import { addGlassReflectionPane } from './glass-reflection';
 import { buildExteriorEnvironment } from './exterior-environment';
 import { NR_WALL_SLOPE, nrWallDepthAtHeight, NR_WALL_SHELF_DEPTH, NR_WALL_CLEARANCE, NR_LEFT_UNIT_STANDOFF, WALL_SHELF_HEIGHTS, NR_SECTION_COLS, UNIT_SECTIONS, seededRandom01, getStorefrontSpec, vestibuleHalfWidth, posterBayIndices, entranceOpeningHalfWidth, mapWallSegmentUV, CENTER_WALKWAY, STORE_CENTER_X, FRONT_GLASS_Z } from './store-layout';
-import { buildFrontSoffit, frontSoffitLidPolygon, frontSoffitPolygon, frontSoffitY, pointInSoffit, soffitConnectHalf, soffitTrofferCenters, tileOverlapsSoffit } from './ceiling-soffit';
+import { buildFrontSoffit, frontSoffitLidPolygon, frontSoffitPolygon, frontSoffitY, pointInSoffit, soffitConnectHalf, soffitKeyCenters, soffitTrofferCenters, tileOverlapsSoffit } from './ceiling-soffit';
 import { createFixture } from './fixture-registry';
 import { CandyDisplay } from './fixtures/period-fixtures';
 import { TipJar } from './fixtures/tip-jar';
@@ -421,12 +421,12 @@ export function buildStore(scene: StoreScene) {
 
   const KNEE_EXT_H = 2.0; // matches createWindowSection's knee-wall height
   const extVestibuleGapHalf = vestibuleHalfWidth(scene.storefrontSpec); // matches the front window's kneeGap
-  const kneeVeneerThick = 0.1;
-  const kneeVeneerZ = FRONT_GLASS_Z + 0.3 + 0.02 + kneeVeneerThick / 2; // clear of the interior knee wall/frame (z=15±0.15)
+  const kneeVeneerThick = 0.45;
+  const kneeVeneerZ = FRONT_GLASS_Z + 0.3 + kneeVeneerThick / 2; // clear of the interior knee wall/frame (z=15±0.15)
 
   const frontKneeSegs: [number, number][] =
     storeWidth / 2 - extVestibuleGapHalf > 0.05
-      ? [[-storeWidth / 2, -extVestibuleGapHalf + .4], [extVestibuleGapHalf - .4, storeWidth / 2]]
+      ? [[-storeWidth / 2, -extVestibuleGapHalf], [extVestibuleGapHalf, storeWidth / 2]]
       : [[-storeWidth / 2, storeWidth / 2]];
   frontKneeSegs.forEach(([a, b]) => {
     const segW = b - a;
@@ -1120,7 +1120,7 @@ export function buildStore(scene: StoreScene) {
     // walk naturally staggers the rows it takes from each column) — an even
     // scatter keeps the store's grounding uniform instead of leaving one
     // half of the floor shadowless.
-    const counterLights = soffitPoly.length ? soffitTrofferCenters() : [];
+    const counterLights = soffitKeyCenters(frontSoffitPolygon(scene.storefrontSpec,storeWidth,CORNICE_WALL_GAP,CORNICE_BAND),CORNICE_BAND,!wantsCeilingCornice);
     const shadowPicks = new Set<number>();
     if (trofferShadows) {
       // The counter always receives its two real fittings first. Spend only
@@ -1170,8 +1170,10 @@ export function buildStore(scene: StoreScene) {
         const key = new THREE.SpotLight(
           0xf3f6ff, (scene.outdoor.outsideMode === 'night' ? 120 : 105) * 1.56 * activeStoreFormat().keyLightIntensityScale, 0, halfAngle, 0.85, 2);
         key.name = counterKey ? 'Counter ceiling illumination' : 'Store ceiling illumination';
-        key.userData.intensityScale = activeStoreFormat().keyLightIntensityScale * (counterKey ? 1.5 : 1);
-        key.intensity *= counterKey ? 1.5 : 1;
+        const fittingGain = counterKey ? (wantsCeilingCornice ? .7 : 1.2) : 1;
+        key.userData.intensityScale = activeStoreFormat().keyLightIntensityScale * fittingGain;
+        key.intensity *= fittingGain;
+        if (counterKey) { key.angle = Math.PI * .4; key.penumbra = 1; }
         key.position.set(kx, ky, kz);
         // A hair off vertical: a perfectly straight-down lookAt runs
         // parallel to the shadow camera's up vector. Same offset on every
@@ -1565,9 +1567,16 @@ export function buildStore(scene: StoreScene) {
   // building runs solid brick from the window heads to the parapet, so the
   // span above is interior gold wall (below) + exterior brick (facade).
   const frontVestibuleHalfWidth = vestibuleHalfWidth(scene.storefrontSpec); // matches buildEntrance's boxW
+  const returnWindowCounter = exitReturnLayout(storeWidth, {
+    xL: STORE_CENTER_X-vestibuleHalfWidth(scene.storefrontSpec)+.2,frontZ:FRONT_GLASS_Z,
+    sideDoorZ:vestibuleSide(scene.storefrontSpec,-1).doorZ,doorW:scene.storefrontSpec.doorWidth,
+    hasChamber:scene.storefrontSpec.entryStyle==='vestibule',
+  });
+  const returnWindowX = returnWindowCounter ? returnWindowCounter.cx + 5.6*returnWindowCounter.w/15.5 : Infinity;
   const { group: frontWindow, panes: frontPanes, width: frontGlazedWidth } = buildWindowBays(
     scene.storefrontSpec, WINDOW_HEAD_Y, { center: 0, halfWidth: frontVestibuleHalfWidth },
     scene.wallSurface ?? undefined,
+    returnWindowCounter ? {x:STORE_CENTER_X-returnWindowX,width:2.05*returnWindowCounter.w/15.5,bottom:3.7,top:4.12} : undefined,
   );
   frontWindow.position.set(STORE_CENTER_X, floorY, FRONT_GLASS_Z);
   frontWindow.rotation.y = Math.PI; // Facing inwards
@@ -1770,7 +1779,8 @@ export function buildStore(scene: StoreScene) {
   // (registered just above) rather than assuming equal division, so this
   // still lands correctly if StorefrontSpec.windowBays ever carries
   // variable-width bays.
-  const frontPanelsWithPosters = activeStoreFormat().id === 'mom-and-pop' ? [] : posterBayIndices(frontPanes.length);
+  const frontPanelsWithPosters = activeStoreFormat().id === 'mom-and-pop' ? [] : posterBayIndices(frontPanes.length)
+    .filter(i => { const p=frontPanes[i]; return Math.abs(STORE_CENTER_X-(p.lo+p.hi)/2-returnWindowX)>3; });
   // Bays under the era campaign banner (bb-2010; storefront-campaign-poster.ts)
   // stay lightbox-free — a suspended poster hanging IN FRONT of the banner is
   // the clash this shares placement math to prevent.

@@ -3,11 +3,11 @@ import assert from 'node:assert/strict';
 import { vestibuleLayout, counterDatumShift, vestibuleSide, vestibuleStraightSide, vestibuleFrontHalf, clampVestibuleSide, vestibuleExitGates } from '../src/vestibule-layout.ts';
 import { exitReturnLayout, exitReturnSegments } from '../src/exit-return-layout.ts';
 
-test('deeper vestibule provides wider front panels and carries checkout inward', () => {
+test('vestibule matches the straight side panel to the door width and shares the checkout datum', () => {
   for (const doorWidth of [3, 3.2, 4]) {
     const spec={doorWidth,entryStyle:'vestibule' as const}, v=vestibuleLayout(spec);
-    assert.ok(Math.abs(v.depth - 2*doorWidth - 2.4)<1e-8);
-    assert.ok(v.frontPanelDepth > doorWidth);
+    assert.ok(Math.abs(vestibuleStraightSide(spec,1).length-doorWidth)<1e-8);
+    assert.ok(v.frontPanelDepth > 0);
     assert.ok(Math.abs(v.sideDoorZ+doorWidth/2+v.frontPanelDepth-15)<1e-8);
     assert.ok(Math.abs(counterDatumShift(spec)-(v.backZ-8.6))<1e-8);
   }
@@ -55,7 +55,7 @@ test('clipped-corner doors meet checkout corners and their entire clear opening 
       const next=point(wall.doorAlong+offset,.7),old=point(wall.doorAlong+offset,-.7);
       assert.deepEqual(clampVestibuleSide(next,old,wall,doorWidth,.4,.3),next);
     }
-    assert.ok(straight.length>3);
+    assert.ok(Math.abs(straight.length-doorWidth)<1e-8);
     assert.ok(Math.abs(Math.abs(wall.sin/wall.cos)-1)<1e-8);
     assert.ok(Math.abs(straight.z+straight.length-15)<1e-8);
     const next=point(.1,.1),old=point(.1,-.7);

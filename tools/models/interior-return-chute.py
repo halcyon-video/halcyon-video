@@ -48,13 +48,14 @@ yz=[(0,-1.49),(3.85,-1.49),(3.85,.52)]
 for i in range(1,17):
  a=math.pi/2*(1-i/16); yz.append((3.47+.38*math.sin(a),.52+.38*math.cos(a)))
 yz.append((0,.9))
-shell=profile('Rounded laminate shell',-1.2,1.2,yz,body,0)
+shell=profile('Rounded laminate shell',-1.6,1.6,yz,body,0)
 def cut(name,x0,x1,y0,y1,z0,z1):
  cutter=box(name,x0,x1,y0,y1,z0,z1,body,0)
  bpy.context.view_layer.objects.active=shell; mod=shell.modifiers.new(name,'BOOLEAN'); mod.operation='DIFFERENCE'; mod.object=cutter
  bpy.ops.object.modifier_apply(modifier=mod.name); parts.remove(cutter); bpy.data.objects.remove(cutter,do_unlink=True)
-cut('Open rear counter socket',-1.06,1.06,.08,3.46,-1.60,.76)
-cut('Through aperture',-1,0,2.4,2.7,.70,1.0)
+cut('Open rear counter socket',-1.46,1.46,.08,3.46,-1.60,.76)
+cut('Left through aperture',-1.4,-.4,2.4,2.7,.70,1.0)
+cut('Right through aperture',.4,1.4,2.4,2.7,.70,1.0)
 # The staff retrieves the tub through the open rear socket. Keep the crown
 # continuous above it: the hollow cavity stops below the blue top skin.
 # Drop receiver: a fitted tub inside the hollow housing, with rear staff access.
@@ -65,6 +66,7 @@ for a,b in [(-1.06,-.98),(.98,1.06)]:box('Receiver side rim',a,b,.91,1.62,-1.41,
 bpy.context.view_layer.objects.active=shell
 mod=shell.modifiers.new('Eased laminate cut edges','BEVEL'); mod.width=.006; mod.segments=2; bpy.ops.object.modifier_apply(modifier=mod.name)
 shell.select_set(True); bpy.ops.object.mode_set(mode='EDIT'); bpy.ops.mesh.select_all(action='SELECT'); bpy.ops.uv.smart_project(island_margin=.015); bpy.ops.object.mode_set(mode='OBJECT'); shell.select_set(False)
+mouth_start=len(parts)
 # Folded throat, open all the way to the receiver. No solid dark cavity cube.
 box('Throat ceiling',-1,0,2.68,2.70,.05,.904,metal,.002)
 box('Throat sill',-1,0,2.40,2.42,.35,.904,metal,.002)
@@ -76,13 +78,19 @@ box('Rear light baffle',-1.03,.03,1.7,2.7,.03,.05,dark,.002)
 flap=box('ChuteFlap',-.97,-.03,2.435,2.665,.737,.749,metal,.003)
 bpy.context.scene.cursor.location=(-.5,-.743,2.665); flap.select_set(True); bpy.context.view_layer.objects.active=flap; bpy.ops.object.origin_set(type='ORIGIN_CURSOR'); flap.select_set(False)
 flap.rotation_euler.x=.24
-for x in [-1.09425,1.09425]:
+mouth_parts=parts[mouth_start:]
+for ob in mouth_parts:
+ ob.location.x-=.4
+ right=ob.copy();right.data=ob.data.copy();bpy.context.collection.objects.link(right);right.location.x+=1.8
+ right.name=ob.name+'Right';parts.append(right)
+right_flap=bpy.data.objects.get('ChuteFlapRight')
+for x in [-1.49425,1.49425]:
  for y in [3.085-(2.24/8.7)*.4,3.085+(2.24/8.7)*.4]:
   box('Acrylic label standoff',x-.014,x+.014,y-.014,y+.014,.9,.907,metal,.002)
 scene=bpy.context.scene; scene.unit_settings.system='IMPERIAL'; scene.unit_settings.scale_length=.3048
-scene['provenance']='Original scripted fitted construction using existing application dimensions; missing archival stills not reinterpreted as an exact replica. No branded art.'
-scene['dimensions_ft']='2.4 W x 3.85 H x 2.397 D; rear -1.49, face .9; mouth (-.5,2.55,.9)'
-scene['moving_parts']='ChuteFlap: top pivot (-.5,2.665,.743), opens inward during tape return'
+scene['provenance']='Original scripted fitted construction using existing application dimensions; two slot layout follows owner feedback 176 with wider original body; existing lettered plate remains runtime-owned. No branded art.'
+scene['dimensions_ft']='3.2 W x 3.85 H x 2.397 D; rear -1.49, face .9; mouths (+/-.9,2.55,.9)'
+scene['moving_parts']='ChuteFlap: top pivot (-.9,2.665,.743), opens inward during tape return; right independent flap at +.9'
 for o in parts:
  bm=bmesh.new(); bm.from_mesh(o.data); assert all(e.is_manifold for e in bm.edges),o.name; bm.free()
  assert o.data.uv_layers
@@ -96,7 +104,7 @@ bpy.ops.wm.save_as_mainfile(filepath=str(ROOT/'tools/models/interior-return-chut
 # Merge static parts by material, keep hinge independently movable.
 source_parts=len(parts)
 for mat in [body,metal,dark]:
- obs=[o for o in scene.objects if o.type=='MESH' and o!=flap and o.data.materials[0]==mat]
+ obs=[o for o in scene.objects if o.type=='MESH' and o not in [flap,right_flap] and o.data.materials[0]==mat]
  for o in obs:o.select_set(True)
  bpy.context.view_layer.objects.active=obs[0]; bpy.ops.object.join(); bpy.context.object.name=mat.name; bpy.context.object.select_set(False)
 obs=[o for o in scene.objects if o.type=='MESH']

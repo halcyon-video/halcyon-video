@@ -10,13 +10,13 @@ ROOT=Path(__file__).resolve().parents[2]
 source=(ROOT/'tools/models/checkout-counter.py').read_text()
 exec(compile(source.split('\ndef shield(')[0],str(ROOT/'tools/models/checkout-counter.py'),'exec'))
 parts=[]
-parts.append(sweep('Continuous blue customer rim',[(7.75,-3.2),(7.75,0),(-7.75,0),(-7.75,-5.75),(-2,-11.5),(3.25,-6.25)],.8))
-parts.append(sweep('Lower white window-side work shelf',[(3.5,-.8),(-6.95,-.8)],1.4,island=True))
+parts.append(sweep('Continuous blue customer rim',[(7.75,-2.4),(7.75,0),(-7.75,0),(-7.75,-5.75),(-2,-11.5),(3.25,-6.25)],.8))
+parts.append(sweep('Lower white window-side work shelf',[(6.95,-.8),(-6.95,-.8)],1.4,island=True))
 parts.append(sweep('Lower white inner sorting shelf',[(-6.95,-5.35),(-2,-10.3),(2.4,-5.9)],1.3,island=True))
-# Generic enclosed return receiver above the window shelf: a real dark mouth,
-# sloping hood and separate lower tray. No copied lettering or graphics.
+# Through-window receiver at the left end when viewed from the staff side.
+# The runtime fits its front endpoint to the glazing and adds outward window vinyl.
 def solid(name,outline,z0,z1,mat):
- n=len(outline);vertices=[(x-4.5,-z,y) for y in (z0,z1) for x,z in outline]
+ n=len(outline);vertices=[(x+5.6,-z,y) for y in (z0,z1) for x,z in outline]
  faces=[tuple(reversed(range(n))),tuple(range(n,2*n))]+[(i,(i+1)%n,(i+1)%n+n,i+n) for i in range(n)]
  mesh=bpy.data.meshes.new(name);mesh.from_pydata(vertices,[],faces);mesh.materials.append(MATERIALS[mat]);mesh.update()
  ob=bpy.data.objects.new(name,mesh);bpy.context.collection.objects.link(ob)
@@ -24,11 +24,10 @@ def solid(name,outline,z0,z1,mat):
  bpy.context.view_layer.objects.active=ob;ob.select_set(True)
  bpy.ops.object.mode_set(mode='EDIT');bpy.ops.mesh.select_all(action='SELECT');bpy.ops.uv.smart_project(island_margin=.02);bpy.ops.object.mode_set(mode='OBJECT');ob.select_set(False)
  parts.append(ob);return ob
-solid('Quick return receiver left cheek',[(-1.15,-.84),(-1.06,-.84),(-1.06,-1.95),(-1.15,-1.95)],2.82,3.52,3)
-solid('Quick return receiver right cheek',[(1.06,-.84),(1.15,-.84),(1.15,-1.95),(1.06,-1.95)],2.82,3.52,3)
-solid('Quick return receiver sill',[(-1.06,-.84),(1.06,-.84),(1.06,-1.95),(-1.06,-1.95)],2.82,2.90,3)
-solid('Quick return dark interior',[(-1.06,-.86),(1.06,-.86),(1.06,-.94),(-1.06,-.94)],2.90,3.43,5)
-solid('Quick return receiver hood',[(-1.15,-.84),(1.15,-.84),(1.15,-1.95),(-1.15,-1.95)],3.43,3.52,3)
+solid('Quick return receiver left cheek',[(-1.15,.23),(-1.06,.23),(-1.06,-1.95),(-1.15,-1.95)],2.82,4.2,3)
+solid('Quick return receiver right cheek',[(1.06,.23),(1.15,.23),(1.15,-1.95),(1.06,-1.95)],2.82,4.2,3)
+solid('Quick return receiver sill',[(-1.06,.23),(1.06,.23),(1.06,-1.95),(-1.06,-1.95)],2.82,2.90,3)
+solid('Quick return receiver hood',[(-1.15,.23),(1.15,.23),(1.15,-1.95),(-1.15,-1.95)],4.11,4.2,3)
 scene=bpy.context.scene;scene.unit_settings.system='IMPERIAL';scene.unit_settings.scale_length=.3048
 scene['construction']='Enclosed returns millwork with an open vestibule-side staff aisle, lower inner worktops and generic return receiver. Angled plan follows the owner floor-plan sketch of 2026-09-20; dimensions are approximate.'
 bpy.context.preferences.filepaths.save_version=0
@@ -38,7 +37,7 @@ bpy.context.view_layer.objects.active=parts[0]
 for screen in bpy.data.screens:
  for area in screen.areas:
   if area.type=='VIEW_3D':area.spaces.active.region_3d.view_distance=22;area.spaces.active.region_3d.view_location=(0,3.5,1.6)
-metrics={'boundsFeet':[15.5,11.5,3.54],'parts':len(parts),'triangles':sum(len(p.vertices)-2 for ob in parts for p in ob.data.polygons),'allSolidPartsManifold':True,'worktopHeightFeet':2.82,'staffOpeningFeet':5.43,'staffOpeningSide':'vestibule (+X)'}
+metrics={'boundsFeet':[15.5,11.73,4.2],'parts':len(parts),'triangles':sum(len(p.vertices)-2 for ob in parts for p in ob.data.polygons),'allSolidPartsManifold':True,'worktopHeightFeet':2.82,'staffOpeningFeet':6.23,'staffOpeningSide':'vestibule (+X)'}
 (ROOT/'tools/models/exit-return-counter-metrics.json').write_text(json.dumps(metrics,indent=2)+'\n')
 bpy.ops.wm.save_as_mainfile(filepath=str(ROOT/'tools/models/exit-return-counter.blend'),compress=True)
 bpy.ops.object.join();bpy.context.object.name='ExitReturnCounter'

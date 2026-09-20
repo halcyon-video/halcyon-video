@@ -91,6 +91,8 @@ export function buildParkingLot(parent: THREE.Group, p: ParkingLayout, sidewalkM
   const rp=ramp.getAttribute('position');
   for(let i=0;i<rp.count;i++) rp.setY(i,-.09*(rp.getZ(i)+2.5)/5);
   ramp.translate(p.centerX,0,p.nearZ+2.5); ramp.computeVertexNormals();
+  const rampUV = ramp.getAttribute('uv'), repeat = sidewalkMat.map?.repeat;
+  for (let i=0; i<rp.count; i++) rampUV.setXY(i,rp.getX(i)/4.5/(repeat?.x||1),-rp.getZ(i)/4.5/(repeat?.y||1));
   const concrete=batches.get(sidewalkMat)||[]; concrete.push(ramp); batches.set(sidewalkMat,concrete);
 
   // One paint batch, including the central pedestrian aisle's diagonal hatching.
@@ -103,7 +105,7 @@ export function buildParkingLot(parent: THREE.Group, p: ParkingLayout, sidewalkM
   for(const s of p.spaces) {
     for(const side of [-1,1]) line(s.x+Math.cos(s.yaw)*side*p.stallWidth/2,s.z-Math.sin(s.yaw)*side*p.stallWidth/2,p.stallDepth-.8,s.yaw);
   }
-  for(let z=p.nearZ+6;z<p.nearZ+p.stallDepth-1;z+=2) line(p.centerX,z,7,-Math.PI/4);
+  for(let z=p.nearZ+8;z<p.nearZ+p.stallDepth-1;z+=2) line(p.centerX,z,7,-Math.PI/4);
   batches.set(paint,lines);
   for(const [mat,geos] of batches) {
     const expanded=geos.map(g=>g.index?g.toNonIndexed():g);

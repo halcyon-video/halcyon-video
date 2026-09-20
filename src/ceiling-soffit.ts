@@ -188,6 +188,54 @@ export function soffitTrofferCenters(): SoffitPoint[] {
   return [5.5, 0.5].map((z) => ({ x: CX, z }));
 }
 
+/** The actual fitting centers also drive direct light sources, for every soffit style. */
+export function soffitLampCenters(poly: SoffitPoint[], corniceBand: number, plainWhite: boolean): SoffitPoint[] {
+  if (!poly.length) return [];
+  const edges = soffitMirroredEdges(poly), fasciaCount=edges.length;
+  let troffers: SoffitPoint[];
+  if (plainWhite) {
+    troffers = [];
+    const canR = DOWNLIGHT_APERTURE_RADIUS, margin = canR + corniceBand + 0.1;
+    // A can fits only where the whole disc (± margin) stays inside the soffit.
+    const fits = (x: number, z: number) =>
+      pointInSoffit(x, z, poly) &&
+      pointInSoffit(x + margin, z, poly) && pointInSoffit(x - margin, z, poly) &&
+      pointInSoffit(x, z + margin, poly) && pointInSoffit(x, z - margin, poly);
+    // ~5 downlights spread evenly along the soffit's front chain (the V of the
+    // cash-wrap), each set inboard of the fascia so it lands on the flat
+    // underside — a spare row of cans following the soffit, not a dense grid.
+    const N_CANS = 5;
+    let chainLen = 0;
+    for (let i = 0; i < fasciaCount; i++) chainLen += edges[i].len;
+    for (let k = 0; k < N_CANS; k++) {
+      const target = chainLen * (k + 0.5) / N_CANS; // biased off the two ends
+      let acc = 0, e = edges[0], local = 0;
+      for (let i = 0; i < fasciaCount; i++) {
+        if (i === fasciaCount - 1 || acc + edges[i].len >= target) {
+          e = edges[i]; local = Math.min(target - acc, edges[i].len); break;
+        }
+        acc += edges[i].len;
+      }
+      const gx = e.a.x + e.ux * local + e.nx * margin;
+      const gz = e.a.z + e.uz * local + e.nz * margin;
+      if (!fits(gx, gz)) continue;
+      troffers.push({ x: gx, z: gz });
+    }
+    if (troffers.length === 0) troffers = soffitTrofferCenters(); // never leave it dark
+  } else {
+    troffers = soffitTrofferCenters();
+  }
+
+  return troffers;
+}
+
+/** Two aggregate keys retain the existing light/shadow budget at real fittings. */
+export function soffitKeyCenters(poly: SoffitPoint[], band: number, plain: boolean): SoffitPoint[] {
+  const fittings=soffitLampCenters(poly,band,plain);
+  const inset=fittings.length>=4 ? 1 : 0;
+  return fittings.length>2 ? [fittings[inset],fittings[fittings.length-1-inset]] : fittings;
+}
+
 export interface SoffitEdge {
   a: SoffitPoint; b: SoffitPoint;
   /** Unit vector a -> b. */
@@ -342,39 +390,7 @@ export function buildFrontSoffit(params: FrontSoffitParams): FrontSoffitResult {
   const edges = soffitMirroredEdges(poly);
   const fasciaCount = edges.length;
 
-  let troffers: SoffitPoint[];
-  if (plainWhite) {
-    troffers = [];
-    const canR = DOWNLIGHT_APERTURE_RADIUS, margin = canR + corniceBand + 0.1;
-    // A can fits only where the whole disc (± margin) stays inside the soffit.
-    const fits = (x: number, z: number) =>
-      pointInSoffit(x, z, poly) &&
-      pointInSoffit(x + margin, z, poly) && pointInSoffit(x - margin, z, poly) &&
-      pointInSoffit(x, z + margin, poly) && pointInSoffit(x, z - margin, poly);
-    // ~5 downlights spread evenly along the soffit's front chain (the V of the
-    // cash-wrap), each set inboard of the fascia so it lands on the flat
-    // underside — a spare row of cans following the soffit, not a dense grid.
-    const N_CANS = 5;
-    let chainLen = 0;
-    for (let i = 0; i < fasciaCount; i++) chainLen += edges[i].len;
-    for (let k = 0; k < N_CANS; k++) {
-      const target = chainLen * (k + 0.5) / N_CANS; // biased off the two ends
-      let acc = 0, e = edges[0], local = 0;
-      for (let i = 0; i < fasciaCount; i++) {
-        if (i === fasciaCount - 1 || acc + edges[i].len >= target) {
-          e = edges[i]; local = Math.min(target - acc, edges[i].len); break;
-        }
-        acc += edges[i].len;
-      }
-      const gx = e.a.x + e.ux * local + e.nx * margin;
-      const gz = e.a.z + e.uz * local + e.nz * margin;
-      if (!fits(gx, gz)) continue;
-      troffers.push({ x: gx, z: gz });
-    }
-    if (troffers.length === 0) troffers = soffitTrofferCenters(); // never leave it dark
-  } else {
-    troffers = soffitTrofferCenters();
-  }
+  const troffers = soffitLampCenters(poly,corniceBand,!!plainWhite);
 
   // ── The lid ──────────────────────────────────────────────────────────────
   // On the LID outline, not the band's — it runs on past the fascia, over the
@@ -511,7 +527,7 @@ export function buildFrontSoffit(params: FrontSoffitParams): FrontSoffitResult {
     const lightGeo = new THREE.CircleGeometry(canR, 28);
     const trimMat = new THREE.MeshStandardMaterial({ color: 0x2b2b2b, roughness: 0.7, metalness: 0.15 });
     const canMat = selfLit(new THREE.MeshStandardMaterial({
-      color: 0xffffff, emissive: new THREE.Color(0xfff3df), emissiveIntensity: 2.2,
+      color: 0xffffff, emissive: new THREE.Color(0xfff3df), emissiveIntensity: 3.2,
       roughness: 1.0, metalness: 0.0,
     }), 'light-source');
 
@@ -531,6 +547,8 @@ export function buildFrontSoffit(params: FrontSoffitParams): FrontSoffitResult {
       group,
       troffers.map(t => ({ x: t.x, y: soffitY, z: t.z })),
       fallback,
+      undefined,
+      3.2,
     );
   } else {
     // ── Two troffers recessed into the lid ─────────────────────────────────
