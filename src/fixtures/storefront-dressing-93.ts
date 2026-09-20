@@ -122,7 +122,7 @@ export function buildStorefrontDressing93(scene: StoreScene): void {
     const dividerHalf = facadeEntryGlazing(spec.doorWidth, facadeStyle()).dividerWidth / 2;
     const x = 11.0 + dividerHalf + spec.doorWidth + ENTRANCE_SIDELIGHT_WIDTH / 2;
     const panel = new THREE.Mesh(new THREE.PlaneGeometry(1.35, 0.9), printedOut(letterboardTex()));
-    panel.position.set(x, 4.8, glassZ - 0.06);
+    panel.position.set(x, 4.8, glassZ - 0.18); // Pin 193: clear the full glazing thickness.
     markSignMesh(panel);
     group.add(panel);
   }
