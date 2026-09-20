@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { vestibuleLayout, counterDatumShift, vestibuleSide, clampVestibuleSide, vestibuleExitGates } from '../src/vestibule-layout.ts';
+import { vestibuleLayout, counterDatumShift, vestibuleSide, vestibuleStraightSide, vestibuleFrontHalf, clampVestibuleSide, vestibuleExitGates } from '../src/vestibule-layout.ts';
 import { exitReturnLayout, exitReturnSegments } from '../src/exit-return-layout.ts';
 
 test('deeper vestibule provides wider front panels and carries checkout inward', () => {
@@ -15,23 +15,22 @@ test('deeper vestibule provides wider front panels and carries checkout inward',
 });
 test('open return end retains the back wall and a body-width side-door approach',()=>{
   for(const doorW of [3,3.2,4]) for(const storeWidth of [40,48,64,80]) {
-    const v=vestibuleLayout({doorWidth:doorW,entryStyle:'vestibule'});
-    const vest={xL:3.3,frontZ:15,sideDoorZ:v.sideDoorZ,doorW,hasChamber:true};
+    const spec={doorWidth:doorW,entryStyle:'vestibule' as const};
+    const wall=vestibuleSide(spec,-1);
+    const vest={xL:11-vestibuleFrontHalf(spec),frontZ:15,sideDoorZ:wall.doorZ,doorW,hasChamber:true};
     const f=exitReturnLayout(storeWidth,vest)!; assert.ok(f);
     assert.ok(Math.abs(f.cx+f.w/2-(vest.xL-.15))<1e-8);
     const segments=exitReturnSegments(f);
     assert.ok(segments.some(p=>p.label==='structure:return-back'),'back wall remains');
     assert.ok(!segments.some(p=>p.label==='structure:return-right'),'vestibule side is open');
-    // A person walks horizontally through the middle of the door without touching millwork.
-    const radius=.5;
-    for(let x=vest.xL-.6;x<=vest.xL+.5;x+=.1) for(const p of segments) {
-      const dx=x-p.cx,dz=v.sideDoorZ-p.cz,c=Math.cos(p.yaw),s=Math.sin(p.yaw);
-      const px=Math.abs(dx*c-dz*s),pz=Math.abs(dx*s+dz*c);
-      assert.ok(px>=p.w/2+radius || pz>=p.d/2+radius,`${p.label} obstructs approach`);
+    // Follow the angled doorway normal, testing a body-width approach.
+    for(let normal=-2;normal<=1.5;normal+=.1) for(const p of segments) {
+      const x=wall.doorX+normal*wall.cos, z=wall.doorZ-normal*wall.sin;
+      const dx=x-p.cx,dz=z-p.cz,c=Math.cos(p.yaw),s=Math.sin(p.yaw);
+      assert.ok(Math.abs(dx*c-dz*s)>=p.w/2+.5 || Math.abs(dx*s+dz*c)>=p.d/2+.5,
+        `${p.label} obstructs angled door approach`);
     }
-    // Sensors frame the exit on the sales floor, clear of its full leaf span.
-    const spec={doorWidth:doorW,entryStyle:'vestibule' as const};
-    const wall=vestibuleSide(spec,-1);
+    // Sensors frame the actual angled exit leaf, clear of the returns millwork.
     for(const gate of vestibuleExitGates(spec)) {
       const dx=gate.x-wall.doorX,dz=gate.z-wall.doorZ;
       assert.ok(dx*wall.cos-dz*wall.sin < -1,'outside the glass');
@@ -45,19 +44,25 @@ test('open return end retains the back wall and a body-width side-door approach'
   }
 });
 
-test('tapered doors meet checkout corners and their entire clear opening is walkable',()=>{
+test('clipped-corner doors meet checkout corners and their entire clear opening is walkable',()=>{
   for(const doorWidth of [3,3.2,4]) for(const side of [-1,1] as const) {
-    const wall=vestibuleSide({doorWidth,entryStyle:'vestibule'},side);
+    const spec={doorWidth,entryStyle:'vestibule' as const};
+    const wall=vestibuleSide(spec,side), straight=vestibuleStraightSide(spec,side);
     assert.equal(wall.x,11+side*6.2);
-    assert.ok(Math.abs(wall.x+wall.sin*wall.length-(11+side*(9+2*doorWidth)/2))<1e-8);
+    assert.ok(Math.abs(wall.x+wall.sin*wall.length-(11+side*vestibuleFrontHalf(spec)))<1e-8);
     const point=(along:number,normal:number)=>({x:wall.x+along*wall.sin+normal*wall.cos,z:wall.z+along*wall.cos-normal*wall.sin});
     for(const offset of [-doorWidth/2+.5,0,doorWidth/2-.5]) {
       const next=point(wall.doorAlong+offset,.7),old=point(wall.doorAlong+offset,-.7);
       assert.deepEqual(clampVestibuleSide(next,old,wall,doorWidth,.4,.3),next);
     }
-    const next=point(wall.length-1,.1),old=point(wall.length-1,-.7);
+    assert.ok(straight.length>3);
+    assert.ok(Math.abs(Math.abs(wall.sin/wall.cos)-3.6/6.24)<1e-8);
+    assert.ok(Math.abs(straight.z+straight.length-15)<1e-8);
+    const next=point(.1,.1),old=point(.1,-.7);
     const hit=clampVestibuleSide(next,old,wall,doorWidth,.4,.3);
     assert.ok(Math.abs((hit.x-wall.x)*wall.cos-(hit.z-wall.z)*wall.sin+.4)<1e-8);
+    const solid={x:straight.x+.1,z:straight.z+straight.length/2};
+    assert.equal(clampVestibuleSide(solid,{x:straight.x-.7,z:solid.z},straight,doorWidth,.4,.3).x,straight.x-.4);
   }
 });
 

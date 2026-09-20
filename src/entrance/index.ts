@@ -1,4 +1,4 @@
-import { vestibuleLayout, vestibuleSide, vestibuleBackHalf } from '../vestibule-layout.ts';
+import { vestibuleLayout, vestibuleSide, vestibuleStraightSide, vestibuleBackHalf } from '../vestibule-layout.ts';
 import { buildExitReturnCounter } from './exit-return-counter';
 import { buildWalkOffMats } from './walk-off-mats';
 import { installCounterOfficeKit } from '../fixtures/counter-office-kit';
@@ -403,7 +403,7 @@ export class EntranceCheckout implements StoreFixture {
       }
     };
 
-    const sideDoorZ = chamber.sideDoorZ;
+    const sideDoorZ = hasChamber ? vestibuleSide(spec,-1,cx).doorZ : chamber.sideDoorZ;
     this.vestibuleInfo = { cx, xL, xR, frontZ, backZ, doorW, sideDoorZ, hasChamber };
     const doorMats = { frameMat, glassMat, chrome };
     if (hasChamber && this.ctx.wallSurface) {
@@ -471,10 +471,12 @@ export class EntranceCheckout implements StoreFixture {
       const backHalf = vestibuleBackHalf(spec);
       buildGlazedWall('X', backZ, cx - backHalf, cx + backHalf, []);
 
-      // Each side is a rigid glazed assembly: full-width leaf, slanted wall,
-      // and aligned jambs meet the main counter's rear corner.
+      // Straight frontage panels turn into diagonal door assemblies at the
+      // checkout corners, mirroring the shield shoulders.
       for (const side of [-1, 1] as const) {
         const wall = vestibuleSide(spec, side, cx);
+        const straight = vestibuleStraightSide(spec,side,cx);
+        buildGlazedWall('Z', straight.x, straight.z, frontZ, [], {frontSillY:2,singlePanels:true});
         const assembly = new THREE.Group(); assembly.name = `vestibule-side-${side}`;
         const first = group.children.length;
         buildGlazedWall('Z', 0, 0, wall.length, [wall.doorAlong], {frontSillY:2,singlePanels:true});
@@ -510,17 +512,21 @@ export class EntranceCheckout implements StoreFixture {
         const wallSurf = this.ctx.wallSurface;
         const capMat = wallSurf?.material
           ?? new THREE.MeshStandardMaterial({ color: new THREE.Color(themeKneeGoldHex()), roughness: 0.92, metalness: 0.0 });
-        const capGeo = new THREE.BoxGeometry(boxW, capH, boxDepth);
-        const positions = capGeo.getAttribute('position');
-        for (let i=0;i<positions.count;i++) {
-          const t=(positions.getZ(i)+boxDepth/2)/boxDepth;
-          positions.setX(i, positions.getX(i)*(2*backHalf+(boxW-2*backHalf)*t)/boxW);
-        }
-        capGeo.computeVertexNormals();
+        const corner = vestibuleStraightSide(spec,1,cx);
+        const outline = new THREE.Shape();
+        outline.moveTo(-backHalf,-backZ);
+        outline.lineTo(backHalf,-backZ);
+        outline.lineTo(corner.x-cx,-corner.z);
+        outline.lineTo(corner.x-cx,-frontZ);
+        outline.lineTo(cx-corner.x,-frontZ);
+        outline.lineTo(cx-corner.x,-corner.z);
+        outline.closePath();
+        const capGeo = new THREE.ExtrudeGeometry(outline,{depth:capH,bevelEnabled:false});
+        capGeo.rotateX(-Math.PI/2);
         if (wallSurf) mapWallSegmentUV(capGeo, boxW, capH, wallH, wallSurf.storeWidth, wallSurf.roomHeight);
         const cap = new THREE.Mesh(capGeo, capMat);
         cap.name = 'vestibule-solid-cap';
-        cap.position.set(cx, wallH + capH / 2, (frontZ + backZ) / 2);
+        cap.position.set(cx, wallH, 0);
         cap.castShadow = true;
         cap.receiveShadow = true;
         group.add(cap);

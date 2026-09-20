@@ -1,3 +1,4 @@
+import { vestibuleFrontHalf } from './vestibule-layout.ts';
 // Store floor-plan constants, shared layout types, and the pure catalog helpers
 // that decide how a library's titles are ordered and categorized on the shelves.
 // Everything in this module is stateless: no scene, no renderer, no DOM.
@@ -309,9 +310,9 @@ export function getStorefrontSpec(storeWidth: number): StorefrontSpec {
 // what shrinks that format's minimum footprint (the chain's 'vestibule'
 // formula below sizes an airlock wide enough to fit a person between two
 // leaves; a door in a wall needs none of that).
-export function vestibuleHalfWidth(spec: Pick<StorefrontSpec, 'doorWidth' | 'entryStyle'>): number {
+export function vestibuleHalfWidth(spec: Pick<StorefrontSpec, 'doorWidth' | 'entryStyle'> & {counterShape?: string}): number {
   if (spec.entryStyle === 'storefront-door') return spec.doorWidth / 2 + 0.35;
-  return (FORMAT.vestibuleInnerWidth + 2 * spec.doorWidth) / 2 + 0.2;
+  return vestibuleFrontHalf(spec) + 0.2;
 }
 
 export const BROWSE_WINDOW_SIZE = 8; // Number of columns visible at once in browse mode

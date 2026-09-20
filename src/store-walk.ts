@@ -1,4 +1,4 @@
-import { vestibuleSide, clampVestibuleSide, vestibuleBackHalf } from './vestibule-layout';
+import { vestibuleSide, vestibuleStraightSide, clampVestibuleSide, vestibuleBackHalf } from './vestibule-layout';
 // First-person walk-around mode — extracted from StoreScene (three-scene.ts
 // keeps one-line delegating stubs): pointer-lock acquisition, walk clicks
 // (shelf case pick-up + inspect), slot raycast resolution, the collision
@@ -226,9 +226,9 @@ export function constrainWalkPosition(scene: StoreScene, oldX: number, oldZ: num
   const entrFrontX1 = vest && !hasChamber ? vest.cx + vest.doorW / 2 : (vest ? vest.cx + vest.doorW : 14.2);
 
   if (hasChamber) {
-    for (const side of [-1,1] as const) {
+    for (const side of [-1,1] as const) for (const wall of [vestibuleSide(scene.storefrontSpec,side,dividerX),vestibuleStraightSide(scene.storefrontSpec,side,dividerX)]) {
       const resolved=clampVestibuleSide({x,z},{x:oldX,z:oldZ},
-        vestibuleSide(scene.storefrontSpec,side,dividerX),scene.storefrontSpec.doorWidth,r,r_door);
+        wall,scene.storefrontSpec.doorWidth,r,r_door);
       x=resolved.x;z=resolved.z;
     }
   }

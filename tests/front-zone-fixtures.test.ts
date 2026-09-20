@@ -100,3 +100,18 @@ test('stocked game wing never becomes the fallback concessions queue',()=>{
   assert.ok(plan.some(p=>p.kind==='two-door-cooler'));
   assert.ok(plan.every(p=>p.position.x<11));
 });
+
+
+test('concessions occupy the exit-side checkout aisle instead of the returns zone',()=>{
+  // Actual shield face, with the fixture-facing side toward -X/-Z.
+  const face:Footprint={label:'checkout face',kind:'structure',cx:6.1,cz:-4.0,
+    w:12.5,d:1.5,yaw:Math.atan2(7.76,9.8)};
+  const returns:Footprint={label:'returns',kind:'structure',cx:-5,cz:9,w:15.5,d:12,yaw:0};
+  const plan=frontRefreshmentPlacements([face,returns],{minX:-33,maxX:55,minZ:-60,maxZ:15});
+  const popcorn=plan.find(p=>p.kind==='acrylic-popcorn-bin');
+  assert.ok(popcorn);
+  assert.ok(Math.hypot(popcorn.position.x-face.cx,popcorn.position.z-face.cz)<8,
+    'a customer at the checkout face can turn toward the concessions aisle');
+  assert.ok(popcorn.position.z<-5 && popcorn.position.x>-2,
+    'the run stays beside the shield face, not past the returns counter');
+});

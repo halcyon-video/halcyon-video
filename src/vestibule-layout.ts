@@ -16,18 +16,22 @@ export function counterDatumShift(spec: VestibuleSpec): number {
 
 export const vestibuleBackHalf = (spec: VestibuleSpec) => spec.counterShape === 'usquare' ? 6.8 : 6.2;
 
-/** Side glazing tapers from the storefront to the checkout's rear corners. */
+/** The clipped rear corners mirror the shield shoulders; the frontage stays straight. */
+export function vestibuleFrontHalf(spec: VestibuleSpec) {
+  return vestibuleBackHalf(spec) + (spec.doorWidth + 1) * 3.6 / Math.hypot(3.6, 6.24);
+}
 export function vestibuleSide(spec: VestibuleSpec, side: -1 | 1, cx = 11) {
-  const v = vestibuleLayout(spec);
-  const frontHalf = (9 + 2 * spec.doorWidth) / 2;
-  const backHalf = vestibuleBackHalf(spec);
-  const dx = side * (frontHalf - backHalf);
-  const length = Math.hypot(dx, v.depth);
-  const sin = dx / length, cos = v.depth / length;
-  const x = cx + side * backHalf, z = v.backZ;
-  const doorAlong = v.rearPanelDepth + spec.doorWidth / 2;
-  return {x,z,length,sin,cos,yaw:Math.atan2(dx,v.depth),doorAlong,
+  const v = vestibuleLayout(spec), length = spec.doorWidth + 1;
+  const sin = side * 3.6 / Math.hypot(3.6, 6.24), cos = 6.24 / Math.hypot(3.6, 6.24);
+  const x = cx + side * vestibuleBackHalf(spec), z = v.backZ;
+  const doorAlong = length / 2;
+  return {x,z,length,sin,cos,yaw:Math.atan2(sin,cos),doorAlong,
     doorX:x+sin*doorAlong,doorZ:z+cos*doorAlong};
+}
+export function vestibuleStraightSide(spec: VestibuleSpec, side: -1 | 1, cx = 11) {
+  const corner = vestibuleSide(spec,side,cx);
+  const x=corner.x+corner.sin*corner.length, z=corner.z+corner.cos*corner.length;
+  return {x,z,length:15-z,sin:0,cos:1,yaw:0,doorAlong:-100,doorX:x,doorZ:z};
 }
 
 /** Resolve a walking body against one slanted wall, leaving its door open. */

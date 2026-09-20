@@ -1,4 +1,4 @@
-import { vestibuleLayout, counterDatumShift } from './vestibule-layout.ts';
+import { vestibuleSide, vestibuleLayout, counterDatumShift } from './vestibule-layout.ts';
 import { exitReturnLayout } from './exit-return-layout';
 import { RETAIL_FIXTURE_SPECS } from './retail-fixture-specs';
 import { floorPromotionPlacements, frontRefreshmentPlacements, placeFloorSaleTable } from './floor-merchandising';
@@ -2339,7 +2339,7 @@ export function buildStore(scene: StoreScene) {
   };
     const returnCounter=exitReturnLayout(storeWidth,{
       xL:STORE_CENTER_X-vestibuleHalfWidth(scene.storefrontSpec)+.2,frontZ:FRONT_GLASS_Z,
-      sideDoorZ:vestibuleLayout(scene.storefrontSpec).sideDoorZ,
+      sideDoorZ:vestibuleSide(scene.storefrontSpec,-1).doorZ,
       doorW:scene.storefrontSpec.doorWidth,hasChamber:scene.storefrontSpec.entryStyle==='vestibule',
     });
     const reserved: Footprint[] = [
@@ -2405,7 +2405,7 @@ export function buildStore(scene: StoreScene) {
   fixturePlacements.filter(p => placementOrder(p)===0).forEach(buildFixture);
   if (activeStoreFormat().floorDisplays) {
     const existing = scene.slottedFixtures.filter(f => f.placement.kind === 'four-sided-display').length;
-    const frontMerchandise = frontRefreshmentPlacements([...scene.plan.getUnitFootprints(), ...fixtureFootprints, ...reserved],
+    const frontMerchandise = frontRefreshmentPlacements([...scene.plan.getUnitFootprints(), ...fixtureFootprints, ...reserved.filter(f=>f.label!=='checkout circulation')],
       { minX: STORE_CENTER_X - storeWidth / 2, maxX: STORE_CENTER_X + storeWidth / 2,
         minZ: backWallZ, maxZ: FRONT_GLASS_Z });
     frontMerchandise.forEach(buildFixture);

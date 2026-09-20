@@ -161,7 +161,8 @@ export function frontRefreshmentPlacements(obstacles: Footprint[], bounds: Bound
   const kinds: RetailFixtureKind[] = ['candy-wall-gondola', 'acrylic-popcorn-bin', 'two-door-cooler'];
   const width = kinds.reduce((sum,k)=>sum+RETAIL_FIXTURE_SPECS[k].w,0), depth=2.6;
   let run: Footprint | undefined;
-  for(let z=-3;z>=-8 && !run;z-=.5) for(let x=4;x>=Math.max(bounds.minX+5,-20);x-=.5) {
+  for(let offset=0;offset<=8 && !run;offset+=.5) for(const dz of [0,-.5,.5,-1,1,-1.5,1.5]) {
+    const x=1-offset, z=-7+dz;
     const fp:Footprint={label:'concessions run',kind:'fixture',cx:x,cz:z,w:width,d:depth,yaw,clearance:3};
     if(fits(fp,obstacles,bounds)) {run=fp;break;}
   }
@@ -193,11 +194,11 @@ export function frontRefreshmentPlacements(obstacles: Footprint[], bounds: Bound
     }
   }
   // The additional freezer keeps a separate pocket outside the sketched run.
-  for(let z=6;z>=-8;z-=.5) {
+  freezer: for(const offset of [4,8,12]) for(let z=6;z>=-8;z-=.5) {
     const p:FixturePlacement={id:'chest-freezer-front',kind:'chest-freezer',
-      position:{x:run.cx-width/2-4,z},yaw:Math.PI/2};
+      position:{x:run.cx-width/2-offset,z},yaw:Math.PI/2};
     const fp={...retailFixtureFootprint('chest-freezer',p),clearance:3};
-    if(fits(fp,placed,bounds)) {result.push(p);break;}
+    if(fits(fp,placed,bounds)) {result.push(p);break freezer;}
   }
   return result;
 }
