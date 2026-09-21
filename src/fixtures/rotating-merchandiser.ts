@@ -4,6 +4,7 @@ import type { FixturePlacement } from '../store-layout';
 import type { Footprint } from '../layout-validator';
 import { installDisplayModel } from './display-model';
 import { prepareRetailModel } from './retail-model';
+import { merchandiserLabels } from './merchandiser-labels';
 import { RETAIL_FIXTURE_SPECS, retailFixtureFootprint } from '../retail-fixture-specs';
 
 /**
@@ -54,7 +55,7 @@ export class RotatingMerchandiser implements StoreFixture {
     };
 
     // Center column pole (H: 5.2 ft)
-    cyl('CenterColumn', [0, 2.6, 0], 0.08, 5.2, metalMat);
+    cyl('CenterColumn', [0, 2.34, 0], 0.08, 4.68, metalMat);
     // Base spider legs
     cyl('BaseRing', [0, 0.15, 0], 1.0, 0.15, metalMat);
     // 4 rotating wire basket tiers
@@ -62,7 +63,9 @@ export class RotatingMerchandiser implements StoreFixture {
       cyl(`SpinnerTier_${idx}`, [0, y, 0], 0.9, 0.25, wireMat);
     }
     // Header sign topper
-    box('HeaderCard', [0, 5.0, 0], [1.0, 0.4, 0.04], cardMat);
+    box('HeaderCard', [0, 4.96, 0], [1.4, 0.5, 0.015], cardMat);
+    const addLabels = merchandiserLabels(own, () => { if (this.group) this.ctx.requestRender(); });
+    addLabels(fallback, false);
 
     const envelope = RETAIL_FIXTURE_SPECS['rotating-merchandiser'];
     // Collision proxy box (2.2 x 5.2 x 2.2 ft)
@@ -77,7 +80,7 @@ export class RotatingMerchandiser implements StoreFixture {
     this.ctx.scene.add(group);
     this.ctx.addCollider(proxy);
     this.removeModel = installDisplayModel(this.ctx, group, fallback, 'models/rotating-merchandiser.glb', {}, new THREE.Vector3(1, 1, 1),
-      model => { prepareRetailModel(model); model.position.y = -0.055; }); // Exported caster bottoms sit 0.055 ft above the source datum.
+      model => { addLabels(model, true); prepareRetailModel(model); model.position.y = -0.055; }); // Exported caster bottoms sit 0.055 ft above the source datum.
     this.ctx.requestShadowRefresh();
     this.ctx.requestRender();
   }

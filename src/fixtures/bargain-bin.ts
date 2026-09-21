@@ -202,7 +202,7 @@ export class BargainBin implements SlottedFixture {
     const signTex = BargainBin.makeSignTexture();
     const signMat = new THREE.MeshStandardMaterial({ map: signTex, roughness: .65,
       metalness: 0, alphaTest: .5 });
-    const signGeo = new THREE.PlaneGeometry(2.0, 1.0);
+    const signGeo = new THREE.PlaneGeometry(2.0, 1.5);
     const stalkGeo = new THREE.CylinderGeometry(.022, .022, 1.60, 8);
     const stalkMat = new THREE.MeshStandardMaterial({ color: 0x202020, roughness: .65 });
     this.disposables.push(signTex, signMat, signGeo, stalkGeo, stalkMat);
@@ -215,7 +215,7 @@ export class BargainBin implements SlottedFixture {
       const sign = markSignMesh(new THREE.Mesh(signGeo, signMat));
       sign.name = 'BargainPriceCard';
       const offset = face === 0 ? .026 : -.026;
-      sign.position.set(-Math.sin(this.placement.yaw)*offset, height + 1.15, Math.cos(this.placement.yaw)*offset);
+      sign.position.set(-Math.sin(this.placement.yaw)*offset, height + 1.35, Math.cos(this.placement.yaw)*offset);
       // Keep the card broadside to the front approach even when the square tub
       // is rotated to join the concessions row.
       sign.rotation.y = face - this.placement.yaw;
@@ -364,17 +364,17 @@ export class BargainBin implements SlottedFixture {
   private static makeSignTexture(): THREE.CanvasTexture {
     const canvas = document.createElement('canvas');
     canvas.width = 512;
-    canvas.height = 256;
+    canvas.height = 384;
     const ctx = canvas.getContext('2d')!;
     // Original price artwork commissioned from the project's art reviewer.
     // Yellow/black is the owner's card specification, independent of house colors.
     const paint = () => {
-      ctx.clearRect(0, 0, 512, 256);
+      ctx.clearRect(0, 0, 512, 384);
       ctx.fillStyle = '#FFD600';
-      ctx.beginPath(); ctx.roundRect(36, 38, 440, 180, 12); ctx.fill();
+      ctx.beginPath(); ctx.roundRect(36, 28, 440, 328, 12); ctx.fill();
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillStyle = '#000000'; ctx.font = `700 78px ${BB_OUTFIT}, sans-serif`;
-      ctx.fillText('3 FOR $10', 256, 128, 400);
+      ['3', 'FOR', '$10'].forEach((line, i) => ctx.fillText(line, 256, 100 + i * 92, 400));
     };
     paint();
     const tex = new THREE.CanvasTexture(canvas);

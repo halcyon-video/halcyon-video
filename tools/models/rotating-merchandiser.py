@@ -99,8 +99,8 @@ for i in range(5):
     cylinder(f'CasterStem_{i}', (cx, cy, 0.18), 0.025, 0.12, m_chrome, verts=12, bevel=0.001)
     cylinder(f'CasterWheel_{i}', (cx, cy, 0.08), 0.07, 0.05, m_caster_rubber, verts=16, bevel=0.002)
 
-# 2. Central Upright Mast (Height from 0.40 to 5.20 ft)
-cylinder('CentralUprightMast', (0, 0, 2.80), 0.055, 4.80, m_chrome, verts=20, bevel=0.002)
+# 2. Central Upright Mast (Height from 0.40 to 4.68 ft; the mast ends below the printed header)
+cylinder('CentralUprightMast', (0, 0, 2.54), 0.055, 4.28, m_chrome, verts=20, bevel=0.002)
 
 # Rotating Collar Bearings (at bottom Z=1.15 and top Z=4.55)
 cylinder('LowerRotatingCollar', (0, 0, 1.15), 0.09, 0.10, m_chrome, verts=20, bevel=0.002)
