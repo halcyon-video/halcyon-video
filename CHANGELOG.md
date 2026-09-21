@@ -5,6 +5,14 @@ All notable changes to Halcyon Video, generated from commit history by
 it on every version tag push. Deterministic and offline: no entry here was
 written by a model.
 
+## [v0.21.2] — 2026-09-20
+
+### CHANGELOG
+- V0.21.1
+
+### General
+- Harden Steam companion security boundary
+
 ## [v0.21.1] — 2026-09-20
 
 ### CHANGELOG
