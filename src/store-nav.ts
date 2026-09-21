@@ -432,7 +432,7 @@ export function moveLeftInternal(scene: StoreScene) {
       }
     }
   } else if (scene.mode === 'inspect') {
-    if (scene.getSelectedMovie()?.isSeries) {
+    if (scene.getSelectedMovie()?.isSeries && !scene.getSelectedMovie()?.streaming) {
       scene.rotateHeroFace(-1);
     } else {
       scene.toggleFlip();
@@ -626,7 +626,7 @@ export function moveRightInternal(scene: StoreScene) {
       }
     }
   } else if (scene.mode === 'inspect') {
-    if (scene.getSelectedMovie()?.isSeries) {
+    if (scene.getSelectedMovie()?.isSeries && !scene.getSelectedMovie()?.streaming) {
       scene.rotateHeroFace(1);
     } else {
       scene.toggleFlip();
@@ -689,6 +689,10 @@ export function moveUp(scene: StoreScene) {
     if (scene.moveSeriesSeasonSelection(-1)) return;
     if (scene.moveSeriesEpisodeSelection(-1)) return;
     if (stepStreamingServiceChoice(scene, -1)) return;
+    if (scene.getSelectedMovie()?.streaming) {
+      if (!scene.isFlipped) scene.toggleFlip();
+      return;
+    }
     if (scene.isFlipped) {
       const movie = scene.getSelectedMovie();
       const regions = movie ? (backCoverRegions.get(movie.id) || []) : [];
@@ -841,7 +845,7 @@ export function isNavOverlayOpen(scene: StoreScene): boolean {
 
 export function moveSeriesEpisodeSelection(scene: StoreScene, dir: number): boolean {
   const movie = scene.getSelectedMovie();
-  if (scene.mode !== 'inspect' || !movie?.isSeries) return false;
+  if (scene.mode !== 'inspect' || !movie?.isSeries || movie.streaming) return false;
   // Only the back-cover selector (face 2) scrolls episodes with up/down; the
   // side panels no longer carry an episode list.
   if (scene.heroFace !== 2) return false;
@@ -856,7 +860,7 @@ export function moveSeriesEpisodeSelection(scene: StoreScene, dir: number): bool
 
 export function moveSeriesSeasonSelection(scene: StoreScene, dir: number): boolean {
   const movie = scene.getSelectedMovie();
-  if (scene.mode !== 'inspect' || !movie?.isSeries) return false;
+  if (scene.mode !== 'inspect' || !movie?.isSeries || movie.streaming) return false;
   if (scene.heroFace !== 3) return false;
   const episodes = scene.heroEpisodes;
   if (episodes && episodes.length > 0) {
@@ -904,6 +908,10 @@ export function moveDown(scene: StoreScene) {
     if (scene.moveSeriesSeasonSelection(1)) return;
     if (scene.moveSeriesEpisodeSelection(1)) return;
     if (stepStreamingServiceChoice(scene, 1)) return;
+    if (scene.getSelectedMovie()?.streaming) {
+      if (!scene.isFlipped) scene.toggleFlip();
+      return;
+    }
     if (scene.isFlipped) {
       const movie = scene.getSelectedMovie();
       const regions = movie ? (backCoverRegions.get(movie.id) || []) : [];

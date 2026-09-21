@@ -220,13 +220,34 @@ export function clearStreamingCheckoutMovie(scene: StoreScene): void {
   checkoutMovies.delete(scene);
 }
 
+/** Called only when the counter's shared walk-out animation reaches the door. */
+export function completeStreamingCheckout(scene: StoreScene): boolean {
+  const movie = checkoutMovies.get(scene);
+  if (!movie?.streamingUrl) return false;
+  const url = movie.streamingUrl;
+  clearStreamingCheckoutMovie(scene);
+  scene.checkoutRunning = false;
+  scene.checkoutExit = null;
+  scene.entrance?.hideBag();
+  scene.clerk?.releaseFromRegister();
+  scene.whiteoutEl()?.classList.remove('active', 'instant');
+  if (scene.overviewStart) scene.enterOverview();
+  else scene.returnToEntrance();
+  scene.requestRender();
+  // Same-tab navigation works after the animation without popup permission,
+  // and browser Back brings the visitor back to their store.
+  try { window.location.assign(url); }
+  catch { scene.onConsoleLog(`[System] Couldn't open the streaming service for "${movie.title}".`, 'system'); }
+  return true;
+}
+
 /**
  * Renders the plain black text service list in the back-panel label window of the Halcyon box.
  * No streaming logos, colored provider badges, or service-labelled aisles.
  */
 export function drawStreamingChoiceOverlays(
   ctx: CanvasRenderingContext2D,
-  L: { dvd2003?: boolean },
+  L: { dvd2003?: boolean; imgH?: number; back?: [number, number, number, number]; card?: { y: number } },
   movie: Movie,
 ): void {
   ctx.save();
@@ -234,9 +255,9 @@ export function drawStreamingChoiceOverlays(
   const selectedIdx = state ? state.selectedIndex : 0;
   const services = state ? state.services : getAvailableStreamingServices(movie);
 
-  const wx = L.dvd2003 ? 60 : 115;
-  const wMax = L.dvd2003 ? 290 : 280;
-  let y = L.dvd2003 ? 140 : 152;
+  const wx = L.card ? 44 : L.dvd2003 ? 60 : 115;
+  const wMax = L.card ? 392 : L.dvd2003 ? 290 : 280;
+  let y = L.card?.y ?? (L.dvd2003 ? 140 : 152);
 
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
@@ -245,11 +266,13 @@ export function drawStreamingChoiceOverlays(
   // Title at top of label window
   const titleSize = 22;
   ctx.font = `bold ${titleSize}px Arial, sans-serif`;
-  ctx.fillText(movie.title.toUpperCase(), wx, y);
-  y += titleSize + 6;
+  if (!L.card) {
+    ctx.fillText(movie.title.toUpperCase(), wx, y);
+    y += titleSize + 6;
+  }
 
   // Header: CHECKOUT — SELECT SERVICE
-  const headerSize = 14;
+  const headerSize = L.card ? 22 : 14;
   ctx.font = `bold ${headerSize}px Arial, sans-serif`;
   ctx.fillText('CHECKOUT — SELECT SERVICE', wx, y);
   y += headerSize + 12;
@@ -265,29 +288,33 @@ export function drawStreamingChoiceOverlays(
 
   // Service options list (plain black text only)
   const rows: RowRegion[] = [];
-  const rowH = 28;
+  const rowH = L.card ? 44 : 28;
   for (let i = 0; i < services.length; i++) {
     const isSelected = i === selectedIdx;
     const prefix = isSelected ? '▶  ' : '   ';
     const text = `${prefix}${services[i].name}`;
 
-    ctx.font = isSelected ? `bold 16px Arial, sans-serif` : `15px Arial, sans-serif`;
-    ctx.fillText(text, wx, y + 4);
+    ctx.font = L.card ? `${isSelected ? 'bold ' : ''}26px Arial, sans-serif`
+      : isSelected ? `bold 16px Arial, sans-serif` : `15px Arial, sans-serif`;
+    ctx.fillText(text, wx, y + 4, wMax);
 
-    rows.push({ index: i, y0: y, y1: y + rowH });
+    const canvasH = L.imgH ?? 768;
+    const cropTop = L.back?.[1] ?? 0, cropHeight = (L.back?.[3] ?? 1) - cropTop;
+    rows.push({ index: i, y0: (y / canvasH - cropTop) / cropHeight,
+      y1: ((y + rowH) / canvasH - cropTop) / cropHeight });
     y += rowH;
   }
   serviceRowRegions.set(movie.id, rows);
 
   // Footer prompt hint
-  y = Math.max(y + 16, L.dvd2003 ? 420 : 430);
-  ctx.font = `bold 12px Arial, sans-serif`;
+  y = L.card ? 706 : Math.max(y + 16, L.dvd2003 ? 420 : 430);
+  ctx.font = `bold ${L.card ? 18 : 12}px Arial, sans-serif`;
   ctx.fillText('OK TO CONFIRM  •  BACK TO CANCEL', wx, y);
 
   ctx.restore();
 }
 
-/** Paint the visible retail face using the same 768-high coordinates as taps. */
+/** Full-face service card, retained for flat renderers; the 3D store uses its wrap crop. */
 export function drawStreamingChoiceBack(ctx: CanvasRenderingContext2D, w: number, h: number, movie: Movie): boolean {
   if (!isStreamingChoiceActive(movie)) return false;
   ctx.save();
@@ -303,7 +330,7 @@ export function drawStreamingChoiceBack(ctx: CanvasRenderingContext2D, w: number
 export function handleStreamingCaseHit(scene: StoreScene, hit: Pick<THREE.Intersection, 'object' | 'face' | 'uv'>): boolean {
   if (scene.mode !== 'inspect' || !scene.isFlipped || !activeChoices.has(scene)
     || !hit.object.visible || hit.face?.materialIndex !== 5 || !hit.uv
-    || (hit.object !== scene.heroFrontMesh && hit.object !== scene.heroBackMesh)) return false;
+    || hit.object !== scene.heroBackMesh) return false;
   handleStreamingBackTap(scene, hit.uv);
   return true; // Consume blank space too; it must never activate cast underneath.
 }
@@ -319,8 +346,7 @@ export function handleStreamingBackTap(scene: StoreScene, uv: THREE.Vector2): bo
   if (!rows || rows.length === 0) return false;
 
   // Texture V is bottom-up; canvas Y is top-down.
-  const canvasH = 768;
-  const canvasY = (1 - uv.y) * canvasH;
+  const canvasY = 1 - uv.y;
 
   const hitRow = rows.find((r) => canvasY >= r.y0 && canvasY <= r.y1);
   if (hitRow) {

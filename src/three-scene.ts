@@ -1,3 +1,4 @@
+import { streamingInspectPose } from './streaming-case-pose';
 import { isExternalGameActive } from './external-game-state.ts';
 import { capturePinPng } from './feedback-image';
 import { compileProgramsInStages, yieldForPrograms } from './program-warmup';
@@ -29,8 +30,7 @@ import {
   setUploadRenderer,
   setTextureStreamWake,
   setPosterLoadedNotify,
-  backCoverRegions,
-  SERIES_DEPTH_MULT,
+  SERIES_DEPTH_MULT, rentalBoxDepth,
   posterPixelCache,
   textureArrayManager,
   prefetchCoverBytes,
@@ -4762,7 +4762,7 @@ export class StoreScene {
       aoFading ||
       this.hadAnimatingSlots ||
       this.stockedRebakeDue(time) ||
-      !!this.launchAnim ||
+      !!this.launchAnim || this.checkoutRunning ||
       // T22: carried-tape flights (take / put-back / checkout hops) and the
       // post-removal restack settle pin ACTIVE; a parked stack costs nothing.
       (!!this.carried && this.carried.isAnimating(time)) ||
@@ -5132,7 +5132,8 @@ export class StoreScene {
       // Series titles render as one chunky season boxset: the shared case
       // geometry gets a non-uniform Z scale on this slot's front instance and
       // the rental back box stays collapsed (the boxset IS the rental copy).
-      const seriesZMult = slot.movie.isSeries ? SERIES_DEPTH_MULT : 1;
+      const streamingPair = isSelected && this.mode === 'inspect' && !!slot.movie.streaming;
+      const seriesZMult = slot.movie.isSeries && !streamingPair ? SERIES_DEPTH_MULT : 1;
       const depth = slot.depth * seriesZMult;
 
       // Determine visibility scale target
@@ -5166,7 +5167,7 @@ export class StoreScene {
       let targetBackRotY = 0;
 
       if (isSelected && targetScale > 0) {
-        showBackBox = !slot.noRentalCase;
+        showBackBox = streamingPair || !slot.noRentalCase;
         targetY = this.mode === 'inspect' ? slot.restingY + 0.3 : slot.restingY + 0.1;
         if (isBackWall) {
           // Pop along the wall run's facing normal: +Z for the back-wall runs,
@@ -5243,6 +5244,11 @@ export class StoreScene {
           // back at its front pose beside it) — spine to the camera, angled a
           // touch short of square so a bit of the front cover stays visible.
           targetBackRotY = this.isFlipped ? Math.PI : this.heroSpine ? HERO_SPINE_YAW : 0;
+          if (streamingPair) {
+            ({ targetX, targetZ, targetRotY, targetFrontX, targetBackX,
+              targetFrontZ, targetBackZ, targetFrontRotY, targetBackRotY } =
+              streamingInspectPose(targetX, targetZ, targetRotY, depth, rentalBoxDepth(), INSPECT_CASE_Z, this.isFlipped));
+          }
         } else {
           targetFrontX = 0.04;
           targetFrontZ = depth / 2 + 0.01;
@@ -5744,24 +5750,7 @@ export class StoreScene {
       if (hit && handleStreamingCaseHit(this, hit)) return;
     }
 
-    // 0a. Cast/crew name taps on the inspected retail case's back cover: the
-    // hero front mesh carries the movie's real back artwork whose clickable
-    // rows are recorded in backCoverRegions (normalized, top-left origin).
-    if (this.mode === 'inspect' && this.isFlipped && this.heroFrontMesh && this.heroFrontMesh.visible && !this.getSelectedMovie()?.isSeries) {
-      const hits = this._raycaster.intersectObject(this.heroFrontMesh, false);
-      if (hits.length > 0 && hits[0].uv) {
-        const movie = this.getSelectedMovie();
-        const regions = movie ? backCoverRegions.get(movie.id) : undefined;
-        if (movie && regions && regions.length > 0) {
-          const v = 1 - hits[0].uv.y; // texture V is bottom-up; canvas is top-down
-          const region = regions.find((r) => v >= r.y0 && v <= r.y1);
-          if (region) {
-            this.showPersonEndcap(region.name, region.kind);
-            return;
-          }
-        }
-      }
-    }
+    if (inspect.handleBackCoverTap(this, this._raycaster)) return;
 
     // 0a2. Recommendation clasps: a plain (non-instanced) Mesh, so the generic
     // fallthrough below can't see it — that loop only understands instanced

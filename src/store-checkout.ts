@@ -24,7 +24,7 @@ import {
 import type { StoreScene } from './three-scene';
 import { counterFrame } from './counter-anchors';
 import { facadeEntryGlazing, facadeStyle } from './storefront-architecture';
-import { getStreamingCheckoutMovie, clearStreamingCheckoutMovie } from './streaming-checkout';
+import { getStreamingCheckoutMovie, completeStreamingCheckout } from './streaming-checkout';
 import { CHECKOUT_BAG_FLOAT_HEIGHT } from './checkout-bag';
 
 export function ensureCarried(scene: StoreScene): CarriedTapes {
@@ -342,23 +342,18 @@ export function confirmCheckout(scene: StoreScene): boolean {
   if (scene.checkoutRunning) return false;
   const streamingMovie = getStreamingCheckoutMovie(scene) ?? (scene.carried?.topMovie()?.streaming ? scene.carried.topMovie() : null);
   if (streamingMovie) {
+    if (!streamingMovie.streamingUrl || !scene.entrance) return false;
     retailAudio.playCheckoutChime();
     showClerkToast(`Enjoy "${streamingMovie.title}" on ${streamingMovie.streamingServiceName || 'streaming'}!`);
-    if (streamingMovie.streamingUrl) {
-      try {
-        window.open(streamingMovie.streamingUrl, '_blank', 'noopener');
-      } catch {
-        scene.onConsoleLog(`[System] Couldn't open the link for "${streamingMovie.title}" (popup blocked?).`, 'system');
-      }
-    }
-    scene.carried?.clearAll(true);
-    clearStreamingCheckoutMovie(scene);
-    scene.clerk?.releaseFromRegister();
-    if (scene.overviewStart) {
-      scene.enterOverview();
-    } else {
-      scene.returnToEntrance();
-    }
+    // Only this streaming sleeve goes into the bag. Physical titles already
+    // being carried remain untouched, including in rental mode.
+    scene.entrance.showBag();
+    const copy = new THREE.Mesh(getRentalCaseGeometry(false), createHeroRentalMaterials(streamingMovie));
+    copy.castShadow = copy.receiveShadow = true;
+    scene.entrance.dropIntoBag(copy);
+    scene.carried?.drop(streamingMovie.id);
+    scene.checkoutRunning = true;
+    scene.checkoutExit = { start: performance.now(), ids: [] };
     scene.requestRender();
     return true;
   }
@@ -474,6 +469,10 @@ export function confirmCheckoutVR(scene: StoreScene): boolean {
 }
 
 export function finishCheckout(scene: StoreScene, ids: string[]): void {
+  if (getStreamingCheckoutMovie(scene)) {
+    completeStreamingCheckout(scene);
+    return;
+  }
   scene.checkoutRunning = false;
   scene.checkoutExit = null;
   scene.carried?.clearAll(true);
@@ -511,7 +510,8 @@ export function finishCheckout(scene: StoreScene, ids: string[]): void {
 export function updateCheckoutExit(scene: StoreScene, now: number): void {
   const exit = scene.checkoutExit;
   if (!exit) return;
-  const t = scene.debugCheckoutExitFreeze ?? (now - exit.start);
+  // A long rendering hitch must land at the door, never extrapolate the path.
+  const t = Math.min(7600, scene.debugCheckoutExitFreeze ?? (now - exit.start));
 
   // Phase map (ms) — mirrored in debugStageCheckoutExit, harness.ts's bagexit
   // comment and CLAUDE.md's bagexit line; keep all four in step. The play

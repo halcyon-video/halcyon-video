@@ -1,3 +1,4 @@
+import { STREAMING_PAIR_X } from './streaming-case-pose';
 import { mobileStoreActive } from './mobile-store';
 import { selfLit } from './material-lighting';
 // Browse-camera targeting & selection presentation — extracted from
@@ -434,12 +435,14 @@ export function updateCameraTarget(scene: StoreScene) {
     const aspect = scene.camera.aspect;
     
     const activeSlot = scene.slotsByPosition.get(scene.getActiveSlotKey());
-    // A streaming film has one retail case. On a phone, reserving the missing
-    // rental case's half of the frame makes the synopsis and providers unreadable.
+    // Streaming inspection holds a compact overlapping pair, including its
+    // slightly larger store shell; fit that deck instead of the owned-copy fan.
+    const streamingPair = !!activeSlot?.movie.streaming;
     const mobileSingleCase = mobileStoreActive() && !!activeSlot?.noRentalCase;
-    const totalWidth = mobileSingleCase ? actualBoxWidth : 2 * INSPECT_FAN_X + actualBoxWidth;
-    const totalHeight = actualBoxHeight;
-    const margin = mobileSingleCase ? 1.24 : INSPECT_FIT_MARGIN;
+    const totalWidth = streamingPair ? actualBoxWidth + 2 * STREAMING_PAIR_X + 0.038
+      : mobileSingleCase ? actualBoxWidth : 2 * INSPECT_FAN_X + actualBoxWidth;
+    const totalHeight = actualBoxHeight + (streamingPair ? 0.060 : 0);
+    const margin = streamingPair || mobileSingleCase ? 1.20 : INSPECT_FIT_MARGIN;
 
     // Height governs at every ordinary aspect: both distances scale with the
     // same margin, and distH > distW whenever totalHeight * aspect > totalWidth

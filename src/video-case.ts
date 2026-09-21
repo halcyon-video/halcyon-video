@@ -31,7 +31,8 @@ import { getLowResFrontMaterial, disposeLowResFrontMaterials } from './hero-lowr
 // only (that file reads every binding from here inside a function, never at
 // module scope) — same arrangement as hero-lowres-front.
 import { stampPosterBadges, getHeroFrontMaterial, disposeHeroFrontDetail, restampHeroFront, heroDetailArtEnabled } from './hero-front-detail';
-import { streamingAvailabilityText, isStreamingChoiceActive, drawStreamingChoiceOverlays, drawStreamingChoiceBack } from './streaming-checkout';
+import { drawStreamingStoreLabel } from './streaming-store-label';
+import { streamingAvailabilityText } from './streaming-checkout';
 // The two DVD typed-metadata passes live in their own module (this file is at
 // its line budget — see dvd-overlays.ts's header). They import this file's
 // shared text/measure helpers back; the cycle is function-level only.
@@ -3278,10 +3279,6 @@ function drawBoxOverlays(ctx: CanvasRenderingContext2D, L: BoxLayout, movie: Mov
   if (!movie) return;
   // All-ticket wraps have no place for metadata — render the print as-is.
   if (L.plain) return;
-  if (isStreamingChoiceActive(movie)) {
-    drawStreamingChoiceOverlays(ctx, L, movie);
-    return;
-  }
   if (L.standardVhs) {
     drawStandardVhsOverlays(ctx, movie);
     return;
@@ -3510,7 +3507,10 @@ function drawRentalBackArt(
   onUpdate?: () => void
 ) {
   const movie = type === 'GENERIC_WARNINGS' ? null : (type as Movie);
-  renderBoxPanel(ctx, w, h, movie, 'back', onUpdate);
+  renderBoxPanel(ctx, w, h, movie, 'back', () => {
+    if (movie?.streaming) drawStreamingStoreLabel(ctx, w, h, movie);
+    onUpdate?.();
+  });
 }
 
 function drawRentalSpineArt(
@@ -4266,10 +4266,7 @@ function drawJellyfinBackImpl(
   highlightedName?: string,
   onUpdate?: () => void
 ) {
-  if (drawStreamingChoiceBack(ctx, w, h, movie)) {
-    backCoverRegions.delete(movie.id);
-    return;
-  }
+
   const theme = getGenreTheme(movie.genres);
   const regions: BackCoverRegion[] = [];
   const corner = getBackCoverCorner(movie);
