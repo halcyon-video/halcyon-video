@@ -5,6 +5,15 @@ All notable changes to Halcyon Video, generated from commit history by
 it on every version tag push. Deterministic and offline: no entry here was
 written by a model.
 
+## [v0.21.1] — 2026-09-20
+
+### CHANGELOG
+- V0.21.0
+
+### General
+- Ship opt-in Steam companion across deployments
+- Fix Seerr session verification and gate releases on regression tests
+
 ## [v0.21.0] — 2026-09-20
 
 ### CHANGELOG
