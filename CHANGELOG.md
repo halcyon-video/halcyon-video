@@ -5,6 +5,57 @@ All notable changes to Halcyon Video, generated from commit history by
 it on every version tag push. Deterministic and offline: no entry here was
 written by a model.
 
+## [v0.21.0] — 2026-09-20
+
+### CHANGELOG
+- V0.20.2
+
+### Fix screensaver
+- Show single rental clamshell instead of library pair
+
+### General
+- Finish price card and VHS cleaner signage feedback
+- Fix entrance feedback and use Shift+C for pins
+- Repair store feedback geometry and stock the beverage cooler
+- Integrate local navigation and hold-back controls with Steam suspension
+- Always package Steam games in DVD cases
+- Add native Steam library shelves and suspend Halcyon during gameplay
+- Keep the manager terminal closed during checkout handoff
+- Refine concessions and stock the flush clubhouse interior
+- Fix fixture framing, compact shelf packing, and walking collision
+- Measure the return-counter opening along its diagonal
+- Correct vestibule, returns millwork and recessed lighting
+- Fix wall signage lighting, spacing and printed panel fit
+- Update tip card wording from feedback pin 200
+- Align store floor plan to walls and 45-degree diagonals
+- Keep N8AO active during motion and slice poster uploads
+- Match vestibule corners and concessions to checkout layout
+- Batch static fixture imports and instance return-counter stock
+- Match front counters and merchandising to the owner floor plan
+- Fix checkout fixture clearance and taper the vestibule
+- Highlight selected series episode and season with high-contrast gold outline
+- Open returns counter beside the vestibule
+- Fix oversized feedback pins and move capture shortcut to C
+- Enlarge vestibule and clear the return-counter exit approach
+- Correct return counter to a broad clipped-corner enclosure
+- Rebuild returns counter as an enclosed staff work area
+- Support optional local exit return counter models
+- Crop film display backdrops and centre metadata title artwork
+- Use landscape film backdrops and restore acrylic display shelves
+- Prepare the hosted opening view before background room shaders
+- Queue optional hosted fixture models after store entry
+- Queue optional hosted fixture models after store entry
+- Replace screensaver disc with tumbling library pair (Closes [#347](https://github.com/halcyon-video/halcyon-video/issues/347))
+- Replace screensaver disc with tumbling library pair (Closes [#347](https://github.com/halcyon-video/halcyon-video/issues/347))
+- Stage hosted inspection shaders after usable store entry
+- Fix F8 storefront divider z-fighting
+- Add exit preparation counter and improve film displays
+- Stage hosted inspection shaders after usable store entry
+- Fix F8 storefront divider z-fighting
+- Integrate bounded retail fixture programme
+- Add optional alphabetical library shelving (Closes [#340](https://github.com/halcyon-video/halcyon-video/issues/340))
+- Fix(seerr): allow string-encoded port in Jellyseerr settings
+
 ## [v0.20.2] — 2026-09-16
 
 ### CHANGELOG
