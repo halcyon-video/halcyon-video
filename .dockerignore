@@ -17,6 +17,7 @@
 !tools/list-slots.mjs
 !tools/remote-play-server.mjs
 !tools/integration-proxy.mjs
+!tools/steam-browser-bridge.mjs
 !tools/seerr-user-auth.mjs
 
 # Local-only dev rigs that may sit inside the re-included dirs on a dev

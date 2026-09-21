@@ -2,7 +2,17 @@ import { invoke } from '@tauri-apps/api/core';
 import { filterSteamTitles, steamTitle, type SteamGame, type SteamReview } from '../steam-catalog';
 import type { Title } from './media-source-provider';
 import { isExternalGameActive } from '../external-game-state.ts';
-export const hasSteamNative = (): boolean => typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__;
+const nativeSteam = (): boolean => typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__;
+export const hasSteamNative = (): boolean => typeof window !== 'undefined' && (nativeSteam() || location.hostname === 'localhost' || location.hostname === '127.0.0.1');
+async function browserInvoke<T>(action: string, args: Record<string, unknown> = {}): Promise<T> {
+  const response = await fetch(`/__halcyon/steam/${action}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(args) });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw (typeof payload.error === 'string' ? payload.error : 'Steam could not complete this request.');
+  return payload as T;
+}
+function steamInvoke<T>(command: string, args: Record<string, unknown> = {}): Promise<T> {
+  return nativeSteam() ? invoke<T>(command, args) : browserInvoke<T>(command.replace(/^steam_/, ''), args);
+}
 let generation = 0;
 let pending: Promise<Title[]> | null = null;
 let current: Title[] = [];
@@ -17,7 +27,7 @@ function changed() { window.dispatchEvent(new Event('steam-catalog-changed')); }
 export async function connectSteam(): Promise<void> {
   generation++; current = []; pending = null;
   changed();
-  await invoke('steam_connect');
+  await steamInvoke('steam_connect');
   localStorage.setItem('steam_enabled', '1');
   localStorage.setItem('steam_configured', '1');
   publish('Sign in in the Steam window, then choose Refresh library.');
@@ -26,7 +36,7 @@ export async function disconnectSteam(): Promise<void> {
   generation++; current = []; pending = null;
   localStorage.removeItem('steam_enabled');
   changed();
-  await invoke('steam_disconnect');
+  if (nativeSteam()) await steamInvoke('steam_disconnect');
   publish('Steam disconnected. Its games have been removed.');
 }
 export function loadSteamGames(force = false): Promise<Title[]> {
@@ -39,7 +49,7 @@ export function loadSteamGames(force = false): Promise<Title[]> {
   const tier = localStorage.getItem('bb_steam_review_tier') || 'all';
   publish('Refreshing your Steam library…');
   const work = (async () => {
-    const library = await invoke<{ steamId: string; games: SteamGame[] }>('steam_library');
+    const library = await steamInvoke<{ steamId: string; games: SteamGame[] }>('steam_library');
     if (generation !== request) return [];
     const reviews: Record<string, SteamReview> = {};
     if (tier !== 'all') {
@@ -47,7 +57,7 @@ export function loadSteamGames(force = false): Promise<Title[]> {
         if (generation !== request) return [];
         if (isExternalGameActive()) throw 'Review refresh paused while a Steam game runs. Refresh after returning.';
         publish(`Checking Steam ratings: ${i} of ${library.games.length} games…`);
-        Object.assign(reviews, await invoke<Record<string, SteamReview>>('steam_reviews', { appIds: library.games.slice(i, i + 20).map(g => g.appid) }));
+        Object.assign(reviews, await steamInvoke<Record<string, SteamReview>>('steam_reviews', { appIds: library.games.slice(i, i + 20).map(g => g.appid) }));
       }
     }
     if (generation !== request) return [];

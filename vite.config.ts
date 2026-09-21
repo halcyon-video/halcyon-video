@@ -21,6 +21,8 @@ import {
 
 // @ts-expect-error plain-js server middleware
 import { integrationProxyPlugin, localEndpointGuardPlugin } from "./tools/integration-proxy.mjs";
+// @ts-expect-error plain-js local companion, intentionally excluded from the browser bundle
+import { steamBrowserBridgePlugin } from "./tools/steam-browser-bridge.mjs";
 
 // @ts-expect-error process is a nodejs global
 const host = process.env.TAURI_DEV_HOST;
@@ -564,6 +566,7 @@ export default defineConfig(async () => ({
     localEndpointGuardPlugin(),
     clientErrorRelayPlugin(),
     feedbackPinPlugin(),
+    steamBrowserBridgePlugin(),
     mpvPlayerPlugin(),
     integrationProxyPlugin(operatorEnv),
     operatorConfigPlugin(),
