@@ -18,7 +18,8 @@ import { recordInspect } from './clerk-recommend';
 import { retailAudio } from './audio';
 import { showClerkToast } from './carried-tapes';
 import { perfTrace } from './perf-trace';
-import { isDiscoveryRequested } from './jellyseerr';
+import { getJellyseerrConfig, isDiscoveryRequested } from './jellyseerr';
+import { isRequestTitle } from './request-title';
 import { SP_HERO, CT_HERO, updatedMeshes } from './scene-shared';
 import { getGoldCaseMaterials } from './fixtures/gold-clamshell';
 import type { StoreScene } from './three-scene';
@@ -233,7 +234,8 @@ export function selectAction(scene: StoreScene): 'inspect' | 'play' | 'request' 
     // An inline discovery suggestion has no rental copy either -- the same
     // deliberate "confirm in inspect mode" press instead sends a Jellyseerr
     // request for it (see main.ts's request handling).
-    if (inspectedMovie?.discovery) {
+    if (inspectedMovie?.discovery && !inspectedMovie.streaming) {
+      if (!isRequestTitle(inspectedMovie, getJellyseerrConfig() !== null)) return null;
       if (inspectedMovie.discoveryRequested || isDiscoveryRequested(inspectedMovie.tmdbId)) {
         showClerkToast(`"${inspectedMovie.title}" is already on order, hon — it should be in soon.`);
         scene.onConsoleLog(`[System] "${inspectedMovie.title}" has already been requested.`, "system");
@@ -246,7 +248,8 @@ export function selectAction(scene: StoreScene): 'inspect' | 'play' | 'request' 
     // same confirm press instead asks the clerk to order it through
     // Jellyseerr (main.ts's request handling), and once it's on order the
     // press just gets you the "already on its way" line.
-    if (inspectedMovie?.collectionGap) {
+    if (inspectedMovie?.collectionGap && !inspectedMovie.streaming) {
+      if (!isRequestTitle(inspectedMovie, getJellyseerrConfig() !== null)) return null;
       if (inspectedMovie.discoveryRequested || isDiscoveryRequested(inspectedMovie.tmdbId)) {
         showClerkToast(`"${inspectedMovie.title}" is already on order, hon — it should be in soon.`);
         scene.onConsoleLog(`[System] "${inspectedMovie.title}" has already been requested.`, "system");

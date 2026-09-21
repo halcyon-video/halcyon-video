@@ -1,3 +1,4 @@
+import { isRequestTitle } from './request-title';
 import { buildSteamControls } from './steam-settings';
 import { loadSteamGames } from './providers/steam-provider';
 import { isExternalGameActive, onExternalGameChange } from './external-game-state.ts';
@@ -810,6 +811,7 @@ function updateMovieHUD(movie: Movie | null) {
   if (!movie || isWelcomeActive()) return;
 
   const isInspecting = storeScene?.mode === 'inspect';
+  const requestable = isRequestTitle(movie, getJellyseerrConfig() !== null);
   const isRequestedDiscovery = typeof movie.tmdbId === 'number' &&
     (movie.discoveryRequested || isDiscoveryRequested(movie.tmdbId));
 
@@ -822,7 +824,7 @@ function updateMovieHUD(movie: Movie | null) {
     if (isTouchInputActive()) {
       hint.textContent = touchMovieHUDText(
         !!isInspecting, !!movie.game, !!movie.discovery, !!movie.collectionGap,
-        !!movie.comingSoon, !!isRequestedDiscovery, !!movie.streaming, !!(movie.streaming && isStreamingChoiceActive(movie)));
+        !!movie.comingSoon, !!isRequestedDiscovery, !!movie.streaming, !!(movie.streaming && isStreamingChoiceActive(movie)), requestable);
       return;
     }
     if (isInspecting) {
@@ -832,6 +834,8 @@ function updateMovieHUD(movie: Movie | null) {
         hint.textContent = isStreamingChoiceActive(movie)
           ? 'ARROWS SELECT SERVICE  •  OK TO CONFIRM  •  BACK TO CANCEL'
           : 'FLIP CASE  •  OK TO CHECK OUT';
+      } else if ((movie.discovery || movie.collectionGap) && !requestable) {
+        hint.textContent = 'FLIP CASE  •  NOT IN STOCK';
       } else if (movie.discovery) {
         hint.textContent = isRequestedDiscovery
           ? 'FLIP CASE  •  ALREADY REQUESTED'
@@ -2012,6 +2016,7 @@ async function openVersionPicker(movie: Movie, versions: MovieVersion[]): Promis
  * Keyboards keep their shortcuts (X dismisses, HOLD ▼ still works).
  */
 async function resolveGapChoice(movie: Movie): Promise<'order' | 'dismiss' | null> {
+  if (!isRequestTitle(movie, getJellyseerrConfig() !== null)) return null;
   const idx = await openListPicker(movie.title, [
     { code: 'ORDER', name: 'Order it — the store will get a copy in' },
     { code: 'PASS', name: 'Not interested — never show me this title again' },
@@ -3024,6 +3029,7 @@ async function executePowerMenuAction(btnId: string) {
  * unrequested on failure so the player can just try again.
  */
 async function handleDiscoveryRequest(movie: Movie) {
+  if (!isRequestTitle(movie, getJellyseerrConfig() !== null)) return;
   if (typeof movie.tmdbId !== 'number') {
     logToConsole(`[System] "${movie.title}" can't be requested (missing TMDB id).`, 'system');
     return;

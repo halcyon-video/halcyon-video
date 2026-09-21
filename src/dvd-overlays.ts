@@ -12,6 +12,7 @@
 // passes too) and are imported back here; video-case.ts imports only these
 // two painters plus the layout override, so the cycle is function-level and
 // resolves at call time, never at module evaluation.
+import { streamingAvailabilityText } from './streaming-checkout';
 import type { Movie } from './jellyfin';
 import {
   drawVerticalText,
@@ -106,6 +107,7 @@ export function drawDvd2003Overlays(ctx: CanvasRenderingContext2D, movie: Movie)
   const genreList = movie.genres.slice(0, 3).join(', ').toUpperCase() || 'FEATURE';
   const metaRaw = [
     movie.director ? `DIRECTED BY ${movie.director.toUpperCase()}` : '',
+    streamingAvailabilityText(movie),
     `${genreList}   ·   RATED ${movie.rating || 'NR'}`,
     `RELEASED ${movie.year}${movie.duration ? `   ·   ${movie.duration}` : ''}`,
   ].filter(Boolean);
@@ -207,6 +209,7 @@ export function drawDvdBlueOverlays(ctx: CanvasRenderingContext2D, movie: Movie)
   const genreList = movie.genres.slice(0, 3).join(', ').toUpperCase() || 'FEATURE';
   const metaRaw = [
     movie.director ? `DIRECTED BY ${movie.director.toUpperCase()}` : '',
+    streamingAvailabilityText(movie),
     `${genreList}   ·   RATED ${movie.rating || 'NR'}`,
     `RELEASED ${movie.year}${movie.duration ? `   ·   ${movie.duration}` : ''}`,
   ].filter(Boolean);

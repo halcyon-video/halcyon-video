@@ -48,11 +48,13 @@ export function touchMovieHUDText(
   isRequestedDiscovery: boolean,
   streaming?: boolean,
   streamingChoice?: boolean,
+  requestable = false,
 ): string | null {
   if (!isInspecting) return mobileStoreActive() ? 'DRAG TO BROWSE  •  TAP A MOVIE' : 'SWIPE TO BROWSE  •  TAP OK TO EXAMINE';
   if (streamingChoice) return 'TAP A SERVICE  •  TAP OK TO CONFIRM';
   if (streaming) return 'SWIPE TO FLIP  •  TAP OK TO CHECK OUT';
   if (game) return 'SWIPE TO FLIP  •  TAP OK TO RENT & PLAY';
+  if ((discovery || collectionGap) && !requestable) return 'SWIPE TO FLIP  •  NOT IN STOCK';
   if (discovery) return isRequestedDiscovery ? 'ALREADY REQUESTED' : 'NOT IN STOCK — TAP OK TO ORDER OR PASS';
   if (collectionGap) return isRequestedDiscovery ? 'ON ORDER — COMING SOON' : 'NOT IN STOCK — TAP OK TO ORDER OR PASS';
   if (comingSoon) return 'COMING SOON — NOT YET AVAILABLE';
@@ -105,11 +107,23 @@ const CSS = `
   position: absolute; pointer-events: none; touch-action: none;
   display: flex; align-items: center; justify-content: center;
   min-width: 64px; height: 46px; padding: 0 18px;
-  background: var(--panel-bg, rgba(0, 10, 26, 0.88));
-  border: 1px solid var(--panel-border, rgba(255, 204, 0, 0.35));
-  border-radius: 10px; color: #fff;
-  font: 700 15px/1 var(--font-title, sans-serif), sans-serif; letter-spacing: 0.06em;
-  text-transform: uppercase; opacity: 0.85; transition: background 90ms, transform 90ms;
+  background: transparent; border: 0; border-radius: 0; color: #fff;
+  font: 900 18px/1.15 'Archivo Black', sans-serif; letter-spacing: 0.025em;
+  text-transform: uppercase; opacity: 1; transition: transform 90ms;
+  -webkit-tap-highlight-color: transparent;
+}
+.st-label {
+  display: inline-block; font-style: italic;
+  color: #eff5ff;
+  background: linear-gradient(to bottom, #52647e 0%, #d8e7f7 32%, #fff 46%, #71859f 49%, #cfdef0 68%, #f5f8ff 78%, #687a92 100%);
+  background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 1px 0 #182940) drop-shadow(0 2px 0 #050a14) drop-shadow(1px 0 0 #050a14);
+}
+.st-btn:focus-visible { outline: 2px solid #fff; outline-offset: -3px; }
+.st-btn.st-pressed .st-label { filter: brightness(1.4) drop-shadow(0 1px 0 #050a14); }
+#store-touch-ok .st-label {
+  font-size: 25px;
+  background-image: linear-gradient(to bottom, #997136, #fff4bc 43%, #b07f27 48%, #ffe5a0 72%, #d19b36);
 }
 #store-touch-controls.visible .st-btn { pointer-events: auto; }
 #store-touch-directions { display: none; position: absolute; left: 16px; bottom: max(24px, env(safe-area-inset-bottom)); grid-template-columns: repeat(3, 56px); gap: 6px; }
@@ -124,12 +138,9 @@ const CSS = `
   top: max(24px, env(safe-area-inset-top));
   left: max(24px, env(safe-area-inset-left));
 }
-#store-touch-back.st-pressed { background: rgba(255, 255, 255, 0.85); color: var(--bb-navy, #000a1c); }
 #store-touch-ok {
   bottom: max(24px, env(safe-area-inset-bottom));
   right: max(24px, env(safe-area-inset-right));
-  background: var(--bb-yellow, #ffcc00); color: var(--bb-navy, #000a1c);
-  border-color: var(--bb-yellow, #ffcc00); opacity: 0.92;
 }
 #store-touch-walk { top: max(24px, env(safe-area-inset-top)); right: max(24px, env(safe-area-inset-right)); display: none; }
 #store-touch-controls:not(.terminal)[data-mode="overview"] #store-touch-walk,
@@ -137,28 +148,30 @@ const CSS = `
 #store-touch-controls:not(.terminal)[data-mode="walk-around"] #store-touch-walk { display: flex; }
 #store-touch-controls:not(.terminal)[data-mode="overview"] #store-touch-ok,
 #store-touch-controls:not(.terminal)[data-mode="walk-around"] #store-touch-ok { display: none; }
-#store-touch-stick { display: none; position: absolute; left: max(24px, env(safe-area-inset-left)); bottom: max(24px, env(safe-area-inset-bottom)); width: 116px; height: 116px; border: 2px solid rgba(255,255,255,.5); border-radius: 50%; background: rgba(0,10,26,.42); touch-action: none; }
+#store-touch-stick { display: none; position: absolute; left: max(24px, env(safe-area-inset-left)); bottom: max(24px, env(safe-area-inset-bottom)); width: 116px; height: 116px; border: 2px solid #8899af; border-radius: 50%; background: radial-gradient(circle, rgba(3,9,20,.8) 42%, rgba(100,120,150,.2) 43%, rgba(3,9,20,.7) 68%); box-shadow: 0 3px 0 #060c18, inset 0 2px 0 #d9e3ef; touch-action: none; }
 #store-touch-controls.visible:not(.terminal)[data-mode="walk-around"] #store-touch-stick { display: block; pointer-events: auto; }
-.st-stick-knob { position: absolute; inset: 36px; border-radius: 50%; background: rgba(255,255,255,.8); pointer-events: none; }
+.st-stick-knob { position: absolute; inset: 36px; border-radius: 50%; background: radial-gradient(circle at 40% 25%, #f3f7fc, #8496b0 65%, #26344c); box-shadow: 0 3px 0 #080f1c; pointer-events: none; }
 .st-stick-label { position: absolute; top: 47px; left: 0; right: 0; text-align: center; color: #000a1c; font: 700 15px/20px sans-serif; pointer-events: none; }
+body .clasp-prompt { border-radius: 0; font-size: 15px; }
+body .clasp-prompt .clasp-key { display: none; }
 body .clerk-prompt { bottom: max(174px, calc(env(safe-area-inset-bottom) + 160px)); max-width: calc(100vw - 48px); }
 body .clerk-prompt .clerk-key { display: none; }
 body:has(.clerk-dialog.visible) #store-touch-controls,
 body:has(.clerk-dialog.visible) #browse-hint { visibility: hidden; }
 #walk-hud.visible, #walk-crosshair.visible { display: none; }
+body:has(#store-touch-controls[data-mode="inspect"]) #browse-locator { display: none; }
 #browse-locator { top: max(86px, calc(env(safe-area-inset-top) + 72px)); max-width: calc(100vw - 48px); }
 .browse-locator-name { white-space: normal; text-align: center; font-size: 18px; letter-spacing: 1px; }
 body:has(#store-touch-controls[data-mode="walk-around"]) #browse-hint { bottom: 40px; left: auto; right: 16px; transform: none; max-width: calc(100vw - 180px); }
-#store-touch-ok.st-pressed { background: #fff; }
-@keyframes st-pulse {
-  0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 204, 0, 0); }
-  50% { transform: scale(1.05); box-shadow: 0 0 12px 2px rgba(255, 204, 0, 0.45); }
-}
-.st-intro .st-btn { animation: st-pulse 1.8s ease-in-out 3; }
+
 /* #browse-hint (styles.css) sits bottom-center, nowrap, exactly where the OK
    button now lives — lift it clear and let it wrap. Phone viewports are
    narrower than the desktop line was ever sized for. */
 #browse-hint { bottom: 84px; max-width: 62vw; white-space: normal; line-height: 1.4; }
+@media (orientation: landscape) and (max-height: 500px) {
+  #browse-hint { bottom: 14px; font-size: 15px; line-height: 1.1; max-width: calc(100vw - 190px); }
+
+}
 `;
 
 /** Press on touchstart, release on touchend; touchcancel cancels without firing. */
@@ -220,7 +233,7 @@ export function installStoreTouchControls(callbacks: InputCallbacks, poke: () =>
   const back = document.createElement('div');
   back.id = 'store-touch-back';
   back.className = 'st-btn';
-  back.textContent = 'BACK';
+  back.innerHTML = '<span class="st-label">BACK</span>';
   back.setAttribute('role', 'button');
   back.setAttribute('aria-label', 'Back');
   bind(back, () => { poke(); callbacks.onBack(); });
@@ -228,7 +241,7 @@ export function installStoreTouchControls(callbacks: InputCallbacks, poke: () =>
   const ok = document.createElement('div');
   ok.id = 'store-touch-ok';
   ok.className = 'st-btn';
-  ok.textContent = 'OK';
+  ok.innerHTML = '<span class="st-label">OK</span>';
   ok.setAttribute('role', 'button');
   ok.setAttribute('aria-label', 'Select');
   bind(ok, () => { poke(); void callbacks.onEnter(); });
@@ -241,7 +254,8 @@ export function installStoreTouchControls(callbacks: InputCallbacks, poke: () =>
     button.type = 'button';
     button.id = `store-touch-${label.toLowerCase()}`;
     button.className = 'st-btn';
-    button.textContent = label;
+    const text = document.createElement('span');
+    text.className = 'st-label'; text.textContent = label; button.appendChild(text);
     bind(button, () => { poke(); fire(); });
     directions.appendChild(button);
   }

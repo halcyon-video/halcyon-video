@@ -18,7 +18,8 @@ export function mobileWalkInput(scene: StoreScene) {
 export function installMobileWalk(root: HTMLElement, stage: HTMLElement, callbacks: InputCallbacks,
   poke: () => void, getScene: () => StoreScene | null): void {
   const walk = document.createElement('button');
-  walk.type = 'button'; walk.id = 'store-touch-walk'; walk.className = 'st-btn'; walk.textContent = 'WALK';
+  walk.type = 'button'; walk.id = 'store-touch-walk'; walk.className = 'st-btn';
+  const walkLabel = document.createElement('span'); walkLabel.className = 'st-label'; walkLabel.textContent = 'WALK'; walk.appendChild(walkLabel);
   walk.setAttribute('aria-label', 'Walk around the store');
   walk.addEventListener('click', () => { if (isMobileOverlayBlocking()) return; stop(); poke(); callbacks.onToggleWalkAround?.(); });
   const stick = document.createElement('div');
@@ -115,7 +116,7 @@ export function installMobileWalk(root: HTMLElement, stage: HTMLElement, callbac
   document.addEventListener('visibilitychange', () => { if (document.hidden) stop(); });
   new MutationObserver(() => {
     const s = getScene(), isWalk = s?.isWalkAroundMode === true;
-    walk.textContent = isWalk ? 'SHELVES' : 'WALK';
+    walkLabel.textContent = isWalk ? 'SHELVES' : 'WALK';
     walk.setAttribute('aria-label', isWalk ? 'Return to shelf browsing' : 'Walk around the store');
     if (!walking() || !root.classList.contains('visible') || root.classList.contains('terminal')) stop();
   }).observe(root, { attributes: true, attributeFilter: ['data-mode', 'class'] });

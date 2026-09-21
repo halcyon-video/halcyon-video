@@ -433,9 +433,13 @@ export function updateCameraTarget(scene: StoreScene) {
     const vFov = (scene.camera.fov * Math.PI) / 180;
     const aspect = scene.camera.aspect;
     
-    const totalWidth = 2 * INSPECT_FAN_X + actualBoxWidth; // the pair's full span
+    const activeSlot = scene.slotsByPosition.get(scene.getActiveSlotKey());
+    // A streaming film has one retail case. On a phone, reserving the missing
+    // rental case's half of the frame makes the synopsis and providers unreadable.
+    const mobileSingleCase = mobileStoreActive() && !!activeSlot?.noRentalCase;
+    const totalWidth = mobileSingleCase ? actualBoxWidth : 2 * INSPECT_FAN_X + actualBoxWidth;
     const totalHeight = actualBoxHeight;
-    const margin = INSPECT_FIT_MARGIN;
+    const margin = mobileSingleCase ? 1.24 : INSPECT_FIT_MARGIN;
 
     // Height governs at every ordinary aspect: both distances scale with the
     // same margin, and distH > distW whenever totalHeight * aspect > totalWidth
@@ -450,8 +454,6 @@ export function updateCameraTarget(scene: StoreScene) {
     // getActiveSlotKey() (NOT a hand-built lib_unit_... key): fixture slots are
     // keyed `fixture_<id>_side_...`, so the inline form silently missed every
     // display-stand slot and inspect fell through to the wide fallback framing.
-    const activeSlot = scene.slotsByPosition.get(scene.getActiveSlotKey());
-    
     if (activeSlot) {
       let targetX = activeSlot.restingX;
       let targetZ = activeSlot.restingZ;

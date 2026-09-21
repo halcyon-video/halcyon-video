@@ -564,13 +564,13 @@ export class ClerkInteraction {
       font-family: 'Courier New', monospace; font-size: 15px; min-height: 44px; font-weight: 700; letter-spacing: .04em;
       color: var(--bb-knockout, #eef3ff); background: rgba(10,18,40,.82);
       border: 1px solid var(--bb-secondary, #f2e8c9);
-      padding: 8px 16px; border-radius: 6px; text-shadow: 0 1px 2px #000;
+      padding: 8px 16px; border-radius: 0; text-shadow: 0 1px 2px #000;
       box-shadow: 0 4px 18px rgba(0,0,0,.5);
     }
     .clerk-prompt.visible { pointer-events: auto; visibility: visible; opacity: 1; transform: translateX(-50%) translateY(0); }
     .clerk-key {
       display: inline-block; min-width: 1.4em; text-align: center; margin-right: 8px;
-      padding: 1px 6px; border-radius: 4px; background: #ffd54a; color: #10203f;
+      padding: 1px 6px; border-radius: 0; background: #ffd54a; color: #10203f;
       font-weight: 800; box-shadow: inset 0 -2px 0 rgba(0,0,0,.25);
     }
     .clerk-dialog {
@@ -580,9 +580,10 @@ export class ClerkInteraction {
       opacity: 0; visibility: hidden; transition: opacity .2s, transform .2s;
       font-family: 'Courier New', monospace; color: #eef3ff;
       background: linear-gradient(180deg, rgba(17,30,64,.97), rgba(9,16,38,.97));
-      border: 2px solid #1560bd; border-radius: 10px; padding: 18px 20px;
-      box-shadow: 0 10px 40px rgba(0,0,0,.6), inset 0 0 0 1px rgba(255,255,255,.05);
+      border: 3px double #c5d0df; border-radius: 0; padding: 18px 20px;
+      box-shadow: 3px 4px 0 #080c18, inset 0 0 0 2px #202e4a;
     }
+    body:has(.clerk-dialog.visible) .clasp-prompt { visibility: hidden; }
     .clerk-dialog.visible { opacity: 1; visibility: visible; transform: translateX(-50%) translateY(0) scale(1); }
     .clerk-speech { overflow-wrap: anywhere; font-size: 15px; line-height: 1.5; margin-bottom: 14px; }
     .clerk-name {
@@ -593,8 +594,8 @@ export class ClerkInteraction {
     .clerk-option {
       display: flex; align-items: center; text-align: left; width: 100%;
       font-family: inherit; font-size: 15px; min-height: 44px; color: #eef3ff; cursor: pointer;
-      background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.12);
-      border-radius: 6px; padding: 8px 12px; transition: background .12s, border-color .12s;
+      background: transparent; border: 1px solid transparent;
+      border-radius: 0; padding: 8px 12px; transition: background .12s, border-color .12s;
     }
     .clerk-option:hover, .clerk-option:focus {
       background: rgba(21,96,189,.35); border-color: #3182d6; outline: none;

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import type { Movie } from '../src/jellyfin.ts';
 import {
   getAvailableStreamingServices,
+  streamingAvailabilityText,
   isStreamingChoiceActive,
   getStreamingChoiceState,
   getStreamingChoiceKey,
@@ -578,4 +579,15 @@ test('backAction: backing out of overview mode opens counter terminal', () => {
   const handled = scene.backAction();
   assert.equal(handled, true);
   assert.equal(terminalOpened, true);
+});
+
+
+test('ordinary case metadata lists provider names before checkout and deduplicates them', () => {
+  setStreamingStockResolver(() => []);
+  const movie = createMockMovie({streamingServices: [
+    {id: 'netflix', name: 'Netflix'}, {id: 'disney', name: 'Disney+'},
+  ]});
+  assert.equal(isStreamingChoiceActive(movie), false);
+  assert.equal(streamingAvailabilityText(movie), 'AVAILABLE ON: NETFLIX · DISNEY+');
+  assert.equal(streamingAvailabilityText(createMockMovie({streaming: false, streamingServiceId: undefined})), '');
 });

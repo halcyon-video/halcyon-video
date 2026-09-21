@@ -94,6 +94,12 @@ export function getAvailableStreamingServices(movie: Movie, additionalStock?: Mo
   return choices;
 }
 
+/** Plain box-back metadata, available before the visitor chooses checkout. */
+export function streamingAvailabilityText(movie: Movie): string {
+  const names = getAvailableStreamingServices(movie).map(service => service.name);
+  return names.length ? `AVAILABLE ON: ${names.join(' · ')}` : '';
+}
+
 export function isStreamingChoiceActive(movie: Movie | null): boolean {
   if (!movie) return false;
   return movieChoices.has(movie.id);

@@ -16,6 +16,8 @@ import type { DecodeMode } from './poster-worker';
 import { getRommConfig, authHeader } from './romm';
 import { prefetchPosterBytes, takePrefetchedPosterBytes, setSharedDecodeEnabled, sharedDecodeGet, sharedDecodePut } from './poster-prefetch';
 import { drawTechSpecsTable, TECH_SPECS_TABLE_H } from './tech-specs';
+import { isRequestTitle } from './request-title';
+import { getJellyseerrConfig } from './jellyseerr';
 import { stampCollectionGapSticker } from './case-corner-stickers';
 import { perfTrace, perfSlot } from './perf-trace';
 import { LruByteCache } from './lru-byte-cache';
@@ -29,7 +31,7 @@ import { getLowResFrontMaterial, disposeLowResFrontMaterials } from './hero-lowr
 // only (that file reads every binding from here inside a function, never at
 // module scope) — same arrangement as hero-lowres-front.
 import { stampPosterBadges, getHeroFrontMaterial, disposeHeroFrontDetail, restampHeroFront, heroDetailArtEnabled } from './hero-front-detail';
-import { isStreamingChoiceActive, drawStreamingChoiceOverlays, drawStreamingChoiceBack } from './streaming-checkout';
+import { streamingAvailabilityText, isStreamingChoiceActive, drawStreamingChoiceOverlays, drawStreamingChoiceBack } from './streaming-checkout';
 // The two DVD typed-metadata passes live in their own module (this file is at
 // its line budget — see dvd-overlays.ts's header). They import this file's
 // shared text/measure helpers back; the cycle is function-level only.
@@ -1648,6 +1650,7 @@ export function getMovieOffsets(id: string) {
  * update.
  */
 export function restampCollectionGapCase(movie: Movie): void {
+  if (!isRequestTitle(movie, getJellyseerrConfig() !== null)) return;
   // The inspected case's 3x front holds its own copy of the pixels, so it needs
   // the new label painted on too — you order FROM the inspect view, and without
   // this the box in your hands would keep the blue REQUEST while every other
@@ -3228,6 +3231,7 @@ function drawStandardVhsOverlays(ctx: CanvasRenderingContext2D, movie: Movie) {
   const genreList = movie.genres.slice(0, 3).join(', ').toUpperCase() || 'FEATURE';
   const metaRaw = [
     movie.director ? `DIRECTED BY ${movie.director.toUpperCase()}` : '',
+    streamingAvailabilityText(movie),
     `${genreList}   ·   RATED ${movie.rating || 'NR'}`,
     `RELEASED ${movie.year}${movie.duration ? `   ·   ${movie.duration}` : ''}`,
   ].filter(Boolean);
@@ -4405,7 +4409,10 @@ function drawJellyfinBackImpl(
   // clearance), the actor list costs 14px after its header plus 46 per row
   // plus a 20px gap.
   const specTop = h - 18 - (movie.streaming ? 0 : TECH_SPECS_TABLE_H);
-  const maxActorRows = Math.floor((specTop - 79 - (h / 2 + 30) - 34) / 46);
+  ctx.font = `24px ${BB_OUTFIT}, sans-serif`;
+  const availability = streamingAvailabilityText(movie);
+  const serviceLines = availability ? wrapText(ctx, availability, w - 100) : [];
+  const maxActorRows = Math.floor((specTop - 79 - serviceLines.length * 30 - (h / 2 + 30) - 34) / 46);
   const actors = (movie.actors || []).slice(0, Math.max(0, Math.min(5, maxActorRows)));
   let cy = h / 2 + 30; // Starts at Y = 510
   if (actors.length > 0) {
@@ -4464,6 +4471,9 @@ function drawJellyfinBackImpl(
   ctx.font = `16px ${BB_OUTFIT}, sans-serif`;
   ctx.fillText(`Director: ${movie.director}`, 50, dirY);
   ctx.fillText(`Genres:   ${movie.genres.join(', ')}`, 50, cy + 65);
+  ctx.fillStyle = bottomContrast.text;
+  ctx.font = `24px ${BB_OUTFIT}, sans-serif`;
+  serviceLines.forEach((line, i) => ctx.fillText(line, 50, cy + 95 + i * 30));
 
   // Retail tech-specs box, bottom-anchored — the year/rating/duration line it
   // replaced lives inside the table (RATED / RUNNING TIME / © year), filled

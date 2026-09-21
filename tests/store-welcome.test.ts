@@ -85,8 +85,8 @@ test('triggerHostedWelcome runs on first demo visit and marks flag', () => {
   assert.equal(res, true);
   assert.equal(isWelcomeActive(), true);
   assert.equal(isFirstVisit(), false, 'First visit should now be marked');
-  assert.equal(toastMsg, 'Welcome test greeting!');
-  assert.equal(toastDuration, 6500);
+  assert.equal(toastMsg, '', 'First visits must not interrupt the room with clerk speech');
+  assert.equal(toastDuration, 0);
 
   // A repeat trigger while active or after marked must return false
   const resSecond = triggerHostedWelcome({ isDemo: true, showToast });
