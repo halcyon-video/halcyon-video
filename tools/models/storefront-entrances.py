@@ -203,9 +203,13 @@ for style in ['gabled-brick','flat-parapet','arcaded-brick']:
             box('Upright brick entry header',-m,m,10.2,12.35,projection+.001,projection+.025,6)
             box('Entry exit masonry divider',-.9,.9,0,9.1,-.18,.25,0)
             for s in [-1,1]:
-                x0,x1=sorted([s*4.1,s*opening])
-                box('Sidelight masonry knee',x0,x1,0,1.6,-.18,.25,0)
-                box('Sidelight soldier sill',x0,x1,1.6,1.82,-.18,.32,6)
+                # A single L-shaped solid joins the knee and jamb. The outer
+                # edge maps to entryHalf, exactly where the wing veneer starts.
+                # Sharing this profile closes both the floor seam and vertical
+                # yellow strip instead of patching one while leaving the other.
+                poly=[(s*4.1,0),(s*(m+.3),0),(s*(m+.3),9.15),
+                      (s*m,9.15),(s*m,2.0),(s*4.1,2.0)]
+                prism('Continuous sidelight knee and jamb',poly,-.18,.25,0)
     objects=[o for o in bpy.context.scene.objects if o not in before]
     for obj in objects:
         for c in list(obj.users_collection):c.objects.unlink(obj)

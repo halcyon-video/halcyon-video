@@ -1,6 +1,5 @@
 // Redesigned video game shelf: a standard double-sided freestanding gondola shelf.
-// Displays sections based on the selected platform list, showing the top 20
-// games for each platform.
+// Displays the selected platform catalog on the same shelf decks as movies.
 import * as THREE from 'three';
 import { ShelfModelBatch } from '../shelf-model';
 import { Movie } from '../jellyfin';
@@ -165,9 +164,8 @@ export class GameSection implements SlottedFixture {
   // Fixed section count per side when this gondola is one unit of a multi-unit
   // game department (see initMovies' sliced mode); null = legacy dynamic count.
   private forcedSections: number | null = null;
-  // 'front' = stock (and blade-card) only the front face — the 2×2 department
-  // rows present their backs to the field/front glass where there's only a
-  // walk-through gap, no browse-camera room. 'both' = classic double-sided.
+  // Only wall-mounted mom-and-pop units use one face. Freestanding units
+  // retain the movie gondola's full depth and both browsable faces.
   private faces: 'front' | 'both' = 'both';
 
   public frontPlatforms: string[] = [];

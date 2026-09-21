@@ -41,10 +41,10 @@ export interface RommConfig {
 // Overall cap on how many games the section carries (see the ticket's texture
 // budget note): games share the movie poster queue, so bound the count so game
 // covers never starve the library's own shelves. Sized to the department's
-// actual slot count — the full-store 2×2 department is 4 single-sided units
-// x 48 slots (4 shelves x 12 cols, see game-section.ts/gameSectionPlacements)
+// actual slot count — the full-store 2×2 department is 4 double-sided units
+// x 96 slots (4 shelves x 12 cols, see game-section.ts/gameSectionPlacements)
 // — so a well-stocked Romm fills every shelf.
-const GAME_SECTION_CAP = 192;
+const GAME_SECTION_CAP = 384;
 // Per-platform ceiling so one huge platform can't consume the whole budget
 // (96 = one full unit). The actual per-platform request size is an even split
 // of the section cap across enabled platforms, computed in fetchGames().

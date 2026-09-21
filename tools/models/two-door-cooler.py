@@ -15,6 +15,8 @@ scene.unit_settings.system = 'IMPERIAL'
 scene.unit_settings.scale_length = 0.3048
 
 parts = []
+cylinder_meshes = {}
+bottle_meshes = {}
 
 def make_mat(name, color, roughness, metal=0.0, alpha=1.0):
     m = bpy.data.materials.new(name)
@@ -33,19 +35,22 @@ def make_mat(name, color, roughness, metal=0.0, alpha=1.0):
     return m
 
 m_cabinet = make_mat('CoolerCabinet', (0.65, 0.025, 0.035), 0.35, metal=0.15)
-m_interior = make_mat('CoolerInteriorWhite', (0.92, 0.93, 0.94), 0.30)
+m_interior = make_mat('CoolerInteriorWhite', (0.48, 0.51, 0.52), 0.60)
 m_grille = make_mat('CoolerGrilleDark', (0.05, 0.05, 0.06), 0.70, metal=0.50)
-m_frame = make_mat('CoolerDoorFrame', (0.15, 0.16, 0.18), 0.25, metal=0.85)
-m_handle = make_mat('CoolerHandleMetal', (0.75, 0.78, 0.82), 0.15, metal=0.95)
+m_frame = make_mat('CoolerDoorFrame', (0.018, 0.020, 0.023), 0.45, metal=0.25)
+m_handle = make_mat('CoolerHandleMetal', (0.022, 0.024, 0.026), 0.48, metal=0.20)
 m_glass = make_mat('CoolerGlass', (0.85, 0.93, 0.95), 0.05, alpha=0.15)
 m_wire = make_mat('CoolerWireShelf', (0.88, 0.90, 0.92), 0.25, metal=0.40)
-m_header = make_mat('CoolerHeaderSign', (0.95, 0.95, 0.90), 0.20)
+m_header = make_mat('CoolerHeaderSign', (0.65, 0.025, 0.035), 0.30)
+m_back = make_mat('CoolerGalvanizedBack', (.37,.40,.42), .66, metal=.65)
 m_lid = make_mat('DrinkAluminum', (.64,.66,.68), .24, metal=.92)
 m_cap = make_mat('BottleCap', (.88,.88,.84), .48)
 m_can_red = make_mat('DrinkCanRed', (0.85, 0.08, 0.10), 0.30, metal=0.60)
 m_can_blue = make_mat('DrinkCanBlue', (0.08, 0.25, 0.85), 0.30, metal=0.60)
 m_can_green = make_mat('DrinkCanGreen', (0.10, 0.75, 0.20), 0.30, metal=0.60)
-m_bottle = make_mat('DrinkBottleAmber', (0.80, 0.65, 0.20), 0.20, alpha=0.65)
+m_bottle = make_mat('DrinkBottleAmber', (0.095, 0.035, 0.012), 0.24)
+m_bottle_green = make_mat('DrinkBottleGreen', (.055,.20,.065), .26)
+m_bottle_water = make_mat('DrinkBottleWater', (.18,.35,.41), .24)
 
 def finish(o, name, m, bevel=0.004):
     o.name = name
@@ -83,7 +88,14 @@ def box(name, loc, dims, m, bevel=0.004):
 def cylinder(name, loc, r, h, m, verts=16, bevel=0.002):
     bpy.ops.mesh.primitive_cylinder_add(vertices=verts, radius=r, depth=h, location=loc)
     o = bpy.context.object
-    return finish(o, name, m, bevel)
+    finish(o, name, m, bevel)
+    key=(r,h,m.name,verts,bevel)
+    if key in cylinder_meshes:
+        old=o.data; o.data=cylinder_meshes[key]; bpy.data.meshes.remove(old)
+    else:
+        for poly in o.data.polygons: poly.use_smooth=abs(poly.normal.z)<.5
+        cylinder_meshes[key]=o.data
+    return o
 
 # Dimensions: W=4.0 ft, D=2.3 ft, H=6.5 ft
 # 1. Main Outer Insulated Cabinet
@@ -96,21 +108,17 @@ box('CabinetBottomBase', (0, 0, 0.04), (4.00, 2.30, 0.08), m_cabinet, bevel=0.00
 # Back insulated wall:
 box('CabinetBackWall', (0, 1.11, 3.25), (3.84, 0.08, 6.34), m_interior, bevel=0.004)
 
-# Original white curved side stripe; no beverage logo or borrowed trade dress.
+# Red enamel sides and a separate galvanized service skin at the rear.
+# These are construction finishes; licensed printed drop-ins remain private.
+box('RearGalvanizedSkin', (0,1.157,3.55), (3.84,.024,5.68), m_back, bevel=.003)
+box('RearCompressorRecess', (0,1.158,.47), (3.60,.024,.76), m_grille, bevel=.003)
+for row in range(5):
+    box(f'RearVentLouver_{row}', (0,1.18,.18+row*.14), (3.52,.03,.075), m_back, bevel=.003)
 for side in [-1,1]:
-    verts=[]
-    for i in range(17):
-        t=i/16
-        y=-1.08+2.16*t
-        z=2.0+1.8*t+.3*math.sin(t*math.pi*2)
-        for dz in [-.13,.13]: verts.append((side*2.004,y,z+dz))
-    faces=[(2*i,2*i+1,2*i+3,2*i+2) for i in range(16)]
-    mesh=bpy.data.meshes.new('SideStripeMesh');mesh.from_pydata(verts,[],faces);mesh.update()
-    o=bpy.data.objects.new('WhiteSideStripe',mesh);scene.collection.objects.link(o)
-    bpy.context.view_layer.objects.active=o;o.select_set(True)
-    solid=o.modifiers.new('PaintFilm','SOLIDIFY');solid.thickness=.002
-    bpy.ops.object.modifier_apply(modifier=solid.name)
-    finish(o,f'WhiteSideStripe_{side}',m_header,bevel=0)
+    box(f'FrontBlackCaseStile_{side}', (side*1.955,-1.16,3.25), (.11,.08,6.50), m_frame)
+    box(f'InnerCabinetLiner_{side}', (side*1.906,.0,3.25), (.024,2.14,4.64), m_interior)
+for z in [.06,6.45]:
+    box(f'FrontBlackCaseRail_{z}', (0,-1.16,z), (3.84,.08,.10), m_frame)
 
 # 2. Lower Compressor Compartment & Intake Louvers (Z: 0.08 to 0.90 ft)
 box('CompressorInteriorDeck', (0, 0, 0.90), (3.84, 2.14, 0.06), m_interior, bevel=0.004)
@@ -129,42 +137,70 @@ box('HeaderBezelBottom', (0, -1.13, 5.62), (3.84, 0.05, 0.05), m_frame, bevel=0.
 # Central mullion divider at front:
 box('CenterDoorMullion', (0, -1.11, 3.25), (0.10, 0.08, 4.64), m_frame, bevel=0.003)
 
-# 4 wire shelves:
-shelf_heights = [1.85, 2.80, 3.75, 4.70]
+# Five close-stocked levels, ten bottles per row and four rows deep.
+# Opaque colored PET/liquid avoids hundreds of transparent draw calls; the
+# existing static retail batching merges equal finishes after loading.
+shelf_heights = [1.08, 1.99, 2.90, 3.81, 4.72]
 for s_idx, sh_z in enumerate(shelf_heights):
-    # Main shelf wire deck
     for wire in range(20):
         box(f'WireShelfDeck_{s_idx}_{wire}', (-1.82+wire*3.64/19, .05, sh_z), (.018,1.95,.024), m_wire, bevel=0)
-    # Front wire retaining lip
-    box(f'WireShelfLip_{s_idx}', (0, -0.92, sh_z + 0.04), (3.74, 0.02, 0.06), m_wire, bevel=0.002)
+    box(f'WireShelfLip_{s_idx}', (0, -.94, sh_z+.03), (3.74,.026,.065), m_wire, bevel=.002)
+    for d_idx in range(10):
+        dx=-1.62+d_idx*.36
+        label=[m_can_red,m_can_red,m_can_green,m_can_blue,m_can_blue][s_idx]
+        liquid=[m_bottle,m_bottle,m_bottle_green,m_bottle,m_bottle_water][s_idx]
+        for depth in range(4):
+            yy=-.73+depth*.43
+            name=f'DrinkBottle_{s_idx}_{d_idx}_{depth}'
+            # Full eight-sided profiles at the glass; four-sided stock deeper
+            # in the cabinet keeps the dense rows inside the fixture budget.
+            # Rear labels and caps are material regions on the same closed mesh.
+            count=8 if depth==0 else 4
+            rings=[(0,.108),(.03,.142),(.27,.14),(.48,.14),(.61,.07),(.72,.055)]
+            verts=[(dx+r*math.cos(k*math.tau/count),yy+r*math.sin(k*math.tau/count),sh_z+.025+zz) for zz,r in rings for k in range(count)]
+            faces=[tuple(reversed(range(count))),tuple(range(5*count,6*count))]+[(q*count+k,q*count+(k+1)%count,(q+1)*count+(k+1)%count,(q+1)*count+k) for q in range(5) for k in range(count)]
+            mesh=bpy.data.meshes.new(name+'Profile');mesh.from_pydata(verts,[],faces);mesh.update()
+            obj=bpy.data.objects.new(name,mesh);scene.collection.objects.link(obj)
+            finish(obj,name,liquid,bevel=0)
+            if depth==0:
+                cylinder(name+'Cap',(dx,yy,sh_z+.770),.064,.07,m_cap,verts=8,bevel=0)
+                wrap=cylinder(name+'PrintedLabel',(dx,yy,sh_z+.385),.144,.19,label,verts=8,bevel=0)
+                wrap['wrapHeight']=.19
+            else:
+                mesh.materials.append(label);mesh.materials.append(m_cap)
+                for poly in mesh.polygons:
+                    if poly.index==1: poly.material_index=2
+                    elif poly.index>=2 and (poly.index-2)//count==2: poly.material_index=1
+                uv=mesh.uv_layers.active
+                for poly in mesh.polygons:
+                    values=[]
+                    for li in poly.loop_indices:
+                        v=mesh.vertices[mesh.loops[li].vertex_index].co
+                        values.append((li,(math.atan2(v.y-yy,v.x-dx)/math.tau+.75)%1,(v.z-sh_z-.295)/.21))
+                    us=[u for _,u,_ in values]
+                    for li,u,v in values:
+                        if max(us)-min(us)>.5 and u<.5:u+=1
+                        uv.data[li].uv=(u,v)
 
-    # Rolled aluminum rims, recessed lids and pull tabs make cans read as packaging.
-    for d_idx,dx in enumerate([-1.4,-.9,-.4,.4,.9,1.4]):
-        mat_can=[m_can_red,m_can_blue,m_can_green][(s_idx+d_idx)%3]
-        for depth,yy in enumerate([-.65,-.15]):
-            name=f'DrinkCan_{s_idx}_{d_idx}_{depth}'
-            body=cylinder(name,(dx,yy,sh_z+.225),.12,.40,mat_can,verts=16,bevel=0)
-            for zz in [sh_z+.035,sh_z+.415]:
-                cylinder(name+'RolledRim',(dx,yy,zz),.123,.018,m_lid,verts=12,bevel=0)
-            cylinder(name+'RecessedLid',(dx,yy,sh_z+.418),.106,.008,m_lid,verts=12,bevel=0)
-            box(name+'PullTab',(dx,yy-.022,sh_z+.426),(.037,.067,.008),m_lid,bevel=0)
-        # Bottle profile includes shoulder, narrowed neck and a fitted screw cap.
-        rings=[(0,.10),(.025,.128),(.38,.128),(.47,.068),(.565,.055)]
-        verts=[(dx+radius*math.cos(k*math.tau/12),.4+radius*math.sin(k*math.tau/12),sh_z+.025+zz) for zz,radius in rings for k in range(12)]
-        faces=[tuple(reversed(range(12))),tuple(range(48,60))]+[(q*12+k,q*12+(k+1)%12,(q+1)*12+(k+1)%12,(q+1)*12+k) for q in range(4) for k in range(12)]
-        mesh=bpy.data.meshes.new('Bottle profile');mesh.from_pydata(verts,[],faces);mesh.update()
-        obj=bpy.data.objects.new('Beverage bottle',mesh);scene.collection.objects.link(obj)
-        finish(obj,f'DrinkBottleRear_{s_idx}_{d_idx}',m_bottle,bevel=0)
-        cylinder(f'BottleCap_{s_idx}_{d_idx}',(dx,.4,sh_z+.612),.061,.065,m_cap,verts=12,bevel=0)
+            # Blender linked meshes preserve all 200 physical bottles while
+            # exporting each repeated profile only once per finish/level.
+            key=(s_idx,depth==0)
+            if key in bottle_meshes:
+                proto,px,py=bottle_meshes[key]
+                old=obj.data;obj.data=proto.data;bpy.data.meshes.remove(old)
+                obj.location=(dx-px,yy-py,0)
+            else:
+                for poly in obj.data.polygons: poly.use_smooth=poly.index>=2
+                bottle_meshes[key]=(obj,dx,yy)
 
 # 5. Framed Glass Double Doors (Left and Right)
 # Left door center: X=-0.95. Right door center: X=0.95.
 for d_side, cx in [('Left', -0.95), ('Right', 0.95)]:
     # Outer frame
-    box(f'{d_side}DoorFrameTop', (cx, -1.13, 5.56), (1.90, 0.05, 0.08), m_frame, bevel=0.002)
-    box(f'{d_side}DoorFrameBottom', (cx, -1.13, 0.96), (1.90, 0.05, 0.08), m_frame, bevel=0.002)
-    box(f'{d_side}DoorFrameLeft', (cx - 0.91, -1.13, 3.26), (0.08, 0.05, 4.52), m_frame, bevel=0.002)
-    box(f'{d_side}DoorFrameRight', (cx + 0.91, -1.13, 3.26), (0.08, 0.05, 4.52), m_frame, bevel=0.002)
+    box(f'{d_side}DoorFrameTop', (cx, -1.13, 5.56), (1.90, 0.085, 0.11), m_frame, bevel=0.002)
+    box(f'{d_side}DoorFrameBottom', (cx, -1.13, 0.96), (1.90, 0.085, 0.11), m_frame, bevel=0.002)
+    box(f'{d_side}DoorFrameLeft', (cx - 0.91, -1.13, 3.26), (0.11, 0.085, 4.52), m_frame, bevel=0.002)
+    box(f'{d_side}DoorFrameRight', (cx + 0.91, -1.13, 3.26), (0.11, 0.085, 4.52), m_frame, bevel=0.002)
     # Double-pane glass panel
     box(f'{d_side}DoorGlass', (cx, -1.13, 3.26), (1.76, 0.02, 4.52), m_glass, bevel=0.001)
 
@@ -182,7 +218,7 @@ for o in parts:
    coords=[]
    for li in face.loop_indices:
     v=o.data.vertices[o.data.loops[li].vertex_index].co
-    coords.append((li,(math.atan2(v.y,v.x)/math.tau+.75)%1,(v.z+.2)/.4))
+    coords.append((li,(math.atan2(v.y,v.x)/math.tau+.75)%1,(v.z+o.get('wrapHeight',.4)/2)/o.get('wrapHeight',.4)))
    us=[v[1] for v in coords]
    for li,u,v in coords:
     if max(us)-min(us)>.5 and u<.5:u+=1
@@ -190,6 +226,8 @@ for o in parts:
 metrics = {
     'units': 'feet',
     'origin': 'floor-centred; X across, Y in-depth, Z up (Blender)',
+    'bottleCount': 200,
+    'shelfLevels': shelf_heights,
     'parts': []
 }
 for o in parts:
@@ -205,7 +243,7 @@ for o in parts:
         'nonmanifoldEdges': bad,
         'uv': bool(o.data.uv_layers)
     })
-    o.modifiers.new('Triangulate', 'TRIANGULATE')
+    # glTF triangulates polygons; keep linked source mesh identities intact.
 
 coords = [o.matrix_world @ Vector(v.co) for o in parts for v in o.data.vertices]
 metrics['boundsBlender'] = {

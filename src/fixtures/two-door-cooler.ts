@@ -30,7 +30,7 @@ export class TwoDoorCooler implements StoreFixture {
     const enamelMat = own(new THREE.MeshStandardMaterial({ color: '#d52e35', roughness: 0.25 }));
     const plinthMat = own(new THREE.MeshStandardMaterial({ color: '#18191c', roughness: 0.7 }));
     const headerMat = own(new THREE.MeshStandardMaterial({
-      color: '#e8f0fe', roughness: 0.2, emissive: '#203a70', emissiveIntensity: 0.25,
+      color: '#d52e35', roughness: 0.3,
     }));
     const glassMat = own(new THREE.MeshStandardMaterial({
       color: '#d6ecf5', roughness: 0.08, transparent: true, opacity: 0.35,

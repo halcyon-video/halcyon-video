@@ -14,6 +14,10 @@ export function fitFacadeEntryVertex(
     : a <= authoredMass ? o + (a-authoredOpening)*(m-o)/(authoredMass-authoredOpening)
       : m+a-authoredMass;
   if (gabled) {
+    // The projecting pier base begins 0.10 ft inside the shaft datum. Treat
+    // it as part of the pier, not the stretchable opening reveal; otherwise
+    // its inner overhang scales while its outer overhang stays fixed.
+    if (a >= authoredMass - .100001) fitted = m + a - authoredMass;
     const doorEdge = o-3.1;
     if (a <= authoredOpening) fitted = a <= .9 ? a
       : a <= 4.1 ? .9+(a-.9)*(doorEdge-.9)/3.2 : doorEdge+(a-4.1);

@@ -49,7 +49,10 @@ export function buildExitReturnCounter(ctx: FixtureContext, parent: THREE.Group,
       model.traverse(o=>{
         if (!(o instanceof THREE.Mesh)) return;
         const p=o.geometry.getAttribute('position');
-        for(let i=0;i<p.count;i++) if(p.getZ(i)>0) p.setZ(i,p.getZ(i)/.23*.38/(length/15.5));
+        // Pin 217: the exterior metal face stands one millimetre proud of
+        // the z=15 glazing, not several inches out in the walkway.
+        const receiverFront = .18 + .00328084;
+        for(let i=0;i<p.count;i++) if(p.getZ(i)>0) p.setZ(i,p.getZ(i)/.18328084*receiverFront/(length/15.5));
         p.needsUpdate=true;o.geometry.computeVertexNormals();o.geometry.computeBoundingSphere();
       });
       prepareRetailModel(model);
@@ -61,7 +64,7 @@ export function buildExitReturnCounter(ctx: FixtureContext, parent: THREE.Group,
   titles.forEach((movie,index)=>{
     // These cached shelf materials belong to video-case, including live artwork refresh.
     const materials = createHeroRentalMaterials(movie);
-    const positions = [[-2.7,-1.5],[-1.8,-1.42],[-.4,-1.55],[.48,-1.46],[2.15,-1.53],
+    const positions = [[-2.7,-1.92],[-1.8,-1.88],[-.4,-1.94],[.48,-1.90],[2.15,-1.91],
       [-5.92,-6.55],[-5.24,-7.25],[-3.92,-8.5],[-.88,-8.38],[.02,-7.6],[.73,-6.84],[1.37,-6.2]];
     const [x,z] = positions[index];
     const levels = [3,5,2,4,6,3,5,2,4,3,6,2][index];

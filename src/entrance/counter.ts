@@ -212,7 +212,9 @@ export function buildCheckoutCounter(
   // this function runs. One definition beats two that agree today.
   const innerD = DESK_DEPTH;
   const backHalf = 6.2;
-  const shoulderHalf = 9.8;
+  // Pin 212: one extra foot of sloped run gives the 3.2-ft return chute a
+  // clear shoulder at each end. A 0.7-ft X/Z extension is 0.99 ft on the 45° edge.
+  const shoulderHalf = 10.5;
   const zBackC = backZ - 0.1;
   // Equal X/Z advances keep shoulders and customer faces exactly 45 degrees.
   const zShoulder = zBackC - (shoulderHalf - backHalf);
@@ -438,9 +440,8 @@ export function buildCheckoutCounter(
         [2, 0, 0.01],                // right side
       ]
     : [
-        [0, 0, P_out[0].distanceTo(P_out[1]) - 1.0],
-        [0, 4.6, 0],
-        [1, 0, 0], [2, 0, 0], [3, 0, 0], [4, 0, 0],
+        [0, 0, 2.2], [1, 2.2, 0],
+        [2, 0, 0], [3, 0, 0], [4, 0, 0],
       ];
   const bandSegs = bandSegDefs.map(([edge, trimA, trimB]) =>
     ({ edge, trimA, trimB, e: segEnds(edge, trimA, trimB) }));

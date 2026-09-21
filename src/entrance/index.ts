@@ -481,8 +481,11 @@ export class EntranceCheckout implements StoreFixture {
         const first = group.children.length;
         buildGlazedWall('Z', 0, 0, wall.length, [wall.doorAlong], {frontSillY:2,singlePanels:true});
         for (const child of group.children.slice(first)) assembly.add(child);
+        // Pin 203: from the sales-floor approach the entrance-side leaf must
+        // hang on the right-hand jamb. Mirror the exit leaf instead of giving
+        // both diagonal doors the same local hinge.
         const door = buildVestibuleDoor(this.ctx, assembly, doorMats, spec, 0, wall.doorAlong,
-          doorH, false, false, -1.4, noFrame);
+          doorH, false, side === 1, -1.4, noFrame);
         assembly.position.set(wall.x, 0, wall.z); assembly.rotation.y = wall.yaw;
         group.add(assembly);
         door.center.set(wall.doorX, door.center.y, wall.doorZ);
@@ -749,7 +752,7 @@ export class EntranceCheckout implements StoreFixture {
     // 90s video stores only. The face is picked per counter shape from
     // the same outline constants counter.ts builds from (mirrored here like
     // the BAND_H trio below — that file stays layout-agnostic): the shield's
-    // right shoulder edge runs (cx+9.8, zBackC-3.6) -> (cx+6.2, zBackC), the
+    // right shoulder edge runs (cx+10.5, zBackC-4.3) -> (cx+6.2, zBackC), the
     // usquare's right side sits flat at x = cx+6.8. Both faces clear the
     // vestibule glazing (z >= 8.6) and the store-side door's swing. The chute
     // protrudes into walkable floor now, so its footprint joins the clerk nav
@@ -795,7 +798,7 @@ export class EntranceCheckout implements StoreFixture {
       } else {
         // Midpoint of the shield's right shoulder edge, facing its outward
         // normal (out toward the walk-in corridor along the vestibule).
-        const ax = cx + 9.8, az = zBackC - (9.8 - 6.2); // shoulder vertex
+        const ax = cx + 10.5, az = zBackC - (10.5 - 6.2); // shoulder vertex
         const bx = cx + 6.2, bz = zBackC;        // back-right vertex
         anchor = { x: (ax + bx) / 2, z: (az + bz) / 2 };
         // Edge tangent (t) -> outward normal (t.z, -t.x); yaw with n = (sin, cos).

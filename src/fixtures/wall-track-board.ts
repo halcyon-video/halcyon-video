@@ -105,7 +105,10 @@ export class WallTrackBoard implements StoreFixture {
 
     this.group = new THREE.Group();
     this.group.name = `wall-track-board-${this.placement.id}`;
-    this.group.position.set(this.placement.position.x, surfaceY, this.placement.position.z);
+    // Pin 207: the paired register boards end beside the vestibule mullion.
+    // Keep a real reveal instead of letting the silver frame cross the post.
+    const mullionClearance = this.placement.id === 'wall-track-board-registers' ? -0.36 : 0;
+    this.group.position.set(this.placement.position.x + mullionClearance, surfaceY, this.placement.position.z);
     this.group.rotation.y = this.placement.yaw;
 
     // Build textures and materials

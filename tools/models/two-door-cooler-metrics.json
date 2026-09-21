@@ -1,6 +1,14 @@
 {
   "units": "feet",
   "origin": "floor-centred; X across, Y in-depth, Z up (Blender)",
+  "bottleCount": 200,
+  "shelfLevels": [
+    1.08,
+    1.99,
+    2.9,
+    3.81,
+    4.72
+  ],
   "parts": [
     {
       "name": "CabinetLeftWall",
@@ -33,14 +41,80 @@
       "uv": true
     },
     {
-      "name": "WhiteSideStripe_-1",
-      "triangles": 132,
+      "name": "RearGalvanizedSkin",
+      "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "WhiteSideStripe_1",
-      "triangles": 132,
+      "name": "RearCompressorRecess",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "RearVentLouver_0",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "RearVentLouver_1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "RearVentLouver_2",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "RearVentLouver_3",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "RearVentLouver_4",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "FrontBlackCaseStile_-1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "InnerCabinetLiner_-1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "FrontBlackCaseStile_1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "InnerCabinetLiner_1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "FrontBlackCaseRail_0.06",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "FrontBlackCaseRail_6.45",
+      "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
@@ -243,433 +317,361 @@
       "uv": true
     },
     {
-      "name": "DrinkCan_0_0_0",
-      "triangles": 60,
+      "name": "DrinkBottle_0_0_0",
+      "triangles": 92,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_0_0_0RolledRim",
+      "name": "DrinkBottle_0_0_0Cap",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_0_0_0PrintedLabel",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_0_0_1",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_0_0_0RolledRim.001",
+      "name": "DrinkBottle_0_0_2",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_0_0_0RecessedLid",
+      "name": "DrinkBottle_0_0_3",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_0_0_0PullTab",
-      "triangles": 12,
+      "name": "DrinkBottle_0_1_0",
+      "triangles": 92,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_0_0_1",
-      "triangles": 60,
+      "name": "DrinkBottle_0_1_0Cap",
+      "triangles": 28,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_0_0_1RolledRim",
+      "name": "DrinkBottle_0_1_0PrintedLabel",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_0_1_1",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_0_0_1RolledRim.001",
+      "name": "DrinkBottle_0_1_2",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_0_0_1RecessedLid",
+      "name": "DrinkBottle_0_1_3",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_0_0_1PullTab",
-      "triangles": 12,
+      "name": "DrinkBottle_0_2_0",
+      "triangles": 92,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkBottleRear_0_0",
-      "triangles": 116,
+      "name": "DrinkBottle_0_2_0Cap",
+      "triangles": 28,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "BottleCap_0_0",
+      "name": "DrinkBottle_0_2_0PrintedLabel",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_0_2_1",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_0_1_0",
-      "triangles": 60,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_0_1_0RolledRim",
+      "name": "DrinkBottle_0_2_2",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_0_1_0RolledRim.001",
+      "name": "DrinkBottle_0_2_3",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_0_1_0RecessedLid",
+      "name": "DrinkBottle_0_3_0",
+      "triangles": 92,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_0_3_0Cap",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_0_3_0PrintedLabel",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_0_3_1",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_0_1_0PullTab",
-      "triangles": 12,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_0_1_1",
-      "triangles": 60,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_0_1_1RolledRim",
+      "name": "DrinkBottle_0_3_2",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_0_1_1RolledRim.001",
+      "name": "DrinkBottle_0_3_3",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_0_1_1RecessedLid",
+      "name": "DrinkBottle_0_4_0",
+      "triangles": 92,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_0_4_0Cap",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_0_4_0PrintedLabel",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_0_4_1",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_0_1_1PullTab",
-      "triangles": 12,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkBottleRear_0_1",
-      "triangles": 116,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "BottleCap_0_1",
+      "name": "DrinkBottle_0_4_2",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_0_2_0",
-      "triangles": 60,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_0_2_0RolledRim",
+      "name": "DrinkBottle_0_4_3",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_0_2_0RolledRim.001",
+      "name": "DrinkBottle_0_5_0",
+      "triangles": 92,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_0_5_0Cap",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_0_5_0PrintedLabel",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_0_5_1",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_0_2_0RecessedLid",
+      "name": "DrinkBottle_0_5_2",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_0_2_0PullTab",
-      "triangles": 12,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_0_2_1",
-      "triangles": 60,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_0_2_1RolledRim",
+      "name": "DrinkBottle_0_5_3",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_0_2_1RolledRim.001",
+      "name": "DrinkBottle_0_6_0",
+      "triangles": 92,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_0_6_0Cap",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_0_6_0PrintedLabel",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_0_6_1",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_0_2_1RecessedLid",
+      "name": "DrinkBottle_0_6_2",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_0_2_1PullTab",
-      "triangles": 12,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkBottleRear_0_2",
-      "triangles": 116,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "BottleCap_0_2",
+      "name": "DrinkBottle_0_6_3",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_0_3_0",
-      "triangles": 60,
+      "name": "DrinkBottle_0_7_0",
+      "triangles": 92,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_0_3_0RolledRim",
+      "name": "DrinkBottle_0_7_0Cap",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_0_7_0PrintedLabel",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_0_7_1",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_0_3_0RolledRim.001",
+      "name": "DrinkBottle_0_7_2",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_0_3_0RecessedLid",
+      "name": "DrinkBottle_0_7_3",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_0_3_0PullTab",
-      "triangles": 12,
+      "name": "DrinkBottle_0_8_0",
+      "triangles": 92,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_0_3_1",
-      "triangles": 60,
+      "name": "DrinkBottle_0_8_0Cap",
+      "triangles": 28,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_0_3_1RolledRim",
+      "name": "DrinkBottle_0_8_0PrintedLabel",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_0_8_1",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_0_3_1RolledRim.001",
+      "name": "DrinkBottle_0_8_2",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_0_3_1RecessedLid",
+      "name": "DrinkBottle_0_8_3",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_0_3_1PullTab",
-      "triangles": 12,
+      "name": "DrinkBottle_0_9_0",
+      "triangles": 92,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkBottleRear_0_3",
-      "triangles": 116,
+      "name": "DrinkBottle_0_9_0Cap",
+      "triangles": 28,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "BottleCap_0_3",
+      "name": "DrinkBottle_0_9_0PrintedLabel",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_0_9_1",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_0_4_0",
-      "triangles": 60,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_0_4_0RolledRim",
+      "name": "DrinkBottle_0_9_2",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_0_4_0RolledRim.001",
-      "triangles": 44,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_0_4_0RecessedLid",
-      "triangles": 44,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_0_4_0PullTab",
-      "triangles": 12,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_0_4_1",
-      "triangles": 60,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_0_4_1RolledRim",
-      "triangles": 44,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_0_4_1RolledRim.001",
-      "triangles": 44,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_0_4_1RecessedLid",
-      "triangles": 44,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_0_4_1PullTab",
-      "triangles": 12,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkBottleRear_0_4",
-      "triangles": 116,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "BottleCap_0_4",
-      "triangles": 44,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_0_5_0",
-      "triangles": 60,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_0_5_0RolledRim",
-      "triangles": 44,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_0_5_0RolledRim.001",
-      "triangles": 44,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_0_5_0RecessedLid",
-      "triangles": 44,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_0_5_0PullTab",
-      "triangles": 12,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_0_5_1",
-      "triangles": 60,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_0_5_1RolledRim",
-      "triangles": 44,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_0_5_1RolledRim.001",
-      "triangles": 44,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_0_5_1RecessedLid",
-      "triangles": 44,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_0_5_1PullTab",
-      "triangles": 12,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkBottleRear_0_5",
-      "triangles": 116,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "BottleCap_0_5",
+      "name": "DrinkBottle_0_9_3",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
@@ -801,433 +803,361 @@
       "uv": true
     },
     {
-      "name": "DrinkCan_1_0_0",
-      "triangles": 60,
+      "name": "DrinkBottle_1_0_0",
+      "triangles": 92,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_1_0_0RolledRim",
+      "name": "DrinkBottle_1_0_0Cap",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_1_0_0PrintedLabel",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_1_0_1",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_1_0_0RolledRim.001",
+      "name": "DrinkBottle_1_0_2",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_1_0_0RecessedLid",
+      "name": "DrinkBottle_1_0_3",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_1_0_0PullTab",
-      "triangles": 12,
+      "name": "DrinkBottle_1_1_0",
+      "triangles": 92,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_1_0_1",
-      "triangles": 60,
+      "name": "DrinkBottle_1_1_0Cap",
+      "triangles": 28,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_1_0_1RolledRim",
+      "name": "DrinkBottle_1_1_0PrintedLabel",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_1_1_1",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_1_0_1RolledRim.001",
+      "name": "DrinkBottle_1_1_2",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_1_0_1RecessedLid",
+      "name": "DrinkBottle_1_1_3",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_1_0_1PullTab",
-      "triangles": 12,
+      "name": "DrinkBottle_1_2_0",
+      "triangles": 92,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkBottleRear_1_0",
-      "triangles": 116,
+      "name": "DrinkBottle_1_2_0Cap",
+      "triangles": 28,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "BottleCap_1_0",
+      "name": "DrinkBottle_1_2_0PrintedLabel",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_1_2_1",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_1_1_0",
-      "triangles": 60,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_1_1_0RolledRim",
+      "name": "DrinkBottle_1_2_2",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_1_1_0RolledRim.001",
+      "name": "DrinkBottle_1_2_3",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_1_1_0RecessedLid",
+      "name": "DrinkBottle_1_3_0",
+      "triangles": 92,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_1_3_0Cap",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_1_3_0PrintedLabel",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_1_3_1",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_1_1_0PullTab",
-      "triangles": 12,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_1_1_1",
-      "triangles": 60,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_1_1_1RolledRim",
+      "name": "DrinkBottle_1_3_2",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_1_1_1RolledRim.001",
+      "name": "DrinkBottle_1_3_3",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_1_1_1RecessedLid",
+      "name": "DrinkBottle_1_4_0",
+      "triangles": 92,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_1_4_0Cap",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_1_4_0PrintedLabel",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_1_4_1",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_1_1_1PullTab",
-      "triangles": 12,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkBottleRear_1_1",
-      "triangles": 116,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "BottleCap_1_1",
+      "name": "DrinkBottle_1_4_2",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_1_2_0",
-      "triangles": 60,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_1_2_0RolledRim",
+      "name": "DrinkBottle_1_4_3",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_1_2_0RolledRim.001",
+      "name": "DrinkBottle_1_5_0",
+      "triangles": 92,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_1_5_0Cap",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_1_5_0PrintedLabel",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_1_5_1",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_1_2_0RecessedLid",
+      "name": "DrinkBottle_1_5_2",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_1_2_0PullTab",
-      "triangles": 12,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_1_2_1",
-      "triangles": 60,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_1_2_1RolledRim",
+      "name": "DrinkBottle_1_5_3",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_1_2_1RolledRim.001",
+      "name": "DrinkBottle_1_6_0",
+      "triangles": 92,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_1_6_0Cap",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_1_6_0PrintedLabel",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_1_6_1",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_1_2_1RecessedLid",
+      "name": "DrinkBottle_1_6_2",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_1_2_1PullTab",
-      "triangles": 12,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkBottleRear_1_2",
-      "triangles": 116,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "BottleCap_1_2",
+      "name": "DrinkBottle_1_6_3",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_1_3_0",
-      "triangles": 60,
+      "name": "DrinkBottle_1_7_0",
+      "triangles": 92,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_1_3_0RolledRim",
+      "name": "DrinkBottle_1_7_0Cap",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_1_7_0PrintedLabel",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_1_7_1",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_1_3_0RolledRim.001",
+      "name": "DrinkBottle_1_7_2",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_1_3_0RecessedLid",
+      "name": "DrinkBottle_1_7_3",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_1_3_0PullTab",
-      "triangles": 12,
+      "name": "DrinkBottle_1_8_0",
+      "triangles": 92,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_1_3_1",
-      "triangles": 60,
+      "name": "DrinkBottle_1_8_0Cap",
+      "triangles": 28,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_1_3_1RolledRim",
+      "name": "DrinkBottle_1_8_0PrintedLabel",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_1_8_1",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_1_3_1RolledRim.001",
+      "name": "DrinkBottle_1_8_2",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_1_3_1RecessedLid",
+      "name": "DrinkBottle_1_8_3",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_1_3_1PullTab",
-      "triangles": 12,
+      "name": "DrinkBottle_1_9_0",
+      "triangles": 92,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkBottleRear_1_3",
-      "triangles": 116,
+      "name": "DrinkBottle_1_9_0Cap",
+      "triangles": 28,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "BottleCap_1_3",
+      "name": "DrinkBottle_1_9_0PrintedLabel",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_1_9_1",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_1_4_0",
-      "triangles": 60,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_1_4_0RolledRim",
+      "name": "DrinkBottle_1_9_2",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_1_4_0RolledRim.001",
-      "triangles": 44,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_1_4_0RecessedLid",
-      "triangles": 44,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_1_4_0PullTab",
-      "triangles": 12,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_1_4_1",
-      "triangles": 60,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_1_4_1RolledRim",
-      "triangles": 44,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_1_4_1RolledRim.001",
-      "triangles": 44,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_1_4_1RecessedLid",
-      "triangles": 44,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_1_4_1PullTab",
-      "triangles": 12,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkBottleRear_1_4",
-      "triangles": 116,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "BottleCap_1_4",
-      "triangles": 44,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_1_5_0",
-      "triangles": 60,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_1_5_0RolledRim",
-      "triangles": 44,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_1_5_0RolledRim.001",
-      "triangles": 44,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_1_5_0RecessedLid",
-      "triangles": 44,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_1_5_0PullTab",
-      "triangles": 12,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_1_5_1",
-      "triangles": 60,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_1_5_1RolledRim",
-      "triangles": 44,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_1_5_1RolledRim.001",
-      "triangles": 44,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_1_5_1RecessedLid",
-      "triangles": 44,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_1_5_1PullTab",
-      "triangles": 12,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkBottleRear_1_5",
-      "triangles": 116,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "BottleCap_1_5",
+      "name": "DrinkBottle_1_9_3",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
@@ -1359,433 +1289,361 @@
       "uv": true
     },
     {
-      "name": "DrinkCan_2_0_0",
-      "triangles": 60,
+      "name": "DrinkBottle_2_0_0",
+      "triangles": 92,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_2_0_0RolledRim",
+      "name": "DrinkBottle_2_0_0Cap",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_2_0_0PrintedLabel",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_2_0_1",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_2_0_0RolledRim.001",
+      "name": "DrinkBottle_2_0_2",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_2_0_0RecessedLid",
+      "name": "DrinkBottle_2_0_3",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_2_0_0PullTab",
-      "triangles": 12,
+      "name": "DrinkBottle_2_1_0",
+      "triangles": 92,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_2_0_1",
-      "triangles": 60,
+      "name": "DrinkBottle_2_1_0Cap",
+      "triangles": 28,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_2_0_1RolledRim",
+      "name": "DrinkBottle_2_1_0PrintedLabel",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_2_1_1",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_2_0_1RolledRim.001",
+      "name": "DrinkBottle_2_1_2",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_2_0_1RecessedLid",
+      "name": "DrinkBottle_2_1_3",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_2_0_1PullTab",
-      "triangles": 12,
+      "name": "DrinkBottle_2_2_0",
+      "triangles": 92,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkBottleRear_2_0",
-      "triangles": 116,
+      "name": "DrinkBottle_2_2_0Cap",
+      "triangles": 28,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "BottleCap_2_0",
+      "name": "DrinkBottle_2_2_0PrintedLabel",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_2_2_1",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_2_1_0",
-      "triangles": 60,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_2_1_0RolledRim",
+      "name": "DrinkBottle_2_2_2",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_2_1_0RolledRim.001",
+      "name": "DrinkBottle_2_2_3",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_2_1_0RecessedLid",
+      "name": "DrinkBottle_2_3_0",
+      "triangles": 92,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_2_3_0Cap",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_2_3_0PrintedLabel",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_2_3_1",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_2_1_0PullTab",
-      "triangles": 12,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_2_1_1",
-      "triangles": 60,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_2_1_1RolledRim",
+      "name": "DrinkBottle_2_3_2",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_2_1_1RolledRim.001",
+      "name": "DrinkBottle_2_3_3",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_2_1_1RecessedLid",
+      "name": "DrinkBottle_2_4_0",
+      "triangles": 92,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_2_4_0Cap",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_2_4_0PrintedLabel",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_2_4_1",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_2_1_1PullTab",
-      "triangles": 12,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkBottleRear_2_1",
-      "triangles": 116,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "BottleCap_2_1",
+      "name": "DrinkBottle_2_4_2",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_2_2_0",
-      "triangles": 60,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_2_2_0RolledRim",
+      "name": "DrinkBottle_2_4_3",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_2_2_0RolledRim.001",
+      "name": "DrinkBottle_2_5_0",
+      "triangles": 92,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_2_5_0Cap",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_2_5_0PrintedLabel",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_2_5_1",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_2_2_0RecessedLid",
+      "name": "DrinkBottle_2_5_2",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_2_2_0PullTab",
-      "triangles": 12,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_2_2_1",
-      "triangles": 60,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_2_2_1RolledRim",
+      "name": "DrinkBottle_2_5_3",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_2_2_1RolledRim.001",
+      "name": "DrinkBottle_2_6_0",
+      "triangles": 92,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_2_6_0Cap",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_2_6_0PrintedLabel",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_2_6_1",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_2_2_1RecessedLid",
+      "name": "DrinkBottle_2_6_2",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_2_2_1PullTab",
-      "triangles": 12,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkBottleRear_2_2",
-      "triangles": 116,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "BottleCap_2_2",
+      "name": "DrinkBottle_2_6_3",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_2_3_0",
-      "triangles": 60,
+      "name": "DrinkBottle_2_7_0",
+      "triangles": 92,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_2_3_0RolledRim",
+      "name": "DrinkBottle_2_7_0Cap",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_2_7_0PrintedLabel",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_2_7_1",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_2_3_0RolledRim.001",
+      "name": "DrinkBottle_2_7_2",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_2_3_0RecessedLid",
+      "name": "DrinkBottle_2_7_3",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_2_3_0PullTab",
-      "triangles": 12,
+      "name": "DrinkBottle_2_8_0",
+      "triangles": 92,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_2_3_1",
-      "triangles": 60,
+      "name": "DrinkBottle_2_8_0Cap",
+      "triangles": 28,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_2_3_1RolledRim",
+      "name": "DrinkBottle_2_8_0PrintedLabel",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_2_8_1",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_2_3_1RolledRim.001",
+      "name": "DrinkBottle_2_8_2",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_2_3_1RecessedLid",
+      "name": "DrinkBottle_2_8_3",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_2_3_1PullTab",
-      "triangles": 12,
+      "name": "DrinkBottle_2_9_0",
+      "triangles": 92,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkBottleRear_2_3",
-      "triangles": 116,
+      "name": "DrinkBottle_2_9_0Cap",
+      "triangles": 28,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "BottleCap_2_3",
+      "name": "DrinkBottle_2_9_0PrintedLabel",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_2_9_1",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_2_4_0",
-      "triangles": 60,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_2_4_0RolledRim",
+      "name": "DrinkBottle_2_9_2",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_2_4_0RolledRim.001",
-      "triangles": 44,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_2_4_0RecessedLid",
-      "triangles": 44,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_2_4_0PullTab",
-      "triangles": 12,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_2_4_1",
-      "triangles": 60,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_2_4_1RolledRim",
-      "triangles": 44,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_2_4_1RolledRim.001",
-      "triangles": 44,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_2_4_1RecessedLid",
-      "triangles": 44,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_2_4_1PullTab",
-      "triangles": 12,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkBottleRear_2_4",
-      "triangles": 116,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "BottleCap_2_4",
-      "triangles": 44,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_2_5_0",
-      "triangles": 60,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_2_5_0RolledRim",
-      "triangles": 44,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_2_5_0RolledRim.001",
-      "triangles": 44,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_2_5_0RecessedLid",
-      "triangles": 44,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_2_5_0PullTab",
-      "triangles": 12,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_2_5_1",
-      "triangles": 60,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_2_5_1RolledRim",
-      "triangles": 44,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_2_5_1RolledRim.001",
-      "triangles": 44,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_2_5_1RecessedLid",
-      "triangles": 44,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_2_5_1PullTab",
-      "triangles": 12,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkBottleRear_2_5",
-      "triangles": 116,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "BottleCap_2_5",
+      "name": "DrinkBottle_2_9_3",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
@@ -1917,433 +1775,847 @@
       "uv": true
     },
     {
-      "name": "DrinkCan_3_0_0",
-      "triangles": 60,
+      "name": "DrinkBottle_3_0_0",
+      "triangles": 92,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_3_0_0RolledRim",
+      "name": "DrinkBottle_3_0_0Cap",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_3_0_0PrintedLabel",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_3_0_1",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_3_0_0RolledRim.001",
+      "name": "DrinkBottle_3_0_2",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_3_0_0RecessedLid",
+      "name": "DrinkBottle_3_0_3",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_3_0_0PullTab",
+      "name": "DrinkBottle_3_1_0",
+      "triangles": 92,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_3_1_0Cap",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_3_1_0PrintedLabel",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_3_1_1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_3_1_2",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_3_1_3",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_3_2_0",
+      "triangles": 92,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_3_2_0Cap",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_3_2_0PrintedLabel",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_3_2_1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_3_2_2",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_3_2_3",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_3_3_0",
+      "triangles": 92,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_3_3_0Cap",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_3_3_0PrintedLabel",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_3_3_1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_3_3_2",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_3_3_3",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_3_4_0",
+      "triangles": 92,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_3_4_0Cap",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_3_4_0PrintedLabel",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_3_4_1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_3_4_2",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_3_4_3",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_3_5_0",
+      "triangles": 92,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_3_5_0Cap",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_3_5_0PrintedLabel",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_3_5_1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_3_5_2",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_3_5_3",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_3_6_0",
+      "triangles": 92,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_3_6_0Cap",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_3_6_0PrintedLabel",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_3_6_1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_3_6_2",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_3_6_3",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_3_7_0",
+      "triangles": 92,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_3_7_0Cap",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_3_7_0PrintedLabel",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_3_7_1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_3_7_2",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_3_7_3",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_3_8_0",
+      "triangles": 92,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_3_8_0Cap",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_3_8_0PrintedLabel",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_3_8_1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_3_8_2",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_3_8_3",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_3_9_0",
+      "triangles": 92,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_3_9_0Cap",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_3_9_0PrintedLabel",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_3_9_1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_3_9_2",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_3_9_3",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "WireShelfDeck_4_0",
       "triangles": 12,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_3_0_1",
-      "triangles": 60,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_3_0_1RolledRim",
-      "triangles": 44,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_3_0_1RolledRim.001",
-      "triangles": 44,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_3_0_1RecessedLid",
-      "triangles": 44,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_3_0_1PullTab",
+      "name": "WireShelfDeck_4_1",
       "triangles": 12,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkBottleRear_3_0",
-      "triangles": 116,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "BottleCap_3_0",
-      "triangles": 44,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_3_1_0",
-      "triangles": 60,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_3_1_0RolledRim",
-      "triangles": 44,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_3_1_0RolledRim.001",
-      "triangles": 44,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_3_1_0RecessedLid",
-      "triangles": 44,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_3_1_0PullTab",
+      "name": "WireShelfDeck_4_2",
       "triangles": 12,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_3_1_1",
-      "triangles": 60,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_3_1_1RolledRim",
-      "triangles": 44,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_3_1_1RolledRim.001",
-      "triangles": 44,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_3_1_1RecessedLid",
-      "triangles": 44,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_3_1_1PullTab",
+      "name": "WireShelfDeck_4_3",
       "triangles": 12,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkBottleRear_3_1",
-      "triangles": 116,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "BottleCap_3_1",
-      "triangles": 44,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_3_2_0",
-      "triangles": 60,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_3_2_0RolledRim",
-      "triangles": 44,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_3_2_0RolledRim.001",
-      "triangles": 44,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_3_2_0RecessedLid",
-      "triangles": 44,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_3_2_0PullTab",
+      "name": "WireShelfDeck_4_4",
       "triangles": 12,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_3_2_1",
-      "triangles": 60,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_3_2_1RolledRim",
-      "triangles": 44,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_3_2_1RolledRim.001",
-      "triangles": 44,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_3_2_1RecessedLid",
-      "triangles": 44,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_3_2_1PullTab",
+      "name": "WireShelfDeck_4_5",
       "triangles": 12,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkBottleRear_3_2",
-      "triangles": 116,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "BottleCap_3_2",
-      "triangles": 44,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_3_3_0",
-      "triangles": 60,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_3_3_0RolledRim",
-      "triangles": 44,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_3_3_0RolledRim.001",
-      "triangles": 44,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_3_3_0RecessedLid",
-      "triangles": 44,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_3_3_0PullTab",
+      "name": "WireShelfDeck_4_6",
       "triangles": 12,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_3_3_1",
-      "triangles": 60,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_3_3_1RolledRim",
-      "triangles": 44,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_3_3_1RolledRim.001",
-      "triangles": 44,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_3_3_1RecessedLid",
-      "triangles": 44,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_3_3_1PullTab",
+      "name": "WireShelfDeck_4_7",
       "triangles": 12,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkBottleRear_3_3",
-      "triangles": 116,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "BottleCap_3_3",
-      "triangles": 44,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_3_4_0",
-      "triangles": 60,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_3_4_0RolledRim",
-      "triangles": 44,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_3_4_0RolledRim.001",
-      "triangles": 44,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_3_4_0RecessedLid",
-      "triangles": 44,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_3_4_0PullTab",
+      "name": "WireShelfDeck_4_8",
       "triangles": 12,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_3_4_1",
-      "triangles": 60,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_3_4_1RolledRim",
-      "triangles": 44,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_3_4_1RolledRim.001",
-      "triangles": 44,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_3_4_1RecessedLid",
-      "triangles": 44,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_3_4_1PullTab",
+      "name": "WireShelfDeck_4_9",
       "triangles": 12,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkBottleRear_3_4",
-      "triangles": 116,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "BottleCap_3_4",
-      "triangles": 44,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_3_5_0",
-      "triangles": 60,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_3_5_0RolledRim",
-      "triangles": 44,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_3_5_0RolledRim.001",
-      "triangles": 44,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_3_5_0RecessedLid",
-      "triangles": 44,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_3_5_0PullTab",
+      "name": "WireShelfDeck_4_10",
       "triangles": 12,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkCan_3_5_1",
-      "triangles": 60,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_3_5_1RolledRim",
-      "triangles": 44,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_3_5_1RolledRim.001",
-      "triangles": 44,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_3_5_1RecessedLid",
-      "triangles": 44,
-      "nonmanifoldEdges": 0,
-      "uv": true
-    },
-    {
-      "name": "DrinkCan_3_5_1PullTab",
+      "name": "WireShelfDeck_4_11",
       "triangles": 12,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "DrinkBottleRear_3_5",
-      "triangles": 116,
+      "name": "WireShelfDeck_4_12",
+      "triangles": 12,
       "nonmanifoldEdges": 0,
       "uv": true
     },
     {
-      "name": "BottleCap_3_5",
+      "name": "WireShelfDeck_4_13",
+      "triangles": 12,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "WireShelfDeck_4_14",
+      "triangles": 12,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "WireShelfDeck_4_15",
+      "triangles": 12,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "WireShelfDeck_4_16",
+      "triangles": 12,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "WireShelfDeck_4_17",
+      "triangles": 12,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "WireShelfDeck_4_18",
+      "triangles": 12,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "WireShelfDeck_4_19",
+      "triangles": 12,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "WireShelfLip_4",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_4_0_0",
+      "triangles": 92,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_4_0_0Cap",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_4_0_0PrintedLabel",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_4_0_1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_4_0_2",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_4_0_3",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_4_1_0",
+      "triangles": 92,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_4_1_0Cap",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_4_1_0PrintedLabel",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_4_1_1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_4_1_2",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_4_1_3",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_4_2_0",
+      "triangles": 92,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_4_2_0Cap",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_4_2_0PrintedLabel",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_4_2_1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_4_2_2",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_4_2_3",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_4_3_0",
+      "triangles": 92,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_4_3_0Cap",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_4_3_0PrintedLabel",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_4_3_1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_4_3_2",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_4_3_3",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_4_4_0",
+      "triangles": 92,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_4_4_0Cap",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_4_4_0PrintedLabel",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_4_4_1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_4_4_2",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_4_4_3",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_4_5_0",
+      "triangles": 92,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_4_5_0Cap",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_4_5_0PrintedLabel",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_4_5_1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_4_5_2",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_4_5_3",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_4_6_0",
+      "triangles": 92,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_4_6_0Cap",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_4_6_0PrintedLabel",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_4_6_1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_4_6_2",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_4_6_3",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_4_7_0",
+      "triangles": 92,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_4_7_0Cap",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_4_7_0PrintedLabel",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_4_7_1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_4_7_2",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_4_7_3",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_4_8_0",
+      "triangles": 92,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_4_8_0Cap",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_4_8_0PrintedLabel",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_4_8_1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_4_8_2",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_4_8_3",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_4_9_0",
+      "triangles": 92,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_4_9_0Cap",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_4_9_0PrintedLabel",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_4_9_1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_4_9_2",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "DrinkBottle_4_9_3",
       "triangles": 44,
       "nonmanifoldEdges": 0,
       "uv": true
@@ -2447,16 +2719,16 @@
   ],
   "boundsBlender": {
     "min": [
-      -2.003999948501587,
+      -2.009999990463257,
       -1.2549999952316284,
       0.0
     ],
     "max": [
-      2.00600004196167,
-      1.149999976158142,
+      2.009999990463257,
+      1.1949999332427979,
       6.5
     ]
   },
-  "triangles": 16612,
-  "glbBytes": 1284452
+  "triangles": 17572,
+  "glbBytes": 428260
 }

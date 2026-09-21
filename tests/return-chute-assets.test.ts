@@ -33,7 +33,7 @@ test('interior chute: fitted bounds, textured roles, open throat and hinged clea
   scene.updateMatrixWorld(true);
   const b = new THREE.Box3().setFromObject(scene);
   assert.ok(b.min.distanceTo(new THREE.Vector3(-1.6, 0, -1.49)) < .001);
-  assert.ok(b.max.distanceTo(new THREE.Vector3(1.6, 3.85, .907)) < .001);
+  assert.ok(b.max.distanceTo(new THREE.Vector3(1.6, 3.85, .340333)) < .001);
   let triangles = 0; const roles = new Set<string>();
   scene.traverse(o => {
     if (!(o instanceof THREE.Mesh)) return;
@@ -48,15 +48,29 @@ test('interior chute: fitted bounds, textured roles, open throat and hinged clea
     const mouth = new THREE.Raycaster(new THREE.Vector3(x,2.55,1.1),new THREE.Vector3(0,0,-1));
     assert.equal(mouth.intersectObject(scene.getObjectByName('ChuteLaminate')!,true).length,0,'both shell apertures pass through');
   }
+  const face = new THREE.Raycaster(new THREE.Vector3(0,2.1,1),new THREE.Vector3(0,0,-1)).intersectObject(scene.getObjectByName('ChuteLaminate')!,true);
+  assert.ok(face.length && Math.abs(face[0].point.z-1/3)<.001,'front shell remains solid outside its two apertures');
   const roof = new THREE.Raycaster(new THREE.Vector3(0, 4.3, -.8), new THREE.Vector3(0, -1, 0), 0, 1).intersectObject(scene, true);
   assert.ok(roof.length > 0, 'continuous top covers the collection cavity');
   assert.ok(Math.abs(roof[0].point.y - 3.85) < .01);
   const rear = new THREE.Raycaster(new THREE.Vector3(.6, 2, -.8), new THREE.Vector3(0, 0, -1), 0, .8);
   assert.equal(rear.intersectObject(scene, true).length, 0, 'hollow receiver remains accessible from the rear');
   const flap = scene.getObjectByName('ChuteFlap')!;
-  assert.ok(flap.position.distanceTo(new THREE.Vector3(-.9, 2.665, .743)) < .0001);
+  assert.ok(flap.position.distanceTo(new THREE.Vector3(-.9, 2.665, .309333)) < .0001);
   flap.rotation.x += Math.PI / 2 - .24; scene.updateMatrixWorld(true);
   const hits = ray.intersectObject(scene, true);
   assert.ok(hits.length > 0);
   assert.ok(hits[0].point.z < .1, 'open flap reveals a deep receiver, not a solid cavity');
+});
+
+
+test('outside return ramp descends through the countertop into an enclosed cabinet', async () => {
+  const bytes = readFileSync(new URL('../public/models/exit-return-counter.glb', import.meta.url));
+  const { scene } = await new GLTFLoader().parseAsync(bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength),'');
+  scene.updateMatrixWorld(true);
+  const down = new THREE.Raycaster(new THREE.Vector3(5.6,3.9,-1.65),new THREE.Vector3(0,-1,0));
+  const hits = down.intersectObject(scene,true);
+  assert.ok(hits.length && hits[0].point.y<2.82 && hits[0].point.y>2.2,'ramp outlet reaches below the surrounding worktop');
+  const front = new THREE.Raycaster(new THREE.Vector3(5.6,1,-3),new THREE.Vector3(0,0,1));
+  assert.ok(front.intersectObject(scene,true).length,'cabinet below the opening remains enclosed');
 });

@@ -592,18 +592,19 @@ function originalCounterAnchoredPlacements(
   }
   // Shield pentagon, derived from counter.ts's points with the default
   // storefront (doorWidth 3.2 => counter back z 8.5): (4.8, 8.5) →
-  // (1.2, 4.9) → (11, -4.9) → (20.8, 4.9) → (17.2, 8.5). Segment ends are
+  // (.5, 4.2) → (11, -6.3) → (21.5, 4.2) → (17.2, 8.5). Segment ends are
   // trimmed 1.55 ft at shared corners so adjacent rects don't SAT-overlap each
   // other at the mitred joints, and the walk-through gap on the left shoulder
-  // (1.0 to 4.6 feet along the shoulder) is left open.
+  // (2.2 feet trimmed on each edge at the left corner) is left open.
   return [
     ...(() => {
-      const a={x:4.8,z:8.5}, b={x:1.2,z:4.9}, c={x:11,z:-4.9};
+      const a={x:4.8,z:8.5}, b={x:.5,z:4.2}, c={x:11,z:-6.3};
       const length=Math.hypot(b.x-a.x,b.z-a.z), tx=(b.x-a.x)/length, tz=(b.z-a.z)/length;
-      const at=(d:number)=>({x:a.x+tx*d,z:a.z+tz*d});
+      const shoulderEnd={x:b.x-tx*2.2,z:b.z-tz*2.2};
+      const frontStart={x:b.x+Math.SQRT1_2*2.2,z:b.z-Math.SQRT1_2*2.2};
       // Conservative rectangular cores avoid overlapping at mitred joins.
       // The built counter supplies the complete collision and clerk boundaries.
-      return [[a,at(1)],[at(4.6),b],[b,c]].map(([p,q],i)=>{
+      return [[a,shoulderEnd],[frontStart,c]].map(([p,q],i)=>{
         const len=Math.hypot(q.x-p.x,q.z-p.z), nx=-(q.z-p.z)/len,nz=(q.x-p.x)/len;
         return {id:`counter-band-doorway-left-${i}`,kind:'structure-footprint',
           position:{x:(p.x+q.x)/2+nx*.75,z:(p.z+q.z)/2+nz*.75},
@@ -613,16 +614,16 @@ function originalCounterAnchoredPlacements(
     {
       id: 'counter-band-front-right',
       kind: 'structure-footprint',
-      position: { x: 15.9 - .75*Math.SQRT1_2, z: .75*Math.SQRT1_2 },
+      position: { x: 16.25 - .75*Math.SQRT1_2, z: -1.05 + .75*Math.SQRT1_2 },
       yaw: -Math.PI/4,
-      options: { footprintWidth: 9.8*Math.SQRT2-3.1, footprintDepth: 1.5 }
+      options: { footprintWidth: 10.5*Math.SQRT2-3.1, footprintDepth: 1.5 }
     },
     {
       id: 'counter-band-shoulder-right',
       kind: 'structure-footprint',
-      position: { x: 19 - .75*Math.SQRT1_2, z: 6.7 - .75*Math.SQRT1_2 },
+      position: { x: 19.35 - .75*Math.SQRT1_2, z: 6.35 - .75*Math.SQRT1_2 },
       yaw: -3*Math.PI/4,
-      options: { footprintWidth: 3.6*Math.SQRT2-3.1, footprintDepth: 1.5 }
+      options: { footprintWidth: 4.3*Math.SQRT2-3.1, footprintDepth: 1.5 }
     },
     {
       id: 'counter-band-back',
@@ -638,7 +639,7 @@ function originalCounterAnchoredPlacements(
     {
       id: 'tape-rewinder-counter',
       kind: 'tape-rewinder',
-      position: { x: 13.9, z: -4.9 + 1.5*Math.SQRT2 + 2.9 + .8*Math.SQRT2 },
+      position: { x: 13.9, z: -6.3 + 1.5*Math.SQRT2 + 2.9 + .8*Math.SQRT2 },
       yaw: -Math.PI/4
     },
     // Head-cleaner merchandise remains dormant.
@@ -651,7 +652,7 @@ function originalCounterAnchoredPlacements(
     {
       id: 'tip-jar-counter',
       kind: 'tip-jar',
-      position: { x: 11 + (3.4-.75)*Math.SQRT1_2, z: -4.9 + (3.4+.75)*Math.SQRT1_2 },
+      position: { x: 11 + (3.4-.75)*Math.SQRT1_2, z: -6.3 + (3.4+.75)*Math.SQRT1_2 },
       yaw: 3*Math.PI/4,
     },
   ];
@@ -660,8 +661,8 @@ function originalCounterAnchoredPlacements(
 export function gameSectionPlacements(storeWidth: number): FixturePlacement[] {
   if (storeWidth >= 50) {
     const rows = [
-      { z: 0.96, yaw: -Math.PI / 2 },  // field-side row, stocked face north
-      { z: 7.92, yaw: Math.PI / 2 },   // glass-side row, stocked face south
+      { z: 0.96, yaw: -Math.PI / 2 },  // freestanding field-side row, both faces stocked
+      { z: 7.92, yaw: Math.PI / 2 },   // freestanding glass-side row, both faces stocked
     ];
     // Each 12-col unit's shelf length is (12 - 1) * BOX_SPACING + 1.0 = 7.38 ft.
     const unitLength = (12 - 1) * BOX_SPACING + 1.0;
@@ -693,7 +694,7 @@ export function gameSectionPlacements(storeWidth: number): FixturePlacement[] {
           yaw: row.yaw,
           options: {
             genre: 'Video Games', relativeToLeftWall: true,
-            units: 4, unit, faces: 'front',
+            units: 4, unit, faces: 'both',
             hasFrontCap, hasBackCap,
           }
         });

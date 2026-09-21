@@ -42,7 +42,7 @@ import {
 // Chute body (feet, LOCAL axes — slot face toward +Z, width along X).
 const CHUTE_W = 3.2;
 const CHUTE_H = 3.85;   // just proud of the band top (3.4 + 0.14 cap)
-const CHUTE_D = 0.9;    // protrusion past the band face into the store
+const CHUTE_D = 1 / 3;  // pin 210: only four inches proud of the band face
 // How far the body runs BACK from the band face. Mirrors counter.ts's bandD
 // (the same layout-agnostic mirroring entrance/index.ts does for BAND_H), so
 // the chute's rear wall lands flush with the inside face of the blue band
