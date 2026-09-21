@@ -17,6 +17,10 @@ The companion listens only on loopback. Every Halcyon origin receives a unique
 random pairing token after explicit approval. Steam cookies and access tokens
 never enter the browser, the Halcyon server, or a Docker container.
 
+Browser deployments must be opened through HTTPS or as localhost on the
+gaming computer. Browsers disable the required cryptography on plain HTTP LAN
+pages, and Halcyon will refuse Steam rather than downgrade the pairing security.
+
 Run `./uninstall.sh` from the extracted archive to remove the service and
 binary. Disabling Steam inside Halcyon removes that store's pairing and stock
 without uninstalling the companion, because another Halcyon deployment may

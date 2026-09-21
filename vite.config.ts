@@ -583,6 +583,7 @@ export default defineConfig(async () => ({
         harness: path.join(import.meta.dirname, "harness.html"),
         assetviewer: path.join(import.meta.dirname, "asset-viewer.html"),
         remote: path.join(import.meta.dirname, "remote.html"),
+        companionapprove: path.join(import.meta.dirname, "companion-approve.html"),
       }).filter(([, f]) => fs.existsSync(f))),
     },
   },

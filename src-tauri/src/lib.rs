@@ -477,10 +477,8 @@ pub fn run() {
         .manage(steam_companion::CompanionState::default())
         .setup(|app| {
             let companion_only = std::env::var_os("HALCYON_STEAM_COMPANION").is_some();
-            if let Err(error) = steam_companion::start(app.handle()) {
-                if companion_only { return Err(error.into()); }
-            }
             if companion_only {
+                steam_companion::start(app.handle())?;
                 if let Some(main) = app.get_webview_window("main") { let _ = main.hide(); }
             }
             #[cfg(debug_assertions)]
@@ -509,7 +507,10 @@ pub fn run() {
             steam::steam_disconnect,
             steam::steam_library,
             steam::steam_reviews,
-            steam::steam_launch
+            steam::steam_launch,
+            steam_companion::steam_companion_pending,
+            steam_companion::steam_companion_approve,
+            steam_companion::steam_companion_deny
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

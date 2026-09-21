@@ -54,6 +54,7 @@ pub(crate) fn companion_connect(app: &AppHandle) -> Result<(), String> { auth_wi
 #[tauri::command]
 pub async fn steam_disconnect(app: AppHandle, window: WebviewWindow) -> Result<(), String> {
     main_only(&window)?;
+    crate::steam_companion::revoke_all(&app)?;
     companion_disconnect(&app)
 }
 pub(crate) fn companion_disconnect(app: &AppHandle) -> Result<(), String> {

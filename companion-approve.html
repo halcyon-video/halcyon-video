@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'">
+  <title>Pair Halcyon Steam Companion</title>
+  <link rel="stylesheet" href="/src/companion-approve.css">
+</head>
+<body>
+  <main>
+    <h1>Allow this Halcyon store?</h1>
+    <p id="origin">Checking the request…</p>
+    <p>It may read your Steam library and launch games you choose.</p>
+    <div><button id="allow" disabled>Allow</button><button id="deny">Deny</button></div>
+    <p id="error" role="alert"></p>
+  </main>
+  <script type="module" src="/src/companion-approve.ts"></script>
+</body>
+</html>

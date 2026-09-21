@@ -1,6 +1,6 @@
 [package]
 name = "tauri-app"
-version = "0.21.1"
+version = "0.21.2"
 description = "Halcyon Video — a 3D video store for your media server"
 authors = ["Halcyon Video"]
 edition = "2021"
@@ -24,7 +24,13 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 reqwest = { version = "0.12", default-features = false, features = ["blocking", "rustls-tls"] }
 url = "2"
-tiny_http = "0.12"
+bytes = "1"
+http-body-util = "0.1"
+hyper = { version = "1", features = ["http1", "server"] }
+hyper-util = { version = "0.1", features = ["tokio", "server", "http1"] }
+hmac = "0.12"
+sha2 = "0.10"
+tokio = { version = "1", features = ["rt-multi-thread", "net", "time", "sync"] }
 
 # Not used by our code: it's here to force a vendored (statically linked) dbus
 # into the Linux bundle. The crate's build script hard-errors with "Unsupported

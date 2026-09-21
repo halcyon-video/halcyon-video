@@ -1,6 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { withExternalGame, isExternalGameActive, onExternalGameChange } from './external-game-state.ts';
 import type { Movie } from './providers/media-source-provider';
+import { companionInvoke } from './providers/steam-provider.ts';
 
 export async function playSteamGame(movie: Movie, report: (message: string) => void): Promise<void> {
   const native = !!(window as any).__TAURI_INTERNALS__;
@@ -13,11 +14,7 @@ export async function playSteamGame(movie: Movie, report: (message: string) => v
   try {
     await withExternalGame(async () => {
       if (native) return invoke<void>('steam_launch', { appId: movie.steamAppId });
-      const token = localStorage.getItem('halcyon_steam_companion_pair');
-      if (!token) throw 'Pair the Halcyon Steam Companion before launching a game.';
-      const response = await fetch('http://127.0.0.1:1421/v1/launch', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ appId: movie.steamAppId }) });
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok) throw (typeof payload.error === 'string' ? payload.error : 'Steam companion could not launch the game.');
+      return companionInvoke<void>('launch', { appId: movie.steamAppId });
     });
     report('The Steam game has closed. Welcome back.');
   } catch (error) {

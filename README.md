@@ -238,6 +238,8 @@ Halcyon Steam Companion installed on the computer that will run the games.
 The container never receives Steam credentials, display access, or host process
 permissions. Download the companion archive from the matching release and see
 `STEAM-COMPANION.md` inside it. Each Halcyon address requires explicit approval.
+For browser cryptography, open Halcyon through HTTPS or as localhost on the
+gaming computer; plain HTTP addresses on another LAN host cannot enable Steam.
 
 ### Prefill Jellyfin for visitors (Docker)
 

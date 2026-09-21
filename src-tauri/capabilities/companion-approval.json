@@ -1,0 +1,11 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "steam-companion-approval",
+  "description": "Minimal lifecycle permissions for the native Steam pairing approval window",
+  "windows": ["steam-companion-approval"],
+  "permissions": [
+    "core:event:default",
+    "core:window:default",
+    "core:window:allow-destroy"
+  ]
+}

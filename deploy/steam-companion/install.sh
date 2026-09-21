@@ -12,6 +12,7 @@ After=graphical-session.target
 [Service]
 Environment=HALCYON_STEAM_COMPANION=1
 Environment=APPIMAGE_EXTRACT_AND_RUN=1
+Environment=WEBKIT_DISABLE_DMABUF_RENDERER=1
 PassEnvironment=DISPLAY WAYLAND_DISPLAY XAUTHORITY DBUS_SESSION_BUS_ADDRESS XDG_RUNTIME_DIR
 ExecStart=$root/halcyon-steam-companion
 Restart=on-failure

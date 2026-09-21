@@ -23,3 +23,13 @@ jobs:
         env:
           PUPPETEER_SKIP_DOWNLOAD: "1"
       - run: npm run check
+  native-security:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Tauri system libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf
+      - name: Test native Steam boundary
+        run: cargo test --manifest-path src-tauri/Cargo.toml
