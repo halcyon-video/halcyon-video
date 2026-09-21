@@ -37,7 +37,10 @@ env:
   IMAGE: ghcr.io/${{ github.repository }}
 
 jobs:
+  check:
+    uses: ./.github/workflows/check.yml
   build:
+    needs: check
     name: build ${{ matrix.platform }}
     runs-on: ${{ matrix.runner }}
     strategy:

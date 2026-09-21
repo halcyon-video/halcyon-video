@@ -3,17 +3,23 @@
 // Seerr's configured Jellyfin validates it; Seerr still enforces the linked
 // user's request permissions, quotas and approval policy via X-Api-User.
 export class SeerrIdentityError extends Error {
-  constructor(status, message) { super(message); this.status = status; }
+  constructor(status, message, code, upstreamStatus) {
+    super(message); this.status = status; this.code = code; this.upstreamStatus = upstreamStatus;
+  }
 }
 const guid = value => typeof value === 'string' && /^(?:[a-f0-9]{32}|[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12})$/i.test(value)
   ? value.replaceAll('-', '').toLowerCase() : null;
 
-async function privateJson(fetchImpl, url, headers, signal) {
+async function privateJson(fetchImpl, url, headers, signal, stage) {
   const response = await fetchImpl(url, { headers, redirect: 'manual', signal });
   if (!response.ok || response.status >= 300) {
     await response.body?.cancel();
-    throw new SeerrIdentityError(response.status === 401 || response.status === 403 ? 401 : 502,
-      'Unable to verify your request account. Sign in to Jellyfin again and retry.');
+    const expired = stage === 'jellyfin-session' && [401, 403].includes(response.status);
+    const message = expired ? 'Your Jellyfin session could not be verified. Sign in to Jellyfin again and retry.'
+      : stage === 'jellyfin-session' ? 'The host could not reach Jellyfin to verify your request account. Ask the host to check its Jellyfin connection.'
+      : stage === 'seerr-settings' ? 'The host could not read the request service connection settings. Ask the host to check its Seerr connection and API key.'
+      : 'The host could not look up your linked request account. Ask the host to check its Seerr connection and API key.';
+    throw new SeerrIdentityError(expired ? 401 : 502, message, stage, response.status);
   }
   const chunks = [];
   let size = 0;
@@ -26,12 +32,12 @@ async function privateJson(fetchImpl, url, headers, signal) {
 }
 
 export async function seerrUserHeaders(service, token, fetchImpl, signal) {
-  if (typeof token !== 'string' || !token || token.length > 4096 || /[^\x21-\x7e]/.test(token)) {
+  if (typeof token !== 'string' || !token || token.length > 4096 || /[^\x21-\x7e]|["\\]/.test(token)) {
     throw new SeerrIdentityError(401, 'Sign in to Jellyfin before requesting a movie.');
   }
   const seerrHeaders = { accept: 'application/json', 'x-api-key': service.apiKey };
-  const getSeerr = path => privateJson(fetchImpl, service.url + path, seerrHeaders, signal);
-  const settings = await getSeerr('/api/v1/settings/jellyfin');
+  const getSeerr = (path, stage) => privateJson(fetchImpl, service.url + path, seerrHeaders, signal, stage);
+  const settings = await getSeerr('/api/v1/settings/jellyfin', 'seerr-settings');
   const serverId = guid(settings.serverId);
   const port = Number.isInteger(settings.port) ? settings.port
     : (typeof settings.port === 'string' && /^\d+$/.test(settings.port) ? Number(settings.port) : null);
@@ -47,8 +53,11 @@ export async function seerrUserHeaders(service, token, fetchImpl, signal) {
   }
   const host = settings.ip.includes(':') && !settings.ip.startsWith('[') ? `[${settings.ip}]` : settings.ip;
   const jellyfin = new URL(`${settings.useSsl ? 'https' : 'http'}://${host}:${port}${basePath.replace(/\/+$/, '')}/Users/Me`);
+  // Same canonical protocol as the Jellyfin provider. X-Emby-Token is ignored
+  // when Jellyfin disables legacy authorization. Token-only identity preserves
+  // the existing session's device metadata instead of renaming it as a proxy.
   const me = await privateJson(fetchImpl, jellyfin.href,
-    { accept: 'application/json', 'x-emby-token': token }, signal);
+    { accept: 'application/json', authorization: `MediaBrowser Token="${token}"` }, signal, 'jellyfin-session');
   const userId = guid(me.Id);
   if (!userId || guid(me.ServerId) !== serverId || me.Policy?.IsDisabled) {
     throw new SeerrIdentityError(403, 'Your Jellyfin account does not match the request service.');
@@ -56,7 +65,7 @@ export async function seerrUserHeaders(service, token, fetchImpl, signal) {
   // Pagination also supports Jellyseerr versions without /user/jellyfin/:id.
   // Do not match display names, email addresses, or a browser-provided id.
   for (let skip = 0; skip < 10000; skip += 100) {
-    const page = await getSeerr(`/api/v1/user?take=100&skip=${skip}`);
+    const page = await getSeerr(`/api/v1/user?take=100&skip=${skip}`, 'seerr-users');
     if (!Array.isArray(page.results)) throw new SeerrIdentityError(502, 'Unable to look up your request account.');
     const user = page.results.find(user => guid(user.jellyfinUserId) === userId);
     if (user) {

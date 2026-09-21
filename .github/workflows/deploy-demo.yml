@@ -43,6 +43,9 @@ jobs:
         env:
           PUPPETEER_SKIP_DOWNLOAD: "1"
 
+      # Auth and upgrade regressions must pass before any deployment.
+      - run: npm test
+
       # Project Pages are served under /<repo>/, so the build needs that base.
       # VITE_DEMO=1 bakes demo mode into the app shell served at the site root
       # (harness.html still ships alongside it for visual verification).

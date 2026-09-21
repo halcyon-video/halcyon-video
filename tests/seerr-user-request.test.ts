@@ -28,7 +28,8 @@ const middleware = createIntegrationProxy({ jellyseerr: service }, { env: {}, fe
   if (url.endsWith('/Users/Me')) {
     assert.equal(url, 'http://jellyfin.internal:8096/jellyfin/Users/Me');
     assert.equal(options.headers['x-api-key'], undefined);
-    assert.equal(options.headers['x-emby-token'], mode === 'invalid' ? 'invalid' : token);
+    assert.equal(options.headers.authorization, `MediaBrowser Token="${mode === 'invalid' ? 'invalid' : token}"`);
+    assert.equal(options.headers['x-emby-token'], undefined);
     if (mode === 'invalid') return reply({ secret: key }, 401);
     return reply({ Id: id, ServerId: mode === 'wrong-server' ? id : serverId, Policy: { IsDisabled: mode === 'disabled' } });
   }

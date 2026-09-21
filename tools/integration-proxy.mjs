@@ -114,7 +114,9 @@ export function createIntegrationProxy(config, { fetchImpl = fetch, env = proces
       if (!contentType.includes('json')) return json(res, 502, { error: 'Invalid integration response' });
       return json(res, r.status, publicCatalog(JSON.parse(bytes.toString())));
     } catch (error) {
-      if (error instanceof SeerrIdentityError) return json(res, error.status, { error: error.message });
+      if (error instanceof SeerrIdentityError) return json(res, error.status, {
+        error: error.message, ...(error.code ? { code: error.code, upstreamStatus: error.upstreamStatus } : {}),
+      });
       // Upstream URLs, bodies and exception messages can contain credentials.
       return json(res, 502, { error: 'Integration unavailable' });
     } finally { active--; }
