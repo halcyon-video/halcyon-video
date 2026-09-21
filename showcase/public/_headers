@@ -1,0 +1,7 @@
+/*
+  X-Robots-Tag: noindex, nofollow
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Cache-Control: public, max-age=0, must-revalidate
+/data/*/*
+  Cache-Control: public, max-age=31536000, immutable

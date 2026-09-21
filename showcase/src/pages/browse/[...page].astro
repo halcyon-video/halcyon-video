@@ -1,0 +1,8 @@
+---
+import Page from '../../layouts/Page.astro';
+import Titles from '../../components/Titles.astro';
+import { pages } from '../../catalog/load';
+export function getStaticPaths() { return pages.map((page, index) => ({ params: { page: index ? String(index + 1) : undefined }, props: { page, total: pages.length } })); }
+const { page, total } = Astro.props;
+---
+<Page title="Browse"><h1>Browse the selection.</h1><p class="lead">Movies and series in one place. This preview contains fictional sample titles.</p><Titles titles={page.titles} /><nav aria-label="Catalog pages">{page.page > 1 && <a href={page.page === 2 ? '/browse/' : `/browse/${page.page - 1}/`}>Previous page</a>}<span>Page {page.page} of {total}</span>{page.page < total && <a href={`/browse/${page.page + 1}/`}>Next page</a>}</nav></Page>
