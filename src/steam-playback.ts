@@ -3,9 +3,10 @@ import { withExternalGame, isExternalGameActive, onExternalGameChange } from './
 import type { Movie } from './providers/media-source-provider';
 
 export async function playSteamGame(movie: Movie, report: (message: string) => void): Promise<void> {
-  const native = !!(window as any).__TAURI_INTERNALS__;
-  const localBrowser = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
-  if (!native && !localBrowser) { report('Steam games launch only on the Halcyon computer.'); return; }
+  if (!(window as any).__TAURI_INTERNALS__) {
+    report('Steam games launch from the installed Halcyon app.');
+    return;
+  }
   report(`Starting ${movie.title} in Steam. Halcyon will sleep until the game closes.`);
   const notice = document.createElement('div');
   notice.setAttribute('role', 'status');
@@ -13,12 +14,7 @@ export async function playSteamGame(movie: Movie, report: (message: string) => v
   notice.textContent = 'Steam is starting your game. Halcyon is sleeping and will return when the game closes.';
   document.body.append(notice);
   try {
-    await withExternalGame(async () => {
-      if (native) return invoke<void>('steam_launch', { appId: movie.steamAppId });
-      const response = await fetch('/__halcyon/steam/launch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ appId: movie.steamAppId }) });
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok) throw (typeof payload.error === 'string' ? payload.error : 'Steam could not launch the game.');
-    });
+    await withExternalGame(() => invoke<void>('steam_launch', { appId: movie.steamAppId }));
     report('The Steam game has closed. Welcome back.');
   } catch (error) {
     const message = typeof error === 'string' ? error : 'Steam could not launch the game.';
