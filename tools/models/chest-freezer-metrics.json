@@ -1,0 +1,260 @@
+{
+  "units": "feet",
+  "origin": "floor-centred; X across, Y in-depth, Z up (Blender)",
+  "parts": [
+    {
+      "name": "FreezerBaseKick",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "FreezerLowerBody",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "FreezerBumperRail",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "FreezerUpperBody",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "TopFrameRear",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "TopFrameFront",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "TopFrameLeft",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "TopFrameRight",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "LeftSlidingLidGlass",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "LeftLidHandle",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "RightSlidingLidGlass",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "RightLidHandle",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "BasketRim_0",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "BasketFloor_0",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "IceCreamPint_0_0_0",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "IceCreamPint_0_0_1",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "IceCreamPint_0_0_2",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "IceCreamPint_0_1_0",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "IceCreamPint_0_1_1",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "IceCreamPint_0_1_2",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "IceCreamPint_0_2_0",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "IceCreamPint_0_2_1",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "IceCreamPint_0_2_2",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "NoveltyPack_0_0",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "NoveltyPack_0_1",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "NoveltyPack_0_2",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "BasketRim_1",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "BasketFloor_1",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "IceCreamPint_1_0_0",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "IceCreamPint_1_0_1",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "IceCreamPint_1_0_2",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "IceCreamPint_1_1_0",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "IceCreamPint_1_1_1",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "IceCreamPint_1_1_2",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "IceCreamPint_1_2_0",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "IceCreamPint_1_2_1",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "IceCreamPint_1_2_2",
+      "triangles": 164,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "NoveltyPack_1_0",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "NoveltyPack_1_1",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "NoveltyPack_1_2",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    }
+  ],
+  "boundsBlender": {
+    "min": [
+      -1.9199999570846558,
+      -1.1200000047683716,
+      0.0
+    ],
+    "max": [
+      1.9199999570846558,
+      1.1200000047683716,
+      2.799999952316284
+    ]
+  },
+  "triangles": 5328,
+  "glbBytes": 410336
+}

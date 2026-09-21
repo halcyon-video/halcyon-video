@@ -41,6 +41,9 @@ export interface FixtureContext {
   requestShadowRefresh: () => void;
   // Request a frame render.
   requestRender: () => void;
+  // Optional detail models can wait until this scene is interactive. The return
+  // value cancels a queued request when its owning fixture is disposed.
+  scheduleDetailLoad?: (start: () => Promise<void>) => () => void;
   // Active store shelving theme.
   activeTheme: StoreTheme;
   // Gondola materials for theme-aware shelving.

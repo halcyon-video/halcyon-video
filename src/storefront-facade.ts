@@ -202,7 +202,13 @@ export function buildStorefrontFacade(params: FacadeBuildParams): StorefrontFaca
   // nothing may protrude at the corner).
   const frontBandBot = WINDOW_HEAD_Y - 0.1;
   for (const { lo, hi } of params.windowMasonryGaps) {
-    const pier = brickBox(hi-lo, frontBandBot, .7, CX-(lo+hi)/2, frontBandBot/2, FRONT_Z+.4);
+    // The interior window builder owns a 0.3-ft solid wall from z=15.0 to
+    // 15.3.  The old full-depth exterior box ran from 15.05 to 15.75, so the
+    // two walls interpenetrated by 0.25 ft and fought with the frame while the
+    // camera moved past it.  This is the brick veneer it actually needs to be:
+    // butt its inner face against that wall at 15.3 and retain the facade's
+    // existing outer face at 15.75.
+    const pier = brickBox(hi-lo, frontBandBot, .45, CX-(lo+hi)/2, frontBandBot/2, FRONT_Z+.525);
     pier.name = 'frontWindowMasonryExterior';
   }
   brickBox(storeWidth + 1.5, parapetTop - frontBandBot, 0.7, CX, (frontBandBot + parapetTop) / 2, FRONT_Z + 0.4);

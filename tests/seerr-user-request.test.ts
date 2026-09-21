@@ -21,7 +21,8 @@ const middleware = createIntegrationProxy({ jellyseerr: service }, { env: {}, fe
   if (url.endsWith('/settings/jellyfin')) {
     assert.equal(options.headers['x-api-key'], key);
     assert.equal(options.headers['x-emby-token'], undefined);
-    return reply({ ip: mode === 'bad-host' ? 'host@attacker.test' : 'jellyfin.internal', port: 8096,
+    return reply({ ip: mode === 'bad-host' ? 'host@attacker.test' : 'jellyfin.internal',
+      port: mode === 'string-port' ? '8096' : 8096,
       urlBase: '/jellyfin', useSsl: false, serverId, apiKey: 'do-not-use-admin-jellyfin-key' });
   }
   if (url.endsWith('/Users/Me')) {
@@ -59,6 +60,11 @@ async function request(headers: Record<string, string> = {}, body = { mediaType:
 test('signed-in Jellyfin users request as their own linked Seerr user', async () => {
   const r = await request({ 'x-api-user': '1', 'x-jellyfin-user-id': serverId },
     { mediaType: 'movie', mediaId: 431693, userId: 1, isAutoRequest: true, serverId: 99 } as any);
+  assert.equal(r.status, 201); assert.deepEqual(await r.json(), { ok: true });
+  assert.equal(calls.length, 4);
+});
+test('string-encoded port from Jellyseerr settings succeeds', async () => {
+  mode = 'string-port'; const r = await request();
   assert.equal(r.status, 201); assert.deepEqual(await r.json(), { ok: true });
   assert.equal(calls.length, 4);
 });

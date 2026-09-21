@@ -1,3 +1,4 @@
+import { isExternalGameActive } from './external-game-state.ts';
 import { publishAmbientPicture, ambientReceiverInFrustum } from './ambient-screen';
 import { selfLit } from './material-lighting';
 // Ceiling-hung CRT TVs playing an ambient movie streamed from the store's media
@@ -619,6 +620,7 @@ export class AmbientTvs implements StoreFixture {
     this.clearStreamWatchdog();
     this.streamWatchdog = setTimeout(() => {
       this.streamWatchdog = null;
+      if (isExternalGameActive()) return;
       const video = this.video;
       if (video && video.readyState >= 2) return; // a picture arrived; nothing to do
       this.giveUpOnStream(`transcode watchdog timeout after ${Math.round(STREAM_WATCHDOG_MS / 1000)}s`);
@@ -662,6 +664,7 @@ export class AmbientTvs implements StoreFixture {
     const startTime = video.currentTime;
     this.livenessWatchdog = setTimeout(() => {
       this.livenessWatchdog = null;
+      if (isExternalGameActive()) return;
       if (this.disposed || this.pictureSource === 'dead') return;
       if (sawFrame || video.currentTime - startTime > 0.05) return; // a real frame landed
       this.onDecoderFault(`no frame decoded ${Math.round(DECODE_LIVENESS_MS / 1000)}s after data claimed ready`);
@@ -1283,7 +1286,7 @@ export class AmbientTvs implements StoreFixture {
     try {
       const audioCtx = new AudioContext();
       this.audioCtx = audioCtx;
-      audioCtx.resume().catch(() => {});
+      if (!isExternalGameActive()) audioCtx.resume().catch(() => {});
 
       const source = audioCtx.createMediaElementSource(video);
       const gain   = audioCtx.createGain();
@@ -1321,7 +1324,7 @@ export class AmbientTvs implements StoreFixture {
       window.removeEventListener('pointerdown', unlock, true);
       window.removeEventListener('keydown', unlock, true);
       this.gestureUnlock = null;
-      this.audioCtx?.resume().catch(() => {});
+      if (!isExternalGameActive()) this.audioCtx?.resume().catch(() => {});
       if (this.video) {
         this.video.muted = false;
         if (this.video.paused) this.video.play().catch(() => {});
@@ -1447,7 +1450,7 @@ export class AmbientTvs implements StoreFixture {
     try {
       const audioCtx = new AudioContext();
       this.audioCtx = audioCtx;
-      audioCtx.resume().catch(() => {});
+      if (!isExternalGameActive()) audioCtx.resume().catch(() => {});
       const source = audioCtx.createMediaElementSource(video);
       const gain = audioCtx.createGain();
       gain.gain.value = 0.35;
@@ -1477,7 +1480,7 @@ export class AmbientTvs implements StoreFixture {
       window.removeEventListener('pointerdown', unlock, true);
       window.removeEventListener('keydown', unlock, true);
       this.gestureUnlock = null;
-      this.audioCtx?.resume().catch(() => {});
+      if (!isExternalGameActive()) this.audioCtx?.resume().catch(() => {});
       if (this.video) {
         this.video.muted = false;
         if (this.video.paused) this.video.play().catch(() => {});
@@ -1740,6 +1743,7 @@ export class AmbientTvs implements StoreFixture {
   }
 
   pause(): void {
+    if (isExternalGameActive()) { this.hls?.stopLoad(); this.clearStreamWatchdog(); this.clearLivenessWatchdog(); }
     this.video?.pause();
     // Screensaver/occlusion idle path: this AudioContext isn't reached by
     // retailAudio's suspendForIdle (that's a separate context), so without
@@ -1752,6 +1756,8 @@ export class AmbientTvs implements StoreFixture {
   }
 
   resume(): void {
+    if (isExternalGameActive()) return;
+    this.hls?.startLoad();
     this.video?.play().catch(() => {});
     if (this.audioCtx && this.audioCtx.state === 'suspended') {
       this.audioCtx.resume().catch(() => {});

@@ -1,5 +1,8 @@
+import { isExternalGameActive } from './external-game-state.ts';
+import { capturePinPng } from './feedback-image';
 import { compileProgramsInStages, yieldForPrograms } from './program-warmup';
 import * as programWarmup from './store-program-warmup';
+import { DeferredModelLoads } from './deferred-model-loads';
 import { ABOVE_R_LIBRARY_ID, partitionAboveRRoom } from './above-r-room';
 import { createNrBayWash } from './nr-bay-wash';
 import { STORE_CENTER_X, FRONT_GLASS_Z } from './store-layout';
@@ -48,7 +51,7 @@ import { BokehPass } from 'three/examples/jsm/postprocessing/BokehPass.js';
 import { Reflector } from 'three/examples/jsm/objects/Reflector.js';
 import * as mirrors from './store-mirrors';
 import { BeautyPass, PartialComposite } from './partial-composite';
-import { FixtureContext, SlottedFixture } from './fixtures';
+import { FixtureContext, SlottedFixture, StoreFixture } from './fixtures';
 import { disposeRooftopHVAC } from './rooftop-hvac';
 import { setWindowAwningLighting, disposeWindowAwnings } from './storefront-awning';
 import { setFacadeEntryLighting, disposeFacadeEntry } from './storefront-entry-model';
@@ -222,14 +225,9 @@ export class StoreScene {
   // default N8AO engine plugs in an adapter that maps `enabled` to a pass
   // swap (N8AOPass replaces RenderPass, so it can't just be disabled) and
   // `blendIntensity` to the AO intensity exponent. Null when AO is off.
-  private aoPass: { enabled: boolean; blendIntensity: number } | null = null;
-  // AO is the single most expensive per-frame cost (its G-buffer prepass replays
-  // every scene draw call), but this store is a static scene: the AO term only
-  // changes when the camera or a box moves. So: OFF while walking (nobody reads
-  // contact shadows mid-stride, and it's what was blowing the frame budget),
-  // faded back in over ~250ms on settle, and while the view is static the
-  // wrapped render() replays the cached AO term with two cheap quads instead of
-  // recomputing it (see the wrapper in initThree).
+  private aoPass: { enabled: boolean; blendIntensity: number; motionSafe?: boolean } | null = null;
+  // Only legacy GTAO replays geometry and needs the walk gate. N8AO resets
+  // its temporal history on camera changes and stays enabled during motion.
   private aoFadeT = 1; // 0→1 blend fade after walk motion stops
   private aoNeedsRefresh = true; // buffers resized/cleared or scene geometry moved — recompute the AO term
   private lastWalkLookTime = -Infinity; // last walk-mode mouse-look event; looking is motion too
@@ -733,6 +731,7 @@ export class StoreScene {
     };
   } | null = null;
   public slottedFixtures: SlottedFixture[] = [];
+  public retailFixtures: StoreFixture[] = [];
   // T19: candy-rack fixtures aren't slotted (no movie slots), so they're not
   // covered by slottedFixtures above -- kept separately so the candy
   // checkout screen can read their real-product rows.
@@ -1086,6 +1085,7 @@ export class StoreScene {
   public catalogLibraries: JellyfinLibrary[];
   public catalogGames: Movie[];
   public ready: Promise<void>;
+  public detailLoads: DeferredModelLoads | null = null;
 
   constructor(
     container: HTMLDivElement,
@@ -1459,6 +1459,9 @@ export class StoreScene {
     // (Floor plan already computed above, before the NR wall derivation.)
 
     this.initThree();
+    if (isPublicDemo && this.effectiveQuality !== 'high') {
+      this.detailLoads = new DeferredModelLoads(this.programWarmupController.signal);
+    }
     if (isPublicDemo) {
       // A settings rebuild may preserve case caches from the outgoing scene.
       // Until this room's deferred bake, use its live bootstrap environment
@@ -1579,7 +1582,13 @@ export class StoreScene {
       }
     }
 
-    await this.warmupRuntimePrograms();
+    // The public overview needs the room's shaders, not dry-run inspections.
+    // Inspection variants prepare after main.ts has wired input and revealed it.
+    if (isPublicDemo && this.effectiveQuality !== 'high') {
+      await programWarmup.prepareInitialViewPrograms(this);
+    } else {
+      await this.warmupRuntimePrograms();
+    }
     if (this.programWarmupController.signal.aborted || this.renderer.getContext().isContextLost()) return;
     this.animate();
 
@@ -1662,6 +1671,7 @@ export class StoreScene {
   // Everything a swappable fixture (ambient TVs, entrance, ...) needs from the
   // scene, bundled so fixture classes never hold a reference to StoreScene.
   public fixtureContext(): FixtureContext {
+    const detailLoads = this.detailLoads;
     const roomIds = new Set(this.libraries.find(lib => lib.id === ABOVE_R_LIBRARY_ID)?.movies.map(movie => movie.id));
     return {
       scene: this.scene,
@@ -1682,6 +1692,7 @@ export class StoreScene {
         this.queueStructuralShadowRefresh();
       },
       requestRender: () => this.requestRender(),
+      scheduleDetailLoad: detailLoads ? start => detailLoads.enqueue(start) : undefined,
       activeTheme: this.activeTheme,
       gondolaMaterials: this.gondolaMaterials,
       wallSurface: this.wallSurface,
@@ -2106,10 +2117,8 @@ export class StoreScene {
       n8aoPass.autoDetectTransparency = false;
       n8aoPass.configuration.transparencyAware = false;
       n8aoPass.configuration.intensity = 1.4;      // soft occlusion (pow exponent) — 2.0 read too heavy against the reference's evenly-lit shelves; faded via the adapter below
-      // Walk gating swaps source passes: while the feet move, AO is off and
-      // the plain RenderPass takes over (EffectComposer skips disabled
-      // passes), so NONE of the AO chain runs — same contract as the GTAO
-      // enabled toggle.
+      // Keep the beauty fallback for explicit pass disabling; N8AO itself
+      // remains active for both walking and looking.
       // Reuse N8AO's depth-owning beauty target while AO is gated off.
       const walkRenderPass = new BeautyPass(this.scene, this.camera,
         this.composer.renderTarget1, (n8aoPass as any).beautyRenderTarget);
@@ -2131,6 +2140,7 @@ export class StoreScene {
       };
       const aoBase = 1.4; // must track n8aoPass.configuration.intensity above (the enabled/blend setters reset to aoBase * blend)
       const aoCtl = {
+        motionSafe: true,
         _on: true,
         _blend: 1,
         get enabled() { return this._on; },
@@ -2549,6 +2559,7 @@ export class StoreScene {
   // Called on init, on window resize, and whenever resScale steps. Renderer
   // pixelRatio (the quality-tier cap) is untouched here — only the buffer
   // dimensions scale, so ratio and size are never multiplied together.
+  private appliedResolution = "";
   public applyRenderResolution() {
     const clientWidth = this.container.clientWidth || window.innerWidth || 1280;
     const clientHeight = this.container.clientHeight || window.innerHeight || 720;
@@ -2620,6 +2631,11 @@ export class StoreScene {
 
     const width = Math.max(1, Math.floor(clientWidth * this.resScale * this.qualityScale));
     const height = Math.max(1, Math.floor(clientHeight * this.resScale * this.qualityScale));
+
+    // Avoid clearing the canvas and reallocating pass targets for a no-op.
+    const pixelRatio = this.renderer.getPixelRatio();
+    if (this.appliedResolution === `${width}:${height}:${pixelRatio}`) return;
+    this.appliedResolution = `${width}:${height}:${pixelRatio}`;
 
     // `false` keeps the canvas CSS size at the full client size so the browser
     // upscales the (possibly smaller) drawing buffer — the standard dynamic
@@ -3968,14 +3984,14 @@ export class StoreScene {
    */
   public debugClerkPathAudit(seconds = 420): boolean { return clerkFlow.debugClerkPathAudit(this, seconds); }
 
-  // Feedback pin (F8, see main.ts): a user who can't read code flags a visual
+  // Feedback pin (Shift+C, see main.ts): a user who can't read code flags a visual
   // bug in-app. Captures the exact replayable view PLUS a screenshot in one
   // shot, before the camera can move. preserveDrawingBuffer is off, so the
   // canvas must be forced to paint and read back in the same tick -- no
   // waiting on the next animate() frame. The walk string is the inverse of
   // teleportWalk() above: extract a 'YXZ' Euler from the camera's current
   // orientation instead of setting rotation from yaw/pitch.
-  public captureFeedbackSnapshot(): { walk: string; png: string } {
+  public captureFeedbackSnapshot(maxEdge?: number): { walk: string; png: string } {
     if (this.composer) {
       this.composer.render();
     } else {
@@ -3986,7 +4002,7 @@ export class StoreScene {
     const pitchDeg = (euler.x * 180) / Math.PI;
     const pos = this.camera.position;
     const walk = `${pos.x.toFixed(2)},${pos.z.toFixed(2)},${yawDeg.toFixed(2)},${pitchDeg.toFixed(2)},${pos.y.toFixed(2)}`;
-    const png = this.renderer.domElement.toDataURL('image/png');
+    const png = capturePinPng(this.renderer.domElement, maxEdge);
     return { walk, png };
   }
 
@@ -4027,7 +4043,7 @@ export class StoreScene {
   // played whenever the entrance or exit doors are passed. No synth fallback:
   // if the sample has not loaded yet the pass retries the fetch and rings as
   // soon as it lands; if WebAudio is unavailable the doors open silently.
-  public playDoorChime() {
+  public playDoorChime() { if (isExternalGameActive()) return;
     try {
       if (!this.chimeCtx) this.chimeCtx = new AudioContext();
       const ctx = this.chimeCtx;
@@ -4364,7 +4380,7 @@ export class StoreScene {
 
   // Animation render loop
   private animate = () => {
-    if (!this.isRendering) return;
+    if (isExternalGameActive()) { this.pauseRendering(); return; } if (!this.isRendering) return;
     
     this.rafId = requestAnimationFrame(this.animate);
     this.frameCount++;
@@ -4666,7 +4682,7 @@ export class StoreScene {
     // render() computes the AO term once and replays it. Browse-mode camera
     // lerps keep AO on (they're ~10 frames; toggling would read as flicker).
     let aoFading = false;
-    if (this.aoPass) {
+    if (this.aoPass && !this.aoPass.motionSafe) {
       // Mouse-look pans arrive as discrete events (requestRender wakeups), not
       // held keys — hold the "in motion" verdict for 150ms past the last one so
       // AO doesn't flip-flop between event gaps mid-pan.
@@ -4831,7 +4847,8 @@ export class StoreScene {
 
     // Undersampling disabled when nothing is moving: snap resScale to full crispness.
     const idleScale = this.softwareGL ? this.resScaleMin : RES_SCALE_MAX;
-    if (!cameraMoving && !sceneChanging && this.resScale !== idleScale) {
+    if (!cameraMoving && !sceneChanging && this.resScale !== idleScale &&
+        time - this.lastCameraMotionTime >= StoreScene.QUALITY_DOWNSHIFT_MS) {
       this.resScale = idleScale;
       this.applyRenderResolution();
       mustRenderThisFrame = true;
@@ -5037,7 +5054,7 @@ export class StoreScene {
       // already established none of it changes anything visible except the TV
       // texture upload, which is the entire point of the frame.
       this.nrBayLightingUpdate?.();
-    this.entrance?.update(time);
+      this.entrance?.update(time);
       this.ambientTvs?.update(time);
       for (const f of this.slottedFixtures) f.update(time);
       perfTrace.end(SP_SIM);
@@ -5431,14 +5448,14 @@ export class StoreScene {
     }
 
     // Mark matrix updates on modified InstancedMesh instances only.
-    // boundingSphere = null: three.js caches an InstancedMesh's frustum-culling
+    // Recompute in place: three.js caches an InstancedMesh's frustum-culling
     // sphere on first cull and never invalidates it when instance matrices
     // change — a sphere cached before placement (e.g. during the boot-time
     // environment bake) would cull fully-stocked shelves forever. Nulling it
-    // here recomputes it on the next cull, only for meshes that actually moved.
+    // here would allocate a fresh Sphere on every moving frame. Reuse it instead.
     for (const mesh of updatedMeshes) {
       mesh.instanceMatrix.needsUpdate = true;
-      mesh.boundingSphere = null;
+      mesh.computeBoundingSphere();
     }
 
     // Real-time reflections are handled automatically by Reflector instances
@@ -5589,7 +5606,7 @@ export class StoreScene {
     this.ambientTvs?.pause();
   }
 
-  public resumeAmbientTvs(): void {
+  public resumeAmbientTvs(): void { if (isExternalGameActive()) return;
     this.ambientTvs?.resume();
   }
 
@@ -5604,7 +5621,7 @@ export class StoreScene {
   }
 
   // Resume rendering loop on playback end
-  public resumeRendering() {
+  public resumeRendering() { if (isExternalGameActive()) return;
     if (!this.isRendering) {
       this.isRendering = true;
       this.requestRender(); // draw a real frame immediately, don't wait for the idle heartbeat
@@ -5959,6 +5976,8 @@ export class StoreScene {
     this.clerk?.dispose(); this.clerk = null; // tear down her DOM prompt/dialog and GPU textures/materials
     this.entrance?.dispose();
     this.entrance = null;
+    this.retailFixtures.forEach(f => f.dispose());
+    this.retailFixtures = [];
     this.slottedFixtures.forEach(f => f.dispose());
     this.slottedFixtures = [];
     this.candyDisplays.forEach(f => f.dispose());

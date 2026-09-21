@@ -5,6 +5,7 @@ import bpy, bmesh, math, json
 import numpy as np
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[2]
+bpy.context.preferences.filepaths.save_version=0
 bpy.ops.object.select_all(action='SELECT'); bpy.ops.object.delete(use_global=False)
 # Deterministic tileable molded polymer grain, stored in the GLB and blend.
 rng=np.random.default_rng(220)
@@ -53,9 +54,9 @@ def shell(name,w,h,r,z,layers,role):
     for p in me.polygons:p.use_smooth=len(p.vertices)==4
     ob['material_role']=mats[role].name
     return ob
-shell('Front_continuous_molded_shell',.5,3.36,.235,.07,[(0.002,0),(.025,0),(.038,.009),(.045,.023)],0)
-shell('Rear_continuous_molded_shell',.5,3.36,.235,.07,[(-.002,0),(-.025,0),(-.038,.009),(-.045,.023)],0)
-shell('Recessed_clamshell_gasket',.493,3.353,.231,.0735,[(-.002,0),(.002,0)],1)
+shell('Front_continuous_molded_shell',1.12,4.20,.235,.07,[(0.002,0),(.025,0),(.038,.009),(.045,.023)],0)
+shell('Rear_continuous_molded_shell',1.12,4.20,.235,.07,[(-.002,0),(-.025,0),(-.038,.009),(-.045,.023)],0)
+shell('Recessed_clamshell_gasket',1.113,4.193,.231,.0735,[(-.002,0),(.002,0)],1)
 shell('Rear_service_cover_reveal',.32,.51,.045,.16,[(-.045,0),(-.046,.002)],1)
 shell('Rear_service_cover',.304,.494,.038,.168,[(-.046,0),(-.05,.008)],0)
 # Horizontal eased mounting shoe, with four separate captive rubber feet.
@@ -66,9 +67,9 @@ def box(name,loc,scale,bevel,role):
     bpy.ops.object.modifier_apply(modifier=m.name)
     bpy.ops.object.mode_set(mode='EDIT');bpy.ops.mesh.select_all(action='SELECT');bpy.ops.uv.smart_project(island_margin=.02);bpy.ops.object.mode_set(mode='OBJECT')
     return o
-box('Molded_mounting_shoe',(0,0,.038),(.62,.5,.044),.012,2)
-box('Shell_socket',(0,0,.067),(.52,.13,.03),.009,0)
-for x in [-.235,.235]:
+box('Molded_mounting_shoe',(0,0,.038),(1.26,.5,.044),.012,2)
+box('Shell_socket',(0,0,.067),(1.14,.13,.03),.009,0)
+for x in [-.55,.55]:
     for y in [-.175,.175]:box('Captive_elastomer_foot',(x,y,.01),(.105,.105,.02),.006,1)
 # Rear sealed cable entry; cable routes into the shoe and floor, never across passage.
 shell('Rear_cable_grommet',.085,.07,.03,.08,[(-.046,0),(-.061,.005)],1)
@@ -76,8 +77,8 @@ box('Cable_entry_into_shoe',(0,-.056,.077),(.031,.028,.055),.01,1)
 for z in [.205,.625]:
     shell('Service_cover_captive_screw',.022,.022,.01,z,[(-.050,0),(-.053,.002)],3)
 scene=bpy.context.scene;scene.unit_settings.system='IMPERIAL';scene.unit_settings.scale_length=.3048
-scene['provenance']='Original generic reconstruction of existing procedural envelope. No period-fidelity claim; late-era archive unavailable.'
-scene['dimensions_feet']='0.62 wide x 0.50 deep x 3.43 tall; floor origin; no moving parts'
+scene['provenance']='Original generic molded pedestal, enlarged for owner pin 160. Broad panel and human scale checked against 1993 exit footage; absolute dimensions are estimates, not a measured replica.'
+scene['dimensions_feet']='1.26 wide x 0.50 deep x 4.27 tall; floor origin; no moving parts'
 parts=list(scene.objects)
 for o in parts:
     # Tile the micrograin eight times across the packed UV domain.
@@ -91,5 +92,5 @@ bpy.context.view_layer.objects.active=parts[0]
 bpy.ops.wm.save_as_mainfile(filepath=str(ROOT/'tools/models/eas-pedestal.blend'))
 bpy.ops.object.join();ob=bpy.context.object;ob.name='EAS_Pedestal';ob.data.calc_loop_triangles()
 bpy.ops.export_scene.gltf(filepath=str(ROOT/'public/models/eas-pedestal.glb'),export_format='GLB',export_yup=True,export_extras=True)
-metrics={'triangles':len(ob.data.loop_triangles),'source_parts':len(parts),'materials':[m.name for m in mats],'textures':['128x128 normal','128x128 roughness'],'dimensions_feet':[.62,3.43,.5],'closed_manifold_parts':True,'glb_bytes':(ROOT/'public/models/eas-pedestal.glb').stat().st_size,'blender':bpy.app.version_string}
+metrics={'triangles':len(ob.data.loop_triangles),'source_parts':len(parts),'materials':[m.name for m in mats],'textures':['128x128 normal','128x128 roughness'],'dimensions_feet':[1.26,4.27,.5],'closed_manifold_parts':True,'glb_bytes':(ROOT/'public/models/eas-pedestal.glb').stat().st_size,'blender':bpy.app.version_string}
 (ROOT/'tools/models/eas-pedestal-metrics.json').write_text(json.dumps(metrics,indent=2)+'\n');print(metrics)

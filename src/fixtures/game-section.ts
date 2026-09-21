@@ -1,6 +1,5 @@
 // Redesigned video game shelf: a standard double-sided freestanding gondola shelf.
-// Displays sections based on the selected platform list, showing the top 20
-// games for each platform.
+// Displays the selected platform catalog on the same shelf decks as movies.
 import * as THREE from 'three';
 import { ShelfModelBatch } from '../shelf-model';
 import { Movie } from '../jellyfin';
@@ -165,9 +164,8 @@ export class GameSection implements SlottedFixture {
   // Fixed section count per side when this gondola is one unit of a multi-unit
   // game department (see initMovies' sliced mode); null = legacy dynamic count.
   private forcedSections: number | null = null;
-  // 'front' = stock (and blade-card) only the front face — the 2×2 department
-  // rows present their backs to the field/front glass where there's only a
-  // walk-through gap, no browse-camera room. 'both' = classic double-sided.
+  // Only wall-mounted mom-and-pop units use one face. Freestanding units
+  // retain the movie gondola's full depth and both browsable faces.
   private faces: 'front' | 'both' = 'both';
 
   public frontPlatforms: string[] = [];
@@ -226,6 +224,7 @@ export class GameSection implements SlottedFixture {
     // Interior joints get nothing so the run reads as one continuous shelf.
     const capTopDepth = isWireFrame ? unitDepth : unitTopDepth;
     const trapezoidGeo = createTrapezoidGeometry(5.1, unitDepth, capTopDepth, 0.1);
+    if (this.faces === 'front') this.trimRearHalf(trapezoidGeo);
     splitTrapezoidGroups(trapezoidGeo);
     const capMats = createLibraryEndCapMaterial(false);
 
@@ -244,7 +243,7 @@ export class GameSection implements SlottedFixture {
       // Back End Cap (-Z end, facing -Z)
       const backCap = new THREE.Mesh(trapezoidGeo, capMats);
       backCap.position.set(0, 2.55, -shelfLength / 2 - 0.05);
-      backCap.rotation.y = Math.PI;
+      backCap.rotation.y = this.faces === 'front' ? 0 : Math.PI;
       backCap.castShadow = true;
       backCap.receiveShadow = true;
       this.group.add(backCap);
@@ -273,7 +272,9 @@ export class GameSection implements SlottedFixture {
     // 3. Horizontal Shelves
     SHELF_HEIGHTS.forEach((yPos) => {
       const shelfDepth = unitDepth - (unitDepth - unitTopDepth) * (yPos / 5.1);
-      const shelfGeo = new THREE.BoxGeometry(shelfDepth, 0.04, shelfLength);
+      const deckDepth = this.faces === 'front' ? shelfDepth / 2 + .25 : shelfDepth;
+      const deckCenter = this.faces === 'front' ? shelfDepth / 4 - .125 : 0;
+      const shelfGeo = new THREE.BoxGeometry(deckDepth, 0.04, shelfLength);
 
       let shelfMat = baseShelfMat;
       if (isWireFrame && this.ctx.gondolaMaterials.wireShelf) {
@@ -288,13 +289,13 @@ export class GameSection implements SlottedFixture {
       }
 
       const shelf = new THREE.Mesh(shelfGeo, shelfMat);
-      shelf.position.set(0, yPos, 0);
+      shelf.position.set(deckCenter, yPos, 0);
       shelf.receiveShadow = true;
       shelf.castShadow = true;
       this.group!.add(shelf);
       this.ctx.addCollider(shelf);
       shelfModels.add(shelf, [{ kind: isWireFrame ? 'wire' : 'deck',
-        depth: isWireFrame ? shelfDepth : shelfDepth - .088, length: shelfLength }],
+        depth: isWireFrame ? deckDepth : deckDepth - .088, length: shelfLength }],
         isWireFrame ? stripMat : baseShelfMat);
 
       // Pricing strips along the lips. STRIP_EPS keeps the bar's outer face and
@@ -317,9 +318,12 @@ export class GameSection implements SlottedFixture {
       const stripBack = new THREE.Mesh(stripGeo, stripMat);
       stripBack.position.set(-stripX, yPos + 0.02, 0);
       stripBack.receiveShadow = true;
-      this.group!.add(stripBack);
-      this.ctx.addCollider(stripBack);
+      if (this.faces === 'both') {
+        this.group!.add(stripBack);
+        this.ctx.addCollider(stripBack);
+      }
       for (const [strip, side] of [[stripFront, 1], [stripBack, -1]] as const) {
+        if (side === -1 && this.faces === 'front') continue;
         shelfModels.add(strip, [{ kind: 'rail', depth: 0, length: shelfLength - .012,
           x: side * (shelfDepth / 2 - .018) - strip.position.x,
           y: -.032, yaw: side < 0 ? Math.PI : 0 }]);
@@ -350,6 +354,7 @@ export class GameSection implements SlottedFixture {
       }
       const dividerGeo = createTrapezoidGeometry(5.1, unitDepth - 0.05, unitTopDepth - 0.05, 0.04);
 
+      if (this.faces === 'front') this.trimRearHalf(dividerGeo);
       const addDivider = (zDiv: number) => {
         const div = new THREE.Mesh(dividerGeo, dividerMat);
         div.position.set(0, 2.55, zDiv);
@@ -609,12 +614,23 @@ export class GameSection implements SlottedFixture {
     return {
       label: `fixture:${this.placement.id}`,
       kind: 'fixture',
-      cx: this.placement.position.x + dx,
-      cz: this.placement.position.z + dz,
-      w: UNIT_DEPTH,
+      cx: this.placement.position.x + dx + (this.faces === 'front' ? (UNIT_DEPTH / 4 - .125) * Math.cos(yaw) : 0),
+      cz: this.placement.position.z + dz - (this.faces === 'front' ? (UNIT_DEPTH / 4 - .125) * Math.sin(yaw) : 0),
+      w: this.faces === 'front' ? UNIT_DEPTH / 2 + .25 : UNIT_DEPTH,
       d: shelfLength + capFront + capBack,
       yaw,
     };
+  }
+
+  // A single-face wall fixture ends at the rear of its central backing.
+  // Keep the original front taper while removing the unused rear carcass.
+  private trimRearHalf(geometry: THREE.BufferGeometry): void {
+    const positions = geometry.getAttribute('position');
+    for (let i = 0; i < positions.count; i++) positions.setX(i, Math.max(-.25, positions.getX(i)));
+    positions.needsUpdate = true;
+    geometry.computeVertexNormals();
+    geometry.computeBoundingBox();
+    geometry.computeBoundingSphere();
   }
 
   getSlots(): FixtureSlot[] {
@@ -783,7 +799,8 @@ export class GameSection implements SlottedFixture {
     const unitCount = typeof options.units === 'number' ? options.units : 0;
     if (unitCount >= 1) {
       const unitIndex = typeof options.unit === 'number' ? options.unit : 0;
-      const sectionsPerSide = GAME_UNIT_SECTIONS;
+      const sectionsPerSide = typeof options.sectionsPerSide === 'number'
+        ? Math.max(1, Math.min(4, Math.floor(options.sectionsPerSide))) : GAME_UNIT_SECTIONS;
       this.cols = sectionsPerSide * GAME_SECTION_COLS;
       this.capacity = (this.faces === 'front' ? 1 : 2) * this.shelfHeights.length * this.cols;
       this.forcedSections = sectionsPerSide;

@@ -1,3 +1,4 @@
+import { isExternalGameActive, onExternalGameChange } from './external-game-state.ts';
 // HTPC Input Management System for Project Blue Ticket
 import { gamepadEverConnected } from './gamepad-tracker';
 import { notifyUserActivity } from './video-case';
@@ -35,6 +36,14 @@ export interface InputCallbacks {
   isHoldDownArmed?: () => boolean;
   onHoldDown?: () => void;
   onHoldDownProgress?: (t: number) => void;
+  // Hold-BACK-to-return-tape: while this returns true (a carried tape can be
+  // put back on its shelf), pressing the back control (Escape/Backspace/Q or
+  // gamepad B) arms a hold timer instead of firing onBack immediately —
+  // a quick tap still fires onBack on RELEASE; holding for HOLD_BACK_MS
+  // fires onHoldBack (returnCarriedTape).
+  isHoldBackArmed?: () => boolean;
+  onHoldBack?: () => void;
+  onHoldBackProgress?: (t: number) => void;
 }
 
 /**
@@ -88,7 +97,12 @@ class HoldGesture {
     this.fired = false;
   }
 
-  destroy() { this.stop(); }
+  destroy() {
+    this.stop();
+    this.pending = false;
+    this.fired = false;
+    this.progress(0);
+  }
 
   private tick() {
     // Something modal may have opened mid-hold — abandon the gesture
@@ -157,10 +171,14 @@ export class InputManager {
   // is one button whether it arrives as Enter or as pad A.
   private readonly holdSelect: HoldGesture;
   private readonly holdDown: HoldGesture;
+  private readonly holdBack: HoldGesture;
   private static readonly HOLD_SELECT_MS = 650;
   // Longer than select's: crossing a title off is permanent, so the meter
   // wants a beat where you can still let go and change your mind.
   private static readonly HOLD_DOWN_MS = 900;
+  private static readonly HOLD_BACK_MS = 650;
+
+  private removeGameListener: (() => void) | null = null;
 
   constructor(callbacks: InputCallbacks) {
     this.callbacks = callbacks;
@@ -178,6 +196,25 @@ export class InputManager {
       () => this.callbacks.onDown(),
       (p) => this.callbacks.onHoldDownProgress?.(p),
     );
+    this.holdBack = new HoldGesture(
+      InputManager.HOLD_BACK_MS,
+      () => !!(this.callbacks.onHoldBack && this.callbacks.isHoldBackArmed?.()),
+      () => this.callbacks.onHoldBack?.(),
+      () => this.callbacks.onBack(),
+      (p) => this.callbacks.onHoldBackProgress?.(p),
+    );
+    this.removeGameListener = onExternalGameChange((active) => {
+      if (active) {
+        this.stopGamepadPolling();
+        this.holdSelect.destroy(); this.holdDown.destroy(); this.holdBack.destroy();
+        if (this.idleTimer !== null) { window.clearTimeout(this.idleTimer); this.idleTimer = null; }
+      } else {
+        this.lastButtonsState = []; this.lastAxesState = [];
+        this.repeatDirection = null;
+        if (gamepadEverConnected) this.startGamepadPolling();
+        this.resetIdleTimer();
+      }
+    });
     this.setupKeyboardListeners();
     this.setupMouseListeners();
     this.setupGamepadListeners();
@@ -187,6 +224,7 @@ export class InputManager {
   // Keyboard navigation mappings
   private setupKeyboardListeners() {
     window.addEventListener('keydown', (e: KeyboardEvent) => {
+      if (isExternalGameActive()) return;
       this.handleActivity();
 
       // Ignore HTPC shortcuts if user is focused on form inputs
@@ -254,7 +292,8 @@ export class InputManager {
         case 'q':
         case 'Q':
           e.preventDefault();
-          this.callbacks.onBack();
+          if (e.repeat) this.holdBack.repeat();
+          else this.holdBack.press();
           break;
         case 'p':
         case 'P':
@@ -267,14 +306,6 @@ export class InputManager {
         case 'F':
           if (this.callbacks.onToggleWalkAround) {
             this.callbacks.onToggleWalkAround();
-          }
-          break;
-        case 'c':
-        case 'C':
-          // T22: carry-mode checkout shortcut (no-op when unwired/disabled).
-          if (this.callbacks.onCheckout) {
-            e.preventDefault();
-            this.callbacks.onCheckout();
           }
           break;
         case 'r':
@@ -299,6 +330,7 @@ export class InputManager {
     // Release side of the hold gestures: a tap (released before the hold
     // threshold) fires the normal action it deferred.
     window.addEventListener('keyup', (e: KeyboardEvent) => {
+      if (isExternalGameActive()) return;
       switch (e.key) {
         case 'Enter':
         case ' ':
@@ -310,6 +342,12 @@ export class InputManager {
         case 's':
         case 'S':
           this.holdDown.release();
+          break;
+        case 'Escape':
+        case 'Backspace':
+        case 'q':
+        case 'Q':
+          this.holdBack.release();
           break;
       }
     });
@@ -350,7 +388,7 @@ export class InputManager {
   }
 
   private startGamepadPolling() {
-    if (this.gamepadPollInterval) return;
+    if (this.gamepadPollInterval || isExternalGameActive()) return;
 
     // Poll gamepad inputs every 16ms (~60Hz) for responsive UI feel; the idle
     // downshift (see setGamepadPollIdle) swaps this for a slow heartbeat.
@@ -437,9 +475,15 @@ export class InputManager {
       this.holdSelect.release();
       hasActivity = true;
     }
-    // Button 1 (B) -> Back
+    // Button 1 (B) -> Back, with hold-back-to-return-tape gesture: while
+    // armed, the press starts the shared hold timer and a quick release
+    // delivers the deferred onBack (mirrors the keyboard path exactly).
     if (buttonStates[1] && !this.lastButtonsState[1]) {
-      this.callbacks.onBack();
+      this.holdBack.press();
+      hasActivity = true;
+    }
+    if (!buttonStates[1] && this.lastButtonsState[1]) {
+      this.holdBack.release();
       hasActivity = true;
     }
     // Button 2 (Y/Triangle) -> Search
@@ -577,6 +621,7 @@ export class InputManager {
   // timer ever firing. The downstream handler is a cheap guarded no-op when
   // there is nothing to heal.
   private handleActivity() {
+    if (isExternalGameActive()) return;
     // Texture uploads back off from burst to the polite per-frame budget
     // while the user is actually interacting (see processUploads in
     // video-case.ts).
@@ -593,6 +638,7 @@ export class InputManager {
   }
 
   private resetIdleTimer() {
+    if (isExternalGameActive()) return;
     if (this.idleTimer) {
       window.clearTimeout(this.idleTimer);
     }
@@ -622,9 +668,11 @@ export class InputManager {
 
   // Clean up listeners
   public destroy() {
+    this.removeGameListener?.();
     this.stopGamepadPolling();
     this.holdSelect.destroy();
     this.holdDown.destroy();
+    this.holdBack.destroy();
     if (this.idleTimer) {
       window.clearTimeout(this.idleTimer);
     }

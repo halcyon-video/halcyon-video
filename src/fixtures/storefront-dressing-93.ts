@@ -1,3 +1,4 @@
+import { vestibuleExitGates } from '../vestibule-layout';
 // 1993 storefront dressing, from the store footage: the STORE HOURS panel on
 // the entrance sidelight glass (moved off a chain-hung window-bay board
 // 2026-08-02 — feedback/018; see the block itself), the red evening-rental
@@ -121,7 +122,7 @@ export function buildStorefrontDressing93(scene: StoreScene): void {
     const dividerHalf = facadeEntryGlazing(spec.doorWidth, facadeStyle()).dividerWidth / 2;
     const x = 11.0 + dividerHalf + spec.doorWidth + ENTRANCE_SIDELIGHT_WIDTH / 2;
     const panel = new THREE.Mesh(new THREE.PlaneGeometry(1.35, 0.9), printedOut(letterboardTex()));
-    panel.position.set(x, 4.8, glassZ - 0.06);
+    panel.position.set(x, 4.8, glassZ - 0.18); // Pin 193: clear the full glazing thickness.
     markSignMesh(panel);
     group.add(panel);
   }
@@ -159,7 +160,7 @@ export function buildStorefrontDressing93(scene: StoreScene): void {
     fallback.name = 'eas-pedestal-fallback';
     group.add(fallback);
     const pedestalShape = new THREE.Shape();
-    const pw = 0.5, ph = 3.4, r = 0.24;
+    const pw = 1.12, ph = 4.24, r = 0.24;
     pedestalShape.moveTo(-pw / 2, 0);
     pedestalShape.lineTo(pw / 2, 0);
     pedestalShape.lineTo(pw / 2, ph - r);
@@ -170,31 +171,21 @@ export function buildStorefrontDressing93(scene: StoreScene): void {
     const geo = new THREE.ExtrudeGeometry(pedestalShape, { depth: 0.09, bevelEnabled: false });
     geo.translate(0, 0, -0.045);
     const cream = new THREE.MeshStandardMaterial({ color: 0xe9e4d6, roughness: 0.5, metalness: 0.02 });
-    const baseGeo = new THREE.BoxGeometry(0.62, 0.06, 0.5);
-    // Gate half-span: clear of the leaf's own opening (doorW/2) plus enough
-    // that an opening leaf sweeps between the panels, never into one.
-    const gateHalf = vest.doorW / 2 + 0.55;
-    // Stand-off from the side wall, on the SALES-FLOOR side. Inside the
-    // chamber there is no room for this gate: the near pedestal would have to
-    // stand at z = sideDoorZ - gateHalf = 8.45, which is through the
-    // vestibule's own back glass at z = backZ.
-    const standOff = 0.62;
-    const gates: { x: number; z: number }[] = [];
-    for (const dz of [-gateHalf, gateHalf]) {
-      gates.push({ x: vest.xL - standOff, z: vest.sideDoorZ + dz }); // walk-out door only
-    }
+    const baseGeo = new THREE.BoxGeometry(1.26, 0.06, 0.5);
+    // One pair on the sales-floor approach between checkout and returns.
+    const gates = vestibuleExitGates(scene.storefrontSpec);
     for (const g of gates) {
       const ped = new THREE.Mesh(geo, cream);
       // Panels stand parallel to the walk line through the side door (which
       // runs along X), so their broad faces greet you side-on as you pass
       // between them.
-      ped.position.set(g.x, 0.03, g.z);
+      ped.position.set(g.x, 0.03, g.z); ped.rotation.y=g.yaw;
       ped.castShadow = true;
       ped.receiveShadow = true;
       fallback.add(ped);
       scene.fixtureContext().addCollider(ped);
       const base = new THREE.Mesh(baseGeo, cream);
-      base.position.set(g.x, 0.03, g.z);
+      base.position.set(g.x, 0.03, g.z); base.rotation.y=g.yaw;
       base.receiveShadow = true;
       fallback.add(base);
     }

@@ -6,7 +6,7 @@ import type { StoreScene } from '../three-scene';
 /** One load shared by the exit pair; hidden fallback remains the collision rig. */
 export function installEasPedestals(
   scene: StoreScene, parent: THREE.Group, fallback: THREE.Group,
-  anchors: readonly { x: number; z: number }[],
+  anchors: readonly { x: number; z: number; yaw?:number }[],
 ): void {
   let retired = false;
   let release: (() => void) | undefined;
@@ -42,6 +42,7 @@ export function installEasPedestals(
       const instance = model.clone(true);
       instance.name = 'eas-pedestal-model';
       instance.position.set(anchor.x, 0, anchor.z);
+      instance.rotation.y=anchor.yaw ?? 0;
       instances.push(instance);
       parent.add(instance);
     }

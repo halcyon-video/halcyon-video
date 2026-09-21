@@ -1,4 +1,7 @@
-import { floorPromotionPlacements } from './floor-merchandising';
+import { vestibuleSide, vestibuleLayout, counterDatumShift } from './vestibule-layout.ts';
+import { exitReturnLayout } from './exit-return-layout';
+import { RETAIL_FIXTURE_SPECS } from './retail-fixture-specs';
+import { floorPromotionPlacements, frontRefreshmentPlacements, placeFloorSaleTable } from './floor-merchandising';
 import { placeStockCart } from './fixtures/stock-cart-layout';
 import { buildNrBayLighting } from './nr-bay-lighting';
 import { NR_BAY_WIDTH, nrColumnX } from './nr-run-layout';
@@ -40,7 +43,7 @@ import { facadeDimensions, facadeStyle } from './storefront-architecture';
 import { addGlassReflectionPane } from './glass-reflection';
 import { buildExteriorEnvironment } from './exterior-environment';
 import { NR_WALL_SLOPE, nrWallDepthAtHeight, NR_WALL_SHELF_DEPTH, NR_WALL_CLEARANCE, NR_LEFT_UNIT_STANDOFF, WALL_SHELF_HEIGHTS, NR_SECTION_COLS, UNIT_SECTIONS, seededRandom01, getStorefrontSpec, vestibuleHalfWidth, posterBayIndices, entranceOpeningHalfWidth, mapWallSegmentUV, CENTER_WALKWAY, STORE_CENTER_X, FRONT_GLASS_Z } from './store-layout';
-import { buildFrontSoffit, frontSoffitLidPolygon, frontSoffitPolygon, frontSoffitY, pointInSoffit, soffitConnectHalf, soffitTrofferCenters, tileOverlapsSoffit } from './ceiling-soffit';
+import { buildFrontSoffit, frontSoffitLidPolygon, frontSoffitPolygon, frontSoffitY, pointInSoffit, soffitConnectHalf, soffitKeyCenters, soffitTrofferCenters, tileOverlapsSoffit } from './ceiling-soffit';
 import { createFixture } from './fixture-registry';
 import { CandyDisplay } from './fixtures/period-fixtures';
 import { TipJar } from './fixtures/tip-jar';
@@ -418,12 +421,12 @@ export function buildStore(scene: StoreScene) {
 
   const KNEE_EXT_H = 2.0; // matches createWindowSection's knee-wall height
   const extVestibuleGapHalf = vestibuleHalfWidth(scene.storefrontSpec); // matches the front window's kneeGap
-  const kneeVeneerThick = 0.1;
-  const kneeVeneerZ = FRONT_GLASS_Z + 0.3 + 0.02 + kneeVeneerThick / 2; // clear of the interior knee wall/frame (z=15±0.15)
+  const kneeVeneerThick = 0.45;
+  const kneeVeneerZ = FRONT_GLASS_Z + 0.3 + kneeVeneerThick / 2; // clear of the interior knee wall/frame (z=15±0.15)
 
   const frontKneeSegs: [number, number][] =
     storeWidth / 2 - extVestibuleGapHalf > 0.05
-      ? [[-storeWidth / 2, -extVestibuleGapHalf + .4], [extVestibuleGapHalf - .4, storeWidth / 2]]
+      ? [[-storeWidth / 2, -extVestibuleGapHalf], [extVestibuleGapHalf, storeWidth / 2]]
       : [[-storeWidth / 2, storeWidth / 2]];
   frontKneeSegs.forEach(([a, b]) => {
     const segW = b - a;
@@ -851,7 +854,7 @@ export function buildStore(scene: StoreScene) {
   // see src/entrance/index.ts): skip any tile whose footprint would
   // intersect it rather than embedding ceiling tiles in the glass box.
   const vestHalfW = vestibuleHalfWidth(scene.storefrontSpec);
-  const vestBackZ = FRONT_GLASS_Z - 2 * scene.storefrontSpec.doorWidth; // boxDepth = doorW * 2
+  const vestBackZ = vestibuleLayout(scene.storefrontSpec).backZ;
   // The cash-wrap soffit (buildFrontSoffit, below) hangs its own lit deck
   // FRONT_SOFFIT_DROP under this one over the whole checkout zone. A troffer
   // left up here would be sealed above that lid — invisible, but still an
@@ -1117,7 +1120,7 @@ export function buildStore(scene: StoreScene) {
     // walk naturally staggers the rows it takes from each column) — an even
     // scatter keeps the store's grounding uniform instead of leaving one
     // half of the floor shadowless.
-    const counterLights = soffitPoly.length ? soffitTrofferCenters() : [];
+    const counterLights = soffitKeyCenters(frontSoffitPolygon(scene.storefrontSpec,storeWidth,CORNICE_WALL_GAP,CORNICE_BAND),CORNICE_BAND,!wantsCeilingCornice);
     const shadowPicks = new Set<number>();
     if (trofferShadows) {
       // The counter always receives its two real fittings first. Spend only
@@ -1167,8 +1170,10 @@ export function buildStore(scene: StoreScene) {
         const key = new THREE.SpotLight(
           0xf3f6ff, (scene.outdoor.outsideMode === 'night' ? 120 : 105) * 1.56 * activeStoreFormat().keyLightIntensityScale, 0, halfAngle, 0.85, 2);
         key.name = counterKey ? 'Counter ceiling illumination' : 'Store ceiling illumination';
-        key.userData.intensityScale = activeStoreFormat().keyLightIntensityScale * (counterKey ? 1.5 : 1);
-        key.intensity *= counterKey ? 1.5 : 1;
+        const fittingGain = counterKey ? (wantsCeilingCornice ? .7 : 1.2) : 1;
+        key.userData.intensityScale = activeStoreFormat().keyLightIntensityScale * fittingGain;
+        key.intensity *= fittingGain;
+        if (counterKey) { key.angle = Math.PI * .4; key.penumbra = 1; }
         key.position.set(kx, ky, kz);
         // A hair off vertical: a perfectly straight-down lookAt runs
         // parallel to the shadow camera's up vector. Same offset on every
@@ -1562,9 +1567,16 @@ export function buildStore(scene: StoreScene) {
   // building runs solid brick from the window heads to the parapet, so the
   // span above is interior gold wall (below) + exterior brick (facade).
   const frontVestibuleHalfWidth = vestibuleHalfWidth(scene.storefrontSpec); // matches buildEntrance's boxW
+  const returnWindowCounter = exitReturnLayout(storeWidth, {
+    xL: STORE_CENTER_X-vestibuleHalfWidth(scene.storefrontSpec)+.2,frontZ:FRONT_GLASS_Z,
+    sideDoorZ:vestibuleSide(scene.storefrontSpec,-1).doorZ,doorW:scene.storefrontSpec.doorWidth,
+    hasChamber:scene.storefrontSpec.entryStyle==='vestibule',
+  });
+  const returnWindowX = returnWindowCounter ? returnWindowCounter.cx + 5.6*returnWindowCounter.w/15.5 : Infinity;
   const { group: frontWindow, panes: frontPanes, width: frontGlazedWidth } = buildWindowBays(
     scene.storefrontSpec, WINDOW_HEAD_Y, { center: 0, halfWidth: frontVestibuleHalfWidth },
     scene.wallSurface ?? undefined,
+    returnWindowCounter ? {x:STORE_CENTER_X-returnWindowX,width:2.05*returnWindowCounter.w/15.5,bottom:3.7,top:4.12} : undefined,
   );
   frontWindow.position.set(STORE_CENTER_X, floorY, FRONT_GLASS_Z);
   frontWindow.rotation.y = Math.PI; // Facing inwards
@@ -1767,7 +1779,8 @@ export function buildStore(scene: StoreScene) {
   // (registered just above) rather than assuming equal division, so this
   // still lands correctly if StorefrontSpec.windowBays ever carries
   // variable-width bays.
-  const frontPanelsWithPosters = activeStoreFormat().id === 'mom-and-pop' ? [] : posterBayIndices(frontPanes.length);
+  const frontPanelsWithPosters = activeStoreFormat().id === 'mom-and-pop' ? [] : posterBayIndices(frontPanes.length)
+    .filter(i => { const p=frontPanes[i]; return Math.abs(STORE_CENTER_X-(p.lo+p.hi)/2-returnWindowX)>3; });
   // Bays under the era campaign banner (bb-2010; storefront-campaign-poster.ts)
   // stay lightbox-free — a suspended poster hanging IN FRONT of the banner is
   // the clash this shares placement math to prevent.
@@ -2268,7 +2281,8 @@ export function buildStore(scene: StoreScene) {
   // open floor for floor displays and no counter band to mount a letterboard
   // on, so those never reach the build loop at all (see admitFixturePlacements).
   const fixturePlacements = admitFixturePlacements([
-    ...DEFAULT_FIXTURE_PLACEMENTS,
+    ...DEFAULT_FIXTURE_PLACEMENTS.map(p => ['coming-soon-letterboard-counter-end', 'wall-track-board-registers'].includes(p.id)
+      ? {...p, position:{...p.position,z:p.position.z+counterDatumShift(scene.storefrontSpec)}} : p),
     ...(scene.plan.clubhouse ? [
       { id: 'clubhouse', kind: 'clubhouse', position: scene.plan.clubhouse.center, yaw: 0, options: { admitted: true } },
     ] : []),
@@ -2333,19 +2347,40 @@ export function buildStore(scene: StoreScene) {
       }
     });
   };
-  fixturePlacements.sort((a, b) => Number(a.kind === 'release-cart') - Number(b.kind === 'release-cart'));
+    const returnCounter=exitReturnLayout(storeWidth,{
+      xL:STORE_CENTER_X-vestibuleHalfWidth(scene.storefrontSpec)+.2,frontZ:FRONT_GLASS_Z,
+      sideDoorZ:vestibuleSide(scene.storefrontSpec,-1).doorZ,
+      doorW:scene.storefrontSpec.doorWidth,hasChamber:scene.storefrontSpec.entryStyle==='vestibule',
+    });
+    const reserved: Footprint[] = [
+      ...(returnCounter?[{...returnCounter,clearance:1.5}]:[]),
+      { label: 'checkout circulation', kind: 'structure', cx: STORE_CENTER_X, cz: 4.5 + counterDatumShift(scene.storefrontSpec)/2, w: 23, d: 21 - counterDatumShift(scene.storefrontSpec), yaw: 0 },
+      ...(scene.plan.clubhouse ? [{ label: 'clubhouse approach', kind: 'structure' as const,
+        cx: STORE_CENTER_X - storeWidth / 2 + 10, cz: backWallZ + 10, w: 20, d: 20, yaw: 0 }] : []),
+    ];
+  // Admit movable furniture after game shelves and other fixed fixtures.
+  const placementOrder = (p: typeof fixturePlacements[number]) => p.kind === 'release-cart' ? 2 : p.id === 'pv-drape-table-front' || p.id === 'bargain-bin-1' ? 1 : 0;
+  fixturePlacements.sort((a,b) => placementOrder(a)-placementOrder(b));
   const buildFixture = (placement: typeof fixturePlacements[number]) => {
     if (placement.kind === 'release-cart') {
       const chosen = placeStockCart([...scene.plan.getUnitFootprints(), ...fixtureFootprints,
-        { label: 'counter and entrance', kind: 'structure', cx: STORE_CENTER_X, cz: 4.5, w: 23, d: 21, yaw: 0 },
+        { label: 'counter and entrance', kind: 'structure', cx: STORE_CENTER_X, cz: 4.5 + counterDatumShift(scene.storefrontSpec)/2, w: 23, d: 21 - counterDatumShift(scene.storefrontSpec), yaw: 0 },
         ...(scene.plan.clubhouse ? [{ label: 'clubhouse reserved', kind: 'structure' as const,
           cx: STORE_CENTER_X - storeWidth / 2 + 10, cz: backWallZ + 10, w: 20, d: 20, yaw: 0 }] : []),
       ], { minX: STORE_CENTER_X - storeWidth / 2, maxX: STORE_CENTER_X + storeWidth / 2, minZ: backWallZ, maxZ: FRONT_GLASS_Z });
       if (!chosen) return;
       placement = chosen;
     }
+    if (placement.id === 'pv-drape-table-front') {
+      const chosen = placeFloorSaleTable(placement,
+        [...scene.plan.getUnitFootprints(), ...fixtureFootprints, ...reserved],
+        {minX:STORE_CENTER_X-storeWidth/2,maxX:STORE_CENTER_X+storeWidth/2,minZ:backWallZ,maxZ:FRONT_GLASS_Z});
+      if (!chosen) return;
+      placement = chosen;
+    }
     const fixture = createFixture(placement, scene.fixtureContext());
     fixture.build();
+    if (placement.kind in RETAIL_FIXTURE_SPECS) scene.retailFixtures.push(fixture);
     const footprint = fixture.getFootprint?.();
     if (footprint) fixtureFootprints.push(footprint);
     fixtureFootprints.push(...(fixture.getFootprints?.() ?? []));
@@ -2376,17 +2411,19 @@ export function buildStore(scene: StoreScene) {
       scene.tipJars.push(fixture);
     }
   };
-  fixturePlacements.forEach(buildFixture);
+  const movable = fixturePlacements.filter(p => placementOrder(p)>0);
+  fixturePlacements.filter(p => placementOrder(p)===0).forEach(buildFixture);
   if (activeStoreFormat().floorDisplays) {
     const existing = scene.slottedFixtures.filter(f => f.placement.kind === 'four-sided-display').length;
-    const reserved: Footprint[] = [
-      { label: 'checkout circulation', kind: 'structure', cx: STORE_CENTER_X, cz: 4.5, w: 23, d: 21, yaw: 0 },
-      ...(scene.plan.clubhouse ? [{ label: 'clubhouse approach', kind: 'structure' as const,
-        cx: STORE_CENTER_X - storeWidth / 2 + 10, cz: backWallZ + 10, w: 20, d: 20, yaw: 0 }] : []),
-    ];
+    const frontMerchandise = frontRefreshmentPlacements([...scene.plan.getUnitFootprints(), ...fixtureFootprints, ...reserved.filter(f=>f.label!=='checkout circulation')],
+      { minX: STORE_CENTER_X - storeWidth / 2, maxX: STORE_CENTER_X + storeWidth / 2,
+        minZ: backWallZ, maxZ: FRONT_GLASS_Z });
+    frontMerchandise.forEach(buildFixture);
+    movable.filter(p=>!frontMerchandise.some(f=>f.id===p.id)).forEach(buildFixture);
     floorPromotionPlacements(scene.fixtureContext().libraries, [...scene.plan.getUnitFootprints(), ...fixtureFootprints, ...reserved],
       { minX: STORE_CENTER_X - storeWidth / 2, maxX: STORE_CENTER_X + storeWidth / 2,
-        minZ: backWallZ, maxZ: FRONT_GLASS_Z }, existing).forEach(buildFixture);
+        minZ: backWallZ, maxZ: FRONT_GLASS_Z },
+      existing + Number(frontMerchandise.some(p=>p.id==='floor-promotion-bargain-bin'))).forEach(buildFixture);
   }
   const archPlacements = departmentArchPlacements({
     format: activeStoreFormat().id, ceiling: ceilingY, exposed,
@@ -2735,11 +2772,16 @@ export function buildStore(scene: StoreScene) {
     ...(scene.nrLeftWallCols > 0 ? [{
       id: 'wall-newrelease-left-wall',
       category: 'wall-newrelease',
-      pos: new THREE.Vector3(leftWallXCenter, 9.4, leftWallZCenter),
+      pos: new THREE.Vector3(getActiveTheme().id==='bb-2000' ? STORE_CENTER_X-storeWidth/2+.06 : leftWallXCenter, 9.4, leftWallZCenter),
       yaw: Math.PI / 2,
       length: leftWallShelfWidth,
       localZ: 0.1
     }] : []),
+    // Pin 194: the 2000 star programme continues onto the right wall too.
+    ...(getActiveTheme().id === 'bb-2000' ? scene.nrRuns.filter(run=>run.yaw < -1 && run.x > STORE_CENTER_X + storeWidth/2 - 2 && run.cols > 0).map(run=>({
+      id: 'wall-newrelease-right-wall', category: 'wall-newrelease',
+      pos: new THREE.Vector3(STORE_CENTER_X+storeWidth/2-.06,9.4,run.z), yaw:run.yaw,length:run.length,localZ:.1
+    })) : []),
     // (The red "$3 RENTAL / 2 EVENING NEW RELEASE" card that used to hang
     // here, in front of the New Releases back wall over the floor displays,
     // was removed entirely by owner request — GH #2. The slot construction

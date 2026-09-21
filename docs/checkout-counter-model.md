@@ -104,3 +104,13 @@ gap is closed, and the tape-cleaner display moves onto the rear band. Collision
 and clerk navigation follow the same segment endpoints as the Blender mesh.
 The shared authoring helper cuts an open staff receiver behind the tape-return
 slot. It is also reused by locally installed reference cabinet models.
+
+## Wall and diagonal alignment
+
+The shield outline uses 45-degree shoulders and customer faces: its back
+half-width is 6.2 ft, shoulder half-width 9.8 ft, shoulder depth 3.6 ft and
+tip depth 13.4 ft. The inner worktop and return receiver follow those faces.
+Vestibule door corners and both diagonal aisle arrangements use the same
+45-degree plan grid. The separate returns cabinet uses equal X/Z diagonal
+advances and scales uniformly in the floor plane, including its collision
+segments, so smaller stores cannot skew its angles.

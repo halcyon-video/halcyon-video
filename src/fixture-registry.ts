@@ -28,6 +28,12 @@ import { MirrorColumn } from './fixtures/mirror-column';
 import { CurtainedAlcove } from './fixtures/curtained-alcove';
 import { PottedPlant } from './fixtures/potted-plant';
 import { WallTrackBoard } from './fixtures/wall-track-board';
+import { AcrylicPopcornBin } from './fixtures/acrylic-popcorn-bin';
+import { RotatingMerchandiser } from './fixtures/rotating-merchandiser';
+import { TwoDoorCooler } from './fixtures/two-door-cooler';
+import { ChestFreezer } from './fixtures/chest-freezer';
+import { CandyWallGondola } from './fixtures/candy-wall-gondola';
+import { SecondaryServiceCounter } from './fixtures/secondary-service-counter';
 
 export interface PlacedFixture extends StoreFixture {
   placement: FixturePlacement;
@@ -95,3 +101,10 @@ registerFixtureKind('department-arch', (placement, ctx) => new DepartmentArch(pl
 registerFixtureKind('children-chair', (placement, ctx) => new ChildrenChair(placement, ctx));
 
 registerFixtureKind('clubhouse', (placement, ctx) => new Clubhouse(placement, ctx));
+
+registerFixtureKind('acrylic-popcorn-bin', (placement, ctx) => new AcrylicPopcornBin(placement, ctx));
+registerFixtureKind('rotating-merchandiser', (placement, ctx) => new RotatingMerchandiser(placement, ctx));
+registerFixtureKind('two-door-cooler', (placement, ctx) => new TwoDoorCooler(placement, ctx));
+registerFixtureKind('chest-freezer', (placement, ctx) => new ChestFreezer(placement, ctx));
+registerFixtureKind('candy-wall-gondola', (placement, ctx) => new CandyWallGondola(placement, ctx));
+registerFixtureKind('secondary-service-counter', (placement, ctx) => new SecondaryServiceCounter(placement, ctx));

@@ -81,19 +81,22 @@ export async function compileProgramsInStages(
 
   async function prepareBindings() {
     const programs = (renderer.info.programs ?? []).filter(program => !preparedPrograms.has(program));
-    const pending = programs.map(program => program.program as WebGLProgram);
+    // Keep the Three owner, not just its GL handle: an asynchronous model swap
+    // can dispose its last material while this scene remains alive.
+    const pending = programs.slice();
     if (extension) {
       while (pending.length) {
         await yieldForPrograms(signal);
         if (gl.isContextLost()) return;
         for (let j = pending.length - 1; j >= 0; j--) {
-          if (gl.getProgramParameter(pending[j], extension.COMPLETION_STATUS_KHR)) pending.splice(j, 1);
+          if (!pending[j].program || gl.getProgramParameter(pending[j].program as WebGLProgram, extension.COMPLETION_STATUS_KHR)) pending.splice(j, 1);
         }
       }
     }
     for (const program of programs) {
       await yieldForPrograms(signal);
       if (gl.isContextLost()) return;
+      if (!program.program) continue; // Retired during a yielded completion/binding step.
       if (!extension) gl.getProgramParameter(program.program as WebGLProgram, gl.LINK_STATUS);
       // Drivers also defer uniform/attribute reflection until first use. Prime
       // Three's cached bindings one program per task, instead of doing every

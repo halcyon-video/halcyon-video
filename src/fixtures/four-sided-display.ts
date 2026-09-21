@@ -1,3 +1,4 @@
+import { createFeatureFilmTopper } from './feature-film-topper';
 import * as THREE from 'three';
 import { installDisplayModel } from './display-model';
 import { localFloorDisplayProfile, type FloorDisplayProfile } from './floor-display-profile';
@@ -103,6 +104,8 @@ export class FourSidedDisplay implements SlottedFixture {
     // old milky opacity-0.25 "fog" panes. depthWrite off so the stacked thin
     // panes blend by mesh sort order instead of popping against each other.
     const theme = getActiveTheme();
+    const featureFilm = this.campaign?.id.startsWith('feature-title:') ? this.campaign.faces[0]?.movies[0] : undefined;
+    const opaqueShelves = Boolean(this.profile?.dark && !featureFilm);
     const acrylicMat = new THREE.MeshPhysicalMaterial({
       color: 0xf4f8ff,
       transparent: true,
@@ -122,11 +125,11 @@ export class FourSidedDisplay implements SlottedFixture {
     });
     acrylicMat.userData.envGainTarget = 0.76;
 
-    // Store-brand core: theme primary, satin finish.
-    if (this.profile?.dark) acrylicMat.dispose();
+    // Single-film promotional stands use neutral black; other campaigns follow the store brand.
+    if (opaqueShelves) acrylicMat.dispose();
 
     const coreMat = new THREE.MeshStandardMaterial({
-      color: new THREE.Color(this.profile?.dark ? themeTrimDarkHex(theme) : theme.palette.primary),
+      color: new THREE.Color(featureFilm ? 0x111111 : this.profile?.dark ? themeTrimDarkHex(theme) : theme.palette.primary),
       roughness: 0.4,
       metalness: 0.05
     });
@@ -146,7 +149,7 @@ export class FourSidedDisplay implements SlottedFixture {
     // topper signs (echoes the checkout band's safety stripe) and a dark
     // trim plinth at the floor so the core doesn't dead-end into the carpet.
     const bandMat = new THREE.MeshStandardMaterial({
-      color: new THREE.Color(this.profile?.dark ? themeTrimDarkHex(theme) : theme.palette.secondary), roughness: 0.45, metalness: 0.05
+      color: new THREE.Color(featureFilm ? 0x111111 : this.profile?.dark ? themeTrimDarkHex(theme) : theme.palette.secondary), roughness: 0.45, metalness: 0.05
     });
     const band = new THREE.Mesh(new THREE.BoxGeometry(fallbackCoreSize + 0.03, 0.14, fallbackCoreSize + 0.03), bandMat);
     band.position.set(0, coreHeight - 0.28, 0);
@@ -154,7 +157,7 @@ export class FourSidedDisplay implements SlottedFixture {
     band.receiveShadow = true;
     furniture.add(band);
     const plinthMat = new THREE.MeshStandardMaterial({
-      color: new THREE.Color(themeTrimDarkHex(theme)), roughness: 0.7, metalness: 0.05
+      color: new THREE.Color(featureFilm ? 0x111111 : themeTrimDarkHex(theme)), roughness: 0.7, metalness: 0.05
     });
     const plinth = new THREE.Mesh(new THREE.BoxGeometry(coreWidth + 0.06, 0.22, coreDepth + 0.06), plinthMat);
     plinth.position.set(0, 0.11, 0);
@@ -171,7 +174,7 @@ export class FourSidedDisplay implements SlottedFixture {
     const createSideShelves = () => {
       const group = new THREE.Group();
       this.shelfHeights.forEach((yPos, row) => {
-        const shelf = new THREE.Mesh(displayShelfGeo, this.profile?.dark ? plinthMat : acrylicMat);
+        const shelf = new THREE.Mesh(displayShelfGeo, opaqueShelves ? plinthMat : acrylicMat);
         shelf.position.set(0, yPos, this.profile?.shelfCenters[row] ?? coreDepth / 2 + shelfDepth / 2);
         shelf.rotation.x = rotationX;
         group.add(shelf);
@@ -194,13 +197,9 @@ export class FourSidedDisplay implements SlottedFixture {
     leftShelves.rotation.y = -Math.PI / 2;
     furniture.add(leftShelves);
 
-    // Per-face header: the campaign's label for that face (faces 0..3 =
-    // front/right/back/left, matching getSlots()'s side order), on the 1993
-    // fascia blade in every theme — see promo-topper.ts. Not a billboard:
-    // this carried a 2.25 ft backdrop-and-poster lightbox per face, four to a
-    // stand, which was bigger than anything the real store hung over a floor
-    // fixture and read as a kiosk rather than a display.
-    this.topperFactory = createPromoTopperFactory();
+    // Film promotions use landscape metadata artwork when available, otherwise
+    // a bare flat top. Other campaigns retain their existing fascia labels.
+    this.topperFactory = featureFilm ? createFeatureFilmTopper(featureFilm, this.ctx) : createPromoTopperFactory();
     this.buildGeneration++; // orphan any in-flight art callbacks from a prior build
     const topperY = coreHeight + 0.01;
     // Seat each header just inside its face so the four meet cleanly at the
@@ -228,7 +227,7 @@ export class FourSidedDisplay implements SlottedFixture {
     if (this.profile || (footprintSize === 2 && this.shelfHeights.join(',') === '1.5,2.4,3.3')) {
       this.disposeModel = installDisplayModel(this.ctx, this.group, furniture,
         this.profile?.model ?? 'models/four-sided-merchandiser.glb',
-        { DisplayBody: coreMat, DisplayShelf: this.profile?.dark ? plinthMat : acrylicMat, DisplayTrim: bandMat, DisplayHardware: plinthMat });
+        { DisplayBody: coreMat, DisplayShelf: opaqueShelves ? plinthMat : acrylicMat, DisplayTrim: bandMat, DisplayHardware: plinthMat });
     }
   }
 

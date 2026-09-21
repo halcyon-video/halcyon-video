@@ -3,7 +3,7 @@
 // first parameter and reads/writes scene state exactly as the original methods
 // did.
 //
-// Once per second, using a window that only accumulates ACTIVE-tier frames,
+// Once per two seconds, using a window that only accumulates ACTIVE-tier frames,
 // step resScale down when fps is sagging or up when it's comfortably healthy.
 // Uses its own counters on purpose — a shared rendered-frame count would fold
 // in VIDEO-tier's throttled ~24fps cadence, which would be misread as a slow
@@ -21,7 +21,7 @@ import { pendingTextureUploads } from './poster-textures';
 import type { StoreScene } from './three-scene';
 
 export const RES_SCALE_MAX = 1.0;
-export const RES_SCALE_STEP = 0.05;
+export const RES_SCALE_STEP = 0.1;
 
 // A frame RATE cannot be measured from a single interval. Windows keep
 // accumulating until they hold at least this many frames, so the guard costs
@@ -33,9 +33,8 @@ const SCALER_MIN_FRAMES = 3;
 // rate. See updateDynamicResolution.
 const SCALER_STALL_FRAME_MS = 250;
 
-// Rounds to 2dp to keep repeated +/- 0.05 steps from drifting off the
-// 0.70/0.75/.../1.00 ladder due to binary floating point (e.g. 0.7 + 0.05 !==
-// 0.75 bit-for-bit).
+// Rounds to 2dp to keep repeated +/- 0.1 steps from drifting off the
+// 0.70/0.80/.../1.00 ladder due to binary floating point.
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
@@ -102,7 +101,7 @@ export function updateDynamicResolution(
   // Both conditions, not either: a window that has run its second but holds
   // one or two frames is a stall being read as a frame rate, so let it keep
   // accumulating instead of ruling on it.
-  if (elapsed < 1000 || scene.resScaleFrames < SCALER_MIN_FRAMES) return;
+  if (elapsed < 2000 || scene.resScaleFrames < SCALER_MIN_FRAMES) return;
 
   // A STALLED FRAME IS NOT A FRAME RATE. The upload guard above catches only
   // the streaming half of the boot problem: the rest of a cold boot — store
@@ -150,7 +149,7 @@ export function updateDynamicResolution(
     console.log(`[resScale] ${fps.toFixed(1)}fps < ${downAt.toFixed(0)} — down to ${scene.resScale}`);
   } else if (fps > upAt && scene.resScale < RES_SCALE_MAX) {
     scene.resScaleGoodStreak++;
-    // Require fps to hold above the up-threshold for 2 consecutive seconds
+    // Require fps to hold above the up-threshold for 2 consecutive windows
     // before stepping up, so a single lucky frame doesn't cause up/down
     // oscillation at the edge.
     if (scene.resScaleGoodStreak >= 2) {
@@ -166,4 +165,5 @@ export function updateDynamicResolution(
   scene.resScaleFrames = 0;
   scene.resScaleWindowStart = time;
   scene.resScaleWorstMs = 0;
+  scene.resScalePrevTime = 0; // exclude the resize itself from the next window
 }

@@ -12,7 +12,7 @@ import {
   LIBRARY_X_SPACING, FIELD_Z_FRONT, CENTER_WALKWAY, AISLE_ANGLE, HERRINGBONE_AISLE_ANGLE, BOX_SPACING,
   MAX_SHELF_COLS, UNIT_CAPACITY, UNIT_SIDE_CAPACITY, MAX_RUN_UNITS, RUN_BREAK_GAP, UNIT_SECTIONS,
   SECTION_CAPACITY, TINY_LIBRARY_MOVIES, MIN_CATEGORY_TITLES,
-  STORE_CATEGORY_ORDER, shelfTitleCompare, sectionFillCopies, columnFillCount,
+  STORE_CATEGORY_ORDER, shelfTitleCompare, alphabeticalTitleCompare, sectionFillCopies, columnFillCount,
   collectionCategoryCandidates, shelfCategoryCandidatesOf,
   type LibraryLayout, type ArrangementId, type ShelvingUnit,
   type OverflowPolicy, DEFAULT_OVERFLOW_POLICY, isOverflowTitle,
@@ -65,6 +65,12 @@ export class StorePlan {
   // stands. Persisted like `arrangement` so a reload keeps the same store.
   public overflowPolicy: OverflowPolicy =
     ((typeof localStorage !== 'undefined' && localStorage.getItem('bb_overflow')) as OverflowPolicy) || DEFAULT_OVERFLOW_POLICY;
+
+  // Read afresh with each scene rebuild, like the aisle arrangement. Unknown
+  // saved values keep the established genre layout.
+  public organization: 'genre' | 'alphabetical' =
+    typeof localStorage !== 'undefined' && localStorage.getItem('bb_library_organization') === 'alphabetical'
+      ? 'alphabetical' : 'genre';
 
   public shelvingUnits: ShelvingUnit[] = [];
   // Z of the back wall: a clear margin behind the deepest planned island.
@@ -337,7 +343,13 @@ export class StorePlan {
       const seenIds = new Set<string>();
       const movies = lib.movies
         .filter((m) => (seenIds.has(m.id) ? false : (seenIds.add(m.id), true)))
-        .sort(shelfTitleCompare);
+        .sort(this.organization === 'alphabetical' ? alphabeticalTitleCompare : shelfTitleCompare);
+      if (this.organization === 'alphabetical') {
+        // One continuous run per library, with no category resets or face-out
+        // filler copies interrupting the title order. Series stay single cases;
+        // their season/episode grouping remains inside inspection.
+        return { entries: movies, sectionLabels: new Map<string, string>(), categorized: false };
+      }
       const hasTvShows = movies.some((m) => m.isSeries);
       const fitsOnThreeUnits = movies.length <= 3 * UNIT_CAPACITY;
       // A games-only platform library (games-only.ts) or a streaming-service
@@ -778,7 +790,10 @@ export class StorePlan {
     const dx = -Math.sin(yaw), dz = -Math.cos(yaw); // front -> back along the run
     const nx = Math.cos(yaw), nz = -Math.sin(yaw);  // unit normal (run-to-run step)
     const p = LIBRARY_X_SPACING * Math.cos(yaw);    // pitch keeps the custom X-spacing
-    const Zf = FIELD_Z_FRONT;                       // front edge of the island field
+    // The exit-side front floor is the concessions/bargain zone. Reserve
+    // nine world feet before hatching its shelves; the capacity solver grows
+    // the back of this field rather than discarding any stocked titles.
+    const Zf = FIELD_Z_FRONT - (FORMAT.floorDisplays && field.xHi < STORE_CENTER_X ? 12 : 0);
     const cx = (field.xLo + field.xHi) / 2;
 
     const runsFor = (Zb: number) => {
@@ -827,7 +842,7 @@ export class StorePlan {
       while (qi + take < slice.length && take < run.cap) {
         const itemLib = slice[qi + take].lib;
         if (itemLib !== lastLib) {
-          if (uniqueLibs >= 2) {
+          if (!FORMAT.singleField && uniqueLibs >= 2) {
             break;
           }
           lastLib = itemLib;
@@ -881,7 +896,7 @@ export class StorePlan {
     }
 
     let qi = 0;
-    for (const run of runs) {
+    for (const [runIndex, run] of runs.entries()) {
       if (qi >= slice.length) break;
       // Every chunk poured from THIS run is one physical straight row split
       // only by the maxRunUnits/RUN_BREAK_GAP bookkeeping below — tag them
@@ -889,7 +904,12 @@ export class StorePlan {
       // recognise the split and treat them as one line (see rowGroupId on
       // ShelvingUnit).
       const rowGroupId = lineId;
-      const take = takeFrom(run, qi);
+      // Balance a compact shop's rows before extending any one of them.
+      // Library boundaries remain contiguous in the pour; they do not reserve
+      // empty tail space or force a third small library onto a distant row.
+      const balancedCap = FORMAT.singleField
+        ? Math.ceil((slice.length - qi) / (runs.length - runIndex)) : run.cap;
+      const take = takeFrom({ cap: Math.min(run.cap, balancedCap) }, qi);
       const fzScaled = this.scaleZ(run.fz);
       const chunks = Math.ceil(take / this.maxRunUnits);
       for (let m = 0; m < take; m++) {

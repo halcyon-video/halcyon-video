@@ -105,7 +105,10 @@ export class WallTrackBoard implements StoreFixture {
 
     this.group = new THREE.Group();
     this.group.name = `wall-track-board-${this.placement.id}`;
-    this.group.position.set(this.placement.position.x, surfaceY, this.placement.position.z);
+    // Pin 207: the paired register boards end beside the vestibule mullion.
+    // Keep a real reveal instead of letting the silver frame cross the post.
+    const mullionClearance = this.placement.id === 'wall-track-board-registers' ? -0.36 : 0;
+    this.group.position.set(this.placement.position.x + mullionClearance, surfaceY, this.placement.position.z);
     this.group.rotation.y = this.placement.yaw;
 
     // Build textures and materials
@@ -212,6 +215,9 @@ export class WallTrackBoard implements StoreFixture {
       const fontSize = isHeader ? Math.round(rowH * 0.44) : Math.round(rowH * 0.36);
       ctx.font = isHeader ? `700 ${fontSize}px sans-serif` : `600 ${fontSize}px sans-serif`;
       ctx.textBaseline = 'middle';
+      // Pin 202: measure inside both frame rebates; keep complete row copy.
+      const textWidth=ctx.measureText(text).width, safeWidth=w*.84;
+      if(textWidth>safeWidth) ctx.font=ctx.font.replace(`${fontSize}px`,`${fontSize*safeWidth/textWidth}px`);
 
       if (format === 'tall') {
         if (isHeader) {

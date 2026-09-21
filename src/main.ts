@@ -1,3 +1,7 @@
+import { buildSteamControls } from './steam-settings';
+import { loadSteamGames } from './providers/steam-provider';
+import { isExternalGameActive, onExternalGameChange } from './external-game-state.ts';
+import { playSteamGame } from './steam-playback';
 import { invoke } from '@tauri-apps/api/core';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { measureDisplayHz } from './display-hz';
@@ -61,8 +65,8 @@ import {
 } from './jellyseerr';
 import { reportError } from './error-telemetry';
 import { verifySeerrCredentialsLive } from './seerr-service-status';
-import { fetchGames, launchGame } from './romm';
-import { isGamesOnly, storeCatalog } from './games-only';
+import { fetchGames, launchGame, getRommConfig } from './romm';
+import { storeCatalog } from './games-only';
 import { buildStreamingLibraries, resolveEnabledServices } from './streaming-catalog';
 import {
   getStreamingMovies,
@@ -110,7 +114,8 @@ setStreamingStockResolver(getStreamingMovies);
 import { triggerHostedWelcome, isWelcomeActive, dismissWelcome, welcomeHUDText } from './store-welcome';
 import { showClerkToast } from './carried-tapes';
 import { initSharedPlace } from './shared-place-ui';
-import { refreshHoldHints, setHoldCheckoutProgress, setHoldDismissProgress } from './hold-hints';
+import { canHoldToReturn } from './carry-return-state';
+import { refreshHoldHints, setHoldCheckoutProgress, setHoldDismissProgress, setHoldReturnProgress } from './hold-hints';
 import {
   setupRemotePlay, isRemoteInstance, isRemotelyDriven, reportRemoteFatal,
   clearRemoteFatal, remoteViewerCount, notifyStoreRebuilt,
@@ -600,57 +605,18 @@ async function mergeCollectionGaps(libraries: JellyfinLibrary[]): Promise<number
  * configured, so the section has to be gated here rather than on config alone.
  */
 async function loadGameMovies(): Promise<void> {
-  // Like the Jellyseerr loader, always leave ONE console line saying where
-  // the VIDEO GAMES department stands — an empty corner with no explanation
-  // reads as a layout bug (feedback pin 010), not an integration state.
-  if (!getSetting<boolean>('bb_games_enabled')) {
-    gameMovies = [];
-    logToConsole('[System] Video games: off — enable in Settings to build the department.', 'system');
-    return;
-  }
-  // Games-only asks Romm for the WHOLE library rather than a 192-case slice —
-  // measured at ~7k roms / ~45 MB of JSON on this store, which does not fit in
-  // the department's 20s budget. The timeout is a never-block-boot guard, not a
-  // performance target, so widen it in proportion instead of half-loading the
-  // only catalog the store has.
-  // Must exceed romm.ts's own per-request ceiling, or this race would fire
-  // first and the per-request budget could never do its job — the whole
-  // catalog would be discarded for one slow platform.
-  const TIMEOUT_MS = isGamesOnly() ? 240_000 : 20_000;
-  const TIMED_OUT = Symbol('romm-timeout');
-  const timeoutPromise = new Promise<typeof TIMED_OUT>((resolve) =>
-    setTimeout(() => resolve(TIMED_OUT), TIMEOUT_MS)
-  );
-  try {
-    const result = await Promise.race([fetchGames(), timeoutPromise]);
-    // On timeout, leave gameMovies as whatever it already held rather than
-    // wiping a previously-successful fetch to [] — this matters on a settings
-    // rebuild, where a hung refetch shouldn't blank out the games shelf.
-    if (result === TIMED_OUT) {
-      logToConsole(
-        `[System] Video games: Romm timed out after ${TIMEOUT_MS / 1000}s — keeping ${gameMovies.length} loaded title(s).`,
-        'system'
-      );
-    } else {
-      gameMovies = result;
-      // Games-only owns the whole floor plan, so an empty fetch is not a bare
-      // corner — it's a store with nothing in it. storeCatalog() keeps the
-      // movies up in that case; say so rather than leaving the user to wonder
-      // why the toggle did nothing.
-      logToConsole(
-        gameMovies.length > 0
-          ? `[System] Video games: ${gameMovies.length} title(s) from Romm${isGamesOnly() ? ' — GAMES ONLY: the whole store is the game store.' : '.'}`
-          : isGamesOnly()
-          ? '[System] Video games: GAMES ONLY is on but Romm returned no titles (check romm_url) — keeping the movie shelves.'
-          : '[System] Video games: enabled, but Romm returned no titles (check romm_url and platform toggles) — no department built.',
-        'system'
-      );
-    }
-  } catch (e) {
-    console.warn('[Romm] Failed to load games:', e);
-    gameMovies = [];
-    logToConsole('[System] Video games: Romm fetch failed — no department built (see browser console).', 'system');
-  }
+  if (!getSetting<boolean>('bb_games_enabled')) { gameMovies = []; return; }
+  const steamEnabled = localStorage.getItem('steam_enabled') === '1';
+  // Both optional sources own their timeouts. Steam review scanning can take
+  // longer than the small Romm department and reports its progress in settings.
+  const [romm, steam] = await Promise.allSettled([
+    !getRommConfig() && (steamEnabled || localStorage.getItem('steam_configured') === '1') ? Promise.resolve([] as Movie[]) : fetchGames(),
+    loadSteamGames(),
+  ]);
+  gameMovies = [...(romm.status === 'fulfilled' ? romm.value : []), ...(steam.status === 'fulfilled' ? steam.value : [])];
+  if (romm.status === 'rejected') logToConsole('[System] Romm could not refresh its games.', 'system');
+  if (steam.status === 'rejected') logToConsole('[System] Steam needs attention in Video Games settings.', 'system');
+  logToConsole(`[System] Video games: ${gameMovies.length} titles loaded.`, 'system');
 }
 
 /**
@@ -751,6 +717,11 @@ let settingsPendingReload = false;
 // rebuild-scene setting (theme/arrangement/medium/...) reuses the in-memory
 // gameMovies list instead of paying a network round trip to redraw the wall.
 let settingsPendingGameRefetch = false;
+window.addEventListener('steam-catalog-changed', () => {
+  gameMovies = gameMovies.filter(movie => !movie.steamAppId);
+  settingsPendingGameRefetch = true;
+  settingsPendingRebuild = true;
+});
 // Connection edits made in the drawer: a new Jellyfin password typed there is
 // held here (never persisted — checkCredentialsAndLoad purges any plaintext
 // password at boot) and exchanged for a fresh token on drawer close; a
@@ -782,7 +753,7 @@ let searchResultIndex = 0;
 // ─── UI Helpers ───────────────────────────────────────────────────────────────
 
 const MAX_LOG_ENTRIES = 200;
-// Ring buffer of recent log lines, attached to F8 feedback pins (saved as
+// Ring buffer of recent log lines, attached to Shift+C feedback pins (saved as
 // log.txt next to the pin) so playback narration reaches disk even when the
 // on-screen log is hidden behind the video overlay.
 const recentLogLines: string[] = [];
@@ -979,6 +950,7 @@ let browseHudVisible: boolean | null = null;
 let browseHudName: string | null = null;
 
 function updateBrowseHUDVisibility() {
+  if (isExternalGameActive()) return;
   refreshHoldCheckoutHint(); // piggyback on the same 200ms poll (cheap when unchanged)
   const locator = document.getElementById('browse-locator');
   const hint = document.getElementById('browse-hint');
@@ -1041,6 +1013,7 @@ function updateBrowseHUDVisibility() {
  * what let `c` open the checkout counter underneath a live jump index.
  */
 function shortcutsAllowed(): boolean {
+  if (isExternalGameActive()) return false;
   return !!storeScene && !ui.isAnyOverlayOpen && !ui.isPlaybackActive
     && !ui.isScreensaverActive && !storeScene.isNavOverlayOpen()
     && !hasReachableFocusedControl();
@@ -1317,6 +1290,11 @@ function generateSettingsDrawer() {
         groupEl.appendChild(makeRow(def.key, def.label, resolveHint(def), '', `setting-value-${def.key}`));
       }
     };
+    if (settingsPage === 'Video Games' && settingsSubpage === null) buildSteamControls(groupEl, {
+      registerRow: (key) => { settingsRowKeys.push(key); return settingsRowKeys.length - 1; },
+      selectRow: setSettingsSelection,
+      dirty: () => { settingsPendingGameRefetch = true; settingsPendingRebuild = true; refreshSettingsValues(); updateSettingsStatus(); },
+    });
     if (settingsPage === 'Store Brand') {
       for (const def of settingsInGroup('Store Brand')) appendDefRow(def);
       // Custom LogoSpec editor page (live preview, presets, pickers/sliders) —
@@ -1553,7 +1531,7 @@ function activateSetting(key: string, dir: number) {
     // a fresh Romm fetch; every other rebuild-scene setting can reuse gameMovies.
     // GAMES ONLY changes it the most of all — it swaps a 192-case budgeted
     // slice for the entire Romm library (and back) — so it refetches too.
-    if (key.startsWith('bb_platform_') || key === 'bb_games_only') settingsPendingGameRefetch = true;
+    if (key.startsWith('bb_platform_') || key === 'bb_games_only' || key === 'bb_steam_review_tier') settingsPendingGameRefetch = true;
   } else if (def.applyMode === 'reload') {
     settingsPendingReload = true;
   }
@@ -1757,14 +1735,14 @@ window.addEventListener('halcyon:tv-status', () => {
   }
 });
 
-// ─── Feedback Pin (F8) ────────────────────────────────────────────────────────
-// Lets a user who can't read code flag a visual bug in place: F8 grabs the
+// ─── Feedback Pin (C) ────────────────────────────────────────────────────────
+// Lets a user who can't read code flag a visual bug in place: C grabs the
 // exact camera pose + a screenshot via StoreScene.captureFeedbackSnapshot()
 // (called before this overlay can show, so the camera hasn't moved yet), then
 // this textarea collects what looks wrong. Saved via the vite dev-server
 // middleware in vite.config.ts, which writes it to feedback/NNN/.
 const FEEDBACK_CONFIG_KEYS = [
-  'bb_theme', 'bb_store_format', 'bb_browse_camera', 'bb_medium', 'bb_arrangement', 'bb_outside', 'bb_corner',
+  'bb_theme', 'bb_store_format', 'bb_browse_camera', 'bb_medium', 'bb_arrangement', 'bb_library_organization', 'bb_outside', 'bb_corner',
   'bb_ceiling', 'bb_ceiling_structure', 'bb_storefront', 'bb_render_mode', 'bb_quality', 'bb_reflections', 'bb_walldecor',
 ] as const;
 
@@ -1795,7 +1773,7 @@ function buildFeedbackOverlay(): HTMLDivElement {
   textarea.addEventListener('keydown', (e) => {
     // Mirror makeTextRow's edit-mode pattern (settings drawer text inputs):
     // stopPropagation so the keystroke doesn't also reach the window-level
-    // F8/InputManager listeners.
+    // C/InputManager listeners.
     if (e.key === 'Escape') {
       e.preventDefault();
       e.stopPropagation();
@@ -1820,7 +1798,7 @@ function openFeedbackPin() {
   if (!storeScene || ui.isFeedbackOpen) return;
   // Capture BEFORE the overlay paints, so the screenshot is the view the user
   // was actually looking at, not the feedback card.
-  feedbackSnapshot = storeScene.captureFeedbackSnapshot();
+  feedbackSnapshot = storeScene.captureFeedbackSnapshot(1600);
   if (!feedbackOverlayEl) feedbackOverlayEl = buildFeedbackOverlay();
   const status = document.getElementById('feedback-pin-status');
   if (status) status.textContent = '';
@@ -2400,7 +2378,7 @@ function applyLiveSettings(scene: StoreScene) {
  * changes on close.
  */
 async function rebuildStoreScene() {
-  if (librariesList.length === 0 && gameMovies.length === 0 && getStreamingMovies().length === 0 && storeLibraries.length === 0 && !streamingStockIsStale()) return; // nothing loaded yet
+  if (!settingsPendingGameRefetch && librariesList.length === 0 && gameMovies.length === 0 && getStreamingMovies().length === 0 && storeLibraries.length === 0 && !streamingStockIsStale()) return; // nothing loaded yet
   logToConsole('[System] Applying store changes (rebuilding scene, no reload)...', 'system');
   showBootOverlay();
   // Nothing is interactive behind the overlay — drain texture uploads at burst
@@ -2851,6 +2829,10 @@ async function initializeStoreScene(preservePosterCache = false) {
       // overlay drops, so the player wakes already at the terminal.
       maybeOpenSetupTerminal();
       hideBootOverlay();
+      if (isPublicDemo) {
+        void scene.warmupRuntimePrograms().finally(() => scene.detailLoads?.release())
+          .catch(error => console.warn('[warmup] Hosted preparation failed:', error));
+      }
       // You've just come in through the doors — ring the entry chime. (May stay
       // silent if the browser hasn't seen a user gesture yet; that's fine.)
       scene.playDoorChime();
@@ -3087,6 +3069,7 @@ function handleGapDismiss() {
  * Plays checkout chime when rental goes through. Never throws.
  */
 async function handleGameLaunch(movie: Movie, startHidden = false) {
+  if (movie.steamAppId) { await playSteamGame(movie, (message) => logToConsole(`[Steam] ${message}`, 'system')); return; }
   if (isDemoMode) {
     openDemoPlaybackOverlay(movie.title, startHidden, 'game');
     return;
@@ -3191,6 +3174,7 @@ function expireSession(reason: string) {
 }
 
 async function wakeRefresh() {
+  if (isExternalGameActive()) return;
   if (wakeRefreshInFlight) return;
   const url = localStorage.getItem('jellyfin_url');
   const token = localStorage.getItem('jellyfin_token');
@@ -3779,20 +3763,21 @@ async function main() {
     openSearchWithQuery(e.key);
   });
 
-  // Feedback pin (F8): works in every render mode / camera state, unlike the
+  // Feedback pin (Shift+C): works in every render mode / camera state, unlike the
   // listener above. Ignored while an input/textarea has focus (so it doesn't
   // fire mid-typing elsewhere, e.g. the settings drawer's text rows) or while
   // the login overlay is up (no scene to screenshot yet).
   window.addEventListener('keydown', (e) => {
-    if (e.key !== 'F8') return;
-    if (ui.isLoginOpen || ui.isFeedbackOpen) return;
-    // Only text-entry fields block F8. A plain tag check would also match the
+    if (e.key.toLowerCase() !== 'c' || !e.shiftKey || e.ctrlKey || e.metaKey || e.altKey || e.repeat || e.isComposing) return;
+    if (!storeScene || ui.isLoginOpen || ui.isFeedbackOpen) return;
+    // Only text-entry fields block Shift+C. A plain tag check would also match the
     // video player's volume slider (<input type=range>), which keeps focus
-    // after a click and made F8 dead for the rest of playback.
+    // after a click and made Shift+C dead for the rest of playback.
     if (textEntryHasFocus()) return;
     e.preventDefault();
+    e.stopImmediatePropagation();
     openFeedbackPin();
-  });
+  }, true);
 
   // Demo mode: hide logout/exit and reveal the standing project link route (#133).
   if (isDemoMode) {
@@ -4149,6 +4134,7 @@ async function main() {
       openSearch();
     },
     onActivity: () => {
+      if (isExternalGameActive()) return;
       if (isWelcomeActive()) dismissWelcome();
       if (ui.isScreensaverActive) {
         ui.isScreensaverActive = false;
@@ -4169,6 +4155,7 @@ async function main() {
       }
     },
     onIdle: () => {
+      if (isExternalGameActive()) return;
       // An abandoned exit-confirm must not pin the renderer/audio awake
       // forever (onIdle fires ONCE per idle period, so bailing here meant the
       // screensaver never engaged until the next input). The dialog is
@@ -4242,9 +4229,44 @@ async function main() {
       handleGapDismiss();
     },
     onHoldDownProgress: (p) => setHoldDismissProgress(p),
+    // Hold Back with a tape in hand = return the tape to the shelf. A quick tap
+    // still does Back's normal navigation on RELEASE.
+    isHoldBackArmed: () => {
+      if (!shortcutsAllowed()) return false;
+      if (videoPlayer?.isOpen) return false;
+      if (storeScene?.isWalkAroundMode) return false;
+      if (ui.isAnyOverlayOpen) return false;
+      return !!storeScene && canHoldToReturn(storeScene);
+    },
+    onHoldBack: () => {
+      setHoldReturnProgress(0);
+      storeScene?.returnCarriedTape();
+    },
+    onHoldBackProgress: (p) => setHoldReturnProgress(p),
   };
 
   const inputManager = new InputManager(inputCallbacks);
+  onExternalGameChange((active) => {
+    if (active) {
+      isOccluded = true;
+      stopScreensaverAnimation();
+      retailAudio.suspendForIdle();
+      storeScene?.suspendChimeForIdle();
+      storeScene?.pauseAmbientTvs();
+      storeScene?.pauseRendering();
+      if (aisleIndicatorInterval !== null) { clearInterval(aisleIndicatorInterval); aisleIndicatorInterval = null; }
+    } else {
+      // Let ordinary focus/visibility rules decide when sound and video wake.
+      ui.isScreensaverActive = false;
+      document.getElementById('screensaver-overlay')?.classList.remove('visible');
+      if (document.visibilityState !== 'hidden' && document.hasFocus()) {
+        isOccluded = true;
+        onReveal();
+      }
+      if (aisleIndicatorInterval === null) aisleIndicatorInterval = window.setInterval(updateBrowseHUDVisibility, 200);
+    }
+  });
+
 
   // Touch layer for the 3D store (issue #126) — a no-op DOM-wise on anything
   // but a touch-primary device. See src/store-touch.ts for why this calls
@@ -4282,6 +4304,7 @@ async function main() {
     storeScene?.pauseRendering();
   }
   function onReveal() {
+    if (isExternalGameActive()) return;
     if (!isOccluded) return;
     isOccluded = false;
     if (ui.isScreensaverActive) {
@@ -4329,6 +4352,7 @@ async function main() {
     // front-end to pick up library changes. A localStorage date stamp guarantees
     // at most one reload per calendar day so the minute-poll can't loop.
     window.setInterval(() => {
+      if (isExternalGameActive()) return;
       const now = new Date();
       if (now.getHours() !== 4) return;
       if (!ui.isScreensaverActive || ui.isPlaybackActive) return;

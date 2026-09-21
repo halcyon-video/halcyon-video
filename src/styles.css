@@ -1571,6 +1571,8 @@ html, body {
   position: absolute;
   top: 0;
   left: 0;
+  width: 240px;
+  height: 240px;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -1579,14 +1581,6 @@ html, body {
   filter: drop-shadow(0 0 15px rgba(0, 240, 255, 0.6));
   transition: filter 0.2s ease;
 }
-
-/* Container sized per object so the bounce walls hug it; must cover the
-   largest rotated extent (box diagonal / tilted disc), since the 3D children
-   overflow the layout box as they spin. */
-.screensaver-logo.mode-vhs { width: 150px; height: 230px; }
-.screensaver-logo.mode-disc { width: 195px; height: 200px; }
-.screensaver-logo.mode-vhs .ss-disc { display: none; }
-.screensaver-logo.mode-disc .ss-vhs { display: none; }
 
 .ss-defs {
   position: absolute;
@@ -1599,6 +1593,22 @@ html, body {
   transform-style: preserve-3d;
 }
 
+.ss-pair {
+  position: relative;
+  width: 0;
+  height: 0;
+  transform-style: preserve-3d;
+  transform: scale(var(--ss-pair-scale, 1));
+}
+
+.ss-case-face {
+  position: absolute;
+  top: 0;
+  left: 0;
+  background-color: #17191d;
+  background-size: 100% 100%;
+}
+
 /* ── VHS rental box: the store's own printed wrap, cropped per face
    by screensaver.ts (front / back / left spine). --vhsW/--vhsD are set from
    the printed panel proportions at runtime; the fallbacks below match the
@@ -1606,18 +1616,13 @@ html, body {
 .ss-vhs {
   --vhsW: 114px;
   --vhsD: 30px;
-  position: relative;
+  position: absolute;
   width: var(--vhsW);
   height: 200px;
+  top: -100px;
+  left: calc(-1 * var(--vhsW) / 2);
+  transform: translate3d(0, 0, 0);
   transform-style: preserve-3d;
-}
-
-.ss-vhs-face {
-  position: absolute;
-  top: 0;
-  left: 0;
-  background-color: #17191d;
-  background-size: 100% 100%;
 }
 
 .ss-vhs-front,
@@ -1655,61 +1660,6 @@ html, body {
 .ss-vhs-top { transform: rotateX(90deg) translateZ(100px); }
 .ss-vhs-bottom { transform: rotateX(-90deg) translateZ(100px); }
 
-/* ── DVD disc (label side + rainbow data side, punched hub) ── */
-.ss-disc {
-  position: relative;
-  width: 176px;
-  height: 176px;
-  transform-style: preserve-3d;
-}
-
-.ss-disc-face {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 176px;
-  height: 176px;
-  border-radius: 50%;
-  backface-visibility: hidden;
-  -webkit-mask: radial-gradient(circle, transparent 0 10px, #000 11px);
-  mask: radial-gradient(circle, transparent 0 10px, #000 11px);
-}
-
-.ss-disc-label {
-  transform: translateZ(1px);
-  background:
-    radial-gradient(circle, rgba(226, 232, 240, 0.95) 0 24px, rgba(226, 232, 240, 0) 25px),
-    radial-gradient(circle, #10327e 0 84px, #d8dee6 85px);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding-top: 26px;
-}
-
-.ss-disc-logo {
-  width: 74px;
-  height: auto;
-}
-
-.ss-disc-text {
-  margin-top: auto;
-  padding-bottom: 24px;
-  font-family: var(--font-title);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 4px;
-  color: #ffa903;
-}
-
-.ss-disc-data {
-  transform: rotateY(180deg) translateZ(1px);
-  background:
-    radial-gradient(circle, #d8dee6 0 24px, rgba(216, 222, 230, 0) 25px),
-    conic-gradient(#c8ccd4, #e2b3f0 40deg, #9fd4ff 95deg, #c4f0c0 140deg,
-      #ffe9a8 185deg, #c8ccd4 220deg, #b9a8ff 265deg, #a8e6f0 305deg,
-      #ffc9d8 340deg, #c8ccd4);
-  box-shadow: inset 0 0 3px 1px rgba(255, 255, 255, 0.6);
-}
 
 /* Animations */
 @keyframes flicker {
@@ -2634,7 +2584,7 @@ html, body {
    canvas + StoreScene.enterSearchMode()/setTerminalText()) -- no DOM overlay
    or CSS needed here anymore. */
 
-/* Feedback Pin Overlay (F8, see main.ts openFeedbackPin) -- styled to match
+/* Feedback Pin Overlay (C, see main.ts openFeedbackPin) -- styled to match
    the episode-card / candy-card family. The overlay element itself is built
    in TS (buildFeedbackOverlay), not baked into index.html. */
 #feedback-pin-overlay {

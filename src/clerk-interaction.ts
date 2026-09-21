@@ -187,7 +187,7 @@ export class ClerkInteraction {
     if (this.open) {
       // A modal owns store shortcuts as well as its own arrows. Do not let
       // movement, checkout or search handlers see a conversation keypress.
-      if (e.key === 'F8') return;
+      if (e.key.toLowerCase() === 'c' && !e.ctrlKey && !e.metaKey && !e.altKey) return;
       e.stopImmediatePropagation();
       if (['Tab', ' ', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
         e.preventDefault();

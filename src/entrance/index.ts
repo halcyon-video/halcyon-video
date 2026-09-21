@@ -1,3 +1,5 @@
+import { vestibuleLayout, vestibuleSide, vestibuleStraightSide, vestibuleBackHalf } from '../vestibule-layout.ts';
+import { buildExitReturnCounter } from './exit-return-counter';
 import { buildWalkOffMats } from './walk-off-mats';
 import { installCounterOfficeKit } from '../fixtures/counter-office-kit';
 import { installPriceLabelGun } from '../fixtures/price-label-gun';
@@ -265,7 +267,8 @@ export class EntranceCheckout implements StoreFixture {
     // reveal). A second copy of the formula here is exactly how the facade
     // and the entrance would drift apart on a new format.
     const boxW = hasChamber ? 2 * vestibuleHalfWidth(spec) - 0.4 : 2 * vestibuleHalfWidth(spec);
-    const boxDepth = hasChamber ? doorW * 2 : 0;  // chamber depth = two door-widths (~6.4 ft); none otherwise
+    const chamber = vestibuleLayout(spec);
+    const boxDepth = chamber.depth;
     const frontZ = 15.0;         // street side (front glass wall)
     const backZ = frontZ - boxDepth; // store side (= counter back); == frontZ with no chamber
     const xL = cx - boxW / 2;    // -X (left) wall
@@ -341,14 +344,14 @@ export class EntranceCheckout implements StoreFixture {
     // delineate the narrow sidelights beside the door pair.
     const buildGlazedWall = (
       orient: 'X' | 'Z', fixed: number, s0: number, s1: number, gaps: number[],
-      opts?: { transomY?: number; extraMullions?: number[]; splitTransom?: boolean; sillY?: number; frontSillY?: number },
+      opts?: { transomY?: number; extraMullions?: number[]; splitTransom?: boolean; sillY?: number; frontSillY?: number; singlePanels?: boolean; doorWidth?: number },
     ) => {
       // place a box whose long axis lies along the wall's run direction
       const along = (center: number, lenAlong: number, y: number, h: number, thick: number, mat: THREE.Material) => {
         if (orient === 'X') box(lenAlong, h, thick, mat, center, y, fixed);
         else box(thick, h, lenAlong, mat, fixed, y, center);
       };
-      const gapHalf = doorW / 2;
+      const gapHalf = (opts?.doorWidth ?? doorW) / 2;
       const intervals = gaps.map((g) => [g - gapHalf, g + gapHalf] as [number, number]).sort((a, b) => a[0] - b[0]);
       // solid (glazed) panel intervals = complement of the door gaps
       const panels: [number, number][] = [];
@@ -368,14 +371,14 @@ export class EntranceCheckout implements StoreFixture {
       // glass runs uninterrupted; only the wall's end posts run full height.
       const verts = new Set<number>([s0, s1]);
       intervals.forEach(([a, b]) => { verts.add(a); verts.add(b); });
-      if (!opts?.transomY) panels.forEach(([a, b]) => { if (b - a > 4.5) verts.add((a + b) / 2); });
+      if (!opts?.transomY && !opts?.singlePanels) panels.forEach(([a, b]) => { if (b - a > 4.5) verts.add((a + b) / 2); });
       opts?.extraMullions?.forEach((v) => verts.add(v));
       verts.forEach((v) => {
         const fullHeight = opts?.splitTransom || !opts?.transomY || Math.abs(v - s0) < 0.01 || Math.abs(v - s1) < 0.01;
         // Only door jambs reach the floor. Fixed sidelight posts sit on the
         // masonry sill instead of cutting a dark stripe through its face.
         const isDoorJamb = intervals.some(([a, b]) => Math.abs(v - a) < 0.01 || Math.abs(v - b) < 0.01);
-        const bottom = isDoorJamb ? 0 : (orient === 'Z' && Math.abs(v - frontZ) < .01 ? opts?.frontSillY ?? sillY : sillY);
+        const bottom = isDoorJamb ? 0 : (orient === 'Z' && Math.abs(v - s1) < .01 ? opts?.frontSillY ?? sillY : sillY);
         const top = fullHeight ? wallH : doorH;
         along(v, frameT, (top + bottom) / 2, top - bottom, frameD, frameMat);
       });
@@ -400,7 +403,7 @@ export class EntranceCheckout implements StoreFixture {
       }
     };
 
-    const sideDoorZ = backZ + doorW / 2 + 0.4; // side doors sit on the store-side (inner) half
+    const sideDoorZ = hasChamber ? vestibuleSide(spec,-1,cx).doorZ : chamber.sideDoorZ;
     this.vestibuleInfo = { cx, xL, xR, frontZ, backZ, doorW, sideDoorZ, hasChamber };
     const doorMats = { frameMat, glassMat, chrome };
     if (hasChamber && this.ctx.wallSurface) {
@@ -454,24 +457,38 @@ export class EntranceCheckout implements StoreFixture {
       // uprights — so each leaf's own static frame parts are all suppressed
       // (duplicating them would coincide with those posts and z-fight).
       //
-      // Swing leaves hinge at the OUTER jambs (exit swings out to the street,
-      // entrance swings into the vestibule — both openAngle -1.4 given their
-      // mirrored hinge sides). For the 'sliding' doorStyle the same flag is the
+      // Viewed from outside, the entrance hinges left and opens inward.
+      // The exit keeps its existing outward swing. For the 'sliding' doorStyle the same flag is the
       // slide direction instead: the pair parts from the centre, each leaf
       // tucking into a pocket behind the sidelight glass on its own side.
       const sliding = spec.doorStyle === 'sliding';
       const noFrame = { header: false, jambLeft: false, jambRight: false };
       this.doors.push(buildVestibuleDoor(this.ctx, group, doorMats, spec, exitX, frontZ, doorH, true, !sliding, -1.4, noFrame));
-      this.doors.push(buildVestibuleDoor(this.ctx, group, doorMats, spec, entrX, frontZ, doorH, true, sliding, -1.4, noFrame));
+      this.doors.push(buildVestibuleDoor(this.ctx, group, doorMats, spec, entrX, frontZ, doorH, true, true, 1.4, noFrame));
 
       // ----- Back wall (Z = backZ): glass too, so the whole chamber is glazed -----
-      buildGlazedWall('X', backZ, xL, xR, []);
+      const backHalf = vestibuleBackHalf(spec);
+      buildGlazedWall('X', backZ, cx - backHalf, cx + backHalf, []);
 
-      // ----- Side walls (glass), each with one door on the inner (store-side) half -----
-      buildGlazedWall('Z', xR, backZ, frontZ, [sideDoorZ], { frontSillY: 2 }); // right wall -> into store
-      buildGlazedWall('Z', xL, backZ, frontZ, [sideDoorZ], { frontSillY: 2 }); // left wall  -> exiters enter
-      this.doors.push(buildVestibuleDoor(this.ctx, group, doorMats, spec, xR, sideDoorZ, doorH, false, true, 1.4));
-      this.doors.push(buildVestibuleDoor(this.ctx, group, doorMats, spec, xL, sideDoorZ, doorH, false, true, 1.4));
+      // Straight frontage panels turn into diagonal door assemblies at the
+      // checkout corners, mirroring the shield shoulders.
+      for (const side of [-1, 1] as const) {
+        const wall = vestibuleSide(spec, side, cx);
+        const straight = vestibuleStraightSide(spec,side,cx);
+        buildGlazedWall('Z', straight.x, straight.z, frontZ, [], {singlePanels:true});
+        const assembly = new THREE.Group(); assembly.name = `vestibule-side-${side}`;
+        const first = group.children.length;
+        buildGlazedWall('Z', 0, 0, wall.length, [wall.doorAlong], {singlePanels:true,doorWidth:wall.doorWidth});
+        for (const child of group.children.slice(first)) assembly.add(child);
+        // From inside the vestibule, the entrance hinges right and opens
+        // into the sales floor. The leaf fills the whole diagonal panel.
+        const door = buildVestibuleDoor(this.ctx, assembly, doorMats, {...spec,doorWidth:wall.doorWidth}, 0, wall.doorAlong,
+          doorH, false, side === -1, -1.4, noFrame);
+        assembly.position.set(wall.x, 0, wall.z); assembly.rotation.y = wall.yaw;
+        group.add(assembly);
+        door.center.set(wall.doorX, door.center.y, wall.doorZ);
+        this.doors.push(door);
+      }
 
       // ----- Central glass divider splitting entrance (+X) from exit (-X) -----
       buildGlazedWall('Z', cx, backZ, frontZ, []);
@@ -496,11 +513,33 @@ export class EntranceCheckout implements StoreFixture {
         const wallSurf = this.ctx.wallSurface;
         const capMat = wallSurf?.material
           ?? new THREE.MeshStandardMaterial({ color: new THREE.Color(themeKneeGoldHex()), roughness: 0.92, metalness: 0.0 });
-        const capGeo = new THREE.BoxGeometry(boxW, capH, boxDepth);
-        if (wallSurf) mapWallSegmentUV(capGeo, boxW, capH, wallH, wallSurf.storeWidth, wallSurf.roomHeight);
+        const corner = vestibuleStraightSide(spec,1,cx);
+        const outline = new THREE.Shape();
+        outline.moveTo(-backHalf,-backZ);
+        outline.lineTo(backHalf,-backZ);
+        outline.lineTo(corner.x-cx,-corner.z);
+        outline.lineTo(corner.x-cx,-frontZ);
+        outline.lineTo(cx-corner.x,-frontZ);
+        outline.lineTo(cx-corner.x,-corner.z);
+        outline.closePath();
+        const capGeo = new THREE.ExtrudeGeometry(outline,{depth:capH,bevelEnabled:false});
+        capGeo.rotateX(-Math.PI/2);
+        if (wallSurf) {
+          // Extrusion UVs are already in feet, unlike the normalized box UVs.
+          // Project each vertical face along its tangent at the wall texture density.
+          const pos = capGeo.getAttribute('position'), normal = capGeo.getAttribute('normal');
+          const uv = capGeo.getAttribute('uv');
+          for (let i = 0; i < pos.count; i++) {
+            const u = pos.getX(i) * normal.getZ(i) - pos.getZ(i) * normal.getX(i);
+            if (Math.abs(normal.getY(i)) > .5) {
+              uv.setXY(i,pos.getX(i)/wallSurf.storeWidth,-pos.getZ(i)/wallSurf.roomHeight);
+            } else uv.setXY(i, u / wallSurf.storeWidth, (pos.getY(i) + wallH) / wallSurf.roomHeight);
+          }
+          uv.needsUpdate = true;
+        }
         const cap = new THREE.Mesh(capGeo, capMat);
         cap.name = 'vestibule-solid-cap';
-        cap.position.set(cx, wallH + capH / 2, (frontZ + backZ) / 2);
+        cap.position.set(cx, wallH, 0);
         cap.castShadow = true;
         cap.receiveShadow = true;
         group.add(cap);
@@ -653,6 +692,8 @@ export class EntranceCheckout implements StoreFixture {
         : [standingAt(spec.counterShape === 'usquare' ? -3.5 : -4), standingAt(spec.counterShape === 'usquare' ? 3.5 : 4)],
     };
 
+    this.clerkNavInfo.footprints.push(...buildExitReturnCounter(this.ctx, group, this.vestibuleInfo));
+
     // Anchor offsets ALONG the inner island, in feet from its centre. The
     // usquare counter's island is shorter (±5.0 vs the shield's ±6.0 — see
     // counter.ts islandHalf), so everything that parks ON it pulls
@@ -709,7 +750,7 @@ export class EntranceCheckout implements StoreFixture {
     // 90s video stores only. The face is picked per counter shape from
     // the same outline constants counter.ts builds from (mirrored here like
     // the BAND_H trio below — that file stays layout-agnostic): the shield's
-    // right shoulder edge runs (cx+9.8, zBackC-6.24) -> (cx+6.2, zBackC), the
+    // right shoulder edge runs (cx+10.5, zBackC-4.3) -> (cx+6.2, zBackC), the
     // usquare's right side sits flat at x = cx+6.8. Both faces clear the
     // vestibule glazing (z >= 8.6) and the store-side door's swing. The chute
     // protrudes into walkable floor now, so its footprint joins the clerk nav
@@ -755,7 +796,7 @@ export class EntranceCheckout implements StoreFixture {
       } else {
         // Midpoint of the shield's right shoulder edge, facing its outward
         // normal (out toward the walk-in corridor along the vestibule).
-        const ax = cx + 9.8, az = zBackC - 6.24; // shoulder vertex
+        const ax = cx + 10.5, az = zBackC - (10.5 - 6.2); // shoulder vertex
         const bx = cx + 6.2, bz = zBackC;        // back-right vertex
         anchor = { x: (ax + bx) / 2, z: (az + bz) / 2 };
         // Edge tangent (t) -> outward normal (t.z, -t.x); yaw with n = (sin, cos).

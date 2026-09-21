@@ -1,3 +1,4 @@
+import { waitForExternalGame } from './external-game-state.ts';
 // Cover-art byte prefetch: start the poster downloads BEFORE the store build.
 //
 // buildAllMovieBoxes() (store-stock.ts) only queues a cover for decode at the
@@ -82,6 +83,7 @@ export function prefetchPosterBytes(urls: Iterable<string>, resolveUrl: (url: st
     };
     const drain = async (): Promise<void> => {
       while (next < list.length) {
+        await waitForExternalGame();
         const url = list[next++];
         if (budgetExhausted) { pending.delete(url); continue; }
         let resolveIt: (b: ArrayBuffer | null) => void = () => {};

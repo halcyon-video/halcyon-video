@@ -26,7 +26,7 @@ import {
 } from '../canvas-textures';
 import { dressing93Active } from '../genre-colors';
 import { getActiveTheme } from '../themes';
-import { createExtrudedMaterials, create3DDoubleLayeredSign, create3DExtrudedSign } from '../sign-builders';
+import { markSignMesh, createExtrudedMaterials, create3DDoubleLayeredSign, create3DExtrudedSign } from '../sign-builders';
 import { SECTION_COLS, BOX_SPACING } from '../store-layout';
 import { installWireSnapFrame } from './wire-snap-frame-model';
 
@@ -326,16 +326,16 @@ export function buildSignage(ctx: FixtureContext, slots: SignSlot[], activeSigna
         });
         const badgeGeo = new THREE.PlaneGeometry(badgeSize, badgeSize);
         const pitch = 18.0; // ft between badge centers — sparse (halved from 9)
-        const n = Math.max(1, Math.round(length / pitch));
+        const n = slot.id.endsWith('-wall') ? 1 : Math.max(1, Math.floor(length / pitch));
         // Wider end inset so the outermost badges sit clear of the corners
         // instead of crowding right up against them.
         const endInset = 1.2;
         const usable = Math.max(0, length - badgeSize - 2 * endInset);
         for (let i = 0; i < n; i++) {
-          const x = n > 1 ? -length / 2 + badgeSize / 2 + endInset + (usable * i) / (n - 1) : 0;
-          const badge = new THREE.Mesh(badgeGeo, badgeMat);
+          const x = n > 1 ? -usable / 2 + usable * (i + .5) / n : 0;
+          const badge = markSignMesh(new THREE.Mesh(badgeGeo, badgeMat));
           badge.position.set(x, badgeY, localZ);
-          badge.layers.set(1);
+          // Printed badges receive the same room lights and shadows as the wall.
           wallGroup.add(badge);
         }
         attemptUserSignArt(wallGroup, badgeTex,

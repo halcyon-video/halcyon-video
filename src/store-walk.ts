@@ -1,3 +1,5 @@
+import { constrainWalkObstacles } from './walk-collision';
+import { vestibuleSide, vestibuleStraightSide, clampVestibuleSide, vestibuleBackHalf } from './vestibule-layout';
 // First-person walk-around mode — extracted from StoreScene (three-scene.ts
 // keeps one-line delegating stubs): pointer-lock acquisition, walk clicks
 // (shelf case pick-up + inspect), slot raycast resolution, the collision
@@ -163,7 +165,7 @@ export function getSlotFromIntersection(scene: StoreScene, object: THREE.Object3
   return null;
 }
 
-export function constrainWalkPosition(scene: StoreScene, oldX: number, oldZ: number, newX: number, newZ: number, storeWidth: number, minZ: number): { x: number; z: number } {
+function constrainWalkStructure(scene: StoreScene, oldX: number, oldZ: number, newX: number, newZ: number, storeWidth: number, minZ: number): { x: number; z: number } {
   const r = 1.5;
   const r_door = 0.5;
   const minX = 11.0 - storeWidth / 2 + r;
@@ -195,54 +197,40 @@ export function constrainWalkPosition(scene: StoreScene, oldX: number, oldZ: num
   // clamps 1-4 (the airlock's back/side/divider walls) don't apply, and
   // clamp 5's door gap is the single leaf instead of the paired exit/entrance.
   const hasChamber = vest ? vest.hasChamber : true;
+  const wallBack = vest?.backZ ?? 8.6, wallFront = vest?.frontZ ?? 15;
+  const dividerX = vest?.cx ?? 11;
 
   if (hasChamber) {
-    // 1. Vestibule back wall (Z = 8.6, X between 3.3 and 18.7)
-    if (x > 3.3 - r && x < 18.7 + r) {
-      if (oldZ < 8.6) {
-        z = Math.min(8.6 - r, z);
-      } else if (oldZ >= 8.6) {
-        z = Math.max(8.6 + r, z);
+    // 1. Vestibule back wall (Z = wallBack, X between wallLeft and wallRight)
+    if (Math.abs(x-dividerX) < vestibuleBackHalf(scene.storefrontSpec)+r) {
+      if (oldZ < wallBack) {
+        z = Math.min(wallBack - r, z);
+      } else if (oldZ >= wallBack) {
+        z = Math.max(wallBack + r, z);
       }
     }
 
-    // 2. Vestibule central divider (X = 11.0, Z between 8.6 and 15.0)
-    if (z > 8.6 - r && z < 15.0 + r) {
-      if (oldX < 11.0) {
-        x = Math.min(11.0 - r, x);
-      } else if (oldX >= 11.0) {
-        x = Math.max(11.0 + r, x);
+    // 2. Vestibule central divider (X = dividerX, Z between wallBack and wallFront)
+    if (z > wallBack - r && z < wallFront + r) {
+      if (oldX < dividerX) {
+        x = Math.min(dividerX - r, x);
+      } else if (oldX >= dividerX) {
+        x = Math.max(dividerX + r, x);
       }
     }
   }
 
-  const sideDoorZ0 = vest ? vest.sideDoorZ - vest.doorW / 2 : 9.0;
-  const sideDoorZ1 = vest ? vest.sideDoorZ + vest.doorW / 2 : 12.2;
   // Single-leaf entrance: one gap centred on the door, no separate exit leaf.
   const exitFrontX0 = vest && !hasChamber ? vest.cx : (vest ? vest.cx - vest.doorW : 7.8);
-  const exitFrontX1 = vest && !hasChamber ? vest.cx : (vest ? vest.cx : 11.0);
-  const entrFrontX0 = vest && !hasChamber ? vest.cx - vest.doorW / 2 : (vest ? vest.cx : 11.0);
+  const exitFrontX1 = vest && !hasChamber ? vest.cx : (vest ? vest.cx : dividerX);
+  const entrFrontX0 = vest && !hasChamber ? vest.cx - vest.doorW / 2 : (vest ? vest.cx : dividerX);
   const entrFrontX1 = vest && !hasChamber ? vest.cx + vest.doorW / 2 : (vest ? vest.cx + vest.doorW : 14.2);
 
   if (hasChamber) {
-    // 3. Vestibule left wall (X = 3.3, Z between 8.6 and 15.0), side door at sideDoorZ
-    const isAtLeftSideDoor = z >= sideDoorZ0 + r_door && z <= sideDoorZ1 - r_door;
-    if (z > 8.6 - r && z < 15.0 + r && !isAtLeftSideDoor) {
-      if (oldX < 3.3) {
-        x = Math.min(3.3 - r, x);
-      } else if (oldX >= 3.3) {
-        x = Math.max(3.3 + r, x);
-      }
-    }
-
-    // 4. Vestibule right wall (X = 18.7, Z between 8.6 and 15.0), side door at sideDoorZ
-    const isAtRightSideDoor = z >= sideDoorZ0 + r_door && z <= sideDoorZ1 - r_door;
-    if (z > 8.6 - r && z < 15.0 + r && !isAtRightSideDoor) {
-      if (oldX > 18.7) {
-        x = Math.max(18.7 + r, x);
-      } else if (oldX <= 18.7) {
-        x = Math.min(18.7 - r, x);
-      }
+    for (const side of [-1,1] as const) for (const wall of [vestibuleSide(scene.storefrontSpec,side,dividerX),vestibuleStraightSide(scene.storefrontSpec,side,dividerX)]) {
+      const resolved=clampVestibuleSide({x,z},{x:oldX,z:oldZ},
+        wall,scene.storefrontSpec.doorWidth,r,r_door);
+      x=resolved.x;z=resolved.z;
     }
   }
 
@@ -274,6 +262,20 @@ export function constrainWalkPosition(scene: StoreScene, oldX: number, oldZ: num
   scene._constrainedWalk.x = x;
   scene._constrainedWalk.z = z;
   return scene._constrainedWalk;
+}
+
+const walkObstacleBounds = { minX: 0, maxX: 0, minZ: 0, maxZ: 43 };
+
+export function constrainWalkPosition(scene: StoreScene, oldX: number, oldZ: number, newX: number, newZ: number, storeWidth: number, minZ: number): { x: number; z: number } {
+  const structural = constrainWalkStructure(scene, oldX, oldZ, newX, newZ, storeWidth, minZ);
+  walkObstacleBounds.minX = 11 - storeWidth / 2 + 1.5;
+  walkObstacleBounds.maxX = 11 + storeWidth / 2 - 1.5;
+  walkObstacleBounds.minZ = minZ;
+  const result = constrainWalkObstacles(oldX, oldZ, structural.x, structural.z,
+    scene.clerkNavRects, scene._constrainedWalk, .45, walkObstacleBounds);
+  // A rotated slide or start-inside recovery must not cross the room shell
+  // or the closed part of a doorway after its original structural clamp.
+  return constrainWalkStructure(scene, oldX, oldZ, result.x, result.z, storeWidth, minZ);
 }
 
 export function updateWalkHUD(scene: StoreScene) {

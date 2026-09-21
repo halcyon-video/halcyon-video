@@ -1,3 +1,4 @@
+import { counterDatumShift } from './vestibule-layout.ts';
 import { fitDepartmentArch, type DepartmentArchHost } from './fixtures/department-arch-layout';
 // Service-wall dressing follows the live facade/door datum, not a fixed floor placement.
 export { WALL_COURTESY_PHONE } from './fixtures/wall-courtesy-telephone';
@@ -118,13 +119,8 @@ export const DEFAULT_FIXTURE_PLACEMENTS: FixturePlacement[] = [
   // period hosts the kit — so on the 2008-fabric bb-2010 theme it stands, and
   // a 2012 period (or a theme with no period at all) simply doesn't get one.
   //
-  // Pin 152 places it on the EXIT (-X) side at (-5,9), out of the entrance and
-  // register flow. The table footprint spans x -8.1..-1.9 and z 7.65..10.35:
-  // 3.9 ft from the minimum-width store wall, 4.65 ft behind the front glass,
-  // and 3.7 ft edge-to-edge from the release cart at (-5,3).
-  // The counter's mirrored outer reach is x=1.2, so x=-5 clears it in X at
-  // every z; its two browse-camera standoffs, z=5.55 and 12.45, remain inside
-  // the open front floor. The vestibule begins more than five feet to its +X.
+  // Owner pin 162: the return counter now occupies the old fixed position.
+  // store-shell admits this table into a measured free pocket at build time.
   {
     id: 'pv-drape-table-front',
     kind: 'pv-drape-table',
@@ -402,6 +398,12 @@ const FLOOR_DISPLAY_KINDS = new Set([
   'previously-viewed-bin',
   'gold-clamshell',
   'rope-stanchions',
+  'acrylic-popcorn-bin',
+  'rotating-merchandiser',
+  'two-door-cooler',
+  'chest-freezer',
+  'candy-wall-gondola',
+  'secondary-service-counter',
 ]);
 
 // Fixture kinds that mount ON the checkout counter's walk-in BAND — its blue
@@ -476,7 +478,7 @@ export function admitFixturePlacements(
     && (!noBand || !COUNTER_BAND_KINDS.has(p.kind)));
 }
 
-export function counterAnchoredPlacements(
+function originalCounterAnchoredPlacements(
   spec: { counterShape: CounterShape; doorWidth: number; entryStyle: 'vestibule' | 'storefront-door' },
   storeWidth: number,
 ): FixturePlacement[] {
@@ -573,13 +575,6 @@ export function counterAnchoredPlacements(
         options: { footprintWidth: 1.5, footprintDepth: 10.5 }
       },
       {
-        id: 'candy-display-front',
-        kind: 'candy-display',
-        position: { x: 9.0, z: -4.45 }, // keep rear edge clear of band at z=-3.6
-        yaw: 0,
-        options: { rows: 5, footprintWidth: 3.0, dispenserPacks: true }
-      },
-      {
         id: 'tape-rewinder-counter',
         kind: 'tape-rewinder',
         position: { x: 13.5, z: -1.3 }, // inner island spine (front -2.1 + innerD/2)
@@ -597,37 +592,38 @@ export function counterAnchoredPlacements(
   }
   // Shield pentagon, derived from counter.ts's points with the default
   // storefront (doorWidth 3.2 => counter back z 8.5): (4.8, 8.5) →
-  // (1.2, 2.26) → (11, -5.5) → (20.8, 2.26) → (17.2, 8.5). Segment ends are
-  // trimmed 1.4 ft at shared corners so adjacent rects don't SAT-overlap each
-  // other at the mitred joints, and the walk-through gap near (1.2, 2.26)
-  // (GAP_TRIM 2.2 in counter.ts) is left open.
+  // (.5, 4.2) → (11, -6.3) → (21.5, 4.2) → (17.2, 8.5). Segment ends are
+  // trimmed 1.55 ft at shared corners so adjacent rects don't SAT-overlap each
+  // other at the mitred joints, and the walk-through gap on the left shoulder
+  // (2.2 feet trimmed on each edge at the left corner) is left open.
   return [
     ...(() => {
-      const a={x:4.8,z:8.5}, b={x:1.2,z:2.26}, c={x:11,z:-5.5};
+      const a={x:4.8,z:8.5}, b={x:.5,z:4.2}, c={x:11,z:-6.3};
       const length=Math.hypot(b.x-a.x,b.z-a.z), tx=(b.x-a.x)/length, tz=(b.z-a.z)/length;
-      const at=(d:number)=>({x:a.x+tx*d,z:a.z+tz*d});
+      const shoulderEnd={x:b.x-tx*2.2,z:b.z-tz*2.2};
+      const frontStart={x:b.x+Math.SQRT1_2*2.2,z:b.z-Math.SQRT1_2*2.2};
       // Conservative rectangular cores avoid overlapping at mitred joins.
       // The built counter supplies the complete collision and clerk boundaries.
-      return [[a,at(1)],[at(4.6),b],[b,c]].map(([p,q],i)=>{
+      return [[a,shoulderEnd],[frontStart,c]].map(([p,q],i)=>{
         const len=Math.hypot(q.x-p.x,q.z-p.z), nx=-(q.z-p.z)/len,nz=(q.x-p.x)/len;
         return {id:`counter-band-doorway-left-${i}`,kind:'structure-footprint',
           position:{x:(p.x+q.x)/2+nx*.75,z:(p.z+q.z)/2+nz*.75},
-          yaw:Math.atan2(-(q.z-p.z),q.x-p.x),options:{footprintWidth:Math.max(.35,len-2.8),footprintDepth:1.5}};
+          yaw:Math.atan2(-(q.z-p.z),q.x-p.x),options:{footprintWidth:Math.max(.05,len-3.1),footprintDepth:1.5}};
       });
     })(),
     {
       id: 'counter-band-front-right',
       kind: 'structure-footprint',
-      position: { x: 15.43, z: -1.03 },
-      yaw: -0.6697,
-      options: { footprintWidth: 9.7, footprintDepth: 1.5 }
+      position: { x: 16.25 - .75*Math.SQRT1_2, z: -1.05 + .75*Math.SQRT1_2 },
+      yaw: -Math.PI/4,
+      options: { footprintWidth: 10.5*Math.SQRT2-3.1, footprintDepth: 1.5 }
     },
     {
       id: 'counter-band-shoulder-right',
       kind: 'structure-footprint',
-      position: { x: 18.35, z: 5.01 },
-      yaw: -2.0941,
-      options: { footprintWidth: 4.4, footprintDepth: 1.5 }
+      position: { x: 19.35 - .75*Math.SQRT1_2, z: 6.35 - .75*Math.SQRT1_2 },
+      yaw: -3*Math.PI/4,
+      options: { footprintWidth: 4.3*Math.SQRT2-3.1, footprintDepth: 1.5 }
     },
     {
       id: 'counter-band-back',
@@ -636,40 +632,28 @@ export function counterAnchoredPlacements(
       yaw: 0,
       options: { footprintWidth: 9.6, footprintDepth: 1.5 }
     },
-    // Candy display (#60): queue-line rack abutting the STORE-side face of
-    // the left front band segment (centreline (6.88, -1.28), yaw 0.6697),
-    // pushed out along the band's store-side normal by bandD/2 + rackDepth/2
-    // + 0.05 ft so its footprint sits just clear of the band footprint.
-    {
-      id: 'candy-display-front',
-      kind: 'candy-display',
-      position: { x: 5.81066, z: -2.47278 },
-      yaw: 0.6697,
-      options: { rows: 5, footprintWidth: 3.0, dispenserPacks: true }
-    },
+    // Pin 170: queue candy now belongs to the shared concessions run.
     // Rewinder on the inner rental counter's top — z matches counter.ts's
     // getInnerCounterSpine(13.9), yaw matches that segment's rotY. See
     // TapeRewinder's build() for why these are constants, not a live anchor.
     {
       id: 'tape-rewinder-counter',
       kind: 'tape-rewinder',
-      position: { x: 13.9, z: -0.27 },
-      yaw: -0.6697
+      position: { x: 13.9, z: -6.3 + 1.5*Math.SQRT2 + 2.9 + .8*Math.SQRT2 },
+      yaw: -Math.PI/4
     },
     // Head-cleaner merchandise remains dormant.
     // Tip jar on the FRONT-RIGHT band top, 3.4 ft up the segment from the
     // apex: the stretch a customer stands at while the clerk works the
     // register, and the opposite end of the counter from the bag's wait spot
     // (store-checkout.ts parks it at the -X gap end) so neither ritual has to
-    // step around it. Position = apex (11, -5.5) + 3.4 along the segment
-    // direction (0.784, 0.621), then the band's own inward normal
-    // (-0.621, 0.784) x bandD/2 — the same construction the footprint above
-    // uses. Yaw points the card's print back out along that normal.
+    // step around it. Follow the 45-degree segment 3.4 feet from its apex,
+    // then move inward by half the band depth. The card faces the customer.
     {
       id: 'tip-jar-counter',
       kind: 'tip-jar',
-      position: { x: 13.20, z: -2.80 },
-      yaw: 2.4719,
+      position: { x: 11 + (3.4-.75)*Math.SQRT1_2, z: -6.3 + (3.4+.75)*Math.SQRT1_2 },
+      yaw: 3*Math.PI/4,
     },
   ];
 }
@@ -677,8 +661,8 @@ export function counterAnchoredPlacements(
 export function gameSectionPlacements(storeWidth: number): FixturePlacement[] {
   if (storeWidth >= 50) {
     const rows = [
-      { z: 0.96, yaw: -Math.PI / 2 },  // field-side row, stocked face north
-      { z: 7.92, yaw: Math.PI / 2 },   // glass-side row, stocked face south
+      { z: 0.96, yaw: -Math.PI / 2 },  // freestanding field-side row, both faces stocked
+      { z: 7.92, yaw: Math.PI / 2 },   // freestanding glass-side row, both faces stocked
     ];
     // Each 12-col unit's shelf length is (12 - 1) * BOX_SPACING + 1.0 = 7.38 ft.
     const unitLength = (12 - 1) * BOX_SPACING + 1.0;
@@ -710,7 +694,7 @@ export function gameSectionPlacements(storeWidth: number): FixturePlacement[] {
           yaw: row.yaw,
           options: {
             genre: 'Video Games', relativeToLeftWall: true,
-            units: 4, unit, faces: 'front',
+            units: 4, unit, faces: 'both',
             hasFrontCap, hasBackCap,
           }
         });
@@ -724,9 +708,9 @@ export function gameSectionPlacements(storeWidth: number): FixturePlacement[] {
     {
       id: 'game-section-w',
       kind: 'game-section',
-      position: { x: 10.5, z: 8.95 },
-      yaw: Math.PI / 2,
-      options: { genre: 'Video Games', relativeToLeftWall: true, units: 1, unit: 0 }
+      position: { x: storeWidth - .3, z: 6.8 },
+      yaw: Math.PI,
+      options: { genre: 'Video Games', relativeToLeftWall: true, units: 1, unit: 0, faces: 'front', sectionsPerSide: 4 }
     }
   ];
 }
@@ -752,3 +736,8 @@ export function departmentArchPlacements(host: DepartmentArchHost): FixturePlace
 }
 
 export { childrenChairPlacements } from './fixtures/clubhouse-layout';
+
+export function counterAnchoredPlacements(spec: { counterShape: CounterShape; doorWidth: number; entryStyle: 'vestibule' | 'storefront-door' }, storeWidth: number): FixturePlacement[] {
+  const shift = spec.counterShape === 'desk' ? 0 : counterDatumShift(spec);
+  return originalCounterAnchoredPlacements(spec, storeWidth).map(p => ({...p, position:{...p.position,z:p.position.z+shift}}));
+}

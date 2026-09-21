@@ -1,0 +1,230 @@
+{
+  "units": "feet",
+  "origin": "floor-centred; X across, Y in-depth, Z up (Blender)",
+  "parts": [
+    {
+      "name": "PedestalToeKick",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PedestalCarcass",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PedestalTopDeck",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "BinBasePlate",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "BinBackWall",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "BinLeftWall",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "BinRightWall",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "BinFrontWall",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PopcornBag_0",
+      "triangles": 372,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "BagCrimp_0_2.24",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "BagCrimp_0_2.87",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PopcornBag_1",
+      "triangles": 372,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "BagCrimp_1_2.24",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "BagCrimp_1_2.87",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PopcornBag_2",
+      "triangles": 372,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "BagCrimp_2_2.24",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "BagCrimp_2_2.87",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PopcornBag_3",
+      "triangles": 372,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "BagCrimp_3_2.24",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "BagCrimp_3_2.87",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PopcornBag_4",
+      "triangles": 372,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "BagCrimp_4_2.24",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "BagCrimp_4_2.87",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PopcornBag_5",
+      "triangles": 372,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "BagCrimp_5_2.24",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "BagCrimp_5_2.87",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PopcornBag_6",
+      "triangles": 372,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "BagCrimp_6_2.24",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "BagCrimp_6_2.87",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PopcornBag_7",
+      "triangles": 372,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "BagCrimp_7_2.24",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "BagCrimp_7_2.87",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PopcornBag_8",
+      "triangles": 372,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "BagCrimp_8_2.24",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "BagCrimp_8_2.87",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    }
+  ],
+  "boundsBlender": {
+    "min": [
+      -0.9100000262260437,
+      -0.9100000262260437,
+      0.0
+    ],
+    "max": [
+      0.9100000262260437,
+      0.9100000262260437,
+      3.0
+    ]
+  },
+  "triangles": 6156,
+  "glbBytes": 592268
+}

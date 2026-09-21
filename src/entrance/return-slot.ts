@@ -40,9 +40,9 @@ import {
 } from '../video-case';
 
 // Chute body (feet, LOCAL axes — slot face toward +Z, width along X).
-const CHUTE_W = 2.4;
+const CHUTE_W = 3.2;
 const CHUTE_H = 3.85;   // just proud of the band top (3.4 + 0.14 cap)
-const CHUTE_D = 0.9;    // protrusion past the band face into the store
+const CHUTE_D = 1 / 3;  // pin 210: only four inches proud of the band face
 // How far the body runs BACK from the band face. Mirrors counter.ts's bandD
 // (the same layout-agnostic mirroring entrance/index.ts does for BAND_H), so
 // the chute's rear wall lands flush with the inside face of the blue band
@@ -55,7 +55,7 @@ const FRONT_T = 0.14;   // face/side wall thickness
 const SLOT_W = 1.0;     // "a little bigger than a VHS length" (case is ~0.73 ft)
 const SLOT_H = 0.3;
 const SLOT_Y = 2.55;    // slot centre height — a natural drop-in height
-const SLOT_X = -0.5;    // flap sits lower-LEFT on the shell (frames2/scene_011)
+const SLOT_X = -0.9;    // flap sits lower-LEFT on the shell (frames2/scene_011)
 const TOP_R = 0.38;     // ~4.6in bullnose per the footage's fat top roll
 
 // ── Sign plate, MEASURED off the 1993 return-station macro ──────────────────
@@ -200,22 +200,24 @@ export class ReturnSlot {
     // stops short of the crown so the bullnose can take over the front edge.
     box(CHUTE_W, CHUTE_H - TOP_R - slotTop, FRONT_T, 0, (slotTop + CHUTE_H - TOP_R) / 2, faceZ, blueMat);
     box(CHUTE_W, slotBot, FRONT_T, 0, slotBot / 2, faceZ, blueMat);
-    // Slot sits lower-left (SLOT_X), so the flanking panels are asymmetric.
-    const leftW = CHUTE_W / 2 + SLOT_X - SLOT_W / 2;
-    const rightW = CHUTE_W / 2 - SLOT_X - SLOT_W / 2;
-    if (leftW > 0.01) box(leftW, SLOT_H, FRONT_T, -CHUTE_W / 2 + leftW / 2, SLOT_Y, faceZ, blueMat);
-    if (rightW > 0.01) box(rightW, SLOT_H, FRONT_T, CHUTE_W / 2 - rightW / 2, SLOT_Y, faceZ, blueMat);
+    // Two independent return mouths flank the central solid stile.
+    for (const [lo,hi] of [[-CHUTE_W/2,SLOT_X-SLOT_W/2],
+      [SLOT_X+SLOT_W/2,-SLOT_X-SLOT_W/2],[-SLOT_X+SLOT_W/2,CHUTE_W/2]]) {
+      box(hi-lo,SLOT_H,FRONT_T,(lo+hi)/2,SLOT_Y,faceZ,blueMat);
+    }
     // Brushed-metal slot frame (the footage flap unit reads stainless, not
     // white trim) + the flap plate itself resting tilted into the throat.
     const metalMat = new THREE.MeshStandardMaterial({ color: 0xf4f4f0, roughness: 0.45, metalness: 0 });
     this.ownedMats.push(metalMat);
     const LINER = 0.03;
-    box(SLOT_W, LINER, FRONT_T, SLOT_X, slotTop - LINER / 2, faceZ, metalMat, false);
-    box(SLOT_W, LINER, FRONT_T, SLOT_X, slotBot + LINER / 2, faceZ, metalMat, false);
-    box(LINER, SLOT_H, FRONT_T, SLOT_X - (SLOT_W - LINER) / 2, SLOT_Y, faceZ, metalMat, false);
-    box(LINER, SLOT_H, FRONT_T, SLOT_X + (SLOT_W - LINER) / 2, SLOT_Y, faceZ, metalMat, false);
-    const flap = box(SLOT_W - 0.06, SLOT_H - 0.04, 0.015, SLOT_X, SLOT_Y - 0.01, faceZ - 0.06, metalMat, false);
+    for (const sx of [SLOT_X,-SLOT_X]) {
+    box(SLOT_W, LINER, FRONT_T, sx, slotTop - LINER / 2, faceZ, metalMat, false);
+    box(SLOT_W, LINER, FRONT_T, sx, slotBot + LINER / 2, faceZ, metalMat, false);
+    box(LINER, SLOT_H, FRONT_T, sx - (SLOT_W - LINER) / 2, SLOT_Y, faceZ, metalMat, false);
+    box(LINER, SLOT_H, FRONT_T, sx + (SLOT_W - LINER) / 2, SLOT_Y, faceZ, metalMat, false);
+    const flap = box(SLOT_W - 0.06, SLOT_H - 0.04, 0.015, sx, SLOT_Y - 0.01, faceZ - 0.06, metalMat, false);
     flap.rotation.x = -0.24; // hinged at the top, resting swung slightly inward
+    }
     // Side walls stop where the crown band starts; the crown closes the top.
     box(FRONT_T, CHUTE_H - TOP_R, depth, -(CHUTE_W - FRONT_T) / 2, (CHUTE_H - TOP_R) / 2, midZ, blueMat);
     box(FRONT_T, CHUTE_H - TOP_R, depth, (CHUTE_W - FRONT_T) / 2, (CHUTE_H - TOP_R) / 2, midZ, blueMat);

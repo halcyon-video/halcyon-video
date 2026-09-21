@@ -1,0 +1,1622 @@
+{
+  "units": "feet",
+  "origin": "floor-centred; X across, Y in-depth, Z up (Blender)",
+  "parts": [
+    {
+      "name": "BaseHubCenter",
+      "triangles": 188,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "ArchedLeg_0",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CasterStem_0",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CasterWheel_0",
+      "triangles": 124,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "ArchedLeg_1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CasterStem_1",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CasterWheel_1",
+      "triangles": 124,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "ArchedLeg_2",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CasterStem_2",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CasterWheel_2",
+      "triangles": 124,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "ArchedLeg_3",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CasterStem_3",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CasterWheel_3",
+      "triangles": 124,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "ArchedLeg_4",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CasterStem_4",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CasterWheel_4",
+      "triangles": 124,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CentralUprightMast",
+      "triangles": 156,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "LowerRotatingCollar",
+      "triangles": 156,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "UpperRotatingCollar",
+      "triangles": 156,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PegboardMainPanel",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PegboardFrameTop",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PegboardFrameBottom",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PegboardFrameLeft",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PegboardFrameRight",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PegHook_-1_0_0",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "HookTip_-1_0_0",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "HangingCard_-1_0_0",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "ClearBlister_-1_0_0",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CleaningCassette_-1_0_0",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CassetteReel_-1_0_0_-1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "ReelHub_-1_0_0_-1",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CassetteReel_-1_0_0_1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "ReelHub_-1_0_0_1",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CassetteLabel_-1_0_0",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PegHook_-1_0_1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "HookTip_-1_0_1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "HangingCard_-1_0_1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "ClearBlister_-1_0_1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CleaningCassette_-1_0_1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CassetteReel_-1_0_1_-1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "ReelHub_-1_0_1_-1",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CassetteReel_-1_0_1_1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "ReelHub_-1_0_1_1",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CassetteLabel_-1_0_1",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PegHook_-1_0_2",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "HookTip_-1_0_2",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "HangingCard_-1_0_2",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "ClearBlister_-1_0_2",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CleaningCassette_-1_0_2",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CassetteReel_-1_0_2_-1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "ReelHub_-1_0_2_-1",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CassetteReel_-1_0_2_1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "ReelHub_-1_0_2_1",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CassetteLabel_-1_0_2",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PegHook_-1_1_0",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "HookTip_-1_1_0",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "HangingCard_-1_1_0",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "ClearBlister_-1_1_0",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CleaningCassette_-1_1_0",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CassetteReel_-1_1_0_-1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "ReelHub_-1_1_0_-1",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CassetteReel_-1_1_0_1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "ReelHub_-1_1_0_1",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CassetteLabel_-1_1_0",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PegHook_-1_1_1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "HookTip_-1_1_1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "HangingCard_-1_1_1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "ClearBlister_-1_1_1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CleaningCassette_-1_1_1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CassetteReel_-1_1_1_-1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "ReelHub_-1_1_1_-1",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CassetteReel_-1_1_1_1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "ReelHub_-1_1_1_1",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CassetteLabel_-1_1_1",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PegHook_-1_1_2",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "HookTip_-1_1_2",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "HangingCard_-1_1_2",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "ClearBlister_-1_1_2",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CleaningCassette_-1_1_2",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CassetteReel_-1_1_2_-1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "ReelHub_-1_1_2_-1",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CassetteReel_-1_1_2_1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "ReelHub_-1_1_2_1",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CassetteLabel_-1_1_2",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PegHook_-1_2_0",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "HookTip_-1_2_0",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "HangingCard_-1_2_0",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "ClearBlister_-1_2_0",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CleaningCassette_-1_2_0",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CassetteReel_-1_2_0_-1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "ReelHub_-1_2_0_-1",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CassetteReel_-1_2_0_1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "ReelHub_-1_2_0_1",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CassetteLabel_-1_2_0",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PegHook_-1_2_1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "HookTip_-1_2_1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "HangingCard_-1_2_1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "ClearBlister_-1_2_1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CleaningCassette_-1_2_1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CassetteReel_-1_2_1_-1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "ReelHub_-1_2_1_-1",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CassetteReel_-1_2_1_1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "ReelHub_-1_2_1_1",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CassetteLabel_-1_2_1",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PegHook_-1_2_2",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "HookTip_-1_2_2",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "HangingCard_-1_2_2",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "ClearBlister_-1_2_2",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CleaningCassette_-1_2_2",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CassetteReel_-1_2_2_-1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "ReelHub_-1_2_2_-1",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CassetteReel_-1_2_2_1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "ReelHub_-1_2_2_1",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CassetteLabel_-1_2_2",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PegHook_-1_3_0",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "HookTip_-1_3_0",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "HangingCard_-1_3_0",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "ClearBlister_-1_3_0",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CleaningCassette_-1_3_0",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CassetteReel_-1_3_0_-1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "ReelHub_-1_3_0_-1",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CassetteReel_-1_3_0_1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "ReelHub_-1_3_0_1",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CassetteLabel_-1_3_0",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PegHook_-1_3_1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "HookTip_-1_3_1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "HangingCard_-1_3_1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "ClearBlister_-1_3_1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CleaningCassette_-1_3_1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CassetteReel_-1_3_1_-1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "ReelHub_-1_3_1_-1",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CassetteReel_-1_3_1_1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "ReelHub_-1_3_1_1",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CassetteLabel_-1_3_1",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PegHook_-1_3_2",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "HookTip_-1_3_2",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "HangingCard_-1_3_2",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "ClearBlister_-1_3_2",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CleaningCassette_-1_3_2",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CassetteReel_-1_3_2_-1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "ReelHub_-1_3_2_-1",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CassetteReel_-1_3_2_1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "ReelHub_-1_3_2_1",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CassetteLabel_-1_3_2",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PegHook_1_0_0",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "HookTip_1_0_0",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "HangingCard_1_0_0",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "ClearBlister_1_0_0",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CleaningCassette_1_0_0",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CassetteReel_1_0_0_-1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "ReelHub_1_0_0_-1",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CassetteReel_1_0_0_1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "ReelHub_1_0_0_1",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CassetteLabel_1_0_0",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PegHook_1_0_1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "HookTip_1_0_1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "HangingCard_1_0_1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "ClearBlister_1_0_1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CleaningCassette_1_0_1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CassetteReel_1_0_1_-1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "ReelHub_1_0_1_-1",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CassetteReel_1_0_1_1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "ReelHub_1_0_1_1",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CassetteLabel_1_0_1",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PegHook_1_0_2",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "HookTip_1_0_2",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "HangingCard_1_0_2",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "ClearBlister_1_0_2",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CleaningCassette_1_0_2",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CassetteReel_1_0_2_-1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "ReelHub_1_0_2_-1",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CassetteReel_1_0_2_1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "ReelHub_1_0_2_1",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CassetteLabel_1_0_2",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PegHook_1_1_0",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "HookTip_1_1_0",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "HangingCard_1_1_0",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "ClearBlister_1_1_0",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CleaningCassette_1_1_0",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CassetteReel_1_1_0_-1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "ReelHub_1_1_0_-1",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CassetteReel_1_1_0_1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "ReelHub_1_1_0_1",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CassetteLabel_1_1_0",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PegHook_1_1_1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "HookTip_1_1_1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "HangingCard_1_1_1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "ClearBlister_1_1_1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CleaningCassette_1_1_1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CassetteReel_1_1_1_-1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "ReelHub_1_1_1_-1",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CassetteReel_1_1_1_1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "ReelHub_1_1_1_1",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CassetteLabel_1_1_1",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PegHook_1_1_2",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "HookTip_1_1_2",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "HangingCard_1_1_2",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "ClearBlister_1_1_2",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CleaningCassette_1_1_2",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CassetteReel_1_1_2_-1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "ReelHub_1_1_2_-1",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CassetteReel_1_1_2_1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "ReelHub_1_1_2_1",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CassetteLabel_1_1_2",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PegHook_1_2_0",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "HookTip_1_2_0",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "HangingCard_1_2_0",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "ClearBlister_1_2_0",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CleaningCassette_1_2_0",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CassetteReel_1_2_0_-1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "ReelHub_1_2_0_-1",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CassetteReel_1_2_0_1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "ReelHub_1_2_0_1",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CassetteLabel_1_2_0",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PegHook_1_2_1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "HookTip_1_2_1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "HangingCard_1_2_1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "ClearBlister_1_2_1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CleaningCassette_1_2_1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CassetteReel_1_2_1_-1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "ReelHub_1_2_1_-1",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CassetteReel_1_2_1_1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "ReelHub_1_2_1_1",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CassetteLabel_1_2_1",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PegHook_1_2_2",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "HookTip_1_2_2",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "HangingCard_1_2_2",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "ClearBlister_1_2_2",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CleaningCassette_1_2_2",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CassetteReel_1_2_2_-1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "ReelHub_1_2_2_-1",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CassetteReel_1_2_2_1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "ReelHub_1_2_2_1",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CassetteLabel_1_2_2",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PegHook_1_3_0",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "HookTip_1_3_0",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "HangingCard_1_3_0",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "ClearBlister_1_3_0",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CleaningCassette_1_3_0",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CassetteReel_1_3_0_-1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "ReelHub_1_3_0_-1",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CassetteReel_1_3_0_1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "ReelHub_1_3_0_1",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CassetteLabel_1_3_0",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PegHook_1_3_1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "HookTip_1_3_1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "HangingCard_1_3_1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "ClearBlister_1_3_1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CleaningCassette_1_3_1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CassetteReel_1_3_1_-1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "ReelHub_1_3_1_-1",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CassetteReel_1_3_1_1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "ReelHub_1_3_1_1",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CassetteLabel_1_3_1",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PegHook_1_3_2",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "HookTip_1_3_2",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "HangingCard_1_3_2",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "ClearBlister_1_3_2",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CleaningCassette_1_3_2",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CassetteReel_1_3_2_-1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "ReelHub_1_3_2_-1",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CassetteReel_1_3_2_1",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "ReelHub_1_3_2_1",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CassetteLabel_1_3_2",
+      "triangles": 28,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "HeaderSignChannel",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "HeaderSignCard",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "HeaderSignTopCap",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    }
+  ],
+  "boundsBlender": {
+    "min": [
+      -0.8385661244392395,
+      -0.9735037088394165,
+      0.054999999701976776
+    ],
+    "max": [
+      1.0199999809265137,
+      0.9735037088394165,
+      5.239999771118164
+    ]
+  },
+  "triangles": 11796,
+  "glbBytes": 147804
+}

@@ -177,22 +177,23 @@ export function initFlatNavigation() {
       let idx = items.indexOf(activeItem);
 
       if (e.key === 'ArrowDown') {
-        idx = (idx + 1) % items.length;
+        idx = idx === -1 ? 0 : (idx + 1) % items.length;
         items.forEach((item, i) => item.classList.toggle('is-focused', i === idx));
         items[idx].focus();
         e.preventDefault();
       } else if (e.key === 'ArrowUp') {
-        idx = (idx - 1 + items.length) % items.length;
+        idx = idx === -1 ? items.length - 1 : (idx - 1 + items.length) % items.length;
         items.forEach((item, i) => item.classList.toggle('is-focused', i === idx));
         items[idx].focus();
         e.preventDefault();
-      } else if (e.key === 'Enter') {
-        if (activeItem) {
-          activeItem.click();
+      } else if (e.key === 'Enter' || e.key === ' ') {
+        const target = activeItem || items[0];
+        if (target) {
+          target.click();
         }
         e.preventDefault();
-      } else if (e.key === 'Escape' || e.key === 'Backspace') {
-        const menuBtn = document.querySelector('.flat-menu-btn') as HTMLElement;
+      } else if (e.key === 'Escape' || e.key === 'Backspace' || e.key === 'ArrowLeft') {
+        const menuBtn = document.getElementById('btn-flat-menu') || document.querySelector('.flat-menu-btn') as HTMLElement;
         dropdown.classList.remove('visible');
         if (menuBtn) {
           menuBtn.setAttribute('aria-expanded', 'false');
@@ -210,14 +211,48 @@ export function initFlatNavigation() {
     // ─── Header Menu Button Mode ───
     const focusedMenu = currentFocus?.classList.contains('flat-menu-btn') ? currentFocus : null;
     if (focusedMenu) {
-      if (e.key === 'ArrowDown') {
+      const headerBtns = Array.from(document.querySelectorAll('.flat-header .flat-menu-btn')) as HTMLElement[];
+      const btnIdx = headerBtns.indexOf(focusedMenu);
+
+      if (e.key === 'ArrowRight') {
+        if (btnIdx >= 0 && btnIdx < headerBtns.length - 1) {
+          setButtonFocus(headerBtns[btnIdx + 1]);
+          e.preventDefault();
+          return;
+        }
+      } else if (e.key === 'ArrowLeft') {
+        if (btnIdx > 0) {
+          setButtonFocus(headerBtns[btnIdx - 1]);
+          e.preventDefault();
+          return;
+        } else {
+          const backBtn = document.querySelector('.flat-back-btn') as HTMLElement;
+          if (backBtn) {
+            setButtonFocus(backBtn);
+            e.preventDefault();
+            return;
+          }
+        }
+      } else if (e.key === 'ArrowDown') {
         const backBtn = document.querySelector('.flat-back-btn') as HTMLElement;
-        if (backBtn) {
+        if (backBtn && btnIdx === 0) {
           setButtonFocus(backBtn);
         } else {
           const libraryCards = Array.from(document.querySelectorAll('.flat-library-card')) as HTMLElement[];
           if (libraryCards.length > 0) {
-            setLibraryFocus(libraryCards[0]);
+            const btnRect = focusedMenu.getBoundingClientRect();
+            const btnCenter = btnRect.left + btnRect.width / 2;
+            let bestCard = libraryCards[0];
+            let bestDist = Infinity;
+            for (const c of libraryCards) {
+              const cRect = c.getBoundingClientRect();
+              const dist = Math.abs(cRect.left + cRect.width / 2 - btnCenter);
+              if (dist < bestDist) {
+                bestDist = dist;
+                bestCard = c;
+              }
+            }
+            setLibraryFocus(bestCard);
           } else {
             const firstCase = document.querySelector('.case') as HTMLElement;
             if (firstCase) setFocus(firstCase);
@@ -235,11 +270,25 @@ export function initFlatNavigation() {
     const focusedBack = currentFocus?.classList.contains('flat-back-btn') ? currentFocus : null;
     if (focusedBack) {
       if (e.key === 'ArrowUp') {
-        const menuBtn = document.querySelector('.flat-menu-btn') as HTMLElement;
-        if (menuBtn) {
-          setButtonFocus(menuBtn);
+        const headerBtns = Array.from(document.querySelectorAll('.flat-header .flat-menu-btn')) as HTMLElement[];
+        const targetBtn = headerBtns[0] || (document.getElementById('btn-flat-menu') as HTMLElement);
+        if (targetBtn) {
+          setButtonFocus(targetBtn);
         }
         e.preventDefault();
+      } else if (e.key === 'ArrowRight') {
+        const headerBtns = Array.from(document.querySelectorAll('.flat-header .flat-menu-btn')) as HTMLElement[];
+        if (headerBtns.length > 0) {
+          setButtonFocus(headerBtns[0]);
+          e.preventDefault();
+          return;
+        }
+        const firstCase = document.querySelector('.case') as HTMLElement;
+        if (firstCase) {
+          setFocus(firstCase);
+          e.preventDefault();
+          return;
+        }
       } else if (e.key === 'ArrowDown') {
         const firstCase = document.querySelector('.case') as HTMLElement;
         if (firstCase) {
@@ -270,7 +319,7 @@ export function initFlatNavigation() {
       }
 
       if (e.key === 'Backspace' || e.key === 'Escape' || e.key === 'q' || e.key === 'Q') {
-        const menuBtn = document.querySelector('.flat-menu-btn') as HTMLElement;
+        const menuBtn = document.getElementById('btn-flat-menu') || document.querySelector('.flat-menu-btn') as HTMLElement;
         if (menuBtn) {
           setButtonFocus(menuBtn);
           e.preventDefault();
@@ -285,8 +334,8 @@ export function initFlatNavigation() {
       else if (e.key === 'ArrowDown') direction = 'ArrowDown';
 
       if (direction) {
-        const menuBtn = document.querySelector('.flat-menu-btn') as HTMLElement;
-        const candidates = menuBtn ? [...libraryCards, menuBtn] : libraryCards;
+        const headerBtns = Array.from(document.querySelectorAll('.flat-header .flat-menu-btn')) as HTMLElement[];
+        const candidates = [...libraryCards, ...headerBtns];
         const next = navigateSpatialGrid(candidates, focusedCard, direction);
         if (next) {
           if (next.classList.contains('flat-menu-btn')) {
@@ -358,14 +407,27 @@ export function initFlatNavigation() {
           }
         }
       } else {
+        const headerBtns = Array.from(document.querySelectorAll('.flat-header .flat-menu-btn')) as HTMLElement[];
         const backBtn = document.querySelector('.flat-back-btn') as HTMLElement;
-        if (backBtn) {
+        const focusedRect = focused.getBoundingClientRect();
+        const focusedCenter = focusedRect.left + focusedRect.width / 2;
+
+        if (backBtn && focusedCenter < window.innerWidth * 0.4) {
           setButtonFocus(backBtn);
-        } else {
-          const menuBtn = document.querySelector('.flat-menu-btn') as HTMLElement;
-          if (menuBtn) {
-            setButtonFocus(menuBtn);
+        } else if (headerBtns.length > 0) {
+          let bestBtn = headerBtns[headerBtns.length - 1];
+          let bestDist = Infinity;
+          for (const btn of headerBtns) {
+            const rect = btn.getBoundingClientRect();
+            const dist = Math.abs(rect.left + rect.width / 2 - focusedCenter);
+            if (dist < bestDist) {
+              bestDist = dist;
+              bestBtn = btn;
+            }
           }
+          setButtonFocus(bestBtn);
+        } else if (backBtn) {
+          setButtonFocus(backBtn);
         }
       }
       e.preventDefault();

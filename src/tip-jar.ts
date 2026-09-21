@@ -24,7 +24,7 @@ export const TIP_URL = 'https://ko-fi.com/halcyonvideo';
 /** The URL as it is PRINTED — no scheme, the way a card of the era would set it. */
 export const TIP_URL_LABEL = 'ko-fi.com/halcyonvideo';
 export const TIP_HEADLINE = 'TIPS';
-export const TIP_SUBLINE = 'KEEP THE TAPES ROLLING';
+export const TIP_SUBLINE = 'DID THIS MAKE YOU SMILE?';
 
 /** `true` unless the owner switched the jar off (default ON). */
 export function tipJarEnabled(): boolean {

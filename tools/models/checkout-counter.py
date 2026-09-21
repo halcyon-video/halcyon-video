@@ -180,24 +180,25 @@ def sweep(name, path, depth, island=False, rounded=False, drawers=False):
 
 
 def shield(modern=False):
-    points = [Vector(p) for p in [(-6.2,-.1),(-9.8,-6.34),(0,-14.1),(9.8,-6.34),(6.2,-.1)]]
-    # Same 2.2-foot trims as counter.ts: an open staff entrance at the left shoulder.
-    a = points[1] + (points[2]-points[1]).normalized()*2.2
-    b = points[1] + (points[0]-points[1]).normalized()*2.2
+    points = [Vector(p) for p in [(-6.2,-.1),(-10.5,-4.4),(0,-14.9),(10.5,-4.4),(6.2,-.1)]]
+    # Same 2.7-foot trims as counter.ts: an open staff entrance at the left shoulder.
+    # The previous replacement path retraced 3.6 ft of this shoulder, putting
+    # two countertop skins in the same plane. Keep one continuous, non-overlapping
+    # sweep and let its two cut ends form the short inward returns (pin 211).
+    a = points[1] + (points[2]-points[1]).normalized()*2.7
+    b = points[1] + (points[0]-points[1]).normalized()*2.7
     path = [a, points[2], points[3], points[4], points[0], b]
-    t0 = (points[1]-points[0]).normalized()
-    path = [points[0]+t0*4.6,points[1],points[2],points[3],points[4],points[0],points[0]+t0*1.0]
     t = (points[2]-points[1]).normalized()
     n = Vector((-t.y,t.x))
-    apex = Vector((0,-14.1 + 1.5/n.y))
-    left = Vector((-6.6, apex.y + 6.6*7.76/9.8))
-    right = Vector((6,apex.y + 6*7.76/9.8))
+    apex = Vector((0,-14.9 + 1.5/n.y))
+    left = Vector((-6.6, apex.y + 6.6))
+    right = Vector((6,apex.y + 6))
     return [path], [left,apex,right]
 
 
 def cut_return_receiver(objects, shape):
-    anchor = (8.0, -3.22) if shape == 'shield' else (6.8, -3.3)
-    yaw = math.atan2(6.24, 3.6) if shape == 'shield' else math.pi/2
+    anchor = (8.35, -2.25) if shape == 'shield' else (6.8, -3.3)
+    yaw = math.pi/4 if shape == 'shield' else math.pi/2
     center_z = -.70
     cx = anchor[0] + math.sin(yaw)*center_z
     cz = anchor[1] + math.cos(yaw)*center_z

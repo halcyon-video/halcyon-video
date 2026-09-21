@@ -17,7 +17,7 @@
 // OK and Back do nothing at all until you happen to click something with a
 // mouse. The video player's volume slider is the same shape of bug from the
 // other direction: an <input type=range> that keeps focus after a click, which
-// is what made F8 dead for the rest of playback (see main.ts).
+// is what made C dead for the rest of playback (see main.ts).
 //
 // So reachability is the real question, not tag name. A focused field that
 // isn't reachable isn't "being typed into", it's STRANDED — and we blur it on
@@ -108,7 +108,7 @@ export function keyboardOwnedByControl(): boolean {
 /**
  * True when a visible TEXT field has focus. Narrower than the above: a range
  * slider or checkbox doesn't count, so a shortcut that can't collide with them
- * (F8) still works while one is focused.
+ * (C) still works while one is focused.
  */
 export function textEntryHasFocus(): boolean {
   if (typeof document === 'undefined') return false;

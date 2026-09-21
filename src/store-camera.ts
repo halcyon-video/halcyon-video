@@ -18,6 +18,8 @@ import { onBrandChange } from './brand-live';
 import { parseSharedPlace, type SharedPlace } from './shared-place';
 import type { StoreScene } from './three-scene';
 
+const fixtureFramingSlots = new WeakMap<object, { side: string; col: number; restingX: number; restingZ: number; restingRotY: number }[]>();
+
 const aisleGlides = new WeakMap<StoreScene, { unit: object; side: string; col: number; direction: number }>();
 
 export function updateLookDownPresent(scene: StoreScene) {
@@ -174,7 +176,8 @@ export function updateCameraTarget(scene: StoreScene) {
           scene.cameraWindowMinCol = Math.max(0, Math.min(scene.cameraWindowMinCol, scene.colsCount - windowSize));
         }
 
-        const centerCol = scene.cameraWindowMinCol + (Math.min(scene.colsCount, windowSize) - 1) / 2;
+        const centerCol = scene.camera.aspect < 1 ? scene.selectedCol
+          : scene.cameraWindowMinCol + (Math.min(scene.colsCount, windowSize) - 1) / 2;
         const shelfLength = (scene.colsCount - 1) * BOX_SPACING + 1.0;
         // Column z must follow the same per-side mapping the gondola's slots
         // bake with (game-section.ts getSlots: the two faces run in opposite
@@ -196,7 +199,7 @@ export function updateCameraTarget(scene: StoreScene) {
         const isBack = scene.selectedSide === 'back';
         const dir = isBack ? -1 : 1;
         const shelfDepthAtHeight = unitDepthAtHeight(shelfY);
-        const cameraX = xCenterVal + dir * (shelfDepthAtHeight / 2 + 3.8);
+        const cameraX = xCenterVal + dir * (shelfDepthAtHeight / 2 + activeStoreFormat().browseStandoff);
 
         scene.targetCameraPos.set(cameraX, cameraY, zCenterVal + colZ);
         scene.targetLookAt.set(xCenterVal + dir * 0.44, lookAtY, zCenterVal + colZ);
@@ -233,15 +236,38 @@ export function updateCameraTarget(scene: StoreScene) {
           const cameraY = shelfY + 0.4;
           const lookAtY = shelfY + 0.4;
 
-          const distance = 1.25 + 2.2; // Backed up by 2.2 feet from active shelf face
-          scene.targetCameraPos.set(fx + distance * Math.sin(sideAngle), cameraY, fz + distance * Math.cos(sideAngle));
-
-          const lookAtDistance = 1.25 + 0.44;
-          scene.targetLookAt.set(
-            fx + lookAtDistance * Math.sin(sideAngle),
-            lookAtY,
-            fz + lookAtDistance * Math.cos(sideAngle),
-          );
+          // Fixtures publish their real slot positions. Fit the occupied face,
+          // including its outer cases, rather than assuming a three-column stand.
+          let faceSlots = fixture && fixtureFramingSlots.get(fixture);
+          if (!faceSlots && fixture) {
+            faceSlots = fixture.getSlots();
+            fixtureFramingSlots.set(fixture, faceSlots);
+          }
+          // Portrait browsing follows a three-column window so cases stay
+          // readable without backing the shopper through the opposite wall.
+          const portrait = scene.camera.aspect < 1;
+          let count = 0, selectedAlong: number | undefined;
+          const faceAngle = faceSlots?.find(slot => slot.side === scene.selectedSide)?.restingRotY ?? sideAngle;
+          const nx = Math.sin(faceAngle), nz = Math.cos(faceAngle);
+          const tx = nz, tz = -nx;
+          let lo = Infinity, hi = -Infinity, front = -Infinity;
+          for (const slot of faceSlots ?? []) {
+            if (slot.side !== scene.selectedSide || (portrait && Math.abs(slot.col - scene.selectedCol) > 1)) continue;
+            count++;
+            const x = slot.restingX - fx, z = slot.restingZ - fz;
+            const along = x * tx + z * tz;
+            if (slot.col === scene.selectedCol) selectedAlong = along;
+            lo = Math.min(lo, along - CASE_WIDTH / 2);
+            hi = Math.max(hi, along + CASE_WIDTH / 2);
+            front = Math.max(front, x * nx + z * nz);
+          }
+          const center = portrait && selectedAlong !== undefined ? selectedAlong : count ? (lo + hi) / 2 : 0;
+          const face = count ? front : 1.69;
+          const halfWidth = count ? Math.max(hi - center, center - lo) : 1;
+          const tanHalfFov = Math.tan(THREE.MathUtils.degToRad(scene.camera.fov / 2));
+          const distance = Math.max(2.2, halfWidth * 1.18 / (tanHalfFov * scene.camera.aspect));
+          scene.targetLookAt.set(fx + center * tx + face * nx, lookAtY, fz + center * tz + face * nz);
+          scene.targetCameraPos.set(scene.targetLookAt.x + nx * distance, cameraY, scene.targetLookAt.z + nz * distance);
         }
       }
     } else if (isBackWall) {
@@ -826,7 +852,7 @@ export function teleportWalk(scene: StoreScene, x: number, z: number, yawDeg = 0
 // CURRENT view as whichever shape reproduces it best -- inspecting a title
 // is shared by name (jumpToTitle survives a different store layout, e.g. a
 // visitor's own library), everything else by camera pose (teleportWalk) the
-// same way F8 feedback pins already do (StoreScene.captureFeedbackSnapshot).
+// same way Shift+C feedback pins already do (StoreScene.captureFeedbackSnapshot).
 export function captureSharedPlace(scene: StoreScene): SharedPlace {
   if (scene.mode === 'inspect') {
     const movie = scene.getSelectedMovie();

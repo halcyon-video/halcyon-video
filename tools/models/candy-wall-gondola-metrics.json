@@ -1,0 +1,524 @@
+{
+  "units": "feet",
+  "origin": "floor-centred; X across, Y in-depth, Z up (Blender)",
+  "parts": [
+    {
+      "name": "WallStandard_0",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "StandardFoot_0",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "WallStandard_1",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "StandardFoot_1",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "GravityTray_0",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "ShelfBracket_0_-1.85",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "ShelfBracket_0_1.85",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "RetainingLip_0",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CandyCarton_0_0",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CandyCarton_0_1",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CandyCarton_0_2",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CandyCarton_0_3",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CandyCarton_0_4",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CandyCarton_0_5",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CandyCarton_0_6",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CandyCarton_0_7",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "GravityTray_1",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "ShelfBracket_1_-1.85",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "ShelfBracket_1_1.85",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "RetainingLip_1",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CandyCarton_1_0",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CandyCarton_1_1",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CandyCarton_1_2",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CandyCarton_1_3",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CandyCarton_1_4",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CandyCarton_1_5",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CandyCarton_1_6",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "CandyCarton_1_7",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "GravityTray_2",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "ShelfBracket_2_-1.85",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "ShelfBracket_2_1.85",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "RetainingLip_2",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "SnackPouch_2_0",
+      "triangles": 260,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PouchCrimp_2_0_-0.365",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PouchCrimp_2_0_0.065",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "SnackPouch_2_1",
+      "triangles": 260,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PouchCrimp_2_1_-0.365",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PouchCrimp_2_1_0.065",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "SnackPouch_2_2",
+      "triangles": 260,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PouchCrimp_2_2_-0.365",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PouchCrimp_2_2_0.065",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "SnackPouch_2_3",
+      "triangles": 260,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PouchCrimp_2_3_-0.365",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PouchCrimp_2_3_0.065",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "SnackPouch_2_4",
+      "triangles": 260,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PouchCrimp_2_4_-0.365",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PouchCrimp_2_4_0.065",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "SnackPouch_2_5",
+      "triangles": 260,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PouchCrimp_2_5_-0.365",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PouchCrimp_2_5_0.065",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "SnackPouch_2_6",
+      "triangles": 260,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PouchCrimp_2_6_-0.365",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PouchCrimp_2_6_0.065",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "SnackPouch_2_7",
+      "triangles": 260,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PouchCrimp_2_7_-0.365",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PouchCrimp_2_7_0.065",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "GravityTray_3",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "ShelfBracket_3_-1.85",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "ShelfBracket_3_1.85",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "RetainingLip_3",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "SnackPouch_3_0",
+      "triangles": 260,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PouchCrimp_3_0_-0.365",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PouchCrimp_3_0_0.065",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "SnackPouch_3_1",
+      "triangles": 260,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PouchCrimp_3_1_-0.365",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PouchCrimp_3_1_0.065",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "SnackPouch_3_2",
+      "triangles": 260,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PouchCrimp_3_2_-0.365",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PouchCrimp_3_2_0.065",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "SnackPouch_3_3",
+      "triangles": 260,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PouchCrimp_3_3_-0.365",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PouchCrimp_3_3_0.065",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "SnackPouch_3_4",
+      "triangles": 260,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PouchCrimp_3_4_-0.365",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PouchCrimp_3_4_0.065",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "SnackPouch_3_5",
+      "triangles": 260,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PouchCrimp_3_5_-0.365",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PouchCrimp_3_5_0.065",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "SnackPouch_3_6",
+      "triangles": 260,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PouchCrimp_3_6_-0.365",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PouchCrimp_3_6_0.065",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "SnackPouch_3_7",
+      "triangles": 260,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PouchCrimp_3_7_-0.365",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "PouchCrimp_3_7_0.065",
+      "triangles": 108,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    }
+  ],
+  "boundsBlender": {
+    "min": [
+      -1.9500000476837158,
+      -0.4461764693260193,
+      0.0
+    ],
+    "max": [
+      1.9500000476837158,
+      0.7000000476837158,
+      5.0
+    ]
+  },
+  "triangles": 11504,
+  "glbBytes": 1061984
+}

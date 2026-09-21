@@ -49,6 +49,9 @@ export const MEDIA_DATE_BUTTON_ID = 'btn-media-date';
 export const STREAMING_BUTTON_ID = 'btn-streaming';
 
 interface TerminalScene {
+  readonly checkoutRunning?: boolean;
+  readonly launchAnim?: unknown;
+  readonly checkoutExit?: unknown;
   setTerminalText(lines: string[] | null, cursorLine?: number): void;
   enterSearchMode(): void;
   exitSearchMode(): void;
@@ -57,7 +60,7 @@ interface TerminalScene {
 export interface CounterTerminalDeps {
   scene: () => TerminalScene | null;
   /** main.ts's ui-state object — the flow owns its isCounterTerminalOpen flag. */
-  ui: { isCounterTerminalOpen: boolean; readonly isAnyOverlayOpen: boolean };
+  ui: { isCounterTerminalOpen: boolean; readonly isAnyOverlayOpen: boolean; readonly isPlaybackActive?: boolean };
   /** Row ids in menu order (main.ts's counterTerminalButtons). */
   buttons: string[];
   /** Dispatch a menu row — main.ts's executePowerMenuAction. */
@@ -150,7 +153,9 @@ function leaveSubScreens(): void {
 export function counterTerminalOpen(): void {
   if (!deps) return;
   const scene = deps.scene();
-  if (!scene || deps.ui.isAnyOverlayOpen) return;
+  // Checkout owns the camera until its handoff to playback has completed.
+  if (!scene || deps.ui.isAnyOverlayOpen || deps.ui.isPlaybackActive ||
+      scene.checkoutRunning || scene.launchAnim || scene.checkoutExit) return;
   deps.ui.isCounterTerminalOpen = true;
   mode = 'menu';
   menuIndex = 0;

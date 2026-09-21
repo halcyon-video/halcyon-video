@@ -6,7 +6,7 @@ import { FixtureContext, SlottedFixture, FixtureSlot } from '../fixtures';
 import { Footprint, FLOOR_DISPLAY_CLEARANCE } from '../layout-validator';
 import { createMovieInstancedMeshes, CASE_HEIGHT, CASE_DEPTH } from '../video-case';
 import { markSignMesh } from '../sign-builders';
-import { BB_OUTFIT } from '../bundled-fonts';
+import { BB_OUTFIT, ensureBundledFont } from '../bundled-fonts';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Bargain bin — a waist-height (2.7 ft) 3×3 ft dump tub of the library's
@@ -198,33 +198,27 @@ export class BargainBin implements SlottedFixture {
     bed.position.y = height - 0.72;
     furniture.add(bed);
 
-    // "BARGAIN BIN" card on all four faces — the tubs are approached from
-    // any direction on the open floor.
-    const signTex = BargainBin.makeSignTexture(palette.primary, palette.secondary);
-    const signMat = new THREE.MeshStandardMaterial({ map: signTex, roughness: 0.55, metalness: 0.0 });
-    const signGeo = new THREE.PlaneGeometry(sideFt * 0.62, sideFt * 0.62 * 0.375);
-    this.disposables.push(signTex, signMat, signGeo);
-    // The wall leans outward toward the top rim: the flat-face apothem grows
-    // from sideFt*0.8/2 at the floor to sideFt/2 at the rim. The card must sit
-    // ON the face — apothem evaluated at the card's own height, leaned by the
-    // wall's actual slope (top edge tips OUTWARD), and nudged proud of the
-    // surface — or it half-sinks into the tub.
-    const topApothem = sideFt / 2;
-    const botApothem = (sideFt * 0.8) / 2;
-    const wallLean = Math.atan2(topApothem - botApothem, height);
-    const signY = height * 0.55;
-    const signApothem = botApothem + (topApothem - botApothem) * (signY / height) + 0.05;
-    for (const face of [0, Math.PI / 2, Math.PI, -Math.PI / 2]) {
-      // markSignMesh, not a bare Mesh: the tub body receives shadow, so a card
-      // that doesn't stays at full brightness on whichever faces the room's
-      // lights miss — the "two sides glow" bug.
+    // One centrally mounted price card, clear of the case pile on both sides.
+    const signTex = BargainBin.makeSignTexture();
+    const signMat = new THREE.MeshStandardMaterial({ map: signTex, roughness: .65,
+      metalness: 0, alphaTest: .5 });
+    const signGeo = new THREE.PlaneGeometry(2.0, 1.5);
+    const stalkGeo = new THREE.CylinderGeometry(.022, .022, 1.60, 8);
+    const stalkMat = new THREE.MeshStandardMaterial({ color: 0x202020, roughness: .65 });
+    this.disposables.push(signTex, signMat, signGeo, stalkGeo, stalkMat);
+    const stalk = new THREE.Mesh(stalkGeo, stalkMat);
+    stalk.name = 'BargainPriceCardStalk';
+    stalk.position.set(0, height + .40, 0);
+    stalk.castShadow = stalk.receiveShadow = true;
+    group.add(stalk);
+    for (const face of [0, Math.PI]) {
       const sign = markSignMesh(new THREE.Mesh(signGeo, signMat));
-      sign.position.set(Math.sin(face) * signApothem, signY, Math.cos(face) * signApothem);
-      // YXZ: yaw to the face first, then lean about the card's own X axis so
-      // every face leans outward, not all four in the same world direction.
-      sign.rotation.order = 'YXZ';
-      sign.rotation.y = face;
-      sign.rotation.x = wallLean;
+      sign.name = 'BargainPriceCard';
+      const offset = face === 0 ? .026 : -.026;
+      sign.position.set(-Math.sin(this.placement.yaw)*offset, height + 1.35, Math.cos(this.placement.yaw)*offset);
+      // Keep the card broadside to the front approach even when the square tub
+      // is rotated to join the concessions row.
+      sign.rotation.y = face - this.placement.yaw;
       group.add(sign);
     }
 
@@ -367,31 +361,28 @@ export class BargainBin implements SlottedFixture {
     return slots;
   }
 
-  private static makeSignTexture(primary: string, secondary: string): THREE.CanvasTexture {
+  private static makeSignTexture(): THREE.CanvasTexture {
     const canvas = document.createElement('canvas');
     canvas.width = 512;
-    canvas.height = 192;
+    canvas.height = 384;
     const ctx = canvas.getContext('2d')!;
-    // Store palette (theme primary + secondary), so the card reads as
-    // store-printed signage on the matching tub.
-    ctx.fillStyle = primary;
-    ctx.fillRect(0, 0, 512, 192);
-    ctx.strokeStyle = secondary;
-    ctx.lineWidth = 8;
-    ctx.strokeRect(12, 12, 488, 168);
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillStyle = secondary;
-    ctx.font = `900 62px ${BB_OUTFIT}, sans-serif`;
-    ctx.fillText('BARGAIN BIN', 256, 70);
-    ctx.fillStyle = '#ffffff';
-    ctx.font = `700 42px ${BB_OUTFIT}, sans-serif`;
-    ctx.fillText('3 FOR $10', 256, 138);
+    // Original price artwork commissioned from the project's art reviewer.
+    // Yellow/black is the owner's card specification, independent of house colors.
+    const paint = () => {
+      ctx.clearRect(0, 0, 512, 384);
+      ctx.fillStyle = '#FFD600';
+      ctx.beginPath(); ctx.roundRect(36, 28, 440, 328, 12); ctx.fill();
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#000000'; ctx.font = `700 78px ${BB_OUTFIT}, sans-serif`;
+      ['3', 'FOR', '$10'].forEach((line, i) => ctx.fillText(line, 256, 100 + i * 92, 400));
+    };
+    paint();
     const tex = new THREE.CanvasTexture(canvas);
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.minFilter = THREE.LinearMipmapLinearFilter;
     tex.magFilter = THREE.LinearFilter;
     tex.generateMipmaps = true;
+    ensureBundledFont(BB_OUTFIT, () => { paint(); tex.needsUpdate = true; });
     return tex;
   }
 

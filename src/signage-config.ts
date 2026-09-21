@@ -15,6 +15,7 @@ export const DEFAULT_SIGNAGE_CONFIG: Record<string, string | null> = {
   'wall-newrelease-back-right': null, // stepped-corner forward face — no sign on the corner
   'wall-newrelease-back-step': null,  // #41 stepped-corner connector run — no sign on the corner
   'wall-newrelease-left-wall': 'new-releases-wall',
+  'wall-newrelease-right-wall': 'new-releases-wall',
 
   // Ceiling navigation signs for aisles default to 'auto' to display
   // the genre/library name dynamically based on what is shelved underneath.
@@ -51,6 +52,7 @@ export const STATIC_SIGNAGE_SLOT_IDS: readonly string[] = [
   'wall-newrelease-back-right',
   'wall-newrelease-back-step',
   'wall-newrelease-left-wall',
+  'wall-newrelease-right-wall',
   // 1993 hanging promo cards (store-shell.ts)
   'promo-previously-viewed',
   // GAMES department ceiling hanger (store-shell.ts). Static rather than a

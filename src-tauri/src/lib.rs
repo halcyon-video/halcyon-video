@@ -1,3 +1,4 @@
+mod steam;
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 use tauri::Manager;
 
@@ -471,6 +472,7 @@ fn launch_game(template: String, path: String) -> Result<String, String> {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .manage(steam::SteamState::default())
         .setup(|app| {
             #[cfg(debug_assertions)]
             {
@@ -493,7 +495,12 @@ pub fn run() {
             jellyseerr_request,
             romm_request,
             launch_game,
-            append_debug_log
+            append_debug_log,
+            steam::steam_connect,
+            steam::steam_disconnect,
+            steam::steam_library,
+            steam::steam_reviews,
+            steam::steam_launch
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

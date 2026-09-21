@@ -1,0 +1,23 @@
+{
+  "boundsFeet": [
+    15.5,
+    11.73,
+    4.2
+  ],
+  "parts": 13,
+  "triangles": 5928,
+  "allSolidPartsManifold": true,
+  "worktopHeightFeet": 2.82,
+  "staffOpeningFeet": 5.92,
+  "staffOpeningSide": "vestibule (+X)",
+  "vestibuleStubDepthFeet": 2.4,
+  "receiverCenterXFeet": 5.6,
+  "receiverFrontBeyondGlassFeet": 0.00328084,
+  "worktopOpeningFeet": [
+    2.36,
+    1.4
+  ],
+  "hasSlopingRamp": true,
+  "rampOutletHeightFeet": 2.2,
+  "upperRimOpeningFeet": 2.36
+}

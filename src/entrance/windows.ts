@@ -1,3 +1,4 @@
+import { windowGlassGeometry, type WindowAperture } from '../window-glass-geometry';
 // Storefront window-bay builder (T05): the customer-facing glazed front wall
 // — a solid knee wall (a real video store never ran glass to the carpet) with
 // glass and mullions above it. Generalizes three-scene.ts's old
@@ -40,6 +41,7 @@ export function buildWindowBays(
   // surface as the walls around it. Omitted (standalone/preview callers) the
   // knee falls back to its own flat theme-gold paint.
   kneeSurface?: { material: THREE.Material; storeWidth: number; roomHeight: number },
+  aperture?: WindowAperture,
 ): WindowBaysResult {
   const bays = spec.windowBays;
   const group = new THREE.Group();
@@ -151,8 +153,8 @@ export function buildWindowBays(
     const wingC = (wing.lo + wing.hi) / 2;
 
     // Glass — one sheet per wing, knee wall to head.
-    const glass = new THREE.Mesh(new THREE.PlaneGeometry(wingW, height - KNEE_H), glassMat);
-    glass.position.set(wingC, KNEE_H + (height - KNEE_H) / 2, 0);
+    const glass = new THREE.Mesh(windowGlassGeometry(wing.lo,wing.hi,KNEE_H,height,aperture), glassMat);
+    glass.name = 'front-window-glass';
     glass.receiveShadow = true;
     group.add(glass);
     // ...and the reflection the pane above cannot show. Its 0.06 opacity is

@@ -1,3 +1,4 @@
+import { vestibuleLayout } from '../vestibule-layout.ts';
 // Ground plan of the STANDALONE DESK counter (counterShape 'desk') — the
 // mom-and-pop format's till. Pure geometry, no imports, on purpose: two very
 // different callers have to agree on this one rectangle and they run at
@@ -110,7 +111,7 @@ export function deskGroundPlan(opts: {
   // counter.ts's outline datum: the entrance's store-side wall, less its
   // 0.1 ft setback. With no vestibule chamber (GH #110) that wall IS the
   // front glass; with one it is the chamber's inner face.
-  const backZ = opts.frontGlassZ - (opts.entryStyle === 'vestibule' ? opts.doorWidth * 2 : 0);
+  const backZ = vestibuleLayout(opts, opts.frontGlassZ).backZ;
   const zBackC = backZ - 0.1;
 
   const wallX = opts.storeCenterX - opts.storeWidth / 2; // LEFT wall (−X)

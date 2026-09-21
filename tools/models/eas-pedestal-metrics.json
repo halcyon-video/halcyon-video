@@ -12,11 +12,11 @@
     "128x128 roughness"
   ],
   "dimensions_feet": [
-    0.62,
-    3.43,
+    1.26,
+    4.27,
     0.5
   ],
   "closed_manifold_parts": true,
-  "glb_bytes": 205256,
+  "glb_bytes": 205316,
   "blender": "5.2.0 LTS"
 }

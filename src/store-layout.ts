@@ -1,3 +1,4 @@
+import { vestibuleFrontHalf } from './vestibule-layout.ts';
 // Store floor-plan constants, shared layout types, and the pure catalog helpers
 // that decide how a library's titles are ordered and categorized on the shelves.
 // Everything in this module is stateless: no scene, no renderer, no DOM.
@@ -43,7 +44,7 @@ export const LIBRARY_X_SPACING = FORMAT.runSpacing;
 // has no game department, so it starts its shelves at world -3.0 instead,
 // right behind its little desk.
 export const FIELD_Z_FRONT = FORMAT.fieldZFront;
-// A 12-col island is ~7.4ft long; tilted ~40deg its X-footprint is ~6ft, so islands on
+// A 12-col island is ~7.4ft long; tilted 45deg its X-footprint is ~6ft, so islands on
 // the same side need ~11ft of centre spacing to leave a real gap and not overlap.
 // Clear central aisle straddling the store centreline (X=11). Columns left of centre
 // are pushed left and columns right of centre (including a dead-centre column) are
@@ -309,9 +310,9 @@ export function getStorefrontSpec(storeWidth: number): StorefrontSpec {
 // what shrinks that format's minimum footprint (the chain's 'vestibule'
 // formula below sizes an airlock wide enough to fit a person between two
 // leaves; a door in a wall needs none of that).
-export function vestibuleHalfWidth(spec: Pick<StorefrontSpec, 'doorWidth' | 'entryStyle'>): number {
+export function vestibuleHalfWidth(spec: Pick<StorefrontSpec, 'doorWidth' | 'entryStyle'> & {counterShape?: string}): number {
   if (spec.entryStyle === 'storefront-door') return spec.doorWidth / 2 + 0.35;
-  return (FORMAT.vestibuleInnerWidth + 2 * spec.doorWidth) / 2 + 0.2;
+  return vestibuleFrontHalf(spec) + 0.2;
 }
 
 export const BROWSE_WINDOW_SIZE = 8; // Number of columns visible at once in browse mode
@@ -395,15 +396,10 @@ export function unitDepthAtHeight(y: number): number {
 // entrance. This is the magnitude of that tilt; the per-aisle sign is chosen by
 // aisleAngleFor() based on which side of the store the aisle sits on.
 // Measured from the store's depth axis (a 0deg aisle runs straight front-to-back).
-// The classic video-store floor plan lays the islands almost broadside to the
-// entrance -- ~30deg off the FRONT wall -- so the tilt off the depth axis is the
-// complement, 60deg. Left field reads "\", right field reads "/".
-export const AISLE_ANGLE = 40 * Math.PI / 180;
-// Herringbone row tilt. Was AISLE_ANGLE - 10deg, but the browse fronts read too
-// side-on walking in; at AISLE_ANGLE + 10deg each row's browse-front face tips
-// ~20deg further toward the front glass than the original (mirrored left/right:
-// right field rotates CCW seen from above, left field CW), greeting the entrance.
-export const HERRINGBONE_AISLE_ANGLE = AISLE_ANGLE + 10 * Math.PI / 180;
+// The floor plan uses only wall-aligned or 45-degree runs. Both diagonal
+// arrangements share that angle; herringbone mirrors it across the centre.
+export const AISLE_ANGLE = Math.PI / 4;
+export const HERRINGBONE_AISLE_ANGLE = AISLE_ANGLE;
 // Cases one unit FACE holds: every column, every shelf tier. Derived from
 // AISLE_SHELF_HEIGHTS — the tier count is measured (see the comment on that
 // array) and has changed; a hardcoded row count here silently left the top
@@ -729,6 +725,16 @@ export function shelfFileKey(m: Movie): string {
     ? m.collectionName.replace(/\s+collection$/i, '')
     : m.title;
   return shelfSortTitle(base);
+}
+
+// Alphabetical organization files each film by its own title, even when it
+// belongs to a collection. Natural number order puts Part 2 before Part 10;
+// remakes and matching titles use year then id for a stable catalog order.
+const alphabeticalCollator = new Intl.Collator('en', { numeric: true, sensitivity: 'base' });
+export function alphabeticalTitleCompare(a: Movie, b: Movie): number {
+  return alphabeticalCollator.compare(shelfSortTitle(a.title.trim()), shelfSortTitle(b.title.trim()))
+    || a.year - b.year
+    || a.id.localeCompare(b.id, 'en');
 }
 
 export function shelfTitleCompare(a: Movie, b: Movie): number {
