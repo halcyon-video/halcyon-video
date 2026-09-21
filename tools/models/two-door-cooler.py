@@ -34,15 +34,21 @@ def make_mat(name, color, roughness, metal=0.0, alpha=1.0):
         p.inputs['Coat Roughness'].default_value = 0.05
     return m
 
-m_cabinet = make_mat('CoolerCabinet', (0.65, 0.025, 0.035), 0.35, metal=0.15)
+m_cabinet = make_mat('CoolerCabinet', (0.65, 0.025, 0.035), 0.27, metal=0.15)
 m_interior = make_mat('CoolerInteriorWhite', (0.48, 0.51, 0.52), 0.60)
 m_grille = make_mat('CoolerGrilleDark', (0.05, 0.05, 0.06), 0.70, metal=0.50)
-m_frame = make_mat('CoolerDoorFrame', (0.018, 0.020, 0.023), 0.45, metal=0.25)
-m_handle = make_mat('CoolerHandleMetal', (0.022, 0.024, 0.026), 0.48, metal=0.20)
+m_frame = make_mat('CoolerDoorFrame', (0.018, 0.020, 0.023), 0.36, metal=0.25)
+m_handle = make_mat('CoolerHandleMetal', (0.022, 0.024, 0.026), 0.39, metal=0.20)
 m_glass = make_mat('CoolerGlass', (0.85, 0.93, 0.95), 0.05, alpha=0.15)
 m_wire = make_mat('CoolerWireShelf', (0.88, 0.90, 0.92), 0.25, metal=0.40)
-m_header = make_mat('CoolerHeaderSign', (0.65, 0.025, 0.035), 0.30)
-m_back = make_mat('CoolerGalvanizedBack', (.37,.40,.42), .66, metal=.65)
+m_header = make_mat('CoolerHeaderSign', (0.65, 0.025, 0.035), 0.24)
+m_back = make_mat('CoolerGalvanizedBack', (.37,.40,.42), .50, metal=.65)
+# A light enamel sheen on every exposed cabinet finish, including the rear.
+for finish_mat in [m_cabinet,m_frame,m_handle,m_header,m_back]:
+    p=finish_mat.node_tree.nodes['Principled BSDF']
+    p.inputs['Coat Weight'].default_value=.18
+    p.inputs['Coat Roughness'].default_value=.24
+
 m_lid = make_mat('DrinkAluminum', (.64,.66,.68), .24, metal=.92)
 m_cap = make_mat('BottleCap', (.88,.88,.84), .48)
 m_can_red = make_mat('DrinkCanRed', (0.85, 0.08, 0.10), 0.30, metal=0.60)

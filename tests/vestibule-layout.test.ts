@@ -51,7 +51,7 @@ test('clipped-corner doors meet checkout corners and their entire clear opening 
     assert.equal(wall.x,11+side*6.2);
     assert.ok(Math.abs(wall.x+wall.sin*wall.length-(11+side*vestibuleFrontHalf(spec)))<1e-8);
     const point=(along:number,normal:number)=>({x:wall.x+along*wall.sin+normal*wall.cos,z:wall.z+along*wall.cos-normal*wall.sin});
-    for(const offset of [-doorWidth/2+.5,0,doorWidth/2-.5]) {
+    for(const offset of [-wall.doorWidth/2+.35,0,wall.doorWidth/2-.35]) {
       const next=point(wall.doorAlong+offset,.7),old=point(wall.doorAlong+offset,-.7);
       assert.deepEqual(clampVestibuleSide(next,old,wall,doorWidth,.4,.3),next);
     }

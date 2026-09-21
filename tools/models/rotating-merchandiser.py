@@ -33,6 +33,12 @@ m_hook = make_mat('MerchandiserHookWire', (0.75, 0.77, 0.80), 0.22, metal=0.90)
 m_pkg_cyan = make_mat('PackageCyan', (0.12, 0.58, 0.72), 0.40)
 m_pkg_orange = make_mat('PackageOrange', (0.88, 0.45, 0.10), 0.40)
 m_pkg_purple = make_mat('PackagePurple', (0.55, 0.15, 0.65), 0.40)
+m_blister = make_mat('MerchandiserClearBlister', (.88,.94,1), .015)
+m_blister.diffuse_color = (.88,.94,1,1)
+m_blister.node_tree.nodes['Principled BSDF'].inputs['Transmission Weight'].default_value = .94
+m_blister.node_tree.nodes['Principled BSDF'].inputs['Coat Weight'].default_value = .3
+m_tape = make_mat('CleaningCassetteShell', (.022,.024,.029), .43)
+m_reel = make_mat('CleaningCassetteReels', (.80,.78,.69), .7)
 m_header = make_mat('HeaderSignCard', (0.92, 0.90, 0.82), 0.50)
 
 def finish(o, name, m, bevel=0.003):
@@ -45,7 +51,7 @@ def finish(o, name, m, bevel=0.003):
     if bevel:
         mod = o.modifiers.new('Bevel', 'BEVEL')
         mod.width = bevel
-        mod.segments = 2
+        mod.segments = 1
         bpy.ops.object.modifier_apply(modifier=mod.name)
     bm = bmesh.new()
     bm.from_mesh(o.data)
@@ -130,7 +136,18 @@ for face_sign in [-1, 1]:  # Front and rear faces
             box(f'HangingCard_{face_sign}_{t_idx}_{c_idx}', (hx, pkg_y, hz - 0.22), (0.36, 0.015, 0.42), p_mat, bevel=0.002)
             # Blister bubble with item
             bubble_y = fy + face_sign * 0.31
-            box(f'BlisterBubble_{face_sign}_{t_idx}_{c_idx}', (hx, bubble_y, hz - 0.24), (0.28, 0.045, 0.26), m_chrome, bevel=0.003)
+            # Sealed transparent blister, fitted around a recognizable VHS cleaning cassette.
+            box(f'ClearBlister_{face_sign}_{t_idx}_{c_idx}', (hx, bubble_y, hz - 0.24), (0.30, 0.080, 0.23), m_blister, bevel=0.014)
+            box(f'CleaningCassette_{face_sign}_{t_idx}_{c_idx}', (hx, bubble_y, hz - 0.24), (0.265, 0.035, 0.16), m_tape, bevel=0.007)
+            for reel in [-1,1]:
+                ob=cylinder(f'CassetteReel_{face_sign}_{t_idx}_{c_idx}_{reel}',
+                    (hx+reel*.064,bubble_y+face_sign*.020,hz-.23),.035,.009,m_reel,verts=12,bevel=0)
+                ob.rotation_euler.x=math.pi/2
+                hub=cylinder(f'ReelHub_{face_sign}_{t_idx}_{c_idx}_{reel}',
+                    (hx+reel*.064,bubble_y+face_sign*.026,hz-.23),.012,.010,m_tape,verts=8,bevel=0)
+                hub.rotation_euler.x=math.pi/2
+            box(f'CassetteLabel_{face_sign}_{t_idx}_{c_idx}',
+                (hx,bubble_y+face_sign*.021,hz-.279),(.19,.004,.035),m_reel,bevel=.002)
             pkg_idx += 1
 
 # 5. Top Header Sign Channel (Height 4.70 to 5.25 ft)
@@ -165,6 +182,22 @@ metrics['boundsBlender'] = {
 }
 metrics['triangles'] = sum(p['triangles'] for p in metrics['parts'])
 
+# Linked Blender mesh data lets glTF reuse repeated packs, reels and hardware
+# instead of serializing each identical part. Keep individual editable objects.
+shared_meshes = {}
+for ob in parts:
+    mesh = ob.data
+    signature = (
+        tuple(tuple(round(v, 6) for v in vertex.co) for vertex in mesh.vertices),
+        tuple(tuple(poly.vertices) for poly in mesh.polygons),
+        tuple(material.name for material in mesh.materials),
+        tuple(tuple(round(v, 6) for v in loop.uv) for loop in mesh.uv_layers.active.data),
+    )
+    if signature in shared_meshes:
+        ob.data = shared_meshes[signature]
+    else:
+        shared_meshes[signature] = mesh
+
 blend_path = ROOT / 'tools/models/rotating-merchandiser.blend'
 glb_path = ROOT / 'public/models/rotating-merchandiser.glb'
 json_path = ROOT / 'tools/models/rotating-merchandiser-metrics.json'
@@ -174,7 +207,7 @@ bpy.ops.export_scene.gltf(
     filepath=str(glb_path),
     export_format='GLB',
     export_yup=True,
-    export_apply=True
+    export_apply=False
 )
 metrics['glbBytes'] = glb_path.stat().st_size
 json_path.write_text(json.dumps(metrics, indent=2) + '\n')

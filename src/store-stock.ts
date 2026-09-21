@@ -728,10 +728,10 @@ export async function buildAllMovieBoxes(scene: StoreScene) {
       const unitAngle = unit.yaw;
       const aisleWorld = scene.unitToWorld(unit, localX, localZ);
       const rotationY = (side === 'front' ? 1 : -1) * fSign * (Math.PI / 2) + unitAngle;
-      const hinge = scene.leanHingeOffset(LEAN_ANGLE, rotationY, boxHeight);
-      // Series boxsets are SERIES_DEPTH_MULT deeper, so their leaned bottom
-      // edge needs proportionally more lift to stay out of the shelf board.
-      const yPos = shelfY + 0.03 + hinge.y + (liftDepth / 2) * Math.sin(Math.abs(LEAN_ANGLE));
+      const lean = movie.isSeries ? 0 : LEAN_ANGLE;
+      const hinge = scene.leanHingeOffset(lean, rotationY, boxHeight);
+      // Box sets stand flat; individual cases retain their display lean.
+      const yPos = shelfY + 0.03 + hinge.y + (liftDepth / 2) * Math.sin(Math.abs(lean));
       const xPos = aisleWorld.x + hinge.x;
       const boxZ = aisleWorld.z + hinge.z;
 
@@ -763,14 +763,14 @@ export async function buildAllMovieBoxes(scene: StoreScene) {
         restingY: yPos,
         restingZ: boxZ,
         restingRotY: rotationY,
-        restingRotX: LEAN_ANGLE,
+        restingRotX: lean,
         aisleAngle: unitAngle,
         browseSign: fSign,
         depth: boxDepth,
         currentX: xPos,
         currentY: yPos,
         currentZ: boxZ,
-        currentRotX: LEAN_ANGLE,
+        currentRotX: lean,
         currentRotY: rotationY,
         frontX: -STAGGER_OFFSET,
         frontZ: boxDepth / 2,
@@ -805,11 +805,11 @@ export async function buildAllMovieBoxes(scene: StoreScene) {
 
     const shelfY = WALL_SHELF_HEIGHTS[shelfIdx];
     const transform = scene.getNewReleasesSlotTransform(col, movie, shelfY);
-    const hinge = scene.leanHingeOffset(LEAN_ANGLE, transform.rotationY, boxHeight);
-    // Series boxsets are SERIES_DEPTH_MULT deeper, so their leaned bottom
-    // edge needs proportionally more lift to stay out of the shelf board.
+    const lean = movie.isSeries ? 0 : LEAN_ANGLE;
+    const hinge = scene.leanHingeOffset(lean, transform.rotationY, boxHeight);
+    // Box sets stand flat; individual cases retain their display lean.
     const yPos = shelfY + 0.03 + NR_WALL_SLOPE * -.14
-      + hinge.y + (liftDepth / 2) * Math.sin(Math.abs(LEAN_ANGLE));
+      + hinge.y + (liftDepth / 2) * Math.sin(Math.abs(lean));
     const bwX = transform.x + hinge.x;
     const bwZ = transform.z + hinge.z;
 
@@ -841,12 +841,12 @@ export async function buildAllMovieBoxes(scene: StoreScene) {
       restingY: yPos,
       restingZ: bwZ,
       restingRotY: transform.rotationY,
-      restingRotX: LEAN_ANGLE,
+      restingRotX: lean,
       depth: boxDepth,
       currentX: bwX,
       currentY: yPos,
       currentZ: bwZ,
-      currentRotX: LEAN_ANGLE,
+      currentRotX: lean,
       currentRotY: transform.rotationY,
       frontX: -STAGGER_OFFSET,
       frontZ: boxDepth / 2,
@@ -1140,10 +1140,10 @@ export function rebuildMovieBoxes(scene: StoreScene) {
       const unitAngle = unit.yaw;
       const aisleWorld = scene.unitToWorld(unit, localX, localZ);
       const rotationY = (side === 'front' ? 1 : -1) * fSign * (Math.PI / 2) + unitAngle;
-      const hinge = scene.leanHingeOffset(LEAN_ANGLE, rotationY, boxHeight);
-      // Series boxsets are SERIES_DEPTH_MULT deeper, so their leaned bottom
-      // edge needs proportionally more lift to stay out of the shelf board.
-      const yPos = shelfY + 0.03 + hinge.y + (liftDepth / 2) * Math.sin(Math.abs(LEAN_ANGLE));
+      const lean = movie.isSeries ? 0 : LEAN_ANGLE;
+      const hinge = scene.leanHingeOffset(lean, rotationY, boxHeight);
+      // Box sets stand flat; individual cases retain their display lean.
+      const yPos = shelfY + 0.03 + hinge.y + (liftDepth / 2) * Math.sin(Math.abs(lean));
       const xPos = aisleWorld.x + hinge.x;
       const boxZ = aisleWorld.z + hinge.z;
 
@@ -1194,7 +1194,7 @@ export function rebuildMovieBoxes(scene: StoreScene) {
       slot.restingY = yPos;
       slot.restingZ = boxZ;
       slot.restingRotY = rotationY;
-      slot.restingRotX = LEAN_ANGLE;
+      slot.restingRotX = lean;
       slot.aisleAngle = unitAngle;
       slot.browseSign = fSign;
       slot.unitIdx = unitIdxInLibrary;

@@ -344,14 +344,14 @@ export class EntranceCheckout implements StoreFixture {
     // delineate the narrow sidelights beside the door pair.
     const buildGlazedWall = (
       orient: 'X' | 'Z', fixed: number, s0: number, s1: number, gaps: number[],
-      opts?: { transomY?: number; extraMullions?: number[]; splitTransom?: boolean; sillY?: number; frontSillY?: number; singlePanels?: boolean },
+      opts?: { transomY?: number; extraMullions?: number[]; splitTransom?: boolean; sillY?: number; frontSillY?: number; singlePanels?: boolean; doorWidth?: number },
     ) => {
       // place a box whose long axis lies along the wall's run direction
       const along = (center: number, lenAlong: number, y: number, h: number, thick: number, mat: THREE.Material) => {
         if (orient === 'X') box(lenAlong, h, thick, mat, center, y, fixed);
         else box(thick, h, lenAlong, mat, fixed, y, center);
       };
-      const gapHalf = doorW / 2;
+      const gapHalf = (opts?.doorWidth ?? doorW) / 2;
       const intervals = gaps.map((g) => [g - gapHalf, g + gapHalf] as [number, number]).sort((a, b) => a[0] - b[0]);
       // solid (glazed) panel intervals = complement of the door gaps
       const panels: [number, number][] = [];
@@ -457,15 +457,14 @@ export class EntranceCheckout implements StoreFixture {
       // uprights — so each leaf's own static frame parts are all suppressed
       // (duplicating them would coincide with those posts and z-fight).
       //
-      // Swing leaves hinge at the OUTER jambs (exit swings out to the street,
-      // entrance swings into the vestibule — both openAngle -1.4 given their
-      // mirrored hinge sides). For the 'sliding' doorStyle the same flag is the
+      // Viewed from outside, the entrance hinges left and opens inward.
+      // The exit keeps its existing outward swing. For the 'sliding' doorStyle the same flag is the
       // slide direction instead: the pair parts from the centre, each leaf
       // tucking into a pocket behind the sidelight glass on its own side.
       const sliding = spec.doorStyle === 'sliding';
       const noFrame = { header: false, jambLeft: false, jambRight: false };
       this.doors.push(buildVestibuleDoor(this.ctx, group, doorMats, spec, exitX, frontZ, doorH, true, !sliding, -1.4, noFrame));
-      this.doors.push(buildVestibuleDoor(this.ctx, group, doorMats, spec, entrX, frontZ, doorH, true, sliding, -1.4, noFrame));
+      this.doors.push(buildVestibuleDoor(this.ctx, group, doorMats, spec, entrX, frontZ, doorH, true, true, 1.4, noFrame));
 
       // ----- Back wall (Z = backZ): glass too, so the whole chamber is glazed -----
       const backHalf = vestibuleBackHalf(spec);
@@ -476,16 +475,15 @@ export class EntranceCheckout implements StoreFixture {
       for (const side of [-1, 1] as const) {
         const wall = vestibuleSide(spec, side, cx);
         const straight = vestibuleStraightSide(spec,side,cx);
-        buildGlazedWall('Z', straight.x, straight.z, frontZ, [], {frontSillY:2,singlePanels:true});
+        buildGlazedWall('Z', straight.x, straight.z, frontZ, [], {singlePanels:true});
         const assembly = new THREE.Group(); assembly.name = `vestibule-side-${side}`;
         const first = group.children.length;
-        buildGlazedWall('Z', 0, 0, wall.length, [wall.doorAlong], {frontSillY:2,singlePanels:true});
+        buildGlazedWall('Z', 0, 0, wall.length, [wall.doorAlong], {singlePanels:true,doorWidth:wall.doorWidth});
         for (const child of group.children.slice(first)) assembly.add(child);
-        // Pin 203: from the sales-floor approach the entrance-side leaf must
-        // hang on the right-hand jamb. Mirror the exit leaf instead of giving
-        // both diagonal doors the same local hinge.
-        const door = buildVestibuleDoor(this.ctx, assembly, doorMats, spec, 0, wall.doorAlong,
-          doorH, false, side === 1, -1.4, noFrame);
+        // From inside the vestibule, the entrance hinges right and opens
+        // into the sales floor. The leaf fills the whole diagonal panel.
+        const door = buildVestibuleDoor(this.ctx, assembly, doorMats, {...spec,doorWidth:wall.doorWidth}, 0, wall.doorAlong,
+          doorH, false, side === -1, -1.4, noFrame);
         assembly.position.set(wall.x, 0, wall.z); assembly.rotation.y = wall.yaw;
         group.add(assembly);
         door.center.set(wall.doorX, door.center.y, wall.doorZ);

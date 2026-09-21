@@ -753,7 +753,7 @@ let searchResultIndex = 0;
 // ─── UI Helpers ───────────────────────────────────────────────────────────────
 
 const MAX_LOG_ENTRIES = 200;
-// Ring buffer of recent log lines, attached to C feedback pins (saved as
+// Ring buffer of recent log lines, attached to Shift+C feedback pins (saved as
 // log.txt next to the pin) so playback narration reaches disk even when the
 // on-screen log is hidden behind the video overlay.
 const recentLogLines: string[] = [];
@@ -3763,16 +3763,16 @@ async function main() {
     openSearchWithQuery(e.key);
   });
 
-  // Feedback pin (C): works in every render mode / camera state, unlike the
+  // Feedback pin (Shift+C): works in every render mode / camera state, unlike the
   // listener above. Ignored while an input/textarea has focus (so it doesn't
   // fire mid-typing elsewhere, e.g. the settings drawer's text rows) or while
   // the login overlay is up (no scene to screenshot yet).
   window.addEventListener('keydown', (e) => {
-    if (e.key.toLowerCase() !== 'c' || e.ctrlKey || e.metaKey || e.altKey || e.repeat || e.isComposing) return;
+    if (e.key.toLowerCase() !== 'c' || !e.shiftKey || e.ctrlKey || e.metaKey || e.altKey || e.repeat || e.isComposing) return;
     if (!storeScene || ui.isLoginOpen || ui.isFeedbackOpen) return;
-    // Only text-entry fields block C. A plain tag check would also match the
+    // Only text-entry fields block Shift+C. A plain tag check would also match the
     // video player's volume slider (<input type=range>), which keeps focus
-    // after a click and made C dead for the rest of playback.
+    // after a click and made Shift+C dead for the rest of playback.
     if (textEntryHasFocus()) return;
     e.preventDefault();
     e.stopImmediatePropagation();

@@ -181,12 +181,12 @@ def sweep(name, path, depth, island=False, rounded=False, drawers=False):
 
 def shield(modern=False):
     points = [Vector(p) for p in [(-6.2,-.1),(-10.5,-4.4),(0,-14.9),(10.5,-4.4),(6.2,-.1)]]
-    # Same 2.2-foot trims as counter.ts: an open staff entrance at the left shoulder.
+    # Same 2.7-foot trims as counter.ts: an open staff entrance at the left shoulder.
     # The previous replacement path retraced 3.6 ft of this shoulder, putting
     # two countertop skins in the same plane. Keep one continuous, non-overlapping
     # sweep and let its two cut ends form the short inward returns (pin 211).
-    a = points[1] + (points[2]-points[1]).normalized()*2.2
-    b = points[1] + (points[0]-points[1]).normalized()*2.2
+    a = points[1] + (points[2]-points[1]).normalized()*2.7
+    b = points[1] + (points[0]-points[1]).normalized()*2.7
     path = [a, points[2], points[3], points[4], points[0], b]
     t = (points[2]-points[1]).normalized()
     n = Vector((-t.y,t.x))

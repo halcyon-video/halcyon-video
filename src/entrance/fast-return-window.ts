@@ -27,9 +27,9 @@ export function addFastReturnWindow(ctx: FixtureContext, root: THREE.Group, scal
   const flap=box(1.96,.32,0,3.90,flapMaterial);flap.position.z=-.07;flap.rotation.x=-.12;
   const canvas=document.createElement('canvas');canvas.width=1024;canvas.height=200;
   const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;
-  const labelMat=new THREE.MeshStandardMaterial({map:texture,transparent:true,depthWrite:false,side:THREE.DoubleSide,roughness:.8,metalness:0});
+  const labelMat=new THREE.MeshStandardMaterial({map:texture,transparent:true,depthWrite:true,alphaTest:.1,side:THREE.DoubleSide,roughness:.8,metalness:0});
   const geo=new THREE.PlaneGeometry(2.75*scale,.54);geometries.push(geo);
-  const label=markSignMesh(new THREE.Mesh(geo,labelMat));label.name='FAST RETURN outward window vinyl';label.position.set(0,4.8,.015);group.add(label);
+  const label=markSignMesh(new THREE.Mesh(geo,labelMat));label.name='FAST RETURN outward window vinyl';label.position.set(0,4.8,.035);group.add(label);
   let disposed=false;
   const paint=()=>{
     if(disposed)return;

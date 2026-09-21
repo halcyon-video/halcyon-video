@@ -3984,7 +3984,7 @@ export class StoreScene {
    */
   public debugClerkPathAudit(seconds = 420): boolean { return clerkFlow.debugClerkPathAudit(this, seconds); }
 
-  // Feedback pin (C, see main.ts): a user who can't read code flags a visual
+  // Feedback pin (Shift+C, see main.ts): a user who can't read code flags a visual
   // bug in-app. Captures the exact replayable view PLUS a screenshot in one
   // shot, before the camera can move. preserveDrawingBuffer is off, so the
   // canvas must be forced to paint and read back in the same tick -- no

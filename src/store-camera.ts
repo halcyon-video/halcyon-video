@@ -852,7 +852,7 @@ export function teleportWalk(scene: StoreScene, x: number, z: number, yawDeg = 0
 // CURRENT view as whichever shape reproduces it best -- inspecting a title
 // is shared by name (jumpToTitle survives a different store layout, e.g. a
 // visitor's own library), everything else by camera pose (teleportWalk) the
-// same way C feedback pins already do (StoreScene.captureFeedbackSnapshot).
+// same way Shift+C feedback pins already do (StoreScene.captureFeedbackSnapshot).
 export function captureSharedPlace(scene: StoreScene): SharedPlace {
   if (scene.mode === 'inspect') {
     const movie = scene.getSelectedMovie();
