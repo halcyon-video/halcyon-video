@@ -1,6 +1,6 @@
 import { setSetting } from './settings';
 import { SettingsRowKit, type RowKitHooks } from './settings-rows';
-import { connectSteam, disconnectSteam, refreshSteam, steamStatus, hasSteamNative } from './providers/steam-provider';
+import { connectSteam, disconnectSteam, refreshSteam, steamStatus, hasSteamNative, installSteamCompanion, needsSteamCompanion } from './providers/steam-provider';
 export function buildSteamControls(container: HTMLElement, hooks: RowKitHooks & { dirty: () => void }): void {
   if (!hasSteamNative()) return;
   const status = document.createElement('p');
@@ -28,6 +28,7 @@ export function buildSteamControls(container: HTMLElement, hooks: RowKitHooks & 
     } catch (error) { display(typeof error === 'string' ? error : 'Steam could not complete this request. Please try again.'); }
     finally { clearInterval(progress); busy = false; }
   };
+  if (needsSteamCompanion()) kit.confirmAction('install', 'Install Steam companion', 'Needed only for browser, hosted, and Docker deployments. Steam remains off until you connect it.', installSteamCompanion);
   kit.confirmAction('connect', 'Connect Steam', 'Sign in directly with Steam. Halcyon never asks for your password or an API key.', () => void perform(connectSteam));
   kit.confirmAction('refresh', 'Refresh Steam library', 'Reads your current account and selected review tier. Large libraries may take a few minutes.', () => void perform(async () => { await refreshSteam(); setSetting('bb_games_enabled', true); }, true));
   kit.confirmAction('disconnect', 'Disconnect Steam', 'Clear this Steam sign-in and remove its games from Halcyon.', () => void perform(disconnectSteam, true));

@@ -1,4 +1,5 @@
 mod steam;
+mod steam_companion;
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 use tauri::Manager;
 
@@ -473,7 +474,15 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .manage(steam::SteamState::default())
+        .manage(steam_companion::CompanionState::default())
         .setup(|app| {
+            let companion_only = std::env::var_os("HALCYON_STEAM_COMPANION").is_some();
+            if let Err(error) = steam_companion::start(app.handle()) {
+                if companion_only { return Err(error.into()); }
+            }
+            if companion_only {
+                if let Some(main) = app.get_webview_window("main") { let _ = main.hide(); }
+            }
             #[cfg(debug_assertions)]
             {
                 let handle = app.handle().clone();

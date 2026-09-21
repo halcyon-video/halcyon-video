@@ -232,6 +232,13 @@ WebRTC advertise an address other devices can reach; ordinary browser-only use
 can publish port 1420 instead. The compose file documents GPU, allowed-host,
 and optional shared-service settings.
 
+Steam remains off unless a user enables it. Native Halcyon includes Steam
+support; browser, hosted, and Docker deployments use the optional
+Halcyon Steam Companion installed on the computer that will run the games.
+The container never receives Steam credentials, display access, or host process
+permissions. Download the companion archive from the matching release and see
+`STEAM-COMPANION.md` inside it. Each Halcyon address requires explicit approval.
+
 ### Prefill Jellyfin for visitors (Docker)
 
 Set `HALCYON_JELLYFIN_URL` when starting the published container. No source

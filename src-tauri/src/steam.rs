@@ -48,12 +48,15 @@ fn auth_window(app: &AppHandle, visible: bool) -> Result<WebviewWindow, String> 
 #[tauri::command]
 pub async fn steam_connect(app: AppHandle, window: WebviewWindow) -> Result<(), String> {
     main_only(&window)?;
-    auth_window(&app, true)?;
-    Ok(())
+    companion_connect(&app)
 }
+pub(crate) fn companion_connect(app: &AppHandle) -> Result<(), String> { auth_window(app, true).map(|_| ()) }
 #[tauri::command]
 pub async fn steam_disconnect(app: AppHandle, window: WebviewWindow) -> Result<(), String> {
     main_only(&window)?;
+    companion_disconnect(&app)
+}
+pub(crate) fn companion_disconnect(app: &AppHandle) -> Result<(), String> {
     let state = app.state::<SteamState>();
     *state.generation.lock().unwrap() += 1;
     state.owned.lock().unwrap().clear();
@@ -114,12 +117,15 @@ fn read_library(cookie: String) -> Result<Library, String> {
 #[tauri::command]
 pub async fn steam_library(app: AppHandle, window: WebviewWindow) -> Result<Library, String> {
     main_only(&window)?;
+    tauri::async_runtime::spawn_blocking(move || companion_library(&app)).await.map_err(|_| "Steam library request stopped.".to_string())?
+}
+pub(crate) fn companion_library(app: &AppHandle) -> Result<Library, String> {
     let auth = auth_window(&app, false)?;
     let generation = *app.state::<SteamState>().generation.lock().unwrap();
     let cookies = auth.cookies_for_url(STORE.parse().unwrap()).map_err(|_| "Cannot read Steam sign-in. Please sign in again.")?;
     if !cookies.iter().any(|c| c.name() == "steamLoginSecure") { return Err("Sign in to Steam, then choose Refresh library.".into()); }
     let cookie = cookies.iter().map(|c| format!("{}={}", c.name(), c.value())).collect::<Vec<_>>().join("; ");
-    let library = tauri::async_runtime::spawn_blocking(move || read_library(cookie)).await.map_err(|_| "Steam library request stopped.")??;
+    let library = read_library(cookie)?;
     let state = app.state::<SteamState>();
     let current = state.generation.lock().unwrap();
     if generation != *current { return Err("Steam account changed. Refresh the library again.".into()); }
@@ -139,25 +145,25 @@ fn read_review(client: &Client, app_id: u32) -> Result<Review, String> {
 #[tauri::command]
 pub async fn steam_reviews(app: AppHandle, window: WebviewWindow, app_ids: Vec<u32>) -> Result<HashMap<u32, Review>, String> {
     main_only(&window)?;
+    tauri::async_runtime::spawn_blocking(move || companion_reviews(&app, app_ids)).await.map_err(|_| "Steam review request stopped.".to_string())?
+}
+pub(crate) fn companion_reviews(app: &AppHandle, app_ids: Vec<u32>) -> Result<HashMap<u32, Review>, String> {
     if app_ids.len() > 100 || app_ids.iter().any(|id| *id == 0) { return Err("Request up to 100 valid Steam games at a time.".into()); }
-    tauri::async_runtime::spawn_blocking(move || {
-        let client = client()?;
-        let state = app.state::<SteamState>();
-        let mut result = HashMap::new();
-        // A small sequential batch deliberately respects Steam's service limits.
-        for id in app_ids {
-            if state.launching.load(Ordering::SeqCst) { return Err("Review refresh paused while a Steam game runs.".into()); }
-            let cached = state.reviews.lock().unwrap().get(&id).filter(|(at, _)| at.elapsed() < Duration::from_secs(86400)).map(|(_, r)| r.clone());
-            let review = if let Some(review) = cached { review } else {
-                let review = read_review(&client, id)?;
-                state.reviews.lock().unwrap().insert(id, (Instant::now(), review.clone()));
-                std::thread::sleep(Duration::from_millis(150));
-                review
-            };
-            result.insert(id, review);
-        }
-        Ok(result)
-    }).await.map_err(|_| "Steam review request stopped.".to_string())?
+    let client = client()?;
+    let state = app.state::<SteamState>();
+    let mut result = HashMap::new();
+    for id in app_ids {
+        if state.launching.load(Ordering::SeqCst) { return Err("Review refresh paused while a Steam game runs.".into()); }
+        let cached = state.reviews.lock().unwrap().get(&id).filter(|(at, _)| at.elapsed() < Duration::from_secs(86400)).map(|(_, r)| r.clone());
+        let review = if let Some(review) = cached { review } else {
+            let review = read_review(&client, id)?;
+            state.reviews.lock().unwrap().insert(id, (Instant::now(), review.clone()));
+            std::thread::sleep(Duration::from_millis(150));
+            review
+        };
+        result.insert(id, review);
+    }
+    Ok(result)
 }
 
 // Steam's launcher process exits as soon as it hands off to the client. Track
@@ -180,6 +186,9 @@ fn environment_matches(environment: &[u8], app_id: u32) -> bool {
 #[tauri::command]
 pub async fn steam_launch(app: AppHandle, window: WebviewWindow, app_id: u32) -> Result<(), String> {
     main_only(&window)?;
+    tauri::async_runtime::spawn_blocking(move || companion_launch(&app, app_id)).await.map_err(|_| "Steam monitoring stopped; return to Halcyon to retry.".to_string())?
+}
+pub(crate) fn companion_launch(app: &AppHandle, app_id: u32) -> Result<(), String> {
     #[cfg(not(target_os = "linux"))]
     { let _ = (app, app_id); return Err("Steam game monitoring currently requires Linux.".into()); }
     #[cfg(target_os = "linux")]
@@ -187,8 +196,7 @@ pub async fn steam_launch(app: AppHandle, window: WebviewWindow, app_id: u32) ->
         let state = app.state::<SteamState>();
         if !state.owned.lock().unwrap().contains(&app_id) { return Err("Refresh your Steam library before launching this game.".into()); }
         if state.launching.swap(true, Ordering::SeqCst) { return Err("A Steam game is already starting or running.".into()); }
-        let handle = app.clone();
-        let result = tauri::async_runtime::spawn_blocking(move || {
+        let result = (|| {
             let mut launcher = std::process::Command::new("steam")
                 .arg(format!("steam://rungameid/{app_id}"))
                 .stdin(std::process::Stdio::null()).stdout(std::process::Stdio::null()).stderr(std::process::Stdio::null())
@@ -210,8 +218,8 @@ pub async fn steam_launch(app: AppHandle, window: WebviewWindow, app_id: u32) ->
                 std::thread::sleep(Duration::from_secs(3));
             }
             Ok(())
-        }).await.map_err(|_| "Steam monitoring stopped; return to Halcyon to retry.".to_string()).and_then(|r| r);
-        handle.state::<SteamState>().launching.store(false, Ordering::SeqCst);
+        })();
+        app.state::<SteamState>().launching.store(false, Ordering::SeqCst);
         result
     }
 }

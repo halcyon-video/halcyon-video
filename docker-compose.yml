@@ -20,6 +20,9 @@ services:
     #   - "1420:1420"
 
     environment:
+      # Steam deliberately has no container flag, privileged sidecar, socket,
+      # or credential mount. A user who enables Steam pairs this browser with
+      # the optional companion on the computer that will run the game.
       # Prefill Jellyfin without rebuilding; use a browser-reachable address.
       # HALCYON_JELLYFIN_URL: https://jellyfin.example.com
       REMOTE_PLAY_SEED: /data/remote-play-seed.json

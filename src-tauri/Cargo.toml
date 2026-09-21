@@ -1,6 +1,6 @@
 [package]
 name = "tauri-app"
-version = "0.1.0"
+version = "0.21.1"
 description = "Halcyon Video — a 3D video store for your media server"
 authors = ["Halcyon Video"]
 edition = "2021"
@@ -24,10 +24,10 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 reqwest = { version = "0.12", default-features = false, features = ["blocking", "rustls-tls"] }
 url = "2"
+tiny_http = "0.12"
 
 # Not used by our code: it's here to force a vendored (statically linked) dbus
 # into the Linux bundle. The crate's build script hard-errors with "Unsupported
 # platform." anywhere else, so it must stay target-gated.
 [target.'cfg(target_os = "linux")'.dependencies]
 libdbus-sys = { version = "0.2.7", features = ["vendored"] }
-

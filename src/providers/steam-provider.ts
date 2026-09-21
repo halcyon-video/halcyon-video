@@ -2,7 +2,53 @@ import { invoke } from '@tauri-apps/api/core';
 import { filterSteamTitles, steamTitle, type SteamGame, type SteamReview } from '../steam-catalog';
 import type { Title } from './media-source-provider';
 import { isExternalGameActive } from '../external-game-state.ts';
-export const hasSteamNative = (): boolean => typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__;
+const nativeSteam = (): boolean => typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__;
+export const hasSteamNative = (): boolean => typeof window !== 'undefined';
+export const needsSteamCompanion = (): boolean => !nativeSteam();
+const COMPANION = 'http://127.0.0.1:1421/v1';
+const PAIR_TOKEN = 'halcyon_steam_companion_pair';
+const COMPANION_DOWNLOAD = 'https://github.com/halcyon-video/halcyon-video/releases/latest';
+let pairing: Promise<string> | null = null;
+const wait = (ms: number) => new Promise(resolve => window.setTimeout(resolve, ms));
+async function ensureCompanion(): Promise<string> {
+  const saved = localStorage.getItem(PAIR_TOKEN);
+  if (saved) return saved;
+  if (pairing) return pairing;
+  pairing = (async () => {
+    try {
+      const status = await fetch(`${COMPANION}/status`);
+      if (!status.ok) throw new Error();
+      const started = await fetch(`${COMPANION}/pair`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ origin: location.origin }) });
+      const request = await started.json();
+      if (!started.ok || typeof request.requestId !== 'string') throw new Error(typeof request.error === 'string' ? request.error : 'The Steam companion could not start pairing.');
+      for (let attempt = 0; attempt < 120; attempt++) {
+        await wait(500);
+        const check = await fetch(`${COMPANION}/pair/${encodeURIComponent(request.requestId)}`);
+        const answer = await check.json();
+        if (typeof answer.token === 'string') { localStorage.setItem(PAIR_TOKEN, answer.token); return answer.token; }
+        if (answer.pending === false) throw new Error('Steam companion pairing was denied.');
+      }
+      throw new Error('Steam companion pairing timed out.');
+    } catch (error) {
+      if (error instanceof TypeError) {
+        throw 'Install and start the Halcyon Steam Companion, then choose Connect Steam again.';
+      }
+      throw error;
+    }
+  })().finally(() => { pairing = null; });
+  return pairing;
+}
+export function installSteamCompanion(): void { window.open(COMPANION_DOWNLOAD, '_blank', 'noopener'); }
+async function companionInvoke<T>(action: string, args: Record<string, unknown> = {}, method = 'POST'): Promise<T> {
+  const token = await ensureCompanion();
+  const response = await fetch(`${COMPANION}/${action}`, { method, headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: method === 'DELETE' ? undefined : JSON.stringify(args) });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw (typeof payload.error === 'string' ? payload.error : 'Steam companion could not complete this request.');
+  return payload as T;
+}
+function steamInvoke<T>(command: string, args: Record<string, unknown> = {}): Promise<T> {
+  return nativeSteam() ? invoke<T>(command, args) : companionInvoke<T>(command.replace(/^steam_/, ''), args);
+}
 let generation = 0;
 let pending: Promise<Title[]> | null = null;
 let current: Title[] = [];
@@ -17,7 +63,7 @@ function changed() { window.dispatchEvent(new Event('steam-catalog-changed')); }
 export async function connectSteam(): Promise<void> {
   generation++; current = []; pending = null;
   changed();
-  await invoke('steam_connect');
+  await steamInvoke('steam_connect');
   localStorage.setItem('steam_enabled', '1');
   localStorage.setItem('steam_configured', '1');
   publish('Sign in in the Steam window, then choose Refresh library.');
@@ -26,7 +72,8 @@ export async function disconnectSteam(): Promise<void> {
   generation++; current = []; pending = null;
   localStorage.removeItem('steam_enabled');
   changed();
-  await invoke('steam_disconnect');
+  if (nativeSteam()) await steamInvoke('steam_disconnect');
+  else { await companionInvoke('pair', {}, 'DELETE'); localStorage.removeItem(PAIR_TOKEN); }
   publish('Steam disconnected. Its games have been removed.');
 }
 export function loadSteamGames(force = false): Promise<Title[]> {
@@ -39,7 +86,7 @@ export function loadSteamGames(force = false): Promise<Title[]> {
   const tier = localStorage.getItem('bb_steam_review_tier') || 'all';
   publish('Refreshing your Steam library…');
   const work = (async () => {
-    const library = await invoke<{ steamId: string; games: SteamGame[] }>('steam_library');
+    const library = await steamInvoke<{ steamId: string; games: SteamGame[] }>('steam_library');
     if (generation !== request) return [];
     const reviews: Record<string, SteamReview> = {};
     if (tier !== 'all') {
@@ -47,7 +94,7 @@ export function loadSteamGames(force = false): Promise<Title[]> {
         if (generation !== request) return [];
         if (isExternalGameActive()) throw 'Review refresh paused while a Steam game runs. Refresh after returning.';
         publish(`Checking Steam ratings: ${i} of ${library.games.length} games…`);
-        Object.assign(reviews, await invoke<Record<string, SteamReview>>('steam_reviews', { appIds: library.games.slice(i, i + 20).map(g => g.appid) }));
+        Object.assign(reviews, await steamInvoke<Record<string, SteamReview>>('steam_reviews', { appIds: library.games.slice(i, i + 20).map(g => g.appid) }));
       }
     }
     if (generation !== request) return [];

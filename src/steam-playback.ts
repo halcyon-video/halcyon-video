@@ -3,10 +3,7 @@ import { withExternalGame, isExternalGameActive, onExternalGameChange } from './
 import type { Movie } from './providers/media-source-provider';
 
 export async function playSteamGame(movie: Movie, report: (message: string) => void): Promise<void> {
-  if (!(window as any).__TAURI_INTERNALS__) {
-    report('Steam games launch from the installed Halcyon app.');
-    return;
-  }
+  const native = !!(window as any).__TAURI_INTERNALS__;
   report(`Starting ${movie.title} in Steam. Halcyon will sleep until the game closes.`);
   const notice = document.createElement('div');
   notice.setAttribute('role', 'status');
@@ -14,7 +11,14 @@ export async function playSteamGame(movie: Movie, report: (message: string) => v
   notice.textContent = 'Steam is starting your game. Halcyon is sleeping and will return when the game closes.';
   document.body.append(notice);
   try {
-    await withExternalGame(() => invoke<void>('steam_launch', { appId: movie.steamAppId }));
+    await withExternalGame(async () => {
+      if (native) return invoke<void>('steam_launch', { appId: movie.steamAppId });
+      const token = localStorage.getItem('halcyon_steam_companion_pair');
+      if (!token) throw 'Pair the Halcyon Steam Companion before launching a game.';
+      const response = await fetch('http://127.0.0.1:1421/v1/launch', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ appId: movie.steamAppId }) });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw (typeof payload.error === 'string' ? payload.error : 'Steam companion could not launch the game.');
+    });
     report('The Steam game has closed. Welcome back.');
   } catch (error) {
     const message = typeof error === 'string' ? error : 'Steam could not launch the game.';
