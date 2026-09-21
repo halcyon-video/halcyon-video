@@ -1,5 +1,6 @@
 // Touch controls share the host overlay callbacks. Hosted mobile browsing
 // uses direct camera manipulation; other touch installs retain arrow swipes.
+import { installMobileWalk } from './mobile-walk';
 import type { InputCallbacks } from './input.ts';
 import type { StoreScene } from './three-scene.ts';
 import { beginMobileDrag, mobileStoreActive, markMobileDragged } from './mobile-store.ts';
@@ -27,9 +28,8 @@ export { SWIPE_MIN_PX, resolveSwipeDirection };
  * do, not a literal key name), swapping the arrow glyphs for SWIPE/TAP since
  * a touch visitor has the on-screen BACK/OK buttons above but no D-pad to
  * point at. `null` means "no touch-specific copy" — main.ts falls through to
- * its own keyboard text (used by 'walk-around', a keyboard-only surface: held
- * WASD state read straight off three-scene.ts, not through InputCallbacks,
- * so a touch visitor can never actually be in it).
+ * its own keyboard text. Walking uses the separate phone thumbstick and
+ * drag-to-look layer, sharing the scene's collision and inspection logic.
  */
 /**
  * Touch-primary copy for main.ts's updateMovieHUD — that function overwrites
@@ -69,7 +69,7 @@ export function touchHUDText(mode: string, canHoldToCheckout: boolean, carryMode
     case 'library-select':
       return 'TAP TO BROWSE THIS SECTION';
     case 'overview':
-      return mobileStoreActive() ? 'SWIPE TO MOVE  •  TAP CURSOR TO ENTER' : 'SWIPE TO BROWSE  •  TAP OK TO GO';
+      return mobileStoreActive() ? 'SWIPE TO LOOK  •  TAP A SHELF' : 'SWIPE TO BROWSE  •  TAP OK TO GO';
     case 'genre-select':
       return '';
     case 'browse':
@@ -80,6 +80,8 @@ export function touchHUDText(mode: string, canHoldToCheckout: boolean, carryMode
       return carryMode
         ? 'TAP OK TO TAKE IT'
         : 'SWIPE TO FLIP  •  TAP OK TO PLAY';
+    case 'walk-around':
+      return 'THUMBSTICK TO MOVE  •  DRAG TO LOOK  •  TAP A MOVIE';
     case 'checkout':
       return 'TAP OK TO CHECK OUT';
     case 'backroom':
@@ -129,6 +131,24 @@ const CSS = `
   background: var(--bb-yellow, #ffcc00); color: var(--bb-navy, #000a1c);
   border-color: var(--bb-yellow, #ffcc00); opacity: 0.92;
 }
+#store-touch-walk { top: max(24px, env(safe-area-inset-top)); right: max(24px, env(safe-area-inset-right)); display: none; }
+#store-touch-controls:not(.terminal)[data-mode="overview"] #store-touch-walk,
+#store-touch-controls:not(.terminal)[data-mode="browse"] #store-touch-walk,
+#store-touch-controls:not(.terminal)[data-mode="walk-around"] #store-touch-walk { display: flex; }
+#store-touch-controls:not(.terminal)[data-mode="overview"] #store-touch-ok,
+#store-touch-controls:not(.terminal)[data-mode="walk-around"] #store-touch-ok { display: none; }
+#store-touch-stick { display: none; position: absolute; left: max(24px, env(safe-area-inset-left)); bottom: max(24px, env(safe-area-inset-bottom)); width: 116px; height: 116px; border: 2px solid rgba(255,255,255,.5); border-radius: 50%; background: rgba(0,10,26,.42); touch-action: none; }
+#store-touch-controls.visible:not(.terminal)[data-mode="walk-around"] #store-touch-stick { display: block; pointer-events: auto; }
+.st-stick-knob { position: absolute; inset: 36px; border-radius: 50%; background: rgba(255,255,255,.8); pointer-events: none; }
+.st-stick-label { position: absolute; top: 47px; left: 0; right: 0; text-align: center; color: #000a1c; font: 700 15px/20px sans-serif; pointer-events: none; }
+body .clerk-prompt { bottom: max(174px, calc(env(safe-area-inset-bottom) + 160px)); max-width: calc(100vw - 48px); }
+body .clerk-prompt .clerk-key { display: none; }
+body:has(.clerk-dialog.visible) #store-touch-controls,
+body:has(.clerk-dialog.visible) #browse-hint { visibility: hidden; }
+#walk-hud.visible, #walk-crosshair.visible { display: none; }
+#browse-locator { top: max(86px, calc(env(safe-area-inset-top) + 72px)); max-width: calc(100vw - 48px); }
+.browse-locator-name { white-space: normal; text-align: center; font-size: 18px; letter-spacing: 1px; }
+body:has(#store-touch-controls[data-mode="walk-around"]) #browse-hint { bottom: 40px; left: auto; right: 16px; transform: none; max-width: calc(100vw - 180px); }
 #store-touch-ok.st-pressed { background: #fff; }
 @keyframes st-pulse {
   0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 204, 0, 0); }
@@ -239,10 +259,12 @@ export function installStoreTouchControls(callbacks: InputCallbacks, poke: () =>
     // handling off entirely, so touchmove needs no preventDefault() to stay
     // out of the page's way.
     stage.style.touchAction = 'none';
+    installMobileWalk(root, stage, callbacks, poke, () => getScene?.() ?? null);
     let startX = 0, startY = 0, tracking = false;
     let drag: ReturnType<typeof beginMobileDrag> = null;
     let moved = false;
     stage.addEventListener('touchstart', (e) => {
+      if (getScene?.()?.isWalkAroundMode) { tracking = false; drag = null; return; }
       if (e.touches.length !== 1) {
         tracking = false;
         const s = getScene?.();

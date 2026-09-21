@@ -1,3 +1,4 @@
+import { mobileStoreActive } from './mobile-store';
 import { constrainWalkObstacles } from './walk-collision';
 import { vestibuleSide, vestibuleStraightSide, clampVestibuleSide, vestibuleBackHalf } from './vestibule-layout';
 // First-person walk-around mode — extracted from StoreScene (three-scene.ts
@@ -19,6 +20,7 @@ import { showClerkToast } from './carried-tapes';
 export const WALK_INTERACT_RANGE = 14;
 
 export function requestWalkPointerLock(scene: StoreScene) {
+  if (mobileStoreActive()) return;
   try {
     const p = scene.renderer.domElement.requestPointerLock() as unknown as Promise<void> | undefined;
     p?.catch?.(() => { /* lock denied — movement-delta fallback covers it */ });
@@ -326,10 +328,18 @@ export function toggleWalkAround(scene: StoreScene) {
     scene.mode = 'walk-around';
     if (scene.onModeChange) scene.onModeChange(scene.mode);
 
-    // Always spawn at the store entrance (inside the entrance chamber), looking
-    // in toward the shop floor.
-    scene.currentCameraPos.set(13.0, 5.5, 12.5);
-    scene.currentLookAt.set(11.0, 5.3, 0.0);
+    // Touch visitors can start beside the shelf they were browsing; other
+    // entries begin in the entrance chamber, looking toward the shop floor.
+    if (!mobileStoreActive() || scene.savedModeBeforeWalk !== 'browse') {
+      scene.currentCameraPos.set(13.0, 5.5, 12.5);
+      scene.currentLookAt.set(11.0, 5.3, 0.0);
+    } else {
+      // Raising a shelf-level camera to eye height must preserve its bearing,
+      // rather than tilting down toward the shelf's old point of interest.
+      const heading = scene.currentLookAt.clone().sub(scene.currentCameraPos);
+      scene.currentCameraPos.y = 5.5;
+      scene.currentLookAt.copy(scene.currentCameraPos).add(heading);
+    }
     scene.camera.position.copy(scene.currentCameraPos);
 
     // Force height to walking height (5.5 ft)
@@ -338,7 +348,7 @@ export function toggleWalkAround(scene: StoreScene) {
 
     // Extract starting yaw and pitch from camera orientation
     const dir = new THREE.Vector3().subVectors(scene.currentLookAt, scene.currentCameraPos).normalize();
-    scene.yaw = Math.atan2(dir.x, -dir.z);
+    scene.yaw = Math.atan2(-dir.x, -dir.z);
     scene.pitch = Math.asin(THREE.MathUtils.clamp(dir.y, -0.9, 0.9));
 
     // Set camera rotation order to YXZ and apply initial rotation

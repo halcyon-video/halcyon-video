@@ -360,7 +360,7 @@ function previewCurrent(scene: StoreScene, state: SubNavState): void {
   if (!item) return;
   if (mobileStoreActive() && scene.mode === 'overview') {
     state.aisleCam = false;
-    aimOverviewAt(scene, item.x, item.y, item.z);
+    aimOverviewAt(scene, item.x, Math.min(item.y, 4), item.z);
     scene.cameraGlideLerp = SUBNAV_GLIDE_LERP;
     scene.requestRender();
   } else if (state.row === 1) {

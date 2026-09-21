@@ -62,7 +62,7 @@ export function isWelcomeActive(): boolean {
  */
 export function welcomeHUDText(isTouch: boolean): string {
   return isTouch
-    ? 'SWIPE TO WALK THE AISLES  •  TAP ANY CASE TO EXAMINE'
+    ? 'SWIPE TO LOOK  •  TAP A SHELF'
     : '◀ ▶ TO WALK THE AISLES  •  ENTER TO EXAMINE';
 }
 
@@ -100,8 +100,9 @@ export function triggerHostedWelcome(deps: WelcomeDeps = {}): boolean {
   touchControls?.classList.add('st-intro');
 
   // 3. Diegetic clerk greeting toast
-  const greeting = deps.brandGreeting ??
-    'Hey there! Welcome to Halcyon — take a look around, or come ask me if you need a recommendation!';
+  const greeting = deps.brandGreeting ?? (isTouch
+    ? 'Welcome in! Tap a shelf to browse.'
+    : 'Hey there! Welcome to Halcyon — take a look around, or come ask me if you need a recommendation!');
   deps.showToast?.(greeting, 6500);
 
   return true;

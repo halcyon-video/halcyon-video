@@ -971,6 +971,7 @@ function updateBrowseHUDVisibility() {
   const terminalBlocked = ui.isLoginOpen || ui.isPowerMenuOpen || ui.isExitConfirmOpen
     || ui.isVersionPickerOpen || ui.isCandyCheckoutOpen || ui.isFeedbackOpen
     || ui.isEmblemStudioOpen || isMembershipPickerOpen() || ui.isPlaybackActive || ui.isScreensaverActive;
+  if (touchControls && touchControls.dataset.mode !== storeScene.mode) touchControls.dataset.mode = storeScene.mode;
   touchControls?.classList.toggle('terminal', terminal);
   touchControls?.classList.toggle('visible', terminal ? !terminalBlocked : !suppressed);
 

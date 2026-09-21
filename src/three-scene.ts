@@ -13,6 +13,7 @@ import { installStoreSurfaceFinishes } from './store-surface-finish';
 import { fitSteppedCornerDepth } from './stepped-corner-clearance';
 import { placementBudget } from './progressive-placement';
 import { tickShelfVisibility, disposeShelfVisibility } from './shelf-visibility';
+import { mobileWalkInput } from './mobile-walk';
 import { mobileStoreActive, mobileStoreTap, mobileArtworkTick } from './mobile-store';
 import * as THREE from 'three';
 import { installDirectLightVisibility } from './direct-light-visibility';
@@ -1810,6 +1811,7 @@ export class StoreScene {
     // memory/bandwidth (see #27).
     this.renderer = new THREE.WebGLRenderer({ antialias: false, alpha: false, powerPreference: "high-performance" });
     this.renderer.setSize(width, height);
+    this.renderer.domElement.style.width = this.renderer.domElement.style.height = '100%';
     // Hitch tracer: per-frame renderer.info deltas always; raw-GL upload/compile
     // timing only when profiling (?trace=1 — it allocates per GL call).
     perfTrace.attachRenderer(this.renderer);
@@ -4406,14 +4408,15 @@ export class StoreScene {
       }
     }
 
+    const touchWalk = mobileWalkInput(this);
     if (this.isWalkAroundMode) {
       const dt = Math.min(0.1, (time - this.lastUpdateTime) / 1000.0);
       this.lastUpdateTime = time;
       const ROTATION_SPEED = 1.6;
 
       // Read gamepad sticks for movement and look
-      let gpMoveX = 0;
-      let gpMoveY = 0;
+      let gpMoveX = touchWalk.x;
+      let gpMoveY = touchWalk.y;
       let gpLookX = 0;
       let gpLookY = 0;
 
@@ -4476,8 +4479,8 @@ export class StoreScene {
       }
 
       if (moveDir.lengthSq() > 0) {
-        moveDir.normalize();
-        const stepDist = WALK_SPEED * dt;
+        const movementScale = (touchWalk.x || touchWalk.y) ? Math.min(1, moveDir.length()) : 1; moveDir.normalize();
+        const stepDist = WALK_SPEED * dt * movementScale;
         this.camera.position.addScaledVector(moveDir, stepDist);
         this.footstepDistAccum += stepDist;
         if (this.footstepDistAccum >= this.nextFootstepDist) {
@@ -4648,7 +4651,7 @@ export class StoreScene {
     }
 
     const walkKeyHeld = (this.isWalkAroundMode && (
-      this.walkKeys.w || this.walkKeys.a || this.walkKeys.s || this.walkKeys.d ||
+      touchWalk.x !== 0 || touchWalk.y !== 0 || this.walkKeys.w || this.walkKeys.a || this.walkKeys.s || this.walkKeys.d ||
       this.walkKeys.ArrowLeft || this.walkKeys.ArrowRight ||
       this.walkKeys.ArrowUp || this.walkKeys.ArrowDown
     )) || gpActive;
@@ -6168,7 +6171,7 @@ export class StoreScene {
     // Wake the renderer on any pointer motion (browse or walk) so the picture is
     // never a frame behind the cursor — this fires before the walk-mode guard.
     this.requestRender();
-    if (!this.isWalkAroundMode) return;
+    if (!this.isWalkAroundMode || mobileStoreActive()) return;
 
     // FPS mouse-look off raw movement deltas, locked or not.
     const MOUSE_SENSITIVITY = 0.0025;
@@ -6183,6 +6186,8 @@ export class StoreScene {
     this.lastWalkLookTime = performance.now(); // mouse-look counts as walk motion for the AO gate
     if (this.isDragging) this.walkPressDragPx += burst;
   };
+
+  public noteWalkLook() { this.lastWalkLookTime = performance.now(); this.requestRender(); }
 
   public updateWalkHUD() { return walk.updateWalkHUD(this); }
 
