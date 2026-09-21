@@ -210,6 +210,7 @@ export function updateColsCount(scene: StoreScene) {
 }
 
 export async function buildAllMovieBoxes(scene: StoreScene) {
+  scene.mirrorCubemap.beginStockBuild();
   scene.clearMovieBoxes();
   caseModelSubscriptions.set(scene, onCaseModelsChanged(() => {
     scene.queueStructuralShadowRefresh(); scene.requestRender();
@@ -1021,6 +1022,7 @@ export async function buildAllMovieBoxes(scene: StoreScene) {
     repaintGoldCase();
     scene.requestRender();
   });
+  scene.mirrorCubemap.finishStockBuild();
 }
 
 
@@ -1325,7 +1327,10 @@ export function restockSlottedFixtures(scene: StoreScene): void {
       existing.loadShelfDetails(1);
     });
   });
-  if (touched) scene.requestRender();
+  if (touched) {
+    scene.mirrorCubemap.stockChanged();
+    scene.requestRender();
+  }
 }
 
 const priorityPoint = new THREE.Vector3();

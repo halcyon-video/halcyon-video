@@ -11,6 +11,7 @@ import { markMirrorVisibility, pickMirror, type MirrorScheduleEntry } from './mi
 import { perfTrace } from './perf-trace';
 import { SP_MIRROR, CT_MIRROR, MIRROR_REFRESH_HZ } from './scene-shared';
 import type { StoreScene } from './three-scene';
+export { shouldCaptureMirrorRoomProbe } from './mirror-cubemap-lifecycle';
 
 type ReflectionMode = 'auto' | 'cubemap' | 'smooth';
 function reflectionMode(): ReflectionMode {

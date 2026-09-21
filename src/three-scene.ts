@@ -50,6 +50,7 @@ import { N8AOPass } from 'n8ao';
 import { BokehPass } from 'three/examples/jsm/postprocessing/BokehPass.js';
 import { Reflector } from 'three/examples/jsm/objects/Reflector.js';
 import * as mirrors from './store-mirrors';
+import { MirrorCubemapLifecycle, stockPlacementSettled } from './mirror-cubemap-lifecycle';
 import { BeautyPass, PartialComposite } from './partial-composite';
 import { FixtureContext, SlottedFixture, StoreFixture } from './fixtures';
 import { disposeRooftopHVAC } from './rooftop-hvac';
@@ -564,15 +565,7 @@ export class StoreScene {
   // once in buildStore(), reacts to day/night via setOutsideMode() only (no
   // per-frame cost). See exterior-environment.ts.
   public exterior: ExteriorEnvironment | null = null;
-  // One-shot: re-bake the environment once the initial async case placement has
-  // settled, so the env/reflections include the stocked shelves (the constructor
-  // bakes can only see the empty shell). Consumed by animate().
-  private pendingStockedRebake = false;
-  // Last requestRender() wall-clock — i.e. the last input/wake event. The
-  // stocked rebake (a ~100ms probes+PMREM burst, see perf-trace baseline)
-  // waits for this to go quiet so it can never land mid-interaction.
-  private lastRenderRequestTime = 0;
-
+  public mirrorCubemap = new MirrorCubemapLifecycle();
   // Bootstrap-only PMREM (see initThree()): scene.environment needs *something*
   // before outdoor.bakeEnvironment() runs its first real bake a few lines later
   // in the constructor. These three references exist only to be disposed right
@@ -1515,8 +1508,6 @@ export class StoreScene {
     // Poster capacity is settled after the progressive stock build.
     this.entrance?.refreshIdleTerminal();
     this.rebuildMovieBoxes();
-    // Rebake once progressive instance placement has settled.
-    this.pendingStockedRebake = true;
     this.createSelectionArrow();
     // After createSelectionArrow(): the arrow is AO-excluded (it bobs while the
     // camera is static, and a floating UI cone shouldn't cast a contact halo),
@@ -2501,9 +2492,10 @@ export class StoreScene {
     // stockedRebakeDue()'s frame count + input-silence window. Verification
     // hook: a screenshot never reaches those conditions, so without this the
     // only reflections a shot can photograph are the EMPTY-SHELL bake taken
-    // before the cases are placed (see pendingStockedRebake).
+    // before the cases are placed (see mirrorCubemap.pending).
     (window as any).debugForceStockedRebake = () => {
-      this.pendingStockedRebake = false;
+      if ([...this.dirtySlots].some(slot => slot.needsInitialMatrixUpdate)) return false;
+      this.mirrorCubemap.settled();
       this.outdoor.rebakeEnvironment(true);
       this.requestRender();
       return true;
@@ -2898,7 +2890,7 @@ export class StoreScene {
   // Cube render targets behind the current reflection probes, kept so a re-bake
   // (outside-mode change) can dispose them instead of leaking GPU memory.
   private probeRenderTargets: THREE.WebGLCubeRenderTarget[] = [];
-  public mirrorRoomProbe: THREE.Texture | null = null;
+  public get mirrorRoomProbe() { return this.mirrorCubemap.probe; }
 
   private generateReflectionProbes() {
     for (const capture of this.reflectionProbeSteps()) capture();
@@ -2931,10 +2923,11 @@ export class StoreScene {
     this.scene.traverse((obj) => { if (obj instanceof Reflector && obj.visible) reflectors.push(obj); });
     reflectors.forEach((r) => { r.visible = false; });
 
-    // Re-bake path: release the previous generation of probes first.
+    // Re-bake path: release the previous generation of case probes first.
+    // The room panorama is retained independently until a complete replacement
+    // has rendered.
     this.probeRenderTargets.forEach((rt) => rt.dispose());
     this.probeRenderTargets = [];
-    this.mirrorRoomProbe = null;
 
     // Software GL: the probes' cost is dominated by the 30 full draw-call
     // replays (5 probes x 6 faces), but shrinking the target still trims the
@@ -2960,19 +2953,22 @@ export class StoreScene {
       }
       // Mirrors need a room vista, not a case-height close-up of one aisle.
       // One shared, elevated entrance capture adds only six scene passes per rebake.
-      if (localStorage.getItem('bb_reflections') === 'cubemap' && mirrors.liveMirrorsAllowed(this)) {
+      if (mirrors.shouldCaptureMirrorRoomProbe(localStorage.getItem('bb_reflections'),
+          mirrors.liveMirrorsAllowed(this), this.mirrorCubemap.ready)) {
         const target = new THREE.WebGLCubeRenderTarget(1024, {
           generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter,
         });
         const camera = new THREE.CubeCamera(0.1, 1000, target);
         camera.position.set(STORE_CENTER_X, Math.min(9, this.ceilingY - 1.5), FRONT_GLASS_Z - 15);
         this.scene.add(camera);
-        this.probeRenderTargets.push(target);
+        let captured = false;
         try {
           yield () => camera.update(this.renderer, this.scene);
-          this.mirrorRoomProbe = target.texture;
+          this.mirrorCubemap.replace(target);
+          captured = true;
         } finally {
           this.scene.remove(camera);
+          if (!captured) target.dispose();
         }
       }
     } finally {
@@ -2982,7 +2978,6 @@ export class StoreScene {
     setReflectionProbes(textures);
   }
 
-  // Populate all shelving units once at startup
   // Populate all shelving units once at startup
   public buildAllMovieBoxes() { return stock.buildAllMovieBoxes(this); }
 
@@ -4334,19 +4329,12 @@ export class StoreScene {
     // of CPU. Multi-frame needs (lerps, fades) hold ACTIVE via their own
     // signals, so the extra safety frames only ever re-drew a settled scene.
     this.forceRenderFrames = this.softwareGL ? 1 : 3;
-    // Doubles as the "something is happening" timestamp the one-shot stocked
-    // rebake defers on (every input path and streaming wake lands here) — see
-    // the pendingStockedRebake block in animate().
-    this.lastRenderRequestTime = performance.now();
   }
 
   /**
-   * Hold the loop awake for a few more composites WITHOUT claiming a user did
-   * something. requestRender() also stamps lastRenderRequestTime, which is the
-   * "is the store idle?" clock the deferred stocked rebake waits on — a
-   * background drain that kept stamping it would starve that rebake forever.
-   * This is the wake for work the renderer owes itself; see the mirror drain in
-   * store-mirrors.ts.
+   * Hold the loop awake for a few more composites without claiming a user did
+   * something. This is the wake for work the renderer owes itself; see the
+   * mirror drain in store-mirrors.ts.
    */
   public holdRenderFrames(frames: number) {
     this.forceRenderFrames = Math.max(this.forceRenderFrames, frames);
@@ -4770,6 +4758,7 @@ export class StoreScene {
       cameraLerping ||
       aoFading ||
       this.hadAnimatingSlots ||
+      this.stockedRebakeDue(time) ||
       !!this.launchAnim ||
       // T22: carried-tape flights (take / put-back / checkout hops) and the
       // post-removal restack settle pin ACTIVE; a parked stack costs nothing.
@@ -5033,7 +5022,7 @@ export class StoreScene {
     //   settleRefine                the supersampled parked frame must be real
     //   shadowRefreshFrames         a shadow-map rebake changes the whole frame
     //   clerkMirrorRefresh / dirty  a mirror would re-render its reflection
-    //   pendingStockedRebake        the one-shot environment bake relights all
+    //   mirrorCubemap.pending       the one-shot environment bake relights all
     //   marquee 'chase'             the bulb pattern advances on drawn frames
     //   entrance.wantsFrame()       cursor blink / vestibule doors / bag solver
     //   checkoutRunning             the checkout flourish drives its own props
@@ -5460,15 +5449,15 @@ export class StoreScene {
 
     // Real-time reflections are handled automatically by Reflector instances
 
-    // 2.4 One-shot stocked-shelves environment re-bake (see pendingStockedRebake):
-    // fires once the initial placement wave has settled — dirty queue empty and
-    // enough frames elapsed for the first poster batches to have landed.
+    // 2.4 One-shot stocked-shelves environment re-bake (see mirrorCubemap.pending):
+    // fires once the initial placement wave has settled and enough frames have
+    // elapsed for the first poster batches to have landed.
     // ALSO requires 2.5s of input silence (perf-trace baseline caught it firing
     // mid-flip-through: 5 probes × 6 faces + a 3-bounce PMREM = ~98ms in one
     // frame). It's a one-shot visual refinement — deferring it until the
     // shopper pauses costs nothing and can never hitch an interaction.
-    if (this.stockedRebakeDue(time)) {
-      this.pendingStockedRebake = false;
+    if (this.stockedRebakeDue(time, movingSlots)) {
+      this.mirrorCubemap.settled();
       this.outdoor.rebakeEnvironment(true);
     }
 
@@ -5555,11 +5544,13 @@ export class StoreScene {
   // that satisfies all of this (see its call site). Asked by the partial-
   // composite gate too: a re-bake relights the whole room, so the frame it
   // lands on must be a full one. Read as a predicate rather than latching on
-  // `pendingStockedRebake` alone, which can stay true indefinitely (dirty
+  // `mirrorCubemap.pending` alone, which can stay true indefinitely (dirty
   // slots, a busy input clock) and would park the partial path forever.
-  private stockedRebakeDue(time: number): boolean {
-    return this.pendingStockedRebake && this.frameCount > 300 && this.dirtySlots.size === 0 &&
-      !this.launchAnim && time - this.lastRenderRequestTime > 2500;
+  private stockedRebakeDue(time: number, movingSlots = this.hadAnimatingSlots ? 1 : 0): boolean {
+    if (!this.mirrorCubemap.pending || this.frameCount <= 300 ||
+        !stockPlacementSettled(movingSlots, this.dirtySlots) ||
+        this.launchAnim || time - getLastUserActivity() <= 2500) return false;
+    return true;
   }
 
   // Partial-composite gate helper: is a mirror that owes a fresh reflection
@@ -6052,7 +6043,7 @@ export class StoreScene {
     // 3D→flat/library-switch teardown leaked 5 cube RTs until context GC.
     this.probeRenderTargets.forEach((rt) => rt.dispose());
     this.probeRenderTargets = [];
-    this.mirrorRoomProbe = null;
+    this.mirrorCubemap.dispose();
     this.aoPass = null;
     this.floorAOTex?.dispose();
     this.floorAOTex = null;
