@@ -111,7 +111,7 @@ const HELP_SECTIONS: HelpSection[] = [
         hint: 'Hold Back or press R to put one back · X not interested.',
       },
       {
-        id: 'feedback', control: 'C', action: 'Leave a feedback pin',
+        id: 'feedback', control: 'Shift+C', action: 'Leave a feedback pin',
         hint: 'Attach this view and a note. Ctrl+Enter saves; Escape cancels.',
       },
       {
