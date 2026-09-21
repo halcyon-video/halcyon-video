@@ -1,17 +1,22 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { MirrorCubemapLifecycle, shouldCaptureMirrorRoomProbe, stockPlacementSettled } from '../src/mirror-cubemap-lifecycle.ts';
+import { MirrorCubemapLifecycle, resolveReflectionMode, shouldCaptureMirrorRoomProbe, stockPlacementSettled } from '../src/mirror-cubemap-lifecycle.ts';
 
 test('cubemap room probe waits for settled stock', () => {
   assert.equal(shouldCaptureMirrorRoomProbe('cubemap', true, false), false);
   assert.equal(shouldCaptureMirrorRoomProbe('cubemap', true, true), true);
 });
 
+test('an unset reflection preference defaults to cubemap even on high quality', () => {
+  assert.equal(resolveReflectionMode(null), 'cubemap');
+  assert.equal(resolveReflectionMode('unexpected'), 'cubemap');
+  assert.equal(shouldCaptureMirrorRoomProbe(null, true, true), true);
+});
+
 test('room probe is not captured for inactive reflection paths', () => {
   assert.equal(shouldCaptureMirrorRoomProbe('auto', true, true), false);
   assert.equal(shouldCaptureMirrorRoomProbe('smooth', true, true), false);
   assert.equal(shouldCaptureMirrorRoomProbe('cubemap', false, true), false);
-  assert.equal(shouldCaptureMirrorRoomProbe(null, true, true), false);
 });
 
 test('a settled selected case may stay dirty without blocking the stocked capture', () => {

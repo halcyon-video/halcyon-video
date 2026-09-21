@@ -1,10 +1,17 @@
 import type { Texture, WebGLCubeRenderTarget } from 'three';
 
+export type MirrorReflectionMode = 'auto' | 'cubemap' | 'smooth';
+
+/** An unset or invalid preference is the inexpensive cubemap path. */
+export function resolveReflectionMode(mode: string | null): MirrorReflectionMode {
+  return mode === 'auto' || mode === 'smooth' ? mode : 'cubemap';
+}
+
 /** A room panorama is valid only after the stock-placement wave has settled. */
 export function shouldCaptureMirrorRoomProbe(
   mode: string | null, liveMirrors: boolean, stockedReflectionReady: boolean
 ): boolean {
-  return mode === 'cubemap' && liveMirrors && stockedReflectionReady;
+  return resolveReflectionMode(mode) === 'cubemap' && liveMirrors && stockedReflectionReady;
 }
 
 export function stockPlacementSettled(

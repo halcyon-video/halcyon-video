@@ -444,13 +444,16 @@ export function setUserWrap(medium: CaseMedium, dataUrl: string | null): void {
   syncUserWrapVariants();
 }
 
-// Loaded from localStorage in initCaseMedium(); first variant is the default.
-const COVER_SELECTION: Record<CaseMedium, string> = { vhs: 'standard', dvd: 'standard' };
+// Loaded from localStorage in initCaseMedium(). The DVD default is the VHS-style
+// blue rental print redrawn on DVD folds, so it fits rather than stretching.
+export const DEFAULT_COVER_SELECTION: Record<CaseMedium, string> = { vhs: 'standard', dvd: 'blue' };
+const COVER_SELECTION: Record<CaseMedium, string> = { ...DEFAULT_COVER_SELECTION };
 
 /** The scan variant the given medium's wrap currently renders from. */
 export function activeCoverVariant(medium: CaseMedium): CoverVariant {
   const list = COVER_VARIANTS[medium];
-  return list.find((v) => v.id === COVER_SELECTION[medium]) ?? list[0];
+  return list.find((v) => v.id === COVER_SELECTION[medium])
+    ?? list.find((v) => v.id === DEFAULT_COVER_SELECTION[medium]) ?? list[0];
 }
 
 /** Cache tag for per-title panel materials: art medium + its cover variant. */
@@ -804,7 +807,7 @@ export function initCaseMedium() {
       : null;
     COVER_SELECTION[m] = COVER_VARIANTS[m].some((v) => v.id === saved)
       ? (saved as string)
-      : COVER_VARIANTS[m][0].id;
+      : DEFAULT_COVER_SELECTION[m];
   }
 
   CASE_WIDTH = CASE_DIMS[CASE_MEDIUM].w;
@@ -4480,10 +4483,9 @@ function drawJellyfinBackImpl(
 // -------------------------------------------------------------
 export function createGenericInstancedMesh(count: number): THREE.InstancedMesh {
   initSharedMaterials();
-  // GH #42: these background fillers are rental clamshells too — black
-  // top/right/bottom edges on VHS, white on DVD. Shared materials only, so
-  // the whole population stays a single instanced draw either way.
-  const edgeMat = CASE_MEDIUM === 'vhs' ? sharedRentalBlackMaterial! : sharedRentalWhiteMaterial!;
+  // These are the store's copies: both VHS clamshells and DVD keepcases use
+  // black molded plastic around the printed rental sleeve.
+  const edgeMat = sharedRentalBlackMaterial!;
   const mats = [
     edgeMat,
     sharedRentalSpinePlaceholderMaterial!,
@@ -4517,15 +4519,10 @@ export function createMovieInstancedMeshes(movie: Movie, count: number, probeIdx
   const boxGeo = getGeometry();
   initSharedMaterials();
 
-  // GH #42: the back box is the rental clamshell — on VHS it is
-  // molded slightly larger than the retail cover box in front of it (so a rim
-  // peeks out on top/right/bottom) and its exposed edges are black plastic.
-  // The white-cased "Animated Movies" tapes keep their white clamshell; DVD
-  // keeps the original white, cover-sized case.
+  // The back box is the store's rental copy: black molded plastic around its
+  // printed sleeve on both VHS clamshells and DVD keepcases.
   const rentalGeo = getRentalGeometry();
-  const bbEdgeMat = (CASE_MEDIUM === 'vhs')
-    ? sharedRentalBlackMaterial!
-    : sharedRentalWhiteMaterial!;
+  const bbEdgeMat = sharedRentalBlackMaterial!;
 
   // Create unique material arrays for this movie so it can have its own textures
   const frontMats = [
@@ -5075,13 +5072,9 @@ export function getGlobalFrontMaterials(isAnimated: boolean = false): THREE.Mate
 
 export function getGlobalBackMaterials(_isAnimated: boolean = false): THREE.Material[] {
   initGlobalMaterials();
-  // GH #42: the back box is the rental clamshell — black molded edges on VHS,
-  // white on DVD. Animated Movies tapes are NOT special-cased: their clamshell
-  // reads exactly like every other store VHS (the white curved border lives on
-  // the retail Jellyfin box in front, never on the rental copy).
-  const edgeMat = (CASE_MEDIUM === 'vhs')
-    ? sharedRentalBlackMaterial!
-    : sharedRentalWhiteMaterial!;
+  // The store copy is always a black molded case. Animated VHS titles are not
+  // special-cased: their white border belongs to the retail sleeve in front.
+  const edgeMat = sharedRentalBlackMaterial!;
   const spineMat = sharedRentalSpinePlaceholderMaterial!;
   const frontMat = sharedRentalFrontMaterial!;
   const backMat = sharedRentalBackPlaceholderMaterial!;
@@ -5315,11 +5308,9 @@ export function createHeroRentalMaterials(movie: Movie, heroDetail: boolean = fa
   initSharedMaterials();
   const isAnimated = CASE_MEDIUM === 'vhs' && isWhiteClamshell(movie, CASE_MEDIUM);
 
-  // GH #42: the hero rental copy is a clamshell — black molded edges on VHS
-  // (including Animated Movies, which now match every other tape); white on DVD.
-  const edgeMat = (CASE_MEDIUM === 'vhs')
-    ? sharedRentalBlackMaterial!
-    : sharedRentalWhiteMaterial!;
+  // The hero store copy is the same black molded VHS/DVD case as the shelf
+  // population, with the title-specific sleeve fitted inside it.
+  const edgeMat = sharedRentalBlackMaterial!;
   const front = heroDetail
     ? getRentalFrontMaterialHero(movie, probeIdx)
     : getRentalFrontMaterial(movie, probeIdx, isAnimated);

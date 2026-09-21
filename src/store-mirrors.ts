@@ -10,17 +10,14 @@ import { mirrorPanoramaRotation } from './mirror-panorama';
 import { markMirrorVisibility, pickMirror, type MirrorScheduleEntry } from './mirror-schedule';
 import { perfTrace } from './perf-trace';
 import { SP_MIRROR, CT_MIRROR, MIRROR_REFRESH_HZ } from './scene-shared';
+import { resolveReflectionMode, type MirrorReflectionMode } from './mirror-cubemap-lifecycle';
 import type { StoreScene } from './three-scene';
 export { shouldCaptureMirrorRoomProbe } from './mirror-cubemap-lifecycle';
 
-type ReflectionMode = 'auto' | 'cubemap' | 'smooth';
-function reflectionMode(): ReflectionMode {
-  const value = localStorage.getItem('bb_reflections');
-  return value === 'cubemap' || value === 'smooth' ? value : 'auto';
-}
+const reflectionMode = (): MirrorReflectionMode => resolveReflectionMode(localStorage.getItem('bb_reflections'));
 type CubeMirror = { material: THREE.MeshBasicMaterial };
 type MirrorState = {
-  targets: MirrorRenderTarget; mode: ReflectionMode; frame: number;
+  targets: MirrorRenderTarget; mode: MirrorReflectionMode; frame: number;
   camera: THREE.PerspectiveCamera; cubes: CubeMirror[];
   probe: THREE.Texture | null;
 };

@@ -3,7 +3,7 @@ import { fitDepartmentArch, type DepartmentArchHost } from './fixtures/departmen
 // Service-wall dressing follows the live facade/door datum, not a fixed floor placement.
 export { WALL_COURTESY_PHONE } from './fixtures/wall-courtesy-telephone';
 import { FixturePlacement, BOX_SPACING, STORE_CENTER_X } from './store-layout';
-import { activeStoreFormat, type CounterShape } from './store-format';
+import { type CounterShape } from './store-format';
 import { registerFixtureKind } from './fixture-registry';
 import { StructureFootprint } from './fixtures/period-fixtures';
 import { PV_DRAPE_TABLE_POP_KIT } from './fixtures/pv-drape-table';
@@ -525,16 +525,6 @@ function originalCounterAnchoredPlacements(
         yaw: plan.facingYaw, // card toward the customer side
         options: { surfaceY: 2.82 }
       },
-      ...(activeStoreFormat().plants ? [{
-        id: 'counter-desk-plant',
-        kind: 'potted-plant',
-        position: {
-          x: plan.cx + plan.ux * -2.55 - plan.nx * 0.15,
-          z: plan.cz + plan.uz * -2.55 - plan.nz * 0.15,
-        },
-        yaw: plan.facingYaw,
-        options: { variant: 'pothos', surfaceY: 2.82 }
-      }] : []),
     ];
   }
   if (counterShape === 'usquare') {

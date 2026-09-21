@@ -49,6 +49,9 @@ test('clipped-corner doors meet checkout corners and their entire clear opening 
     const spec={doorWidth,entryStyle:'vestibule' as const};
     const wall=vestibuleSide(spec,side), straight=vestibuleStraightSide(spec,side);
     assert.equal(wall.x,11+side*6.2);
+    assert.equal(wall.doorWidth,doorWidth,'side leaf keeps the specified door width');
+    assert.ok(Math.abs((wall.doorAlong-wall.doorWidth/2)-1)<1e-8,
+      'one-foot fixed panel separates the leaf from the counter corner');
     assert.ok(Math.abs(wall.x+wall.sin*wall.length-(11+side*vestibuleFrontHalf(spec)))<1e-8);
     const point=(along:number,normal:number)=>({x:wall.x+along*wall.sin+normal*wall.cos,z:wall.z+along*wall.cos-normal*wall.sin});
     for(const offset of [-wall.doorWidth/2+.35,0,wall.doorWidth/2-.35]) {
