@@ -979,7 +979,7 @@ export async function buildAllMovieBoxes(scene: StoreScene) {
   // Public streaming covers consume the early prefetch here without gating
   // entry. Local boots retain their non-streaming texture readiness gate.
   const allSlots = Array.from(scene.slotsByPosition.values());
-  const gatedSlots = allSlots.filter(slot => (isPublicDemo || !slot.movie.streaming) &&
+  const gatedSlots = allSlots.filter(slot => (isPublicDemo || mobileStoreActive() || !slot.movie.streaming) &&
     (slot.restingX - OVERVIEW_POS.x) ** 2 + (slot.restingZ - OVERVIEW_POS.z) ** 2 < 400).slice(0, 96);
   // Nearby shelf faces lead the download queue. Copies share one decode.
   if (mobileStoreActive()) {
@@ -996,7 +996,7 @@ export async function buildAllMovieBoxes(scene: StoreScene) {
   // no-reload rebuild. It matters most at catalog scale: a 7k-title store
   // otherwise reveals a room of bare rental shells that paint in over tens of
   // seconds. Self-clearing when the queue empties.
-  if (!isPublicDemo) beginRebuildDrain();
+  if (!(isPublicDemo || mobileStoreActive())) beginRebuildDrain();
   scene.onTextureLoadProgress?.(0, total);
   scene.texturesReadyPromise = Promise.all(gatedSlots.map(slot => new Promise<void>(resolve => {
     slot.loadShelfDetails(0, () => {

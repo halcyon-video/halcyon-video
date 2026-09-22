@@ -17,6 +17,7 @@ import {
   fallbackToSnapshotOnFailure,
   synthesizeStreamingMovie,
   ingestStreamingResults,
+  limitStreamingMoviesPerService,
   deduplicateStreamingMovies,
   buildStreamingLibraries,
   resolveStreamingWatchRegion,
@@ -240,6 +241,19 @@ test('ingestStreamingResults: caps at the requested limit', () => {
   const items = Array.from({ length: 30 }, (_, i) => ({ id: i, title: `Title ${i}` }));
   const out = ingestStreamingResults(items, netflix, { cap: 5 });
   assert.equal(out.length, 5);
+});
+
+test('mobile stock cap keeps each chosen service represented', () => {
+  const netflix = DEFAULT_STREAMING_SERVICES.find((d) => d.id === 'netflix')!;
+  const hulu = DEFAULT_STREAMING_SERVICES.find((d) => d.id === 'hulu')!;
+  const movies = [
+    ...Array.from({ length: 10 }, (_, i) => synthesizeStreamingMovie({ id: i + 1, title: `N${i}` }, netflix)!),
+    ...Array.from({ length: 10 }, (_, i) => synthesizeStreamingMovie({ id: i + 101, title: `H${i}` }, hulu)!),
+  ];
+  const limited = limitStreamingMoviesPerService(movies, [netflix, hulu], 3);
+  assert.deepEqual(limited.map((m) => m.streamingServiceId), [
+    'netflix', 'netflix', 'netflix', 'hulu', 'hulu', 'hulu',
+  ]);
 });
 
 test('deduplicateStreamingMovies: consolidates titles with same tmdbId across services and merges streaming services in order', () => {

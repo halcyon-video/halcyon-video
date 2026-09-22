@@ -18,6 +18,7 @@ import { tickShelfVisibility, disposeShelfVisibility } from './shelf-visibility'
 import { mobileWalkInput } from './mobile-walk';
 import { mobileStoreActive, mobileStoreTap, mobileArtworkTick } from './mobile-store';
 import * as THREE from 'three';
+import { simplifyMobileSceneMaterials } from './mobile-materials';
 import { installDirectLightVisibility } from './direct-light-visibility';
 installDirectLightVisibility();
 import { isPublicDemo } from './demo-mode';
@@ -1457,10 +1458,10 @@ export class StoreScene {
     // (Floor plan already computed above, before the NR wall derivation.)
 
     this.initThree();
-    if (isPublicDemo && this.effectiveQuality !== 'high') {
+    if ((isPublicDemo || mobileStoreActive()) && this.effectiveQuality !== 'high') {
       this.detailLoads = new DeferredModelLoads(this.programWarmupController.signal);
     }
-    if (isPublicDemo) {
+    if (isPublicDemo || mobileStoreActive()) {
       // A settings rebuild may preserve case caches from the outgoing scene.
       // Until this room's deferred bake, use its live bootstrap environment
       // instead of keeping references to the previous room's disposed probes.
@@ -1492,7 +1493,7 @@ export class StoreScene {
     // Public entry uses the existing inexpensive room environment until the
     // visitor pauses. The full bounce/probe bake used to compile the whole
     // room several times before the first interactive frame.
-    if (!isPublicDemo) {
+    if (!(isPublicDemo || mobileStoreActive())) {
       const prepare = () => compileProgramsInStages(this.renderer, this.scene, this.camera,
         this.composer?.readBuffer ?? null, this.programWarmupController.signal);
       await this.outdoor.bakeEnvironmentInStages(prepare);
@@ -1580,7 +1581,16 @@ export class StoreScene {
 
     // The public overview needs the room's shaders, not dry-run inspections.
     // Inspection variants prepare after main.ts has wired input and revealed it.
-    if ((isPublicDemo || mobileStoreActive()) && this.effectiveQuality !== 'high') {
+    if (mobileStoreActive() && this.effectiveQuality !== 'high') {
+      // Phone entry has a five-second abandonment budget. Rendering the real
+      // opening frame compiles only what the camera draws; walking the rest of
+      // the room compiles those programs naturally, instead of holding the
+      // door shut while every off-camera material is prepared in advance.
+      simplifyMobileSceneMaterials(this.scene, this.mode);
+      this.animate();
+      this.onConsoleLog("[System] 3D Store rendering active in Library Select mode.", "system");
+      return;
+    } else if (isPublicDemo && this.effectiveQuality !== 'high') {
       await programWarmup.prepareInitialViewPrograms(this);
     } else {
       await this.warmupRuntimePrograms();
@@ -1984,7 +1994,7 @@ export class StoreScene {
     // shaders compile without any shadow sampling at all (smaller programs =
     // faster Subzero JIT too) and all shadowMap.needsUpdate requests below
     // become harmless no-ops.
-    this.renderer.shadowMap.enabled = !softwareGL;
+    this.renderer.shadowMap.enabled = !softwareGL && !phoneBudget;
     // Three r184 replaces PCFSoft with PCF on first shadow draw. Select the
     // actual mode now so asynchronous warmup compiles the runtime variant.
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
@@ -2037,7 +2047,7 @@ export class StoreScene {
     // Tuned against the baked-room environment (see bakeEnvironment), which is
     // considerably dimmer than the synthetic RoomEnvironment this value was
     // originally set for (0.55): the real room needs more of its own bounce.
-    this.scene.environmentIntensity = isPublicDemo ? 0.55 : 0.95;
+    this.scene.environmentIntensity = (isPublicDemo || mobileStoreActive()) ? 0.55 : 0.95;
 
     this.container.appendChild(this.renderer.domElement);
 
@@ -3993,7 +4003,7 @@ export class StoreScene {
   // teleportWalk() above: extract a 'YXZ' Euler from the camera's current
   // orientation instead of setting rotation from yaw/pitch.
   public captureFeedbackSnapshot(maxEdge?: number): { walk: string; png: string } {
-    if (this.composer) {
+    if (this.composer && !mobileStoreActive()) {
       this.composer.render();
     } else {
       this.renderer.render(this.scene, this.camera);
@@ -5535,7 +5545,8 @@ export class StoreScene {
     // 3. Render scene
     perfTrace.end(SP_SIM);
     perfTrace.begin(SP_RENDER);
-    if (this.composer) {
+    if (mobileStoreActive()) simplifyMobileSceneMaterials(this.scene, this.mode);
+    if (this.composer && !mobileStoreActive()) {
       this.composer.render();
     } else {
       this.renderer.render(this.scene, this.camera);

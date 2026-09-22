@@ -2836,7 +2836,10 @@ async function initializeStoreScene(preservePosterCache = false) {
       // overlay drops, so the player wakes already at the terminal.
       maybeOpenSetupTerminal();
       hideBootOverlay();
-      if (isPublicDemo || mobileStoreActive()) {
+      // Phone-low has already collapsed the room to its small shader set. Do
+      // not seize the main thread again after its first usable frame; optional
+      // high-detail models remain deferred for that low tier.
+      if (isPublicDemo && !mobileStoreActive()) {
         void scene.warmupRuntimePrograms().finally(() => scene.detailLoads?.release())
           .catch(error => console.warn('[warmup] Hosted preparation failed:', error));
       }

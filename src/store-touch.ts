@@ -96,6 +96,9 @@ export function touchHUDText(mode: string, canHoldToCheckout: boolean, carryMode
 }
 
 const CSS = `
+/* A phone's first usable frame is the budget boundary; do not spend another
+   six tenths of a second fading the boot console over it. */
+#boot-overlay { transition: none !important; }
 /* Fades with the rest of the HUD (main.ts's updateBrowseHUDVisibility drives
    .visible in lockstep with #browse-locator/#browse-hint) — a DOM overlay,
    playback, the screensaver or a live jump index all suppress it the same
@@ -114,10 +117,12 @@ const CSS = `
 }
 .st-label {
   display: inline-block; font-style: italic;
-  color: #eff5ff;
-  background: linear-gradient(to bottom, #52647e 0%, #d8e7f7 32%, #fff 46%, #71859f 49%, #cfdef0 68%, #f5f8ff 78%, #687a92 100%);
+  color: #fff;
+  background: linear-gradient(to bottom, #fff 0%, #e5effa 30%, #fff 46%, #8fa8c5 50%, #fff 72%, #d6e5f5 100%);
   background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-  filter: drop-shadow(0 1px 0 #182940) drop-shadow(0 2px 0 #050a14) drop-shadow(1px 0 0 #050a14);
+  -webkit-text-stroke: 1.25px #040914;
+  paint-order: stroke fill;
+  filter: drop-shadow(0 2px 0 #02050a) drop-shadow(0 0 4px rgba(2,5,10,.95));
 }
 .st-btn:focus-visible { outline: 2px solid #fff; outline-offset: -3px; }
 .st-btn.st-pressed .st-label { filter: brightness(1.4) drop-shadow(0 1px 0 #050a14); }
@@ -148,10 +153,10 @@ const CSS = `
 #store-touch-controls:not(.terminal)[data-mode="walk-around"] #store-touch-walk { display: flex; }
 #store-touch-controls:not(.terminal)[data-mode="overview"] #store-touch-ok,
 #store-touch-controls:not(.terminal)[data-mode="walk-around"] #store-touch-ok { display: none; }
-#store-touch-stick { display: none; position: absolute; left: max(24px, env(safe-area-inset-left)); bottom: max(24px, env(safe-area-inset-bottom)); width: 116px; height: 116px; border: 2px solid #8899af; border-radius: 50%; background: radial-gradient(circle, rgba(3,9,20,.8) 42%, rgba(100,120,150,.2) 43%, rgba(3,9,20,.7) 68%); box-shadow: 0 3px 0 #060c18, inset 0 2px 0 #d9e3ef; touch-action: none; }
+#store-touch-stick { display: none; position: absolute; left: max(24px, env(safe-area-inset-left)); bottom: max(42px, calc(env(safe-area-inset-bottom) + 18px)); width: 124px; height: 124px; border: 3px solid #f2e8c9; border-radius: 50%; background: radial-gradient(circle, rgba(3,9,20,.92) 42%, rgba(242,232,201,.34) 43%, rgba(3,9,20,.88) 69%); box-shadow: 0 4px 0 #02050a, 0 0 0 3px rgba(5,12,28,.82), 0 0 12px rgba(242,232,201,.8), inset 0 2px 0 #fff; touch-action: none; }
 #store-touch-controls.visible:not(.terminal)[data-mode="walk-around"] #store-touch-stick { display: block; pointer-events: auto; }
-.st-stick-knob { position: absolute; inset: 36px; border-radius: 50%; background: radial-gradient(circle at 40% 25%, #f3f7fc, #8496b0 65%, #26344c); box-shadow: 0 3px 0 #080f1c; pointer-events: none; }
-.st-stick-label { position: absolute; top: 47px; left: 0; right: 0; text-align: center; color: #000a1c; font: 700 15px/20px sans-serif; pointer-events: none; }
+.st-stick-knob { position: absolute; inset: 38px; border-radius: 50%; background: radial-gradient(circle at 40% 25%, #fff, #b9c9dc 58%, #526680 78%, #19263b); box-shadow: 0 3px 0 #02050a, 0 0 0 2px #f2e8c9; pointer-events: none; }
+.st-stick-label { position: absolute; z-index: 2; top: 51px; left: 0; right: 0; text-align: center; color: #020814; font: 900 13px/20px sans-serif; letter-spacing: -0.4px; text-shadow: 0 1px 0 #fff; pointer-events: none; }
 body .clasp-prompt { border-radius: 0; font-size: 15px; }
 body .clasp-prompt .clasp-key { display: none; }
 body .clerk-prompt { bottom: max(174px, calc(env(safe-area-inset-bottom) + 160px)); max-width: calc(100vw - 48px); }

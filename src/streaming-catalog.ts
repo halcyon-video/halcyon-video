@@ -306,6 +306,26 @@ export function synthesizeStreamingMovie(item: RawDiscoverItem, def: StreamingSe
 
 /** Bound live and bundled catalogues while giving the demo several full shelf units per service. */
 export const STREAMING_CAP_PER_SERVICE = 120;
+export const MOBILE_STREAMING_CAP_PER_SERVICE = 6;
+
+/** Keep every chosen service represented while bounding phone scene cost. */
+export function limitStreamingMoviesPerService(
+  movies: Movie[],
+  services: StreamingServiceDef[],
+  perService = MOBILE_STREAMING_CAP_PER_SERVICE,
+): Movie[] {
+  if (perService < 1) return [];
+  const out: Movie[] = [];
+  for (const service of services) {
+    let count = 0;
+    for (const movie of movies) {
+      if (movie.streamingServiceId !== service.id) continue;
+      out.push(movie);
+      if (++count >= perService) break;
+    }
+  }
+  return out;
+}
 
 /**
  * Raw discover results for one service -> shelvable Movies: skips malformed

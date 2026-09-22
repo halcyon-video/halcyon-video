@@ -10,12 +10,14 @@ import { fetchStreamingMovies, getJellyseerrConfig } from './jellyseerr';
 import type { Movie } from './providers/media-source-provider';
 import {
   fallbackToSnapshotOnFailure,
+  limitStreamingMoviesPerService,
   resolveEnabledServices,
   resolveStreamingSource,
   deduplicateStreamingMovies,
   resolveStreamingWatchRegion,
   type StreamingSource,
 } from './streaming-catalog';
+import { mobileStoreActive } from './mobile-store';
 import { fetchStreamingMoviesFromSnapshot } from './streaming-snapshot';
 import { getSetting } from './settings';
 import { fetchStreamingMoviesFromTmdb, getTmdbConfig } from './tmdb';
@@ -145,6 +147,9 @@ export async function loadStreamingMovies(): Promise<void> {
       streamingLoadedSource = null;
     }
   }
-  streamingMovies = deduplicateStreamingMovies(rawMovies, enabledDefs);
+  const entryMovies = mobileStoreActive()
+    ? limitStreamingMoviesPerService(rawMovies, enabledDefs)
+    : rawMovies;
+  streamingMovies = deduplicateStreamingMovies(entryMovies, enabledDefs);
   streamingLoadedAt = Date.now();
 }
