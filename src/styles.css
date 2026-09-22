@@ -3682,3 +3682,43 @@ html, body {
 .boot-model-status { display: none; margin: 0; text-align: center; font-size: 18px; color: #fff; }
 #boot-overlay.preparing-models .boot-model-status { display: block; }
 #boot-overlay.preparing-models .boot-console { display: none; }
+
+/* Responsive / Mobile styles for login overlay */
+@media (max-width: 900px) {
+  #login-overlay {
+    padding: 20px 12px;
+    gap: 16px;
+  }
+  .login-logo-container {
+    width: min(220px, 60vw);
+  }
+  .login-card {
+    padding: 20px 16px;
+    max-width: 96vw;
+    gap: 16px;
+  }
+  .login-title {
+    font-size: 1.5rem;
+    letter-spacing: 1px;
+  }
+  .login-subtitle {
+    font-size: 0.85rem;
+  }
+  .login-columns {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+  }
+  .login-column {
+    padding: 16px;
+  }
+  .login-actions {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+  .login-btn {
+    flex: 1 1 auto;
+    width: 100%;
+    min-height: 48px;
+  }
+}

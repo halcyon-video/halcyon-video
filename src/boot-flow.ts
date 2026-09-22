@@ -1,3 +1,4 @@
+import { mobileStoreActive } from './mobile-store';
 // The boot / credentials flow — every path from "the app just loaded" to "the
 // store is stocked and revealed": saved-session auto-connect with its stall
 // watchdog and backoff retry, the membership-card picker hand-off, the classic
@@ -691,6 +692,13 @@ export function switchMember() {
 }
 
 function abortBootToLogin(reason?: string) {
+  if (mobileStoreActive()) {
+    deps?.log('[System] Mobile touch visitor: aborting to demo store rather than login form.', 'system');
+    hideLoginOverlay();
+    showBootOverlay();
+    void startDemoAndLoad();
+    return;
+  }
   hideBootOverlay();
   showLoginOverlay();
   if (reason) {
@@ -1066,6 +1074,11 @@ export async function checkCredentialsAndLoad() {
             noticeShown = true;
             document.removeEventListener('keydown', bootEscape);
             document.removeEventListener('click', bootEscape);
+            if (mobileStoreActive()) {
+              d.log('[System] Mobile touch visitor: auto-login failed. Stocking streaming demo store immediately.', 'system');
+              void startDemoAndLoad();
+              return;
+            }
             enterOpeningDay({ notice: { address: jellyfinUrl, detail: msg } });
           } else {
             openSetupNotice(jellyfinUrl, msg);
@@ -1151,6 +1164,11 @@ export async function checkCredentialsAndLoad() {
     if (getSetting<string>('bb_render_mode') === 'flat') {
       d.log('[System] No saved credentials. Showing Login screen.', 'system');
       setTimeout(() => { hideBootOverlay(); showLoginOrCards(); }, 500);
+      return;
+    }
+    if (mobileStoreActive()) {
+      d.log('[System] First run on mobile — stocking streaming demo store immediately.', 'system');
+      void startDemoAndLoad();
       return;
     }
     d.log('[System] First run — opening day. Setting up at the counter terminal.', 'system');
