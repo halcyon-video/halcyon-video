@@ -1,3 +1,4 @@
+import { mobileStoreActive } from './mobile-store';
 import { isRequestTitle } from './request-title';
 import { buildSteamControls } from './steam-settings';
 import { loadSteamGames } from './providers/steam-provider';
@@ -2773,7 +2774,7 @@ async function initializeStoreScene(preservePosterCache = false) {
 
     // Keep the existing splash over the counter's crude loading solids. Covers
     // still stream progressively in the public store; the model grace is bounded.
-    (isPublicDemo ? Promise.resolve() : scene.texturesReadyPromise).then(async () => {
+    ((isPublicDemo || mobileStoreActive()) ? Promise.resolve() : scene.texturesReadyPromise).then(async () => {
       document.getElementById('boot-overlay')?.classList.add('preparing-models');
       await waitForStartupModel(scene.entrance?.whenCounterModelReady());
       if (contextLossGaveUp || scene.renderer.getContext().isContextLost()) {
@@ -2829,7 +2830,7 @@ async function initializeStoreScene(preservePosterCache = false) {
       updateBrowseHUDVisibility();
       aisleIndicatorInterval = window.setInterval(updateBrowseHUDVisibility, 200);
 
-      logToConsole(isPublicDemo ? '[System] Store ready. Artwork continues loading.' : '[System] All textures loaded. Store ready.', 'system');
+      logToConsole((isPublicDemo || mobileStoreActive()) ? '[System] Store ready. Artwork continues loading.' : '[System] All textures loaded. Store ready.', 'system');
       initSharedPlace(scene, isSetupPending(), () => storeScene, () => ui.isLoginOpen || textEntryHasFocus(), showClerkToast);
       // Opening day (#41): dock the counter CRT's NEW STORE SETUP before the
       // overlay drops, so the player wakes already at the terminal.
