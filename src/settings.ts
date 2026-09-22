@@ -919,6 +919,15 @@ export function registerCoreSettings(): void {
     hint: 'When server stream fails: play demo, keep tubes dark, or show test card.',
   });
 
+  registerSetting({
+    key: 'bb_tv_layout', label: 'Ceiling Mount', kind: 'cycle',
+    group: 'Playback', subpage: 'Overhead TVs',
+    values: [{id: 'era', label: 'Era Default'}, {id: 'paired', label: 'Separate Sets'},
+      {id: 'triple', label: 'Shared Three-Screen Frame'}],
+    default: 'era', applyMode: 'rebuild-scene',
+    hint: 'Choose separate ceiling sets or one shared frame. The 2000 wall bank stays wall-mounted.',
+  });
+
   // Tone mapping (research-driven, see three-scene initThree): AgX is the
   // filmic default; Khronos PBR Neutral reproduces authored colors exactly
   // below its highlight knee — box art and brand colors read truer, at the

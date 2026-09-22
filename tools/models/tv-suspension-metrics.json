@@ -1,0 +1,16 @@
+{
+  "bytes": 518424,
+  "polygons": 3538,
+  "meshes": 12,
+  "units": "feet",
+  "cabinetEnvelope": [
+    2.6,
+    2.2,
+    2.2
+  ],
+  "cradleBounds": [
+    2.8,
+    2.56,
+    1.7
+  ]
+}

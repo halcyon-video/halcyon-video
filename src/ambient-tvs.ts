@@ -1,3 +1,4 @@
+import { installTvMount } from './ambient-tv-mount';
 import { isExternalGameActive } from './external-game-state.ts';
 import { publishAmbientPicture, ambientReceiverInFrustum } from './ambient-screen';
 import { selfLit } from './material-lighting';
@@ -1168,7 +1169,11 @@ export class AmbientTvs implements StoreFixture {
     const fieldHi   = 11.0 + storeWidth / 2 - 7.5;
     const leftTvX   = (fieldLo + (11.0 - CENTER_WALKWAY / 2)) / 2;
     const rightTvX  = ((11.0 + CENTER_WALKWAY / 2) + fieldHi) / 2;
-    const tvZ       = 15.0 - (15.0 - this.ctx.backWallZ) * 0.30;
+    const triple = localStorage.getItem('bb_tv_layout') === 'triple' ||
+      (localStorage.getItem('bb_tv_layout') !== 'paired' && getActiveTheme().id === 'bb-1993');
+    // The shared center frame belongs beyond the checkout soffit, in the
+    // open sales-floor ceiling. Separate sets retain their established anchors.
+    const tvZ = 15 - (15 - this.ctx.backWallZ) * (triple ? .55 : .30);
 
     // screenNormal: the world-space direction the screen face points toward.
     // Build a "look-at with world-up constraint" so the TV stays landscape/upright.
@@ -1180,7 +1185,7 @@ export class AmbientTvs implements StoreFixture {
       return new THREE.Matrix4().makeBasis(right, up, fwd);
     };
 
-    const addTv = (x: number, screenNormal: THREE.Vector3) => {
+    const addTv = (x: number, screenNormal: THREE.Vector3, shared = false) => {
       const g = new THREE.Group();
       g.position.set(x, this.ctx.ceilingY, tvZ);
 
@@ -1265,12 +1270,28 @@ export class AmbientTvs implements StoreFixture {
         this.tvWorldSpheres.push(worldSphere);
       }
       this.pushScreenPose(screen, screenW, screenH);
+      const fallback = [plate, pole, knuckle];
+      if (!shared) void installTvMount(this.ctx, g, tvG, fallback, () => !this.disposed);
+      return { g, tvG, fallback };
     };
 
     // Screen normals: inward ±X, 45° downward, slight forward lean.
     // The makeTvRotation ensures the TV body stays landscape-upright (world-up constraint).
-    addTv(leftTvX,  new THREE.Vector3( 0.8, -0.65, -0.3).normalize());
-    addTv(rightTvX, new THREE.Vector3(-0.8, -0.65, -0.3).normalize());
+    const audioPositions: number[] = [];
+    if (triple) {
+      const sets = [-2.75, 0, 2.75].map(offset => {
+        audioPositions.push(11 + offset);
+        return addTv(11 + offset, new THREE.Vector3(0, -.22, 1).normalize(), true);
+      });
+      // One frame bears all three cabinets. Individual mount fallbacks remain
+      // visible until the shared model has actually loaded.
+      void installTvMount(this.ctx, sets[1].g, sets[1].tvG,
+        sets.flatMap(set => set.fallback), () => !this.disposed, true);
+    } else {
+      addTv(leftTvX, new THREE.Vector3(.8, -.65, -.3).normalize());
+      addTv(rightTvX, new THREE.Vector3(-.8, -.65, -.3).normalize());
+      audioPositions.push(leftTvX, rightTvX);
+    }
 
     // T24: swap the procedural shells for the real CRT GLB once it loads.
     // Fire-and-forget — if models/tv_ceiling.glb hasn't been downloaded yet
@@ -1290,7 +1311,7 @@ export class AmbientTvs implements StoreFixture {
 
       const source = audioCtx.createMediaElementSource(video);
       const gain   = audioCtx.createGain();
-      gain.gain.value = 0.35;
+      gain.gain.value = 0.35 * (2 / audioPositions.length);
       source.connect(gain);
 
       const initPos = this.ctx.camera.position;
@@ -1302,7 +1323,7 @@ export class AmbientTvs implements StoreFixture {
         audioCtx.listener.setPosition(initPos.x, initPos.y, initPos.z);
       }
 
-      for (const tvX of [leftTvX, rightTvX]) {
+      for (const tvX of audioPositions) {
         const panner = audioCtx.createPanner();
         panner.panningModel  = 'HRTF';
         panner.distanceModel = 'inverse';
