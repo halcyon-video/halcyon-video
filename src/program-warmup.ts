@@ -63,7 +63,17 @@ export async function compileProgramsInStages(
       renderer.autoClear = false;
       renderer.localClippingEnabled = true;
       renderer.render(empty, camera);
-      batch.children = objects.slice(i, i + batchSize);
+      // A mesh can own child lights/meshes already present in targetScene.
+      // Compiling its whole subtree counts those lights twice (or once per
+      // ancestor), producing nonexistent shader variants and sampler overflow.
+      // Draw-free shallow views preserve mesh flags without changing the live
+      // hierarchy or copying large instancing buffers.
+      batch.children = objects.slice(i, i + batchSize).map(object => {
+        if (object.children.length === 0) return object;
+        const view = Object.create(object) as THREE.Object3D;
+        view.children = [];
+        return view;
+      });
       renderer.compile(batch, camera, scene);
     } finally {
       batch.children = [];

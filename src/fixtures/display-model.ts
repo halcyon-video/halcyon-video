@@ -21,7 +21,8 @@ export function installDisplayModel(
   const ownedTextures = new Set<THREE.Texture>();
   const release = (model: THREE.Group) => {
     const geometries = new Set<THREE.BufferGeometry>();
-    model.traverse((o) => { if (o instanceof THREE.Mesh) geometries.add(o.geometry); });
+    model.traverse((o) => { if (o instanceof THREE.BatchedMesh) o.dispose();
+      else if (o instanceof THREE.Mesh) geometries.add(o.geometry); });
     geometries.forEach((g) => g.dispose());
     ownedMaterials.forEach((m) => m.dispose());
     ownedMaterials.clear();

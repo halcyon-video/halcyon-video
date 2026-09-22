@@ -24,14 +24,15 @@ export function stockPlacementSettled(
 
 /** Owns the one retained, fully-stocked room panorama and its refresh state. */
 export class MirrorCubemapLifecycle {
+  version = 0;
   pending = false;
   ready = false;
   probe: Texture | null = null;
   private target: WebGLCubeRenderTarget | null = null;
 
-  beginStockBuild() { this.ready = false; this.pending = false; }
-  finishStockBuild() { this.pending = true; }
-  stockChanged() { this.ready = false; this.pending = true; }
+  beginStockBuild() { this.version++; this.ready = false; this.pending = false; }
+  finishStockBuild() { this.version++; this.pending = true; }
+  stockChanged() { this.version++; this.ready = false; this.pending = true; }
   settled() { this.ready = true; this.pending = false; }
   replace(target: WebGLCubeRenderTarget) {
     const previous = this.target;
@@ -40,6 +41,7 @@ export class MirrorCubemapLifecycle {
     previous?.dispose();
   }
   dispose() {
+    this.version++;
     this.target?.dispose();
     this.target = null;
     this.probe = null;

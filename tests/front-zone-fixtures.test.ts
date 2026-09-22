@@ -22,14 +22,14 @@ for (const kind of kinds) test(`${kind}: real export fits collider, has normals/
   assert.ok(bounds.min.z >= -spec.d / 2 - 1e-5 && bounds.max.z <= spec.d / 2 + 1e-5);
   assert.ok(Math.abs(bounds.min.y) < 1e-5 && bounds.max.y <= spec.h + 1e-5);
   let transparentBefore = 0;
-  scene.traverse(o => { if (o instanceof THREE.Mesh && !Array.isArray(o.material) && o.material.transparent) transparentBefore++; });
+  scene.traverse(o => { if (o instanceof THREE.Mesh && !Array.isArray(o.material) && (o.material.transparent || (o.material instanceof THREE.MeshPhysicalMaterial && o.material.transmission > 0))) transparentBefore++; });
   prepareRetailModel(scene);
   const mergedBounds = new THREE.Box3().setFromObject(scene);
   assert.ok(mergedBounds.min.distanceTo(bounds.min) < 1e-5 && mergedBounds.max.distanceTo(bounds.max) < 1e-5, 'batching preserves installed geometry bounds');
   let triangles = 0, draws = 0, transparentAfter = 0;
   scene.traverse(o => {
     if (!(o instanceof THREE.Mesh)) return;
-    if (!Array.isArray(o.material) && o.material.transparent) transparentAfter++;
+    if (!Array.isArray(o.material) && o.material.transparent) transparentAfter += o instanceof THREE.BatchedMesh ? o.instanceCount : 1;
     draws++; triangles += (o.geometry.index?.count ?? o.geometry.attributes.position.count) / 3;
     for (const attribute of ['position', 'normal', 'uv']) {
       const a = o.geometry.getAttribute(attribute);

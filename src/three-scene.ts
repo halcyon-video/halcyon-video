@@ -1,3 +1,4 @@
+import { refreshStockedReflections, reflectionRefreshRunning } from './stocked-reflection-refresh';
 import { streamingInspectPose } from './streaming-case-pose';
 import { isExternalGameActive } from './external-game-state.ts';
 import { capturePinPng } from './feedback-image';
@@ -349,7 +350,10 @@ export class StoreScene {
   }
   public get resScaleMin(): number {
     if (this.softwareGL) return 0.4;
-    return this.effectiveQuality === 'high' ? 0.7 : 0.5;
+    // High detail must still recover on an integrated GPU. At the default
+    // supersampled high budget, 0.4 is approximately native 720p, while 0.7
+    // remained a multi-megapixel frame even after sustained single-digit FPS.
+    return this.effectiveQuality === 'high' ? 0.4 : 0.5;
   }
   // Settle supersample: how many times the MOVING frame's pixel count the one
   // parked frame is drawn at. 2 = 1.41x linear, the classic 2xSS — measurably
@@ -475,11 +479,11 @@ export class StoreScene {
     getCeilingY: () => this.ceilingY,
     getHeadlight: () => this.headlight ?? null,
     getBakeHidden: () => (this.selectionArrow ? [this.selectionArrow] : []),
-    onEnvironmentRebaked: () => {
+    onEnvironmentRebaked: (captureProbes = true) => {
       mirrors.updateMirrorThrottle(this, true);
       this.requestRender();
       this.rebuildSSAOExclusionList();
-      this.generateReflectionProbes();
+      if (captureProbes) { this.mirrorCubemap.version++; this.generateReflectionProbes(); }
       this.updateLOD();
       this.applyExteriorEnvClamp();
       this.bootstrapEnvRT?.dispose();
@@ -781,7 +785,7 @@ export class StoreScene {
   // Tracks whether any movie-case slot was actually moving (isMoving) last frame, or a
   // launch flourish was in flight. When this transitions from true to false, exactly one
   // shadow map re-bake is requested — "settle once" instead of "re-bake every frame".
-  private hadAnimatingSlots = false;
+  public hadAnimatingSlots = false;
   // Floor plan: unit placement, category shelf order, arrangement, and the
   // layout-space transforms (see store-plan.ts). Created in the constructor once
   // the libraries are known; read everywhere through the delegation getters.
@@ -2891,7 +2895,7 @@ export class StoreScene {
 
   // Cube render targets behind the current reflection probes, kept so a re-bake
   // (outside-mode change) can dispose them instead of leaking GPU memory.
-  private probeRenderTargets: THREE.WebGLCubeRenderTarget[] = [];
+  public probeRenderTargets: THREE.WebGLCubeRenderTarget[] = [];
   public get mirrorRoomProbe() { return this.mirrorCubemap.probe; }
 
   private generateReflectionProbes() {
@@ -4665,6 +4669,8 @@ export class StoreScene {
       this.cameraGlideLerp = CAMERA_GLIDE_LERP;
     }
 
+    this.reflectionInteractionActive = walkKeyHeld || cameraLerping || performance.now() - this.lastCameraMotionTime < 2500;
+
     // AO walk gating: GTAO's G-buffer prepass replays every scene draw call,
     // which is what was blowing the walking frame budget (60-70fps + hitching
     // on real hardware at 'high'). Disable the pass entirely while the feet are
@@ -5458,17 +5464,9 @@ export class StoreScene {
 
     // Real-time reflections are handled automatically by Reflector instances
 
-    // 2.4 One-shot stocked-shelves environment re-bake (see mirrorCubemap.pending):
-    // fires once the initial placement wave has settled and enough frames have
-    // elapsed for the first poster batches to have landed.
-    // ALSO requires 2.5s of input silence (perf-trace baseline caught it firing
-    // mid-flip-through: 5 probes × 6 faces + a 3-bounce PMREM = ~98ms in one
-    // frame). It's a one-shot visual refinement — deferring it until the
-    // shopper pauses costs nothing and can never hitch an interaction.
-    if (this.stockedRebakeDue(time, movingSlots)) {
-      this.mirrorCubemap.settled();
-      this.outdoor.rebakeEnvironment(true);
-    }
+    // Optional reflections compile cooperatively and capture one face per idle
+    // slice. Held walking/look input pauses them even without new DOM events.
+    if (this.stockedRebakeDue(time, movingSlots)) refreshStockedReflections(this);
 
     // 2.5 Prebaked shadows: re-render the sun's shadow map only on frames where a
     // shadow-caster actually changed — a structural rebuild (shadowRefreshFrames) or a
@@ -5555,8 +5553,10 @@ export class StoreScene {
   // lands on must be a full one. Read as a predicate rather than latching on
   // `mirrorCubemap.pending` alone, which can stay true indefinitely (dirty
   // slots, a busy input clock) and would park the partial path forever.
+  public reflectionInteractionActive = false;
+
   private stockedRebakeDue(time: number, movingSlots = this.hadAnimatingSlots ? 1 : 0): boolean {
-    if (!this.mirrorCubemap.pending || this.frameCount <= 300 ||
+    if (reflectionRefreshRunning(this) || this.reflectionInteractionActive || !this.mirrorCubemap.pending || this.frameCount <= 300 ||
         !stockPlacementSettled(movingSlots, this.dirtySlots) ||
         this.launchAnim || time - getLastUserActivity() <= 2500) return false;
     return true;
