@@ -5570,7 +5570,7 @@ export class StoreScene {
   public reflectionInteractionActive = false;
 
   private stockedRebakeDue(time: number, movingSlots = this.hadAnimatingSlots ? 1 : 0): boolean {
-    if (reflectionRefreshRunning(this) || this.reflectionInteractionActive || !this.mirrorCubemap.pending || this.frameCount <= 300 ||
+    if (mobileStoreActive() || reflectionRefreshRunning(this) || this.reflectionInteractionActive || !this.mirrorCubemap.pending || this.frameCount <= 300 ||
         !stockPlacementSettled(movingSlots, this.dirtySlots) ||
         this.launchAnim || time - getLastUserActivity() <= 2500) return false;
     return true;

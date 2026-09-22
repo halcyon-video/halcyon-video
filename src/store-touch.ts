@@ -1,5 +1,7 @@
+import { mobileCheckoutAction } from './mobile-checkout';
 // Touch controls share the host overlay callbacks. Hosted mobile browsing
 // uses direct camera manipulation; other touch installs retain arrow swipes.
+import { isStreamingChoiceActive } from './streaming-checkout';
 import { installMobileWalk } from './mobile-walk';
 import type { InputCallbacks } from './input.ts';
 import type { StoreScene } from './three-scene.ts';
@@ -51,14 +53,14 @@ export function touchMovieHUDText(
   requestable = false,
 ): string | null {
   if (!isInspecting) return mobileStoreActive() ? 'DRAG TO BROWSE  •  TAP A MOVIE' : 'SWIPE TO BROWSE  •  TAP OK TO EXAMINE';
-  if (streamingChoice) return 'TAP A SERVICE  •  TAP OK TO CONFIRM';
-  if (streaming) return 'SWIPE TO FLIP  •  TAP OK TO CHECK OUT';
-  if (game) return 'SWIPE TO FLIP  •  TAP OK TO RENT & PLAY';
+  if (streamingChoice) return 'TAP A SERVICE  •  TAP CONFIRM SERVICE';
+  if (streaming) return 'SWIPE TO FLIP  •  TAP TAKE TO COUNTER';
+  if (game) return 'SWIPE TO FLIP  •  TAP TAKE TO COUNTER';
   if ((discovery || collectionGap) && !requestable) return 'SWIPE TO FLIP  •  NOT IN STOCK';
   if (discovery) return isRequestedDiscovery ? 'ALREADY REQUESTED' : 'NOT IN STOCK — TAP OK TO ORDER OR PASS';
   if (collectionGap) return isRequestedDiscovery ? 'ON ORDER — COMING SOON' : 'NOT IN STOCK — TAP OK TO ORDER OR PASS';
   if (comingSoon) return 'COMING SOON — NOT YET AVAILABLE';
-  return 'SWIPE TO FLIP  •  TAP OK TO PLAY';
+  return 'SWIPE TO FLIP  •  TAP TAKE TO COUNTER';
 }
 
 export function touchHUDText(mode: string, canHoldToCheckout: boolean, carryMode: boolean): string | null {
@@ -80,12 +82,12 @@ export function touchHUDText(mode: string, canHoldToCheckout: boolean, carryMode
         : 'SWIPE TO BROWSE  •  TAP OK TO EXAMINE';
     case 'inspect':
       return carryMode
-        ? 'TAP OK TO TAKE IT'
-        : 'SWIPE TO FLIP  •  TAP OK TO PLAY';
+        ? 'TAP TAKE TO COUNTER'
+        : 'SWIPE TO FLIP  •  TAP TAKE TO COUNTER';
     case 'walk-around':
       return 'DRAG TO LOOK  •  TAP A MOVIE';
     case 'checkout':
-      return 'TAP OK TO CHECK OUT';
+      return 'TAP CHECK OUT';
     case 'backroom':
       return 'SWIPE TO PICK A TAPE  •  TAP OK TO PLAY';
     case 'person-endcap':
@@ -93,6 +95,28 @@ export function touchHUDText(mode: string, canHoldToCheckout: boolean, carryMode
     default:
       return null;
   }
+}
+
+/** Keep the next action explicit, including the carried-title route after pickup. */
+export function syncTouchAction(scene: StoreScene, terminal: boolean): void {
+  const ok = document.getElementById('store-touch-ok');
+  if (!ok) return;
+  const movie = scene.getSelectedMovie();
+  let label = 'OK';
+  if (!terminal) {
+    if (scene.mode === 'inspect') {
+      label = movie?.streaming && isStreamingChoiceActive(movie) ? 'CONFIRM SERVICE'
+        : movie?.comingSoon ? 'COMING SOON'
+        : !movie?.streaming && (movie?.discovery || movie?.collectionGap) ? 'REQUEST OPTIONS'
+        : movie?.isSeries && !movie.streaming ? 'SELECT EPISODE' : 'TAKE TO COUNTER';
+    } else if (scene.mode === 'checkout') label = scene.checkoutRunning ? 'CHECKING OUT' : 'CHECK OUT';
+    else if (scene.canHoldToCheckout()) label = 'GO TO COUNTER';
+    else if (scene.mode === 'browse') label = 'EXAMINE';
+  }
+  const text = ok.querySelector('.st-label');
+  if (text && text.textContent !== label) text.textContent = label;
+  ok.setAttribute('aria-label', label);
+  ok.parentElement?.classList.toggle('has-carry', scene.canHoldToCheckout());
 }
 
 const CSS = `
@@ -136,11 +160,18 @@ const CSS = `
   bottom: max(24px, env(safe-area-inset-bottom));
   right: max(24px, env(safe-area-inset-right));
 }
+#store-touch-controls:not(.terminal)[data-mode="inspect"] #store-touch-ok,
+#store-touch-controls:not(.terminal)[data-mode="checkout"] #store-touch-ok,
+#store-touch-controls.has-carry:not(.terminal) #store-touch-ok {
+  display: flex; min-width: 190px; min-height: 52px; background: #101923;
+  border: 2px solid #f2e8c9; box-shadow: 0 3px 0 #000; z-index: 2;
+}
+#store-touch-controls.has-carry[data-mode="walk-around"] #store-touch-ok { display: flex; }
 #store-touch-walk { top: max(24px, env(safe-area-inset-top)); right: max(24px, env(safe-area-inset-right)); display: none; }
 #store-touch-controls:not(.terminal)[data-mode="overview"] #store-touch-walk,
 #store-touch-controls:not(.terminal)[data-mode="browse"] #store-touch-walk { display: flex; }
 #store-touch-controls:not(.terminal)[data-mode="overview"] #store-touch-ok,
-#store-touch-controls:not(.terminal)[data-mode="walk-around"] #store-touch-ok,
+#store-touch-controls:not(.terminal):not(.has-carry)[data-mode="walk-around"] #store-touch-ok,
 #store-touch-controls:not(.terminal)[data-mode="walk-around"] #store-touch-back { display: none; }
 #store-touch-stick { display: none; position: absolute; left: max(24px, env(safe-area-inset-left)); bottom: max(100px, calc(env(safe-area-inset-bottom) + 76px)); width: 124px; height: 124px; border: 3px solid #f2e8c9; border-radius: 50%; background: radial-gradient(circle, rgba(3,9,20,.92) 42%, rgba(242,232,201,.34) 43%, rgba(3,9,20,.88) 69%); box-shadow: 0 4px 0 #02050a, 0 0 0 3px rgba(5,12,28,.82), 0 0 12px rgba(242,232,201,.8), inset 0 2px 0 #fff; touch-action: none; }
 #store-touch-controls.visible:not(.terminal)[data-mode="walk-around"] #store-touch-stick { display: block; pointer-events: auto; }
@@ -202,6 +233,10 @@ function bind(el: HTMLElement, fire: () => void): void {
     }
     fire();
   };
+  for (const type of ['keydown', 'keyup']) el.addEventListener(type, e => {
+    if ((e as KeyboardEvent).key === 'Enter' || (e as KeyboardEvent).key === ' ') e.stopPropagation();
+  });
+  el.addEventListener('click', fire); // Native keyboard and assistive activation; touchend suppresses its synthetic click.
   el.addEventListener('touchstart', press, { passive: false });
   el.addEventListener('touchend', release, { passive: false });
   el.addEventListener('touchcancel', cancel, { passive: false });
@@ -226,7 +261,8 @@ export function installStoreTouchControls(callbacks: InputCallbacks, poke: () =>
   const root = document.createElement('div');
   root.id = 'store-touch-controls';
 
-  const back = document.createElement('div');
+  const back = document.createElement('button');
+  back.type = 'button';
   back.id = 'store-touch-back';
   back.className = 'st-btn';
   back.innerHTML = '<span class="st-label">BACK</span>';
@@ -234,13 +270,19 @@ export function installStoreTouchControls(callbacks: InputCallbacks, poke: () =>
   back.setAttribute('aria-label', 'Back');
   bind(back, () => { poke(); callbacks.onBack(); });
 
-  const ok = document.createElement('div');
+  const ok = document.createElement('button');
+  ok.type = 'button';
   ok.id = 'store-touch-ok';
   ok.className = 'st-btn';
   ok.innerHTML = '<span class="st-label">OK</span>';
   ok.setAttribute('role', 'button');
   ok.setAttribute('aria-label', 'Select');
-  bind(ok, () => { poke(); void callbacks.onEnter(); });
+  bind(ok, () => {
+    poke();
+    const scene = getScene?.();
+    if (scene && mobileCheckoutAction(scene, root.classList.contains('terminal'))) return;
+    void callbacks.onEnter();
+  });
 
   const directions = document.createElement('div');
   directions.id = 'store-touch-directions';

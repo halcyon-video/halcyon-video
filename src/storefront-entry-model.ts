@@ -251,7 +251,7 @@ export function buildFacadeEntryModel(ctx: FixtureContext, p: EntryParams): THRE
     downlight.emissiveIntensity = mode === 'night' ? 3 : mode === 'sunset' ? .7 : 0;
     canopy.emissiveIntensity = mode === 'night' ? .65 : mode === 'sunset' ? .15 : 0;
     const parapetLevel = mode === 'night' ? 1 : mode === 'sunset' ? .3 : 0;
-    parapetSpots.forEach(light => { light.intensity = 95 * parapetLevel; });
+    parapetSpots.forEach(light => { light.intensity = 95 * parapetLevel; light.visible = light.intensity > 0; });
     parapetRoot.getObjectByName('recessed-downlights')?.traverse(object => {
       if (!(object instanceof THREE.Mesh)) return;
       for (const material of Array.isArray(object.material) ? object.material : [object.material]) {
@@ -295,7 +295,7 @@ export function setFacadeEntryLighting(scene: THREE.Scene, mode: OutsideMode): v
     });
   }
   const light = scene.getObjectByName('storefrontSignLight');
-  if (light instanceof THREE.PointLight) light.intensity = 15 * level;
+  if (light instanceof THREE.PointLight) { light.intensity = 15 * level; light.visible = light.intensity > 0; }
 }
 
 export function disposeFacadeEntry(scene: THREE.Scene): void {

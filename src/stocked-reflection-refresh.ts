@@ -1,3 +1,4 @@
+import { mobileStoreActive } from './mobile-store';
 import * as THREE from 'three';
 import type { StoreScene } from './three-scene';
 import { captureCubeInSlices, captureSceneState } from './cube-capture';
@@ -12,7 +13,9 @@ const running = new WeakSet<StoreScene>();
 export const reflectionRefreshRunning = (store: StoreScene): boolean => running.has(store);
 /** Keep the old generation visible until the complete replacement is captured. */
 export function refreshStockedReflections(store: StoreScene): void {
-  if (running.has(store)) return;
+  // Phones already use the offline room map. Even cooperative cube capture
+  // compiles whole-room variants and stalls the driver when walking resumes.
+  if (mobileStoreActive() || running.has(store)) return;
   running.add(store);
   const signal = store.programWarmupController.signal;
   const version = store.mirrorCubemap.version;

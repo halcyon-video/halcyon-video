@@ -111,7 +111,7 @@ import { brandString, loadBrandPack } from './brand-pack';
 import type { StoreScene } from './three-scene';
 import { waitForStartupModel } from './startup-reveal';
 import { InputManager, type InputCallbacks } from './input';
-import { installStoreTouchControls, isTouchInputActive, touchHUDText, touchMovieHUDText } from './store-touch';
+import { syncTouchAction, installStoreTouchControls, isTouchInputActive, touchHUDText, touchMovieHUDText } from './store-touch';
 import { isStreamingChoiceActive, cancelStreamingServiceChoice, setStreamingStockResolver } from './streaming-checkout';
 setStreamingStockResolver(getStreamingMovies);
 import { triggerHostedWelcome, isWelcomeActive, dismissWelcome, welcomeHUDText } from './store-welcome';
@@ -980,6 +980,7 @@ function updateBrowseHUDVisibility() {
     || ui.isEmblemStudioOpen || isMembershipPickerOpen() || ui.isPlaybackActive || ui.isScreensaverActive;
   if (touchControls && touchControls.dataset.mode !== storeScene.mode) touchControls.dataset.mode = storeScene.mode;
   touchControls?.classList.toggle('terminal', terminal);
+  syncTouchAction(storeScene, terminal);
   touchControls?.classList.toggle('visible', terminal ? !terminalBlocked : !suppressed);
 
   if (suppressed) {
@@ -2915,6 +2916,7 @@ async function waitForFontsAndInit() {
   // opacity rather than 2% of the way in. Debug-only override, never surfaced
   // in Settings, kept for the A/B that proved it: bb_debug_no_boot_paint=1.
   if (!localStorage.getItem('bb_debug_no_boot_paint')) await nextPaintedFrame();
+  await paintStoreLoading(21, 'Loading the lettering');
   if (document.fonts) {
     try {
       // Explicitly wait for the display face used in canvas texture rendering.
@@ -2930,13 +2932,16 @@ async function waitForFontsAndInit() {
   // declare faces of its own, and registering them here is what puts them in
   // bundledFontsReady()'s wait rather than a repaint that never comes. Never
   // rejects — no pack installed is the normal case (src/brand-pack.ts).
+  await paintStoreLoading(22, 'Loading the store identity');
   await loadBrandPack();
   // Same reason, for the bundled display faces (Anton / Archivo Black / Outfit /
   // Orbitron / Yellowtail): most of the canvases that set them are painted once
   // into a texture cache and never repainted, so a face landing after the store
   // build bakes a fallback in permanently. These are local bundle assets, so
   // the wait is a decode, not a fetch.
+  await paintStoreLoading(23, 'Preparing the lettering');
   await bundledFontsReady();
+  await paintStoreLoading(24, 'Preparing the catalog');
   await initializeStoreScene();
 }
 

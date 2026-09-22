@@ -106,6 +106,8 @@ export async function compileProgramsInStages(
         for (let j = pending.length - 1; j >= 0; j--) {
           if (!pending[j].program || gl.getProgramParameter(pending[j].program as WebGLProgram, extension.COMPLETION_STATUS_KHR)) pending.splice(j, 1);
         }
+        progress?.(.5 + .25 * (programs.length - pending.length) / Math.max(1, programs.length),
+          `Compiling graphics · ${programs.length - pending.length} of ${programs.length}`);
       }
     }
     let bound = 0, bindingYield = -Infinity;
@@ -124,7 +126,7 @@ export async function compileProgramsInStages(
       program.getAttributes();
       preparedPrograms.add(program);
       bound++;
-      progress?.(extension ? .5 + .5 * bound / programs.length : .9 * submitted / Math.max(1, objects.length), `Preparing graphics · ${bound} of ${programs.length}`);
+      progress?.(extension ? .75 + .25 * bound / programs.length : .9 * submitted / Math.max(1, objects.length), `Preparing graphics · ${bound} of ${programs.length}`);
     }
   }
 }
