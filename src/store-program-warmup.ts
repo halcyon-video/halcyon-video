@@ -15,13 +15,13 @@ const stagedInitialRooms = new WeakSet<StoreScene>();
 export async function prepareInitialViewPrograms(scene: StoreScene): Promise<void> {
   // Returning rentals and saved alternate roots can move through other views
   // before entry; retain their full-room preparation instead of guessing a frame.
-  if (scene.mode !== 'overview' || scene.returnDropWatch) {
+  if (!['overview', 'walk-around'].includes(scene.mode) || scene.returnDropWatch) {
     await compileProgramsInStages(scene.renderer, scene.scene, scene.camera,
       scene.composer?.readBuffer ?? null, scene.programWarmupController.signal);
     return;
   }
   stagedInitialRooms.add(scene);
-  scene.snapCamera();
+  if (!scene.isWalkAroundMode) scene.snapCamera();
   const roots = new THREE.Group();
   roots.children = initialProgramObjects(scene.scene, scene.camera);
   try {

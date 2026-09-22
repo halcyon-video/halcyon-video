@@ -1,4 +1,6 @@
+import { operatorDefault } from './operator-defaults';
 import { mobileStoreActive } from './mobile-store';
+import { resetStoreLoading, updateStoreLoading } from './store-loading';
 // The boot / credentials flow — every path from "the app just loaded" to "the
 // store is stocked and revealed": saved-session auto-connect with its stall
 // watchdog and backoff retry, the membership-card picker hand-off, the classic
@@ -35,7 +37,6 @@ import {
 import { buildDemoLibraries, buildDemoGames } from './demo-library';
 import { getSetting } from './settings';
 import { seedAutomaticDemoStreamingServices } from './streaming-catalog';
-import { defaultJellyfinUrl, operatorDefault, type OperatorServiceId } from './operator-defaults';
 import { isDemoMode, useSyntheticDemoStock } from './demo-mode';
 import { fetchCatalogFromAllSources } from './catalog-sync';
 import { hydrateStoreConfig, resetStoreConfigSync } from './store-config-sync';
@@ -398,113 +399,12 @@ async function syncForSetup(
 
 // ─── Login / boot overlays ────────────────────────────────────────────────────
 
-/**
- * Replace a login column's credential boxes with a line saying the server
- * already supplies this service (#129).
- *
- * Skipped when the visitor has a value of their own, so their fields stay
- * editable and their own server keeps winning — the operator's default is a
- * default, not a lock. Idempotent: showLoginOverlay() can run several times in
- * a session, so the note is keyed by id and never stacks up.
- */
-function hideIfOperatorManaged(
-  id: OperatorServiceId,
-  ownValue: string | null | undefined,
-  inputs: (HTMLInputElement | null)[]
-): void {
-  const operator = operatorDefault(id);
-  const column = inputs.find((i) => i)?.closest('.login-column') as HTMLElement | null;
-  const noteId = `login-${id}-operator-note`;
-  document.getElementById(noteId)?.remove();
-  for (const input of inputs) {
-    const group = input?.closest('.input-group') as HTMLElement | null;
-    if (group) group.style.display = operator && !ownValue ? 'none' : '';
-  }
-  if (!operator || ownValue || !column) return;
-  const note = document.createElement('p');
-  note.id = noteId;
-  note.className = 'column-desc';
-  note.textContent = `Provided by this store's server (${operator.url}). Nothing to enter — `
-    + 'the API key stays on the server and is never sent to your browser.';
-  column.appendChild(note);
-}
-
 export function showLoginOverlay() {
-  if (isDemoMode) return; // the demo never logs in
-  closeMembershipCardPicker(); // defensive: idempotent if it wasn't open
-  if (deps) deps.ui.isLoginOpen = true;
-  const overlay = document.getElementById('login-overlay');
-  if (overlay) {
-    overlay.classList.add('visible');
-
-    const envUrl = typeof import.meta.env !== 'undefined' ? import.meta.env.VITE_JELLYFIN_URL : undefined;
-    const savedUrl = defaultJellyfinUrl(localStorage.getItem('jellyfin_url'), envUrl);
-    if (savedUrl) {
-      const urlInput = document.getElementById('login-url') as HTMLInputElement;
-      if (urlInput) urlInput.value = savedUrl;
-    }
-
-    const envUser = typeof import.meta.env !== 'undefined' ? import.meta.env.VITE_JELLYFIN_USERNAME : undefined;
-    const savedUsername = localStorage.getItem('jellyfin_username') || envUser;
-    const userInput = document.getElementById('login-user') as HTMLInputElement;
-    if (userInput) {
-      if (savedUsername) userInput.value = savedUsername;
-      userInput.focus();
-    }
-
-    const envPass = typeof import.meta.env !== 'undefined' ? import.meta.env.VITE_JELLYFIN_PASSWORD : undefined;
-    const passInput = document.getElementById('login-pass') as HTMLInputElement;
-    if (passInput && envPass) {
-      passInput.value = envPass;
-    }
-
-    // Jellyseerr (optional) -- same persistence mechanism as the Jellyfin
-    // fields above, just two extra fields that stay blank when unused.
-    const envJellyseerrUrl = typeof import.meta.env !== 'undefined' ? import.meta.env.VITE_JELLYSEERR_URL : undefined;
-    const savedJellyseerrUrl = localStorage.getItem('jellyseerr_url') || envJellyseerrUrl;
-    const jellyseerrUrlInput = document.getElementById('login-jellyseerr-url') as HTMLInputElement;
-    if (jellyseerrUrlInput) jellyseerrUrlInput.value = savedJellyseerrUrl || '';
-
-    const envJellyseerrKey = typeof import.meta.env !== 'undefined' ? import.meta.env.VITE_JELLYSEERR_APIKEY : undefined;
-    const savedJellyseerrKey = localStorage.getItem('jellyseerr_apikey') || envJellyseerrKey;
-    const jellyseerrKeyInput = document.getElementById('login-jellyseerr-key') as HTMLInputElement;
-    if (jellyseerrKeyInput) jellyseerrKeyInput.value = savedJellyseerrKey || '';
-
-    // Don't ask for what this server already supplies (#129). An
-    // operator-managed service has no key to type — asking for one invites a
-    // visitor to paste a credential that would only override a working
-    // connection with their own.
-    hideIfOperatorManaged('jellyseerr', savedJellyseerrUrl, [jellyseerrUrlInput, jellyseerrKeyInput]);
-
-    const seerrStatusEl = document.getElementById('login-jellyseerr-status') as HTMLDivElement | null;
-    if (savedJellyseerrUrl && savedJellyseerrKey && seerrStatusEl) {
-      void verifySeerrCredentialsLive({ url: savedJellyseerrUrl, apiKey: savedJellyseerrKey }, 'login').then((res) => {
-        if (!seerrStatusEl) return;
-        if (res.ok) {
-          seerrStatusEl.textContent = '✓ Connected to Jellyseerr' + (res.email ? ` (${res.email})` : '');
-          seerrStatusEl.className = 'login-field-status is-success';
-        } else {
-          seerrStatusEl.textContent = `✗ ${res.reason || 'Connection failed'}`;
-          seerrStatusEl.className = 'login-field-status is-error';
-        }
-      });
-    }
-
-    // T18: Romm (optional) -- same prefill treatment as Jellyseerr. Column
-    // stays hidden (values still prefilled, just not shown) unless the Video
-    // Games section is switched on in Settings, so opting in still requires a
-    // deliberate settings-drawer toggle before Romm creds are even offered.
-    const envRommUrl = typeof import.meta.env !== 'undefined' ? import.meta.env.VITE_ROMM_URL : undefined;
-    const envRommKey = typeof import.meta.env !== 'undefined' ? import.meta.env.VITE_ROMM_APIKEY : undefined;
-    const rommUrlInput = document.getElementById('login-romm-url') as HTMLInputElement | null;
-    const savedRommUrl = localStorage.getItem('romm_url') || envRommUrl || '';
-    if (rommUrlInput) rommUrlInput.value = savedRommUrl;
-    const rommKeyInput = document.getElementById('login-romm-key') as HTMLInputElement | null;
-    if (rommKeyInput) rommKeyInput.value = localStorage.getItem('romm_apikey') || envRommKey || '';
-    hideIfOperatorManaged('romm', savedRommUrl, [rommUrlInput, rommKeyInput]);
-    const rommColumn = document.getElementById('login-romm-column');
-    if (rommColumn) rommColumn.style.display = getSetting<boolean>('bb_games_enabled') ? '' : 'none';
-  }
+  // Source configuration belongs at the in-store terminal, never a connection wall.
+  if (isDemoMode) return;
+  closeMembershipCardPicker();
+  hideLoginOverlay();
+  enterOpeningDay();
 }
 
 export function hideLoginOverlay() {
@@ -522,6 +422,7 @@ export function hideLoginOverlay() {
 }
 
 export function hideBootOverlay() {
+  updateStoreLoading(100);
   const overlay = document.getElementById('boot-overlay');
   if (overlay) {
     // Restore the stylesheet's fade for the way OUT (showBootOverlay suppresses
@@ -535,6 +436,7 @@ export function hideBootOverlay() {
 // very first paint) so the scene has somewhere opaque to load behind while its
 // textures stream in.
 export function showBootOverlay() {
+  resetStoreLoading();
   const overlay = document.getElementById('boot-overlay');
   if (overlay) {
     overlay.classList.remove('preparing-models');
@@ -770,6 +672,7 @@ async function demoCatalogBaseCount(): Promise<number> {
  * explicit ?demo=1 retains the synthetic library for development verification.
  */
 export async function startDemoAndLoad() {
+  updateStoreLoading(10);
   if (!deps) return;
   // Warm the 3D scene chunk while the GPU calibration below runs: the network
   // is idle for that half second, and main.ts's own dynamic import of it

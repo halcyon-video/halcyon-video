@@ -18,7 +18,7 @@ import { tickShelfVisibility, disposeShelfVisibility } from './shelf-visibility'
 import { mobileWalkInput } from './mobile-walk';
 import { mobileStoreActive, mobileStoreTap, mobileArtworkTick } from './mobile-store';
 import * as THREE from 'three';
-import { simplifyMobileSceneMaterials } from './mobile-materials';
+import { paintStoreLoading } from './store-loading';
 import { installDirectLightVisibility } from './direct-light-visibility';
 installDirectLightVisibility();
 import { isPublicDemo } from './demo-mode';
@@ -1510,7 +1510,9 @@ export class StoreScene {
         capture();
       }
     }
+    await paintStoreLoading(45);
     await this.buildAllMovieBoxes();
+    await paintStoreLoading(70);
     // Poster capacity is settled after the progressive stock build.
     this.entrance?.refreshIdleTerminal();
     this.rebuildMovieBoxes();
@@ -1582,11 +1584,10 @@ export class StoreScene {
     // The public overview needs the room's shaders, not dry-run inspections.
     // Inspection variants prepare after main.ts has wired input and revealed it.
     if (mobileStoreActive() && this.effectiveQuality !== 'high') {
-      // Phone entry has a five-second abandonment budget. Rendering the real
-      // opening frame compiles only what the camera draws; walking the rest of
-      // the room compiles those programs naturally, instead of holding the
-      // door shut while every off-camera material is prepared in advance.
-      simplifyMobileSceneMaterials(this.scene, this.mode);
+      // Keep original textured, lit materials. Draw only the opening view;
+      // off-camera program preparation must not hold the entrance closed.
+      await programWarmup.prepareInitialViewPrograms(this);
+      await paintStoreLoading(80);
       this.animate();
       this.onConsoleLog("[System] 3D Store rendering active in Library Select mode.", "system");
       return;
@@ -1994,7 +1995,7 @@ export class StoreScene {
     // shaders compile without any shadow sampling at all (smaller programs =
     // faster Subzero JIT too) and all shadowMap.needsUpdate requests below
     // become harmless no-ops.
-    this.renderer.shadowMap.enabled = !softwareGL && !phoneBudget;
+    this.renderer.shadowMap.enabled = !softwareGL;
     // Three r184 replaces PCFSoft with PCF on first shadow draw. Select the
     // actual mode now so asynchronous warmup compiles the runtime variant.
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
@@ -4003,7 +4004,7 @@ export class StoreScene {
   // teleportWalk() above: extract a 'YXZ' Euler from the camera's current
   // orientation instead of setting rotation from yaw/pitch.
   public captureFeedbackSnapshot(maxEdge?: number): { walk: string; png: string } {
-    if (this.composer && !mobileStoreActive()) {
+    if (this.composer) {
       this.composer.render();
     } else {
       this.renderer.render(this.scene, this.camera);
@@ -5545,8 +5546,7 @@ export class StoreScene {
     // 3. Render scene
     perfTrace.end(SP_SIM);
     perfTrace.begin(SP_RENDER);
-    if (mobileStoreActive()) simplifyMobileSceneMaterials(this.scene, this.mode);
-    if (this.composer && !mobileStoreActive()) {
+    if (this.composer) {
       this.composer.render();
     } else {
       this.renderer.render(this.scene, this.camera);

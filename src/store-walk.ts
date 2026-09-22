@@ -1,3 +1,4 @@
+import { OVERVIEW_POS } from './scene-shared';
 import { mobileStoreActive } from './mobile-store';
 import { constrainWalkObstacles } from './walk-collision';
 import { vestibuleSide, vestibuleStraightSide, clampVestibuleSide, vestibuleBackHalf } from './vestibule-layout';
@@ -331,8 +332,9 @@ export function toggleWalkAround(scene: StoreScene) {
     // Touch visitors can start beside the shelf they were browsing; other
     // entries begin in the entrance chamber, looking toward the shop floor.
     if (!mobileStoreActive() || scene.savedModeBeforeWalk !== 'browse') {
-      scene.currentCameraPos.set(13.0, 5.5, 12.5);
-      scene.currentLookAt.set(11.0, 5.3, 0.0);
+      if (mobileStoreActive()) scene.currentCameraPos.copy(OVERVIEW_POS);
+      else scene.currentCameraPos.set(13.0, 5.5, 12.5);
+      scene.currentLookAt.set(mobileStoreActive() ? scene.currentCameraPos.x : 11.0, 5.3, 0.0);
     } else {
       // Raising a shelf-level camera to eye height must preserve its bearing,
       // rather than tilting down toward the shelf's old point of interest.

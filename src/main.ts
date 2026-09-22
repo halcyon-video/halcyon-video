@@ -1,3 +1,4 @@
+import { paintStoreLoading, updateStoreLoading, showStoreLoadingFailure } from './store-loading';
 import { mobileStoreActive } from './mobile-store';
 import { isRequestTitle } from './request-title';
 import { buildSteamControls } from './steam-settings';
@@ -312,6 +313,7 @@ function installContextLossRecovery(canvas: HTMLCanvasElement) {
       sessionStorage.setItem(BOOT_CONTEXT_LOSS_KEY, String(attempts));
       if (attempts > BOOT_CONTEXT_LOSS_MAX_ATTEMPTS) {
         contextLossGaveUp = true;
+        showStoreLoadingFailure();
         logToConsole(
           `[System] WebGL context lost during startup (attempt ${attempts}) — giving up after ${BOOT_CONTEXT_LOSS_MAX_ATTEMPTS} retries. `
           + 'Close and reopen Halcyon, or restart this device, to try again.',
@@ -2573,6 +2575,7 @@ async function initializeStoreScene(preservePosterCache = false) {
     const { calibrateQualityIfNeeded, armQualityBackstop } = await import('./quality-calibrate');
     await calibrateQualityIfNeeded();
 
+    await paintStoreLoading(25);
     const { StoreScene } = await import('./three-scene');
     // Every carried library belongs on the floor. Keep stock construction
     // batched and offscreen shelves culled without paging away departments.
@@ -2584,6 +2587,7 @@ async function initializeStoreScene(preservePosterCache = false) {
     // that heavy startup work, so recovery must already be listening.
     installContextLossRecovery(scene.renderer.domElement);
     try { await scene.ready; } catch (error) { scene.destroy(); throw error; }
+    updateStoreLoading(85);
     armQualityBackstop();
     let lastLoggedPct = -1;
     scene.onTextureLoadProgress = (loaded, total) => {
@@ -2776,6 +2780,7 @@ async function initializeStoreScene(preservePosterCache = false) {
     // still stream progressively in the public store; the model grace is bounded.
     ((isPublicDemo || mobileStoreActive()) ? Promise.resolve() : scene.texturesReadyPromise).then(async () => {
       document.getElementById('boot-overlay')?.classList.add('preparing-models');
+      await paintStoreLoading(92);
       await waitForStartupModel(scene.entrance?.whenCounterModelReady());
       if (contextLossGaveUp || scene.renderer.getContext().isContextLost()) {
         document.getElementById('boot-overlay')?.classList.remove('preparing-models');
@@ -2836,9 +2841,9 @@ async function initializeStoreScene(preservePosterCache = false) {
       // overlay drops, so the player wakes already at the terminal.
       maybeOpenSetupTerminal();
       hideBootOverlay();
-      // Phone-low has already collapsed the room to its small shader set. Do
-      // not seize the main thread again after its first usable frame; optional
-      // high-detail models remain deferred for that low tier.
+      // Restore detailed fixtures progressively, one idle load at a time.
+      // Full-room reflection bakes still stay off the phone startup path.
+      if (mobileStoreActive()) scene.detailLoads?.release();
       if (isPublicDemo && !mobileStoreActive()) {
         void scene.warmupRuntimePrograms().finally(() => scene.detailLoads?.release())
           .catch(error => console.warn('[warmup] Hosted preparation failed:', error));
@@ -4021,7 +4026,8 @@ async function main() {
       }
     },
     onBack: () => {
-      if (storeScene?.isWalkAroundMode) {
+      if (storeScene?.isWalkAroundMode && !ui.isAnyOverlayOpen) {
+        if (mobileStoreActive()) return;
         storeScene.toggleWalkAround();
         return;
       }
@@ -4196,7 +4202,7 @@ async function main() {
       // SETUP still swallowed every key (ui.isSetupOpen), while nothing left
       // could bring the camera back to the terminal. Same trap at the manager
       // terminal. isAnyOverlayOpen covers all of them, plus the old four.
-      if (!shortcutsAllowed()) return;
+      if (!shortcutsAllowed() || (mobileStoreActive() && storeScene?.isWalkAroundMode)) return;
       storeScene?.toggleWalkAround();
     },
     // T22: carry-mode shortcuts. Both are guarded no-ops with the 'Carry &

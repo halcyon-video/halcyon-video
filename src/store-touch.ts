@@ -83,7 +83,7 @@ export function touchHUDText(mode: string, canHoldToCheckout: boolean, carryMode
         ? 'TAP OK TO TAKE IT'
         : 'SWIPE TO FLIP  •  TAP OK TO PLAY';
     case 'walk-around':
-      return 'THUMBSTICK TO MOVE  •  DRAG TO LOOK  •  TAP A MOVIE';
+      return 'DRAG TO LOOK  •  TAP A MOVIE';
     case 'checkout':
       return 'TAP OK TO CHECK OUT';
     case 'backroom':
@@ -115,21 +115,10 @@ const CSS = `
   text-transform: uppercase; opacity: 1; transition: transform 90ms;
   -webkit-tap-highlight-color: transparent;
 }
-.st-label {
-  display: inline-block; font-style: italic;
-  color: #fff;
-  background: linear-gradient(to bottom, #fff 0%, #e5effa 30%, #fff 46%, #8fa8c5 50%, #fff 72%, #d6e5f5 100%);
-  background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-  -webkit-text-stroke: 1.25px #040914;
-  paint-order: stroke fill;
-  filter: drop-shadow(0 2px 0 #02050a) drop-shadow(0 0 4px rgba(2,5,10,.95));
-}
+.st-label { color: #fff; font-style: normal; text-shadow: 0 2px 3px #000; }
+.st-btn { font: 700 15px/1 var(--font-title, sans-serif), sans-serif; letter-spacing: .06em; }
 .st-btn:focus-visible { outline: 2px solid #fff; outline-offset: -3px; }
-.st-btn.st-pressed .st-label { filter: brightness(1.4) drop-shadow(0 1px 0 #050a14); }
-#store-touch-ok .st-label {
-  font-size: 25px;
-  background-image: linear-gradient(to bottom, #997136, #fff4bc 43%, #b07f27 48%, #ffe5a0 72%, #d19b36);
-}
+.st-btn.st-pressed .st-label { color: #ddd; }
 #store-touch-controls.visible .st-btn { pointer-events: auto; }
 #store-touch-directions { display: none; position: absolute; left: 16px; bottom: max(24px, env(safe-area-inset-bottom)); grid-template-columns: repeat(3, 56px); gap: 6px; }
 #store-touch-controls.terminal #store-touch-directions { display: grid; }
@@ -149,14 +138,13 @@ const CSS = `
 }
 #store-touch-walk { top: max(24px, env(safe-area-inset-top)); right: max(24px, env(safe-area-inset-right)); display: none; }
 #store-touch-controls:not(.terminal)[data-mode="overview"] #store-touch-walk,
-#store-touch-controls:not(.terminal)[data-mode="browse"] #store-touch-walk,
-#store-touch-controls:not(.terminal)[data-mode="walk-around"] #store-touch-walk { display: flex; }
+#store-touch-controls:not(.terminal)[data-mode="browse"] #store-touch-walk { display: flex; }
 #store-touch-controls:not(.terminal)[data-mode="overview"] #store-touch-ok,
 #store-touch-controls:not(.terminal)[data-mode="walk-around"] #store-touch-ok { display: none; }
-#store-touch-stick { display: none; position: absolute; left: max(24px, env(safe-area-inset-left)); bottom: max(42px, calc(env(safe-area-inset-bottom) + 18px)); width: 124px; height: 124px; border: 3px solid #f2e8c9; border-radius: 50%; background: radial-gradient(circle, rgba(3,9,20,.92) 42%, rgba(242,232,201,.34) 43%, rgba(3,9,20,.88) 69%); box-shadow: 0 4px 0 #02050a, 0 0 0 3px rgba(5,12,28,.82), 0 0 12px rgba(242,232,201,.8), inset 0 2px 0 #fff; touch-action: none; }
+#store-touch-stick { display: none; position: absolute; left: max(24px, env(safe-area-inset-left)); bottom: max(100px, calc(env(safe-area-inset-bottom) + 76px)); width: 124px; height: 124px; border: 3px solid #f2e8c9; border-radius: 50%; background: radial-gradient(circle, rgba(3,9,20,.92) 42%, rgba(242,232,201,.34) 43%, rgba(3,9,20,.88) 69%); box-shadow: 0 4px 0 #02050a, 0 0 0 3px rgba(5,12,28,.82), 0 0 12px rgba(242,232,201,.8), inset 0 2px 0 #fff; touch-action: none; }
 #store-touch-controls.visible:not(.terminal)[data-mode="walk-around"] #store-touch-stick { display: block; pointer-events: auto; }
 .st-stick-knob { position: absolute; inset: 38px; border-radius: 50%; background: radial-gradient(circle at 40% 25%, #fff, #b9c9dc 58%, #526680 78%, #19263b); box-shadow: 0 3px 0 #02050a, 0 0 0 2px #f2e8c9; pointer-events: none; }
-.st-stick-label { position: absolute; z-index: 2; top: 51px; left: 0; right: 0; text-align: center; color: #020814; font: 900 13px/20px sans-serif; letter-spacing: -0.4px; text-shadow: 0 1px 0 #fff; pointer-events: none; }
+.st-stick-label { position: absolute; z-index: 2; top: 51px; left: 0; right: 0; text-align: center; color: #020814; font: 700 15px/20px sans-serif; letter-spacing: -0.4px; text-shadow: 0 1px 0 #fff; pointer-events: none; }
 body .clasp-prompt { border-radius: 0; font-size: 15px; }
 body .clasp-prompt .clasp-key { display: none; }
 body .clerk-prompt { bottom: max(174px, calc(env(safe-area-inset-bottom) + 160px)); max-width: calc(100vw - 48px); }
@@ -167,13 +155,14 @@ body:has(.clerk-dialog.visible) #browse-hint { visibility: hidden; }
 body:has(#store-touch-controls[data-mode="inspect"]) #browse-locator { display: none; }
 #browse-locator { top: max(86px, calc(env(safe-area-inset-top) + 72px)); max-width: calc(100vw - 48px); }
 .browse-locator-name { white-space: normal; text-align: center; font-size: 18px; letter-spacing: 1px; }
-body:has(#store-touch-controls[data-mode="walk-around"]) #browse-hint { bottom: 40px; left: auto; right: 16px; transform: none; max-width: calc(100vw - 180px); }
+body:has(#store-touch-controls[data-mode="walk-around"]) #browse-hint { bottom: 40px; left: auto; right: 16px; transform: none; max-width: calc(100vw - 180px); font: 700 15px/1.4 sans-serif; letter-spacing: .04em; text-shadow: 0 2px 3px #000; }
 
 /* #browse-hint (styles.css) sits bottom-center, nowrap, exactly where the OK
    button now lives — lift it clear and let it wrap. Phone viewports are
    narrower than the desktop line was ever sized for. */
 #browse-hint { bottom: 84px; max-width: 62vw; white-space: normal; line-height: 1.4; }
 @media (orientation: landscape) and (max-height: 500px) {
+  #store-touch-stick { bottom: max(48px, calc(env(safe-area-inset-bottom) + 24px)); }
   #browse-hint { bottom: 14px; font-size: 15px; line-height: 1.1; max-width: calc(100vw - 190px); }
 
 }

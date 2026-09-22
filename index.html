@@ -72,23 +72,12 @@
       <div id="main-ui-container">
         <!-- Boot Screen Overlay -->
         <div id="boot-overlay" class="visible">
-          <div class="boot-card">
-          <!-- House emblem -->
-          <div class="boot-logo-container">
-            <svg class="bb-logo-svg" viewBox="0 0 640 400"><use href="#bb-ticket-logo"/></svg>
-          </div>
-          <p class="boot-model-status" role="status">Getting your store ready…</p>
-          <!-- Boot Terminal/Console -->
-          <div class="boot-console">
-            <div class="boot-console-header">
-              <span>HTPC Operations Log</span>
-              <span class="pulse-indicator"></span>
-            </div>
-            <div class="boot-console-logs" id="boot-console-logs-container">
-              <div class="log-entry system">[System] Booting Halcyon...</div>
+          <div class="store-loading-strip">
+            <span id="store-loading-label">LOADING</span>
+            <div id="store-loading-progress" role="progressbar" aria-label="Loading the store" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+              <div id="store-loading-fill"></div>
             </div>
           </div>
-        </div>
       </div>
       </div>
 
@@ -121,7 +110,7 @@
       <!-- Debug Console Overlay -->
       <div id="dev-console">
         <div class="console-title">
-          <span>HTPC Operations Log</span>
+          <span>Diagnostics</span>
           <button id="dev-console-toggle" type="button" title="Minimize log" aria-label="Minimize log">_</button>
         </div>
         <div class="console-logs" id="console-logs-container">
@@ -228,7 +217,7 @@
           <svg class="bb-logo-svg" viewBox="0 0 640 400"><use href="#bb-ticket-logo"/></svg>
         </div>
         <div class="login-card">
-          <h2 class="login-title">HTPC Connection Center</h2>
+          <h2 class="login-title">Media Library Sign In</h2>
           <p class="login-subtitle">Configure your media sources and integrations</p>
           
           <form id="login-form">
