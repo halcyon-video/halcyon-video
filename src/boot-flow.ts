@@ -34,6 +34,7 @@ import {
 } from './membership-cards';
 import { buildDemoLibraries, buildDemoGames } from './demo-library';
 import { getSetting } from './settings';
+import { seedAutomaticDemoStreamingServices } from './streaming-catalog';
 import { defaultJellyfinUrl, operatorDefault, type OperatorServiceId } from './operator-defaults';
 import { isDemoMode, useSyntheticDemoStock } from './demo-mode';
 import { fetchCatalogFromAllSources } from './catalog-sync';
@@ -783,6 +784,12 @@ export async function startDemoAndLoad() {
     // and no synthetic movie/game artwork belongs on its critical path.
     deps.setLibraries([]);
     deps.setGames([]);
+    // A local build normally defaults to no chosen services, but its mobile
+    // first-run path deliberately enters this ready-made demo instead of the
+    // counter setup flow. Give only a truly unset browser the same useful
+    // starting catalog as the hosted build; an explicit empty choice remains
+    // the user's choice.
+    seedAutomaticDemoStreamingServices(localStorage);
     await deps.loadStreaming();
     deps.launchStore();
     return;

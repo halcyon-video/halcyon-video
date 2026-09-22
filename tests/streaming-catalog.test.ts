@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 import {
   DEFAULT_STREAMING_SERVICES,
   ALL_DEFAULT_STREAMING_SERVICES_CSV,
+  seedAutomaticDemoStreamingServices,
   resolveEnabledServices,
   resolveStreamingSource,
   matchProviderId,
@@ -90,6 +91,25 @@ test('resolveEnabledServices: blank/undefined/whitespace-only means NONE chosen 
 
 test('ALL_DEFAULT_STREAMING_SERVICES_CSV resolves back to the full default eight, in order -- the demo build\'s own setting default', () => {
   assert.deepEqual(resolveEnabledServices(ALL_DEFAULT_STREAMING_SERVICES_CSV), DEFAULT_STREAMING_SERVICES);
+});
+
+test('automatic demo boot seeds a missing streaming choice without replacing an explicit choice', () => {
+  const values = new Map<string, string>();
+  const storage = {
+    getItem: (key: string) => values.get(key) ?? null,
+    setItem: (key: string, value: string) => { values.set(key, value); },
+  };
+
+  assert.equal(seedAutomaticDemoStreamingServices(storage), true);
+  assert.equal(values.get('bb_streaming_services'), ALL_DEFAULT_STREAMING_SERVICES_CSV);
+
+  values.set('bb_streaming_services', 'netflix');
+  assert.equal(seedAutomaticDemoStreamingServices(storage), false);
+  assert.equal(values.get('bb_streaming_services'), 'netflix');
+
+  values.set('bb_streaming_services', '');
+  assert.equal(seedAutomaticDemoStreamingServices(storage), false);
+  assert.equal(values.get('bb_streaming_services'), '');
 });
 
 test('resolveEnabledServices: matches defaults by id or alias, case-insensitively', () => {

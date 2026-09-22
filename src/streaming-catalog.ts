@@ -137,6 +137,21 @@ export function resolveEnabledServices(overrideCsv: string | undefined | null): 
 export const ALL_DEFAULT_STREAMING_SERVICES_CSV = DEFAULT_STREAMING_SERVICES.map((d) => d.id).join(',');
 
 /**
+ * A non-demo local build defaults to no streaming choices. Its mobile first
+ * visit intentionally skips setup and enters the ready-made streaming store,
+ * so an absent preference needs a concrete catalog before that boot fetches.
+ * Presence matters: an explicitly saved empty string means "none" and must
+ * not be replaced.
+ */
+export function seedAutomaticDemoStreamingServices(
+  storage: Pick<Storage, 'getItem' | 'setItem'>,
+): boolean {
+  if (storage.getItem('bb_streaming_services') !== null) return false;
+  storage.setItem('bb_streaming_services', ALL_DEFAULT_STREAMING_SERVICES_CSV);
+  return true;
+}
+
+/**
  * Which network source stocks the streaming sections (owner correction
  * 2026-08-21, GH #86 follow-up): a direct TMDB key is no longer optional
  * icing on top of Jellyseerr -- it is a full replacement source, so the

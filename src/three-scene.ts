@@ -1580,7 +1580,7 @@ export class StoreScene {
 
     // The public overview needs the room's shaders, not dry-run inspections.
     // Inspection variants prepare after main.ts has wired input and revealed it.
-    if (isPublicDemo && this.effectiveQuality !== 'high') {
+    if ((isPublicDemo || mobileStoreActive()) && this.effectiveQuality !== 'high') {
       await programWarmup.prepareInitialViewPrograms(this);
     } else {
       await this.warmupRuntimePrograms();

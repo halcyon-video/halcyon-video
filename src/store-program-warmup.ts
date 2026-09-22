@@ -6,6 +6,7 @@ import { CASE_MEDIUM, posterPixelCache, createProgramWarmupMaterials } from './v
 import { isWhiteClamshell } from './packaging-formats';
 import { retailAudio } from './audio';
 import { isPublicDemo } from './demo-mode';
+import { mobileStoreActive } from './mobile-store';
 import { compileProgramsInStages, yieldForPrograms } from './program-warmup';
 
 const stagedInitialRooms = new WeakSet<StoreScene>();
@@ -35,7 +36,7 @@ export async function warmupRuntimePrograms(scene: StoreScene) {
   const signal = scene.programWarmupController.signal;
   // Explicit High keeps the complete depth-of-field/hero draw preparation.
   // Automatic phone tiers can prepare inspection materials after room entry.
-  const background = isPublicDemo && scene.effectiveQuality !== 'high';
+  const background = (isPublicDemo || mobileStoreActive()) && scene.effectiveQuality !== 'high';
   let geo: THREE.BoxGeometry | undefined;
   let warmScene: THREE.Group | undefined;
   const bokehEnabled = scene.bokehPass?.enabled;
@@ -164,4 +165,3 @@ export async function warmupRuntimePrograms(scene: StoreScene) {
     if (!background) scene.hideHeroCases();
   }
 }
-
