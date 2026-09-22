@@ -2575,7 +2575,7 @@ async function initializeStoreScene(preservePosterCache = false) {
     const { calibrateQualityIfNeeded, armQualityBackstop } = await import('./quality-calibrate');
     await calibrateQualityIfNeeded();
 
-    await paintStoreLoading(25);
+    await paintStoreLoading(25, 'Building the room');
     const { StoreScene } = await import('./three-scene');
     // Every carried library belongs on the floor. Keep stock construction
     // batched and offscreen shelves culled without paging away departments.
@@ -2587,7 +2587,7 @@ async function initializeStoreScene(preservePosterCache = false) {
     // that heavy startup work, so recovery must already be listening.
     installContextLossRecovery(scene.renderer.domElement);
     try { await scene.ready; } catch (error) { scene.destroy(); throw error; }
-    updateStoreLoading(85);
+    updateStoreLoading(85, 'Preparing the entrance');
     armQualityBackstop();
     let lastLoggedPct = -1;
     scene.onTextureLoadProgress = (loaded, total) => {
@@ -2780,7 +2780,7 @@ async function initializeStoreScene(preservePosterCache = false) {
     // still stream progressively in the public store; the model grace is bounded.
     ((isPublicDemo || mobileStoreActive()) ? Promise.resolve() : scene.texturesReadyPromise).then(async () => {
       document.getElementById('boot-overlay')?.classList.add('preparing-models');
-      await paintStoreLoading(92);
+      await paintStoreLoading(92, 'Finishing the counter');
       await waitForStartupModel(scene.entrance?.whenCounterModelReady());
       if (contextLossGaveUp || scene.renderer.getContext().isContextLost()) {
         document.getElementById('boot-overlay')?.classList.remove('preparing-models');

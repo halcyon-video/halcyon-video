@@ -1,3 +1,4 @@
+import { compactAssets } from './mobile-assets';
 import { installTvMount } from './ambient-tv-mount';
 import { isExternalGameActive } from './external-game-state.ts';
 import { publishAmbientPicture, ambientReceiverInFrustum } from './ambient-screen';
@@ -144,6 +145,7 @@ function tvStartOffsetSec(movie: Movie): number {
  * off, since a decoding video makes every still it takes differ frame to frame.
  */
 function demoLoopEnabled(): boolean {
+  if (compactAssets()) return false;
   try {
     return localStorage.getItem('bb_tv_demo_loop') !== '0';
   } catch {
@@ -375,7 +377,7 @@ export class AmbientTvs implements StoreFixture {
     // The TVs are store furniture — they hang from the ceiling regardless of
     // whether a stream is available; without a server they just show dead glass.
     let videoTex: THREE.VideoTexture | null = null;
-    if (pool.length > 0 && this.ctx.jellyfinUrl && this.ctx.jellyfinToken) {
+    if (!compactAssets() && pool.length > 0 && this.ctx.jellyfinUrl && this.ctx.jellyfinToken) {
       const movie = this.pickPoolTitle(null);
       const seekSec = tvStartOffsetSec(movie);
       videoTex = this.makeVideoTexture(movie, seekSec);

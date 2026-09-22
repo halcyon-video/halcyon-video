@@ -1,3 +1,4 @@
+import { updateStoreLoading } from './store-loading';
 import { initialProgramObjects } from './initial-programs';
 import * as THREE from 'three';
 import type { StoreScene } from './three-scene';
@@ -26,7 +27,8 @@ export async function prepareInitialViewPrograms(scene: StoreScene): Promise<voi
   roots.children = initialProgramObjects(scene.scene, scene.camera);
   try {
     await compileProgramsInStages(scene.renderer, scene.scene, scene.camera,
-      scene.composer?.readBuffer ?? null, scene.programWarmupController.signal, roots);
+      scene.composer?.readBuffer ?? null, scene.programWarmupController.signal, roots,
+      (fraction, detail) => updateStoreLoading(70 + 14 * fraction, detail));
   } finally { roots.children = []; }
 }
 

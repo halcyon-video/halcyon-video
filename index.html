@@ -72,12 +72,20 @@
       <div id="main-ui-container">
         <!-- Boot Screen Overlay -->
         <div id="boot-overlay" class="visible">
+          <div class="store-loading-views" aria-hidden="true">
+            <img id="store-loading-view-a" src="%BASE_URL%loading/store-interior.webp" alt="" fetchpriority="high" />
+            <img id="store-loading-view-b" alt="" />
+          </div>
+          <div class="store-loading-caption">THE DESKTOP EXPERIENCE</div>
           <div class="store-loading-strip">
-            <span id="store-loading-label">LOADING</span>
+            <p id="store-loading-tip">Loading the mobile store. Visit on desktop for the full visual experience.</p>
+            <span id="store-loading-label">LOADING <span id="store-loading-percent">0%</span></span>
+            <span id="store-loading-status">Downloading the store</span>
             <div id="store-loading-progress" role="progressbar" aria-label="Loading the store" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
               <div id="store-loading-fill"></div>
             </div>
           </div>
+          <script src="%BASE_URL%loading-screen.js"></script>
       </div>
       </div>
 

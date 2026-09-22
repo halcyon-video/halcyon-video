@@ -20,22 +20,23 @@ import { tryLoadShippedSurfaceKtx2 } from './surface-textures';
 // still sees them in demo mode.
 const HOSTED_BUILD = typeof import.meta.env !== 'undefined' && import.meta.env.VITE_DEMO === '1';
 
-// One load attempt at an exact public/-relative path.
-function loadOne(
-  urlPath: string,
-  onLoad: (tex: THREE.Texture) => void,
-  srgb: boolean,
-  onMiss: () => void,
-): void {
-  new THREE.TextureLoader().load(
-    assetUrl(urlPath),
-    (tex) => {
-      tex.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
-      onLoad(tex);
-    },
-    undefined,
-    onMiss,
-  );
+// A shared download is independent of each material's repeat, color space and disposal.
+const imageLoads = new Map<string, Promise<HTMLImageElement>>();
+function loadOne(urlPath: string, onLoad: (tex: THREE.Texture) => void, srgb: boolean, onMiss: () => void): void {
+  const url = assetUrl(urlPath);
+  let load = imageLoads.get(url);
+  if (!load) {
+    load = new Promise<HTMLImageElement>((resolve, reject) => {
+      const image = new Image(); image.crossOrigin = 'anonymous';
+      image.onload = () => resolve(image); image.onerror = reject; image.src = url;
+    });
+    imageLoads.set(url, load);
+  }
+  load.then(image => {
+    const tex = new THREE.Texture(image); tex.needsUpdate = true;
+    tex.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
+    onLoad(tex);
+  }, onMiss);
 }
 
 export function tryLoadUserAssetTexture(

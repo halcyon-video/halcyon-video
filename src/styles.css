@@ -2167,9 +2167,19 @@ html, body {
   padding: 22px max(28px, env(safe-area-inset-right)) max(30px, calc(env(safe-area-inset-bottom) + 22px)) max(28px, env(safe-area-inset-left));
   color: #fff; font: 700 16px/1.2 Arial, sans-serif; letter-spacing: .16em;
 }
-#store-loading-label { display: block; margin-bottom: 12px; }
-#store-loading-progress { height: 10px; padding: 2px; border: 1px solid #fff; }
-#store-loading-fill { width: 0; height: 100%; background: #fff; transition: width .12s linear; }
+#store-loading-label { display: block; margin-bottom: 8px; }
+#store-loading-percent { float: right; }
+#store-loading-status { display: block; font: 400 15px/1.3 Arial, sans-serif; letter-spacing: .02em; margin-bottom: 12px; color: #ddd; }
+#store-loading-tip { font: 400 16px/1.45 Arial, sans-serif; letter-spacing: .01em; max-width: 620px; margin: 0 0 24px; }
+.store-loading-views { position: absolute; inset: 0 0 200px; overflow: hidden; }
+.store-loading-views img { position: absolute; width: 100%; height: 100%; object-fit: cover; object-position: center; opacity: 0; transition: opacity 1.2s ease; }
+.store-loading-views img:first-child { opacity: 1; }
+.store-loading-caption { position: absolute; top: max(24px, env(safe-area-inset-top)); left: 24px; color: white; font: 700 15px/1.3 Arial,sans-serif; letter-spacing: .12em; text-shadow: 0 2px 5px #000; }
+.store-loading-strip { background: linear-gradient(transparent, #000 22px); padding-top: 42px; }
+@media (max-height: 500px) { #store-loading-tip { margin-bottom: 12px; } .store-loading-views { bottom: 100px; } .store-loading-strip { padding-top: 28px; padding-bottom: 16px; } }
+@media (prefers-reduced-motion: reduce) { .store-loading-views img { transition: none; } }
+#store-loading-progress { height: 22px; box-sizing: border-box; padding: 3px; border: 1px solid #fff; }
+#store-loading-fill { width: 0; height: 100%; background: #fff; }
 @media (prefers-reduced-motion: reduce) { #store-loading-fill { transition: none; } }
 
 .boot-console {

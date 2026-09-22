@@ -1,3 +1,4 @@
+import { compactAssets } from '../mobile-assets';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { assetUrl } from '../asset-url';
@@ -6,7 +7,7 @@ import type { FixtureContext } from '../fixtures';
 
 /** One fixture owns this load and its geometry; supplied finishes belong to its fallback. */
 export function installDisplayModel(
-  ctx: Pick<FixtureContext, 'scene' | 'requestShadowRefresh' | 'requestRender' | 'log' | 'scheduleDetailLoad'>,
+  ctx: Pick<FixtureContext, 'scene' | 'requestShadowRefresh' | 'requestRender' | 'log' | 'scheduleDetailLoad'> & Partial<Pick<FixtureContext, 'camera'>>,
   parent: THREE.Group,
   fallback: THREE.Group,
   file: string | readonly string[],
@@ -83,10 +84,31 @@ export function installDisplayModel(
     };
     attempt(0);
   });
-  const cancelQueued = ctx.scheduleDetailLoad?.(load);
-  if (!ctx.scheduleDetailLoad) void load();
+  let cancelQueued: (() => void) | undefined;
+  let nearbyTimer: ReturnType<typeof setTimeout> | undefined;
+  const bounds = new THREE.Sphere();
+  const box = new THREE.Box3();
+  const schedule = () => {
+    if (cancelled) return;
+    // On phones, keep the textured built-in fixture until its detail can be
+    // seen at useful scale. Recheck as the visitor walks; never fetch the whole
+    // exterior and distant fixture collection simply because entry completed.
+    if (compactAssets() && ctx.camera) {
+      parent.updateWorldMatrix(true, true);
+      box.setFromObject(fallback).getBoundingSphere(bounds);
+      if (bounds.radius >= 0 && ctx.camera.position.distanceTo(bounds.center) > 22 + bounds.radius) {
+        nearbyTimer = setTimeout(schedule, 750); return;
+      }
+    }
+    cancelQueued = ctx.scheduleDetailLoad?.(load);
+    if (!ctx.scheduleDetailLoad) void load();
+  };
+  // The caller adds the group to its world parent after this installer returns.
+  if (compactAssets() && ctx.camera) nearbyTimer = setTimeout(schedule, 0);
+  else schedule();
   return () => {
     cancelled = true;
+    clearTimeout(nearbyTimer);
     cancelQueued?.();
     if (installed) { release(installed); installed = null; }
   };

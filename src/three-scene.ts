@@ -1,3 +1,4 @@
+import { loadMobileRoomLighting, updateMobileRoomLighting } from './mobile-room-lighting';
 import { refreshStockedReflections, reflectionRefreshRunning } from './stocked-reflection-refresh';
 import { streamingInspectPose } from './streaming-case-pose';
 import { isExternalGameActive } from './external-game-state.ts';
@@ -550,7 +551,7 @@ export class StoreScene {
   // (user: "carpet is dark as night"). Real troffers pour direct light DOWN;
   // brighten the key spots after dark so the carpet actually receives it.
   private applyModeLighting(mode: OutsideMode) {
-    this.exterior?.setOutsideMode(mode);
+    updateMobileRoomLighting(this.scene, mode); this.exterior?.setOutsideMode(mode);
     setWindowAwningLighting(this.scene, mode);
     setFacadeEntryLighting(this.scene, mode);
     // Day 110 -> 145 -> 180 chased a dark carpet by raising energy, but the
@@ -578,6 +579,7 @@ export class StoreScene {
   // after that first bake replaces this texture — otherwise the render target,
   // its compiled PMREM blur programs, and the synthetic RoomEnvironment's
   // meshes/materials are orphaned for the whole session (issue #121).
+  private disposeMobileLighting: (() => void) | undefined;
   private bootstrapEnvRT: THREE.WebGLRenderTarget | null = null;
   private bootstrapPmremGen: THREE.PMREMGenerator | null = null;
   private bootstrapRoomEnv: RoomEnvironment | null = null;
@@ -1510,9 +1512,9 @@ export class StoreScene {
         capture();
       }
     }
-    await paintStoreLoading(45);
+    await paintStoreLoading(45, 'Stocking the shelves');
     await this.buildAllMovieBoxes();
-    await paintStoreLoading(70);
+    await paintStoreLoading(70, 'Preparing lighting and materials');
     // Poster capacity is settled after the progressive stock build.
     this.entrance?.refreshIdleTerminal();
     this.rebuildMovieBoxes();
@@ -2050,6 +2052,7 @@ export class StoreScene {
     // originally set for (0.55): the real room needs more of its own bounce.
     this.scene.environmentIntensity = (isPublicDemo || mobileStoreActive()) ? 0.55 : 0.95;
 
+    this.disposeMobileLighting = loadMobileRoomLighting(this.scene, this.programWarmupController.signal, () => { this.applyExteriorEnvClamp(); this.requestRender(); }, () => this.outdoor.outsideMode);
     this.container.appendChild(this.renderer.domElement);
 
     // Let the texture upload queue drive GPU uploads through this renderer so
@@ -5896,6 +5899,7 @@ export class StoreScene {
 
   // Clean up WebGL resources
   public destroy(preservePosterCache = false) {
+    this.disposeMobileLighting?.();
     this.programWarmupController.abort();
     this.disposeWarmedPrograms?.();
     this.disposeWarmedPrograms = null;

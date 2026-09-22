@@ -1,5 +1,6 @@
 import { disposeShelfVisibility, initializeHiddenShelfInstances } from './shelf-visibility';
 import { mobileStoreActive } from './mobile-store';
+import { updateStoreLoading } from './store-loading';
 // Movie-box stock instancing — extracted from StoreScene (three-scene.ts
 // keeps one-line delegating stubs): building/clearing the instanced shelf
 // stock (buildAllMovieBoxes/clearMovieBoxes/rebuildMovieBoxes), the stacked
@@ -377,7 +378,9 @@ export async function buildAllMovieBoxes(scene: StoreScene) {
     initializeHiddenShelfInstances(mesh);
   };
 
+  let builtFaces = 0;
   for (const [key, capacity] of unitSideCapacity) {
+    updateStoreLoading(45 + 10 * builtFaces++ / unitSideCapacity.size, `Building shelves · ${builtFaces} of ${unitSideCapacity.size}`);
     await yieldBuild();
     const isAnimated = aisleKeyShape(key) === 'white';
 
@@ -695,7 +698,10 @@ export async function buildAllMovieBoxes(scene: StoreScene) {
     const blockOrder = scene.plan.entryBlockOrder(libIdx);
 
     for (const [idx, movie] of layoutEntries.entries()) {
-      if (idx % 96 === 0) await yieldBuild();
+      if (idx % 96 === 0) {
+        updateStoreLoading(55 + 14 * (libIdx + idx / Math.max(1, layoutEntries.length)) / scene.libraries.length, `Stocking aisle ${libIdx + 1} of ${scene.libraries.length}`);
+        await yieldBuild();
+      }
       if (!movie) continue;
       // Entry blocks flow in customer walk order — front of a line, around
       // the end cap, back of that line (line-reversed so it reads

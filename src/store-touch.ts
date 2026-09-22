@@ -140,11 +140,13 @@ const CSS = `
 #store-touch-controls:not(.terminal)[data-mode="overview"] #store-touch-walk,
 #store-touch-controls:not(.terminal)[data-mode="browse"] #store-touch-walk { display: flex; }
 #store-touch-controls:not(.terminal)[data-mode="overview"] #store-touch-ok,
-#store-touch-controls:not(.terminal)[data-mode="walk-around"] #store-touch-ok { display: none; }
+#store-touch-controls:not(.terminal)[data-mode="walk-around"] #store-touch-ok,
+#store-touch-controls:not(.terminal)[data-mode="walk-around"] #store-touch-back { display: none; }
 #store-touch-stick { display: none; position: absolute; left: max(24px, env(safe-area-inset-left)); bottom: max(100px, calc(env(safe-area-inset-bottom) + 76px)); width: 124px; height: 124px; border: 3px solid #f2e8c9; border-radius: 50%; background: radial-gradient(circle, rgba(3,9,20,.92) 42%, rgba(242,232,201,.34) 43%, rgba(3,9,20,.88) 69%); box-shadow: 0 4px 0 #02050a, 0 0 0 3px rgba(5,12,28,.82), 0 0 12px rgba(242,232,201,.8), inset 0 2px 0 #fff; touch-action: none; }
 #store-touch-controls.visible:not(.terminal)[data-mode="walk-around"] #store-touch-stick { display: block; pointer-events: auto; }
 .st-stick-knob { position: absolute; inset: 38px; border-radius: 50%; background: radial-gradient(circle at 40% 25%, #fff, #b9c9dc 58%, #526680 78%, #19263b); box-shadow: 0 3px 0 #02050a, 0 0 0 2px #f2e8c9; pointer-events: none; }
-.st-stick-label { position: absolute; z-index: 2; top: 51px; left: 0; right: 0; text-align: center; color: #020814; font: 700 15px/20px sans-serif; letter-spacing: -0.4px; text-shadow: 0 1px 0 #fff; pointer-events: none; }
+.st-stick-label { position: absolute; top: -31px; left: 0; right: 0; text-align: center; color: #e9edf5; font: 900 18px/22px Arial, sans-serif; letter-spacing: 1.5px; pointer-events: none; filter: drop-shadow(0 2px 0 #10151d) drop-shadow(0 1px 2px #000); }
+@supports (background-clip: text) { .st-stick-label { background: linear-gradient(#fff 0%, #c5cedc 40%, #fff 48%, #69788e 51%, #e7edf7 88%); background-clip: text; -webkit-background-clip: text; color: transparent; } }
 body .clasp-prompt { border-radius: 0; font-size: 15px; }
 body .clasp-prompt .clasp-key { display: none; }
 body .clerk-prompt { bottom: max(174px, calc(env(safe-area-inset-bottom) + 160px)); max-width: calc(100vw - 48px); }
