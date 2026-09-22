@@ -49,23 +49,33 @@ inner_corner=8.025-math.sqrt(2)*.25-6.775
 inner=[(-6.8,-6.8),(6.775,-6.8),(6.775,inner_corner),(inner_corner,6.775),(-6.8,6.775)]
 # Ring faces use matching corner topology, then beveled edge joins.
 def ring(name,lo,hi,role):
+ return partial_ring(name,lo,hi,role,range(5))
+
+def partial_ring(name,lo,hi,role,indices):
  n=5;poly=outer+inner;vs=[(x,-z,y) for y in [lo,hi] for x,z in poly];fs=[]
- for i in range(n):
+ for i in indices:
   j=(i+1)%n;fs += [(i,j,j+n,i+n),(i+10,i+15,j+15,j+10),(i,i+10,j+10,j),(i+n,j+n,j+15,i+15)]
+ if len(list(indices)) < n:
+  ind=list(indices);first=ind[0];last=(ind[-1]+1)%n
+  fs += [(first,first+n,first+15,first+10),(last,last+10,last+15,last+n)]
  me=bpy.data.meshes.new(name);me.from_pydata(vs,[],fs);me.update();o=bpy.data.objects.new(name,me);bpy.context.collection.objects.link(o);o.data.materials.append(roles[role]);parts.append(o)
  bm=bmesh.new();bm.from_mesh(me);bmesh.ops.recalc_face_normals(bm,faces=list(bm.faces));assert all(e.is_manifold for e in bm.edges);bm.to_mesh(me);bm.free()
  bpy.context.view_layer.objects.active=o;o.select_set(True);bpy.ops.object.mode_set(mode='EDIT');bpy.ops.mesh.select_all(action='SELECT');bpy.ops.uv.smart_project(island_margin=.015);bpy.ops.object.mode_set(mode='OBJECT');o.select_set(False)
-ring('Mitered broad fascia',9.15,12.7,'HeaderPaint');ring('Upper fascia cap',13.08,13.5,'HeaderPaint');ring('Upper accent band',12.7,13.08,'EdgePaint');ring('Lintel lower return',8.5,9.15,'FramePaint')
-# Solid wall-contiguous millwork liners extending to store corner walls at -7.2
-box('Rear liner',-0.1,-7.0,14.2,0.4,0,9.15,'PanelLaminate')
-box('Left liner',-7.0,-0.1,0.4,14.2,0,9.15,'PanelLaminate')
+ return o
+
+ring('Mitered broad fascia',9.15,12.7,'HeaderPaint');ring('Upper fascia cap',13.08,13.5,'HeaderPaint');ring('Upper accent band',12.7,13.08,'EdgePaint')
+# Pin 232: Lintel lower return belongs only to the exposed opening faces [1,2,3], avoiding coplanar overlap on rear/left liners.
+partial_ring('Lintel lower return',8.5,9.15,'FramePaint',[1,2,3])
+# Pin 233: Millwork liners stop at the inner face of the return walls (6.775), preventing stray white projection into the opening.
+box('Rear liner',-0.2125,-7.0,13.975,0.4,0,9.15,'PanelLaminate')
+box('Left liner',-7.0,-0.2125,0.4,13.975,0,9.15,'PanelLaminate')
 # Open flanking windows: unified continuous millwork via boolean diff.
 for side in ['front','right']:
  def face(name,u,v,w,d,lo,hi,role,cutters=None):
   return box(side+' '+name,u if side=='front' else v,v if side=='front' else u,w if side=='front' else d,d if side=='front' else w,lo,hi,role,cutters=cutters)
  c_d = 1.0; c_w = 5.0
  cutter = box_cutter(side+' window cutter', -3.2 if side=='front' else 6.9, 6.9 if side=='front' else -3.2, c_w if side=='front' else c_d, c_d if side=='front' else c_w, 3.5, 8.72)
- face('wall',-3.2,6.9,7.4,.25,.12,9.15,'FramePaint',cutters=[cutter])
+ face('wall',-3.35,6.9,7.7,.25,.12,9.15,'FramePaint',cutters=[cutter])
  # Pin 179: uninterrupted blue millwork; no low accent strip.
 # Entrance jambs support the diagonal header without a sill/trip edge.
 for x,z,w,d in [(.75,6.9,.5,.25),(6.9,.75,.25,.5)]:box('Entry jamb',x,z,w,d,0,8.5,'FramePaint')

@@ -33,7 +33,8 @@ export function planNrRuns(room: NrRoom): NrRun[] {
   connector.z = room.backZ + NR_RUN_DEPTH + .08 + connector.length / 2;
   const end = room.backRightX - (room.wall ? NR_RUN_DEPTH + .08 : 0);
   const stepped = fitNrRun(step ? end - room.stepX : 0, (room.stepX + end) / 2, rightBack, 0);
-  const rightRun = fitNrRun(room.wall ? room.sideBackZ - 3 - rightBack - NR_RUN_DEPTH - .08 : 0,
+  // Pin 230: modest 0.25 ft shelf clearance margin in front of courtesy phone
+  const rightRun = fitNrRun(room.wall ? room.sideBackZ - 3.25 - rightBack - NR_RUN_DEPTH - .08 : 0,
     right - NR_LEFT_UNIT_STANDOFF, 0, -Math.PI / 2);
   rightRun.wallInset = NR_LEFT_UNIT_STANDOFF;
   rightRun.z = rightBack + NR_RUN_DEPTH + .08 + rightRun.length / 2;

@@ -1316,6 +1316,7 @@ export function buildStore(scene: StoreScene) {
     metalness: 0.0
   });
   const floor = new THREE.Mesh(floorGeo, floorMat);
+  floor.name = 'store-floor';
   floor.position.set(STORE_CENTER_X, floorY, sideWallZ);
   floor.rotation.x = -Math.PI / 2;
   floor.receiveShadow = true;

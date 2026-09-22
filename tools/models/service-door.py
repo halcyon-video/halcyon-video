@@ -85,17 +85,45 @@ def box(name,lo,hi,role,bevel=0):
  return obj
 # The assembly fits the two pre-existing wall faces. Matched skins are deliberate
 # architectural dressing, not a claim of a ten-inch-thick physical door leaf.
+# Generic commercial hollow metal frame profile (depth offset d from wall face, width offset w from 1.70 outer edge).
+# Nominal modeled 2" face width (0.1667 ft), 5/8" stop (0.0521 ft), 1/2" backbend return.
+poly_hm = [
+    (0.025, 0.0),
+    (-0.040, 0.0),
+    (-0.040, 0.1667),
+    (-0.160, 0.1667),
+    (-0.160, 0.2188),
+    (-0.108, 0.2188),
+    (-0.108, 0.205),
+    (-0.020, 0.205),
+    (-0.020, 0.025),
+    (0.025, 0.025),
+]
+n_hm = len(poly_hm)
+
 for side,face,direction in [('Interior',-.12,-1),('Exterior',.735,1)]:
  back=face-direction*.146
- box(side+' hollow metal leaf',(min(face,back),.035,-1.475),(max(face,back),6.99,1.475),0,.009)
- # Brake-folded jamb: flange, return, stop and inner return, closed sheet section.
- for sign in [-1,1]:
-  profile=[(face+direction*d,sign*w) for d,w in [(.025,1.70),(-.055,1.70),(-.055,1.51),(-.16,1.51),(-.16,1.47),(-.135,1.47),(-.135,1.485),(-.03,1.485),(-.03,1.675),(.025,1.675)]]
-  prism(side+(' hinge jamb' if sign==-1 else ' strike jamb'),profile,0,7.0,1,1)
-  box(side+' compression seal '+str(sign),(min(face,face-direction*.028),.04,sign*1.485-.012),(max(face,face-direction*.028),6.99,sign*1.485+.012),3)
- # Head folds share the jamb depth and meet at 7 feet.
- profile=[(face+direction*d,7+w-1.5) for d,w in [(.025,1.70),(-.055,1.70),(-.055,1.51),(-.16,1.51),(-.16,1.47),(-.135,1.47),(-.135,1.485),(-.03,1.485),(-.03,1.675),(.025,1.675)]]
- prism(side+' pressed head',profile,-1.70,1.70,2,1)
+ box(side+' hollow metal leaf',(min(face,back),.035,-1.475),(max(face,back),6.98,1.475),0,.009)
+ # Standard 45-degree mitered hollow metal jambs and head.
+ for sign, jname in [(-1, ' hinge jamb'), (1, ' strike jamb')]:
+  v_bot = [(face + direction * d, 0.0, sign * (1.70 - w)) for d, w in poly_hm]
+  v_top = [(face + direction * d, 7.1667 - w, sign * (1.70 - w)) for d, w in poly_hm]
+  verts = v_bot + v_top
+  faces = [tuple(reversed(range(n_hm))), tuple(range(n_hm, 2*n_hm))]
+  for j in range(n_hm):
+   j_next = (j + 1) % n_hm
+   faces.append((j, j_next, j_next + n_hm, j + n_hm))
+  mesh(side + jname, verts, faces, 1)
+  box(side+' compression seal '+str(sign),(min(face,face-direction*.028),.04,sign*1.481-.012),(max(face,face-direction*.028),6.95,sign*1.481+.012),3)
+ v_left = [(face + direction * d, 7.1667 - w, -(1.70 - w)) for d, w in poly_hm]
+ v_right = [(face + direction * d, 7.1667 - w, +(1.70 - w)) for d, w in poly_hm]
+ verts = v_left + v_right
+ faces = [tuple(range(n_hm)), tuple(reversed(range(n_hm, 2*n_hm)))]
+ for j in range(n_hm):
+  j_next = (j + 1) % n_hm
+  faces.append((j, j_next, j_next + n_hm, j + n_hm))
+ mesh(side + ' pressed head', verts, faces, 1)
+ box(side+' head compression seal',(min(face,face-direction*.028),6.94,-1.481),(max(face,face-direction*.028),6.964,1.481),3)
  box(side+' sweep',(min(face,face+direction*.018),.035,-1.46),(max(face,face+direction*.018),.09,1.46),3)
 # Exterior out-swing hinge barrels, five alternating knuckles, fitted hinge plates.
 for i,y in enumerate([.85,3.5,6.15]):

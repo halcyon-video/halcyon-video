@@ -5,7 +5,8 @@ import { installDisplayModel } from './display-model';
 
 // Feet. Origin is the center of the backplate on the interior wall surface.
 // Local +Z faces the room; cord remains above floor, outside the exit opening.
-export const WALL_COURTESY_PHONE = { height: 4.65, doorGap: .35, halfWidth: .285 } as const;
+// Pin 230: modestly adjust clearance between phone and shelf/door frame.
+export const WALL_COURTESY_PHONE = { height: 4.65, doorGap: .20, halfWidth: .285 } as const;
 
 export function buildWallCourtesyTelephone(
   ctx: FixtureContext, facade: THREE.Group, wallX: number, doorBackZ: number,

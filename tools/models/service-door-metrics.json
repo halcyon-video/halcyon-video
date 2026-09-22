@@ -36,6 +36,11 @@
       "nonManifoldEdges": 0
     },
     {
+      "name": "Interior head compression seal",
+      "triangles": 12,
+      "nonManifoldEdges": 0
+    },
+    {
       "name": "Interior sweep",
       "triangles": 12,
       "nonManifoldEdges": 0
@@ -68,6 +73,11 @@
     {
       "name": "Exterior pressed head",
       "triangles": 36,
+      "nonManifoldEdges": 0
+    },
+    {
+      "name": "Exterior head compression seal",
+      "triangles": 12,
       "nonManifoldEdges": 0
     },
     {
@@ -371,7 +381,7 @@
       "nonManifoldEdges": 0
     }
   ],
-  "triangles": 3132,
+  "triangles": 3156,
   "draws": 4,
-  "bytes": 212052
+  "bytes": 213736
 }

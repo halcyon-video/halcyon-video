@@ -321,8 +321,35 @@ export function buildStorefrontFacade(params: FacadeBuildParams): StorefrontFaca
     const DOOR_W = RIGHT_SIDE_DOOR_W;
     const DOOR_H = RIGHT_SIDE_DOOR_H;
     const doorZ = sideRibbon.backZ - 0.5 - DOOR_W / 2; // right against the last pane's brick margin
-    const frameMat = new THREE.MeshStandardMaterial({ color: 0x22252a, roughness: 0.5, metalness: 0.6 });
-    const leafMat = new THREE.MeshStandardMaterial({ color: 0x39404a, roughness: 0.6, metalness: 0.35 });
+    const doorFinishTex = (() => {
+      const size = 128, pixels = new Uint8Array(size * size * 4);
+      let seed = 449;
+      for (let i = 0; i < size * size; i++) {
+        seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+        const grain = (seed >>> 24) / 255;
+        pixels[i * 4] = Math.round(110 + grain * 55);     // bump height
+        pixels[i * 4 + 1] = Math.round(205 + grain * 45); // roughness variation
+        pixels[i * 4 + 2] = 255;
+        pixels[i * 4 + 3] = 255;
+      }
+      const tex = new THREE.DataTexture(pixels, size, size);
+      tex.name = 'ServiceDoorPowdercoatGrain';
+      tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+      tex.repeat.set(4, 4);
+      tex.magFilter = THREE.LinearFilter;
+      tex.minFilter = THREE.LinearMipmapLinearFilter;
+      tex.generateMipmaps = true;
+      tex.needsUpdate = true;
+      return tex;
+    })();
+    const frameMat = new THREE.MeshStandardMaterial({
+      color: 0x22252a, roughness: 0.52, metalness: 0.25,
+      bumpMap: doorFinishTex, bumpScale: 0.0018, roughnessMap: doorFinishTex,
+    });
+    const leafMat = new THREE.MeshStandardMaterial({
+      color: 0x39404a, roughness: 0.58, metalness: 0.2,
+      bumpMap: doorFinishTex, bumpScale: 0.0014, roughnessMap: doorFinishTex,
+    });
     const hardwareMat = new THREE.MeshStandardMaterial({ color: 0xb9bec5, roughness: 0.25, metalness: 0.9 });
     const stoopMat = new THREE.MeshStandardMaterial({ color: 0x9a938a, roughness: 0.95, metalness: 0.0 });
 
@@ -365,8 +392,19 @@ export function buildStorefrontFacade(params: FacadeBuildParams): StorefrontFaca
     const releaseDoor = installDisplayModel(params.context, door, fallback, 'models/service-door.glb', {
       ServiceLeaf: leafMat, ServiceFrame: frameMat, ServiceHardware: hardwareMat,
     });
-    door.userData.dispose = releaseDoor;
-    group.addEventListener('removed', releaseDoor);
+    let doorCleaned = false;
+    const cleanupDoor = () => {
+      if (doorCleaned) return;
+      doorCleaned = true;
+      releaseDoor();
+      doorFinishTex.dispose();
+      frameMat.dispose();
+      leafMat.dispose();
+      hardwareMat.dispose();
+      stoopMat.dispose();
+    };
+    door.userData.dispose = cleanupDoor;
+    group.addEventListener('removed', cleanupDoor);
     // Independent static wall prop; door/frame and exit/navigation stay unchanged.
     buildWallCourtesyTelephone(params.context, group, rightEdgeX, rightSideDoorZone(sideRibbon)!.z0);
 
