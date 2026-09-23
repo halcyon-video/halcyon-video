@@ -306,7 +306,8 @@ export function synthesizeStreamingMovie(item: RawDiscoverItem, def: StreamingSe
 
 /** Bound live and bundled catalogues while giving the demo several full shelf units per service. */
 export const STREAMING_CAP_PER_SERVICE = 120;
-export const MOBILE_STREAMING_CAP_PER_SERVICE = 6;
+// Phone rendering already loads artwork by proximity; keep the physical store stocked.
+export const MOBILE_STREAMING_CAP_PER_SERVICE = STREAMING_CAP_PER_SERVICE;
 
 /** Keep every chosen service represented while bounding phone scene cost. */
 export function limitStreamingMoviesPerService(

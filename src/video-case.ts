@@ -3281,14 +3281,17 @@ function drawBoxOverlays(ctx: CanvasRenderingContext2D, L: BoxLayout, movie: Mov
   if (L.plain) return;
   if (L.standardVhs) {
     drawStandardVhsOverlays(ctx, movie);
+    drawStreamingStoreLabel(ctx, L, movie);
     return;
   }
   if (L.dvdBlue) {
     drawDvdBlueOverlays(ctx, movie);
+    drawStreamingStoreLabel(ctx, L, movie);
     return;
   }
   if (L.dvd2003) {
     drawDvd2003Overlays(ctx, movie);
+    drawStreamingStoreLabel(ctx, L, movie);
   }
 }
 
@@ -3507,10 +3510,7 @@ function drawRentalBackArt(
   onUpdate?: () => void
 ) {
   const movie = type === 'GENERIC_WARNINGS' ? null : (type as Movie);
-  renderBoxPanel(ctx, w, h, movie, 'back', () => {
-    if (movie?.streaming) drawStreamingStoreLabel(ctx, w, h, movie);
-    onUpdate?.();
-  });
+  renderBoxPanel(ctx, w, h, movie, 'back', onUpdate);
 }
 
 function drawRentalSpineArt(

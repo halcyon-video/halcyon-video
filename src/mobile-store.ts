@@ -397,6 +397,13 @@ export function beginMobileDrag(scene: StoreScene, x: number, y: number) {
           scene.updateSelectionArrow();
         }
       } else if (!overview) {
+        // A deliberate drag ends where the finger leaves it. Reframing the
+        // selected case here pulls a stationary finger release back toward
+        // the shelf's discrete camera window (visible rubber-banding).
+        if (Math.max(Math.abs(velX), Math.abs(velY)) <= 0.35) {
+          scene.updateLOD(); scene.requestRender();
+          return;
+        }
         // Bounded settling on flick across columns or rows
         const absVx = Math.abs(velX);
         const absVy = Math.abs(velY);

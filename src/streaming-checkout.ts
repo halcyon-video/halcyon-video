@@ -247,7 +247,7 @@ export function completeStreamingCheckout(scene: StoreScene): boolean {
  */
 export function drawStreamingChoiceOverlays(
   ctx: CanvasRenderingContext2D,
-  L: { dvd2003?: boolean; imgH?: number; back?: [number, number, number, number]; card?: { y: number } },
+  L: { dvd2003?: boolean; imgH?: number; back?: [number, number, number, number]; card?: { y: number }; window?: { x: number; y: number; width: number; bottom: number } },
   movie: Movie,
 ): void {
   ctx.save();
@@ -255,9 +255,9 @@ export function drawStreamingChoiceOverlays(
   const selectedIdx = state ? state.selectedIndex : 0;
   const services = state ? state.services : getAvailableStreamingServices(movie);
 
-  const wx = L.card ? 44 : L.dvd2003 ? 60 : 115;
-  const wMax = L.card ? 392 : L.dvd2003 ? 290 : 280;
-  let y = L.card?.y ?? (L.dvd2003 ? 140 : 152);
+  const wx = L.window?.x ?? (L.card ? 44 : L.dvd2003 ? 60 : 115);
+  const wMax = L.window?.width ?? (L.card ? 392 : L.dvd2003 ? 290 : 280);
+  let y = L.window?.y ?? L.card?.y ?? (L.dvd2003 ? 140 : 152);
 
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
@@ -267,7 +267,7 @@ export function drawStreamingChoiceOverlays(
   const titleSize = 22;
   ctx.font = `bold ${titleSize}px Arial, sans-serif`;
   if (!L.card) {
-    ctx.fillText(movie.title.toUpperCase(), wx, y);
+    ctx.fillText(movie.title.toUpperCase(), wx, y, wMax);
     y += titleSize + 6;
   }
 
@@ -288,7 +288,7 @@ export function drawStreamingChoiceOverlays(
 
   // Service options list (plain black text only)
   const rows: RowRegion[] = [];
-  const rowH = L.card ? 44 : 28;
+  const rowH = L.window ? Math.min(28, (L.window.bottom - y - 24) / Math.max(1, services.length)) : L.card ? 44 : 28;
   for (let i = 0; i < services.length; i++) {
     const isSelected = i === selectedIdx;
     const prefix = isSelected ? '▶  ' : '   ';
@@ -307,7 +307,7 @@ export function drawStreamingChoiceOverlays(
   serviceRowRegions.set(movie.id, rows);
 
   // Footer prompt hint
-  y = L.card ? 706 : Math.max(y + 16, L.dvd2003 ? 420 : 430);
+  y = L.window ? L.window.bottom - 14 : L.card ? 706 : Math.max(y + 16, L.dvd2003 ? 420 : 430);
   ctx.font = `bold ${L.card ? 18 : 12}px Arial, sans-serif`;
   ctx.fillText('OK TO CONFIRM  •  BACK TO CANCEL', wx, y);
 

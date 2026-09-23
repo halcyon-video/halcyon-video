@@ -621,3 +621,20 @@ test('streaming handoff occurs at exit completion, keeps physical tapes, and run
     else Reflect.deleteProperty(globalThis, 'window');
   }
 });
+
+test('printed metadata window keeps all service rows inside it and preserves cropped touch targets', () => {
+  const scene = createMockScene(), movie = createMockMovie();
+  startStreamingServiceChoice(scene, movie);
+  const state = getStreamingChoiceState(scene)!;
+  state.services = Array.from({length:8}, (_, i) => ({id:'service-'+i,name:'SERVICE '+i,url:'https://example.com/'+i}));
+  const labels: {text:string,x:number,y:number}[] = [];
+  const ctx: any = {save(){},restore(){},beginPath(){},moveTo(){},lineTo(){},stroke(){},
+    fillText(text:string,x:number,y:number){labels.push({text,x,y})}};
+  drawStreamingChoiceOverlays(ctx, {imgH:683,back:[0,.05,.5,.95],window:{x:60,y:140,width:300,bottom:389}}, movie);
+  assert.ok(labels.every(label => label.x === 60 && label.y >= 140 && label.y < 389));
+  const service = labels.find(label => label.text.includes('SERVICE 6'))!;
+  assert.ok(service);
+  assert.equal(handleStreamingBackTap(scene, {x:.25,y:1-(service.y/683-.05)/.9} as any),true);
+  assert.equal(state.selectedIndex,6);
+  cancelStreamingServiceChoice(scene);
+});

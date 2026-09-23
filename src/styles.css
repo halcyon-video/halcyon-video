@@ -2178,8 +2178,8 @@ html, body {
 .store-loading-strip { background: linear-gradient(transparent, #000 22px); padding-top: 42px; }
 @media (max-height: 500px) { #store-loading-tip { margin-bottom: 12px; } .store-loading-views { bottom: 100px; } .store-loading-strip { padding-top: 28px; padding-bottom: 16px; } }
 @media (prefers-reduced-motion: reduce) { .store-loading-views img { transition: none; } }
-#store-loading-progress { height: 22px; box-sizing: border-box; padding: 3px; border: 1px solid #fff; }
-#store-loading-fill { width: 0; height: 100%; background: #fff; }
+#store-loading-progress { height: 22px; box-sizing: border-box; padding: 3px; border: 1px solid #fff; background: #000; display: flex; }
+#store-loading-fill { width: 0; align-self: stretch; min-height: 14px; flex: 0 0 auto; background-color: #fff; }
 @media (prefers-reduced-motion: reduce) { #store-loading-fill { transition: none; } }
 
 .boot-console {
