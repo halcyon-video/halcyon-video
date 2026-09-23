@@ -230,3 +230,13 @@ test('Emby setup keeps its provider through retries and requires a server addres
   assert.match(lines(wrapped).join(' '), /JELLYFIN/);
   assert.equal(initialHomeScreen(null, 'unrecognized').provider, 0);
 });
+
+test('notice: back key emits demo action', () => {
+  const base: SetupScreen = { kind: 'notice', address: 'http://tv:8096', detail: 'NO ANSWER', row: 0 };
+  assert.equal(setupScreenKey(base, 'back').action, 'demo');
+});
+
+test('home: back key emits demo action', () => {
+  const base: SetupScreen = initialHomeScreen('http://tv:8096');
+  assert.equal(setupScreenKey(base, 'back').action, 'demo');
+});

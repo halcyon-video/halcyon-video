@@ -1,0 +1,174 @@
+{
+  "schemaVersion": 1,
+  "snapshotVersion": "fixture-v1",
+  "region": "US",
+  "generatedAt": "2026-09-21T12:00:00Z",
+  "checkedAt": "2026-09-21T12:00:00Z",
+  "source": "fixture",
+  "selection": "curated",
+  "perProviderMediaLimit": 120,
+  "coverage": [
+    {
+      "serviceId": "netflix",
+      "mediaType": "movie",
+      "providerIds": [
+        8
+      ],
+      "limitation": "Synthetic test data; not verified availability."
+    },
+    {
+      "serviceId": "netflix",
+      "mediaType": "tv",
+      "providerIds": [
+        8
+      ],
+      "limitation": "Synthetic test data; not verified availability."
+    },
+    {
+      "serviceId": "prime",
+      "mediaType": "movie",
+      "providerIds": [],
+      "limitation": "Synthetic test data; not verified availability."
+    },
+    {
+      "serviceId": "prime",
+      "mediaType": "tv",
+      "providerIds": [],
+      "limitation": "Synthetic test data; not verified availability."
+    },
+    {
+      "serviceId": "disney",
+      "mediaType": "movie",
+      "providerIds": [],
+      "limitation": "Synthetic test data; not verified availability."
+    },
+    {
+      "serviceId": "disney",
+      "mediaType": "tv",
+      "providerIds": [],
+      "limitation": "Synthetic test data; not verified availability."
+    },
+    {
+      "serviceId": "hulu",
+      "mediaType": "movie",
+      "providerIds": [],
+      "limitation": "Synthetic test data; not verified availability."
+    },
+    {
+      "serviceId": "hulu",
+      "mediaType": "tv",
+      "providerIds": [],
+      "limitation": "Synthetic test data; not verified availability."
+    },
+    {
+      "serviceId": "max",
+      "mediaType": "movie",
+      "providerIds": [],
+      "limitation": "Synthetic test data; not verified availability."
+    },
+    {
+      "serviceId": "max",
+      "mediaType": "tv",
+      "providerIds": [],
+      "limitation": "Synthetic test data; not verified availability."
+    },
+    {
+      "serviceId": "appletv",
+      "mediaType": "movie",
+      "providerIds": [],
+      "limitation": "Synthetic test data; not verified availability."
+    },
+    {
+      "serviceId": "appletv",
+      "mediaType": "tv",
+      "providerIds": [],
+      "limitation": "Synthetic test data; not verified availability."
+    },
+    {
+      "serviceId": "paramount",
+      "mediaType": "movie",
+      "providerIds": [],
+      "limitation": "Synthetic test data; not verified availability."
+    },
+    {
+      "serviceId": "paramount",
+      "mediaType": "tv",
+      "providerIds": [],
+      "limitation": "Synthetic test data; not verified availability."
+    },
+    {
+      "serviceId": "peacock",
+      "mediaType": "movie",
+      "providerIds": [],
+      "limitation": "Synthetic test data; not verified availability."
+    },
+    {
+      "serviceId": "peacock",
+      "mediaType": "tv",
+      "providerIds": [],
+      "limitation": "Synthetic test data; not verified availability."
+    }
+  ],
+  "titles": [
+    {
+      "mediaType": "movie",
+      "tmdbId": 1,
+      "title": "The Last Picture House",
+      "synopsis": "A fictional film for testing the catalog. No real availability is claimed.",
+      "year": 2026,
+      "genres": [
+        "Drama"
+      ],
+      "adult": false,
+      "posterPath": null,
+      "runtimeMinutes": 96,
+      "seasonCount": null,
+      "episodeCount": null,
+      "rating": null,
+      "offers": [
+        {
+          "region": "US",
+          "serviceId": "netflix",
+          "providerId": 8,
+          "type": "subscription",
+          "checkedAt": "2026-09-21T12:00:00Z",
+          "provenance": "fixture",
+          "link": {
+            "kind": "tmdb-watch-page",
+            "url": "https://www.themoviedb.org/movie/1/watch?locale=US"
+          }
+        }
+      ]
+    },
+    {
+      "mediaType": "tv",
+      "tmdbId": 1,
+      "title": "Midnight Matinee",
+      "synopsis": "A fictional series for testing movie and TV identity collisions.",
+      "year": 2026,
+      "genres": [
+        "Drama"
+      ],
+      "adult": false,
+      "posterPath": null,
+      "runtimeMinutes": null,
+      "seasonCount": 2,
+      "episodeCount": 12,
+      "rating": null,
+      "offers": [
+        {
+          "region": "US",
+          "serviceId": "netflix",
+          "providerId": 8,
+          "type": "subscription",
+          "checkedAt": "2026-09-21T12:00:00Z",
+          "provenance": "fixture",
+          "link": {
+            "kind": "tmdb-watch-page",
+            "url": "https://www.themoviedb.org/tv/1/watch?locale=US"
+          }
+        }
+      ]
+    }
+  ]
+}

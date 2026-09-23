@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 import {
   DEFAULT_STREAMING_SERVICES,
   ALL_DEFAULT_STREAMING_SERVICES_CSV,
+  seedAutomaticDemoStreamingServices,
   resolveEnabledServices,
   resolveStreamingSource,
   matchProviderId,
@@ -16,6 +17,7 @@ import {
   fallbackToSnapshotOnFailure,
   synthesizeStreamingMovie,
   ingestStreamingResults,
+  limitStreamingMoviesPerService,
   deduplicateStreamingMovies,
   buildStreamingLibraries,
   resolveStreamingWatchRegion,
@@ -90,6 +92,25 @@ test('resolveEnabledServices: blank/undefined/whitespace-only means NONE chosen 
 
 test('ALL_DEFAULT_STREAMING_SERVICES_CSV resolves back to the full default eight, in order -- the demo build\'s own setting default', () => {
   assert.deepEqual(resolveEnabledServices(ALL_DEFAULT_STREAMING_SERVICES_CSV), DEFAULT_STREAMING_SERVICES);
+});
+
+test('automatic demo boot seeds a missing streaming choice without replacing an explicit choice', () => {
+  const values = new Map<string, string>();
+  const storage = {
+    getItem: (key: string) => values.get(key) ?? null,
+    setItem: (key: string, value: string) => { values.set(key, value); },
+  };
+
+  assert.equal(seedAutomaticDemoStreamingServices(storage), true);
+  assert.equal(values.get('bb_streaming_services'), ALL_DEFAULT_STREAMING_SERVICES_CSV);
+
+  values.set('bb_streaming_services', 'netflix');
+  assert.equal(seedAutomaticDemoStreamingServices(storage), false);
+  assert.equal(values.get('bb_streaming_services'), 'netflix');
+
+  values.set('bb_streaming_services', '');
+  assert.equal(seedAutomaticDemoStreamingServices(storage), false);
+  assert.equal(values.get('bb_streaming_services'), '');
 });
 
 test('resolveEnabledServices: matches defaults by id or alias, case-insensitively', () => {
@@ -222,6 +243,19 @@ test('ingestStreamingResults: caps at the requested limit', () => {
   assert.equal(out.length, 5);
 });
 
+test('mobile stock cap keeps each chosen service represented', () => {
+  const netflix = DEFAULT_STREAMING_SERVICES.find((d) => d.id === 'netflix')!;
+  const hulu = DEFAULT_STREAMING_SERVICES.find((d) => d.id === 'hulu')!;
+  const movies = [
+    ...Array.from({ length: 10 }, (_, i) => synthesizeStreamingMovie({ id: i + 1, title: `N${i}` }, netflix)!),
+    ...Array.from({ length: 10 }, (_, i) => synthesizeStreamingMovie({ id: i + 101, title: `H${i}` }, hulu)!),
+  ];
+  const limited = limitStreamingMoviesPerService(movies, [netflix, hulu], 3);
+  assert.deepEqual(limited.map((m) => m.streamingServiceId), [
+    'netflix', 'netflix', 'netflix', 'hulu', 'hulu', 'hulu',
+  ]);
+});
+
 test('deduplicateStreamingMovies: consolidates titles with same tmdbId across services and merges streaming services in order', () => {
   const netflix = DEFAULT_STREAMING_SERVICES.find((d) => d.id === 'netflix')!;
   const prime = DEFAULT_STREAMING_SERVICES.find((d) => d.id === 'prime')!;
@@ -299,4 +333,18 @@ test('resolveStreamingWatchRegion: defaults to US and normalizes whitespace and 
   assert.equal(resolveStreamingWatchRegion(''), 'US');
   assert.equal(resolveStreamingWatchRegion('  gb  '), 'GB');
   assert.equal(resolveStreamingWatchRegion('ca'), 'CA');
+});
+
+
+test('Disney checkout repairs retired search links and preserves real entity links', async () => {
+  const { resolveStreamingCheckoutUrl } = await import('../src/streaming-catalog.ts');
+  const disney = DEFAULT_STREAMING_SERVICES.find(service => service.id === 'disney')!;
+  const moana = 'https://www.disneyplus.com/browse/entity-e8896bfa-1052-41f7-ae2e-00255d77cf05';
+  assert.equal(buildStreamingUrl(disney, 'Moana', 277834), moana);
+  assert.equal(resolveStreamingCheckoutUrl('disney', 'Moana', 277834,
+    'https://www.disneyplus.com/search?q=Moana'), moana);
+  assert.equal(resolveStreamingCheckoutUrl('disney', 'Other movie', 123,
+    'https://www.disneyplus.com/en-us/search/?q=Other'), tmdbWatchFallbackUrl(123));
+  assert.equal(resolveStreamingCheckoutUrl('disney', 'Other movie', 123, moana), moana);
+  assert.equal(buildStreamingUrl(disney, 'Other movie', 123), tmdbWatchFallbackUrl(123));
 });

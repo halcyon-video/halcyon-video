@@ -5,6 +5,35 @@ All notable changes to Halcyon Video, generated from commit history by
 it on every version tag push. Deterministic and offline: no entry here was
 written by a model.
 
+## [v0.22.0] — 2026-09-22
+
+### CHANGELOG
+- V0.21.2
+
+### General
+- Map mobile lighting across every store era
+- Fill shelf wings before extending store depth
+- Fix mobile era entry, Disney checkout and store lighting
+- Fix mobile loading contrast, uncaptured mirrors and cover taps
+- Restore mobile store shelving and printed box metadata
+- Make mobile checkout explicit and prevent deferred reflection stalls
+- Show measured loading progress and reduce mobile store downloads
+- Restore lit mobile walking and replace the connection boot screen
+- Make the mobile store usable in five seconds
+- Stock the first-run mobile store
+- Model ceiling TV mounts and install the shared three-screen frame (Closes [#208](https://github.com/halcyon-video/halcyon-video/issues/208))
+- Repair service-door finishes and clubhouse joints and carpet
+- Stage stocked reflections and remove full-room blister refraction
+- Use heavier display lettering on the sale price card
+- Unblock mobile store reveal without waiting on texture preload
+- Fall back to streaming demo on mobile auto-login failure and add responsive connection styling
+- Pair streaming artwork with a store sleeve and exit before handoff
+- Fix streaming case requests and restyle the mobile interface
+- Keep mobile browsing in the 3D store with optional touch walking
+- Add isolated mobile catalog foundation and launch contract (Closes [#353](https://github.com/halcyon-video/halcyon-video/issues/353))
+- Fix checkout exit and rental-case presentation
+- Fix cubemap capture after stock settles
+
 ## [v0.21.2] — 2026-09-20
 
 ### CHANGELOG

@@ -16,6 +16,8 @@ import type { DecodeMode } from './poster-worker';
 import { getRommConfig, authHeader } from './romm';
 import { prefetchPosterBytes, takePrefetchedPosterBytes, setSharedDecodeEnabled, sharedDecodeGet, sharedDecodePut } from './poster-prefetch';
 import { drawTechSpecsTable, TECH_SPECS_TABLE_H } from './tech-specs';
+import { isRequestTitle } from './request-title';
+import { getJellyseerrConfig } from './jellyseerr';
 import { stampCollectionGapSticker } from './case-corner-stickers';
 import { perfTrace, perfSlot } from './perf-trace';
 import { LruByteCache } from './lru-byte-cache';
@@ -29,7 +31,8 @@ import { getLowResFrontMaterial, disposeLowResFrontMaterials } from './hero-lowr
 // only (that file reads every binding from here inside a function, never at
 // module scope) — same arrangement as hero-lowres-front.
 import { stampPosterBadges, getHeroFrontMaterial, disposeHeroFrontDetail, restampHeroFront, heroDetailArtEnabled } from './hero-front-detail';
-import { isStreamingChoiceActive, drawStreamingChoiceOverlays, drawStreamingChoiceBack } from './streaming-checkout';
+import { drawStreamingStoreLabel } from './streaming-store-label';
+import { streamingAvailabilityText } from './streaming-checkout';
 // The two DVD typed-metadata passes live in their own module (this file is at
 // its line budget — see dvd-overlays.ts's header). They import this file's
 // shared text/measure helpers back; the cycle is function-level only.
@@ -444,13 +447,16 @@ export function setUserWrap(medium: CaseMedium, dataUrl: string | null): void {
   syncUserWrapVariants();
 }
 
-// Loaded from localStorage in initCaseMedium(); first variant is the default.
-const COVER_SELECTION: Record<CaseMedium, string> = { vhs: 'standard', dvd: 'standard' };
+// Loaded from localStorage in initCaseMedium(). The DVD default is the VHS-style
+// blue rental print redrawn on DVD folds, so it fits rather than stretching.
+export const DEFAULT_COVER_SELECTION: Record<CaseMedium, string> = { vhs: 'standard', dvd: 'blue' };
+const COVER_SELECTION: Record<CaseMedium, string> = { ...DEFAULT_COVER_SELECTION };
 
 /** The scan variant the given medium's wrap currently renders from. */
 export function activeCoverVariant(medium: CaseMedium): CoverVariant {
   const list = COVER_VARIANTS[medium];
-  return list.find((v) => v.id === COVER_SELECTION[medium]) ?? list[0];
+  return list.find((v) => v.id === COVER_SELECTION[medium])
+    ?? list.find((v) => v.id === DEFAULT_COVER_SELECTION[medium]) ?? list[0];
 }
 
 /** Cache tag for per-title panel materials: art medium + its cover variant. */
@@ -804,7 +810,7 @@ export function initCaseMedium() {
       : null;
     COVER_SELECTION[m] = COVER_VARIANTS[m].some((v) => v.id === saved)
       ? (saved as string)
-      : COVER_VARIANTS[m][0].id;
+      : DEFAULT_COVER_SELECTION[m];
   }
 
   CASE_WIDTH = CASE_DIMS[CASE_MEDIUM].w;
@@ -1645,6 +1651,7 @@ export function getMovieOffsets(id: string) {
  * update.
  */
 export function restampCollectionGapCase(movie: Movie): void {
+  if (!isRequestTitle(movie, getJellyseerrConfig() !== null)) return;
   // The inspected case's 3x front holds its own copy of the pixels, so it needs
   // the new label painted on too — you order FROM the inspect view, and without
   // this the box in your hands would keep the blue REQUEST while every other
@@ -3225,6 +3232,7 @@ function drawStandardVhsOverlays(ctx: CanvasRenderingContext2D, movie: Movie) {
   const genreList = movie.genres.slice(0, 3).join(', ').toUpperCase() || 'FEATURE';
   const metaRaw = [
     movie.director ? `DIRECTED BY ${movie.director.toUpperCase()}` : '',
+    streamingAvailabilityText(movie),
     `${genreList}   ·   RATED ${movie.rating || 'NR'}`,
     `RELEASED ${movie.year}${movie.duration ? `   ·   ${movie.duration}` : ''}`,
   ].filter(Boolean);
@@ -3271,20 +3279,19 @@ function drawBoxOverlays(ctx: CanvasRenderingContext2D, L: BoxLayout, movie: Mov
   if (!movie) return;
   // All-ticket wraps have no place for metadata — render the print as-is.
   if (L.plain) return;
-  if (isStreamingChoiceActive(movie)) {
-    drawStreamingChoiceOverlays(ctx, L, movie);
-    return;
-  }
   if (L.standardVhs) {
     drawStandardVhsOverlays(ctx, movie);
+    drawStreamingStoreLabel(ctx, L, movie);
     return;
   }
   if (L.dvdBlue) {
     drawDvdBlueOverlays(ctx, movie);
+    drawStreamingStoreLabel(ctx, L, movie);
     return;
   }
   if (L.dvd2003) {
     drawDvd2003Overlays(ctx, movie);
+    drawStreamingStoreLabel(ctx, L, movie);
   }
 }
 
@@ -4259,10 +4266,7 @@ function drawJellyfinBackImpl(
   highlightedName?: string,
   onUpdate?: () => void
 ) {
-  if (drawStreamingChoiceBack(ctx, w, h, movie)) {
-    backCoverRegions.delete(movie.id);
-    return;
-  }
+
   const theme = getGenreTheme(movie.genres);
   const regions: BackCoverRegion[] = [];
   const corner = getBackCoverCorner(movie);
@@ -4402,7 +4406,10 @@ function drawJellyfinBackImpl(
   // clearance), the actor list costs 14px after its header plus 46 per row
   // plus a 20px gap.
   const specTop = h - 18 - (movie.streaming ? 0 : TECH_SPECS_TABLE_H);
-  const maxActorRows = Math.floor((specTop - 79 - (h / 2 + 30) - 34) / 46);
+  ctx.font = `24px ${BB_OUTFIT}, sans-serif`;
+  const availability = streamingAvailabilityText(movie);
+  const serviceLines = availability ? wrapText(ctx, availability, w - 100) : [];
+  const maxActorRows = Math.floor((specTop - 79 - serviceLines.length * 30 - (h / 2 + 30) - 34) / 46);
   const actors = (movie.actors || []).slice(0, Math.max(0, Math.min(5, maxActorRows)));
   let cy = h / 2 + 30; // Starts at Y = 510
   if (actors.length > 0) {
@@ -4461,6 +4468,9 @@ function drawJellyfinBackImpl(
   ctx.font = `16px ${BB_OUTFIT}, sans-serif`;
   ctx.fillText(`Director: ${movie.director}`, 50, dirY);
   ctx.fillText(`Genres:   ${movie.genres.join(', ')}`, 50, cy + 65);
+  ctx.fillStyle = bottomContrast.text;
+  ctx.font = `24px ${BB_OUTFIT}, sans-serif`;
+  serviceLines.forEach((line, i) => ctx.fillText(line, 50, cy + 95 + i * 30));
 
   // Retail tech-specs box, bottom-anchored — the year/rating/duration line it
   // replaced lives inside the table (RATED / RUNNING TIME / © year), filled
@@ -4480,10 +4490,9 @@ function drawJellyfinBackImpl(
 // -------------------------------------------------------------
 export function createGenericInstancedMesh(count: number): THREE.InstancedMesh {
   initSharedMaterials();
-  // GH #42: these background fillers are rental clamshells too — black
-  // top/right/bottom edges on VHS, white on DVD. Shared materials only, so
-  // the whole population stays a single instanced draw either way.
-  const edgeMat = CASE_MEDIUM === 'vhs' ? sharedRentalBlackMaterial! : sharedRentalWhiteMaterial!;
+  // These are the store's copies: both VHS clamshells and DVD keepcases use
+  // black molded plastic around the printed rental sleeve.
+  const edgeMat = sharedRentalBlackMaterial!;
   const mats = [
     edgeMat,
     sharedRentalSpinePlaceholderMaterial!,
@@ -4517,15 +4526,10 @@ export function createMovieInstancedMeshes(movie: Movie, count: number, probeIdx
   const boxGeo = getGeometry();
   initSharedMaterials();
 
-  // GH #42: the back box is the rental clamshell — on VHS it is
-  // molded slightly larger than the retail cover box in front of it (so a rim
-  // peeks out on top/right/bottom) and its exposed edges are black plastic.
-  // The white-cased "Animated Movies" tapes keep their white clamshell; DVD
-  // keeps the original white, cover-sized case.
+  // The back box is the store's rental copy: black molded plastic around its
+  // printed sleeve on both VHS clamshells and DVD keepcases.
   const rentalGeo = getRentalGeometry();
-  const bbEdgeMat = (CASE_MEDIUM === 'vhs')
-    ? sharedRentalBlackMaterial!
-    : sharedRentalWhiteMaterial!;
+  const bbEdgeMat = sharedRentalBlackMaterial!;
 
   // Create unique material arrays for this movie so it can have its own textures
   const frontMats = [
@@ -5075,13 +5079,9 @@ export function getGlobalFrontMaterials(isAnimated: boolean = false): THREE.Mate
 
 export function getGlobalBackMaterials(_isAnimated: boolean = false): THREE.Material[] {
   initGlobalMaterials();
-  // GH #42: the back box is the rental clamshell — black molded edges on VHS,
-  // white on DVD. Animated Movies tapes are NOT special-cased: their clamshell
-  // reads exactly like every other store VHS (the white curved border lives on
-  // the retail Jellyfin box in front, never on the rental copy).
-  const edgeMat = (CASE_MEDIUM === 'vhs')
-    ? sharedRentalBlackMaterial!
-    : sharedRentalWhiteMaterial!;
+  // The store copy is always a black molded case. Animated VHS titles are not
+  // special-cased: their white border belongs to the retail sleeve in front.
+  const edgeMat = sharedRentalBlackMaterial!;
   const spineMat = sharedRentalSpinePlaceholderMaterial!;
   const frontMat = sharedRentalFrontMaterial!;
   const backMat = sharedRentalBackPlaceholderMaterial!;
@@ -5315,11 +5315,9 @@ export function createHeroRentalMaterials(movie: Movie, heroDetail: boolean = fa
   initSharedMaterials();
   const isAnimated = CASE_MEDIUM === 'vhs' && isWhiteClamshell(movie, CASE_MEDIUM);
 
-  // GH #42: the hero rental copy is a clamshell — black molded edges on VHS
-  // (including Animated Movies, which now match every other tape); white on DVD.
-  const edgeMat = (CASE_MEDIUM === 'vhs')
-    ? sharedRentalBlackMaterial!
-    : sharedRentalWhiteMaterial!;
+  // The hero store copy is the same black molded VHS/DVD case as the shelf
+  // population, with the title-specific sleeve fitted inside it.
+  const edgeMat = sharedRentalBlackMaterial!;
   const front = heroDetail
     ? getRentalFrontMaterialHero(movie, probeIdx)
     : getRentalFrontMaterial(movie, probeIdx, isAnimated);

@@ -1,5 +1,6 @@
 import { disposeShelfVisibility, initializeHiddenShelfInstances } from './shelf-visibility';
 import { mobileStoreActive } from './mobile-store';
+import { updateStoreLoading } from './store-loading';
 // Movie-box stock instancing — extracted from StoreScene (three-scene.ts
 // keeps one-line delegating stubs): building/clearing the instanced shelf
 // stock (buildAllMovieBoxes/clearMovieBoxes/rebuildMovieBoxes), the stacked
@@ -210,6 +211,7 @@ export function updateColsCount(scene: StoreScene) {
 }
 
 export async function buildAllMovieBoxes(scene: StoreScene) {
+  scene.mirrorCubemap.beginStockBuild();
   scene.clearMovieBoxes();
   caseModelSubscriptions.set(scene, onCaseModelsChanged(() => {
     scene.queueStructuralShadowRefresh(); scene.requestRender();
@@ -376,7 +378,9 @@ export async function buildAllMovieBoxes(scene: StoreScene) {
     initializeHiddenShelfInstances(mesh);
   };
 
+  let builtFaces = 0;
   for (const [key, capacity] of unitSideCapacity) {
+    updateStoreLoading(45 + 10 * builtFaces++ / unitSideCapacity.size, `Building shelves · ${builtFaces} of ${unitSideCapacity.size}`);
     await yieldBuild();
     const isAnimated = aisleKeyShape(key) === 'white';
 
@@ -694,7 +698,10 @@ export async function buildAllMovieBoxes(scene: StoreScene) {
     const blockOrder = scene.plan.entryBlockOrder(libIdx);
 
     for (const [idx, movie] of layoutEntries.entries()) {
-      if (idx % 96 === 0) await yieldBuild();
+      if (idx % 96 === 0) {
+        updateStoreLoading(55 + 14 * (libIdx + idx / Math.max(1, layoutEntries.length)) / scene.libraries.length, `Stocking aisle ${libIdx + 1} of ${scene.libraries.length}`);
+        await yieldBuild();
+      }
       if (!movie) continue;
       // Entry blocks flow in customer walk order — front of a line, around
       // the end cap, back of that line (line-reversed so it reads
@@ -978,7 +985,7 @@ export async function buildAllMovieBoxes(scene: StoreScene) {
   // Public streaming covers consume the early prefetch here without gating
   // entry. Local boots retain their non-streaming texture readiness gate.
   const allSlots = Array.from(scene.slotsByPosition.values());
-  const gatedSlots = allSlots.filter(slot => (isPublicDemo || !slot.movie.streaming) &&
+  const gatedSlots = allSlots.filter(slot => (isPublicDemo || mobileStoreActive() || !slot.movie.streaming) &&
     (slot.restingX - OVERVIEW_POS.x) ** 2 + (slot.restingZ - OVERVIEW_POS.z) ** 2 < 400).slice(0, 96);
   // Nearby shelf faces lead the download queue. Copies share one decode.
   if (mobileStoreActive()) {
@@ -995,7 +1002,7 @@ export async function buildAllMovieBoxes(scene: StoreScene) {
   // no-reload rebuild. It matters most at catalog scale: a 7k-title store
   // otherwise reveals a room of bare rental shells that paint in over tens of
   // seconds. Self-clearing when the queue empties.
-  if (!isPublicDemo) beginRebuildDrain();
+  if (!(isPublicDemo || mobileStoreActive())) beginRebuildDrain();
   scene.onTextureLoadProgress?.(0, total);
   scene.texturesReadyPromise = Promise.all(gatedSlots.map(slot => new Promise<void>(resolve => {
     slot.loadShelfDetails(0, () => {
@@ -1021,6 +1028,7 @@ export async function buildAllMovieBoxes(scene: StoreScene) {
     repaintGoldCase();
     scene.requestRender();
   });
+  scene.mirrorCubemap.finishStockBuild();
 }
 
 
@@ -1325,7 +1333,10 @@ export function restockSlottedFixtures(scene: StoreScene): void {
       existing.loadShelfDetails(1);
     });
   });
-  if (touched) scene.requestRender();
+  if (touched) {
+    scene.mirrorCubemap.stockChanged();
+    scene.requestRender();
+  }
 }
 
 const priorityPoint = new THREE.Vector3();

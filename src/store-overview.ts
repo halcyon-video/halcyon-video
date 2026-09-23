@@ -24,6 +24,7 @@ import { isEndcapKind } from './fixtures/genre-endcap';
 import { slottedFixtureLabel, qualifyDuplicateLabels } from './fixture-labels';
 import type { StoreScene } from './three-scene';
 import { counterFrame } from './counter-anchors';
+import { mobileStoreActive } from './mobile-store';
 
 export function buildOverviewCursorTargets(scene: StoreScene): OverviewCursorTarget[] {
   const targets: OverviewCursorTarget[] = [];
@@ -278,6 +279,13 @@ export function applyOverviewFocus(scene: StoreScene, idx: number): void {
 }
 
 export function enterOverview(scene: StoreScene): void {
+  if (mobileStoreActive()) {
+    scene.hideHeroCases();
+    scene.hideOverviewVisuals();
+    scene.isFlipped = false; scene.heroSpine = false;
+    if (!scene.isWalkAroundMode) scene.toggleWalkAround();
+    return;
+  }
   scene.requestRender();
   if (scene.isWalkAroundMode) scene.toggleWalkAround(); // walk mode owns the camera
   scene.hideHeroCases();

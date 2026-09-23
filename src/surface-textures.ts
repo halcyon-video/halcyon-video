@@ -1,3 +1,4 @@
+import { compactAssets } from './mobile-assets';
 // Shipped-fallback KTX2 (GPU block-compressed) textures for
 // public/textures/surfaces/*/*.ktx2 — the shipped-default step of the
 // surface-PBR resolution chain in src/user-assets.ts:
@@ -64,7 +65,7 @@ export function tryLoadShippedSurfaceKtx2(
   srgb: boolean,
   onMiss: () => void,
 ): void {
-  if (!ready) { onMiss(); return; }
+  if (compactAssets() || !ready) { onMiss(); return; }
   const ktx2RelPath = relPath.replace(/\.png$/, '.ktx2');
   const url = assetUrl(`textures/${ktx2RelPath}`);
   // Fetched by hand, not through the loader's FileLoader, for two reasons

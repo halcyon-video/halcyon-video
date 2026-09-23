@@ -1,0 +1,7 @@
+---
+import Page from '../../../layouts/Page.astro';
+import { snapshot } from '../../../catalog/load';
+export function getStaticPaths() { return snapshot.titles.map(title => ({ params: { mediaType: title.mediaType, id: String(title.tmdbId) }, props: { title } })); }
+const { title } = Astro.props;
+---
+<Page title={title.title} description={title.synopsis}><a href="/browse/">Back to browse</a><p class="meta">{title.mediaType === 'tv' ? 'Series' : 'Movie'} · {title.year} · {title.genres.join(', ')}</p><h1>{title.title}</h1><p class="lead">{title.synopsis}</p>{title.runtimeMinutes && <p>{title.runtimeMinutes} minutes</p>}{title.seasonCount && <p>{title.seasonCount} seasons · Series availability does not guarantee every season.</p>}<details><summary>Watch options</summary><p>No live watch options in this sample. Real availability will show the region and date checked. A service may require its own subscription and sign-in.</p></details><p><a href="/store/">Explore the 3D store</a> · <a href="/self-host/">Make it your own</a></p></Page>

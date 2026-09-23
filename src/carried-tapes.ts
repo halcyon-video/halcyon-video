@@ -644,9 +644,9 @@ export function showClerkToast(text: string, ms = 3200, speaker = 'CLERK'): void
       'position:fixed;left:50%;bottom:110px;transform:translateX(-50%) translateY(10px);' +
       'z-index:62;pointer-events:none;opacity:0;transition:opacity .2s,transform .2s;' +
       "font-family:var(--font-mono,'Courier New',monospace);font-size:20px;font-weight:400;letter-spacing:.03em;" +
-      'color:#eef3ff;background:linear-gradient(180deg,rgba(17,30,64,.96),rgba(9,16,38,.96));' +
-      'border:2px solid var(--bb-primary, #1560bd);border-radius:8px;padding:12px 18px;max-width:min(720px,90vw);' +
-      'box-shadow:0 8px 30px rgba(0,0,0,.55);text-shadow:0 1px 2px #000;';
+      'color:#fff;background:rgba(5,10,22,.88);' +
+      'border:0;border-left:3px solid var(--bb-secondary, #f2e8c9);border-radius:0;padding:10px 16px;max-width:min(720px,84vw);' +
+      'box-sizing:border-box;text-shadow:0 2px 1px #000;';
     const name = document.createElement('span');
     name.className = 'clerk-toast-speaker';
     name.textContent = `${speaker}  `;

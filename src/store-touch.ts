@@ -1,5 +1,8 @@
+import { mobileCheckoutAction } from './mobile-checkout';
 // Touch controls share the host overlay callbacks. Hosted mobile browsing
 // uses direct camera manipulation; other touch installs retain arrow swipes.
+import { isStreamingChoiceActive } from './streaming-checkout';
+import { installMobileWalk } from './mobile-walk';
 import type { InputCallbacks } from './input.ts';
 import type { StoreScene } from './three-scene.ts';
 import { beginMobileDrag, mobileStoreActive, markMobileDragged } from './mobile-store.ts';
@@ -27,9 +30,8 @@ export { SWIPE_MIN_PX, resolveSwipeDirection };
  * do, not a literal key name), swapping the arrow glyphs for SWIPE/TAP since
  * a touch visitor has the on-screen BACK/OK buttons above but no D-pad to
  * point at. `null` means "no touch-specific copy" — main.ts falls through to
- * its own keyboard text (used by 'walk-around', a keyboard-only surface: held
- * WASD state read straight off three-scene.ts, not through InputCallbacks,
- * so a touch visitor can never actually be in it).
+ * its own keyboard text. Walking uses the separate phone thumbstick and
+ * drag-to-look layer, sharing the scene's collision and inspection logic.
  */
 /**
  * Touch-primary copy for main.ts's updateMovieHUD — that function overwrites
@@ -48,15 +50,17 @@ export function touchMovieHUDText(
   isRequestedDiscovery: boolean,
   streaming?: boolean,
   streamingChoice?: boolean,
+  requestable = false,
 ): string | null {
   if (!isInspecting) return mobileStoreActive() ? 'DRAG TO BROWSE  •  TAP A MOVIE' : 'SWIPE TO BROWSE  •  TAP OK TO EXAMINE';
-  if (streamingChoice) return 'TAP A SERVICE  •  TAP OK TO CONFIRM';
-  if (streaming) return 'SWIPE TO FLIP  •  TAP OK TO CHECK OUT';
-  if (game) return 'SWIPE TO FLIP  •  TAP OK TO RENT & PLAY';
+  if (streamingChoice) return 'TAP A SERVICE  •  TAP CONFIRM SERVICE';
+  if (streaming) return 'SWIPE TO FLIP  •  TAP TAKE TO COUNTER';
+  if (game) return 'SWIPE TO FLIP  •  TAP TAKE TO COUNTER';
+  if ((discovery || collectionGap) && !requestable) return 'SWIPE TO FLIP  •  NOT IN STOCK';
   if (discovery) return isRequestedDiscovery ? 'ALREADY REQUESTED' : 'NOT IN STOCK — TAP OK TO ORDER OR PASS';
   if (collectionGap) return isRequestedDiscovery ? 'ON ORDER — COMING SOON' : 'NOT IN STOCK — TAP OK TO ORDER OR PASS';
   if (comingSoon) return 'COMING SOON — NOT YET AVAILABLE';
-  return 'SWIPE TO FLIP  •  TAP OK TO PLAY';
+  return 'SWIPE TO FLIP  •  TAP TAKE TO COUNTER';
 }
 
 export function touchHUDText(mode: string, canHoldToCheckout: boolean, carryMode: boolean): string | null {
@@ -69,7 +73,7 @@ export function touchHUDText(mode: string, canHoldToCheckout: boolean, carryMode
     case 'library-select':
       return 'TAP TO BROWSE THIS SECTION';
     case 'overview':
-      return mobileStoreActive() ? 'SWIPE TO MOVE  •  TAP CURSOR TO ENTER' : 'SWIPE TO BROWSE  •  TAP OK TO GO';
+      return mobileStoreActive() ? 'SWIPE TO LOOK  •  TAP A SHELF' : 'SWIPE TO BROWSE  •  TAP OK TO GO';
     case 'genre-select':
       return '';
     case 'browse':
@@ -78,10 +82,12 @@ export function touchHUDText(mode: string, canHoldToCheckout: boolean, carryMode
         : 'SWIPE TO BROWSE  •  TAP OK TO EXAMINE';
     case 'inspect':
       return carryMode
-        ? 'TAP OK TO TAKE IT'
-        : 'SWIPE TO FLIP  •  TAP OK TO PLAY';
+        ? 'TAP TAKE TO COUNTER'
+        : 'SWIPE TO FLIP  •  TAP TAKE TO COUNTER';
+    case 'walk-around':
+      return 'DRAG TO LOOK  •  TAP A MOVIE';
     case 'checkout':
-      return 'TAP OK TO CHECK OUT';
+      return 'TAP CHECK OUT';
     case 'backroom':
       return 'SWIPE TO PICK A TAPE  •  TAP OK TO PLAY';
     case 'person-endcap':
@@ -91,7 +97,32 @@ export function touchHUDText(mode: string, canHoldToCheckout: boolean, carryMode
   }
 }
 
+/** Keep the next action explicit, including the carried-title route after pickup. */
+export function syncTouchAction(scene: StoreScene, terminal: boolean): void {
+  const ok = document.getElementById('store-touch-ok');
+  if (!ok) return;
+  const movie = scene.getSelectedMovie();
+  let label = 'OK';
+  if (!terminal) {
+    if (scene.mode === 'inspect') {
+      label = movie?.streaming && isStreamingChoiceActive(movie) ? 'CONFIRM SERVICE'
+        : movie?.comingSoon ? 'COMING SOON'
+        : !movie?.streaming && (movie?.discovery || movie?.collectionGap) ? 'REQUEST OPTIONS'
+        : movie?.isSeries && !movie.streaming ? 'SELECT EPISODE' : 'TAKE TO COUNTER';
+    } else if (scene.mode === 'checkout') label = scene.checkoutRunning ? 'CHECKING OUT' : 'CHECK OUT';
+    else if (scene.canHoldToCheckout()) label = 'GO TO COUNTER';
+    else if (scene.mode === 'browse') label = 'EXAMINE';
+  }
+  const text = ok.querySelector('.st-label');
+  if (text && text.textContent !== label) text.textContent = label;
+  ok.setAttribute('aria-label', label);
+  ok.parentElement?.classList.toggle('has-carry', scene.canHoldToCheckout());
+}
+
 const CSS = `
+/* A phone's first usable frame is the budget boundary; do not spend another
+   six tenths of a second fading the boot console over it. */
+#boot-overlay { transition: none !important; }
 /* Fades with the rest of the HUD (main.ts's updateBrowseHUDVisibility drives
    .visible in lockstep with #browse-locator/#browse-hint) — a DOM overlay,
    playback, the screensaver or a live jump index all suppress it the same
@@ -103,12 +134,15 @@ const CSS = `
   position: absolute; pointer-events: none; touch-action: none;
   display: flex; align-items: center; justify-content: center;
   min-width: 64px; height: 46px; padding: 0 18px;
-  background: var(--panel-bg, rgba(0, 10, 26, 0.88));
-  border: 1px solid var(--panel-border, rgba(255, 204, 0, 0.35));
-  border-radius: 10px; color: #fff;
-  font: 700 15px/1 var(--font-title, sans-serif), sans-serif; letter-spacing: 0.06em;
-  text-transform: uppercase; opacity: 0.85; transition: background 90ms, transform 90ms;
+  background: transparent; border: 0; border-radius: 0; color: #fff;
+  font: 900 18px/1.15 'Archivo Black', sans-serif; letter-spacing: 0.025em;
+  text-transform: uppercase; opacity: 1; transition: transform 90ms;
+  -webkit-tap-highlight-color: transparent;
 }
+.st-label { color: #fff; font-style: normal; text-shadow: 0 2px 3px #000; }
+.st-btn { font: 700 15px/1 var(--font-title, sans-serif), sans-serif; letter-spacing: .06em; }
+.st-btn:focus-visible { outline: 2px solid #fff; outline-offset: -3px; }
+.st-btn.st-pressed .st-label { color: #ddd; }
 #store-touch-controls.visible .st-btn { pointer-events: auto; }
 #store-touch-directions { display: none; position: absolute; left: 16px; bottom: max(24px, env(safe-area-inset-bottom)); grid-template-columns: repeat(3, 56px); gap: 6px; }
 #store-touch-controls.terminal #store-touch-directions { display: grid; }
@@ -122,23 +156,49 @@ const CSS = `
   top: max(24px, env(safe-area-inset-top));
   left: max(24px, env(safe-area-inset-left));
 }
-#store-touch-back.st-pressed { background: rgba(255, 255, 255, 0.85); color: var(--bb-navy, #000a1c); }
 #store-touch-ok {
   bottom: max(24px, env(safe-area-inset-bottom));
   right: max(24px, env(safe-area-inset-right));
-  background: var(--bb-yellow, #ffcc00); color: var(--bb-navy, #000a1c);
-  border-color: var(--bb-yellow, #ffcc00); opacity: 0.92;
 }
-#store-touch-ok.st-pressed { background: #fff; }
-@keyframes st-pulse {
-  0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 204, 0, 0); }
-  50% { transform: scale(1.05); box-shadow: 0 0 12px 2px rgba(255, 204, 0, 0.45); }
+#store-touch-controls:not(.terminal)[data-mode="inspect"] #store-touch-ok,
+#store-touch-controls:not(.terminal)[data-mode="checkout"] #store-touch-ok,
+#store-touch-controls.has-carry:not(.terminal) #store-touch-ok {
+  display: flex; min-width: 190px; min-height: 52px; background: #101923;
+  border: 2px solid #f2e8c9; box-shadow: 0 3px 0 #000; z-index: 2;
 }
-.st-intro .st-btn { animation: st-pulse 1.8s ease-in-out 3; }
+#store-touch-controls.has-carry[data-mode="walk-around"] #store-touch-ok { display: flex; }
+#store-touch-walk { top: max(24px, env(safe-area-inset-top)); right: max(24px, env(safe-area-inset-right)); display: none; }
+#store-touch-controls:not(.terminal)[data-mode="overview"] #store-touch-walk,
+#store-touch-controls:not(.terminal)[data-mode="browse"] #store-touch-walk { display: flex; }
+#store-touch-controls:not(.terminal)[data-mode="overview"] #store-touch-ok,
+#store-touch-controls:not(.terminal):not(.has-carry)[data-mode="walk-around"] #store-touch-ok,
+#store-touch-controls:not(.terminal)[data-mode="walk-around"] #store-touch-back { display: none; }
+#store-touch-stick { display: none; position: absolute; left: max(24px, env(safe-area-inset-left)); bottom: max(100px, calc(env(safe-area-inset-bottom) + 76px)); width: 124px; height: 124px; border: 3px solid #f2e8c9; border-radius: 50%; background: radial-gradient(circle, rgba(3,9,20,.92) 42%, rgba(242,232,201,.34) 43%, rgba(3,9,20,.88) 69%); box-shadow: 0 4px 0 #02050a, 0 0 0 3px rgba(5,12,28,.82), 0 0 12px rgba(242,232,201,.8), inset 0 2px 0 #fff; touch-action: none; }
+#store-touch-controls.visible:not(.terminal)[data-mode="walk-around"] #store-touch-stick { display: block; pointer-events: auto; }
+.st-stick-knob { position: absolute; inset: 38px; border-radius: 50%; background: radial-gradient(circle at 40% 25%, #fff, #b9c9dc 58%, #526680 78%, #19263b); box-shadow: 0 3px 0 #02050a, 0 0 0 2px #f2e8c9; pointer-events: none; }
+.st-stick-label { position: absolute; top: -31px; left: 0; right: 0; text-align: center; color: #e9edf5; font: 900 18px/22px Arial, sans-serif; letter-spacing: 1.5px; pointer-events: none; filter: drop-shadow(0 2px 0 #10151d) drop-shadow(0 1px 2px #000); }
+@supports (background-clip: text) { .st-stick-label { background: linear-gradient(#fff 0%, #c5cedc 40%, #fff 48%, #69788e 51%, #e7edf7 88%); background-clip: text; -webkit-background-clip: text; color: transparent; } }
+body .clasp-prompt { border-radius: 0; font-size: 15px; }
+body .clasp-prompt .clasp-key { display: none; }
+body .clerk-prompt { bottom: max(174px, calc(env(safe-area-inset-bottom) + 160px)); max-width: calc(100vw - 48px); }
+body .clerk-prompt .clerk-key { display: none; }
+body:has(.clerk-dialog.visible) #store-touch-controls,
+body:has(.clerk-dialog.visible) #browse-hint { visibility: hidden; }
+#walk-hud.visible, #walk-crosshair.visible { display: none; }
+body:has(#store-touch-controls[data-mode="inspect"]) #browse-locator { display: none; }
+#browse-locator { top: max(86px, calc(env(safe-area-inset-top) + 72px)); max-width: calc(100vw - 48px); }
+.browse-locator-name { white-space: normal; text-align: center; font-size: 18px; letter-spacing: 1px; }
+body:has(#store-touch-controls[data-mode="walk-around"]) #browse-hint { bottom: 40px; left: auto; right: 16px; transform: none; max-width: calc(100vw - 180px); font: 700 15px/1.4 sans-serif; letter-spacing: .04em; text-shadow: 0 2px 3px #000; }
+
 /* #browse-hint (styles.css) sits bottom-center, nowrap, exactly where the OK
    button now lives — lift it clear and let it wrap. Phone viewports are
    narrower than the desktop line was ever sized for. */
 #browse-hint { bottom: 84px; max-width: 62vw; white-space: normal; line-height: 1.4; }
+@media (orientation: landscape) and (max-height: 500px) {
+  #store-touch-stick { bottom: max(48px, calc(env(safe-area-inset-bottom) + 24px)); }
+  #browse-hint { bottom: 14px; font-size: 15px; line-height: 1.1; max-width: calc(100vw - 190px); }
+
+}
 `;
 
 /** Press on touchstart, release on touchend; touchcancel cancels without firing. */
@@ -173,6 +233,10 @@ function bind(el: HTMLElement, fire: () => void): void {
     }
     fire();
   };
+  for (const type of ['keydown', 'keyup']) el.addEventListener(type, e => {
+    if ((e as KeyboardEvent).key === 'Enter' || (e as KeyboardEvent).key === ' ') e.stopPropagation();
+  });
+  el.addEventListener('click', fire); // Native keyboard and assistive activation; touchend suppresses its synthetic click.
   el.addEventListener('touchstart', press, { passive: false });
   el.addEventListener('touchend', release, { passive: false });
   el.addEventListener('touchcancel', cancel, { passive: false });
@@ -197,21 +261,28 @@ export function installStoreTouchControls(callbacks: InputCallbacks, poke: () =>
   const root = document.createElement('div');
   root.id = 'store-touch-controls';
 
-  const back = document.createElement('div');
+  const back = document.createElement('button');
+  back.type = 'button';
   back.id = 'store-touch-back';
   back.className = 'st-btn';
-  back.textContent = 'BACK';
+  back.innerHTML = '<span class="st-label">BACK</span>';
   back.setAttribute('role', 'button');
   back.setAttribute('aria-label', 'Back');
   bind(back, () => { poke(); callbacks.onBack(); });
 
-  const ok = document.createElement('div');
+  const ok = document.createElement('button');
+  ok.type = 'button';
   ok.id = 'store-touch-ok';
   ok.className = 'st-btn';
-  ok.textContent = 'OK';
+  ok.innerHTML = '<span class="st-label">OK</span>';
   ok.setAttribute('role', 'button');
   ok.setAttribute('aria-label', 'Select');
-  bind(ok, () => { poke(); void callbacks.onEnter(); });
+  bind(ok, () => {
+    poke();
+    const scene = getScene?.();
+    if (scene && mobileCheckoutAction(scene, root.classList.contains('terminal'))) return;
+    void callbacks.onEnter();
+  });
 
   const directions = document.createElement('div');
   directions.id = 'store-touch-directions';
@@ -221,7 +292,8 @@ export function installStoreTouchControls(callbacks: InputCallbacks, poke: () =>
     button.type = 'button';
     button.id = `store-touch-${label.toLowerCase()}`;
     button.className = 'st-btn';
-    button.textContent = label;
+    const text = document.createElement('span');
+    text.className = 'st-label'; text.textContent = label; button.appendChild(text);
     bind(button, () => { poke(); fire(); });
     directions.appendChild(button);
   }
@@ -239,10 +311,12 @@ export function installStoreTouchControls(callbacks: InputCallbacks, poke: () =>
     // handling off entirely, so touchmove needs no preventDefault() to stay
     // out of the page's way.
     stage.style.touchAction = 'none';
+    installMobileWalk(root, stage, callbacks, poke, () => getScene?.() ?? null);
     let startX = 0, startY = 0, tracking = false;
     let drag: ReturnType<typeof beginMobileDrag> = null;
     let moved = false;
     stage.addEventListener('touchstart', (e) => {
+      if (getScene?.()?.isWalkAroundMode) { tracking = false; drag = null; return; }
       if (e.touches.length !== 1) {
         tracking = false;
         const s = getScene?.();

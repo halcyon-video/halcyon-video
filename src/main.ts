@@ -1,3 +1,7 @@
+import { paintStoreLoading, updateStoreLoading, showStoreLoadingFailure } from './store-loading';
+import { mobileStoreActive } from './mobile-store';
+import { beginMobileEraChoice, finishMobileEraChoice } from './mobile-era-choice';
+import { isRequestTitle } from './request-title';
 import { buildSteamControls } from './steam-settings';
 import { loadSteamGames } from './providers/steam-provider';
 import { isExternalGameActive, onExternalGameChange } from './external-game-state.ts';
@@ -108,7 +112,7 @@ import { brandString, loadBrandPack } from './brand-pack';
 import type { StoreScene } from './three-scene';
 import { waitForStartupModel } from './startup-reveal';
 import { InputManager, type InputCallbacks } from './input';
-import { installStoreTouchControls, isTouchInputActive, touchHUDText, touchMovieHUDText } from './store-touch';
+import { syncTouchAction, installStoreTouchControls, isTouchInputActive, touchHUDText, touchMovieHUDText } from './store-touch';
 import { isStreamingChoiceActive, cancelStreamingServiceChoice, setStreamingStockResolver } from './streaming-checkout';
 setStreamingStockResolver(getStreamingMovies);
 import { triggerHostedWelcome, isWelcomeActive, dismissWelcome, welcomeHUDText } from './store-welcome';
@@ -310,6 +314,7 @@ function installContextLossRecovery(canvas: HTMLCanvasElement) {
       sessionStorage.setItem(BOOT_CONTEXT_LOSS_KEY, String(attempts));
       if (attempts > BOOT_CONTEXT_LOSS_MAX_ATTEMPTS) {
         contextLossGaveUp = true;
+        showStoreLoadingFailure();
         logToConsole(
           `[System] WebGL context lost during startup (attempt ${attempts}) — giving up after ${BOOT_CONTEXT_LOSS_MAX_ATTEMPTS} retries. `
           + 'Close and reopen Halcyon, or restart this device, to try again.',
@@ -810,6 +815,7 @@ function updateMovieHUD(movie: Movie | null) {
   if (!movie || isWelcomeActive()) return;
 
   const isInspecting = storeScene?.mode === 'inspect';
+  const requestable = isRequestTitle(movie, getJellyseerrConfig() !== null);
   const isRequestedDiscovery = typeof movie.tmdbId === 'number' &&
     (movie.discoveryRequested || isDiscoveryRequested(movie.tmdbId));
 
@@ -822,7 +828,7 @@ function updateMovieHUD(movie: Movie | null) {
     if (isTouchInputActive()) {
       hint.textContent = touchMovieHUDText(
         !!isInspecting, !!movie.game, !!movie.discovery, !!movie.collectionGap,
-        !!movie.comingSoon, !!isRequestedDiscovery, !!movie.streaming, !!(movie.streaming && isStreamingChoiceActive(movie)));
+        !!movie.comingSoon, !!isRequestedDiscovery, !!movie.streaming, !!(movie.streaming && isStreamingChoiceActive(movie)), requestable);
       return;
     }
     if (isInspecting) {
@@ -832,6 +838,8 @@ function updateMovieHUD(movie: Movie | null) {
         hint.textContent = isStreamingChoiceActive(movie)
           ? 'ARROWS SELECT SERVICE  •  OK TO CONFIRM  •  BACK TO CANCEL'
           : 'FLIP CASE  •  OK TO CHECK OUT';
+      } else if ((movie.discovery || movie.collectionGap) && !requestable) {
+        hint.textContent = 'FLIP CASE  •  NOT IN STOCK';
       } else if (movie.discovery) {
         hint.textContent = isRequestedDiscovery
           ? 'FLIP CASE  •  ALREADY REQUESTED'
@@ -971,7 +979,9 @@ function updateBrowseHUDVisibility() {
   const terminalBlocked = ui.isLoginOpen || ui.isPowerMenuOpen || ui.isExitConfirmOpen
     || ui.isVersionPickerOpen || ui.isCandyCheckoutOpen || ui.isFeedbackOpen
     || ui.isEmblemStudioOpen || isMembershipPickerOpen() || ui.isPlaybackActive || ui.isScreensaverActive;
+  if (touchControls && touchControls.dataset.mode !== storeScene.mode) touchControls.dataset.mode = storeScene.mode;
   touchControls?.classList.toggle('terminal', terminal);
+  syncTouchAction(storeScene, terminal);
   touchControls?.classList.toggle('visible', terminal ? !terminalBlocked : !suppressed);
 
   if (suppressed) {
@@ -2011,6 +2021,7 @@ async function openVersionPicker(movie: Movie, versions: MovieVersion[]): Promis
  * Keyboards keep their shortcuts (X dismisses, HOLD ▼ still works).
  */
 async function resolveGapChoice(movie: Movie): Promise<'order' | 'dismiss' | null> {
+  if (!isRequestTitle(movie, getJellyseerrConfig() !== null)) return null;
   const idx = await openListPicker(movie.title, [
     { code: 'ORDER', name: 'Order it — the store will get a copy in' },
     { code: 'PASS', name: 'Not interested — never show me this title again' },
@@ -2443,6 +2454,7 @@ async function switchRenderMode(target: 'flat' | '3d') {
 async function initializeStoreScene(preservePosterCache = false) {
   // Single funnel for every boot and rebuild, 3D and flat — resolve which
   // catalog this store is made of before anything reads it.
+  await finishMobileEraChoice();
   refreshStoreCatalog();
   const mode = getSetting<string>('bb_render_mode');
   if (mode === 'flat') {
@@ -2566,6 +2578,7 @@ async function initializeStoreScene(preservePosterCache = false) {
     const { calibrateQualityIfNeeded, armQualityBackstop } = await import('./quality-calibrate');
     await calibrateQualityIfNeeded();
 
+    await paintStoreLoading(25, 'Building the room');
     const { StoreScene } = await import('./three-scene');
     // Every carried library belongs on the floor. Keep stock construction
     // batched and offscreen shelves culled without paging away departments.
@@ -2577,6 +2590,7 @@ async function initializeStoreScene(preservePosterCache = false) {
     // that heavy startup work, so recovery must already be listening.
     installContextLossRecovery(scene.renderer.domElement);
     try { await scene.ready; } catch (error) { scene.destroy(); throw error; }
+    updateStoreLoading(85, 'Preparing the entrance');
     armQualityBackstop();
     let lastLoggedPct = -1;
     scene.onTextureLoadProgress = (loaded, total) => {
@@ -2767,8 +2781,9 @@ async function initializeStoreScene(preservePosterCache = false) {
 
     // Keep the existing splash over the counter's crude loading solids. Covers
     // still stream progressively in the public store; the model grace is bounded.
-    (isPublicDemo ? Promise.resolve() : scene.texturesReadyPromise).then(async () => {
+    ((isPublicDemo || mobileStoreActive()) ? Promise.resolve() : scene.texturesReadyPromise).then(async () => {
       document.getElementById('boot-overlay')?.classList.add('preparing-models');
+      await paintStoreLoading(92, 'Finishing the counter');
       await waitForStartupModel(scene.entrance?.whenCounterModelReady());
       if (contextLossGaveUp || scene.renderer.getContext().isContextLost()) {
         document.getElementById('boot-overlay')?.classList.remove('preparing-models');
@@ -2823,13 +2838,16 @@ async function initializeStoreScene(preservePosterCache = false) {
       updateBrowseHUDVisibility();
       aisleIndicatorInterval = window.setInterval(updateBrowseHUDVisibility, 200);
 
-      logToConsole(isPublicDemo ? '[System] Store ready. Artwork continues loading.' : '[System] All textures loaded. Store ready.', 'system');
+      logToConsole((isPublicDemo || mobileStoreActive()) ? '[System] Store ready. Artwork continues loading.' : '[System] All textures loaded. Store ready.', 'system');
       initSharedPlace(scene, isSetupPending(), () => storeScene, () => ui.isLoginOpen || textEntryHasFocus(), showClerkToast);
       // Opening day (#41): dock the counter CRT's NEW STORE SETUP before the
       // overlay drops, so the player wakes already at the terminal.
       maybeOpenSetupTerminal();
       hideBootOverlay();
-      if (isPublicDemo) {
+      // Restore detailed fixtures progressively, one idle load at a time.
+      // Full-room reflection bakes still stay off the phone startup path.
+      if (mobileStoreActive()) scene.detailLoads?.release();
+      if (isPublicDemo && !mobileStoreActive()) {
         void scene.warmupRuntimePrograms().finally(() => scene.detailLoads?.release())
           .catch(error => console.warn('[warmup] Hosted preparation failed:', error));
       }
@@ -2900,6 +2918,7 @@ async function waitForFontsAndInit() {
   // opacity rather than 2% of the way in. Debug-only override, never surfaced
   // in Settings, kept for the A/B that proved it: bb_debug_no_boot_paint=1.
   if (!localStorage.getItem('bb_debug_no_boot_paint')) await nextPaintedFrame();
+  await paintStoreLoading(21, 'Loading the lettering');
   if (document.fonts) {
     try {
       // Explicitly wait for the display face used in canvas texture rendering.
@@ -2915,13 +2934,16 @@ async function waitForFontsAndInit() {
   // declare faces of its own, and registering them here is what puts them in
   // bundledFontsReady()'s wait rather than a repaint that never comes. Never
   // rejects — no pack installed is the normal case (src/brand-pack.ts).
+  await paintStoreLoading(22, 'Loading the store identity');
   await loadBrandPack();
   // Same reason, for the bundled display faces (Anton / Archivo Black / Outfit /
   // Orbitron / Yellowtail): most of the canvases that set them are painted once
   // into a texture cache and never repainted, so a face landing after the store
   // build bakes a fallback in permanently. These are local bundle assets, so
   // the wait is a decode, not a fetch.
+  await paintStoreLoading(23, 'Preparing the lettering');
   await bundledFontsReady();
+  await paintStoreLoading(24, 'Preparing the catalog');
   await initializeStoreScene();
 }
 
@@ -3023,6 +3045,7 @@ async function executePowerMenuAction(btnId: string) {
  * unrequested on failure so the player can just try again.
  */
 async function handleDiscoveryRequest(movie: Movie) {
+  if (!isRequestTitle(movie, getJellyseerrConfig() !== null)) return;
   if (typeof movie.tmdbId !== 'number') {
     logToConsole(`[System] "${movie.title}" can't be requested (missing TMDB id).`, 'system');
     return;
@@ -4010,7 +4033,8 @@ async function main() {
       }
     },
     onBack: () => {
-      if (storeScene?.isWalkAroundMode) {
+      if (storeScene?.isWalkAroundMode && !ui.isAnyOverlayOpen) {
+        if (mobileStoreActive()) return;
         storeScene.toggleWalkAround();
         return;
       }
@@ -4185,7 +4209,7 @@ async function main() {
       // SETUP still swallowed every key (ui.isSetupOpen), while nothing left
       // could bring the camera back to the terminal. Same trap at the manager
       // terminal. isAnyOverlayOpen covers all of them, plus the old four.
-      if (!shortcutsAllowed()) return;
+      if (!shortcutsAllowed() || (mobileStoreActive() && storeScene?.isWalkAroundMode)) return;
       storeScene?.toggleWalkAround();
     },
     // T22: carry-mode shortcuts. Both are guarded no-ops with the 'Carry &
@@ -4474,6 +4498,7 @@ async function main() {
   // shelves as an unconfigured one. One short request, capped at 4s, and every
   // failure mode — static host, Tauri, no operator config — resolves to "none"
   // rather than throwing, so this can't hold up a boot it doesn't apply to.
+  if (!isRemoteInstance() && mobileStoreActive()) beginMobileEraChoice();
   await loadOperatorDefaults();
 
   // Check saved credentials and try connection in background (demo mode

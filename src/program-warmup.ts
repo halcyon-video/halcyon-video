@@ -20,6 +20,7 @@ export async function compileProgramsInStages(
   renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera,
   target: THREE.WebGLRenderTarget | null, signal: AbortSignal,
   roots: THREE.Object3D = scene,
+  progress?: (fraction: number, detail: string) => void,
 ): Promise<void> {
   const gl = renderer.getContext();
   const extension = gl.getExtension('KHR_parallel_shader_compile');
@@ -43,7 +44,8 @@ export async function compileProgramsInStages(
   });
   const batch = new THREE.Group();
   const empty = new THREE.Scene();
-  const batchSize = extension ? 128 : 1;
+  const batchSize = extension ? 32 : 1;
+  let submitted = 0;
   let lastYield = -Infinity;
   for (let i = 0; i < objects.length; i += batchSize) {
     if (extension || performance.now() - lastYield >= 8) {
@@ -63,8 +65,20 @@ export async function compileProgramsInStages(
       renderer.autoClear = false;
       renderer.localClippingEnabled = true;
       renderer.render(empty, camera);
-      batch.children = objects.slice(i, i + batchSize);
+      // A mesh can own child lights/meshes already present in targetScene.
+      // Compiling its whole subtree counts those lights twice (or once per
+      // ancestor), producing nonexistent shader variants and sampler overflow.
+      // Draw-free shallow views preserve mesh flags without changing the live
+      // hierarchy or copying large instancing buffers.
+      batch.children = objects.slice(i, i + batchSize).map(object => {
+        if (object.children.length === 0) return object;
+        const view = Object.create(object) as THREE.Object3D;
+        view.children = [];
+        return view;
+      });
       renderer.compile(batch, camera, scene);
+      submitted = Math.min(objects.length, i + batchSize);
+      progress?.((extension ? .5 : .9) * submitted / objects.length, `Preparing materials · ${Math.min(i + batchSize, objects.length)} of ${objects.length}`);
     } finally {
       batch.children = [];
       renderer.autoClear = autoClear;
@@ -78,6 +92,7 @@ export async function compileProgramsInStages(
     if (!extension) await prepareBindings();
   }
   await prepareBindings();
+  progress?.(1, 'Graphics ready');
 
   async function prepareBindings() {
     const programs = (renderer.info.programs ?? []).filter(program => !preparedPrograms.has(program));
@@ -91,10 +106,16 @@ export async function compileProgramsInStages(
         for (let j = pending.length - 1; j >= 0; j--) {
           if (!pending[j].program || gl.getProgramParameter(pending[j].program as WebGLProgram, extension.COMPLETION_STATUS_KHR)) pending.splice(j, 1);
         }
+        progress?.(.5 + .25 * (programs.length - pending.length) / Math.max(1, programs.length),
+          `Compiling graphics · ${programs.length - pending.length} of ${programs.length}`);
       }
     }
+    let bound = 0, bindingYield = -Infinity;
     for (const program of programs) {
-      await yieldForPrograms(signal);
+      if (performance.now() - bindingYield >= 8) {
+        await yieldForPrograms(signal); bindingYield = performance.now();
+      }
+      signal.throwIfAborted();
       if (gl.isContextLost()) return;
       if (!program.program) continue; // Retired during a yielded completion/binding step.
       if (!extension) gl.getProgramParameter(program.program as WebGLProgram, gl.LINK_STATUS);
@@ -104,6 +125,8 @@ export async function compileProgramsInStages(
       program.getUniforms();
       program.getAttributes();
       preparedPrograms.add(program);
+      bound++;
+      progress?.(extension ? .75 + .25 * bound / programs.length : .9 * submitted / Math.max(1, objects.length), `Preparing graphics · ${bound} of ${programs.length}`);
     }
   }
 }

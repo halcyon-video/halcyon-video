@@ -142,6 +142,7 @@ export function buildWindowAwnings(ctx: FixtureContext, entryHalfWidth: number):
     lettering.emissiveIntensity = level * 1.45;
     for (const dl of downlights) {
       dl.intensity = level * 14;
+      dl.visible = dl.intensity > 0;
     }
   };
   const dispose = () => {

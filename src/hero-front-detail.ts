@@ -51,8 +51,9 @@ import {
   applyWhiteBorderShader,
   type CaseFinish,
 } from './video-case';
+import { isRequestTitle } from './request-title';
 import { stampCollectionGapSticker } from './case-corner-stickers';
-import { isDiscoveryRequested } from './jellyseerr';
+import { getJellyseerrConfig, isDiscoveryRequested } from './jellyseerr';
 import { onProbesReplaced } from './case-env-probes';
 import { uploadTextureNow } from './poster-textures';
 import { BB_ARCHIVO_BLACK } from './bundled-fonts';
@@ -148,13 +149,11 @@ export function stampPosterBadges(data: Uint8Array, w: number, h: number, movie:
   // time so an ordered case comes back gold after a reload, not just in the
   // session that ordered it. A gap title is never is4k (you don't own the file),
   // so those two stickers can't collide.
-  if (movie.collectionGap || movie.discovery) {
+  if (isRequestTitle(movie, getJellyseerrConfig() !== null)) {
     const requested = !!movie.discoveryRequested || isDiscoveryRequested(movie.tmdbId);
     out = stampCollectionGapSticker(out, w, h, movie.id, requested);
   }
-  // Provider identities are kept hidden while browsing and inspecting (GH #297, #294).
-  // Streaming titles carry no corner stickers during browsing; service choices
-  // are revealed only at checkout per #293.
+  // Streaming availability is printed with the box-back metadata; no front sticker.
   // Watch-history staff pick (staff-picks.ts): endcap order candidates only.
   if (movie.staffPick) out = stampStaffPickSticker(out, w, h, movie.id);
   return out;

@@ -132,3 +132,38 @@ for (const { arrangement, movieCount, requirePairs } of CASES) {
     }
   });
 }
+
+test('herringbone fills more wings before growing beyond the six-pane baseline', () => {
+  const plan = new StorePlan([buildBigLibrary(1200)]);
+  plan.setArrangement('herringbone');
+  plan.plan();
+  assert.equal(15 - plan.backWallZ, 52.5);
+  assert.ok(new Set(plan.shelvingUnits.map(u => u.rowGroupId)).size >= 5);
+  assert.ok(plan.shelvingUnits.length >= 10, 'retain all stock capacity');
+});
+
+test('herringbone retains clear parallel aisles and still grows for large collections', () => {
+  const plan = new StorePlan([buildBigLibrary(9600)]);
+  plan.setArrangement('herringbone');
+  plan.plan();
+  assert.ok(15 - plan.backWallZ > 60, 'depth is not capped at six panes');
+  const units = plan.shelvingUnits;
+  for (let i = 0; i < units.length; i++) {
+    for (let j = i + 1; j < units.length; j++) {
+      const a = units[i], b = units[j];
+      if (a.rowGroupId === b.rowGroupId || a.yaw !== b.yaw) continue;
+      const normal = Math.abs((b.xCenter-a.xCenter)*Math.cos(a.yaw)
+        -(plan.aisleZCenter(b)-plan.aisleZCenter(a))*Math.sin(a.yaw));
+      assert.ok(normal - 2.16 >= 3, `parallel aisle clearance ${normal - 2.16}`);
+    }
+  }
+});
+
+
+test('2400 titles fill existing wings before adding a seventh side pane', () => {
+  const plan = new StorePlan([buildBigLibrary(2400)]);
+  plan.setArrangement('herringbone');
+  plan.plan();
+  assert.ok(15 - plan.backWallZ < 56.5, 'retain six whole panes at this stock level');
+  assert.ok(plan.shelvingUnits.length >= 20, 'do not discard stock to avoid growth');
+});

@@ -24,8 +24,13 @@ export function vestibuleSide(spec: VestibuleSpec, side: -1 | 1, cx = 11) {
   const v = vestibuleLayout(spec), length = spec.doorWidth + 1;
   const sin = side * Math.SQRT1_2, cos = Math.SQRT1_2;
   const x = cx + side * vestibuleBackHalf(spec), z = v.backZ;
-  const doorAlong = length / 2;
-  return {x,z,length,sin,cos,yaw:Math.atan2(sin,cos),doorAlong,doorWidth:length,
+  // The clipped panel is one foot wider than the door so it can carry a real
+  // fixed jamb/sidelight between the counter and the leaf. Keep the leaf's
+  // front edge where it was and spend that extra foot at the rear: the old
+  // full-panel leaf looked oversized and put the counter-side EAS pedestal
+  // through the checkout band.
+  const doorAlong = length - spec.doorWidth / 2;
+  return {x,z,length,sin,cos,yaw:Math.atan2(sin,cos),doorAlong,doorWidth:spec.doorWidth,
     doorX:x+sin*doorAlong,doorZ:z+cos*doorAlong};
 }
 export function vestibuleStraightSide(spec: VestibuleSpec, side: -1 | 1, cx = 11) {

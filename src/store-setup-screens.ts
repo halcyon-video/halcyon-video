@@ -127,6 +127,9 @@ export function setupScreenKey(s: SetupScreen, key: SetupKey): { state: SetupScr
         const n = SETUP_PROVIDERS.length;
         return { state: { ...s, provider: (s.provider + (key === 'left' ? -1 : 1) + n) % n } };
       }
+      if (key === 'back') {
+        return { state: s, action: 'demo' };
+      }
       return { state: s };
     }
     case 'dialing':
@@ -196,6 +199,9 @@ export function setupScreenKey(s: SetupScreen, key: SetupKey): { state: SetupScr
         if (s.row === 1) return { state: s, action: 'change-server' };
         if (s.row === 2) return { state: s, action: 'demo' };
         if (s.row === 3) return { state: { ...s, copied: true }, action: 'copy-report' };
+      }
+      if (key === 'back') {
+        return { state: s, action: 'demo' };
       }
       return { state: s };
     }

@@ -10,18 +10,16 @@ import { mirrorPanoramaRotation } from './mirror-panorama';
 import { markMirrorVisibility, pickMirror, type MirrorScheduleEntry } from './mirror-schedule';
 import { perfTrace } from './perf-trace';
 import { SP_MIRROR, CT_MIRROR, MIRROR_REFRESH_HZ } from './scene-shared';
+import { resolveReflectionMode, type MirrorReflectionMode } from './mirror-cubemap-lifecycle';
 import type { StoreScene } from './three-scene';
+export { shouldCaptureMirrorRoomProbe } from './mirror-cubemap-lifecycle';
 
-type ReflectionMode = 'auto' | 'cubemap' | 'smooth';
-function reflectionMode(): ReflectionMode {
-  const value = localStorage.getItem('bb_reflections');
-  return value === 'cubemap' || value === 'smooth' ? value : 'auto';
-}
-type CubeMirror = { material: THREE.MeshBasicMaterial };
+const reflectionMode = (): MirrorReflectionMode => resolveReflectionMode(localStorage.getItem('bb_reflections'));
+type CubeMirror = { material: THREE.MeshBasicMaterial; mesh: THREE.Mesh };
 type MirrorState = {
-  targets: MirrorRenderTarget; mode: ReflectionMode; frame: number;
+  targets: MirrorRenderTarget; mode: MirrorReflectionMode; frame: number;
   camera: THREE.PerspectiveCamera; cubes: CubeMirror[];
-  probe: THREE.Texture | null;
+  probe: THREE.Texture | null; fallback: THREE.MeshStandardMaterial | null;
 };
 let reflectorRendering = false;
 const states = new WeakMap<StoreScene, MirrorState>();
@@ -31,6 +29,8 @@ export function disposeMirrorTargets(scene: StoreScene): void {
   state?.targets.dispose();
   // Reflector.dispose also releases its current material; disposal is idempotent.
   for (const cube of state?.cubes ?? []) cube.material.dispose();
+  state?.fallback?.map?.dispose();
+  state?.fallback?.dispose();
   states.delete(scene);
 }
 export type MirrorEntry = MirrorScheduleEntry & {
@@ -164,11 +164,33 @@ export function renderMirrorsAhead(scene: StoreScene) {
   }
 }
 
+/** Uncaptured mirrors are satin metal, never unlit white panels. */
+function uncapturedMirrorMaterial(): THREE.MeshStandardMaterial {
+  const size = 64, pixels = new Uint8Array(size * size * 4);
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const i = (y * size + x) * 4;
+      const grain = 206 + ((y * 17) % 13) + ((x * 13 + y * 7) % 3);
+      pixels[i] = pixels[i + 1] = pixels[i + 2] = grain;
+      pixels[i + 3] = 255;
+    }
+  }
+  const map = new THREE.DataTexture(pixels, size, size);
+  map.colorSpace = THREE.SRGBColorSpace;
+  map.wrapS = map.wrapT = THREE.RepeatWrapping;
+  map.magFilter = THREE.LinearFilter;
+  map.needsUpdate = true;
+  return new THREE.MeshStandardMaterial({
+    color: 0x8c949e, map, metalness: .35, roughness: .7, envMapIntensity: .25,
+  });
+}
+
 function updateCubeProbes(scene: StoreScene, state: MirrorState) {
   const next = scene.mirrorRoomProbe;
   if (state.probe === next) return;
   state.probe = next;
   for (const cube of state.cubes) {
+    cube.mesh.material = next ? cube.material : state.fallback!;
     cube.material.envMap = next;
     cube.material.needsUpdate = true;
   }
@@ -178,7 +200,7 @@ export function installMirrorThrottle(scene: StoreScene) {
   disposeMirrorTargets(scene);
   const state: MirrorState = {
     targets: new MirrorRenderTarget(), mode: reflectionMode(), frame: 0,
-    camera: new THREE.PerspectiveCamera(), cubes: [], probe: null,
+    camera: new THREE.PerspectiveCamera(), cubes: [], probe: null, fallback: null,
   };
   states.set(scene, state);
   scene.mirrors.length = 0;
@@ -198,8 +220,9 @@ export function installMirrorThrottle(scene: StoreScene) {
       });
       // Reflector is still a mesh; its unrendered target allocates no GPU storage.
       // Its normal disposal path owns the replacement material.
-      (obj as THREE.Mesh).material = material;
-      state.cubes.push({ material });
+      state.fallback ??= uncapturedMirrorMaterial();
+      (obj as THREE.Mesh).material = state.fallback;
+      state.cubes.push({ material, mesh: obj });
     } else {
       state.targets.prepare(obj.getRenderTarget());
       scene.mirrors.push({

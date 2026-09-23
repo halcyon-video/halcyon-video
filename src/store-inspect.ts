@@ -18,7 +18,8 @@ import { recordInspect } from './clerk-recommend';
 import { retailAudio } from './audio';
 import { showClerkToast } from './carried-tapes';
 import { perfTrace } from './perf-trace';
-import { isDiscoveryRequested } from './jellyseerr';
+import { getJellyseerrConfig, isDiscoveryRequested } from './jellyseerr';
+import { isRequestTitle } from './request-title';
 import { SP_HERO, CT_HERO, updatedMeshes } from './scene-shared';
 import { getGoldCaseMaterials } from './fixtures/gold-clamshell';
 import type { StoreScene } from './three-scene';
@@ -233,7 +234,8 @@ export function selectAction(scene: StoreScene): 'inspect' | 'play' | 'request' 
     // An inline discovery suggestion has no rental copy either -- the same
     // deliberate "confirm in inspect mode" press instead sends a Jellyseerr
     // request for it (see main.ts's request handling).
-    if (inspectedMovie?.discovery) {
+    if (inspectedMovie?.discovery && !inspectedMovie.streaming) {
+      if (!isRequestTitle(inspectedMovie, getJellyseerrConfig() !== null)) return null;
       if (inspectedMovie.discoveryRequested || isDiscoveryRequested(inspectedMovie.tmdbId)) {
         showClerkToast(`"${inspectedMovie.title}" is already on order, hon — it should be in soon.`);
         scene.onConsoleLog(`[System] "${inspectedMovie.title}" has already been requested.`, "system");
@@ -246,7 +248,8 @@ export function selectAction(scene: StoreScene): 'inspect' | 'play' | 'request' 
     // same confirm press instead asks the clerk to order it through
     // Jellyseerr (main.ts's request handling), and once it's on order the
     // press just gets you the "already on its way" line.
-    if (inspectedMovie?.collectionGap) {
+    if (inspectedMovie?.collectionGap && !inspectedMovie.streaming) {
+      if (!isRequestTitle(inspectedMovie, getJellyseerrConfig() !== null)) return null;
       if (inspectedMovie.discoveryRequested || isDiscoveryRequested(inspectedMovie.tmdbId)) {
         showClerkToast(`"${inspectedMovie.title}" is already on order, hon — it should be in soon.`);
         scene.onConsoleLog(`[System] "${inspectedMovie.title}" has already been requested.`, "system");
@@ -545,20 +548,20 @@ export function toggleFlip(scene: StoreScene) {
   if (scene.mode === 'inspect') {
     // A series boxset has four faces — "flip" jumps front <-> back through
     // the shortest turn so jumpToTitle(..., {flip}) and existing callers work.
-    if (scene.getSelectedMovie()?.isSeries) {
+    if (scene.getSelectedMovie()?.isSeries && !scene.getSelectedMovie()?.streaming) {
       scene.rotateHeroFace(scene.heroFace === 2 ? -2 : 2 - scene.heroFace);
       return;
     }
     // No rental copy beside it (bargain-bin stock) — nothing to turn to
     // its spine, so it's a plain two-stop front <-> back cycle on the retail
     // case, same as a boxset.
-    if (scene.slotsByPosition.get(scene.getActiveSlotKey())?.noRentalCase) {
+    if (scene.getSelectedMovie()?.streaming || scene.slotsByPosition.get(scene.getActiveSlotKey())?.noRentalCase) {
       scene.isFlipped = !scene.isFlipped;
       if (!scene.isFlipped && isStreamingChoiceActive(scene.getSelectedMovie())) {
         cancelStreamingServiceChoice(scene);
       }
       scene.heroSpine = false;
-      scene.selectedBackCoverRegionIdx = scene.isFlipped ? 0 : -1;
+      scene.selectedBackCoverRegionIdx = scene.isFlipped && !scene.getSelectedMovie()?.streaming ? 0 : -1;
       scene.updateBackCoverHighlight();
       retailAudio.playBoxFlip();
       scene.onConsoleLog(`[System] Flipped case: ${scene.isFlipped ? 'Back' : 'Front'}`, "system");
@@ -598,6 +601,9 @@ export function updateBackCoverHighlight(scene: StoreScene) {
 
   scene.heroFrontMesh.material = scene.heroFrontMaterials(movie);
   scene.applyNrBayWash?.(scene.heroFrontMesh);
+  if (movie.streaming && scene.heroBackMesh) {
+    scene.heroBackMesh.material = createHeroRentalMaterials(movie, true, Math.min(scene.selectedLibraryIdx, 4));
+  }
 
   // Flipping changes the pose, never the physical rental construction.
   if (scene.heroBackMesh) {
@@ -649,7 +655,7 @@ export function ensureHeroCases(scene: StoreScene, movie: Movie, nrCase = false)
     scene.heroMovieId = movie.id;
     heroWasNRCase = nrCase;
     heroDetailKey = wantDetail;
-    scene.heroFrontMesh.geometry = movie.isSeries ? getSeriesBoxsetGeometry() : detailedCaseGeometry(getCaseGeometry(isAnimated, gameDims));
+    scene.heroFrontMesh.geometry = movie.isSeries && !movie.streaming ? getSeriesBoxsetGeometry() : detailedCaseGeometry(getCaseGeometry(isAnimated, gameDims));
     scene.heroBackMesh.geometry = detailedCaseGeometry(getRentalCaseGeometry(false, shellDims));
     scene.heroFrontMesh.material = scene.heroFrontMaterials(movie);
     scene.applyNrBayWash?.(scene.heroFrontMesh);
@@ -658,12 +664,12 @@ export function ensureHeroCases(scene: StoreScene, movie: Movie, nrCase = false)
     syncJewelDressing(scene.heroFrontMesh, movie, gameDims);
     // NR wall slots: the rental copy is the red-sleeve/gold-ticket NEW
     // RELEASE RENTAL case, matching the wall's instanced back boxes.
-    scene.heroBackMesh.material = nrCase
+    scene.heroBackMesh.material = nrCase && !movie.streaming
       ? withCaseConstructionMaterials(getGoldCaseMaterials())
       : createHeroRentalMaterials(movie, wantDetail !== null, probeIdx);
     scene.applyNrBayWash?.(scene.heroBackMesh);
     perfTrace.end(SP_HERO);
-    if (movie.isSeries) scene.ensureSeriesEpisodes(movie);
+    if (movie.isSeries && !movie.streaming) scene.ensureSeriesEpisodes(movie);
     // Poster may still be streaming in — either never decoded yet, or its
     // posterPixelCache entry was evicted since (miss-tolerant: the hero mesh
     // above already built with a placeholder front via createHeroJellyfinMaterials
@@ -691,7 +697,7 @@ export function heroFrontMaterials(scene: StoreScene, movie: Movie): THREE.Mater
   // shopper is actually reading — so an inspected case gets the high-resolution
   // face here too, not just via ensureHeroCases (this is the path flip and
   // cast-row navigation come back through).
-  if (movie.isSeries) return createHeroSeriesBoxsetMaterials(movie, scene.highlightedBackRegionName, probeIdx);
+  if (movie.isSeries && !movie.streaming) return createHeroSeriesBoxsetMaterials(movie, scene.highlightedBackRegionName, probeIdx);
   const heroDetail = scene.mode === 'inspect';
   const mats = createHeroJellyfinMaterials(movie, scene.highlightedBackRegionName, false, heroDetail, probeIdx);
   // The cover art is the reason you picked the box up, and at shelf resolution it
@@ -839,7 +845,8 @@ const _focusFace = new THREE.Vector3();
 export function heroFocusDistance(scene: StoreScene): number {
   const cam = scene.camera;
   cam.getWorldDirection(_focusFwd);
-  const hero = (scene.heroFrontMesh && scene.heroFrontMesh.visible) ? scene.heroFrontMesh
+  const hero = scene.isFlipped && scene.getSelectedMovie()?.streaming && scene.heroBackMesh?.visible ? scene.heroBackMesh
+    : (scene.heroFrontMesh && scene.heroFrontMesh.visible) ? scene.heroFrontMesh
     : (scene.heroBackMesh && scene.heroBackMesh.visible) ? scene.heroBackMesh
     : null;
   // No hero bound (the instanced-box fallback path in updateHeroCase): the look
@@ -868,4 +875,18 @@ export function heroFocusDistance(scene: StoreScene): number {
     }
   }
   return nearest;
+}
+
+
+export function handleBackCoverTap(scene: StoreScene, raycaster: THREE.Raycaster): boolean {
+  const movie = scene.getSelectedMovie();
+  if (scene.mode !== 'inspect' || !scene.isFlipped || movie?.streaming || movie?.isSeries
+    || !movie || !scene.heroFrontMesh?.visible) return false;
+  const hit = raycaster.intersectObject(scene.heroFrontMesh, false)[0];
+  if (hit?.face?.materialIndex !== 5 || !hit.uv) return false;
+  const v = 1 - hit.uv.y;
+  const region = backCoverRegions.get(movie.id)?.find(r => v >= r.y0 && v <= r.y1);
+  if (!region) return false;
+  scene.showPersonEndcap(region.name, region.kind);
+  return true;
 }

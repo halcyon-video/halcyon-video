@@ -1,3 +1,4 @@
+import { mobileCheckoutAction } from './mobile-checkout';
 // Direct manipulation for the hosted touch store. Desktop input stays in its
 // existing keyboard/mouse state machine.
 import * as THREE from 'three';
@@ -47,10 +48,11 @@ function selectSlot(scene: StoreScene, slot: MovieSlot): void {
   }
 }
 
-function isOverlayBlocking(): boolean {
+export function isMobileOverlayBlocking(): boolean {
   if (typeof window === 'undefined') return false;
   const u = (window as any).__uiState;
   if (u?.isAnyOverlayOpen || u?.isPlaybackActive || u?.isScreensaverActive) return true;
+  if (document.querySelector('.clerk-dialog.visible')) return true;
   const overlayIds = [
     'power-menu-overlay', 'settings-drawer-overlay', 'search-overlay',
     'feedback-pin-overlay', 'login-overlay', 'exit-confirm-overlay',
@@ -135,7 +137,7 @@ export function isCursorTap(scene: StoreScene, clientX: number, clientY: number)
 /** One tap examines a case; a tap from overview flies to that exact section. */
 export function mobileStoreTap(scene: StoreScene, e: PointerEvent): boolean {
   if (!mobileStoreActive() || !['overview', 'browse', 'inspect'].includes(scene.mode)) return false;
-  if (isOverlayBlocking()) return false;
+  if (isMobileOverlayBlocking()) return false;
   if (dragged.has(scene)) {
     dragged.delete(scene);
     if (scene.mode !== 'inspect') return true;
@@ -159,6 +161,12 @@ export function mobileStoreTap(scene: StoreScene, e: PointerEvent): boolean {
     if (!hit.object.visible) continue;
     if (scene.mode === 'inspect' && (hit.object === scene.heroFrontMesh || hit.object === scene.heroBackMesh)) {
       if (handleStreamingCaseHit(scene, hit)) {
+        return true;
+      }
+      // The held front is an action target, just like TAKE TO COUNTER.
+      // Back-cover taps retain their cast and service-row hit regions.
+      if (!scene.isFlipped) {
+        if (!mobileCheckoutAction(scene, false)) scene.onBrowseConfirm?.();
         return true;
       }
       return false;
@@ -226,7 +234,7 @@ export function mobileStoreTap(scene: StoreScene, e: PointerEvent): boolean {
 /** A gesture holds its own continuous camera pose; no arrow callbacks. */
 export function beginMobileDrag(scene: StoreScene, x: number, y: number) {
   dragged.delete(scene);
-  if (isOverlayBlocking()) return null;
+  if (isMobileOverlayBlocking()) return null;
   if (!mobileStoreActive() || !['overview', 'browse'].includes(scene.mode) || scene.tvPeek) return null;
   const overview = scene.mode === 'overview';
   const mode = scene.mode;
@@ -284,7 +292,7 @@ export function beginMobileDrag(scene: StoreScene, x: number, y: number) {
 
   return {
     move(px: number, py: number) {
-      if (scene.mode !== mode || isOverlayBlocking()) return;
+      if (scene.mode !== mode || isMobileOverlayBlocking()) return;
       dragged.add(scene);
 
       const now = performance.now();
@@ -370,7 +378,7 @@ export function beginMobileDrag(scene: StoreScene, x: number, y: number) {
       scene.requestRender();
     },
     end() {
-      if (scene.mode !== mode || isOverlayBlocking()) return;
+      if (scene.mode !== mode || isMobileOverlayBlocking()) return;
 
       // Finger held still before lift dissipates flick velocity
       if (performance.now() - lastMoveTime > 80) {
@@ -391,12 +399,18 @@ export function beginMobileDrag(scene: StoreScene, x: number, y: number) {
         const item = items[selIdx];
         if (item) {
           scene.overviewYaw = angles[selIdx];
-          scene.overviewPitch = 0;
           scene.updateCameraTarget();
           scene.cameraGlideLerp = 0.16;
           scene.updateSelectionArrow();
         }
       } else if (!overview) {
+        // A deliberate drag ends where the finger leaves it. Reframing the
+        // selected case here pulls a stationary finger release back toward
+        // the shelf's discrete camera window (visible rubber-banding).
+        if (Math.max(Math.abs(velX), Math.abs(velY)) <= 0.35) {
+          scene.updateLOD(); scene.requestRender();
+          return;
+        }
         // Bounded settling on flick across columns or rows
         const absVx = Math.abs(velX);
         const absVy = Math.abs(velY);

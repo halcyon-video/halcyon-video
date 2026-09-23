@@ -1,3 +1,4 @@
+import { captureEnvironmentInSlices } from './cube-capture';
 // Outside world + interior light energy: the sky dome texture per mode
 // (day/night/sunset), the per-visit sun placement, and the baked-environment
 // pipeline (PMREM capture of the actual store) that supplies ambient light and
@@ -99,7 +100,7 @@ export interface OutdoorLightingDeps {
   getBakeHidden: () => THREE.Object3D[];
   // After a re-bake the per-library reflection probes (case-material env maps)
   // were captured under stale lighting — the scene recaptures and re-applies.
-  onEnvironmentRebaked: () => void;
+  onEnvironmentRebaked: (captureProbes?: boolean) => void;
   // Per-mode interior light retune (e.g. troffer key spots carry the floor at
   // night). Called from updateSkybox BEFORE the re-bake, so the change is
   // folded into the captured environment too.
@@ -697,6 +698,19 @@ export class OutdoorLightingRig {
     // every case dark in daylight. Re-capture them under the new environment and
     // re-apply the active probe to the shared case materials.
     this.deps.onEnvironmentRebaked();
+  }
+
+  async rebakeEnvironmentInSlices(wait: () => Promise<void>, signal: AbortSignal): Promise<void> {
+    const renderer = this.deps.getRenderer(), scene = this.deps.getScene();
+    if (!this.envPmremGen) this.envPmremGen = new THREE.PMREMGenerator(renderer);
+    const target = await captureEnvironmentInSlices(renderer, scene, this.envPmremGen,
+      new THREE.Vector3(11, 6.5 * this.deps.getCeilingY() / CEILING_Y, (15 + this.deps.getBackWallZ()) / 2),
+      this.bakeResolution, this.defaultBakeBounces, this.deps.getBakeHidden(), wait, signal);
+    const previous = this.envRenderTarget;
+    this.envRenderTarget = target; scene.environment = target.texture;
+    scene.environmentIntensity = this.envDisplayIntensity; this.envBakeReady = true;
+    this.deps.onEnvironmentRebaked(false);
+    previous?.dispose();
   }
 
   dispose() {

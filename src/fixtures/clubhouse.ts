@@ -13,6 +13,7 @@ import { createSignTextTexture, createEntranceTicketLogoTexture } from '../canva
 import { markSignMesh } from '../sign-builders';
 import { tryLoadUserSignArtTexture } from '../user-assets';
 import { makeCurvedScreenGeometry } from '../crt-tube';
+import { installClubhouseCarpet } from './clubhouse-carpet';
 
 /** Original built-in corner club. Private artwork uses the existing sign slots.
  * Scene teardown owns the root; async loads and all finishes retire with it. */
@@ -88,8 +89,7 @@ export class Clubhouse implements SlottedFixture {
         if(o.material===wall || [finishes.FramePaint,finishes.HeaderPaint,finishes.EdgePaint].includes(o.material as THREE.MeshStandardMaterial))mapClubhouseWall(o,this.ctx);
         const uv=o.geometry.getAttribute('uv');if(uv)o.geometry.setAttribute('uv1',uv.clone());}});
     }));
-    // The continuous store floor supplies the nook's exact carpet maps, weave,
-    // world UVs, normal scale, roughness and baked contact AO. No overlay rug.
+    this.removers.push(installClubhouseCarpet(this.ctx, root));
     this.sign('clubhouse-header',createEntranceTicketLogoTexture(this.ctx.activeTheme,true),4.6,2.76,4.14,8.98,4.14,Math.PI/4);
     this.sign('clubhouse-plaque',createSignTextTexture('KIDS CLUBHOUSE',undefined,'standard',6.4/.65),6.4,.65,4.15,7.47,4.15,Math.PI/4);
     // Existing modeled television, sitting on the console at its floor datum.

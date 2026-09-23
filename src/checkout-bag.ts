@@ -89,6 +89,9 @@ const LIFT_H = 0.42;
 
 const MAX_VISIBLE_ITEMS = 3;
 
+// The clerk holds an empty bag above the crowded worktop while filling it.
+export const CHECKOUT_BAG_FLOAT_HEIGHT = 1.15;
+
 // The VISIBLE mesh shrinks to this as it sinks past the rim; the cloth keeps
 // colliding with the FULL-size box, so the bag stays bulged around a
 // full-size tape while the rendered case ends up well inside that envelope —
@@ -198,6 +201,7 @@ export class CheckoutBag {
   // Lift state
   private lifting = false;
   private liftStart = 0; // bag-clock ms
+  private floating = false;
   private liftHold = false; // harness: freeze mid-carry to photograph the droop
   private repinning = false; // easing the bottom back onto the counter
   private itemLift = 0; // lagged carry-rise the contents ride during the lift
@@ -527,20 +531,28 @@ export class CheckoutBag {
     this.baseGroupPos.set(x, y, z);
     this.baseGroupQuat.setFromEuler(new THREE.Euler(0, yaw, 0));
     this.laidQuat.copy(this.baseGroupQuat).multiply(new THREE.Quaternion().setFromAxisAngle(_xAxis, -Math.PI / 2));
-    this.mouthWorld.set(x, y + BODY_H * .78, z);
+    const floatY = this.floating ? CHECKOUT_BAG_FLOAT_HEIGHT : 0;
+    this.mouthWorld.set(x, y + BODY_H * .78 + floatY, z);
     this.group.position.copy(this.baseGroupPos);
+    this.group.position.y += floatY;
     this.group.quaternion.copy(this.baseGroupQuat);
   }
 
-  /** Reveal the bag in its rest pose (checkout flourish start). */
-  show(): void {
+  /** Reveal the empty bag held above the worktop, clear of its fixtures. */
+  show(floating = true): void {
     if (this.shown) return;
     this.shown = true;
+    this.floating = floating;
     this.group.visible = true;
-    // A previous checkout may have carried the bag off on its side — snap the
-    // whole group back to its upright rest spot on the counter.
+    // A previous checkout may have carried the bag off on its side.
     this.group.position.copy(this.baseGroupPos);
+    if (floating) this.group.position.y += CHECKOUT_BAG_FLOAT_HEIGHT;
     this.group.quaternion.copy(this.baseGroupQuat);
+    this.mouthWorld.set(
+      this.baseGroupPos.x,
+      this.baseGroupPos.y + BODY_H * .78 + (floating ? CHECKOUT_BAG_FLOAT_HEIGHT : 0),
+      this.baseGroupPos.z,
+    );
     this.lastNow = null;
     this.accumMs = 0;
     this.pos.set(this.rest);
@@ -570,6 +582,7 @@ export class CheckoutBag {
     this.lifting = false;
     this.liftHold = false;
     this.sleeping = true;
+    this.floating = false;
   }
 
   /**

@@ -1568,8 +1568,8 @@ export class EntranceCheckout implements StoreFixture {
   // Make the (single) bag appear and start simulating — called at the start of
   // the checkout flourish. Resets the cloth to its rest pose so each trip looks
   // the same, then the solver runs (sleeping whenever settled) until hideBag().
-  showBag(): void {
-    this.bag?.show();
+  showBag(floating = true): void {
+    this.bag?.show(floating);
   }
 
   // Hide + freeze the bag once the exit walk completes; it costs nothing until

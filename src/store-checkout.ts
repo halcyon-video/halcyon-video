@@ -24,7 +24,8 @@ import {
 import type { StoreScene } from './three-scene';
 import { counterFrame } from './counter-anchors';
 import { facadeEntryGlazing, facadeStyle } from './storefront-architecture';
-import { getStreamingCheckoutMovie, clearStreamingCheckoutMovie } from './streaming-checkout';
+import { getStreamingCheckoutMovie, completeStreamingCheckout } from './streaming-checkout';
+import { CHECKOUT_BAG_FLOAT_HEIGHT } from './checkout-bag';
 
 export function ensureCarried(scene: StoreScene): CarriedTapes {
   if (!scene.carried) {
@@ -341,23 +342,18 @@ export function confirmCheckout(scene: StoreScene): boolean {
   if (scene.checkoutRunning) return false;
   const streamingMovie = getStreamingCheckoutMovie(scene) ?? (scene.carried?.topMovie()?.streaming ? scene.carried.topMovie() : null);
   if (streamingMovie) {
+    if (!streamingMovie.streamingUrl || !scene.entrance) return false;
     retailAudio.playCheckoutChime();
     showClerkToast(`Enjoy "${streamingMovie.title}" on ${streamingMovie.streamingServiceName || 'streaming'}!`);
-    if (streamingMovie.streamingUrl) {
-      try {
-        window.open(streamingMovie.streamingUrl, '_blank', 'noopener');
-      } catch {
-        scene.onConsoleLog(`[System] Couldn't open the link for "${streamingMovie.title}" (popup blocked?).`, 'system');
-      }
-    }
-    scene.carried?.clearAll(true);
-    clearStreamingCheckoutMovie(scene);
-    scene.clerk?.releaseFromRegister();
-    if (scene.overviewStart) {
-      scene.enterOverview();
-    } else {
-      scene.returnToEntrance();
-    }
+    // Only this streaming sleeve goes into the bag. Physical titles already
+    // being carried remain untouched, including in rental mode.
+    scene.entrance.showBag();
+    const copy = new THREE.Mesh(getRentalCaseGeometry(false), createHeroRentalMaterials(streamingMovie));
+    copy.castShadow = copy.receiveShadow = true;
+    scene.entrance.dropIntoBag(copy);
+    scene.carried?.drop(streamingMovie.id);
+    scene.checkoutRunning = true;
+    scene.checkoutExit = { start: performance.now(), ids: [] };
     scene.requestRender();
     return true;
   }
@@ -473,6 +469,10 @@ export function confirmCheckoutVR(scene: StoreScene): boolean {
 }
 
 export function finishCheckout(scene: StoreScene, ids: string[]): void {
+  if (getStreamingCheckoutMovie(scene)) {
+    completeStreamingCheckout(scene);
+    return;
+  }
   scene.checkoutRunning = false;
   scene.checkoutExit = null;
   scene.carried?.clearAll(true);
@@ -510,14 +510,14 @@ export function finishCheckout(scene: StoreScene, ids: string[]): void {
 export function updateCheckoutExit(scene: StoreScene, now: number): void {
   const exit = scene.checkoutExit;
   if (!exit) return;
-  const t = scene.debugCheckoutExitFreeze ?? (now - exit.start);
+  // A long rendering hitch must land at the door, never extrapolate the path.
+  const t = Math.min(7600, scene.debugCheckoutExitFreeze ?? (now - exit.start));
 
   // Phase map (ms) — mirrored in debugStageCheckoutExit, harness.ts's bagexit
   // comment and CLAUDE.md's bagexit line; keep all four in step. The play
   // flourish also lands here (store-inspect.ts hands off at LAUNCH_HANDOFF_MS),
   // so launch pins map onto these phases at x−4300.
-  const T_SLIDE0 = 1200;    // wrap done; cloth frozen; the clerk starts the shove
-  const T_SLIDE1 = 2000;    // bag parked ON the band top at the counter's right end
+  const T_SLIDE0 = 1200;    // filled bag laid flat at the clear counter-edge wait spot
   const T_WALK0 = 2400;     // first-person walk-out starts — the bag stays put
   const T_PICK = 4100;      // walker halts beside the waiting bag; handle pinch
   const T_HAND0 = 4300;     // rigid blend: band-top wait spot -> hand carry
@@ -554,8 +554,8 @@ export function updateCheckoutExit(scene: StoreScene, now: number): void {
 
   if (t >= T_SLIDE0 && !exit.slid) {
     exit.slid = true;
-    // Freeze the SETTLED cloth (no lift): the slide is a rigid shove of a
-    // standing bag along the countertop, not a carry.
+    // Freeze the settled cloth after the clerk has lowered the filled bag onto
+    // the clear edge spot, away from the printer/terminal work surface.
     scene.entrance?.freezeBag();
   }
   if (t >= T_PICK && !exit.pickedUp) {
@@ -571,34 +571,28 @@ export function updateCheckoutExit(scene: StoreScene, now: number): void {
 
   if (t < T_WALK0) {
     if (t < T_SLIDE0) {
-      // WRAP: lean in over the bag from the right-side stand while the
-      // cloth does the acting.
+      // The clerk holds the bag clear of the crowded worktop while it fills,
+      // then lowers it directly to the counter-edge wait spot and lays it
+      // print-side up. It never intersects the printer beneath its fill pose.
+      const k = Math.min(1, t / T_SLIDE0);
+      const u = k * k * (3 - 2 * k);
+      carry.set(
+        WAIT_DX * u,
+        CHECKOUT_BAG_FLOAT_HEIGHT * (1 - u) + WAIT_RISE * u,
+        WAIT_DZ * u,
+      );
+      scene.entrance?.setBagExitPose(u, carry);
       scene.targetCameraPos.set(
         stand.x + (bag.x - stand.x) * 0.30, bag.y + 1.15,
         stand.z + (bag.z - stand.z) * 0.30);
-      scene.targetLookAt.set(bag.x, bag.y - 0.25, bag.z);
+      scene.targetLookAt.set(
+        bagBase.x + carry.x, bagBase.y + carry.y + 0.45, bagBase.z + carry.z);
       return;
     }
-    // SLIDE (0.8s): the clerk shoves the standing bag across the island,
-    // up over the shared lip onto the shield band's blue top, and parks it
-    // at the counter's right end — where the walk-out will pass. It never
-    // leaves the counter: the vertical hugs the two surfaces the whole
-    // way, and it WAITS there until the walker comes around to grab it.
-    const k = Math.min(1, (t - T_SLIDE0) / (T_SLIDE1 - T_SLIDE0));
-    const u = k * k * (3 - 2 * k);
-    let y: number;
-    if (u < 0.30) {
-      y = 0.012 * Math.sin(t * 0.02); // dragging chatter on the island top
-    } else if (u < 0.62) {
-      const s = (u - 0.30) / 0.32;
-      y = WAIT_RISE * (s * s * (3 - 2 * s)); // up over the lip onto the band
-    } else {
-      // skating the band top; chatter dies out so the park is dead still
-      y = WAIT_RISE + 0.010 * Math.sin(t * 0.02) * (1 - (u - 0.62) / 0.38);
-    }
-    carry.set(WAIT_DX * u, y, WAIT_DZ * u);
-    scene.entrance?.setBagExitPose(0, carry, Math.sin(t * 0.005) * 0.12 * u * (1 - u));
-    // Camera pulls back to the stand, tracking the shove.
+    // The filled bag waits flat on the counter edge until the customer rounds
+    // the counter to collect it.
+    carry.set(WAIT_DX, WAIT_RISE, WAIT_DZ);
+    scene.entrance?.setBagExitPose(1, carry);
     scene.targetCameraPos.copy(stand);
     scene.targetLookAt.set(
       bagBase.x + carry.x, bagBase.y + carry.y + 0.9, bagBase.z + carry.z);
@@ -674,7 +668,7 @@ export function updateCheckoutExit(scene: StoreScene, now: number): void {
     WAIT_DZ + (hz - WAIT_DZ) * g);
   const walkYaw = Math.atan2(fx, fz) + Math.PI / 2; // faces swing to the sides
   const restYaw = scene.entrance?.bagRestYaw ?? walkYaw;
-  scene.entrance?.setBagExitPose(0, carry, Math.sin(t * 0.006) * 0.06 * g,
+  scene.entrance?.setBagExitPose(1 - g, carry, Math.sin(t * 0.006) * 0.06 * g,
     restYaw + (walkYaw - restYaw) * g);
 
   // Camera: eyes ahead along the path, turning PART-way to the bag for the

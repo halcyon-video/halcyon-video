@@ -1,3 +1,4 @@
+import { mobileStoreActive } from './mobile-store';
 import { vestibuleSide, vestibuleLayout, counterDatumShift } from './vestibule-layout.ts';
 import { exitReturnLayout } from './exit-return-layout';
 import { RETAIL_FIXTURE_SPECS } from './retail-fixture-specs';
@@ -1065,7 +1066,7 @@ export function buildStore(scene: StoreScene) {
   {
     const keyY = ceilingY - 0.2; // just under the tiles, below the roof slab
     const halfAngle = THREE.MathUtils.degToRad(62);
-    const trofferShadows = scene.effectiveQuality !== 'low' && !scene.softwareGL;
+    const trofferShadows = (scene.effectiveQuality !== 'low' || mobileStoreActive()) && !scene.softwareGL;
     const trofferMapSize = scene.effectiveQuality === 'high' ? 1024 : 512;
     // FRAGMENT-SAMPLER BUDGET — why every troffer can't cast a shadow.
     //
@@ -1099,8 +1100,8 @@ export function buildStore(scene: StoreScene) {
     let OTHER_SHADOW_LIGHTS = 0;
     // Include the parking sources before allocating the remaining troffer samplers.
     scene.scene.traverse(o => { if (o instanceof THREE.Light && o.castShadow) OTHER_SHADOW_LIGHTS++; });
-    const spotShadowBudget = Math.max(0,
-      scene.renderer.capabilities.maxTextures - MATERIAL_SAMPLER_RESERVE - OTHER_SHADOW_LIGHTS);
+    const spotShadowBudget = Math.min(mobileStoreActive() ? 2 : Infinity, Math.max(0,
+      scene.renderer.capabilities.maxTextures - MATERIAL_SAMPLER_RESERVE - OTHER_SHADOW_LIGHTS));
     // Spacing is set by where a pool actually still reads, not by the cone's
     // nominal 62°. Penumbra 0.85 feathers the outer 85% of the cone away, and
     // illuminance on the floor falls as cos³ of the off-axis angle on top of
@@ -1316,6 +1317,7 @@ export function buildStore(scene: StoreScene) {
     metalness: 0.0
   });
   const floor = new THREE.Mesh(floorGeo, floorMat);
+  floor.name = 'store-floor';
   floor.position.set(STORE_CENTER_X, floorY, sideWallZ);
   floor.rotation.x = -Math.PI / 2;
   floor.receiveShadow = true;

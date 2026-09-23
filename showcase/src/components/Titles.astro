@@ -1,0 +1,7 @@
+---
+import type { CatalogTitle } from '../catalog/schema';
+interface Props { titles: CatalogTitle[]; }
+import { titlePath } from '../catalog/schema';
+const { titles } = Astro.props;
+---
+<ul class="cards">{titles.map(title => <li><a class="card" href={titlePath(title)}><div class="poster" aria-hidden="true">{title.title}</div><h2>{title.title}</h2><p class="meta">{title.mediaType === 'tv' ? 'Series' : 'Movie'} · {title.year ?? 'Year unknown'}</p></a></li>)}</ul>

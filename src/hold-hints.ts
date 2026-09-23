@@ -25,7 +25,7 @@ function makePill(id: string, label: string, bottomPx: number): HoldPill {
     'pointer-events:none;opacity:0;transition:opacity .25s;overflow:hidden;' +
     "font-family:var(--font-mono,'Courier New',monospace);font-size:20px;font-weight:400;letter-spacing:.1em;" +
     'color:#eef3ff;background:rgba(9,16,38,.85);border:2px solid var(--bb-secondary, #f2e8c9);' +
-    'border-radius:999px;padding:8px 22px;text-shadow:0 1px 2px #000;';
+    'border-radius:0;padding:8px 22px;max-width:calc(100vw - 48px);box-sizing:border-box;text-align:center;text-shadow:0 1px 2px #000;';
   const fill = document.createElement('div');
   fill.style.cssText =
     'position:absolute;inset:0;transform-origin:left;transform:scaleX(0);' +
@@ -57,7 +57,7 @@ export function refreshHoldHints(state: { checkout: boolean; dismiss: boolean })
   if (!checkoutPill) {
     // Stacked with room for the 20px-type pills (each ~44px tall now).
     checkoutPill = makePill('hold-checkout-hint', '📼 TAPE IN HAND — CHECK OUT: BACK, THEN THE COUNTER', 96);
-    dismissPill = makePill('hold-dismiss-hint', '🚫 NOT YOUR THING? OK, THEN “NOT INTERESTED”', 150);
+    dismissPill = makePill('hold-dismiss-hint', 'REQUEST A COPY — OK FOR OPTIONS', 150);
   }
   setShown(checkoutPill, state.checkout);
   setShown(dismissPill!, state.dismiss);

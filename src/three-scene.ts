@@ -1,3 +1,6 @@
+import { loadMobileRoomLighting, updateMobileRoomLighting } from './mobile-room-lighting';
+import { refreshStockedReflections, reflectionRefreshRunning } from './stocked-reflection-refresh';
+import { streamingInspectPose } from './streaming-case-pose';
 import { isExternalGameActive } from './external-game-state.ts';
 import { capturePinPng } from './feedback-image';
 import { compileProgramsInStages, yieldForPrograms } from './program-warmup';
@@ -13,8 +16,10 @@ import { installStoreSurfaceFinishes } from './store-surface-finish';
 import { fitSteppedCornerDepth } from './stepped-corner-clearance';
 import { placementBudget } from './progressive-placement';
 import { tickShelfVisibility, disposeShelfVisibility } from './shelf-visibility';
+import { mobileWalkInput } from './mobile-walk';
 import { mobileStoreActive, mobileStoreTap, mobileArtworkTick } from './mobile-store';
 import * as THREE from 'three';
+import { paintStoreLoading } from './store-loading';
 import { installDirectLightVisibility } from './direct-light-visibility';
 installDirectLightVisibility();
 import { isPublicDemo } from './demo-mode';
@@ -28,8 +33,7 @@ import {
   setUploadRenderer,
   setTextureStreamWake,
   setPosterLoadedNotify,
-  backCoverRegions,
-  SERIES_DEPTH_MULT,
+  SERIES_DEPTH_MULT, rentalBoxDepth,
   posterPixelCache,
   textureArrayManager,
   prefetchCoverBytes,
@@ -50,6 +54,7 @@ import { N8AOPass } from 'n8ao';
 import { BokehPass } from 'three/examples/jsm/postprocessing/BokehPass.js';
 import { Reflector } from 'three/examples/jsm/objects/Reflector.js';
 import * as mirrors from './store-mirrors';
+import { MirrorCubemapLifecycle, stockPlacementSettled } from './mirror-cubemap-lifecycle';
 import { BeautyPass, PartialComposite } from './partial-composite';
 import { FixtureContext, SlottedFixture, StoreFixture } from './fixtures';
 import { disposeRooftopHVAC } from './rooftop-hvac';
@@ -347,7 +352,10 @@ export class StoreScene {
   }
   public get resScaleMin(): number {
     if (this.softwareGL) return 0.4;
-    return this.effectiveQuality === 'high' ? 0.7 : 0.5;
+    // High detail must still recover on an integrated GPU. At the default
+    // supersampled high budget, 0.4 is approximately native 720p, while 0.7
+    // remained a multi-megapixel frame even after sustained single-digit FPS.
+    return this.effectiveQuality === 'high' ? 0.4 : 0.5;
   }
   // Settle supersample: how many times the MOVING frame's pixel count the one
   // parked frame is drawn at. 2 = 1.41x linear, the classic 2xSS — measurably
@@ -473,11 +481,11 @@ export class StoreScene {
     getCeilingY: () => this.ceilingY,
     getHeadlight: () => this.headlight ?? null,
     getBakeHidden: () => (this.selectionArrow ? [this.selectionArrow] : []),
-    onEnvironmentRebaked: () => {
+    onEnvironmentRebaked: (captureProbes = true) => {
       mirrors.updateMirrorThrottle(this, true);
       this.requestRender();
       this.rebuildSSAOExclusionList();
-      this.generateReflectionProbes();
+      if (captureProbes) { this.mirrorCubemap.version++; this.generateReflectionProbes(); }
       this.updateLOD();
       this.applyExteriorEnvClamp();
       this.bootstrapEnvRT?.dispose();
@@ -543,7 +551,7 @@ export class StoreScene {
   // (user: "carpet is dark as night"). Real troffers pour direct light DOWN;
   // brighten the key spots after dark so the carpet actually receives it.
   private applyModeLighting(mode: OutsideMode) {
-    this.exterior?.setOutsideMode(mode);
+    updateMobileRoomLighting(this.scene, mode); this.exterior?.setOutsideMode(mode);
     setWindowAwningLighting(this.scene, mode);
     setFacadeEntryLighting(this.scene, mode);
     // Day 110 -> 145 -> 180 chased a dark carpet by raising energy, but the
@@ -564,21 +572,14 @@ export class StoreScene {
   // once in buildStore(), reacts to day/night via setOutsideMode() only (no
   // per-frame cost). See exterior-environment.ts.
   public exterior: ExteriorEnvironment | null = null;
-  // One-shot: re-bake the environment once the initial async case placement has
-  // settled, so the env/reflections include the stocked shelves (the constructor
-  // bakes can only see the empty shell). Consumed by animate().
-  private pendingStockedRebake = false;
-  // Last requestRender() wall-clock — i.e. the last input/wake event. The
-  // stocked rebake (a ~100ms probes+PMREM burst, see perf-trace baseline)
-  // waits for this to go quiet so it can never land mid-interaction.
-  private lastRenderRequestTime = 0;
-
+  public mirrorCubemap = new MirrorCubemapLifecycle();
   // Bootstrap-only PMREM (see initThree()): scene.environment needs *something*
   // before outdoor.bakeEnvironment() runs its first real bake a few lines later
   // in the constructor. These three references exist only to be disposed right
   // after that first bake replaces this texture — otherwise the render target,
   // its compiled PMREM blur programs, and the synthetic RoomEnvironment's
   // meshes/materials are orphaned for the whole session (issue #121).
+  private disposeMobileLighting: (() => void) | undefined;
   private bootstrapEnvRT: THREE.WebGLRenderTarget | null = null;
   private bootstrapPmremGen: THREE.PMREMGenerator | null = null;
   private bootstrapRoomEnv: RoomEnvironment | null = null;
@@ -787,7 +788,7 @@ export class StoreScene {
   // Tracks whether any movie-case slot was actually moving (isMoving) last frame, or a
   // launch flourish was in flight. When this transitions from true to false, exactly one
   // shadow map re-bake is requested — "settle once" instead of "re-bake every frame".
-  private hadAnimatingSlots = false;
+  public hadAnimatingSlots = false;
   // Floor plan: unit placement, category shelf order, arrangement, and the
   // layout-space transforms (see store-plan.ts). Created in the constructor once
   // the libraries are known; read everywhere through the delegation getters.
@@ -1264,14 +1265,8 @@ export class StoreScene {
       // be user-authored to match their real store, with the NR runs filling
       // the space that remains.
       const stepWallZ = this.backWallZ + this.stepDepth;
-      // Depth rule (user direction): "the store is twice as deep as the side
-      // windows extend — the side windows end half way down the store". The
-      // ribbon is built from WHOLE 4-ft panes (SIDE_RIBBON_PANE_W), so its
-      // length is the whole-pane count closest to (half the glass-to-back-wall
-      // depth minus the front corner margin) — never a stretched pane. At the
-      // baseline depth (52.5 ft, store-layout.ts baselineStoreDepth) that is
-      // exactly SIX panes ending exactly at half-depth. The count is still
-      // capped by what the tighter (right, stepped-corner) wall can give.
+      // Whole panes follow half the actual store depth; six is the baseline,
+      // not a cap. The floor planner fills existing wings before growing.
       const idealLen = (15.0 - this.backWallZ) / 2 - (15.0 - SIDE_RIBBON_FRONT_Z);
       const maxSpan = SIDE_RIBBON_FRONT_Z - (stepWallZ + 0.3) - SIDE_RIBBON_CLEARANCE; // most the tighter (right) wall could give
       const paneCount = Math.min(
@@ -1459,10 +1454,10 @@ export class StoreScene {
     // (Floor plan already computed above, before the NR wall derivation.)
 
     this.initThree();
-    if (isPublicDemo && this.effectiveQuality !== 'high') {
+    if ((isPublicDemo || mobileStoreActive()) && this.effectiveQuality !== 'high') {
       this.detailLoads = new DeferredModelLoads(this.programWarmupController.signal);
     }
-    if (isPublicDemo) {
+    if (isPublicDemo || mobileStoreActive()) {
       // A settings rebuild may preserve case caches from the outgoing scene.
       // Until this room's deferred bake, use its live bootstrap environment
       // instead of keeping references to the previous room's disposed probes.
@@ -1494,7 +1489,7 @@ export class StoreScene {
     // Public entry uses the existing inexpensive room environment until the
     // visitor pauses. The full bounce/probe bake used to compile the whole
     // room several times before the first interactive frame.
-    if (!isPublicDemo) {
+    if (!(isPublicDemo || mobileStoreActive())) {
       const prepare = () => compileProgramsInStages(this.renderer, this.scene, this.camera,
         this.composer?.readBuffer ?? null, this.programWarmupController.signal);
       await this.outdoor.bakeEnvironmentInStages(prepare);
@@ -1511,12 +1506,12 @@ export class StoreScene {
         capture();
       }
     }
+    await paintStoreLoading(45, 'Stocking the shelves');
     await this.buildAllMovieBoxes();
+    await paintStoreLoading(70, 'Preparing lighting and materials');
     // Poster capacity is settled after the progressive stock build.
     this.entrance?.refreshIdleTerminal();
     this.rebuildMovieBoxes();
-    // Rebake once progressive instance placement has settled.
-    this.pendingStockedRebake = true;
     this.createSelectionArrow();
     // After createSelectionArrow(): the arrow is AO-excluded (it bobs while the
     // camera is static, and a floating UI cone shouldn't cast a contact halo),
@@ -1584,7 +1579,15 @@ export class StoreScene {
 
     // The public overview needs the room's shaders, not dry-run inspections.
     // Inspection variants prepare after main.ts has wired input and revealed it.
-    if (isPublicDemo && this.effectiveQuality !== 'high') {
+    if (mobileStoreActive() && this.effectiveQuality !== 'high') {
+      // Keep original textured, lit materials. Draw only the opening view;
+      // off-camera program preparation must not hold the entrance closed.
+      await programWarmup.prepareInitialViewPrograms(this);
+      await paintStoreLoading(80);
+      this.animate();
+      this.onConsoleLog("[System] 3D Store rendering active in Library Select mode.", "system");
+      return;
+    } else if (isPublicDemo && this.effectiveQuality !== 'high') {
       await programWarmup.prepareInitialViewPrograms(this);
     } else {
       await this.warmupRuntimePrograms();
@@ -1819,6 +1822,7 @@ export class StoreScene {
     // memory/bandwidth (see #27).
     this.renderer = new THREE.WebGLRenderer({ antialias: false, alpha: false, powerPreference: "high-performance" });
     this.renderer.setSize(width, height);
+    this.renderer.domElement.style.width = this.renderer.domElement.style.height = '100%';
     // Hitch tracer: per-frame renderer.info deltas always; raw-GL upload/compile
     // timing only when profiling (?trace=1 — it allocates per GL call).
     perfTrace.attachRenderer(this.renderer);
@@ -2040,8 +2044,9 @@ export class StoreScene {
     // Tuned against the baked-room environment (see bakeEnvironment), which is
     // considerably dimmer than the synthetic RoomEnvironment this value was
     // originally set for (0.55): the real room needs more of its own bounce.
-    this.scene.environmentIntensity = isPublicDemo ? 0.55 : 0.95;
+    this.scene.environmentIntensity = (isPublicDemo || mobileStoreActive()) ? 0.55 : 0.95;
 
+    this.disposeMobileLighting = loadMobileRoomLighting(this.scene, this.programWarmupController.signal, () => { this.applyExteriorEnvClamp(); this.requestRender(); }, () => this.outdoor.outsideMode);
     this.container.appendChild(this.renderer.domElement);
 
     // Let the texture upload queue drive GPU uploads through this renderer so
@@ -2501,9 +2506,10 @@ export class StoreScene {
     // stockedRebakeDue()'s frame count + input-silence window. Verification
     // hook: a screenshot never reaches those conditions, so without this the
     // only reflections a shot can photograph are the EMPTY-SHELL bake taken
-    // before the cases are placed (see pendingStockedRebake).
+    // before the cases are placed (see mirrorCubemap.pending).
     (window as any).debugForceStockedRebake = () => {
-      this.pendingStockedRebake = false;
+      if ([...this.dirtySlots].some(slot => slot.needsInitialMatrixUpdate)) return false;
+      this.mirrorCubemap.settled();
       this.outdoor.rebakeEnvironment(true);
       this.requestRender();
       return true;
@@ -2714,7 +2720,12 @@ export class StoreScene {
     this.scene.add(ambient);
     // Low-frequency interior bounce, reflected up from floor and fixtures.
     // Unlike material emission this obeys normals, albedo and light intensity.
-    const interiorBounce = new THREE.HemisphereLight(0x000000, 0xc5cbd6, 0.30);
+    // The white-walled 1990 room needs a small extra lift; later eras retain
+    // the approved balance. Offline mobile environment maps are baked after
+    // this light is installed, so the distinction is preserved at runtime.
+    const interiorBounce = new THREE.HemisphereLight(
+      0x252a32, 0xc5cbd6, getActiveTheme().id === 'bb-1990' ? 0.37 : 0.34,
+    );
     interiorBounce.name = 'interior-diffuse-bounce';
     interiorBounce.userData.interiorBounce = true;
     this.scene.add(interiorBounce);
@@ -2897,8 +2908,8 @@ export class StoreScene {
 
   // Cube render targets behind the current reflection probes, kept so a re-bake
   // (outside-mode change) can dispose them instead of leaking GPU memory.
-  private probeRenderTargets: THREE.WebGLCubeRenderTarget[] = [];
-  public mirrorRoomProbe: THREE.Texture | null = null;
+  public probeRenderTargets: THREE.WebGLCubeRenderTarget[] = [];
+  public get mirrorRoomProbe() { return this.mirrorCubemap.probe; }
 
   private generateReflectionProbes() {
     for (const capture of this.reflectionProbeSteps()) capture();
@@ -2931,10 +2942,11 @@ export class StoreScene {
     this.scene.traverse((obj) => { if (obj instanceof Reflector && obj.visible) reflectors.push(obj); });
     reflectors.forEach((r) => { r.visible = false; });
 
-    // Re-bake path: release the previous generation of probes first.
+    // Re-bake path: release the previous generation of case probes first.
+    // The room panorama is retained independently until a complete replacement
+    // has rendered.
     this.probeRenderTargets.forEach((rt) => rt.dispose());
     this.probeRenderTargets = [];
-    this.mirrorRoomProbe = null;
 
     // Software GL: the probes' cost is dominated by the 30 full draw-call
     // replays (5 probes x 6 faces), but shrinking the target still trims the
@@ -2960,19 +2972,22 @@ export class StoreScene {
       }
       // Mirrors need a room vista, not a case-height close-up of one aisle.
       // One shared, elevated entrance capture adds only six scene passes per rebake.
-      if (localStorage.getItem('bb_reflections') === 'cubemap' && mirrors.liveMirrorsAllowed(this)) {
+      if (mirrors.shouldCaptureMirrorRoomProbe(localStorage.getItem('bb_reflections'),
+          mirrors.liveMirrorsAllowed(this), this.mirrorCubemap.ready)) {
         const target = new THREE.WebGLCubeRenderTarget(1024, {
           generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter,
         });
         const camera = new THREE.CubeCamera(0.1, 1000, target);
         camera.position.set(STORE_CENTER_X, Math.min(9, this.ceilingY - 1.5), FRONT_GLASS_Z - 15);
         this.scene.add(camera);
-        this.probeRenderTargets.push(target);
+        let captured = false;
         try {
           yield () => camera.update(this.renderer, this.scene);
-          this.mirrorRoomProbe = target.texture;
+          this.mirrorCubemap.replace(target);
+          captured = true;
         } finally {
           this.scene.remove(camera);
+          if (!captured) target.dispose();
         }
       }
     } finally {
@@ -2982,7 +2997,6 @@ export class StoreScene {
     setReflectionProbes(textures);
   }
 
-  // Populate all shelving units once at startup
   // Populate all shelving units once at startup
   public buildAllMovieBoxes() { return stock.buildAllMovieBoxes(this); }
 
@@ -4334,19 +4348,12 @@ export class StoreScene {
     // of CPU. Multi-frame needs (lerps, fades) hold ACTIVE via their own
     // signals, so the extra safety frames only ever re-drew a settled scene.
     this.forceRenderFrames = this.softwareGL ? 1 : 3;
-    // Doubles as the "something is happening" timestamp the one-shot stocked
-    // rebake defers on (every input path and streaming wake lands here) — see
-    // the pendingStockedRebake block in animate().
-    this.lastRenderRequestTime = performance.now();
   }
 
   /**
-   * Hold the loop awake for a few more composites WITHOUT claiming a user did
-   * something. requestRender() also stamps lastRenderRequestTime, which is the
-   * "is the store idle?" clock the deferred stocked rebake waits on — a
-   * background drain that kept stamping it would starve that rebake forever.
-   * This is the wake for work the renderer owes itself; see the mirror drain in
-   * store-mirrors.ts.
+   * Hold the loop awake for a few more composites without claiming a user did
+   * something. This is the wake for work the renderer owes itself; see the
+   * mirror drain in store-mirrors.ts.
    */
   public holdRenderFrames(frames: number) {
     this.forceRenderFrames = Math.max(this.forceRenderFrames, frames);
@@ -4418,14 +4425,15 @@ export class StoreScene {
       }
     }
 
+    const touchWalk = mobileWalkInput(this);
     if (this.isWalkAroundMode) {
       const dt = Math.min(0.1, (time - this.lastUpdateTime) / 1000.0);
       this.lastUpdateTime = time;
       const ROTATION_SPEED = 1.6;
 
       // Read gamepad sticks for movement and look
-      let gpMoveX = 0;
-      let gpMoveY = 0;
+      let gpMoveX = touchWalk.x;
+      let gpMoveY = touchWalk.y;
       let gpLookX = 0;
       let gpLookY = 0;
 
@@ -4488,8 +4496,8 @@ export class StoreScene {
       }
 
       if (moveDir.lengthSq() > 0) {
-        moveDir.normalize();
-        const stepDist = WALK_SPEED * dt;
+        const movementScale = (touchWalk.x || touchWalk.y) ? Math.min(1, moveDir.length()) : 1; moveDir.normalize();
+        const stepDist = WALK_SPEED * dt * movementScale;
         this.camera.position.addScaledVector(moveDir, stepDist);
         this.footstepDistAccum += stepDist;
         if (this.footstepDistAccum >= this.nextFootstepDist) {
@@ -4660,7 +4668,7 @@ export class StoreScene {
     }
 
     const walkKeyHeld = (this.isWalkAroundMode && (
-      this.walkKeys.w || this.walkKeys.a || this.walkKeys.s || this.walkKeys.d ||
+      touchWalk.x !== 0 || touchWalk.y !== 0 || this.walkKeys.w || this.walkKeys.a || this.walkKeys.s || this.walkKeys.d ||
       this.walkKeys.ArrowLeft || this.walkKeys.ArrowRight ||
       this.walkKeys.ArrowUp || this.walkKeys.ArrowDown
     )) || gpActive;
@@ -4673,6 +4681,8 @@ export class StoreScene {
     if (!cameraLerping && this.cameraGlideLerp !== CAMERA_GLIDE_LERP) {
       this.cameraGlideLerp = CAMERA_GLIDE_LERP;
     }
+
+    this.reflectionInteractionActive = walkKeyHeld || cameraLerping || performance.now() - this.lastCameraMotionTime < 2500;
 
     // AO walk gating: GTAO's G-buffer prepass replays every scene draw call,
     // which is what was blowing the walking frame budget (60-70fps + hitching
@@ -4770,7 +4780,8 @@ export class StoreScene {
       cameraLerping ||
       aoFading ||
       this.hadAnimatingSlots ||
-      !!this.launchAnim ||
+      this.stockedRebakeDue(time) ||
+      !!this.launchAnim || this.checkoutRunning ||
       // T22: carried-tape flights (take / put-back / checkout hops) and the
       // post-removal restack settle pin ACTIVE; a parked stack costs nothing.
       (!!this.carried && this.carried.isAnimating(time)) ||
@@ -5033,7 +5044,7 @@ export class StoreScene {
     //   settleRefine                the supersampled parked frame must be real
     //   shadowRefreshFrames         a shadow-map rebake changes the whole frame
     //   clerkMirrorRefresh / dirty  a mirror would re-render its reflection
-    //   pendingStockedRebake        the one-shot environment bake relights all
+    //   mirrorCubemap.pending       the one-shot environment bake relights all
     //   marquee 'chase'             the bulb pattern advances on drawn frames
     //   entrance.wantsFrame()       cursor blink / vestibule doors / bag solver
     //   checkoutRunning             the checkout flourish drives its own props
@@ -5140,7 +5151,8 @@ export class StoreScene {
       // Series titles render as one chunky season boxset: the shared case
       // geometry gets a non-uniform Z scale on this slot's front instance and
       // the rental back box stays collapsed (the boxset IS the rental copy).
-      const seriesZMult = slot.movie.isSeries ? SERIES_DEPTH_MULT : 1;
+      const streamingPair = isSelected && this.mode === 'inspect' && !!slot.movie.streaming;
+      const seriesZMult = slot.movie.isSeries && !streamingPair ? SERIES_DEPTH_MULT : 1;
       const depth = slot.depth * seriesZMult;
 
       // Determine visibility scale target
@@ -5174,7 +5186,7 @@ export class StoreScene {
       let targetBackRotY = 0;
 
       if (isSelected && targetScale > 0) {
-        showBackBox = !slot.noRentalCase;
+        showBackBox = streamingPair || !slot.noRentalCase;
         targetY = this.mode === 'inspect' ? slot.restingY + 0.3 : slot.restingY + 0.1;
         if (isBackWall) {
           // Pop along the wall run's facing normal: +Z for the back-wall runs,
@@ -5251,6 +5263,11 @@ export class StoreScene {
           // back at its front pose beside it) — spine to the camera, angled a
           // touch short of square so a bit of the front cover stays visible.
           targetBackRotY = this.isFlipped ? Math.PI : this.heroSpine ? HERO_SPINE_YAW : 0;
+          if (streamingPair) {
+            ({ targetX, targetZ, targetRotY, targetFrontX, targetBackX,
+              targetFrontZ, targetBackZ, targetFrontRotY, targetBackRotY } =
+              streamingInspectPose(targetX, targetZ, targetRotY, depth, rentalBoxDepth(), INSPECT_CASE_Z, this.isFlipped));
+          }
         } else {
           targetFrontX = 0.04;
           targetFrontZ = depth / 2 + 0.01;
@@ -5460,17 +5477,9 @@ export class StoreScene {
 
     // Real-time reflections are handled automatically by Reflector instances
 
-    // 2.4 One-shot stocked-shelves environment re-bake (see pendingStockedRebake):
-    // fires once the initial placement wave has settled — dirty queue empty and
-    // enough frames elapsed for the first poster batches to have landed.
-    // ALSO requires 2.5s of input silence (perf-trace baseline caught it firing
-    // mid-flip-through: 5 probes × 6 faces + a 3-bounce PMREM = ~98ms in one
-    // frame). It's a one-shot visual refinement — deferring it until the
-    // shopper pauses costs nothing and can never hitch an interaction.
-    if (this.stockedRebakeDue(time)) {
-      this.pendingStockedRebake = false;
-      this.outdoor.rebakeEnvironment(true);
-    }
+    // Optional reflections compile cooperatively and capture one face per idle
+    // slice. Held walking/look input pauses them even without new DOM events.
+    if (this.stockedRebakeDue(time, movingSlots)) refreshStockedReflections(this);
 
     // 2.5 Prebaked shadows: re-render the sun's shadow map only on frames where a
     // shadow-caster actually changed — a structural rebuild (shadowRefreshFrames) or a
@@ -5555,11 +5564,15 @@ export class StoreScene {
   // that satisfies all of this (see its call site). Asked by the partial-
   // composite gate too: a re-bake relights the whole room, so the frame it
   // lands on must be a full one. Read as a predicate rather than latching on
-  // `pendingStockedRebake` alone, which can stay true indefinitely (dirty
+  // `mirrorCubemap.pending` alone, which can stay true indefinitely (dirty
   // slots, a busy input clock) and would park the partial path forever.
-  private stockedRebakeDue(time: number): boolean {
-    return this.pendingStockedRebake && this.frameCount > 300 && this.dirtySlots.size === 0 &&
-      !this.launchAnim && time - this.lastRenderRequestTime > 2500;
+  public reflectionInteractionActive = false;
+
+  private stockedRebakeDue(time: number, movingSlots = this.hadAnimatingSlots ? 1 : 0): boolean {
+    if (mobileStoreActive() || reflectionRefreshRunning(this) || this.reflectionInteractionActive || !this.mirrorCubemap.pending || this.frameCount <= 300 ||
+        !stockPlacementSettled(movingSlots, this.dirtySlots) ||
+        this.launchAnim || time - getLastUserActivity() <= 2500) return false;
+    return true;
   }
 
   // Partial-composite gate helper: is a mirror that owes a fresh reflection
@@ -5750,24 +5763,7 @@ export class StoreScene {
       if (hit && handleStreamingCaseHit(this, hit)) return;
     }
 
-    // 0a. Cast/crew name taps on the inspected retail case's back cover: the
-    // hero front mesh carries the movie's real back artwork whose clickable
-    // rows are recorded in backCoverRegions (normalized, top-left origin).
-    if (this.mode === 'inspect' && this.isFlipped && this.heroFrontMesh && this.heroFrontMesh.visible && !this.getSelectedMovie()?.isSeries) {
-      const hits = this._raycaster.intersectObject(this.heroFrontMesh, false);
-      if (hits.length > 0 && hits[0].uv) {
-        const movie = this.getSelectedMovie();
-        const regions = movie ? backCoverRegions.get(movie.id) : undefined;
-        if (movie && regions && regions.length > 0) {
-          const v = 1 - hits[0].uv.y; // texture V is bottom-up; canvas is top-down
-          const region = regions.find((r) => v >= r.y0 && v <= r.y1);
-          if (region) {
-            this.showPersonEndcap(region.name, region.kind);
-            return;
-          }
-        }
-      }
-    }
+    if (inspect.handleBackCoverTap(this, this._raycaster)) return;
 
     // 0a2. Recommendation clasps: a plain (non-instanced) Mesh, so the generic
     // fallthrough below can't see it — that loop only understands instanced
@@ -5902,6 +5898,7 @@ export class StoreScene {
 
   // Clean up WebGL resources
   public destroy(preservePosterCache = false) {
+    this.disposeMobileLighting?.();
     this.programWarmupController.abort();
     this.disposeWarmedPrograms?.();
     this.disposeWarmedPrograms = null;
@@ -6052,7 +6049,7 @@ export class StoreScene {
     // 3D→flat/library-switch teardown leaked 5 cube RTs until context GC.
     this.probeRenderTargets.forEach((rt) => rt.dispose());
     this.probeRenderTargets = [];
-    this.mirrorRoomProbe = null;
+    this.mirrorCubemap.dispose();
     this.aoPass = null;
     this.floorAOTex?.dispose();
     this.floorAOTex = null;
@@ -6177,7 +6174,7 @@ export class StoreScene {
     // Wake the renderer on any pointer motion (browse or walk) so the picture is
     // never a frame behind the cursor — this fires before the walk-mode guard.
     this.requestRender();
-    if (!this.isWalkAroundMode) return;
+    if (!this.isWalkAroundMode || mobileStoreActive()) return;
 
     // FPS mouse-look off raw movement deltas, locked or not.
     const MOUSE_SENSITIVITY = 0.0025;
@@ -6192,6 +6189,8 @@ export class StoreScene {
     this.lastWalkLookTime = performance.now(); // mouse-look counts as walk motion for the AO gate
     if (this.isDragging) this.walkPressDragPx += burst;
   };
+
+  public noteWalkLook() { this.lastWalkLookTime = performance.now(); this.requestRender(); }
 
   public updateWalkHUD() { return walk.updateWalkHUD(this); }
 

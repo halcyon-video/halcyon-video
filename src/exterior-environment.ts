@@ -335,6 +335,7 @@ export function buildExteriorEnvironment(scene: THREE.Scene, storeWidth: number,
     const dusk = mode === 'sunset';
     for (const light of windowLights) {
       light.intensity = night ? 2600 : 0;
+      light.visible = light.intensity > 0;
       light.shadow.needsUpdate = true;
     }
     // Subpixel lenses must not cross the bloom threshold as coverage changes.

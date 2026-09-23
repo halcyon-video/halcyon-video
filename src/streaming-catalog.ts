@@ -45,7 +45,7 @@ function searchTemplate(base: string, param: string): (title: string) => string 
  * `aliases` below match against that `name` field.
  *
  * `urlTemplate` is set only where the search-URL shape is well-established
- * (Netflix/Hulu/Disney+'s plain "/search?q=" pattern) -- confidence on the
+ * (Netflix/Hulu's plain "/search?q=" pattern) -- confidence on the
  * other five's exact query param name is LOW (no live instance to verify
  * against in this environment, and at least one of them has changed brand
  * name/URL scheme more than once), so they deliberately fall back to the
@@ -62,7 +62,10 @@ export const DEFAULT_STREAMING_SERVICES: StreamingServiceDef[] = [
   },
   {
     id: 'disney', name: 'DISNEY+', aliases: ['Disney Plus', 'Disney+'],
-    urlTemplate: searchTemplate('https://www.disneyplus.com/search', 'q'),
+    // Disney rejects the old search?q route; use verified title links or watch availability.
+    urlTemplate: (_title, tmdbId) => tmdbId === 277834
+      ? 'https://www.disneyplus.com/browse/entity-e8896bfa-1052-41f7-ae2e-00255d77cf05'
+      : tmdbWatchFallbackUrl(tmdbId),
   },
   {
     id: 'hulu', name: 'HULU', aliases: ['Hulu'],
@@ -137,6 +140,21 @@ export function resolveEnabledServices(overrideCsv: string | undefined | null): 
 export const ALL_DEFAULT_STREAMING_SERVICES_CSV = DEFAULT_STREAMING_SERVICES.map((d) => d.id).join(',');
 
 /**
+ * A non-demo local build defaults to no streaming choices. Its mobile first
+ * visit intentionally skips setup and enters the ready-made streaming store,
+ * so an absent preference needs a concrete catalog before that boot fetches.
+ * Presence matters: an explicitly saved empty string means "none" and must
+ * not be replaced.
+ */
+export function seedAutomaticDemoStreamingServices(
+  storage: Pick<Storage, 'getItem' | 'setItem'>,
+): boolean {
+  if (storage.getItem('bb_streaming_services') !== null) return false;
+  storage.setItem('bb_streaming_services', ALL_DEFAULT_STREAMING_SERVICES_CSV);
+  return true;
+}
+
+/**
  * Which network source stocks the streaming sections (owner correction
  * 2026-08-21, GH #86 follow-up): a direct TMDB key is no longer optional
  * icing on top of Jellyseerr -- it is a full replacement source, so the
@@ -196,6 +214,23 @@ export function tmdbWatchFallbackUrl(tmdbId: number): string {
 
 export function buildStreamingUrl(def: StreamingServiceDef, title: string, tmdbId: number): string {
   return def.urlTemplate ? def.urlTemplate(title, tmdbId) : tmdbWatchFallbackUrl(tmdbId);
+}
+
+/** Repair retired Disney search links from persisted catalogs at checkout.
+ * Verified Moana entity: https://www.disneyplus.com/browse/entity-e8896bfa-1052-41f7-ae2e-00255d77cf05
+ * Other Disney titles use watch availability until a real provider deep link is supplied.
+ */
+export function resolveStreamingCheckoutUrl(serviceId: string, title: string, tmdbId: number, supplied?: string): string {
+  const def = DEFAULT_STREAMING_SERVICES.find(service => service.id === serviceId);
+  if (supplied) {
+    try {
+      const url = new URL(supplied);
+      const retiredDisneySearch = serviceId === 'disney' &&
+        /(^|\.)disneyplus\.com$/.test(url.hostname) && /\/search\/?$/.test(url.pathname);
+      if (url.protocol === 'https:' && !retiredDisneySearch) return supplied;
+    } catch { /* Malformed cached links use the catalog fallback. */ }
+  }
+  return def ? buildStreamingUrl(def, title, tmdbId) : tmdbWatchFallbackUrl(tmdbId);
 }
 
 // TMDB's movie genre list, id -> name -- a deliberate duplicate of the same
@@ -291,6 +326,27 @@ export function synthesizeStreamingMovie(item: RawDiscoverItem, def: StreamingSe
 
 /** Bound live and bundled catalogues while giving the demo several full shelf units per service. */
 export const STREAMING_CAP_PER_SERVICE = 120;
+// Phone rendering already loads artwork by proximity; keep the physical store stocked.
+export const MOBILE_STREAMING_CAP_PER_SERVICE = STREAMING_CAP_PER_SERVICE;
+
+/** Keep every chosen service represented while bounding phone scene cost. */
+export function limitStreamingMoviesPerService(
+  movies: Movie[],
+  services: StreamingServiceDef[],
+  perService = MOBILE_STREAMING_CAP_PER_SERVICE,
+): Movie[] {
+  if (perService < 1) return [];
+  const out: Movie[] = [];
+  for (const service of services) {
+    let count = 0;
+    for (const movie of movies) {
+      if (movie.streamingServiceId !== service.id) continue;
+      out.push(movie);
+      if (++count >= perService) break;
+    }
+  }
+  return out;
+}
 
 /**
  * Raw discover results for one service -> shelvable Movies: skips malformed

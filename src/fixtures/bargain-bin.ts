@@ -6,7 +6,7 @@ import { FixtureContext, SlottedFixture, FixtureSlot } from '../fixtures';
 import { Footprint, FLOOR_DISPLAY_CLEARANCE } from '../layout-validator';
 import { createMovieInstancedMeshes, CASE_HEIGHT, CASE_DEPTH } from '../video-case';
 import { markSignMesh } from '../sign-builders';
-import { BB_OUTFIT, ensureBundledFont } from '../bundled-fonts';
+import { BB_ARCHIVO_BLACK, ensureBundledFont } from '../bundled-fonts';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Bargain bin — a waist-height (2.7 ft) 3×3 ft dump tub of the library's
@@ -373,7 +373,7 @@ export class BargainBin implements SlottedFixture {
       ctx.fillStyle = '#FFD600';
       ctx.beginPath(); ctx.roundRect(36, 28, 440, 328, 12); ctx.fill();
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillStyle = '#000000'; ctx.font = `700 78px ${BB_OUTFIT}, sans-serif`;
+      ctx.fillStyle = '#000000'; ctx.font = `400 78px ${BB_ARCHIVO_BLACK}, sans-serif`;
       ['3', 'FOR', '$10'].forEach((line, i) => ctx.fillText(line, 256, 100 + i * 92, 400));
     };
     paint();
@@ -382,7 +382,7 @@ export class BargainBin implements SlottedFixture {
     tex.minFilter = THREE.LinearMipmapLinearFilter;
     tex.magFilter = THREE.LinearFilter;
     tex.generateMipmaps = true;
-    ensureBundledFont(BB_OUTFIT, () => { paint(); tex.needsUpdate = true; });
+    ensureBundledFont(BB_ARCHIVO_BLACK, () => { paint(); tex.needsUpdate = true; });
     return tex;
   }
 

@@ -1,0 +1,49 @@
+import type { Texture, WebGLCubeRenderTarget } from 'three';
+
+export type MirrorReflectionMode = 'auto' | 'cubemap' | 'smooth';
+
+/** An unset or invalid preference is the inexpensive cubemap path. */
+export function resolveReflectionMode(mode: string | null): MirrorReflectionMode {
+  return mode === 'auto' || mode === 'smooth' ? mode : 'cubemap';
+}
+
+/** A room panorama is valid only after the stock-placement wave has settled. */
+export function shouldCaptureMirrorRoomProbe(
+  mode: string | null, liveMirrors: boolean, stockedReflectionReady: boolean
+): boolean {
+  return resolveReflectionMode(mode) === 'cubemap' && liveMirrors && stockedReflectionReady;
+}
+
+export function stockPlacementSettled(
+  movingSlots: number, dirtySlots: Iterable<{ needsInitialMatrixUpdate?: boolean }>
+): boolean {
+  if (movingSlots > 0) return false;
+  for (const slot of dirtySlots) if (slot.needsInitialMatrixUpdate) return false;
+  return true;
+}
+
+/** Owns the one retained, fully-stocked room panorama and its refresh state. */
+export class MirrorCubemapLifecycle {
+  version = 0;
+  pending = false;
+  ready = false;
+  probe: Texture | null = null;
+  private target: WebGLCubeRenderTarget | null = null;
+
+  beginStockBuild() { this.version++; this.ready = false; this.pending = false; }
+  finishStockBuild() { this.version++; this.pending = true; }
+  stockChanged() { this.version++; this.ready = false; this.pending = true; }
+  settled() { this.ready = true; this.pending = false; }
+  replace(target: WebGLCubeRenderTarget) {
+    const previous = this.target;
+    this.target = target;
+    this.probe = target.texture;
+    previous?.dispose();
+  }
+  dispose() {
+    this.version++;
+    this.target?.dispose();
+    this.target = null;
+    this.probe = null;
+  }
+}

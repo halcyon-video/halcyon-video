@@ -16,7 +16,8 @@ import { getLastUserActivity } from './user-activity';
 import { showClerkToast, hideClerkToast } from './carried-tapes';
 import { type ClaspTarget } from './fixtures/shelf-clasp';
 import { recommend as recommendFromLibrary } from './clerk-recommend';
-import { isDiscoveryRequested, markTitleDismissed } from './jellyseerr';
+import { getJellyseerrConfig, isDiscoveryRequested, markTitleDismissed } from './jellyseerr';
+import { isRequestTitle } from './request-title';
 import { buildLibraryIndex, pickRecommendations } from './recommend-why';
 import type { ClerkSuggestion } from './clerk-interaction';
 import { CLERK_SLEEP_INPUT_MS } from './scene-shared';
@@ -43,17 +44,9 @@ export function markDiscoveryRequested(scene: StoreScene, movieId: string): void
   }
 }
 
-/**
- * Is this case one the player can cross off ("not interested")? An un-ordered
- * not-in-stock case qualifies wherever it stands: a shelved collection gap /
- * inline discovery suggestion (a library entry), a streaming-service title
- * (GH #86 — same shared jellyseerr_dismissed_ids pool, so "not interested"
- * works there too), or a FOR YOU order candidate on a staff-picks endcap
- * (fixture stock, not a library entry — the endcap keeps an honest empty spot
- * afterwards, exactly like the shelf does).
- */
+/** Only an unrequested case backed by a configured request server can be dismissed. */
 function isDismissable(scene: StoreScene, movie: Movie): boolean {
-  if (!(movie.collectionGap || movie.discovery || movie.streaming) || typeof movie.tmdbId !== 'number') return false;
+  if (!isRequestTitle(movie, getJellyseerrConfig() !== null)) return false;
   if (movie.discoveryRequested || isDiscoveryRequested(movie.tmdbId)) return false;
   if (scene.libraries.some((l) => l.movies.some((mm) => mm.id === movie.id))) return true;
   // Fixture stock: only while a case is actually standing there to remove.

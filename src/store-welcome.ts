@@ -5,7 +5,7 @@
 // for a recommendation. This module provides a short diegetic welcome on the
 // hosted boot:
 //   1. First-visit flag in localStorage ('halcyon_first_visit').
-//   2. One clerk greeting line (diegetic clerk toast).
+//   2. Unobtrusive control guidance, without an automatic clerk speech card.
 //   3. Brief control hint in #browse-hint and touch button intro glow, both
 //      fading/transitioning on first user input.
 //
@@ -62,7 +62,7 @@ export function isWelcomeActive(): boolean {
  */
 export function welcomeHUDText(isTouch: boolean): string {
   return isTouch
-    ? 'SWIPE TO WALK THE AISLES  •  TAP ANY CASE TO EXAMINE'
+    ? 'SWIPE TO LOOK  •  TAP A SHELF'
     : '◀ ▶ TO WALK THE AISLES  •  ENTER TO EXAMINE';
 }
 
@@ -99,10 +99,7 @@ export function triggerHostedWelcome(deps: WelcomeDeps = {}): boolean {
   const touchControls = typeof document !== 'undefined' ? document.getElementById('store-touch-controls') : null;
   touchControls?.classList.add('st-intro');
 
-  // 3. Diegetic clerk greeting toast
-  const greeting = deps.brandGreeting ??
-    'Hey there! Welcome to Halcyon — take a look around, or come ask me if you need a recommendation!';
-  deps.showToast?.(greeting, 6500);
+  // The control hint is enough; clerk speech begins when the visitor asks.
 
   return true;
 }

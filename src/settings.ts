@@ -30,7 +30,7 @@ import { enableFpsMeter, initFpsMeter, FPS_METER_KEY } from './fps-meter';
 import { setRemotePlayEnabled } from './remote-play';
 import { THEMES, getActiveTheme, resolveThemeId, WALL_PAINT_OPTIONS, applyThemeCssVars } from './themes';
 import { refreshBrand } from './brand-live';
-import { COVER_VARIANTS, USER_WRAP_SPECS, getUserWrap, setUserWrap } from './video-case';
+import { COVER_VARIANTS, DEFAULT_COVER_SELECTION, USER_WRAP_SPECS, getUserWrap, setUserWrap } from './video-case';
 import type { CaseMedium } from './video-case';
 import { DEFAULT_LOGO_SPECS, getActiveLogoSpec } from './logo-spec';
 import {
@@ -270,7 +270,7 @@ export function registerCoverVariantSettings(): void {
       kind: 'cycle',
       group: 'Store Look',
       values: variants.map((v) => ({ id: v.id, label: v.label })),
-      default: variants[0].id,
+      default: DEFAULT_COVER_SELECTION[medium],
       // Same caching rationale as Rental Case Art below: the panel art lives
       // on shared + per-title materials a no-reload rebuild preserves.
       applyMode: 'reload',
@@ -526,7 +526,7 @@ export function registerCoreSettings(): void {
       { id: 'vhs', label: 'VHS Box' },
       { id: 'dvd', label: 'DVD Box' },
     ],
-    default: 'auto',
+    default: 'cubemap',
     // 'reload' (not rebuild-scene): the rental front/back/spine art is
     // cached on shared + per-title materials that a no-reload scene rebuild
     // deliberately preserves (see clearVideoCaseCache's 'rebuild' mode in
@@ -917,6 +917,15 @@ export function registerCoreSettings(): void {
     default: 'loop',
     applyMode: 'rebuild-scene',
     hint: 'When server stream fails: play demo, keep tubes dark, or show test card.',
+  });
+
+  registerSetting({
+    key: 'bb_tv_layout', label: 'Ceiling Mount', kind: 'cycle',
+    group: 'Playback', subpage: 'Overhead TVs',
+    values: [{id: 'era', label: 'Era Default'}, {id: 'paired', label: 'Separate Sets'},
+      {id: 'triple', label: 'Shared Three-Screen Frame'}],
+    default: 'era', applyMode: 'rebuild-scene',
+    hint: 'Choose separate ceiling sets or one shared frame. The 2000 wall bank stays wall-mounted.',
   });
 
   // Tone mapping (research-driven, see three-scene initThree): AgX is the

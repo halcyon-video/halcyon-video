@@ -1,3 +1,4 @@
+import { updateStoreLoading } from './store-loading';
 import { initialProgramObjects } from './initial-programs';
 import * as THREE from 'three';
 import type { StoreScene } from './three-scene';
@@ -6,6 +7,7 @@ import { CASE_MEDIUM, posterPixelCache, createProgramWarmupMaterials } from './v
 import { isWhiteClamshell } from './packaging-formats';
 import { retailAudio } from './audio';
 import { isPublicDemo } from './demo-mode';
+import { mobileStoreActive } from './mobile-store';
 import { compileProgramsInStages, yieldForPrograms } from './program-warmup';
 
 const stagedInitialRooms = new WeakSet<StoreScene>();
@@ -14,18 +16,19 @@ const stagedInitialRooms = new WeakSet<StoreScene>();
 export async function prepareInitialViewPrograms(scene: StoreScene): Promise<void> {
   // Returning rentals and saved alternate roots can move through other views
   // before entry; retain their full-room preparation instead of guessing a frame.
-  if (scene.mode !== 'overview' || scene.returnDropWatch) {
+  if (!['overview', 'walk-around'].includes(scene.mode) || scene.returnDropWatch) {
     await compileProgramsInStages(scene.renderer, scene.scene, scene.camera,
       scene.composer?.readBuffer ?? null, scene.programWarmupController.signal);
     return;
   }
   stagedInitialRooms.add(scene);
-  scene.snapCamera();
+  if (!scene.isWalkAroundMode) scene.snapCamera();
   const roots = new THREE.Group();
   roots.children = initialProgramObjects(scene.scene, scene.camera);
   try {
     await compileProgramsInStages(scene.renderer, scene.scene, scene.camera,
-      scene.composer?.readBuffer ?? null, scene.programWarmupController.signal, roots);
+      scene.composer?.readBuffer ?? null, scene.programWarmupController.signal, roots,
+      (fraction, detail) => updateStoreLoading(70 + 14 * fraction, detail));
   } finally { roots.children = []; }
 }
 
@@ -35,7 +38,7 @@ export async function warmupRuntimePrograms(scene: StoreScene) {
   const signal = scene.programWarmupController.signal;
   // Explicit High keeps the complete depth-of-field/hero draw preparation.
   // Automatic phone tiers can prepare inspection materials after room entry.
-  const background = isPublicDemo && scene.effectiveQuality !== 'high';
+  const background = (isPublicDemo || mobileStoreActive()) && scene.effectiveQuality !== 'high';
   let geo: THREE.BoxGeometry | undefined;
   let warmScene: THREE.Group | undefined;
   const bokehEnabled = scene.bokehPass?.enabled;
@@ -164,4 +167,3 @@ export async function warmupRuntimePrograms(scene: StoreScene) {
     if (!background) scene.hideHeroCases();
   }
 }
-

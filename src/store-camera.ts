@@ -1,3 +1,4 @@
+import { STREAMING_PAIR_X } from './streaming-case-pose';
 import { mobileStoreActive } from './mobile-store';
 import { selfLit } from './material-lighting';
 // Browse-camera targeting & selection presentation — extracted from
@@ -433,9 +434,15 @@ export function updateCameraTarget(scene: StoreScene) {
     const vFov = (scene.camera.fov * Math.PI) / 180;
     const aspect = scene.camera.aspect;
     
-    const totalWidth = 2 * INSPECT_FAN_X + actualBoxWidth; // the pair's full span
-    const totalHeight = actualBoxHeight;
-    const margin = INSPECT_FIT_MARGIN;
+    const activeSlot = scene.slotsByPosition.get(scene.getActiveSlotKey());
+    // Streaming inspection holds a compact overlapping pair, including its
+    // slightly larger store shell; fit that deck instead of the owned-copy fan.
+    const streamingPair = !!activeSlot?.movie.streaming;
+    const mobileSingleCase = mobileStoreActive() && !!activeSlot?.noRentalCase;
+    const totalWidth = streamingPair ? actualBoxWidth + 2 * STREAMING_PAIR_X + 0.038
+      : mobileSingleCase ? actualBoxWidth : 2 * INSPECT_FAN_X + actualBoxWidth;
+    const totalHeight = actualBoxHeight + (streamingPair ? 0.060 : 0);
+    const margin = streamingPair || mobileSingleCase ? 1.20 : INSPECT_FIT_MARGIN;
 
     // Height governs at every ordinary aspect: both distances scale with the
     // same margin, and distH > distW whenever totalHeight * aspect > totalWidth
@@ -450,8 +457,6 @@ export function updateCameraTarget(scene: StoreScene) {
     // getActiveSlotKey() (NOT a hand-built lib_unit_... key): fixture slots are
     // keyed `fixture_<id>_side_...`, so the inline form silently missed every
     // display-stand slot and inspect fell through to the wide fallback framing.
-    const activeSlot = scene.slotsByPosition.get(scene.getActiveSlotKey());
-    
     if (activeSlot) {
       let targetX = activeSlot.restingX;
       let targetZ = activeSlot.restingZ;
@@ -686,7 +691,7 @@ export function updateSelectionArrowLabel(scene: StoreScene, text: string) {
 
 export function updateSelectionArrow(scene: StoreScene) {
   if (!scene.selectionArrow) return;
-  if (mobileStoreActive() && scene.mode !== 'overview' && !scene.subNav) { scene.selectionArrow.visible = false; return; }
+  if (mobileStoreActive() && (scene.mode === 'overview' || !scene.subNav)) { scene.selectionArrow.visible = false; return; }
   // The ▼ jump index (store-subnav.ts, browse mode) drives this same single
   // big cursor over its focused destination — the owner retired the
   // per-target chevron cloud in feedback/003 and the index follows suit.
