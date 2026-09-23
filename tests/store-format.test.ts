@@ -52,12 +52,12 @@ test('unknown / absent / malformed saved values fall back to corporate', () => {
   assert.equal(resolveStoreFormatId('mom-and-pop'), 'mom-and-pop');
 });
 
-test('corporate preset reproduces the pre-format literals exactly', () => {
+test('corporate preset preserves shelf geometry and the denser central aisle', () => {
   assert.deepEqual(corporate.aisleShelfHeights, [0.5, 1.333, 2.167, 3.0, 3.833]);
   assert.equal(corporate.unitSections, 2);
   assert.equal(corporate.unitFrameHeight, 4.6);
   assert.equal(corporate.unitTaper, true);
-  assert.equal(corporate.centerWalkway, 16.0);
+  assert.equal(corporate.centerWalkway, 12.0);
   assert.equal(corporate.runSpacing, 11.0);
   assert.equal(corporate.runBreakGap, 3.0);
   assert.equal(corporate.fieldZFront, -14.4);
@@ -91,7 +91,7 @@ test('store-layout exports still carry the corporate literals', () => {
   assert.equal(UNIT_SIDE_CAPACITY, 60);   // 12 cols x 5 tiers
   assert.equal(UNIT_CAPACITY, 120);       // double-sided
   assert.equal(SECTION_CAPACITY, 30);     // 6 cols x 5 tiers
-  assert.equal(CENTER_WALKWAY, 16.0);
+  assert.equal(CENTER_WALKWAY, 12.0);
   assert.equal(LIBRARY_X_SPACING, 11.0);
   assert.equal(FIELD_Z_FRONT, -14.4);
   assert.equal(CEILING_Y, 13.5);

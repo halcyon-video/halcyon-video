@@ -1265,11 +1265,12 @@ export class StoreScene {
       // be user-authored to match their real store, with the NR runs filling
       // the space that remains.
       const stepWallZ = this.backWallZ + this.stepDepth;
-      // Six whole 4-ft panes per side, independent of catalog/store depth.
-      // A physically shorter wall can hold fewer; never add a seventh pane.
+      // Whole panes follow half the actual store depth; six is the baseline,
+      // not a cap. The floor planner fills existing wings before growing.
+      const idealLen = (15.0 - this.backWallZ) / 2 - (15.0 - SIDE_RIBBON_FRONT_Z);
       const maxSpan = SIDE_RIBBON_FRONT_Z - (stepWallZ + 0.3) - SIDE_RIBBON_CLEARANCE; // most the tighter (right) wall could give
       const paneCount = Math.min(
-        6, // The reference facade has six panes, independent of catalog depth.
+        Math.round(idealLen / SIDE_RIBBON_PANE_W),
         Math.floor(maxSpan / SIDE_RIBBON_PANE_W),
       );
       const ribbonLen = paneCount * SIDE_RIBBON_PANE_W;

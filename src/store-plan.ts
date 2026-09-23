@@ -247,7 +247,7 @@ export class StorePlan {
     // untilted mom-and-pop run steps a full runSpacing sideways, not
     // runSpacing·cos(35°), and estimating it at the diagonal's pitch would
     // under-count its depth by a fifth.
-    const p = LIBRARY_X_SPACING * Math.cos(FORMAT.forcedArrangement === 'straight' ? 0 : AISLE_ANGLE);
+    const p = this.runSpacing() * Math.cos(FORMAT.forcedArrangement === 'straight' ? 0 : AISLE_ANGLE);
     const lEff = L + RUN_BREAK_GAP / this.maxRunUnits;
     // Tilted fields never pack their whole area: runs clipped by the field
     // corners shed unusable stubs, and the one-library-boundary-per-run rule
@@ -776,6 +776,12 @@ export class StorePlan {
     return { tlo, thi };
   }
 
+  private runSpacing(): number {
+    // Ten feet of X spacing preserves at least three feet of clear aisle
+    // even where clipping and depth compression bring adjacent rows closer.
+    return !FORMAT.singleField && this.arrangement === 'herringbone' ? 10 : LIBRARY_X_SPACING;
+  }
+
   // Hatch one field with parallel runs and pour `slice` units into them, front-most
   // run first. Returns the next free lineId. Sets each unit's centre on its run so
   // consecutive units join short-end to short-end.
@@ -789,7 +795,7 @@ export class StorePlan {
     const yaw = field.yaw;
     const dx = -Math.sin(yaw), dz = -Math.cos(yaw); // front -> back along the run
     const nx = Math.cos(yaw), nz = -Math.sin(yaw);  // unit normal (run-to-run step)
-    const p = LIBRARY_X_SPACING * Math.cos(yaw);    // pitch keeps the custom X-spacing
+    const p = this.runSpacing() * Math.cos(yaw);    // pitch keeps the custom X-spacing
     // The exit-side front floor is the concessions/bargain zone. Reserve
     // nine world feet before hatching its shelves; the capacity solver grows
     // the back of this field rather than discarding any stocked titles.
@@ -866,14 +872,26 @@ export class StorePlan {
     };
     const canFitAll = (currentRuns: { cap: number }[]) => pourInto(currentRuns).qi >= slice.length;
 
-    // Use the available parallel aisles before extending a single-field shop.
-    // A demand-sized starting depth left an isolated long row beside empty floor.
+    // Use available parallel aisles before extending any store.
+    // A demand-sized starting depth skips usable wings beside existing rows.
     // The existing capacity check still grows the room until every unit fits.
-    let Zb = Zf - (FORMAT.singleField ? 12 : Math.max(12, slice.length * 2));
+    let Zb = Zf - 12;
     let runs = runsFor(Zb);
     let guard = 0;
     while (!canFitAll(runs) && guard++ < 400) {
       Zb -= L;
+      runs = runsFor(Zb);
+    }
+    // A whole shelf-length growth step can skip several feet of usable floor.
+    // Refine the last step so the back wall is earned by actual capacity.
+    if (guard > 0 && canFitAll(runs)) {
+      let fits = Zb, tooShallow = Zb + L;
+      for (let i = 0; i < 12; i++) {
+        const candidate = (fits + tooShallow) / 2;
+        if (canFitAll(runsFor(candidate))) fits = candidate;
+        else tooShallow = candidate;
+      }
+      Zb = fits;
       runs = runsFor(Zb);
     }
 

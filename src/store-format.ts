@@ -411,7 +411,7 @@ const CORPORATE: StoreFormatSpec = {
 
   forcedArrangement: null,
   singleField: false,
-  centerWalkway: 16.0,
+  centerWalkway: 12.0,
   wallMargin: 7.5,
   runSpacing: 11.0,
   runBreakGap: 3.0,

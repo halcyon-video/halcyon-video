@@ -312,7 +312,8 @@ export function promoStandPlacements(backWallZ: number): FixturePlacement[] {
     {
       id: 'promo-stand-back',
       kind: 'four-sided-display',
-      position: { x: 24.0, z: -3.0 },
+      // Keep the three-foot browsing clearance beside the denser shelf wings.
+      position: { x: 26.0, z: -3.0 },
       yaw: 0,
       options: {
         // studio-spotlight:2: each stand owns exactly one studio-spotlight

@@ -50,8 +50,8 @@ export const FIELD_Z_FRONT = FORMAT.fieldZFront;
 // are pushed left and columns right of centre (including a dead-centre column) are
 // pushed right by half this, opening a walkway between the left and right fields.
 // Clear central aisle straddling the store centreline. FORMAT-DRIVEN: the
-// corporate box widened this twice (12.0 -> 16.0) for a real open floor area
-// down the store centre; a mom-and-pop has no central walkway at all (its
+// corporate box keeps a 12-foot central aisle, using the reclaimed wing
+// space for shelving before extending the back wall; a mom-and-pop has no central walkway at all (its
 // format hatches ONE field across the whole floor — see StoreFormatSpec.singleField),
 // so it reads 0 and nothing straddles anything.
 export const CENTER_WALKWAY = FORMAT.centerWalkway;
