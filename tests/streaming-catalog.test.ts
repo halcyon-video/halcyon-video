@@ -334,3 +334,17 @@ test('resolveStreamingWatchRegion: defaults to US and normalizes whitespace and 
   assert.equal(resolveStreamingWatchRegion('  gb  '), 'GB');
   assert.equal(resolveStreamingWatchRegion('ca'), 'CA');
 });
+
+
+test('Disney checkout repairs retired search links and preserves real entity links', async () => {
+  const { resolveStreamingCheckoutUrl } = await import('../src/streaming-catalog.ts');
+  const disney = DEFAULT_STREAMING_SERVICES.find(service => service.id === 'disney')!;
+  const moana = 'https://www.disneyplus.com/browse/entity-e8896bfa-1052-41f7-ae2e-00255d77cf05';
+  assert.equal(buildStreamingUrl(disney, 'Moana', 277834), moana);
+  assert.equal(resolveStreamingCheckoutUrl('disney', 'Moana', 277834,
+    'https://www.disneyplus.com/search?q=Moana'), moana);
+  assert.equal(resolveStreamingCheckoutUrl('disney', 'Other movie', 123,
+    'https://www.disneyplus.com/en-us/search/?q=Other'), tmdbWatchFallbackUrl(123));
+  assert.equal(resolveStreamingCheckoutUrl('disney', 'Other movie', 123, moana), moana);
+  assert.equal(buildStreamingUrl(disney, 'Other movie', 123), tmdbWatchFallbackUrl(123));
+});

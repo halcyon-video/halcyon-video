@@ -18,6 +18,7 @@ import {
   type StreamingSource,
 } from './streaming-catalog';
 import { mobileStoreActive } from './mobile-store';
+import { prefetchPosterBytes } from './poster-prefetch';
 import { fetchStreamingMoviesFromSnapshot } from './streaming-snapshot';
 import { getSetting } from './settings';
 import { fetchStreamingMoviesFromTmdb, getTmdbConfig } from './tmdb';
@@ -152,4 +153,10 @@ export async function loadStreamingMovies(): Promise<void> {
     : rawMovies;
   streamingMovies = deduplicateStreamingMovies(entryMovies, enabledDefs);
   streamingLoadedAt = Date.now();
+  if (mobileStoreActive()) {
+    // Reuse the existing byte cache while the visitor chooses a year. Bound
+    // this first-shelf warmup so it cannot swamp a phone connection.
+    const covers = [...new Set(streamingMovies.map(movie => movie.posterUrl).filter((url): url is string => !!url))].slice(0, 8);
+    prefetchPosterBytes(covers, url => url);
+  }
 }

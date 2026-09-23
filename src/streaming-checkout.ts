@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { Movie } from './jellyfin.ts';
 import type { StoreScene } from './three-scene.ts';
-import { DEFAULT_STREAMING_SERVICES, buildStreamingUrl, type StreamingServiceDef } from './streaming-catalog.ts';
+import { resolveStreamingCheckoutUrl } from './streaming-catalog.ts';
 import { retailAudio } from './audio.ts';
 
 export const STANDARD_INK = '#211d19';
@@ -164,12 +164,7 @@ export function confirmStreamingServiceChoice(scene: StoreScene): boolean {
   // Apply chosen service properties to movie
   movie.streamingServiceId = chosen.id;
   movie.streamingServiceName = chosen.name;
-  if (chosen.url) {
-    movie.streamingUrl = chosen.url;
-  } else {
-    const def = DEFAULT_STREAMING_SERVICES.find((d: StreamingServiceDef) => d.id === chosen.id);
-    if (def) movie.streamingUrl = buildStreamingUrl(def, movie.title, movie.tmdbId ?? 0);
-  }
+  movie.streamingUrl = resolveStreamingCheckoutUrl(chosen.id, movie.title, movie.tmdbId ?? 0, chosen.url);
 
   // Clear choice state before flight to counter
   activeChoices.delete(scene);

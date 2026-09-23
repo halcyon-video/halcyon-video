@@ -1265,18 +1265,11 @@ export class StoreScene {
       // be user-authored to match their real store, with the NR runs filling
       // the space that remains.
       const stepWallZ = this.backWallZ + this.stepDepth;
-      // Depth rule (user direction): "the store is twice as deep as the side
-      // windows extend — the side windows end half way down the store". The
-      // ribbon is built from WHOLE 4-ft panes (SIDE_RIBBON_PANE_W), so its
-      // length is the whole-pane count closest to (half the glass-to-back-wall
-      // depth minus the front corner margin) — never a stretched pane. At the
-      // baseline depth (52.5 ft, store-layout.ts baselineStoreDepth) that is
-      // exactly SIX panes ending exactly at half-depth. The count is still
-      // capped by what the tighter (right, stepped-corner) wall can give.
-      const idealLen = (15.0 - this.backWallZ) / 2 - (15.0 - SIDE_RIBBON_FRONT_Z);
+      // Six whole 4-ft panes per side, independent of catalog/store depth.
+      // A physically shorter wall can hold fewer; never add a seventh pane.
       const maxSpan = SIDE_RIBBON_FRONT_Z - (stepWallZ + 0.3) - SIDE_RIBBON_CLEARANCE; // most the tighter (right) wall could give
       const paneCount = Math.min(
-        Math.round(idealLen / SIDE_RIBBON_PANE_W),
+        6, // The reference facade has six panes, independent of catalog depth.
         Math.floor(maxSpan / SIDE_RIBBON_PANE_W),
       );
       const ribbonLen = paneCount * SIDE_RIBBON_PANE_W;
@@ -2726,7 +2719,7 @@ export class StoreScene {
     this.scene.add(ambient);
     // Low-frequency interior bounce, reflected up from floor and fixtures.
     // Unlike material emission this obeys normals, albedo and light intensity.
-    const interiorBounce = new THREE.HemisphereLight(0x000000, 0xc5cbd6, 0.30);
+    const interiorBounce = new THREE.HemisphereLight(0x252a32, 0xc5cbd6, 0.34);
     interiorBounce.name = 'interior-diffuse-bounce';
     interiorBounce.userData.interiorBounce = true;
     this.scene.add(interiorBounce);

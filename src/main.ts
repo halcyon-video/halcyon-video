@@ -1,5 +1,6 @@
 import { paintStoreLoading, updateStoreLoading, showStoreLoadingFailure } from './store-loading';
 import { mobileStoreActive } from './mobile-store';
+import { beginMobileEraChoice, finishMobileEraChoice } from './mobile-era-choice';
 import { isRequestTitle } from './request-title';
 import { buildSteamControls } from './steam-settings';
 import { loadSteamGames } from './providers/steam-provider';
@@ -2453,6 +2454,7 @@ async function switchRenderMode(target: 'flat' | '3d') {
 async function initializeStoreScene(preservePosterCache = false) {
   // Single funnel for every boot and rebuild, 3D and flat — resolve which
   // catalog this store is made of before anything reads it.
+  await finishMobileEraChoice();
   refreshStoreCatalog();
   const mode = getSetting<string>('bb_render_mode');
   if (mode === 'flat') {
@@ -4496,6 +4498,7 @@ async function main() {
   // shelves as an unconfigured one. One short request, capped at 4s, and every
   // failure mode — static host, Tauri, no operator config — resolves to "none"
   // rather than throwing, so this can't hold up a boot it doesn't apply to.
+  if (!isRemoteInstance() && mobileStoreActive()) beginMobileEraChoice();
   await loadOperatorDefaults();
 
   // Check saved credentials and try connection in background (demo mode
