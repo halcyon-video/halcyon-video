@@ -2720,7 +2720,12 @@ export class StoreScene {
     this.scene.add(ambient);
     // Low-frequency interior bounce, reflected up from floor and fixtures.
     // Unlike material emission this obeys normals, albedo and light intensity.
-    const interiorBounce = new THREE.HemisphereLight(0x252a32, 0xc5cbd6, 0.34);
+    // The white-walled 1990 room needs a small extra lift; later eras retain
+    // the approved balance. Offline mobile environment maps are baked after
+    // this light is installed, so the distinction is preserved at runtime.
+    const interiorBounce = new THREE.HemisphereLight(
+      0x252a32, 0xc5cbd6, getActiveTheme().id === 'bb-1990' ? 0.37 : 0.34,
+    );
     interiorBounce.name = 'interior-diffuse-bounce';
     interiorBounce.userData.interiorBounce = true;
     this.scene.add(interiorBounce);

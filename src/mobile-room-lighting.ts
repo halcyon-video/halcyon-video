@@ -18,12 +18,13 @@ export function updateMobileRoomLighting(scene: THREE.Scene, mode: string): void
  */
 export function loadMobileRoomLighting(scene: THREE.Scene, signal: AbortSignal, render: () => void, mode: () => string): () => void {
   let texture: THREE.DataTexture | undefined, disposed = false;
-  if (!compactAssets() || getActiveTheme().id !== 'bb-1990' ||
+  const era = getActiveTheme().id;
+  if (!compactAssets() ||
       (localStorage.getItem('bb_outside') || 'day') !== 'day' || typeof DecompressionStream === 'undefined') return () => {};
   const original = scene.environment;
   void Promise.all([
-    fetch(assetUrl('lighting/store-environment.json'), {signal}).then(r => { if (!r.ok) throw Error('Lighting metadata unavailable'); return r.json(); }),
-    fetch(assetUrl('lighting/store-environment.bin.gz'), {signal}).then(async r => {
+    fetch(assetUrl(`lighting/${era}/store-environment.json`), {signal}).then(r => { if (!r.ok) throw Error('Lighting metadata unavailable'); return r.json(); }),
+    fetch(assetUrl(`lighting/${era}/store-environment.bin.gz`), {signal}).then(async r => {
       if (!r.ok) throw Error('Lighting map unavailable');
       const bytes = await r.arrayBuffer();
       // Some static hosts send Content-Encoding: gzip for .gz files, so fetch
@@ -37,7 +38,7 @@ export function loadMobileRoomLighting(scene: THREE.Scene, signal: AbortSignal, 
     if (disposed || signal.aborted || scene.environment !== original) return;
     if (!Number.isInteger(meta.width) || !Number.isInteger(meta.height) || meta.width * meta.height * 8 !== buffer.byteLength) throw Error('Invalid baked lighting');
     texture = new THREE.DataTexture(new Uint16Array(buffer), meta.width, meta.height, THREE.RGBAFormat, THREE.HalfFloatType);
-    texture.name = 'Offline daytime store lighting';
+    texture.name = `Offline daytime ${era} store lighting`;
     texture.mapping = THREE.CubeUVReflectionMapping;
     texture.colorSpace = THREE.LinearSRGBColorSpace;
     texture.minFilter = texture.magFilter = THREE.LinearFilter;
