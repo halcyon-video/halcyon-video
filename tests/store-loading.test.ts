@@ -5,6 +5,8 @@ import {runInNewContext} from 'node:vm';
 function rig() {
  const elements = new Map<string,any>();
  const element=(id:string)=>{ if(!elements.has(id))elements.set(id,{style:{},attributes:{},textContent:'',classList:{contains:()=>true},setAttribute(k:string,v:string){this.attributes[k]=v},removeAttribute(k:string){delete this.attributes[k]}});return elements.get(id)};
+ const paint={fillStyle:'',fillRect(){}};
+ element('store-loading-fill').getContext=()=>paint;
  const window:any={};let tick:Function=()=>{};
  const document={getElementById:element,currentScript:{src:'https://example.test/store/loading-screen.js'},querySelectorAll:()=>[{src:'https://example.test/store/main.js'}]};
  const context={window,document,URL,Set,Number,Math,performance:{getEntriesByType:()=>[]},PerformanceObserver:class{observe(){}disconnect(){}},MutationObserver:class{observe(){}},setTimeout:(fn:Function)=>{tick=fn;return 1},clearTimeout:()=>{}};

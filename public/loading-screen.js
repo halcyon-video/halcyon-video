@@ -2,6 +2,11 @@
 (() => {
   const overlay = document.getElementById('boot-overlay');
   const meter = document.getElementById('store-loading-progress');
+  // Browser automatic darkening can turn a CSS white fill black. A single
+  // white canvas pixel stays white; CSS still sizes it to measured progress.
+  const fill = document.getElementById('store-loading-fill');
+  const paint = fill.getContext('2d');
+  if (paint) { paint.fillStyle = '#fff'; paint.fillRect(0, 0, 1, 1); }
   const status = document.getElementById('store-loading-status');
   const label = document.getElementById('store-loading-label');
   const base = new URL('.', document.currentScript.src);

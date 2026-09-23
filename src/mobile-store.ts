@@ -1,3 +1,4 @@
+import { mobileCheckoutAction } from './mobile-checkout';
 // Direct manipulation for the hosted touch store. Desktop input stays in its
 // existing keyboard/mouse state machine.
 import * as THREE from 'three';
@@ -160,6 +161,12 @@ export function mobileStoreTap(scene: StoreScene, e: PointerEvent): boolean {
     if (!hit.object.visible) continue;
     if (scene.mode === 'inspect' && (hit.object === scene.heroFrontMesh || hit.object === scene.heroBackMesh)) {
       if (handleStreamingCaseHit(scene, hit)) {
+        return true;
+      }
+      // The held front is an action target, just like TAKE TO COUNTER.
+      // Back-cover taps retain their cast and service-row hit regions.
+      if (!scene.isFlipped) {
+        if (!mobileCheckoutAction(scene, false)) scene.onBrowseConfirm?.();
         return true;
       }
       return false;
