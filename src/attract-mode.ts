@@ -22,6 +22,8 @@
 // the pre-tour view synchronously, before the key's own handler runs, so the
 // key that woke the store lands in the mode the visitor left.
 import * as THREE from 'three';
+import { initialMirrorCapturePending } from './mirror-cubemap-lifecycle';
+import { liveMirrorsAllowed } from './store-mirrors';
 import type { StoreScene } from './three-scene';
 import { getSetting } from './settings';
 import { getLastUserActivity, onUserActivity } from './user-activity';
@@ -239,6 +241,7 @@ export function attractTourLength(): number {
 export function startAttractTour(): boolean {
   const s = scene;
   if (active || !s) return false;
+  if (initialMirrorCapturePending(localStorage.getItem('bb_reflections'), liveMirrorsAllowed(s), s.mirrorCubemap)) return false;
   if (s.mode === 'backroom' || s.mode === 'checkout' || s.mode === 'person-endcap' || hasReachableFocusedControl()) return false;
   legs = buildTour(s);
   totalMs = legs.reduce((sum, l) => sum + l.ms + l.holdMs, 0);

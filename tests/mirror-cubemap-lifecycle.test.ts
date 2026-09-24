@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { MirrorCubemapLifecycle, resolveReflectionMode, shouldCaptureMirrorRoomProbe, stockPlacementSettled } from '../src/mirror-cubemap-lifecycle.ts';
+import { MirrorCubemapLifecycle, resolveReflectionMode, shouldCaptureMirrorRoomProbe, stockPlacementSettled, initialMirrorCapturePending } from '../src/mirror-cubemap-lifecycle.ts';
 
 test('cubemap room probe waits for settled stock', () => {
   assert.equal(shouldCaptureMirrorRoomProbe('cubemap', true, false), false);
@@ -39,4 +39,19 @@ test('last complete panorama survives stock work until its replacement exists', 
   assert.deepEqual(disposed, ['first']);
   lifecycle.dispose();
   assert.deepEqual(disposed, ['first', 'second']);
+});
+
+
+test('automatic touring waits only for a missing, enabled first cubemap', () => {
+  const lifecycle = new MirrorCubemapLifecycle();
+  lifecycle.finishStockBuild();
+  assert.equal(initialMirrorCapturePending(null, true, lifecycle), true);
+  assert.equal(initialMirrorCapturePending('cubemap', false, lifecycle), false, 'mobile and unsupported renderers do not wait');
+  assert.equal(initialMirrorCapturePending('auto', true, lifecycle), false);
+  assert.equal(initialMirrorCapturePending('smooth', true, lifecycle), false);
+  lifecycle.replace({ texture: {}, dispose() {} } as any);
+  assert.equal(initialMirrorCapturePending('cubemap', true, lifecycle), false, 'later lighting refresh does not delay touring');
+  lifecycle.dispose();
+  lifecycle.pending = false;
+  assert.equal(initialMirrorCapturePending('cubemap', true, lifecycle), false, 'failed captures release the tour');
 });

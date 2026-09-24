@@ -3,6 +3,7 @@
 // Box projection was rejected in an earlier trial because interior furniture
 // stretched onto the room shell. This option deliberately uses plain probes.
 import * as THREE from 'three';
+import { mobileStoreActive } from './mobile-store';
 import { coplanarMirrorGroups } from './mirror-view';
 import { MirrorRenderTarget } from './mirror-render-target';
 import { Reflector } from 'three/examples/jsm/objects/Reflector.js';
@@ -67,7 +68,7 @@ function intersects(m: MirrorEntry, frustum: THREE.Frustum, camera: THREE.Vector
 
 /** Explicit cubemaps also work at lower detail; unsupported GL keeps chrome. */
 export function liveMirrorsAllowed(scene: StoreScene): boolean {
-  return !scene.softwareGL && !scene.webkitGL &&
+  return !mobileStoreActive() && !scene.softwareGL && !scene.webkitGL &&
     (scene.effectiveQuality === 'high' || reflectionMode() === 'cubemap');
 }
 export function reflectorTargetSize(renderer: THREE.WebGLRenderer): { w: number; h: number } {

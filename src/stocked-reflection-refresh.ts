@@ -5,7 +5,7 @@ import { captureCubeInSlices, captureSceneState } from './cube-capture';
 import { setReflectionProbes } from './video-case';
 import { yieldForPrograms } from './program-warmup';
 import { getLastUserActivity } from './user-activity';
-import { stockPlacementSettled } from './mirror-cubemap-lifecycle';
+import { stockPlacementSettled, initialMirrorCapturePending } from './mirror-cubemap-lifecycle';
 import { liveMirrorsAllowed, shouldCaptureMirrorRoomProbe } from './store-mirrors';
 import { STORE_CENTER_X, FRONT_GLASS_Z } from './store-layout';
 
@@ -30,6 +30,20 @@ export function refreshStockedReflections(store: StoreScene): void {
     const targets: THREE.WebGLCubeRenderTarget[] = [];
     let panorama: THREE.WebGLCubeRenderTarget | null = null;
     try {
+      // Publish the first room vista before the multi-bounce lighting and five
+      // case probes. Those optional refinements can take many idle slices;
+      // leaving the mirrors blank until all of them finish starves the tour.
+      if (initialMirrorCapturePending(localStorage.getItem('bb_reflections'), liveMirrorsAllowed(store), store.mirrorCubemap)) {
+        panorama = new THREE.WebGLCubeRenderTarget(1024,
+          {generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter});
+        const camera = new THREE.CubeCamera(.1, 1000, panorama);
+        camera.position.set(STORE_CENTER_X, Math.min(9, store.ceilingY - 1.5), FRONT_GLASS_Z - 15);
+        await captureCubeInSlices(store.renderer, store.scene, camera, wait, signal,
+          captureSceneState(store.scene, store.selectionArrow ? [store.selectionArrow] : []));
+        await wait();
+        store.mirrorCubemap.replace(panorama); panorama = null;
+        store.requestRender();
+      }
       await store.outdoor.rebakeEnvironmentInSlices(wait, signal);
       const positions = [-2, 6, 14, 22].map(x => new THREE.Vector3(x, 5.5, store.scaleZ(-15)));
       positions.push(new THREE.Vector3(11, 5.5, store.backWallZ + 10));

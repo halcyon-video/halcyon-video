@@ -14,6 +14,13 @@ export function shouldCaptureMirrorRoomProbe(
   return resolveReflectionMode(mode) === 'cubemap' && liveMirrors && stockedReflectionReady;
 }
 
+/** The automatic tour must not starve the first desktop panorama. */
+export function initialMirrorCapturePending(
+  mode: string | null, enabled: boolean, lifecycle: { pending: boolean; probe: Texture | null }
+): boolean {
+  return lifecycle.pending && !lifecycle.probe && shouldCaptureMirrorRoomProbe(mode, enabled, true);
+}
+
 export function stockPlacementSettled(
   movingSlots: number, dirtySlots: Iterable<{ needsInitialMatrixUpdate?: boolean }>
 ): boolean {
