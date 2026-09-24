@@ -123,10 +123,12 @@ function buildTour(s: StoreScene): Leg[] {
   const f = counterFrame(s);
   // +n is into the counter; the customer stands 7ft out on the −n side,
   // a couple of feet along it so the register isn't dead centre.
-  const atCounter = P(f.fx - f.nx * 7 + f.ux * 2, EYE_Y, f.fz - f.nz * 7 + f.uz * 2);
-  const counterTop = P(f.fx, 3.6, f.fz);
+  const atCounter = P(f.fx - f.nx * 4.2 - f.ux * 3.5, EYE_Y, f.fz - f.nz * 4.2 - f.uz * 3.5);
+  const counterLook = P(f.fx - f.ux * 1.5, 4.2, f.fz + f.nz * 2.0);
   const half = s.getStoreWidth() / 2;
-  const xCorner = cx - Math.min(16, Math.max(6, half - 5));
+  const xOverview = cx + Math.min(11, Math.max(6, half - 5));
+  const zOverview = Math.min(6, frontZ - 2);
+  const yOverview = Math.min(8.5, s.ceilingY - 2.0);
 
   const out: Leg[] = [];
   const doorstep = P(xE, EYE_Y, frontZ + 1.2);
@@ -160,13 +162,13 @@ function buildTour(s: StoreScene): Leg[] {
     26_000, 'out', 2_500));
 
   out.push(leg('counter',
-    [P(lane, EYE_Y, zDeep), P(lane, EYE_Y, zMid + 2), atCounter],
-    [backWallGaze, P(lane - 10, 4.8, zMid), counterTop],
+    [P(lane, EYE_Y, zDeep), P(lane - 4, EYE_Y, zMid + 2), atCounter],
+    [backWallGaze, P(lane - 6, 4.6, zMid), counterLook],
     20_000, 'inout', 3_500));
 
   out.push(leg('overview',
-    [atCounter, P(xCorner + 4, 6.5, zField + 6), P(xCorner, 7.5, -2)],
-    [counterTop, P(cx, 4.5, zMid), P(cx + 2, 4.0, zb + 12)],
+    [atCounter, P(f.fx + 4, 6.8, -2), P(xOverview, yOverview, zOverview)],
+    [counterLook, P(cx, 4.5, zMid), P(cx - 2, 3.5, zMid - 4)],
     14_000, 'inout', 3_000));
   return out;
 }
@@ -238,10 +240,10 @@ export function attractTourLength(): number {
 }
 
 /** Start the tour now. False when it is already running or the scene is in a state it must not hijack. */
-export function startAttractTour(): boolean {
+export function startAttractTour(force = false): boolean {
   const s = scene;
   if (active || !s) return false;
-  if (initialMirrorCapturePending(localStorage.getItem('bb_reflections'), liveMirrorsAllowed(s), s.mirrorCubemap)) return false;
+  if (!force && initialMirrorCapturePending(localStorage.getItem('bb_reflections'), liveMirrorsAllowed(s), s.mirrorCubemap)) return false;
   if (s.mode === 'backroom' || s.mode === 'checkout' || s.mode === 'person-endcap' || hasReachableFocusedControl()) return false;
   legs = buildTour(s);
   totalMs = legs.reduce((sum, l) => sum + l.ms + l.holdMs, 0);
@@ -306,7 +308,7 @@ export function stopAttractTour(): void {
 export function pinAttractTour(s: StoreScene, ms: number): string {
   if (!active) {
     scene = s;
-    if (!startAttractTour()) return '';
+    if (!startAttractTour(true)) return '';
   }
   pinned = true;
   const pose = poseAt(Math.max(0, Math.min(ms, totalMs - 1))) ?? poseAt(0);
