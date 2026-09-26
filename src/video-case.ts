@@ -5911,14 +5911,14 @@ export function createProgramWarmupMaterials(
   }
 
   const px = new Uint8Array(COVER_WIDTH * COVER_HEIGHT * 4).fill(128);
-  const mkPosterFlavor = (animatedFlavor: boolean, finish?: CaseFinish, skipCrop = false) => {
+  const mkPosterFlavor = (animatedFlavor: boolean, finish?: CaseFinish, skipCrop = false, rental = false) => {
     const tex = createPosterDataTexture(px);
     owned.push(tex);
     const map = (skipCrop || animatedFlavor) ? tex : cropFrontTextureForMedium(tex);
     if (map !== tex) owned.push(map);
     // High-detail fronts use an explicit cube probe, unlike the scene's IBL.
     for (const envMap of reflectionProbes[probeIdx] ? [null, reflectionProbes[probeIdx]] : [null]) {
-      const mat = makePlasticMaterial({ map, finish, envMap });
+      const mat = makePlasticMaterial({ map, finish, envMap, isRentalCase: rental });
       if (animatedFlavor) applyWhiteBorderShader(mat, skipCrop ? 0 : POSTER_CROP_X);
       owned.push(mat);
       unmodifiedMaterials.push(mat);
@@ -5929,6 +5929,7 @@ export function createProgramWarmupMaterials(
   mkPosterFlavor(false, 'shrinkwrap');      // series boxset front
   mkPosterFlavor(true);                     // Animated Movies front (white-border shader)
   mkPosterFlavor(false, undefined, true);   // game-box front (skipCrop)
+  mkPosterFlavor(false, undefined, false, true); // rental-label replacement (no retail grain)
 
   return {
     materialSets, unmodifiedMaterials,

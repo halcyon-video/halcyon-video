@@ -44,6 +44,8 @@ export interface FixtureContext {
   // Optional detail models can wait until this scene is interactive. The return
   // value cancels a queued request when its owning fixture is disposed.
   scheduleDetailLoad?: (start: () => Promise<void>) => () => void;
+  // Prepare a hidden, attached model before replacing its visible fallback.
+  prepareDetailModel?: (model: THREE.Group, signal: AbortSignal) => Promise<void>;
   // Active store shelving theme.
   activeTheme: StoreTheme;
   // Gondola materials for theme-aware shelving.

@@ -45,6 +45,43 @@ test('service door loader preserves fallback on failure and retires successful o
     const late = await parse(); let lateDisposals = 0;
     late.traverse(o=>{if(o instanceof THREE.Mesh){o.geometry.addEventListener('dispose',()=>lateDisposals++);(o.material as THREE.Material).addEventListener('dispose',()=>lateDisposals++);}});
     accept({scene:late}); assert.equal(lateDisposals,8); assert.ok(fallback.visible); assert.equal(renders,1);
+    // Delayed detail must stay hidden through preparation, and a fixture
+    // retired during that wait must never reappear or release shared finishes.
+    for (const action of ['reveal', 'cancel', 'detach', 'failure']) {
+      const holder = new THREE.Group(), simple = new THREE.Group();
+      holder.add(simple); scene.add(holder);
+      const model = await parse();
+      let signal: AbortSignal | undefined, finishPreparation!: () => void, disposals = 0;
+      const preparation = new Promise<void>(resolve => { finishPreparation = resolve; });
+      model.traverse(o => { if (o instanceof THREE.Mesh) o.geometry.addEventListener('dispose', () => disposals++); });
+      const beforeRenders = renders, beforeShadows = shadows;
+      const cancel = installDisplayModel({...ctx, prepareDetailModel: async (detail: THREE.Group, lifetime: AbortSignal) => {
+        signal = lifetime;
+        assert.equal(detail.visible, false);
+        assert.equal(detail.parent, holder);
+        assert.equal(simple.visible, true);
+        await preparation;
+        if (action === 'failure') throw new Error('preparation failed');
+      }}, holder, simple, 'models/service-door.glb', {ServiceLeaf:finish});
+      accept({scene:model});
+      assert.ok(signal);
+      assert.equal(simple.visible, true);
+      if (action === 'cancel') { cancel(); assert.equal(signal.aborted, true); }
+      if (action === 'detach') holder.removeFromParent();
+      finishPreparation();
+      await new Promise<void>(resolve => setImmediate(resolve));
+      if (action === 'reveal') {
+        assert.equal(simple.visible, false); assert.equal(model.visible, true);
+        assert.equal(renders, beforeRenders + 1); assert.equal(shadows, beforeShadows + 1);
+      } else {
+        assert.equal(simple.visible, true); assert.equal(model.parent, null);
+        assert.equal(renders, beforeRenders); assert.equal(shadows, beforeShadows);
+      }
+      cancel(); cancel();
+      assert.equal(signal.aborted, true); assert.equal(disposals, 4);
+      assert.equal(sharedDisposals, 0);
+      holder.removeFromParent();
+    }
     const mediaDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'matchMedia');
     Object.defineProperty(globalThis, 'matchMedia', {configurable:true, value:()=>({matches:true})});
     const camera = new THREE.PerspectiveCamera(); camera.position.set(1000,0,0);

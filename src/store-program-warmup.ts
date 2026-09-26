@@ -1,3 +1,4 @@
+import { getLastUserActivity } from './user-activity';
 import { updateStoreLoading } from './store-loading';
 import { initialProgramObjects } from './initial-programs';
 import * as THREE from 'three';
@@ -11,6 +12,8 @@ import { mobileStoreActive } from './mobile-store';
 import { compileProgramsInStages, yieldForPrograms } from './program-warmup';
 
 const stagedInitialRooms = new WeakSet<StoreScene>();
+const preparing = new WeakSet<StoreScene>();
+export const runtimeProgramsPreparing = (scene: StoreScene): boolean => preparing.has(scene);
 
 /** Resolve the real initial pose before deciding which colour programs block entry. */
 export async function prepareInitialViewPrograms(scene: StoreScene): Promise<void> {
@@ -33,12 +36,14 @@ export async function prepareInitialViewPrograms(scene: StoreScene): Promise<voi
 }
 
 export async function warmupRuntimePrograms(scene: StoreScene) {
-  if (scene.warmedPrograms) return;
-  scene.warmedPrograms = true;
+  if (scene.warmedPrograms || preparing.has(scene)) return;
+  preparing.add(scene);
   const signal = scene.programWarmupController.signal;
   // Explicit High keeps the complete depth-of-field/hero draw preparation.
   // Automatic phone tiers can prepare inspection materials after room entry.
   const background = (isPublicDemo || mobileStoreActive()) && scene.effectiveQuality !== 'high';
+  const options = background ? backgroundOptions(scene, signal) : {};
+  const instancedProbes: THREE.InstancedMesh[] = [];
   let geo: THREE.BoxGeometry | undefined;
   let warmScene: THREE.Group | undefined;
   const bokehEnabled = scene.bokehPass?.enabled;
@@ -50,7 +55,7 @@ export async function warmupRuntimePrograms(scene: StoreScene) {
       // materials part of the initial entrance gate. This never draws the scene.
       if (stagedInitialRooms.has(scene)) {
         await compileProgramsInStages(scene.renderer, scene.scene, scene.camera,
-          scene.composer?.readBuffer ?? null, signal);
+          scene.composer?.readBuffer ?? null, signal, scene.scene, undefined, options);
         stagedInitialRooms.delete(scene);
       }
     }
@@ -95,6 +100,14 @@ export async function warmupRuntimePrograms(scene: StoreScene) {
       mesh.frustumCulled = false;
       warmScene.add(mesh);
     }
+    // Shelf batches need the instanced variant of the same undecorated
+    // poster finishes. Zero instances prepare it without drawing a probe.
+    for (const material of warm.unmodifiedMaterials) {
+      const probe = new THREE.InstancedMesh(geo, material, 1);
+      probe.count = 0;
+      instancedProbes.push(probe);
+      warmScene.add(probe);
+    }
     // The checkout bag's glossy-plastic variant (map + alphaTest + clearcoat
     // + DoubleSide) otherwise compiles mid-checkout on its first draw.
     const bagMat = scene.entrance?.getBagWarmupMaterial();
@@ -115,7 +128,7 @@ export async function warmupRuntimePrograms(scene: StoreScene) {
     }
     const t0 = performance.now();
     await compileProgramsInStages(scene.renderer, scene.scene, scene.camera,
-      scene.composer?.readBuffer ?? null, signal, background ? warmScene : scene.scene);
+      scene.composer?.readBuffer ?? null, signal, background ? warmScene : scene.scene, undefined, options);
     if (background) {
       // Do not bind, show or hide the visitor's hero cases, or force a composer
       // draw: they may already be browsing or inspecting while this completes.
@@ -161,9 +174,41 @@ export async function warmupRuntimePrograms(scene: StoreScene) {
   } catch (e) {
     if (!signal.aborted) console.warn('[warmup] runtime program warmup failed:', e);
   } finally {
+    scene.warmedPrograms = true;
+    preparing.delete(scene);
+    instancedProbes.forEach(probe => probe.dispose());
     if (warmScene) scene.scene.remove(warmScene);
     geo?.dispose();
     if (!background && scene.bokehPass && bokehEnabled !== undefined) scene.bokehPass.enabled = bokehEnabled;
     if (!background) scene.hideHeroCases();
   }
+}
+
+/** Keep the textured fallback visible while an arriving fixture prepares its
+ * actual room-lighting variants and uploads its maps, one operation at a time.
+ * The hidden model is already attached so surface finishes have been applied.
+ */
+export async function prepareDetailModel(scene: StoreScene, model: THREE.Group, lifetime: AbortSignal): Promise<void> {
+  const signal = AbortSignal.any([scene.programWarmupController.signal, lifetime]);
+  await compileProgramsInStages(scene.renderer, scene.scene, scene.camera,
+    scene.composer?.readBuffer ?? null, signal, model, undefined, backgroundOptions(scene, signal));
+  const textures = new Set<THREE.Texture>();
+  model.traverse(object => {
+    const material = (object as THREE.Mesh).material;
+    for (const mat of Array.isArray(material) ? material : material ? [material] : []) {
+      for (const value of Object.values(mat)) if (value instanceof THREE.Texture) textures.add(value);
+    }
+  });
+  for (const texture of textures) {
+    await backgroundOptions(scene, signal).beforeWork();
+    if (scene.renderer.getContext().isContextLost()) return;
+    scene.renderer.initTexture(texture);
+  }
+}
+
+function backgroundOptions(scene: StoreScene, signal: AbortSignal) {
+  return { batchSize: 1, beforeWork: async () => {
+    do { await yieldForPrograms(signal); }
+    while ((!scene.attractTour && scene.reflectionInteractionActive) || performance.now() - getLastUserActivity() < 500);
+  } };
 }

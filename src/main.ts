@@ -1071,6 +1071,8 @@ function setPowerMenuSelection(index: number) {
 }
 
 function openPowerMenu() {
+  // The pending handoff will open playback; don't put another modal under it.
+  if (storeScene?.checkoutRunning || storeScene?.launchAnim) return;
   if (ui.isExitConfirmOpen) closeExitConfirm();
   ui.isPowerMenuOpen = true;
   document.getElementById('power-menu-overlay')!.classList.add('visible');
@@ -2846,8 +2848,7 @@ async function initializeStoreScene(preservePosterCache = false) {
       hideBootOverlay();
       // Restore detailed fixtures progressively, one idle load at a time.
       // Full-room reflection bakes still stay off the phone startup path.
-      if (mobileStoreActive()) scene.detailLoads?.release();
-      if (isPublicDemo && !mobileStoreActive()) {
+      if (isPublicDemo || mobileStoreActive()) {
         void scene.warmupRuntimePrograms().finally(() => scene.detailLoads?.release())
           .catch(error => console.warn('[warmup] Hosted preparation failed:', error));
       }

@@ -21,7 +21,10 @@ export async function compileProgramsInStages(
   target: THREE.WebGLRenderTarget | null, signal: AbortSignal,
   roots: THREE.Object3D = scene,
   progress?: (fraction: number, detail: string) => void,
+  options: { batchSize?: number; beforeWork?: () => Promise<void> } = {},
 ): Promise<void> {
+  const maxBatchSize = options.batchSize ?? 32;
+  const beforeWork = options.beforeWork ?? (() => yieldForPrograms(signal));
   const gl = renderer.getContext();
   const extension = gl.getExtension('KHR_parallel_shader_compile');
   const objects: THREE.Object3D[] = [];
@@ -34,7 +37,8 @@ export async function compileProgramsInStages(
     if (!mesh.material) return;
     // Exact shared geometry/material pairs have the same shader inputs. Keep
     // special mesh kinds separate (skinning, instancing, batching).
-    if (mesh.type === 'Mesh') {
+    if (mesh.type === 'Mesh' && !(mesh as THREE.InstancedMesh).isInstancedMesh
+        && !(mesh as THREE.SkinnedMesh).isSkinnedMesh && !(mesh as THREE.BatchedMesh).isBatchedMesh) {
       const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
       const key = mesh.geometry.uuid + ':' + mats.map(m => m.uuid).join(',');
       if (signatures.has(key)) return;
@@ -44,12 +48,15 @@ export async function compileProgramsInStages(
   });
   const batch = new THREE.Group();
   const empty = new THREE.Scene();
-  const batchSize = extension ? 32 : 1;
+  const batchSize = extension ? Math.max(1, Math.floor(maxBatchSize)) : 1;
   let submitted = 0;
   let lastYield = -Infinity;
   for (let i = 0; i < objects.length; i += batchSize) {
-    if (extension || performance.now() - lastYield >= 8) {
-      await yieldForPrograms(signal);
+    // Background callers submit one drawable at a time. Cached programs can
+    // share a short task; a driver operation that exhausts the budget yields
+    // before the next drawable, even when parallel compilation is available.
+    if ((extension && maxBatchSize > 1) || performance.now() - lastYield >= 8) {
+      await beforeWork();
       lastYield = performance.now();
     }
     if (gl.isContextLost()) return;
@@ -89,7 +96,10 @@ export async function compileProgramsInStages(
     // Without completion polling, a status query can wait for EVERYTHING
     // already submitted to the driver. Drain each family before submitting
     // the next; merely splitting queries after submitting all links still stalls.
-    if (!extension) await prepareBindings();
+    // Background work must also drain each submitted family: some drivers
+    // defer uniform reflection until first use even after parallel completion.
+    // Queuing the room first makes that first query wait on the entire batch.
+    if (!extension || maxBatchSize === 1) await prepareBindings();
   }
   await prepareBindings();
   progress?.(1, 'Graphics ready');
@@ -101,7 +111,7 @@ export async function compileProgramsInStages(
     const pending = programs.slice();
     if (extension) {
       while (pending.length) {
-        await yieldForPrograms(signal);
+        await beforeWork();
         if (gl.isContextLost()) return;
         for (let j = pending.length - 1; j >= 0; j--) {
           if (!pending[j].program || gl.getProgramParameter(pending[j].program as WebGLProgram, extension.COMPLETION_STATUS_KHR)) pending.splice(j, 1);
@@ -113,7 +123,7 @@ export async function compileProgramsInStages(
     let bound = 0, bindingYield = -Infinity;
     for (const program of programs) {
       if (performance.now() - bindingYield >= 8) {
-        await yieldForPrograms(signal); bindingYield = performance.now();
+        await beforeWork(); bindingYield = performance.now();
       }
       signal.throwIfAborted();
       if (gl.isContextLost()) return;

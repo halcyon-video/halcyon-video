@@ -7,7 +7,7 @@ import type { FixtureContext } from '../fixtures';
 
 /** One fixture owns this load and its geometry; supplied finishes belong to its fallback. */
 export function installDisplayModel(
-  ctx: Pick<FixtureContext, 'scene' | 'requestShadowRefresh' | 'requestRender' | 'log' | 'scheduleDetailLoad'> & Partial<Pick<FixtureContext, 'camera'>>,
+  ctx: Pick<FixtureContext, 'scene' | 'requestShadowRefresh' | 'requestRender' | 'log' | 'scheduleDetailLoad' | 'prepareDetailModel'> & Partial<Pick<FixtureContext, 'camera'>>,
   parent: THREE.Group,
   fallback: THREE.Group,
   file: string | readonly string[],
@@ -17,6 +17,7 @@ export function installDisplayModel(
 ): () => void {
   fallback.name = 'display-fallback';
   let cancelled = false;
+  const lifetime = new AbortController();
   let installed: THREE.Group | null = null;
   const ownedMaterials = new Set<THREE.Material>();
   const ownedTextures = new Set<THREE.Texture>();
@@ -31,7 +32,7 @@ export function installDisplayModel(
     ownedTextures.clear();
     model.removeFromParent();
   };
-  const install = (model: THREE.Group) => {
+  const install = async (model: THREE.Group) => {
     let root: THREE.Object3D = parent;
     while (root.parent) root = root.parent;
     const detached = cancelled || root !== ctx.scene;
@@ -63,8 +64,25 @@ export function installDisplayModel(
     else prepareRetailModel(model);
     model.name = 'display-model';
     model.scale.copy(scale);
+    // Adding the hidden detail applies the scene's surface/lighting hooks.
+    // Keep the fallback on screen until shaders and texture uploads are ready.
+    model.visible = !ctx.prepareDetailModel;
     parent.add(model);
     installed = model;
+    try {
+      if (ctx.prepareDetailModel) await ctx.prepareDetailModel(model, lifetime.signal);
+    } catch (error) {
+      if (installed === model) { release(model); installed = null; }
+      if (!cancelled) ctx.log(`Display detail preparation failed; keeping built-in fixture. ${String(error)}`, 'system');
+      return;
+    }
+    let currentRoot: THREE.Object3D = parent;
+    while (currentRoot.parent) currentRoot = currentRoot.parent;
+    if (cancelled || currentRoot !== ctx.scene) {
+      if (installed === model) { release(model); installed = null; }
+      return;
+    }
+    model.visible = true;
     fallback.visible = false; // Registered collision meshes keep their established shape.
     ctx.requestShadowRefresh();
     ctx.requestRender();
@@ -75,7 +93,9 @@ export function installDisplayModel(
     const attempt = (index: number): void => {
       if (cancelled) { complete(); return; }
       new GLTFLoader().load(assetUrl(paths[index]), result => {
-      try { install(result.scene); } finally { complete(); }
+      void install(result.scene).catch(error => {
+        if (!cancelled) ctx.log(`Display model unavailable; using built-in fixture. ${String(error)}`, 'system');
+      }).finally(complete);
     }, undefined, error => {
       if (!cancelled && index + 1 < paths.length) { attempt(index + 1); return; }
       if (!cancelled) ctx.log(`Display model unavailable; using built-in fixture. ${String(error)}`, 'system');
@@ -108,6 +128,7 @@ export function installDisplayModel(
   else schedule();
   return () => {
     cancelled = true;
+    lifetime.abort();
     clearTimeout(nearbyTimer);
     cancelQueued?.();
     if (installed) { release(installed); installed = null; }

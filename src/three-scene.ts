@@ -1696,6 +1696,7 @@ export class StoreScene {
       },
       requestRender: () => this.requestRender(),
       scheduleDetailLoad: detailLoads ? start => detailLoads.enqueue(start) : undefined,
+      prepareDetailModel: detailLoads ? (model, signal) => programWarmup.prepareDetailModel(this, model, signal) : undefined,
       activeTheme: this.activeTheme,
       gondolaMaterials: this.gondolaMaterials,
       wallSurface: this.wallSurface,
