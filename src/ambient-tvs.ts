@@ -1173,9 +1173,6 @@ export class AmbientTvs implements StoreFixture {
     const rightTvX  = ((11.0 + CENTER_WALKWAY / 2) + fieldHi) / 2;
     const triple = localStorage.getItem('bb_tv_layout') === 'triple' ||
       (localStorage.getItem('bb_tv_layout') !== 'paired' && getActiveTheme().id === 'bb-1993');
-    // The shared center frame belongs beyond the checkout soffit, in the
-    // open sales-floor ceiling. Separate sets retain their established anchors.
-    const tvZ = 15 - (15 - this.ctx.backWallZ) * (triple ? .55 : .30);
 
     // screenNormal: the world-space direction the screen face points toward.
     // Build a "look-at with world-up constraint" so the TV stays landscape/upright.
@@ -1187,9 +1184,9 @@ export class AmbientTvs implements StoreFixture {
       return new THREE.Matrix4().makeBasis(right, up, fwd);
     };
 
-    const addTv = (x: number, screenNormal: THREE.Vector3, shared = false) => {
+    const addTv = (x: number, z: number, screenNormal: THREE.Vector3, shared = false) => {
       const g = new THREE.Group();
-      g.position.set(x, this.ctx.ceilingY, tvZ);
+      g.position.set(x, this.ctx.ceilingY, z);
 
       // Ceiling plate
       const plate = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.07, 14), poleMat);
@@ -1277,22 +1274,46 @@ export class AmbientTvs implements StoreFixture {
       return { g, tvG, fallback };
     };
 
-    // Screen normals: inward ±X, 45° downward, slight forward lean.
+    // Screen normals: inward ±X, downward angle, aimed toward the front counter/sales floor.
     // The makeTvRotation ensures the TV body stays landscape-upright (world-up constraint).
-    const audioPositions: number[] = [];
+    const audioPositions: THREE.Vector3[] = [];
     if (triple) {
-      const sets = [-2.75, 0, 2.75].map(offset => {
-        audioPositions.push(11 + offset);
-        return addTv(11 + offset, new THREE.Vector3(0, -.22, 1).normalize(), true);
+      // Move triple fixture away from direct store center (x=11) to the left side
+      // of the sales floor, aimed toward the front counter and entrance approach.
+      const minTripleX = 11.0 - storeWidth / 2 + 5.5;
+      const maxTripleX = 11.0 - CENTER_WALKWAY / 2 - 1.0;
+      const tripleCenterX = THREE.MathUtils.clamp(leftTvX, minTripleX, maxTripleX);
+      const tripleCenterZ = 15 - (15 - this.ctx.backWallZ) * 0.48;
+      const tripleNormal = new THREE.Vector3(0.62, -0.30, 0.73).normalize();
+      const fwd = tripleNormal.clone().normalize();
+      const right = new THREE.Vector3().crossVectors(new THREE.Vector3(0, 1, 0), fwd).normalize();
+
+      const offsets = [-2.75, 0, 2.75];
+      const sets = offsets.map(offset => {
+        const tvX = tripleCenterX + right.x * offset;
+        const tvZ = tripleCenterZ + right.z * offset;
+        const set = addTv(tvX, tvZ, tripleNormal, true);
+        const pos = new THREE.Vector3();
+        set.tvG.getWorldPosition(pos);
+        audioPositions.push(pos);
+        return set;
       });
+
       // One frame bears all three cabinets. Individual mount fallbacks remain
       // visible until the shared model has actually loaded.
       void installTvMount(this.ctx, sets[1].g, sets[1].tvG,
         sets.flatMap(set => set.fallback), () => !this.disposed, true);
     } else {
-      addTv(leftTvX, new THREE.Vector3(.8, -.65, -.3).normalize());
-      addTv(rightTvX, new THREE.Vector3(-.8, -.65, -.3).normalize());
-      audioPositions.push(leftTvX, rightTvX);
+      const pairedZ = 15 - (15 - this.ctx.backWallZ) * 0.30;
+      const normL = new THREE.Vector3(.8, -.65, -.3).normalize();
+      const normR = new THREE.Vector3(-.8, -.65, -.3).normalize();
+      const setL = addTv(leftTvX, pairedZ, normL);
+      const setR = addTv(rightTvX, pairedZ, normR);
+      const posL = new THREE.Vector3();
+      setL.tvG.getWorldPosition(posL);
+      const posR = new THREE.Vector3();
+      setR.tvG.getWorldPosition(posR);
+      audioPositions.push(posL, posR);
     }
 
     // T24: swap the procedural shells for the real CRT GLB once it loads.
@@ -1305,7 +1326,6 @@ export class AmbientTvs implements StoreFixture {
     const video = this.video;
     if (!video || !videoTex) return; // dead-glass TVs are silent
 
-    const tvBodyY = this.ctx.ceilingY - poleLen - bodyH * 0.08;
     try {
       const audioCtx = new AudioContext();
       this.audioCtx = audioCtx;
@@ -1325,13 +1345,13 @@ export class AmbientTvs implements StoreFixture {
         audioCtx.listener.setPosition(initPos.x, initPos.y, initPos.z);
       }
 
-      for (const tvX of audioPositions) {
+      for (const pos of audioPositions) {
         const panner = audioCtx.createPanner();
         panner.panningModel  = 'HRTF';
         panner.distanceModel = 'inverse';
         panner.refDistance   = 5;
         panner.rolloffFactor = 1.8;
-        panner.setPosition(tvX, tvBodyY, tvZ);
+        panner.setPosition(pos.x, pos.y, pos.z);
         gain.connect(panner);
         panner.connect(audioCtx.destination);
       }
