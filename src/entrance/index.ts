@@ -1,3 +1,4 @@
+import { FRAME_REVEAL_DEPTH, FRAME_REVEAL_CENTER } from '../frame-reveal';
 import { vestibuleLayout, vestibuleSide, vestibuleStraightSide, vestibuleBackHalf } from '../vestibule-layout.ts';
 import { buildExitReturnCounter } from './exit-return-counter';
 import { buildWalkOffMats } from './walk-off-mats';
@@ -349,7 +350,13 @@ export class EntranceCheckout implements StoreFixture {
     ) => {
       // place a box whose long axis lies along the wall's run direction
       const along = (center: number, lenAlong: number, y: number, h: number, thick: number, mat: THREE.Material) => {
-        if (orient === 'X') box(lenAlong, h, thick, mat, center, y, fixed);
+        // The exterior front frame must cover the interior liner and brick
+        // reveal together. Chamber glazing retains its slim frame depth.
+        const exteriorFrame = orient === 'X' && Math.abs(fixed - frontZ) < .01 && mat === frameMat;
+        if (orient === 'X') {
+          const mesh = box(lenAlong, h, exteriorFrame ? FRAME_REVEAL_DEPTH : thick, mat, center, y, fixed + (exteriorFrame ? FRAME_REVEAL_CENTER : 0));
+          if (exteriorFrame) mesh.name = 'entrance-exterior-reveal-frame';
+        }
         else box(thick, h, lenAlong, mat, fixed, y, center);
       };
       const gapHalf = (opts?.doorWidth ?? doorW) / 2;

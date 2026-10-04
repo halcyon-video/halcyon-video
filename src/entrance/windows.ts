@@ -1,3 +1,4 @@
+import { FRAME_REVEAL_DEPTH, FRAME_REVEAL_CENTER } from '../frame-reveal';
 import { windowGlassGeometry, type WindowAperture } from '../window-glass-geometry';
 // Storefront window-bay builder (T05): the customer-facing glazed front wall
 // — a solid knee wall (a real video store never ran glass to the carpet) with
@@ -168,24 +169,25 @@ export function buildWindowBays(
     // Outer border frames (per wing): sill on the knee wall, head, and the
     // two verticals. Both posts sit within their pane opening, so the
     // adjacent masonry cannot bury the entrance-side frame.
-    const horizGeo = new THREE.BoxGeometry(wingW, frameThickness, frameDepth);
+    const horizGeo = new THREE.BoxGeometry(wingW, frameThickness, FRAME_REVEAL_DEPTH);
     const bottomFrame = new THREE.Mesh(horizGeo, frameMat);
-    bottomFrame.position.set(wingC, KNEE_H + frameThickness / 2, 0);
+    bottomFrame.position.set(wingC, KNEE_H + frameThickness / 2, -FRAME_REVEAL_CENTER);
     const topFrame = new THREE.Mesh(horizGeo, frameMat);
-    topFrame.position.set(wingC, height - frameThickness / 2, 0);
+    topFrame.position.set(wingC, height - frameThickness / 2, -FRAME_REVEAL_CENTER);
     // Both ends sit on the knee wall; the entrance owns its floor-reaching
     // door jambs. Extending a wing frame downward splits the brick footer.
-    const vertSillGeo = new THREE.BoxGeometry(frameThickness, height - KNEE_H, frameDepth);
+    const vertSillGeo = new THREE.BoxGeometry(frameThickness, height - KNEE_H, FRAME_REVEAL_DEPTH);
     const sillVertY = KNEE_H + (height - KNEE_H) / 2;
     const leftVert = new THREE.Mesh(vertSillGeo, frameMat);
     leftVert.position.set(
       wing.lo + frameThickness / 2,
-      sillVertY, 0);
+      sillVertY, -FRAME_REVEAL_CENTER);
     const rightVert = new THREE.Mesh(vertSillGeo, frameMat);
     rightVert.position.set(
       wing.hi - frameThickness / 2,
-      sillVertY, 0);
+      sillVertY, -FRAME_REVEAL_CENTER);
     [bottomFrame, topFrame, leftVert, rightVert].forEach((f) => {
+      f.name = 'front-window-reveal-frame';
       f.castShadow = true;
       f.receiveShadow = true;
       group.add(f);

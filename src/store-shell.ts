@@ -1,3 +1,4 @@
+import { FRAME_REVEAL_DEPTH, FRAME_REVEAL_CENTER } from './frame-reveal';
 import { materialTextureLoad } from './material-texture-load';
 import quickDrop from './exit-return-spec.json' with { type: 'json' };
 import { installTrofferModels, trofferCeilingGeometry } from './troffer-model.ts';
@@ -230,16 +231,16 @@ scene: StoreScene,
 
   // Outer border frames
   // Bottom horizontal frame — the glazing sill sits on the knee wall
-  const bottomFrameGeo = new THREE.BoxGeometry(width, frameThickness, frameDepth);
+  const bottomFrameGeo = new THREE.BoxGeometry(width, frameThickness, FRAME_REVEAL_DEPTH);
   const bottomFrame = new THREE.Mesh(bottomFrameGeo, frameMat);
-  bottomFrame.position.set(0, KNEE_H + frameThickness / 2, 0);
+  bottomFrame.position.set(0, KNEE_H + frameThickness / 2, -FRAME_REVEAL_CENTER);
   bottomFrame.castShadow = true;
   bottomFrame.receiveShadow = true;
   group.add(bottomFrame);
 
   // Top horizontal frame
   const topFrame = new THREE.Mesh(bottomFrameGeo, frameMat);
-  topFrame.position.set(0, height - frameThickness / 2, 0);
+  topFrame.position.set(0, height - frameThickness / 2, -FRAME_REVEAL_CENTER);
   topFrame.castShadow = true;
   topFrame.receiveShadow = true;
   group.add(topFrame);
@@ -248,15 +249,15 @@ scene: StoreScene,
   // sill. They used to run the full height to the floor, which buried a
   // charcoal strip down the face of the knee wall at every section end
   // (feedback/041's "strange black bars extending to the floor").
-  const verticalFrameGeo = new THREE.BoxGeometry(frameThickness, height - KNEE_H, frameDepth);
+  const verticalFrameGeo = new THREE.BoxGeometry(frameThickness, height - KNEE_H, FRAME_REVEAL_DEPTH);
   const leftFrame = new THREE.Mesh(verticalFrameGeo, frameMat);
-  leftFrame.position.set(-width / 2 + frameThickness / 2, KNEE_H + (height - KNEE_H) / 2, 0);
+  leftFrame.position.set(-width / 2 + frameThickness / 2, KNEE_H + (height - KNEE_H) / 2, -FRAME_REVEAL_CENTER);
   leftFrame.castShadow = true;
   leftFrame.receiveShadow = true;
   group.add(leftFrame);
 
   const rightFrame = new THREE.Mesh(verticalFrameGeo, frameMat);
-  rightFrame.position.set(width / 2 - frameThickness / 2, KNEE_H + (height - KNEE_H) / 2, 0);
+  rightFrame.position.set(width / 2 - frameThickness / 2, KNEE_H + (height - KNEE_H) / 2, -FRAME_REVEAL_CENTER);
   rightFrame.castShadow = true;
   rightFrame.receiveShadow = true;
   group.add(rightFrame);
