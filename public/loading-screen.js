@@ -13,7 +13,7 @@
   let value = 0, failed = false, timer, slide = 0, front = 0;
   const views = ['store-interior.webp', 'store-aisles.webp', 'store-exterior.webp'];
   const tips = [
-    'Loading the mobile store. Visit on desktop for the full visual experience.',
+    'Preparing your store. Your shelves will open when they are ready.',
     'Make it your own: self-host Halcyon with your Jellyfin or Plex media library.',
     'More than streaming: connect your games through RomM and browse them in the store.',
     'On your phone, drag the thumbstick to walk, swipe to look, and tap a case to examine it.'

@@ -1071,6 +1071,7 @@ async function fetchJellyfinLibrariesAndMovies(
 
     const librariesList: JellyfinLibrary[] = [];
 
+    let completedLibraries = 0;
     const libraryPromises = movieLibraries.map(async (lib: any) => {
       console.log(`[Media server] Syncing catalog for library "${lib.Name}" (${lib.Id})...`);
       onProgress?.(`library "${lib.Name}"`);
@@ -1142,6 +1143,8 @@ async function fetchJellyfinLibrariesAndMovies(
         if (dialect === "emby") throw err;
         console.error(`[Media server] Failed to sync library "${lib.Name}":`, err);
         return null;
+      } finally {
+        onProgress?.(`catalog ${++completedLibraries} of ${movieLibraries.length}`);
       }
     });
 

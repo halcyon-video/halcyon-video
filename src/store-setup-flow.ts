@@ -189,10 +189,11 @@ function onTypedKey(e: KeyboardEvent): void {
 }
 
 /** First-run entry: dock the camera and show NEW STORE SETUP. */
-export function openSetupTerminal(): void {
+export function openSetupTerminal(signInReason?: string): void {
   if (!deps) return;
   initSetupReport();
-  openWith(initialHomeScreen(defaultJellyfinUrl(localStorage.getItem('jellyfin_url'), import.meta.env.VITE_JELLYFIN_URL)));
+  const home = initialHomeScreen(defaultJellyfinUrl(localStorage.getItem('jellyfin_url'), import.meta.env.VITE_JELLYFIN_URL));
+  openWith(signInReason ? { ...home, row: 2, error: signInReason } : home);
   deps.log('[Setup] Opening day — NEW STORE SETUP is on the counter CRT.');
 }
 

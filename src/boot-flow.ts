@@ -1,6 +1,7 @@
 import { operatorDefault } from './operator-defaults';
 import { mobileStoreActive } from './mobile-store';
 import { resetStoreLoading, updateStoreLoading } from './store-loading';
+import { catalogLoadingReporter, shouldPauseStoreConnection, requiresStoreSignIn } from './boot-loading';
 // The boot / credentials flow — every path from "the app just loaded" to "the
 // store is stocked and revealed": saved-session auto-connect with its stall
 // watchdog and backoff retry, the membership-card picker hand-off, the classic
@@ -91,7 +92,7 @@ let deps: BootFlowDeps | null = null;
 // Opening-day (#41) plumbing: what the setup terminal should show once the
 // empty scene has revealed, and hooks into the auto-retry loop below so the
 // notice screen's RETRY NOW / CHANGE SERVER rows can drive it.
-let pendingSetup: { notice?: { title?: string; address: string; detail: string } } | null = null;
+let pendingSetup: { signIn?: string; notice?: { title?: string; address: string; detail: string } } | null = null;
 let retryNowHook: (() => void) | null = null;
 let cancelRetryHook: (() => void) | null = null;
 
@@ -140,9 +141,9 @@ export function initBootFlow(d: BootFlowDeps): void {
  * queue the setup terminal to dock once the scene reveals (#41). Serves both
  * the true first run and the unreachable-server failure state.
  */
-export function enterOpeningDay(opts?: { notice?: { title?: string; address: string; detail: string } }): void {
+export function enterOpeningDay(opts?: { signIn?: string; notice?: { title?: string; address: string; detail: string } }): void {
   if (!deps) return;
-  pendingSetup = { notice: opts?.notice };
+  pendingSetup = { notice: opts?.notice, signIn: opts?.signIn };
   deps.setLibraries([]);
   deps.setGames([]);
   // The empty build takes a second or two; the boot overlay (already up on
@@ -162,7 +163,7 @@ export function maybeOpenSetupTerminal(): void {
   const p = pendingSetup;
   pendingSetup = null;
   if (p.notice) openSetupNotice(p.notice.address, p.notice.detail, p.notice.title);
-  else openSetupTerminal();
+  else openSetupTerminal(p.signIn);
 }
 
 /** Whether an opening-day setup terminal is queued for this reveal (#137: a shared-place link is meaningless over an empty store, and would fight the terminal for the camera). */
@@ -325,12 +326,14 @@ async function syncAllSources(
   onProgress?: (stage: string) => void, stall?: Promise<never>,
 ): Promise<JellyfinLibrary[]> {
   const d = deps!;
+  const report = catalogLoadingReporter(updateStoreLoading, onProgress);
   const result = await syncConfiguredCatalog(
-    () => restoreStoreSettings(onProgress),
-    () => fetchCatalogFromAllSources({ onProgress }),
+    () => restoreStoreSettings(report),
+    () => fetchCatalogFromAllSources({ onProgress: report }),
     [d.loadComingSoon, d.loadDiscovery, d.loadGames, d.loadStreaming],
     stall,
   );
+  updateStoreLoading(24, 'Catalog ready');
   for (const failure of result.failures) {
     deps?.log(`[System] ${failure.source.name} did not answer: ${failure.error}`, 'system');
   }
@@ -438,8 +441,8 @@ export function hideBootOverlay() {
 // very first paint) so the scene has somewhere opaque to load behind while its
 // textures stream in.
 export function showBootOverlay() {
-  resetStoreLoading();
   const overlay = document.getElementById('boot-overlay');
+  if (!overlay?.classList.contains('visible')) resetStoreLoading();
   if (overlay) {
     overlay.classList.remove('preparing-models');
     // Raise it INSTANTLY, not over the stylesheet's 0.6s fade. What follows a
@@ -846,7 +849,8 @@ export async function checkCredentialsAndLoad() {
   let retryTimeoutId: any = null;
   let noticeShown = false; // the setup-terminal notice (#41), docked once
 
-  // Any keypress or click on the boot screen skips the wait. In the 3D store
+  // Only deliberate Escape pauses the connection; incidental input must not
+  // empty the store. In the 3D store
   // that means the same place every other setup moment lives: the counter
   // CRT, docked over the empty store with a "paused by you" notice whose
   // RETRY NOW / CHANGE SERVER / DEMO rows are the ways forward — the
@@ -856,7 +860,7 @@ export async function checkCredentialsAndLoad() {
   // different app bolted onto the boot. Flat mode has no counter to dock to
   // and keeps the classic form.
   const bootEscape = (e: Event) => {
-    if (e.type === 'keydown' && (e as KeyboardEvent).key === 'Tab') return; // ignore tab
+    if (!shouldPauseStoreConnection(e.type, (e as KeyboardEvent).key)) return;
     document.removeEventListener('keydown', bootEscape);
     document.removeEventListener('click', bootEscape);
     if (getSetting<string>('bb_render_mode') !== 'flat' && jellyfinUrl) {
@@ -970,6 +974,14 @@ export async function checkCredentialsAndLoad() {
         if (escaped) return;
 
         const msg = err?.message ?? (typeof err === 'string' ? err : String(err));
+        if (requiresStoreSignIn(msg)) {
+          escaped = true;
+          document.removeEventListener('keydown', bootEscape);
+          document.removeEventListener('click', bootEscape);
+          d.log('[System] Saved login expired. Please sign in again to reopen your library.', 'system');
+          enterOpeningDay({ signIn: 'SAVED LOGIN EXPIRED. CONNECT TO SIGN IN AGAIN.' });
+          return;
+        }
         d.log(`[System] Auto-login failed: ${msg}. Retrying in ${currentDelay / 1000}s...`, 'system');
 
         // #41: the empty store doubles as the failure state — never a modal
