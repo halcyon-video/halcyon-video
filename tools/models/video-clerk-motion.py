@@ -26,6 +26,10 @@ for o in [body,ox,*extras]:
 bpy.context.view_layer.objects.active=arm;bpy.ops.object.mode_set(mode='EDIT')
 for b in arm.data.edit_bones:b.head=shape(b.head);b.tail=shape(b.tail)
 bpy.ops.object.mode_set(mode='OBJECT')
+# Refine the source garment before skinning and motion sampling.
+import runpy
+cloth_report=runpy.run_path(str(ROOT/'tools/models/clerk-cloth.py'))['refine_cloth'](arm,body,ox,extras)
+bpy.context.view_layer.objects.active=arm
 # Preserve original skin and digit geometry; add three phalanges per finger.
 hand_frames={s:arm.data.bones[s+'Hand'].matrix_local.copy() for s in ['Left','Right']}
 fingers={};segments={}
@@ -149,6 +153,14 @@ def pose(anim,u):
   reset();sample=walk_samples[round(u*40)%40]
   for dst,(delta,direction) in sample.items():
    b=arm.pose.bones[dst];b.matrix=Matrix.Translation(b.head)@delta.to_matrix().to_4x4()@rest[dst].to_3x3().to_4x4();update();aim(dst,direction)
+  # Keep the reference gait, but stand the torso over the pelvis. Preserve
+  # leg world poses so this correction does not tilt the feet or stride.
+  legs={b.name:b.matrix.copy() for b in arm.pose.bones if any(b.name==side+part for side in ['Left','Right'] for part in ['UpLeg','Leg','Foot','ToeBase'])}
+  hips=arm.pose.bones['Hips'];axis=arm.pose.bones['neck'].head-hips.head
+  pitch=math.atan2(-axis.y,axis.z)
+  upright=math.radians(2+.4*math.cos(u*math.tau*2))
+  m=hips.matrix.copy();hips.matrix=Matrix.Translation(m.translation)@Matrix.Rotation(upright-pitch,4,'X')@m.to_3x3().to_4x4();update()
+  for name,matrix in legs.items():arm.pose.bones[name].matrix=matrix;update()
   for side,s in [('Left',1),('Right',-1)]:
    # Smaller, relaxed arm swing and wider clearance for this stylized silhouette.
    ph=u*math.tau+(0 if s==1 else math.pi)
@@ -212,7 +224,7 @@ if '--probe' in sys.argv:
  sys.exit(0)
 
 # Sample all motions before attaching any actions: evaluation is deterministic.
-samples={};report={'proportions':{'legScale':.90,'torsoScale':1.10},'fingerBones':30,'clips':{},'source':'Quaternius Universal Animation Library Standard, Walk_Loop; authored contact actions'}
+samples={};report={'cloth':cloth_report,'proportions':{'legScale':.90,'torsoScale':1.10},'fingerBones':30,'clips':{},'source':'Quaternius Universal Animation Library Standard, Walk_Loop; authored contact actions'}
 for anim,duration in DUR.items():
  count=round(duration*30);frames=[]
  for fi in range(count+1):
@@ -257,9 +269,21 @@ for im in bpy.data.images:
  if im.size[0]>2048:im.scale(2048,2048)
 def bake_cloth(o,style):
  originals=list(o.data.materials)
+ source_uv=o.data.uv_layers.active.name
+ baked_uv=source_uv
+ if style=='oxford':
+  baked_uv='Oxford review atlas'
+  o.data.uv_layers.new(name=baked_uv);o.data.uv_layers.active=o.data.uv_layers[baked_uv];o.data.uv_layers[baked_uv].active_render=True
+  bpy.ops.object.select_all(action='DESELECT');o.hide_set(False);o.hide_render=False;o.select_set(True);bpy.context.view_layer.objects.active=o
+  bpy.ops.object.mode_set(mode='EDIT');bpy.ops.mesh.select_all(action='SELECT');bpy.ops.uv.smart_project(island_margin=.004);bpy.ops.object.mode_set(mode='OBJECT')
  image=bpy.data.images.new('Clerk '+style+' baked colour',width=2048,height=2048,alpha=True)
  for i,source in enumerate(originals):
   m=source.copy();o.data.materials[i]=m;nodes=m.node_tree.nodes;links=m.node_tree.links
+  # The shader still reads the original UVs while the target bake uses its
+  # own atlas; new sleeve topology must not overwrite a source texture island.
+  for tex_node in list(nodes):
+   if tex_node.type=='TEX_IMAGE' and not tex_node.inputs['Vector'].is_linked:
+    source_map=nodes.new('ShaderNodeUVMap');source_map.uv_map=source_uv;links.new(source_map.outputs['UV'],tex_node.inputs['Vector'])
   output=next(n for n in nodes if n.type=='OUTPUT_MATERIAL')
   surface=output.inputs['Surface'].links[0].from_node
   if surface.type=='BSDF_PRINCIPLED':
@@ -274,7 +298,7 @@ def bake_cloth(o,style):
  bpy.ops.object.bake(type='EMIT',margin=4,use_clear=True)
  m=bpy.data.materials.new('Baked '+style+' colour');m.use_nodes=True
  bs=m.node_tree.nodes.get('Principled BSDF');bs.inputs['Roughness'].default_value=.85
- tex=m.node_tree.nodes.new('ShaderNodeTexImage');tex.image=image;m.node_tree.links.new(tex.outputs['Color'],bs.inputs['Base Color'])
+ tex=m.node_tree.nodes.new('ShaderNodeTexImage');tex.image=image;uv_map=m.node_tree.nodes.new('ShaderNodeUVMap');uv_map.uv_map=baked_uv;m.node_tree.links.new(uv_map.outputs['UV'],tex.inputs['Vector']);m.node_tree.links.new(tex.outputs['Color'],bs.inputs['Base Color'])
  o.data.materials.clear();o.data.materials.append(m)
  for poly in o.data.polygons:poly.material_index=0
  image.pack()

@@ -57,3 +57,54 @@ was replaced.
 Final receipts and visual findings accompany the delivered review. Studio
 inspection establishes this candidate's appearance and playback; it is not a
 physical-phone performance measurement or an in-store sprite acceptance test.
+
+## Posture and garment revision — owner review follow-up
+
+The owner found the walk too stooped and the shirt too closely fitted beneath the
+chest, with rough sleeve edges and a penetrating pocket. The reproducible motion
+script now calls `clerk-cloth.py` before animation sampling. Blender mesh edits
+remove tiny coincident garment defects, smooth cloth, rebuild the Oxford shirt with Blender voxel remeshing and native
+skin-weight transfer,
+and distribute the shirt front continuously from the bust apex to the waistband.
+The face, hair and hands retain their source geometry; the collar, badge and
+trousers retain their original design and texture.
+The original texture coordinates remain the bake input; the Oxford export gets
+a fresh Blender UV atlas for the revised topology.
+
+The Oxford pocket is a tessellated cloth patch fitted to the shirt, with skin
+weights interpolated from the supporting triangles. The placket and buttons
+receive the same surface fitting and skin interpolation. It therefore follows
+the garment through bends instead of using unrelated rigid spine weights.
+
+The reference walk retains its leg poses and timing. A torso correction at the
+pelvis keeps the hip-to-neck axis between 1.6 and 2.4 degrees forward, replacing
+roughly 10–11 degrees in the preceding review. Lower-body pose matrices are
+preserved during that correction; the existing shoe-grounding pass still runs.
+
+This remains a review candidate. The production sprite sheets are unchanged.
+Validation receipts and matching before/after captures are retained with the
+MogNet review evidence and in `scratch/publicity-kits/clerk-drape-20261004`.
+
+The Oxford uses a smooth remeshed outer surface, with the original cut edges and
+an inset continuous lining retained underneath. Fitted positions and transferred
+normals blend the surfaces at their joins. Plain Oxford pigment matches across
+both surfaces; the original pixel mask still preserves skin and trousers at the
+hem. The production sprite atlases remain unchanged.
+
+Final validation: the build and all 1,112 tests pass on source base
+`63ddf269cea771b875605f5ec0d0b7fc246a5b12`. The 712-frame pocket-to-torso mesh audit
+passes for both sides of the pocket thickness, with minimum signed clearance
+0.0595 cm. All 40 walking frames keep the hip-to-neck angle between 1.6 and
+2.4 degrees. Existing stocking grip and seated-case checks pass across all 405
+stocking frames. A full-character nearest-face query was rejected as the pocket
+check because raised sleeves can become the nearest unrelated surface; the final
+audit explicitly measures the supporting torso. A supplemental forward ray is
+not a gate at the crouched silhouette, where 30 rays have no intersection; the
+3D nearest-surface check covers every vertex in every frame.
+
+Chromium at 390×844 loads both exported uniforms, exercises all seven clips and
+the playback controls, and passes layout, reduced-motion and error checks.
+The actual exported models were inspected in that viewer from side and three-
+quarter views, with matching old/new walking captures. Source face, hair, skin,
+trouser texture details and the original generated collar design remain; this
+pass does not claim a wholly retopologized character or physical-phone FPS.
