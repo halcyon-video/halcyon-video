@@ -50,6 +50,7 @@ import { windowBayLayout } from './storefront-window-layout';
 import { facadeDimensions, facadeStyle } from './storefront-architecture';
 import { addGlassReflectionPane } from './glass-reflection';
 import { buildExteriorEnvironment } from './exterior-environment';
+import { buildExteriorPanorama } from './exterior-panorama';
 import { NR_WALL_SLOPE, nrWallDepthAtHeight, NR_WALL_SHELF_DEPTH, NR_WALL_CLEARANCE, NR_LEFT_UNIT_STANDOFF, WALL_SHELF_HEIGHTS, NR_SECTION_COLS, UNIT_SECTIONS, seededRandom01, getStorefrontSpec, vestibuleHalfWidth, posterBayIndices, entranceOpeningHalfWidth, mapWallSegmentUV, CENTER_WALKWAY, STORE_CENTER_X, FRONT_GLASS_Z } from './store-layout';
 import { buildFrontSoffit, frontSoffitLidPolygon, frontSoffitPolygon, frontSoffitY, pointInSoffit, soffitConnectHalf, soffitKeyCenters, soffitTrofferCenters, tileOverlapsSoffit } from './ceiling-soffit';
 import { createFixture } from './fixture-registry';
@@ -300,65 +301,13 @@ export function buildStore(scene: StoreScene) {
   // storefront window build below and the EntranceCheckout fixture (via
   // fixtureContext()).
   scene.storefrontSpec = getStorefrontSpec(storeWidth);
-  // Add sky dome sphere.
-  //
-  // The radius is DERIVED, not fixed, because the dome has to enclose the whole
-  // built store however deep the library makes it. The dome is an ordinary
-  // opaque, depth-tested mesh, so anywhere it intrudes into the room it simply
-  // draws OVER the wall behind it and the store reads as open to the sky —
-  // pale blue by day, black at night.
-  //
-  // A fixed 200 ft dome centred SKY_CENTER_Z toward the street reaches only
-  // z = -80 on the centreline, and — being a sphere — far less off-axis. A
-  // games-only store (the whole Romm library as aisles) is ~96 ft deep with its
-  // back wall at z ≈ -81.6, so the dome landed ~12 ft IN FRONT of that wall at
-  // the store's x edge and sliced the back of the shop open in an arc.
-  //
-  // The binding corner is the ROOF SLAB, the outermost geometry at the back: it
-  // overhangs the room by ROOF_OVERHANG on every side (see roofGeo below) and
-  // sits 0.85 ft above ceilingY. Note the dome centre is x = 0 while the store
-  // centres on x = 11, so the +x corner is the far one. Everything beyond the
-  // glass (lot, sidewalk, dressing) sits far nearer the dome centre than that
-  // corner, so it never binds.
-  //
-  // The old fixed 200 was not arbitrary — it is almost exactly the corner
-  // distance for a ~3000-title movie store (measured: 200.00), i.e. the dome was
-  // sized to GRAZE that corner. Grazing is not actually safe: the dome is
-  // tessellated, and a sphere's flat faces are chords that dip
-  // R·(1−cos(π/segments)) INSIDE the true sphere between vertices (~1 ft at
-  // these radii). So clear the corner by the chord sag (twice, since the corner
-  // can fall mid-facet in both angular axes) plus a small constant, rather than
-  // by a magic number.
-  //
-  // Consequence worth knowing: this does NOT leave the baseline store
-  // pixel-identical. A 3000-title movie store goes 200 -> 203.9 because its
-  // corner was already at the old radius. Verified visually indistinguishable
-  // (building, lot and framing unchanged); note you cannot prove that by pixel
-  // diffing, as the harness is not deterministic run-to-run — two identical runs
-  // differ across ~92% of pixels.
-  const SKY_CENTER_Z = 120.0;
-  const SKY_MIN_RADIUS = 200.0;   // floor: never shrink the dome below its historical size
-  const SKY_SEGMENTS = 32;
-  const ROOF_OVERHANG = 2.0;      // must track roofGeo's storeWidth/floorCeilLen padding
-  const skyCornerDist = Math.hypot(
-    STORE_CENTER_X + (storeWidth + 2 * ROOF_OVERHANG) / 2,
-    scene.ceilingY + 0.85,
-    SKY_CENTER_Z - (scene.backWallZ - ROOF_OVERHANG),
-  );
-  const skyChordSag = skyCornerDist * (1 - Math.cos(Math.PI / SKY_SEGMENTS));
-  const skyRadius = Math.max(SKY_MIN_RADIUS, skyCornerDist + 2 * skyChordSag + 2.0);
-  const skyGeo = new THREE.SphereGeometry(skyRadius, SKY_SEGMENTS, SKY_SEGMENTS);
-  // toneMapped: false — the panos are display-referred JPGs (already "tone mapped"
-  // by the camera that shot them); running them through AgX a second time is what
-  // made the sky read washed-out gray. Render them as authored.
-  const skyMat = selfLit(new THREE.MeshBasicMaterial({ side: THREE.BackSide, fog: false, toneMapped: false }), 'sky');
-  const sky = new THREE.Mesh(skyGeo, skyMat);
-
-  // Shift the center of the skybox sphere towards the front of the store/street (+Z)
-  sky.position.set(0, 0, SKY_CENTER_Z);
+  const panoramaWalkDepth = activeStoreFormat().facadeStyle === 'storefront' ? 4.7
+    : facadeDimensions(scene.ceilingY, vestibuleHalfWidth(scene.storefrontSpec), facadeStyle()).sidewalkDepth;
+  const sky = buildExteriorPanorama(storeWidth, scene.backWallZ, scene.ceilingY, panoramaWalkDepth, scene.effectiveQuality === 'high');
   scene.scene.add(sky);
   scene.outdoor.skyMesh = sky;
-  scene.outdoor.commercialSky = scene.effectiveQuality === 'high';
+  scene.camera.far = Math.max(1000, Number(sky.userData.panoramaRadius) * 2);
+  scene.camera.updateProjectionMatrix();
   // Base rotation (street side at the storefront) + this visit's sun azimuth.
   scene.outdoor.applySunPlacement();
   
@@ -544,10 +493,7 @@ export function buildStore(scene: StoreScene) {
   }, scene.backWallZ);
   scene.exterior.setOutsideMode(scene.outdoor.outsideMode);
   scene.exterior.setGroundColor(scene.outdoor.getGroundColor());
-  scene.outdoor.setGroundColorListener((color) => {
-    scene.exterior?.setGroundColor(color);
-    scene.requestRender();
-  });
+  scene.outdoor.setGroundColorListener(color => scene.exterior?.setGroundColor(color));
   dimEnvOutside(scene.exterior.group);
 
   // Initialize 3D wall signage textures and materials

@@ -606,13 +606,14 @@ export function registerCoreSettings(): void {
     kind: 'cycle',
     group: 'Store Look',
     values: [
-      { id: 'day', label: 'Daytime' },
-      { id: 'night', label: 'Nighttime' },
+      { id: 'morning', label: 'Morning' },
+      { id: 'day', label: 'Afternoon' },
       { id: 'sunset', label: 'Sunset' },
+      { id: 'night', label: 'Nighttime' },
     ],
     default: 'day',
     applyMode: 'live',
-    apply: (value, scene) => scene.setOutsideMode(value as 'day' | 'night' | 'sunset'),
+    apply: (value, scene) => scene.setOutsideMode(value as 'morning' | 'day' | 'night' | 'sunset'),
     hint: 'Time of day seen through the storefront windows.',
   });
 

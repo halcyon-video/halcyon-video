@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { createAsphaltTexture } from './canvas-textures';
+import { selfLit } from './material-lighting';
+import { createMatchedPavement } from './matched-pavement';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { ParkingLayout } from './parking-layout';
 
@@ -25,10 +26,15 @@ export function buildParkingLot(parent: THREE.Group, p: ParkingLayout, sidewalkM
   }
   // A continuous U-shaped apron wraps the freestanding building. Asphalt is
   // below its slab and the street-side grass, with the right driveway open.
-  const asphaltTex = track(createAsphaltTexture(0,0));
-  const asphaltMat = track(new THREE.MeshStandardMaterial({map:asphaltTex,roughness:.95}));
-  shapeMesh(rect(p.minX,p.rearZ,p.maxX,p.farZ),asphaltMat,-.09);
-  shapeMesh(rect(p.drivewayMinX,p.farZ,p.maxX,p.streetZ+2),asphaltMat,-.09);
+  const pavement = track(createMatchedPavement());
+  const asphaltMat = pavement.material;
+  const shadows = track(selfLit(new THREE.ShadowMaterial({opacity:.35,depthWrite:false,fog:false}), 'shadow'));
+  shadows.name = 'panorama-parking-shadows';
+  for (const mat of [asphaltMat, shadows]) {
+    const y = mat === shadows ? -.087 : -.09;
+    shapeMesh(rect(p.minX,p.rearZ,p.maxX,p.farZ),mat,y);
+    shapeMesh(rect(p.drivewayMinX,p.farZ,p.maxX,p.streetZ+2),mat,y);
+  }
   const apron = new THREE.Shape();
   apron.moveTo(p.left,-p.rearZ); apron.lineTo(p.left,-(p.nearZ-3));
   apron.quadraticCurveTo(p.left,-p.nearZ,p.left+3,-p.nearZ);
@@ -114,5 +120,5 @@ export function buildParkingLot(parent: THREE.Group, p: ParkingLayout, sidewalkM
     if(!merged) throw new Error('Parking surface batch failed');
     const mesh=new THREE.Mesh(track(merged),mat);mesh.receiveShadow=true;group.add(mesh);
   }
-  return {dispose(){owned.forEach(o=>o.dispose());group.removeFromParent();}};
+  return {setGroundColor: pavement.setColor, dispose(){owned.forEach(o=>o.dispose());group.removeFromParent();}};
 }

@@ -13,8 +13,7 @@
 // per-frame) and merges into whichever parent group the caller passes,
 // riding that group's existing exterior env-map dimming pass for free.
 import * as THREE from 'three';
-import { createAsphaltTexture } from './canvas-textures';
-import { buildGroundBlend } from './ground-blend';
+import { createMatchedPavement } from './matched-pavement';
 
 export interface ExteriorRoad {
   group: THREE.Group;
@@ -43,9 +42,6 @@ const GUTTER_DEPTH = 1.6; // flat drainage pan between the curb and the road sur
 const ROAD_DEPTH = 26; // two-lane road, ft (24-30 requested)
 const ROAD_OVERHANG = 70; // road runs this far past the lot's side edges, ft — wide
 // enough that its ends leave frame rather than terminating in the photo
-const ROAD_TILE_FT = 9; // asphalt-texture tile scale, matches the lot's own stall-width tiling
-const FAR_FADE_WIDTH = 6; // seam fade where the road's own outer edge meets the pano
-const SIDE_FADE_WIDTH = 5; // seam fade behind the lot's side curbs, where no road covers
 
 const DASH_LENGTH = 6;
 const DASH_GAP = 10;
@@ -53,7 +49,8 @@ const DASH_WIDTH = 0.45;
 const DASH_HEIGHT = 0.02;
 
 export function buildExteriorRoad(parent: THREE.Object3D, opts: ExteriorRoadOptions): ExteriorRoad {
-  const { centerX, minX, maxX, frontZ, farZ, initialGroundColor } = opts;
+  const { centerX, minX, maxX, frontZ, farZ } = opts;
+  const lotDepth = farZ - frontZ;
   const group = new THREE.Group();
   group.name = 'exteriorRoad';
   parent.add(group);
@@ -64,7 +61,6 @@ export function buildExteriorRoad(parent: THREE.Object3D, opts: ExteriorRoadOpti
   const edgeFallback = new THREE.Group(); edgeFallback.name = 'Road edge fallback';
   group.add(edgeFallback);
 
-  const lotDepth = farZ - frontZ;
   const roadMinX = minX - ROAD_OVERHANG;
   const roadMaxX = maxX + ROAD_OVERHANG;
   const roadWidth = roadMaxX - roadMinX;
@@ -101,10 +97,9 @@ export function buildExteriorRoad(parent: THREE.Object3D, opts: ExteriorRoadOpti
 
   // The through street has no parking-stall markings.
   const roadStartZ = farZ + CURB_DEPTH + GUTTER_DEPTH;
-  const roadEndZ = roadStartZ + ROAD_DEPTH;
-  const roadTex = track(createAsphaltTexture(0, 0));
-  roadTex.repeat.set(roadWidth / ROAD_TILE_FT, ROAD_DEPTH / ROAD_TILE_FT);
-  const roadMat = track(new THREE.MeshStandardMaterial({ map: roadTex, roughness: 0.95, metalness: 0.0 }));
+  const pavement = track(createMatchedPavement());
+  pavement.setColor(opts.initialGroundColor);
+  const roadMat = pavement.material;
   const road = new THREE.Mesh(track(new THREE.PlaneGeometry(roadWidth, ROAD_DEPTH)), roadMat);
   road.rotation.x = -Math.PI / 2;
   road.position.set(centerX, opts.customEdges ? -.09 : -.03, roadStartZ + ROAD_DEPTH / 2);
@@ -129,41 +124,8 @@ export function buildExteriorRoad(parent: THREE.Object3D, opts: ExteriorRoadOpti
   dashMesh.instanceMatrix.needsUpdate = true;
   group.add(dashMesh);
 
-  // ─── Seam fades (ground-blend.ts, narrowed): the road's own outer edge is
-  // the only edge that meets the pano directly, so it always gets one. The
-  // lot's two side edges (behind the bare curb, where no road covers) get a
-  // second, since a thin curb alone can still read as a cut against a busy
-  // photo — both stay far narrower than #144's 16 ft ring, since a flat
-  // tinted quad blended over photo detail reads as haze at any width and the
-  // fix is making the affected strip small enough not to register.
-  const farBlend = track(buildGroundBlend(group, {
-    minX: roadMinX,
-    maxX: roadMaxX,
-    frontZ: roadStartZ,
-    farZ: roadEndZ,
-    fadeWidth: FAR_FADE_WIDTH,
-    y: opts.customEdges ? -.14 : undefined,
-    initialColor: initialGroundColor,
-  }));
-  const sideBlend = track(buildGroundBlend(group, {
-    minX,
-    maxX,
-    frontZ,
-    farZ,
-    fadeWidth: SIDE_FADE_WIDTH,
-    y: opts.customEdges ? -.14 : undefined,
-    initialColor: initialGroundColor,
-  }));
+  function setGroundColor(color: THREE.Color) { pavement.setColor(color); }
 
-  function setGroundColor(color: THREE.Color) {
-    farBlend.setColor(color);
-    sideBlend.setColor(color);
-  }
-
-  function dispose() {
-    disposables.forEach((d) => d.dispose());
-    parent.remove(group);
-  }
-
+  function dispose() { disposables.forEach(item => item.dispose()); group.removeFromParent(); }
   return { group, edgeFallback, setGroundColor, dispose };
 }

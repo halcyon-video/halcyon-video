@@ -788,7 +788,6 @@ export class StoreScene {
   // come through here: they refresh the sun's map alone.
   public queueStructuralShadowRefresh(frames = 3) {
     this.shadowRefreshFrames = frames;
-    this.exterior?.refreshShadows();
     for (const key of this.trofferKeyLights) {
       if (key.castShadow) key.shadow.needsUpdate = true;
     }
@@ -1216,7 +1215,7 @@ export class StoreScene {
     // setups / deterministic testing), otherwise randomize (50% night).
     const forcedOutside = typeof localStorage !== 'undefined' ? localStorage.getItem('bb_outside') : null;
     this.outdoor.outsideMode = (forcedOutside === 'day' || forcedOutside === 'night'
-        || forcedOutside === 'sunset')
+        || forcedOutside === 'sunset' || forcedOutside === 'morning')
       ? forcedOutside
       : (() => { const r = Math.random(); return r < 0.4 ? 'night' : r < 0.8 ? 'day' : 'sunset'; })();
     // Fresh sun direction for this visit (see rollSunPlacement) — the lighting
