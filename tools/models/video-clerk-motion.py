@@ -5,68 +5,80 @@ from pathlib import Path
 from mathutils import Vector, Matrix, Quaternion
 ROOT=Path(__file__).resolve().parents[2]
 OUT=ROOT/'scratch/clerk-motion';OUT.mkdir(parents=True,exist_ok=True)
-bpy.ops.wm.open_mainfile(filepath=str(ROOT/'tools/models/video-clerk.blend'))
-scene=bpy.context.scene;scene.render.fps=30
-arm=bpy.data.objects['Armature'];body=bpy.data.objects['Clerk A with polo'];ox=bpy.data.objects['Clerk A with Oxford']
-anchor=arm.parent;anchor.location=(0,0,0)
-case=bpy.data.objects['Clerk rental case'];label=bpy.data.objects['Rental case insert']
-extras=[o for o in bpy.data.objects if o.type=='MESH' and o not in [body,ox,case,label]]
-for o in [ox,*extras]:o.hide_set(False)
-arm.animation_data_clear()
-for b in arm.pose.bones:b.matrix_basis=Matrix.Identity(4)
-bpy.context.view_layer.update()
-# Ten percent shorter leg region; ten percent longer torso; head size retained.
-def shape(p):
- p=p.copy();z=p.z
- p.z=z*.90 if z<80 else 72+(z-80)*1.10 if z<115 else z-4.5
- return p
-for o in [body,ox,*extras]:
- for v in o.data.vertices:v.co=shape(v.co)
- o.data.update()
-bpy.context.view_layer.objects.active=arm;bpy.ops.object.mode_set(mode='EDIT')
-for b in arm.data.edit_bones:b.head=shape(b.head);b.tail=shape(b.tail)
-bpy.ops.object.mode_set(mode='OBJECT')
-# Refine the source garment before skinning and motion sampling.
-import runpy
-cloth_report=runpy.run_path(str(ROOT/'tools/models/clerk-cloth.py'))['refine_cloth'](arm,body,ox,extras)
-bpy.context.view_layer.objects.active=arm
-# Preserve original skin and digit geometry; add three phalanges per finger.
-hand_frames={s:arm.data.bones[s+'Hand'].matrix_local.copy() for s in ['Left','Right']}
-fingers={};segments={}
-bpy.ops.object.mode_set(mode='EDIT')
-for side,sgn in [('Left',1),('Right',-1)]:
- M=hand_frames[side]
- for fi,(finger,z,end) in enumerate([('Index',4.1,18),('Middle',1.3,20),('Ring',-1.4,19),('Little',-4,16.8)]):
-  pts=[Vector((0,y,z)) for y in [8.8,12.5,15.7,end]];names=[]
+if '--reuse-geometry' in sys.argv:
+ bpy.ops.wm.open_mainfile(filepath=str(ROOT/'tools/models/video-clerk-motion.blend'))
+ scene=bpy.context.scene;scene.render.fps=30
+ arm=bpy.data.objects['Armature'];body=bpy.data.objects['Clerk A with polo'];ox=bpy.data.objects['Clerk A with Oxford']
+ anchor=arm.parent;case=bpy.data.objects['Clerk rental case'];label=bpy.data.objects['Rental case insert']
+ extras=[o for o in bpy.data.objects if o.type=='MESH' and o not in [body,ox,case,label] and not o.name.startswith('Review ')]
+ for o in bpy.data.objects:o.animation_data_clear()
+ for b in arm.pose.bones:b.matrix_basis=Matrix.Identity(4)
+ anchor.location=(0,0,0);bpy.context.view_layer.update()
+ fingers={(side,f):[f'{side}{f}{j}' for j in [1,2,3]] for side in ['Left','Right'] for f in ['Index','Middle','Ring','Little','Thumb']}
+ cloth_report={'reusedAuthoredGeometry':True}
+else:
+ bpy.ops.wm.open_mainfile(filepath=str(ROOT/'tools/models/video-clerk.blend'))
+ scene=bpy.context.scene;scene.render.fps=30
+ arm=bpy.data.objects['Armature'];body=bpy.data.objects['Clerk A with polo'];ox=bpy.data.objects['Clerk A with Oxford']
+ anchor=arm.parent;anchor.location=(0,0,0)
+ case=bpy.data.objects['Clerk rental case'];label=bpy.data.objects['Rental case insert']
+ extras=[o for o in bpy.data.objects if o.type=='MESH' and o not in [body,ox,case,label]]
+ for o in [ox,*extras]:o.hide_set(False)
+ arm.animation_data_clear()
+ for b in arm.pose.bones:b.matrix_basis=Matrix.Identity(4)
+ bpy.context.view_layer.update()
+ # Ten percent shorter leg region; ten percent longer torso; head size retained.
+ def shape(p):
+  p=p.copy();z=p.z
+  p.z=z*.90 if z<80 else 72+(z-80)*1.10 if z<115 else z-4.5
+  return p
+ for o in [body,ox,*extras]:
+  for v in o.data.vertices:v.co=shape(v.co)
+  o.data.update()
+ bpy.context.view_layer.objects.active=arm;bpy.ops.object.mode_set(mode='EDIT')
+ for b in arm.data.edit_bones:b.head=shape(b.head);b.tail=shape(b.tail)
+ bpy.ops.object.mode_set(mode='OBJECT')
+ # Refine the source garment before skinning and motion sampling.
+ import runpy
+ cloth_report=runpy.run_path(str(ROOT/'tools/models/clerk-cloth.py'))['refine_cloth'](arm,body,ox,extras)
+ bpy.context.view_layer.objects.active=arm
+ # Preserve original skin and digit geometry; add three phalanges per finger.
+ hand_frames={s:arm.data.bones[s+'Hand'].matrix_local.copy() for s in ['Left','Right']}
+ fingers={};segments={}
+ bpy.ops.object.mode_set(mode='EDIT')
+ for side,sgn in [('Left',1),('Right',-1)]:
+  M=hand_frames[side]
+  for fi,(finger,z,end) in enumerate([('Index',4.1,18),('Middle',1.3,20),('Ring',-1.4,19),('Little',-4,16.8)]):
+   pts=[Vector((0,y,z)) for y in [8.8,12.5,15.7,end]];names=[]
+   for j in range(3):
+    n=f'{side}{finger}{j+1}';b=arm.data.edit_bones.new(n);b.head=M@pts[j];b.tail=M@pts[j+1];b.parent=arm.data.edit_bones[names[-1] if names else side+'Hand'];b.align_roll(M.to_3x3()@Vector((0,0,1)));names.append(n)
+   fingers[side,finger]=names;segments[side,finger]=pts
+  pts=[Vector((sgn*2.5,3.8,2.0)),Vector((sgn*5.3,7,2.4)),Vector((sgn*6,10,2.3)),Vector((sgn*6,12.5,2.1))];names=[]
   for j in range(3):
-   n=f'{side}{finger}{j+1}';b=arm.data.edit_bones.new(n);b.head=M@pts[j];b.tail=M@pts[j+1];b.parent=arm.data.edit_bones[names[-1] if names else side+'Hand'];b.align_roll(M.to_3x3()@Vector((0,0,1)));names.append(n)
-  fingers[side,finger]=names;segments[side,finger]=pts
- pts=[Vector((sgn*2.5,3.8,2.0)),Vector((sgn*5.3,7,2.4)),Vector((sgn*6,10,2.3)),Vector((sgn*6,12.5,2.1))];names=[]
- for j in range(3):
-  n=f'{side}Thumb{j+1}';b=arm.data.edit_bones.new(n);b.head=M@pts[j];b.tail=M@pts[j+1];b.parent=arm.data.edit_bones[names[-1] if names else side+'Hand'];b.align_roll(M.to_3x3()@Vector((0,0,1)));names.append(n)
- fingers[side,'Thumb']=names;segments[side,'Thumb']=pts
-bpy.ops.object.mode_set(mode='OBJECT')
-for o in [body,ox]:
- for names in fingers.values():
-  for name in names:o.vertex_groups.new(name=name)
- for v in o.data.vertices:
-  side='Left' if v.co.x>0 else 'Right';sgn=1 if side=='Left' else -1
-  ws={o.vertex_groups[g.group].name:g.weight for g in v.groups}
-  hw=ws.get(side+'Hand',0)
-  if hw<.45:continue
-  p=hand_frames[side].inverted()@v.co
-  thumb=p.x*sgn>2.9 and p.y>4
-  f='Thumb' if thumb else min(['Index','Middle','Ring','Little'],key=lambda f:abs(p.z-segments[side,f][0].z))
-  pts=segments[side,f];names=fingers[side,f]
-  start=4.8 if thumb else 8.7;blend=max(0,min(1,(p.y-start)/2))
-  if blend<=0:continue
-  # Smooth distribution across joints rather than rigid face islands.
-  centres=[(pts[i].y+pts[i+1].y)*.5 for i in range(3)]
-  vals=[max(0,1-abs(p.y-c)/3.7) for c in centres]
-  if sum(vals)==0:vals[-1]=1
-  total=sum(vals)
-  o.vertex_groups[side+'Hand'].add([v.index],hw*(1-blend),'REPLACE')
-  for n,w in zip(names,vals):o.vertex_groups[n].add([v.index],hw*blend*w/total,'REPLACE')
+   n=f'{side}Thumb{j+1}';b=arm.data.edit_bones.new(n);b.head=M@pts[j];b.tail=M@pts[j+1];b.parent=arm.data.edit_bones[names[-1] if names else side+'Hand'];b.align_roll(M.to_3x3()@Vector((0,0,1)));names.append(n)
+  fingers[side,'Thumb']=names;segments[side,'Thumb']=pts
+ bpy.ops.object.mode_set(mode='OBJECT')
+ for o in [body,ox]:
+  for names in fingers.values():
+   for name in names:o.vertex_groups.new(name=name)
+  for v in o.data.vertices:
+   side='Left' if v.co.x>0 else 'Right';sgn=1 if side=='Left' else -1
+   ws={o.vertex_groups[g.group].name:g.weight for g in v.groups}
+   hw=ws.get(side+'Hand',0)
+   if hw<.45:continue
+   p=hand_frames[side].inverted()@v.co
+   thumb=p.x*sgn>2.9 and p.y>4
+   f='Thumb' if thumb else min(['Index','Middle','Ring','Little'],key=lambda f:abs(p.z-segments[side,f][0].z))
+   pts=segments[side,f];names=fingers[side,f]
+   start=4.8 if thumb else 8.7;blend=max(0,min(1,(p.y-start)/2))
+   if blend<=0:continue
+   # Smooth distribution across joints rather than rigid face islands.
+   centres=[(pts[i].y+pts[i+1].y)*.5 for i in range(3)]
+   vals=[max(0,1-abs(p.y-c)/3.7) for c in centres]
+   if sum(vals)==0:vals[-1]=1
+   total=sum(vals)
+   o.vertex_groups[side+'Hand'].add([v.index],hw*(1-blend),'REPLACE')
+   for n,w in zip(names,vals):o.vertex_groups[n].add([v.index],hw*blend*w/total,'REPLACE')
 # Read Quaternius's licensed authored walking action for motion reference.
 existing=set(bpy.data.objects)
 refpath=ROOT/'tools/models/clerk-motion-reference.glb'
@@ -91,6 +103,8 @@ for o in list(bpy.data.objects):
  if o not in existing:bpy.data.objects.remove(o,do_unlink=True)
 # Studio interaction geometry, in the same armature-space centimetres.
 def box(name,loc,dims,color):
+ existing=bpy.data.objects.get(name)
+ if existing:return existing
  bpy.ops.mesh.primitive_cube_add(size=1);o=bpy.context.object;o.name=name;o.parent=arm;o.location=loc;o.scale=dims
  bpy.ops.object.transform_apply(location=False,rotation=False,scale=True)
  m=bpy.data.materials.new(name);m.diffuse_color=(*color,1);m.use_nodes=True;m.node_tree.nodes.get('Principled BSDF').inputs['Base Color'].default_value=(*color,1);m.node_tree.nodes.get('Principled BSDF').inputs['Roughness'].default_value=.8;o.data.materials.append(m)
@@ -127,13 +141,13 @@ def neutral(t=0):
 # Two-link reach authoring with a measured outward/downward elbow guide.
 # This fixes the imported rig's asymmetric IK pole rolls, without stretching skin.
 constraints=[]
-def wrist(side,point,finger_dir,palm_normal):
+def wrist(side,point,finger_dir,palm_normal,elbow_width=45):
  s=1 if side=='Left' else -1
  upper=arm.pose.bones[side+'Arm'];lower=arm.pose.bones[side+'ForeArm']
  shoulder=upper.head.copy();target=Vector(point);v=target-shoulder
  L1=arm.data.bones[side+'Arm'].length;L2=arm.data.bones[side+'ForeArm'].length
  d=min(v.length,L1+L2-.15);axis=v.normalized()
- pole=Vector((s*45,10,75))-shoulder;bend=(pole-axis*pole.dot(axis)).normalized()
+ pole=Vector((s*elbow_width,10,75))-shoulder;bend=(pole-axis*pole.dot(axis)).normalized()
  along=(L1*L1-L2*L2+d*d)/(2*d);height=math.sqrt(max(0,L1*L1-along*along))
  elbow=shoulder+axis*along+bend*height
  aim(side+'Arm',elbow-shoulder);aim(side+'ForeArm',target-elbow)
@@ -151,20 +165,25 @@ def pose(anim,u):
  case.hide_render=label.hide_render=not anim.startswith('stock')
  if anim=='walk':
   reset();sample=walk_samples[round(u*40)%40]
-  for dst,(delta,direction) in sample.items():
-   b=arm.pose.bones[dst];b.matrix=Matrix.Translation(b.head)@delta.to_matrix().to_4x4()@rest[dst].to_3x3().to_4x4();update();aim(dst,direction)
-  # Keep the reference gait, but stand the torso over the pelvis. Preserve
-  # leg world poses so this correction does not tilt the feet or stride.
-  legs={b.name:b.matrix.copy() for b in arm.pose.bones if any(b.name==side+part for side in ['Left','Right'] for part in ['UpLeg','Leg','Foot','ToeBase'])}
-  hips=arm.pose.bones['Hips'];axis=arm.pose.bones['neck'].head-hips.head
-  pitch=math.atan2(-axis.y,axis.z)
-  upright=math.radians(2+.4*math.cos(u*math.tau*2))
-  m=hips.matrix.copy();hips.matrix=Matrix.Translation(m.translation)@Matrix.Rotation(upright-pitch,4,'X')@m.to_3x3().to_4x4();update()
-  for name,matrix in legs.items():arm.pose.bones[name].matrix=matrix;update()
+  # Preserve the clerk's connected rest spine and clavicles. The previous
+  # world-matrix transfer imported incompatible pelvic/spinal bends and moved
+  # shoulder and hip joint heads away from their parents.
+  ph=u*math.tau
+  aim('Hips',(.012*math.sin(ph),-math.tan(math.radians(1.5)),1))
+  rot('Hips',math.radians(1.2)*math.cos(ph),'Y')
   for side,s in [('Left',1),('Right',-1)]:
-   # Smaller, relaxed arm swing and wider clearance for this stylized silhouette.
-   ph=u*math.tau+(0 if s==1 else math.pi)
-   aim(side+'Arm',(s*.40,.19*math.cos(ph),-1));aim(side+'ForeArm',(s*.05,-.12+.10*math.cos(ph),-1));aim(side+'Hand',(s*.14,-.06,-1));hand_curl(side,.20)
+   upper=sample[side+'UpLeg'][1];lower=sample[side+'Leg'][1]
+   thigh=max(-.30,min(.35,.45*math.atan2(-upper.y,-upper.z)))
+   knee=max(math.radians(3),min(math.radians(38),.42*upper.angle(lower)))
+   shin=thigh-knee
+   aim(side+'UpLeg',(s*.045,-math.sin(thigh),-math.cos(thigh)))
+   aim(side+'Leg',(s*.020,-math.sin(shin),-math.cos(shin)))
+   # Small heel/toe roll, retaining the character's own rest foot shape.
+   delta=Quaternion().slerp(sample[side+'Foot'][0],.40)
+   foot=arm.pose.bones[side+'Foot'];foot.matrix=Matrix.Translation(foot.head)@delta.to_matrix().to_4x4()@rest[side+'Foot'].to_3x3().to_4x4();update()
+   arm.pose.bones[side+'ToeBase'].matrix_basis=Matrix.Identity(4);update()
+   swing=math.cos(ph+(0 if s==1 else math.pi))
+   aim(side+'Arm',(s*.40,.15*swing,-1));aim(side+'ForeArm',(s*.05,-.12+.12*swing,-1));aim(side+'Hand',(s*.10,-.12+.12*swing,-1));hand_curl(side,.20)
  elif anim.startswith('stock'):
   # Place -> release -> withdraw -> regrip -> retrieve; case stays seated
   # between release and regrip, so looping never moves an unsupported prop.
@@ -192,11 +211,24 @@ def pose(anim,u):
   case.location=centre;case.rotation_quaternion=Quaternion((1,0,0),math.pi/2)
   label.location=centre+Vector((0,1.55,0));label.rotation_quaternion=case.rotation_quaternion
   for side,s in [('Left',1),('Right',-1)]:
-   # Local +Y fingers run upward around the thin case edge; palms contact sides.
-   contact=centre+Vector((s*9.1,1.4,-6.5))
-   home=Vector((s*27,-8,75))
-   point=contact.lerp(home,withdraw)
-   wrist(side,point,(0,-.10,1),(-1,0,0))
+   # The palm reaches the case; the wrist stays behind it and the fingers
+   # continue forward from the forearm, rather than standing vertically.
+   contact=centre+Vector((s*9.1,1.0,0))
+   home=Vector((s*25,-10,80))
+   palm=contact.lerp(home,withdraw)
+   # Solve to the palm with the forearm plus palm length as one rigid link.
+   # This keeps the wrist neutral through the whole lift and withdrawal.
+   shoulder=arm.pose.bones[side+'Arm'].head.copy()
+   L1=arm.data.bones[side+'Arm'].length;L2=arm.data.bones[side+'ForeArm'].length
+   v=palm-shoulder;d=min(v.length,L1+L2+8.8-.15);axis=v.normalized()
+   pole=Vector((s*32,8,min(100,palm.z-12)))-shoulder
+   bend=(pole-axis*pole.dot(axis)).normalized()
+   along=(L1*L1-(L2+8.8)**2+d*d)/(2*d)
+   elbow=shoulder+axis*along+bend*math.sqrt(max(0,L1*L1-along*along))
+   direction=(palm-elbow).normalized()
+   aim(side+'Arm',elbow-shoulder);aim(side+'ForeArm',direction)
+   hand=arm.pose.bones[side+'Hand'];y=direction;x=Vector((-1,0,0));x=(x-y*x.dot(y)).normalized();z=x.cross(y).normalized()
+   hand.matrix=Matrix.Translation(hand.head)@Matrix((x,y,z)).transposed().to_4x4();update()
    hand_curl(side,.75*(1-smooth(0,1,(u-.37)/.06)+smooth(0,1,(u-.78)/.06))+.15)
  elif anim=='talk':
   wave=(1-math.cos(u*math.tau))*.5
@@ -219,8 +251,8 @@ def pose(anim,u):
 if '--probe' in sys.argv:
  scene.render.resolution_x=600;scene.render.resolution_y=700;scene.cycles.samples=12
  cam=scene.camera;cam.data.ortho_scale=5.8;cam.location=(5,-9,4);cam.rotation_euler=(Vector((0,-.2,2.5))-cam.location).to_track_quat('-Z','Y').to_euler()
- for anim,u in [('idle',0),('stockHigh',.33),('stockMid',.33),('stockLow',.33)]:
-  pose(anim,u);scene.render.filepath=str(OUT/(anim+'-probe.png'));bpy.ops.render.render(write_still=True)
+ for anim,u in [('walk',0),('walk',.75),('stockHigh',.33),('stockMid',.33),('stockLow',.33)]:
+  pose(anim,u);scene.render.filepath=str(OUT/(anim+'-'+str(u)+'-probe.png'));bpy.ops.render.render(write_still=True)
  sys.exit(0)
 
 # Sample all motions before attaching any actions: evaluation is deterministic.

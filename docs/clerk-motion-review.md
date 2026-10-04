@@ -108,3 +108,32 @@ The actual exported models were inspected in that viewer from side and three-
 quarter views, with matching old/new walking captures. Source face, hair, skin,
 trouser texture details and the original generated collar design remain; this
 pass does not claim a wholly retopologized character or physical-phone FPS.
+
+## Connected gait and neutral hands — second owner correction
+
+The preceding hip-to-neck angle check missed opposing segment bends and
+backward-displaced clavicles. The corrected walk retains the clerk's connected
+rest spine and shoulder offsets, with a small pelvic sway and a coherent forward
+pitch. Only the reference's leg timing and reduced sagittal motion are transferred;
+foreign shoulder transforms and disconnected leg world matrices are no longer
+imported. Thigh swing is reduced and knee flexion is limited to 38 degrees.
+
+Stocking now solves the arm to the palm, treating the forearm and palm as one
+straight reach. This places the wrists behind the case and keeps the hands
+aligned with the forearms during lift, placement, release, withdrawal and return.
+The same case and release timing remain. All three shelf heights use this rule.
+
+`--reuse-geometry` loads the already-authored garment and finger mesh from the
+packed motion blend, clears its old actions, and rebuilds the motion, baked colour
+textures and exports. This correction used that option to preserve the preceding
+clothing repair. Without it, the original source blend and cloth script still
+reproduce the full model and motion pipeline.
+
+Run `tools/models/check-clerk-motion.py` in Blender after export. It checks every
+baked frame for connected walk joint positions, each spine segment's pitch,
+shoulder depth, knee flexion, stocking wrist alignment and hand elevation, palm
+contact, seated-case height, pocket clearance and loop seams. This is a regression
+gate for concrete faults, not a substitute for inspecting the animated mesh.
+
+The owner review remains MogNet's Halcyon clerk page. Store sprite sheets are
+unchanged; this is not a release to the public store.
