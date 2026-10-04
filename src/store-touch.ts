@@ -169,7 +169,8 @@ const CSS = `
 #store-touch-controls.has-carry[data-mode="walk-around"] #store-touch-ok { display: flex; }
 #store-touch-walk { top: max(24px, env(safe-area-inset-top)); right: max(24px, env(safe-area-inset-right)); display: none; }
 #store-touch-controls:not(.terminal)[data-mode="overview"] #store-touch-walk,
-#store-touch-controls:not(.terminal)[data-mode="browse"] #store-touch-walk { display: flex; }
+#store-touch-controls:not(.terminal)[data-mode="browse"] #store-touch-walk,
+#store-touch-controls:not(.terminal)[data-mode="walk-around"] #store-touch-walk { display: flex; }
 #store-touch-controls:not(.terminal)[data-mode="overview"] #store-touch-ok,
 #store-touch-controls:not(.terminal):not(.has-carry)[data-mode="walk-around"] #store-touch-ok,
 #store-touch-controls:not(.terminal)[data-mode="walk-around"] #store-touch-back { display: none; }

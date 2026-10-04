@@ -1,3 +1,4 @@
+import { enterOverview } from './store-overview';
 import type { StoreScene } from './three-scene';
 import type { InputCallbacks } from './input';
 import { isMobileOverlayBlocking } from './mobile-store';
@@ -21,7 +22,13 @@ export function installMobileWalk(root: HTMLElement, stage: HTMLElement, callbac
   walk.type = 'button'; walk.id = 'store-touch-walk'; walk.className = 'st-btn';
   const walkLabel = document.createElement('span'); walkLabel.className = 'st-label'; walkLabel.textContent = 'WALK'; walk.appendChild(walkLabel);
   walk.setAttribute('aria-label', 'Walk around the store');
-  walk.addEventListener('click', () => { if (isMobileOverlayBlocking()) return; stop(); poke(); callbacks.onToggleWalkAround?.(); });
+  walk.addEventListener('click', () => {
+    if (isMobileOverlayBlocking()) return;
+    stop(); poke();
+    const scene = getScene();
+    if (scene?.isWalkAroundMode) enterOverview(scene, true);
+    else callbacks.onToggleWalkAround?.();
+  });
   const stick = document.createElement('div');
   stick.id = 'store-touch-stick'; stick.setAttribute('role', 'group');
   stick.setAttribute('aria-label', 'Movement thumbstick. Drag to walk.');

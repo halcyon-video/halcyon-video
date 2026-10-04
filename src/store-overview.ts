@@ -278,8 +278,11 @@ export function applyOverviewFocus(scene: StoreScene, idx: number): void {
   scene.triggerLibrarySelectUpdate(false); // keeps the HUD locator label fresh
 }
 
-export function enterOverview(scene: StoreScene): void {
-  if (mobileStoreActive()) {
+export function enterOverview(scene: StoreScene, deliberateMobileNavigation = false): void {
+  // Fresh phone entry and ordinary Back retain walking. The visible SHELVES
+  // control deliberately opens the existing index instead of looping through
+  // library-select and straight back into walking.
+  if (mobileStoreActive() && !deliberateMobileNavigation) {
     scene.hideHeroCases();
     scene.hideOverviewVisuals();
     scene.isFlipped = false; scene.heroSpine = false;
