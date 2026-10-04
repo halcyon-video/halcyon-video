@@ -34,3 +34,19 @@ test('an unlit character billboard is audited alongside physical meshes', () => 
   root.add(new THREE.Sprite(new THREE.SpriteMaterial()));
   assert.equal(auditStoreMaterials(root).problems.length, 1);
 });
+
+test('nonrendered collision proxies and hidden model fallbacks do not fail lighting audit', () => {
+  const root = new THREE.Group(), geometry = new THREE.BoxGeometry();
+  root.add(new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ visible: false })));
+  root.add(new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false, colorWrite: false })));
+  const hidden = new THREE.Group(); hidden.visible = false;
+  hidden.add(new THREE.Mesh(geometry, new THREE.MeshBasicMaterial())); root.add(hidden);
+  assert.deepEqual(auditStoreMaterials(root).problems, []);
+});
+
+test('a shared unlit material remains a defect on its visible mesh', () => {
+  const root = new THREE.Group(), material = new THREE.MeshBasicMaterial();
+  const hidden = new THREE.Mesh(new THREE.BoxGeometry(), material); hidden.visible = false;
+  root.add(hidden, new THREE.Mesh(hidden.geometry, material));
+  assert.equal(auditStoreMaterials(root).problems.length, 1);
+});

@@ -19,11 +19,12 @@ export interface MaterialLightingAudit {
 export function auditStoreMaterials(root: THREE.Object3D): MaterialLightingAudit {
   const report: MaterialLightingAudit = { meshes: 0, materials: 0, textured: 0, exceptions: {}, problems: [] };
   const seen = new Set<THREE.Material>();
-  root.traverse(obj => {
+  root.traverseVisible(obj => {
     if (!(obj instanceof THREE.Mesh) && !(obj instanceof THREE.Sprite)) return;
     report.meshes++;
     for (const material of Array.isArray(obj.material) ? obj.material : [obj.material]) {
-      if (seen.has(material)) continue;
+      // Collision proxies and lifetime sentinels never reach the renderer.
+      if (!material.visible || !material.colorWrite || seen.has(material)) continue;
       seen.add(material);
       report.materials++;
       const m = material as THREE.MeshPhysicalMaterial;

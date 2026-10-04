@@ -180,6 +180,8 @@ export class OutdoorLightingRig {
   private envRenderTarget: THREE.WebGLRenderTarget | null = null;
   private envPmremGen: THREE.PMREMGenerator | null = null;
   private envBakeReady = false;
+  private disposed = false;
+  private skyTextureRequest = 0;
   // Display-time gain on the baked environment. Baking always happens at a fixed
   // intensity (see bakeEnvironment) so bounce energy is stable; this per-mode gain
   // is applied afterwards. Night leans hard on it: with the sun off, the troffers
@@ -357,6 +359,8 @@ export class OutdoorLightingRig {
   }
 
   updateSkybox() {
+    if (this.disposed) return;
+    const request = ++this.skyTextureRequest;
     if (!this.skyMesh) return;
     const scene = this.deps.getScene();
 
@@ -514,6 +518,9 @@ export class OutdoorLightingRig {
       this.skyTextureLoader.load(
         texUrl,
         (loadedTex) => {
+          // A slow pano may outlive this store or a later day/night choice.
+          // It must not revive retired GPU resources or repaint a newer sky.
+          if (this.disposed || request !== this.skyTextureRequest) { loadedTex.dispose(); return; }
           loadedTex.colorSpace = THREE.SRGBColorSpace;
           // Every sky pano is viewed at an extreme grazing angle where it meets
           // the horizon — at the default anisotropy of 1 that band aliases
@@ -533,6 +540,7 @@ export class OutdoorLightingRig {
         },
         undefined,
         (err) => {
+          if (this.disposed || request !== this.skyTextureRequest) return;
           console.error(`Failed to load skybox texture: ${texUrl}`, err);
         }
       );
@@ -714,6 +722,7 @@ export class OutdoorLightingRig {
   }
 
   dispose() {
+    this.disposed = true;
     this.envRenderTarget?.dispose();
     this.envRenderTarget = null;
     this.envPmremGen?.dispose();

@@ -1,3 +1,4 @@
+import { materialTextureLoad } from './material-texture-load';
 import quickDrop from './exit-return-spec.json' with { type: 'json' };
 import { installTrofferModels, trofferCeilingGeometry } from './troffer-model.ts';
 import { reelSetting } from './reel-profile';
@@ -1362,7 +1363,7 @@ export function buildStore(scene: StoreScene) {
       tex.repeat.set(storeWidth / carpetFeetPerTile, floorCeilLen / carpetFeetPerTile);
       tex.anisotropy = maxAniso;
     };
-    tryLoadUserAssetTexture('surfaces/store-carpet/color.png', (tex) => {
+    tryLoadUserAssetTexture('surfaces/store-carpet/color.png', materialTextureLoad([floorMat], (tex) => {
       configureCarpetMap(tex);
       // The scan is a PHOTO of one particular carpet, so using it raw pins the
       // floor to that carpet's color and the theme's palette.carpet silently
@@ -1390,19 +1391,19 @@ export function buildStore(scene: StoreScene) {
       }
       floorMat.needsUpdate = true;
       scene.requestRender?.();
-    }, { allowKtx2: false });
-    tryLoadUserAssetTexture('surfaces/store-carpet/normal.png', (tex) => {
+    }), { allowKtx2: false });
+    tryLoadUserAssetTexture('surfaces/store-carpet/normal.png', materialTextureLoad([floorMat], (tex) => {
       configureCarpetMap(tex);
       floorMat.normalMap = tex;
       floorMat.needsUpdate = true;
       scene.requestRender?.();
-    }, { srgb: false });
-    tryLoadUserAssetTexture('surfaces/store-carpet/roughness.png', (tex) => {
+    }), { srgb: false });
+    tryLoadUserAssetTexture('surfaces/store-carpet/roughness.png', materialTextureLoad([floorMat], (tex) => {
       configureCarpetMap(tex);
       floorMat.roughnessMap = tex;
       floorMat.needsUpdate = true;
       scene.requestRender?.();
-    }, { srgb: false });
+    }), { srgb: false });
   }
 
   // 2.5 Store walls, per FORMAT: amber-gold drywall with painted orange-peel
@@ -1450,12 +1451,15 @@ export function buildStore(scene: StoreScene) {
   if (!wallPrefinished) {
     const wallColorChoice = getSetting<string>('bb_wall_color');
     const wallTintHex = WALL_PAINT_OPTIONS[wallColorChoice]?.hex ?? theme.palette.wall;
-    loadUserAssetSurface('surfaces/store-wall', (slot, tex) => {
+    const loadWallMap = materialTextureLoad([wallMat], (tex, slot: 'map' | 'normalMap' | 'roughnessMap') => {
       if (slot === 'map') wallMat.color.set(wallTintHex);
       if (slot === 'normalMap') wallMat.normalScale.set(0.35, 0.35);
       wallMat[slot] = tex;
       wallMat.needsUpdate = true;
       scene.requestRender();
+    });
+    loadUserAssetSurface('surfaces/store-wall', (slot, tex) => {
+      loadWallMap(tex, slot);
     }, { repeat: [storeWidth / wallFeetPerTile, roomHeight / wallFeetPerTile], anisotropy: 8 });
   }
 
@@ -2047,7 +2051,7 @@ export function buildStore(scene: StoreScene) {
   // wood format's shelving would put the chain's fixtures back in the room the
   // format just rebuilt.
   if (!shelfWood) {
-    loadUserAssetSurface('surfaces/store-shelf', (slot, tex) => {
+    const loadShelfMap = materialTextureLoad([sharedShelfMat, nrBackingMat], (tex, slot: 'map' | 'normalMap' | 'roughnessMap') => {
       sharedShelfMat[slot] = tex;
       sharedShelfMat.needsUpdate = true;
       if (slot === 'normalMap' || slot === 'roughnessMap') {
@@ -2055,6 +2059,9 @@ export function buildStore(scene: StoreScene) {
         nrBackingMat.needsUpdate = true;
       }
       scene.requestRender();
+    });
+    loadUserAssetSurface('surfaces/store-shelf', (slot, tex) => {
+      loadShelfMap(tex, slot);
     }, { repeat: [6, 2], anisotropy: 8 });
   }
 

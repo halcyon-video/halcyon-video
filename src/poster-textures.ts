@@ -111,6 +111,22 @@ let uploadRenderer: THREE.WebGLRenderer | null = null;
 
 export function setUploadRenderer(renderer: THREE.WebGLRenderer) {
   uploadRenderer = renderer;
+  // Keep queued CPU-backed uploads across a rebuild, but only drain them
+  // after a live replacement context owns the stream again.
+  if (!isUploading && pendingUploads()) {
+    isUploading = true;
+    requestAnimationFrame(processUploads);
+  }
+}
+
+/** A retired scene must not leave GPU uploads or wake hooks targeting it.
+ * An older scene cannot detach a replacement already registered here. */
+export function releaseUploadRenderer(renderer: THREE.WebGLRenderer, preserveQueue = false): void {
+  if (uploadRenderer !== renderer) return;
+  uploadRenderer = null;
+  textureStreamWake = null;
+  posterLoadedNotify = null;
+  if (!preserveQueue) { priorityUploadQueue.length = 0; textureUploadQueue.length = 0; }
 }
 
 /** The renderer uploads are issued against, or null before a scene exists. */
@@ -197,7 +213,7 @@ export function beginRebuildDrain() {}
 export function pendingTextureUploads(): number { return pendingUploads(); }
 
 function processUploads() {
-  if (isExternalGameActive()) { isUploading = false; return; }
+  if (!uploadRenderer || isExternalGameActive()) { isUploading = false; return; }
   if (pendingUploads() === 0) {
     isUploading = false;
     return;

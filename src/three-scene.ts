@@ -1,3 +1,4 @@
+import { releaseUploadRenderer } from './poster-textures';
 import { reelModeEnabled, reelSetting } from './reel-profile';
 import { updateReelFlight, reelFlightKey, reelFlightMouse } from './store-reel-flight';
 import { loadMobileRoomLighting, updateMobileRoomLighting } from './mobile-room-lighting';
@@ -5915,6 +5916,7 @@ export class StoreScene {
 
   // Clean up WebGL resources
   public destroy(preservePosterCache = false) {
+    releaseUploadRenderer(this.renderer, preservePosterCache);
     this.disposeMobileLighting?.();
     this.programWarmupController.abort();
     this.disposeWarmedPrograms?.();
