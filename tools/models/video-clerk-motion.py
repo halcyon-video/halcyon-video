@@ -79,28 +79,6 @@ else:
    total=sum(vals)
    o.vertex_groups[side+'Hand'].add([v.index],hw*(1-blend),'REPLACE')
    for n,w in zip(names,vals):o.vertex_groups[n].add([v.index],hw*blend*w/total,'REPLACE')
-# Read Quaternius's licensed authored walking action for motion reference.
-existing=set(bpy.data.objects)
-refpath=ROOT/'tools/models/clerk-motion-reference.glb'
-bpy.ops.import_scene.gltf(filepath=str(refpath))
-ref=next(o for o in bpy.data.objects if o not in existing and o.type=='ARMATURE')
-ref.animation_data_create();refwalk=next(a for a in bpy.data.actions if a.name=='Walk_Loop')
-ref.animation_data.action=refwalk;ref.animation_data.action_slot=refwalk.slots[0]
-mapnames={'Hips':'pelvis','Spine02':'spine_01','Spine01':'spine_02','Spine':'spine_03','neck':'neck_01','Head':'Head'}
-for side,short in [('Left','l'),('Right','r')]:
- for dst,src in [('Shoulder','clavicle'),('Arm','upperarm'),('ForeArm','lowerarm'),('Hand','hand'),('UpLeg','thigh'),('Leg','calf'),('Foot','foot'),('ToeBase','ball')]:mapnames[side+dst]=src+'_'+short
-# Source rest and motion directions in world axes, captured before removal.
-walk_samples=[]
-for fi in range(41):
- rf=refwalk.frame_range[0]+(refwalk.frame_range[1]-refwalk.frame_range[0])*fi/40;scene.frame_set(int(rf),subframe=rf%1)
- sample={}
- for dst,src in mapnames.items():
-  b=ref.pose.bones[src];r=ref.data.bones[src]
-  posed=(ref.matrix_world@b.matrix).to_quaternion();rest=(ref.matrix_world@r.matrix_local).to_quaternion()
-  sample[dst]=(posed@rest.inverted(),(ref.matrix_world.to_3x3()@(b.tail-b.head)).normalized())
- walk_samples.append(sample)
-for o in list(bpy.data.objects):
- if o not in existing:bpy.data.objects.remove(o,do_unlink=True)
 # Studio interaction geometry, in the same armature-space centimetres.
 def box(name,loc,dims,color):
  existing=bpy.data.objects.get(name)
@@ -156,36 +134,17 @@ def wrist(side,point,finger_dir,palm_normal,elbow_width=45):
 def smooth(a,b,t):
  t=max(0,min(1,t));return a+(b-a)*(t*t*(3-2*t))
 def lerp(a,b,t):return Vector(a).lerp(Vector(b),t)
-DUR={'idle':3.2,'walk':1.3,'stockHigh':4.4,'stockMid':4.2,'stockLow':4.8,'talk':3.2,'type':2.4}
+import runpy
+captures,captured_pose=runpy.run_path(str(ROOT/'tools/models/clerk-captured-motion.py'))['make_retarget'](arm,reset,aim,hand_curl,update,ROOT)
+DUR={**{n:c['duration'] for n,c in captures.items()},'stockHigh':4.4,'stockMid':4.2,'stockLow':4.8,'talk':3.2,'type':2.4}
 def pose(anim,u):
  for c in constraints:c.influence=0
  neutral(u)
  shelf.location.z={'stockHigh':112,'stockMid':84,'stockLow':46}.get(anim,84)
  shelf.hide_render=not anim.startswith('stock');keyboard.hide_render=anim!='type'
  case.hide_render=label.hide_render=not anim.startswith('stock')
- if anim=='walk':
-  reset()
-  # Preserve the clerk's connected rest spine and clavicles. The previous
-  # world-matrix transfer imported incompatible pelvic/spinal bends and moved
-  # shoulder and hip joint heads away from their parents.
-  ph=u*math.tau
-  aim('Hips',(.012*math.sin(ph),0,1))
-  rot('Hips',math.radians(1.2)*math.cos(ph),'Y')
-  for side,s in [('Left',1),('Right',-1)]:
-   # Keep the forward contact leg extended. The old independent thigh
-   # attenuation erased its reach while retaining the rearward shin bend.
-   step=u*math.tau+(0 if s==1 else math.pi)
-   thigh=math.radians(3+36*math.cos(step))
-   knee=math.radians(4+30*max(0,-math.sin(step))**2)
-   shin=thigh-knee
-   aim(side+'UpLeg',(s*.045,-math.sin(thigh),-math.cos(thigh)))
-   aim(side+'Leg',(s*.020,-math.sin(shin),-math.cos(shin)))
-   # Heel-first contact at the forward step, toe-off behind the body.
-   delta=Quaternion((1,0,0),-math.radians(8)*math.cos(step))
-   foot=arm.pose.bones[side+'Foot'];foot.matrix=Matrix.Translation(foot.head)@delta.to_matrix().to_4x4()@rest[side+'Foot'].to_3x3().to_4x4();update()
-   arm.pose.bones[side+'ToeBase'].matrix_basis=Matrix.Identity(4);update()
-   swing=math.cos(ph+(0 if s==1 else math.pi))
-   aim(side+'Arm',(s*.40,.15*swing,-1));aim(side+'ForeArm',(s*.05,-.12+.12*swing,-1));aim(side+'Hand',(s*.10,-.12+.12*swing,-1));hand_curl(side,.20)
+ if anim in captures:
+  captured_pose(anim,u)
  elif anim.startswith('stock'):
   # Place -> release -> withdraw -> regrip -> retrieve; case stays seated
   # between release and regrip, so looping never moves an unsupported prop.
@@ -253,12 +212,12 @@ def pose(anim,u):
 if '--probe' in sys.argv:
  scene.render.resolution_x=600;scene.render.resolution_y=700;scene.cycles.samples=12
  cam=scene.camera;cam.data.ortho_scale=5.8;cam.location=(5,-9,4);cam.rotation_euler=(Vector((0,-.2,2.5))-cam.location).to_track_quat('-Z','Y').to_euler()
- for anim,u in [('walk',0),('walk',.75),('stockHigh',.33),('stockMid',.33),('stockLow',.33)]:
+ for anim,u in [('idle',0),('walk',0),('walk',.25),('walkCompact',0),('walkSteady',0)]:
   pose(anim,u);scene.render.filepath=str(OUT/(anim+'-'+str(u)+'-probe.png'));bpy.ops.render.render(write_still=True)
  sys.exit(0)
 
 # Sample all motions before attaching any actions: evaluation is deterministic.
-samples={};report={'cloth':cloth_report,'proportions':{'legScale':.90,'torsoScale':1.10},'fingerBones':30,'clips':{},'source':'Authored heel-to-chest walking cycle and contact actions; Quaternius reference retained for provenance'}
+samples={};report={'cloth':cloth_report,'proportions':{'legScale':.90,'torsoScale':1.10},'fingerBones':30,'clips':{},'source':'ACCAD female motion capture: standing and three walks; existing contact actions retained'}
 for anim,duration in DUR.items():
  count=round(duration*30);frames=[]
  for fi in range(count+1):
