@@ -137,3 +137,27 @@ gate for concrete faults, not a substitute for inspecting the animated mesh.
 
 The owner review remains MogNet's Halcyon clerk page. Store sprite sheets are
 unchanged; this is not a release to the public store.
+
+## Chest-to-heel walking correction — 2026-10-04
+
+The prior walk could pass its upright bone-angle gates while the leading shoe
+remained behind the visible chest. At phase zero its heel was 27.46 cm behind
+the shirt front. Independent attenuation of the reference thigh motion and knee
+flexion had removed forward foot reach.
+
+The walking cycle now authors contact and passing phases together: coherent
+opposed thigh swing, a nearly extended contact knee, restrained swing-leg knee
+flexion, and heel-first contact/toe-off. The pelvis has no forward pitch. The
+existing garment geometry, finger articulation and stocking actions are retained.
+The walk remains 1.3 seconds and loops at 30 fps.
+
+The permanent Blender audit now measures the deformed shirt and both shoes in
+both uniforms. At each forward contact it requires the back of the leading shoe
+to pass the front of the chest by more than 0.5 cm, with the sole within 1.5 cm of
+the ground. This supplements the existing spine, connected-joint, knee, stocking
+wrist, grip, pocket-clearance and loop checks. The browser independently samples
+the exported skinned GLB vertices and checks chest/heel alignment and heel contact.
+
+The GLBs are installed in MogNet's Halcyon clerk animation review. The Halcyon
+store still uses its established sprite assets; this work updates the 3D motion
+candidate being reviewed, not the store sprite pipeline or a public release.

@@ -164,22 +164,24 @@ def pose(anim,u):
  shelf.hide_render=not anim.startswith('stock');keyboard.hide_render=anim!='type'
  case.hide_render=label.hide_render=not anim.startswith('stock')
  if anim=='walk':
-  reset();sample=walk_samples[round(u*40)%40]
+  reset()
   # Preserve the clerk's connected rest spine and clavicles. The previous
   # world-matrix transfer imported incompatible pelvic/spinal bends and moved
   # shoulder and hip joint heads away from their parents.
   ph=u*math.tau
-  aim('Hips',(.012*math.sin(ph),-math.tan(math.radians(1.5)),1))
+  aim('Hips',(.012*math.sin(ph),0,1))
   rot('Hips',math.radians(1.2)*math.cos(ph),'Y')
   for side,s in [('Left',1),('Right',-1)]:
-   upper=sample[side+'UpLeg'][1];lower=sample[side+'Leg'][1]
-   thigh=max(-.30,min(.35,.45*math.atan2(-upper.y,-upper.z)))
-   knee=max(math.radians(3),min(math.radians(38),.42*upper.angle(lower)))
+   # Keep the forward contact leg extended. The old independent thigh
+   # attenuation erased its reach while retaining the rearward shin bend.
+   step=u*math.tau+(0 if s==1 else math.pi)
+   thigh=math.radians(3+36*math.cos(step))
+   knee=math.radians(4+30*max(0,-math.sin(step))**2)
    shin=thigh-knee
    aim(side+'UpLeg',(s*.045,-math.sin(thigh),-math.cos(thigh)))
    aim(side+'Leg',(s*.020,-math.sin(shin),-math.cos(shin)))
-   # Small heel/toe roll, retaining the character's own rest foot shape.
-   delta=Quaternion().slerp(sample[side+'Foot'][0],.40)
+   # Heel-first contact at the forward step, toe-off behind the body.
+   delta=Quaternion((1,0,0),-math.radians(8)*math.cos(step))
    foot=arm.pose.bones[side+'Foot'];foot.matrix=Matrix.Translation(foot.head)@delta.to_matrix().to_4x4()@rest[side+'Foot'].to_3x3().to_4x4();update()
    arm.pose.bones[side+'ToeBase'].matrix_basis=Matrix.Identity(4);update()
    swing=math.cos(ph+(0 if s==1 else math.pi))
@@ -256,7 +258,7 @@ if '--probe' in sys.argv:
  sys.exit(0)
 
 # Sample all motions before attaching any actions: evaluation is deterministic.
-samples={};report={'cloth':cloth_report,'proportions':{'legScale':.90,'torsoScale':1.10},'fingerBones':30,'clips':{},'source':'Quaternius Universal Animation Library Standard, Walk_Loop; authored contact actions'}
+samples={};report={'cloth':cloth_report,'proportions':{'legScale':.90,'torsoScale':1.10},'fingerBones':30,'clips':{},'source':'Authored heel-to-chest walking cycle and contact actions; Quaternius reference retained for provenance'}
 for anim,duration in DUR.items():
  count=round(duration*30);frames=[]
  for fi in range(count+1):

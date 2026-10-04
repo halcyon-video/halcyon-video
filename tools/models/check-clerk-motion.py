@@ -40,6 +40,20 @@ for anim,seconds in [('idle',3.2),('walk',1.3),('stockHigh',4.4),('stockMid',4.2
    require(max(row['kneeDegrees'])<39,f'walk frame {frame}: excessive knee flexion')
    require(row['jointLocalTranslationCm']<.01,f'walk frame {frame}: disconnected bone translation')
    require(row['shoulderDepthCm']<1.5,f'walk frame {frame}: pulled-back shoulder')
+   # Judge the visible shirt/shoe surfaces, not just bone orientation. The
+   # previous upright-spine gate allowed the whole stride behind the chest.
+   row['surfaceFootfalls']={}
+   for obj in [body,ox]:
+    ev=obj.evaluated_get(deps);vs=ev.data.vertices
+    chest=min(vs[v.index].co.y for v in obj.data.vertices if abs(v.co.x)<15 and 93<v.co.z<112)
+    shoes={side:[vs[v.index].co for v in obj.data.vertices if v.co.z<9 and (v.co.x>0)==(side=='Left')] for side in ['Left','Right']}
+    values={side:{'heelAheadCm':chest-max(v.y for v in ps),'soleHeightCm':min((ev.matrix_world@v).z for v in ps)/a.matrix_world.to_scale().z} for side,ps in shoes.items()}
+    row['surfaceFootfalls'][obj.name]=values
+    if frame in [0,count] or abs(u-.5)<.014:
+     side='Left' if frame in [0,count] else 'Right';v=values[side]
+     require(v['heelAheadCm']>.5,f'walk frame {frame}: {obj.name} {side} heel behind chest {v}')
+     require(abs(v['soleHeightCm'])<1.5,f'walk frame {frame}: {obj.name} {side} forward foot airborne {v}')
+
   if anim.startswith('stock'):
    row['wristDegrees']=[math.degrees(direction(s+'Hand').angle(direction(s+'ForeArm'))) for s in ['Left','Right']]
    row['fingerElevationDegrees']=[math.degrees(math.asin(direction(s+'Hand').z)) for s in ['Left','Right']]
