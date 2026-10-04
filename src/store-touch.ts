@@ -5,7 +5,7 @@ import { isStreamingChoiceActive } from './streaming-checkout';
 import { installMobileWalk } from './mobile-walk';
 import type { InputCallbacks } from './input.ts';
 import type { StoreScene } from './three-scene.ts';
-import { beginMobileDrag, mobileStoreActive, markMobileDragged } from './mobile-store.ts';
+import { beginMobileDrag, mobileStoreActive, markMobileDragged, isMobileOverlayBlocking } from './mobile-store.ts';
 
 /**
  * A finger with no hover is the only signal this acts on. Unlike the
@@ -281,7 +281,7 @@ export function installStoreTouchControls(callbacks: InputCallbacks, poke: () =>
   bind(ok, () => {
     poke();
     const scene = getScene?.();
-    if (scene && mobileCheckoutAction(scene, root.classList.contains('terminal'))) return;
+    if (scene && mobileCheckoutAction(scene, root.classList.contains('terminal') || isMobileOverlayBlocking())) return;
     void callbacks.onEnter();
   });
 

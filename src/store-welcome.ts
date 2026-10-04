@@ -62,7 +62,7 @@ export function isWelcomeActive(): boolean {
  */
 export function welcomeHUDText(isTouch: boolean): string {
   return isTouch
-    ? 'SWIPE TO LOOK  •  TAP A SHELF'
+    ? 'DRAG TO LOOK  •  TAP A MOVIE'
     : '◀ ▶ TO WALK THE AISLES  •  ENTER TO EXAMINE';
 }
 

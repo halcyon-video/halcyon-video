@@ -3245,7 +3245,15 @@ function drawStandardVhsOverlays(ctx: CanvasRenderingContext2D, movie: Movie) {
 
   ctx.font = `${overSize}px Arial, sans-serif`;
   const maxOverLines = Math.max(0, Math.floor((metaTop - 10 - y) / (overSize + 3)));
-  for (const ln of wrapText(ctx, movie.overview || '', wMax).slice(0, maxOverLines)) {
+  const synopsisLines = wrapText(ctx, movie.overview || '', wMax);
+  const visibleSynopsis = synopsisLines.slice(0, maxOverLines);
+  if (visibleSynopsis.length && synopsisLines.length > visibleSynopsis.length) {
+    const last = visibleSynopsis.length - 1;
+    const chars = Array.from(visibleSynopsis[last].trimEnd());
+    while (chars.length && ctx.measureText(chars.join('') + '…').width > wMax) chars.pop();
+    visibleSynopsis[last] = chars.join('').trimEnd() + '…';
+  }
+  for (const ln of visibleSynopsis) {
     ctx.fillText(ln, wx, y);
     y += overSize + 3;
   }

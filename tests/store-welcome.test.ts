@@ -40,7 +40,7 @@ test('first-visit flag reads correctly from storage', () => {
 
 test('welcomeHUDText returns appropriate copy for touch vs keyboard', () => {
   const touchText = welcomeHUDText(true);
-  assert.match(touchText, /SWIPE/, 'Touch hint should teach swiping');
+  assert.match(touchText, /DRAG|SWIPE/, 'Touch hint should teach a look gesture');
   assert.match(touchText, /TAP/, 'Touch hint should teach tapping');
 
   const kbText = welcomeHUDText(false);
