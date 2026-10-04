@@ -1,3 +1,4 @@
+import { setChangedShelfMatrix } from './shelf-instance-matrix';
 // Inspect / flip / hero cases / launch flourish — extracted from StoreScene
 // (three-scene.ts keeps one-line delegating stubs): the Enter-key
 // selectAction dispatcher, the play-flourish launch animation, the
@@ -401,10 +402,8 @@ export function updateLaunchAnimation(scene: StoreScene, now: number): boolean {
     tempQuaternion.setFromEuler(tempRotation);
     tempScale.set(0, 0, 0);
     tempMatrix.compose(tempPosition, tempQuaternion, tempScale);
-    slot.backMesh.setMatrixAt(slot.instanceIdx, tempMatrix);
-    slot.frontMesh.setMatrixAt(slot.instanceIdx, tempMatrix);
-    updatedMeshes.add(slot.backMesh);
-    updatedMeshes.add(slot.frontMesh);
+    if (setChangedShelfMatrix(slot.backMesh, slot.instanceIdx, tempMatrix)) updatedMeshes.add(slot.backMesh);
+    if (setChangedShelfMatrix(slot.frontMesh, slot.instanceIdx, tempMatrix)) updatedMeshes.add(slot.frontMesh);
   };
 
   // Hand the visible case to the bag's soft-body sim once (at the end of the
@@ -516,10 +515,8 @@ scene: StoreScene,
     tempQuaternion.setFromEuler(tempRotation);
     tempScale.set(0, 0, 0);
     tempMatrix.compose(tempPosition, tempQuaternion, tempScale);
-    slot.backMesh.setMatrixAt(slot.instanceIdx, tempMatrix);
-    slot.frontMesh.setMatrixAt(slot.instanceIdx, tempMatrix);
-    updatedMeshes.add(slot.backMesh);
-    updatedMeshes.add(slot.frontMesh);
+    if (setChangedShelfMatrix(slot.backMesh, slot.instanceIdx, tempMatrix)) updatedMeshes.add(slot.backMesh);
+    if (setChangedShelfMatrix(slot.frontMesh, slot.instanceIdx, tempMatrix)) updatedMeshes.add(slot.frontMesh);
     return;
   }
 
@@ -530,13 +527,11 @@ scene: StoreScene,
   tempQuaternion.setFromEuler(tempRotation);
   tempScale.set(scale, scale, scale);
   tempMatrix.compose(tempPosition, tempQuaternion, tempScale);
-  slot.backMesh.setMatrixAt(slot.instanceIdx, tempMatrix);
-  updatedMeshes.add(slot.backMesh);
+  if (setChangedShelfMatrix(slot.backMesh, slot.instanceIdx, tempMatrix)) updatedMeshes.add(slot.backMesh);
 
   tempScale.set(0, 0, 0);
   tempMatrix.compose(tempPosition, tempQuaternion, tempScale);
-  slot.frontMesh.setMatrixAt(slot.instanceIdx, tempMatrix);
-  updatedMeshes.add(slot.frontMesh);
+  if (setChangedShelfMatrix(slot.frontMesh, slot.instanceIdx, tempMatrix)) updatedMeshes.add(slot.frontMesh);
 }
 
 export function toggleFlip(scene: StoreScene) {

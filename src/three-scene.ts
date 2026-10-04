@@ -1,3 +1,4 @@
+import { setChangedShelfMatrix } from './shelf-instance-matrix';
 import { releaseUploadRenderer } from './poster-textures';
 import { reelModeEnabled, reelSetting } from './reel-profile';
 import { updateReelFlight, reelFlightKey, reelFlightMouse } from './store-reel-flight';
@@ -5418,10 +5419,8 @@ export class StoreScene {
         tempQuaternion.setFromEuler(tempRotation);
         tempScale.set(0, 0, 0);
         tempMatrix.compose(tempPosition, tempQuaternion, tempScale);
-        slot.frontMesh.setMatrixAt(slot.instanceIdx, tempMatrix);
-        slot.backMesh.setMatrixAt(slot.instanceIdx, tempMatrix);
-        updatedMeshes.add(slot.frontMesh);
-        updatedMeshes.add(slot.backMesh);
+        if (setChangedShelfMatrix(slot.frontMesh, slot.instanceIdx, tempMatrix)) updatedMeshes.add(slot.frontMesh);
+        if (setChangedShelfMatrix(slot.backMesh, slot.instanceIdx, tempMatrix)) updatedMeshes.add(slot.backMesh);
         continue;
       }
 
@@ -5449,16 +5448,14 @@ export class StoreScene {
       const fs = s; // Unpainted spines remain visible while nearby art streams in.
       tempScale.set(fs, fs, fs * seriesZMult);
       tempMatrix.compose(tempPosition, tempQuaternion, tempScale);
-      slot.frontMesh.setMatrixAt(slot.instanceIdx, tempMatrix);
-      updatedMeshes.add(slot.frontMesh);
+      if (setChangedShelfMatrix(slot.frontMesh, slot.instanceIdx, tempMatrix)) updatedMeshes.add(slot.frontMesh);
 
       tempPosition.set(bWorldX, bWorldY, bWorldZ);
       tempRotation.set(slot.currentRotX, slot.backRotY + theta, leanZ, CASE_EULER_ORDER);
       tempQuaternion.setFromEuler(tempRotation);
       tempScale.set(bScale, bScale, bScale);
       tempMatrix.compose(tempPosition, tempQuaternion, tempScale);
-      slot.backMesh.setMatrixAt(slot.instanceIdx, tempMatrix);
-      updatedMeshes.add(slot.backMesh);
+      if (setChangedShelfMatrix(slot.backMesh, slot.instanceIdx, tempMatrix)) updatedMeshes.add(slot.backMesh);
     }
 
     // Remove settled non-selected slots from dirty set so they aren't iterated next frame
@@ -5547,7 +5544,7 @@ export class StoreScene {
     // full scene pass then lands after the shadow passes stop, not on top of
     // them, and the 1/frame drain budget spreads the rest.
     this.updateMirrorThrottle(shadowCastersMoved || clerkWalking ||
-      this.clerkMirrorRefresh || updatedMeshes.size > 0 ||
+      this.clerkMirrorRefresh || animatingNow || updatedMeshes.size > 0 ||
       (forceShadowRefresh && this.shadowRefreshFrames === 0));
     this.clerkMirrorRefresh = false;
     mirrors.renderMirrorsAhead(this);
