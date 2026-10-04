@@ -1,460 +1,332 @@
-"""Original Halcyon clerk, authored as fitted meshes in Blender.
-
-blender -b -t 4 --python tools/models/video-clerk.py -- --preview
-blender -b -t 4 --python tools/models/video-clerk.py -- --render
-
-Feet, Z up, facing -Y. Orthographic cells retain the existing 256x384,
-16-column / 5-direction sprite contract. The neutral polo has a separate
-occlusion-correct livery mask so every store can supply its own uniform color.
-No external models, textures, fonts or character likenesses are used.
-"""
-import bpy
-import math
-import json
-import sys
-import subprocess
+# Original Halcyon clerk: Meshy image-derived base and walk; Blender bound rig,
+# fitted Oxford, independent uniform materials, and deterministic sprite rendering.
+# Provenance and reproduction: docs/video-clerk-model.md.
+import bpy,bmesh,math,sys,json,numpy as np
 from pathlib import Path
-from mathutils import Vector
-
-ROOT = Path(__file__).resolve().parents[2]
-OUT = ROOT / 'scratch/clerk-render'
-OUT.mkdir(parents=True, exist_ok=True)
-bpy.ops.object.select_all(action='SELECT')
-bpy.ops.object.delete(use_global=False)
-for mat in list(bpy.data.materials):
-    bpy.data.materials.remove(mat)
-
-def material(name, color, rough=.6, metallic=0):
-    m = bpy.data.materials.new(name)
-    m.diffuse_color = (*color, 1)
-    m.use_nodes = True
-    p = m.node_tree.nodes.get('Principled BSDF')
-    p.inputs['Base Color'].default_value = (*color, 1)
-    p.inputs['Roughness'].default_value = rough
-    p.inputs['Metallic'].default_value = metallic
-    return m
-
-skin = material('Warm peach skin', (.64, .345, .205), .66)
-hair = material('Chestnut bob', (.075, .031, .018), .62)
-hair_light = material('Soft chestnut highlights', (.105, .046, .025), .66)
-hair_dark = material('Hair part and lashes', (.024, .009, .006), .6)
-polo = material('Uniform - replaceable livery', (.7, .7, .7), .82)
-khaki = material('Sand cotton twill', (.39, .28, .16), .86)
-seam = material('Trouser stitch', (.27, .18, .105), .85)
-shoe = material('Charcoal canvas sneakers', (.025, .03, .032), .8)
-sole = material('Cream rubber sole', (.58, .55, .46), .8)
-white = material('Warm ivory', (.89, .85, .75), .55)
-iris = material('Hazel iris', (.19, .085, .025), .4)
-pupil = material('Pupil', (.009, .005, .003), .25)
-lip = material('Muted rose lips', (.36, .092, .071), .72)
-blush = material('Cheek warmth', (.63, .255, .175), .85)
-nail = material('Natural fingernails', (.76, .49, .36), .76)
-gold = material('Brass fastenings', (.48, .30, .075), .4, .65)
-belt = material('Brown leather belt', (.061, .027, .014), .65)
-case_mat = material('Midnight video case', (.021, .041, .047), .55)
-
-def mesh(name, vertices, faces, mat, parent=None, sub=1):
-    data = bpy.data.meshes.new(name)
-    data.from_pydata(vertices, [], faces)
-    data.update()
-    obj = bpy.data.objects.new(name, data)
-    bpy.context.collection.objects.link(obj)
-    obj.data.materials.append(mat)
-    for p in data.polygons:
-        p.use_smooth = True
-    if parent:
-        obj.parent = parent
-    if sub:
-        mod = obj.modifiers.new('Tailored smooth surface', 'SUBSURF')
-        mod.levels = sub
-    return obj
-
-def empty(name, at, parent=None):
-    o = bpy.data.objects.new(name, None)
-    bpy.context.collection.objects.link(o)
-    o.location = at
-    o.parent = parent
-    o.empty_display_size = .10
-    return o
-
-root = empty('Clerk - heading', (0, 0, 0))
-body = empty('Body - breathing and crouch', (0, 0, 0), root)
-head = empty('Head - attentive tilt', (0, 0, 4.24), body)
-
-def rings(name, profile, mat, parent=body, n=32, sub=2):
-    # profile: z, x radius, y radius, y center, x center (optional)
-    vertices = []
-    for row in profile:
-        z, rx, ry, cy = row[:4]
-        cx = row[4] if len(row) > 4 else 0
-        for k in range(n):
-            a = k * math.tau / n
-            vertices.append((cx + rx*math.cos(a), cy + ry*math.sin(a), z))
-    faces = [tuple(reversed(range(n)))]
-    for j in range(len(profile)-1):
-        for k in range(n):
-            a=j*n+k; b=j*n+(k+1)%n
-            faces.append((a,b,b+n,a+n))
-    faces.append(tuple((len(profile)-1)*n+k for k in range(n)))
-    return mesh(name, vertices, faces, mat, parent, sub)
-
-def ellipsoid(name, at, scale, mat, parent=body, n=32, m=20):
-    # Latitudinal quad surface; small capped poles keep the topology closed.
-    profile=[]
-    for j in range(m+1):
-        a=.002+(math.pi-.004)*j/m
-        profile.append((at[2]-scale[2]*math.cos(a), scale[0]*math.sin(a),
-                        scale[1]*math.sin(a), at[1], at[0]))
-    return rings(name, profile, mat, parent, n, 1)
-
-def tube(name, pts, radii, mat, parent=body, sides=12):
-    verts=[]
-    for i, p in enumerate(pts):
-        tangent=Vector(pts[min(i+1,len(pts)-1)])-Vector(pts[max(0,i-1)])
-        tangent.normalize()
-        u=tangent.cross(Vector((0,1,0)))
-        if u.length < .1: u=tangent.cross(Vector((1,0,0)))
-        u.normalize(); v=tangent.cross(u).normalized()
-        r=radii[i] if isinstance(radii,list) else radii
-        rx,ry = r if isinstance(r,tuple) else (r,r)
-        for k in range(sides):
-            a=math.tau*k/sides
-            verts.append(Vector(p)+u*math.cos(a)*rx+v*math.sin(a)*ry)
-    faces=[tuple(reversed(range(sides)))]
-    for j in range(len(pts)-1):
-        for k in range(sides):
-            a=j*sides+k; b=j*sides+(k+1)%sides
-            faces.append((a,b,b+sides,a+sides))
-    faces.append(tuple((len(pts)-1)*sides+k for k in range(sides)))
-    return mesh(name,verts,faces,mat,parent,1)
-
-def line(name, pts, width, mat, parent=body):
-    return tube(name, pts, width, mat, parent, 8)
-
-def patch(name, vertices, mat, parent=body, thickness=.014):
-    o=mesh(name,vertices,[tuple(range(len(vertices)))],mat,parent,0)
-    s=o.modifiers.new('Fabric thickness','SOLIDIFY'); s.thickness=thickness
-    b=o.modifiers.new('Soft finished edge','BEVEL'); b.width=.015; b.segments=3
-    return o
-
-def rounded_box(name, at, scale, mat, parent=body, bevel=.04):
-    x,y,z=scale
-    vertices=[(at[0]+a*x/2,at[1]+b*y/2,at[2]+c*z/2)
-              for a,b,c in [(-1,-1,-1),(-1,-1,1),(-1,1,-1),(-1,1,1),(1,-1,-1),(1,-1,1),(1,1,-1),(1,1,1)]]
-    faces=[(0,4,6,2),(1,3,7,5),(0,1,5,4),(2,6,7,3),(0,2,3,1),(4,5,7,6)]
-    o=mesh(name,vertices,faces,mat,parent,0)
-    m=o.modifiers.new('Rounded manufactured edges','BEVEL');m.width=bevel;m.segments=3
-    return o
-
-# The polo is one contoured surface, with sewn collar leaves and placket.
-rings('Polo body',[(2.49,.33,.20,0),(2.51,.39,.235,0),(2.63,.40,.245,0),
- (2.91,.34,.235,0),(3.19,.365,.26,-.01),(3.44,.44,.28,-.015),
- (3.66,.49,.225,.015),(3.78,.40,.185,.02),(3.91,.19,.155,.015)],polo)
-rings('Neck',[(3.73,.155,.14,.018),(3.95,.155,.14,.018),(4.29,.17,.15,.025)],skin)
-for side in [-1,1]:
-    patch('Polo collar leaf',[(side*.05,-.158,3.97),(side*.24,-.13,3.82),
-          (side*.25,-.24,3.61),(side*.045,-.25,3.77)],polo)
-rounded_box('Polo button placket',(0,-.266,3.59),(.075,.024,.35),polo,bevel=.014)
-for z in [3.67,3.54]: ellipsoid('Polo button',(0,-.285,z),(.017,.014,.017),white)
-rounded_box('Name badge',(-.245,-.272,3.40),(.27,.039,.13),white,bevel=.025)
-rounded_box('Badge brass clip',(-.245,-.3,3.465),(.06,.014,.03),gold,bevel=.008)
-for x, width in [(-.25,.14),(-.275,.09)]:
-    rounded_box('Badge embossed rule',(x,-.295,3.40 if width==.14 else 3.365),(width,.009,.012),case_mat,bevel=.004)
-seat=rings('Trouser seat',[(2.12,.27,.19,.02),(2.30,.405,.245,.02),(2.47,.40,.25,.015),(2.56,.37,.24,0)],khaki)
-rings('Leather belt',[(2.47,.401,.247,0),(2.49,.405,.25,0),(2.56,.385,.245,0),(2.575,.377,.24,0)],belt,sub=1)
-rounded_box('Belt buckle',(0,-.253,2.525),(.17,.045,.115),gold,bevel=.022)
-rounded_box('Buckle opening',(0,-.279,2.525),(.105,.011,.06),belt,bevel=.01)
-for side in [-1,1]:
-    line('Slanted pocket opening',[(side*.37,-.105,2.45),(side*.355,-.19,2.34),(side*.30,-.23,2.24)],.012,seam)
-    rounded_box('Back welt pocket',(side*.205,.248,2.34),(.22,.018,.018),seam,bevel=.008)
-
-# Sculpted chin, cheeks and forehead, rather than an unshaped sphere.
-rings('Face and cranium',[(-.30,.10,.13,-.017),(-.265,.19,.20,-.012),
- (-.17,.29,.26,0),(-.02,.365,.285,.005),(.17,.38,.275,.02),
- (.35,.37,.28,.025),(.50,.31,.255,.035),(.61,.18,.17,.045),(.65,.02,.03,.05)],skin,head,48,2)
-for s in [-1,1]:
-    ellipsoid('Ear',(s*.37,.015,.05),(.087,.076,.135),skin,head)
-    ellipsoid('Ear concha',(s*.411,-.037,.05),(.038,.026,.068),blush,head)
-    ellipsoid('Tiny brass stud',(s*.405,-.042,-.033),(.031,.025,.033),gold,head)
-    # Almond white, warm iris, defined upper lash and tiny catchlight.
-    eye=ellipsoid('Almond eye',(s*.155,-.258,.20),(.114,.043,.079),white,head)
-    eye.rotation_euler.y=s*.06
-    ellipsoid('Hazel iris',(s*.15,-.298,.20),(.046,.018,.057),iris,head)
-    ellipsoid('Pupil',(s*.148,-.313,.201),(.024,.009,.038),pupil,head)
-    ellipsoid('Eye catchlight',(s*.148-.012,-.322,.224),(.012,.006,.015),white,head)
-    line('Upper eyelid',[(s*.046,-.272,.21),(s*.105,-.293,.271),
-         (s*.18,-.293,.282),(s*.254,-.253,.237)],.014,hair_dark,head)
-    line('Outer eyelash',[(s*.24,-.262,.25),(s*.282,-.238,.27)],.012,hair_dark,head)
-    line('Expressive eyebrow',[(s*.064,-.248,.365),(s*.14,-.269,.392),
-         (s*.22,-.252,.382),(s*.27,-.225,.35)],.021,hair,head)
-    # Sit the warmth on the cheek surface.  The old centre was almost half an
-    # inch in front of the face, which made the mark detach in three-quarter
-    # and profile frames instead of reading as skin colour.
-    ellipsoid('Soft cheek',(s*.258,-.194,.035),(.040,.006,.021),blush,head)
-    for k in range(3):
-        ellipsoid('Freckle',(s*(.211+k*.03),-.218+k*.021,.082+(k%2)*.015),(.006,.005,.005),hair_light,head,n=12,m=8)
-# Soft bridge and a rounded nose tip with two restrained nostril marks.
-ellipsoid('Nose bridge',(0,-.276,.10),(.044,.050,.105),skin,head)
-ellipsoid('Nose tip',(0,-.319,.045),(.063,.045,.046),skin,head)
-for s in [-1,1]: ellipsoid('Nostril',(s*.032,-.346,.025),(.017,.01,.009),lip,head)
-line('Friendly smile',[(-.116,-.241,-.116),(-.065,-.268,-.15),(0,-.28,-.159),(.065,-.268,-.15),(.116,-.241,-.116)],.011,lip,head)
-line('Lower lip',[(-.063,-.262,-.174),(0,-.273,-.184),(.063,-.262,-.174)],.012,lip,head)
-mouth_open=ellipsoid('Speaking mouth',(0,-.277,-.15),(.07,.015,.039),lip,head)
-
-# A bob built as a continuous cap with a shaped face opening and turned-under
-# hem.  Keep the crown close to the skull and slightly flatter at the rear: the
-# first pass used an almost spherical shell plus eight rope-like side locks,
-# which read as a glossy helmet at sprite scale.
-verts=[]; faces=[]; hn=64; hm=18
-for j in range(hm+1):
-    t=j/hm
-    for k in range(hn):
-        a=math.tau*k/hn
-        front=max(0,-math.sin(a))
-        edge=2.48-1.25*(front**.40)
-        theta=.003+t*edge
-        x=.405*math.sin(theta)*math.cos(a)
-        y=.035+.315*math.sin(theta)*math.sin(a)
-        z=.245+.475*math.cos(theta)
-        # Bob length on the sides and rear; open face and nape remain shaped.
-        z-=.17*(t**5)*(1-front**.4)
-        verts.append((x,y,z))
-for j in range(hm):
-    for k in range(hn):
-        a=j*hn+k;b=j*hn+(k+1)%hn;faces.append((a,b,b+hn,a+hn))
-cap=mesh('Sculpted bob cap',verts,faces,hair,head,2)
-solid=cap.modifiers.new('Hair volume','SOLIDIFY');solid.thickness=.04
-# Broad tapered locks follow the scalp and tuck under, with deliberate parting.
-for i in range(4):
-    shift=i*.054
-    pts=[(.15+shift*.12,-.06,.717),(.07-shift*.30,-.235,.63),
-         (-.08-shift*.55,-.324,.50),(-.23-shift*.37,-.30,.365),(-.315-shift*.12,-.23,.24)]
-    tube('Side swept fringe',pts,[(.018,.014),(.046,.024),(.052,.030),(.038,.026),(.006,.007)],hair if i%3 else hair_light,head,12)
-for s in [-1,1]:
-    for i in range(2):
-        y=-.13+i*.16
-        tube('Bob side lock',[(s*.30,y,.54),(s*.398,y-.012,.34),(s*.418,y,.06),
-             (s*.398,y+.014,-.20),(s*.335,y+.022,-.285)],
-             [(.018,.026),(.034,.044),(.037,.047),(.034,.042),(.009,.013)],hair if i else hair_light,head)
-line('Hair part',[(.13,.025,.742),(.16,-.085,.70),(.19,-.18,.62)],.009,hair_dark,head)
-
-# Named joint pivots make all poses editable. Each clothed limb is a single
-# continuous ring mesh, deformed around its elbow/knee by the pose authoring.
-limbs=[]
-hands=[]
-feet=[]
-def limb_geometry(name, start, joint, end, radii, mat):
-    a,b,c=map(Vector,[start,joint,end])
-    ts=[0,.07,.26,.48,.64,.82,1]
-    pts=[a.lerp(b,t) for t in ts]+[b.lerp(c,t) for t in ts[1:]]
-    return tube(name,pts,radii,mat,root,16)
-
-for s in [-1,1]:
-    # Sleeve belongs to the moving arm pivot, finished at a sewn cuff.
-    pivot=empty(('Left' if s<0 else 'Right')+' shoulder',(s*.435,.015,3.65),body)
-    sleeve=rings('Polo sleeve',[(.07,.18,.17,0),(.0,.205,.185,0),(-.18,.18,.17,0),
-           (-.41,.14,.145,0),(-.43,.14,.145,0)],polo,pivot,32,2)
-    hand=empty(('Left' if s<0 else 'Right')+' wrist',(0,0,0),root)
-    ellipsoid('Palm',(0,0,0),(.10,.075,.16),skin,hand)
-    for k in range(4):
-        x=(k-1.5)*.044
-        tube('Relaxed finger',[(x,-.005,-.075),(x,-.02,-.16),(x,-.033,-.205+(abs(k-1.5))*.018)],
-             [.031,.027,.018],skin,hand,10)
-        # Dorsal nail marks make palm orientation readable in the tiny atlas:
-        # hidden from a palm-forward idle, visible on top after pronation.
-        ellipsoid('Fingernail',(x,.030,-.174+(abs(k-1.5))*.010),(.018,.007,.026),nail,hand,n=12,m=8)
-    tube('Thumb',[(s*.063,-.014,.045),(s*.12,-.02,-.018),(s*.119,-.05,-.085)],
-         [.045,.036,.023],skin,hand)
-    foot=empty(('Left' if s<0 else 'Right')+' shoe',(0,0,0),root)
-    ellipsoid('Sneaker outsole',(0,-.10,.097),(.18,.325,.085),sole,foot)
-    ellipsoid('Canvas sneaker',(0,-.08,.184),(.174,.295,.13),shoe,foot)
-    ellipsoid('Rubber toe cap',(0,-.275,.169),(.165,.113,.086),sole,foot)
-    for k in range(3): line('Cream shoelace',[(-.085,-.08-k*.045,.291-k*.009),(.085,-.08-k*.045,.291-k*.009)],.013,white,foot)
-    hands.append((s,hand,pivot));feet.append((s,foot))
-
-video=rounded_box('Restock video case',(0,-.04,-.07),(.29,.12,.46),case_mat,hands[1][1],.025)
-label=rounded_box('Video case paper insert',(0,-.105,-.06),(.225,.012,.335),white,hands[1][1],.012)
-video_mark=rounded_box('Video insert stripe',(0,-.115,-.06),(.20,.009,.065),polo,hands[1][1],.006)
-
-def pose(anim='idle', f=0):
-    for o in limbs:
-        bpy.data.objects.remove(o,do_unlink=True)
-    limbs.clear()
-    crouch=.84 if anim=='stockLow' else 0
-    bob=(.018 if f else 0) if anim in ['idle','talk'] else 0
-    body.location=(0,0,-crouch+bob)
-    head.rotation_euler=(.10 if anim=='stockHigh' else -.025, -.04 if anim=='talk' else .015, .025 if f else 0)
-    mouth_open.hide_render=anim!='talk' or f==0
-    hold=anim.startswith('stock')
-    for o in [video,label,video_mark]:o.hide_render=not hold
-    stride=[.36,.04,-.36,-.04][f] if anim=='walk' else 0
-    for s,hand,pivot in hands:
-        shoulder=Vector((s*.435,.015,3.65-crouch+bob))
-        angle=.055
-        bend=.13
-        spread=s*.055
-        if anim=='walk':angle=-stride*s*1.3;bend=.22
-        if anim=='talk' and s>0: angle=.40+f*.1;bend=.90
-        if anim=='type':angle=.36;bend=1.15+f*.10
-        if anim=='stockMid':angle=.80;bend=.62+f*.09
-        if anim=='stockHigh':angle=2.37+f*.10;bend=.16
-        if anim=='stockLow':angle=.50;bend=.62
-        elbow=shoulder+Vector((spread,-math.sin(angle)*.70,-math.cos(angle)*.70))
-        wrist=elbow+Vector((spread*.2,-math.sin(angle+bend)*.63,-math.cos(angle+bend)*.63))
-        pivot.rotation_euler.x=-angle
-        pivot.rotation_euler.y=-s*.09
-        # Arm extends beneath the real short sleeve to the wrist.
-        arm_start=shoulder.lerp(elbow,.42)
-        rr=[.127,.13,.13,.126,.116,.108,.102,.102,.103,.099,.083,.067,.06]
-        arm=limb_geometry('Continuous arm',arm_start,elbow,wrist,rr,skin);limbs.append(arm)
-        hand.location=wrist
-        wrist_pitch = .45 if anim == 'type' else (.20 if anim in ['stockMid','stockLow'] else 0)
-        hand.rotation_euler.x=-(angle+bend)+wrist_pitch
-        # The neutral hand is authored palm-forward with the thumb outside.
-        # When both forearms swing forward to type or shelve a low/mid case,
-        # pronate them: palms face down and the thumbs face one another.  The
-        # old pose merely tipped the neutral hand through 90 degrees, leaving
-        # both palms and thumbs visibly upside-down.
-        hand.rotation_euler.z=math.pi if anim in ['type','stockMid','stockLow'] else 0
-        hip=Vector((s*.215,.018,2.49-crouch+bob))
-        foot=next(o for side,o in feet if side==s)
-        forward=stride*s
-        lift=(.16 if f in [1,3] and (f==1)==(s>0) else 0) if anim=='walk' else 0
-        ankle=Vector((s*(.24 if not crouch else .36),-forward,.22+lift))
-        knee=hip.lerp(ankle,.52)+Vector((0,-.04-(.56 if crouch else 0),0))
-        rr=[(.213,.236),(.222,.242),(.22,.234),(.197,.21),(.18,.195),(.168,.18),
-            (.157,.17),(.155,.167),(.15,.158),(.146,.153),(.145,.147),(.143,.14),(.14,.14)]
-        leg=limb_geometry('Tailored trouser leg',hip,knee,ankle,rr,khaki);limbs.append(leg)
-        foot.location=(ankle.x,ankle.y,lift)
-        foot.rotation_euler.z=s*-.065
-    # Voxel-union the seat and both tailored leg surfaces to eliminate seams
-    # at the crotch while retaining the deliberately modeled pant profiles.
-    seat.hide_render=True
-    seat_copy=seat.copy();seat_copy.data=seat.data.copy()
-    bpy.context.collection.objects.link(seat_copy)
-    seat_copy.hide_render=False
-    bpy.context.view_layer.update()
-    seat_world=seat.matrix_world.copy()
-    seat_copy.parent=None
-    seat_copy.matrix_world=seat_world
-    pieces=[o for o in limbs if o.name.startswith('Tailored trouser')]+[seat_copy]
-    bpy.ops.object.select_all(action='DESELECT')
-    for o in pieces:o.select_set(True)
-    bpy.context.view_layer.objects.active=seat_copy
-    bpy.ops.object.convert(target='MESH')
-    bpy.ops.object.join()
-    seat_copy.name='Continuous tailored trousers'
-    mod=seat_copy.modifiers.new('Welded cloth sculpt','REMESH');mod.mode='VOXEL';mod.voxel_size=.022
-    smooth=seat_copy.modifiers.new('Relax cloth junctions','SMOOTH');smooth.factor=.65;smooth.iterations=4
-    trouser_world=seat_copy.matrix_world.copy()
-    seat_copy.parent=root
-    seat_copy.matrix_world=trouser_world
-    limbs[:]=[o for o in limbs if o not in pieces]+[seat_copy]
-
-pose()
-
-# Transparent, softly lit orthographic output. Lighting remains camera-fixed
-# across directions; the runtime still receives the store's lights and shadows.
+from mathutils import Vector,Matrix
+ROOT=Path(__file__).resolve().parents[2]
+R=ROOT/'tools/models'
+OUT=ROOT/'scratch/clerk-render'
+OUT.mkdir(parents=True,exist_ok=True)
+bpy.ops.object.select_all(action='SELECT');bpy.ops.object.delete(use_global=False)
+bpy.ops.import_scene.gltf(filepath=str(R/'video-clerk-source.glb'))
+arm=next(o for o in bpy.context.scene.objects if o.type=='ARMATURE')
+body=next(o for o in bpy.context.scene.objects if o.type=='MESH' and len(o.vertex_groups)>0)
+for o in list(bpy.context.scene.objects):
+ if o.type=='MESH' and o!=body:bpy.data.objects.remove(o,do_unlink=True)
+walk=arm.animation_data.action;walk.use_fake_user=True
+arm.animation_data_clear()
+bpy.context.view_layer.objects.active=arm;arm.select_set(True)
+bpy.ops.object.mode_set(mode='EDIT')
+for b in arm.data.edit_bones:b.length/=100
+bpy.ops.object.mode_set(mode='OBJECT')
+root=bpy.data.objects.new('Clerk A floor anchor',None);bpy.context.collection.objects.link(root)
+for o in list(bpy.context.scene.objects):
+ if o!=root and o.parent is None:o.parent=root
+root.scale=(1/.3048,)*3
 scene=bpy.context.scene
-scene.render.engine='CYCLES'
-scene.cycles.samples=24
-scene.cycles.use_denoising=True
-scene.render.film_transparent=True
-scene.render.resolution_x=256;scene.render.resolution_y=384
-scene.render.resolution_percentage=100
-scene.render.image_settings.file_format='PNG'
-scene.render.image_settings.color_mode='RGBA'
-scene.world.color=(.45,.45,.45)
-scene.view_settings.view_transform='Standard'
-scene.view_settings.look='None'
-scene.view_settings.exposure=0
-scene.view_settings.gamma=1
-def area(name, at, power, size):
-    d=bpy.data.lights.new(name,'AREA');d.energy=power;d.shape='DISK';d.size=size
-    o=bpy.data.objects.new(name,d);bpy.context.collection.objects.link(o);o.location=at
-    o.rotation_euler=(Vector((0,0,2.8))-o.location).to_track_quat('-Z','Y').to_euler()
-area('Large softbox',(-3,-5,8),450,5)
-area('Soft fill',(4,-3,4.5),240,5)
-area('Hair rim',(-1,3,7),380,4)
-camera_data=bpy.data.cameras.new('Orthographic sprite camera')
-camera=bpy.data.objects.new('Orthographic sprite camera',camera_data)
-bpy.context.collection.objects.link(camera)
-camera.location=(0,-12,2.80)
-camera.rotation_euler=(math.pi/2,0,0)
-camera_data.type='ORTHO';camera_data.ortho_scale=5.7
-scene.camera=camera
+scene.render.engine='CYCLES';scene.cycles.samples=12;scene.cycles.use_denoising=True
+scene.render.film_transparent=True;scene.render.resolution_x=384;scene.render.resolution_y=576;scene.render.resolution_percentage=100
+scene.render.image_settings.file_format='PNG';scene.render.image_settings.color_mode='RGBA'
+scene.view_settings.view_transform='Standard';scene.view_settings.look='None';scene.world.color=(.45,.45,.45)
+for name,loc,power,size in [('Key',(-3,-5,8),360,5),('Fill',(4,-3,4.5),180,5),('Rim',(-1,3,7),250,4)]:
+ d=bpy.data.lights.new(name,'AREA');d.energy=power;d.shape='DISK';d.size=size;o=bpy.data.objects.new(name,d);bpy.context.collection.objects.link(o);o.location=loc;o.rotation_euler=(Vector((0,0,2.8))-o.location).to_track_quat('-Z','Y').to_euler()
+d=bpy.data.cameras.new('Sprite camera');cam=bpy.data.objects.new('Sprite camera',d);bpy.context.collection.objects.link(cam)
+cam.location=(0,-12,2.8);cam.rotation_euler=(math.pi/2,0,0);d.type='ORTHO';d.ortho_scale=5.7;scene.camera=cam
 
-def render(path):
-    scene.render.filepath=str(path)
-    bpy.ops.render.render(write_still=True)
+def aim(name,direction):
+ b=arm.pose.bones[name];mat=b.matrix.copy();q=(mat.to_3x3()@Vector((0,1,0))).rotation_difference(Vector(direction))
+ b.matrix=Matrix.Translation(mat.translation)@q.to_matrix().to_4x4()@mat.to_3x3().to_4x4();bpy.context.view_layer.update()
+def pose(kind,frame=0):
+ arm.animation_data_clear();root.location=(0,0,0);root.rotation_euler=(0,0,0)
+ for b in arm.pose.bones:b.matrix_basis=Matrix.Identity(4)
+ bpy.context.view_layer.update()
+ if kind=='walk':
+  arm.animation_data_create();arm.animation_data.action=walk
+  arm.animation_data.action_slot=walk.slots[0];scene.frame_set(frame)
+ else:
+  for side,sgn in [('Left',1),('Right',-1)]:
+   aim(side+'Arm',(sgn*.12,-.03,-1));aim(side+'ForeArm',(sgn*.03,-.13,-1))
+   aim(side+'UpLeg',(sgn*.08,0,-1));aim(side+'Leg',(sgn*.02,0,-1))
+  if kind=='reach':
+   aim('RightArm',(-.18,-.35,.92));aim('RightForeArm',(-.02,-.2,1))
+  if kind=='talk':
+   aim('LeftArm',(.24,-.35,-.82));aim('LeftForeArm',(.38,-.80,.35))
+ bpy.context.view_layer.update();dg=bpy.context.evaluated_depsgraph_get();ev=body.evaluated_get(dg)
+ points=[ev.matrix_world@v.co for v in ev.data.vertices]
+ root.location.z=-min(v.z for v in points)
+ bpy.context.view_layer.update()
+ return {'pose':kind,'frame':frame,'floor_adjustment':root.location.z,'bounds':[[min(v[i] for v in points) for i in range(3)],[max(v[i] for v in points) for i in range(3)]]}
+
+arm.animation_data_clear()
+for b in arm.pose.bones:b.matrix_basis=Matrix.Identity(4)
+bpy.context.view_layer.update()
+arm.animation_data_clear()
+for b in arm.pose.bones:b.matrix_basis=Matrix.Identity(4)
+bpy.context.view_layer.objects.active=arm
+bpy.ops.object.mode_set(mode='EDIT')
+for b in arm.data.edit_bones:
+ children=[c for c in b.children if c.name not in ['headfront']]
+ if children:b.tail=children[0].head
+ if b.name in ['headfront','head_end']:b.use_deform=False
+ if b.name.endswith('Hand'):b.length=10
+ if b.name.endswith('ToeBase'):b.length=7
+bpy.ops.object.mode_set(mode='OBJECT')
+body.vertex_groups.clear()
+bm=bmesh.new();bm.from_mesh(body.data);before=len(bm.verts);bmesh.ops.remove_doubles(bm,verts=list(bm.verts),dist=.0001);bm.to_mesh(body.data);bm.free()
+for m in list(body.modifiers):
+ if m.type=='ARMATURE':body.modifiers.remove(m)
+bpy.ops.object.select_all(action='DESELECT');body.select_set(True);arm.select_set(True);bpy.context.view_layer.objects.active=arm
+before_world=body.matrix_world.copy()
+bpy.ops.object.parent_set(type='ARMATURE_AUTO',keep_transform=True)
+body.matrix_world=before_world
+bpy.context.view_layer.update()
+print('BODY_MATRIX_AFTER_BIND',list(map(list,body.matrix_world)))
+print('BINDING',json.dumps({'before_vertices':before,'after_vertices':len(body.data.vertices),'unweighted':sum(not v.groups for v in body.data.vertices),'groups':len(body.vertex_groups)}))
+
+for v in body.data.vertices:
+ weights=[(g.group,g.weight) for g in v.groups];total=sum(w for _,w in weights)
+ if total<=0:raise RuntimeError('Character has an unweighted vertex')
+ for gi,weight in weights:body.vertex_groups[gi].add([v.index],weight/total,'REPLACE')
+original=body.data.materials[0];original.name='Skin hair khakis shoes and badge'
+texture=next(n.image for n in original.node_tree.nodes if n.type=='TEX_IMAGE')
+pixels=np.array(texture.pixels[:],dtype=np.float32).reshape(texture.size[1],texture.size[0],4)
+uv=body.data.uv_layers.active.data
+roles=[];primary_pixels=[]
+for poly in body.data.polygons:
+ c=sum((body.data.vertices[v].co for v in poly.vertices),Vector())/len(poly.vertices)
+ t=sum((uv[i].uv for i in poly.loop_indices),Vector((0,0)))/len(poly.loop_indices)
+ rgb=pixels[min(texture.size[1]-1,max(0,int(t.y*texture.size[1]))),min(texture.size[0]-1,max(0,int(t.x*texture.size[0]))),:3]
+ teal=(rgb[1]>rgb[0]*1.3 and rgb[2]>rgb[0]*1.15) or (88<c.z<111 and abs(c.x)<14 and max(rgb)<.75)
+ cream=min(rgb)>.45 and rgb[1]>rgb[0]*.8 and (max(rgb)-min(rgb))/max(rgb)<.45
+ role=1 if teal and 82<c.z<120 else 2 if cream and ((111<c.z<121 and abs(c.x)<11) or (98<c.z<112 and abs(c.x)>15)) else 0
+ roles.append(role)
+ if role==1:primary_pixels.append(rgb)
+
+def cloth(name,gain,colour,textured=True):
+ m=bpy.data.materials.new(name);m.use_nodes=True;n=m.node_tree.nodes;n.clear();l=m.node_tree.links
+ out=n.new('ShaderNodeOutputMaterial');bs=n.new('ShaderNodeBsdfPrincipled');bs.inputs['Roughness'].default_value=.85;bs.inputs['Specular IOR Level'].default_value=.12;l.new(bs.outputs['BSDF'],out.inputs['Surface'])
+ rgb=n.new('ShaderNodeRGB');rgb.name='Cloth colour';rgb.outputs[0].default_value=(*colour,1)
+ if textured:
+  tex=n.new('ShaderNodeTexImage');tex.image=texture;bw=n.new('ShaderNodeRGBToBW');l.new(tex.outputs['Color'],bw.inputs[0]);scale=n.new('ShaderNodeMath');scale.operation='MULTIPLY';scale.inputs[1].default_value=gain;l.new(bw.outputs[0],scale.inputs[0]);mix=n.new('ShaderNodeMixRGB');mix.blend_type='MULTIPLY';mix.inputs[0].default_value=1;contrast=n.new('ShaderNodeMath');contrast.operation='MULTIPLY_ADD';contrast.inputs[1].default_value=.22;contrast.inputs[2].default_value=.78;l.new(scale.outputs[0],contrast.inputs[0]);l.new(contrast.outputs[0],mix.inputs[1]);l.new(rgb.outputs[0],mix.inputs[2]);l.new(mix.outputs[0],bs.inputs['Base Color'])
+ else:l.new(rgb.outputs[0],bs.inputs['Base Color'])
+ # Use the actual pigment boundary inside triangles at the shirt hem. Assigning
+ # one colour to a straddling triangle would incorrectly dye the khakis.
+ if textured and 'primary cloth' in name:
+  hsv=n.new('ShaderNodeSeparateColor');hsv.mode='HSV';l.new(tex.outputs['Color'],hsv.inputs[0])
+  def compare(value,operation,threshold):
+   node=n.new('ShaderNodeMath');node.operation=operation;node.inputs[1].default_value=threshold;l.new(value,node.inputs[0]);return node.outputs[0]
+  lo=compare(hsv.outputs[0],'GREATER_THAN',.38);hi=compare(hsv.outputs[0],'LESS_THAN',.65);sat=compare(hsv.outputs[1],'GREATER_THAN',.15)
+  both=n.new('ShaderNodeMath');both.operation='MULTIPLY';l.new(lo,both.inputs[0]);l.new(hi,both.inputs[1])
+  cov=n.new('ShaderNodeMath');cov.name='Coverage';cov.operation='MULTIPLY';l.new(both.outputs[0],cov.inputs[0]);l.new(sat,cov.inputs[1])
+  coloured=n.new('ShaderNodeMixRGB');l.new(cov.outputs[0],coloured.inputs[0]);l.new(tex.outputs['Color'],coloured.inputs[1]);l.new(mix.outputs[0],coloured.inputs[2]);l.new(coloured.outputs[0],bs.inputs['Base Color'])
+ return m
+primary_rgb=np.array(primary_pixels);primary_linear=np.where(primary_rgb<=.04045,primary_rgb/12.92,((primary_rgb+.055)/1.055)**2.4)
+primary_gain=1/float(np.median(primary_linear@np.array([.2126,.7152,.0722])))
+print('PRIMARY_GAIN',primary_gain)
+polo=cloth('Polo primary cloth',primary_gain,(.05,.24,.22));trim=cloth('Polo secondary collar and cuffs',1,(.9,.82,.57))
+oxford=cloth('Oxford pale primary cloth',primary_gain,(.65,.83,.76));oxcollar=cloth('Oxford collar',1,(.65,.83,.76));oxplain=cloth('Oxford fitted sleeve pocket and placket',1,(.65,.83,.76),False)
+body.data.materials.append(polo);body.data.materials.append(trim)
+for poly,role in zip(body.data.polygons,roles):poly.material_index=role
+body.name='Clerk A with polo'
+ox=body.copy();ox.data=body.data.copy();bpy.context.collection.objects.link(ox);ox.name='Clerk A with Oxford'
+ox.data.materials[1]=oxford;ox.data.materials[2]=oxcollar
+# Fit the Oxford directly to the continuous shoulder/arm surface. The original
+# body supplies the seam; no detached tube or open shoulder edge is introduced.
+ox.data.materials.append(oxplain)
+for p in ox.data.polygons:
+ c=sum((ox.data.vertices[v].co for v in p.vertices),Vector())/len(p.vertices)
+ side='Left' if c.x>0 else 'Right';e=arm.data.bones[side+'ForeArm'].head_local;w=arm.data.bones[side+'Hand'].head_local
+ fore=(w-e).normalized()
+ arm_weight=sum(sum(g.weight for g in ox.data.vertices[v].groups if ox.vertex_groups[g.group].name in [side+'Arm',side+'ForeArm']) for v in p.vertices)/len(p.vertices)
+ if arm_weight>.30 and (c-w).dot(fore)<.8:
+  p.material_index=3
+for v in ox.data.vertices:
+ side='Left' if v.co.x>0 else 'Right';s0=arm.data.bones[side+'Arm'].head_local;e=arm.data.bones[side+'ForeArm'].head_local;w=arm.data.bones[side+'Hand'].head_local
+ up=e-s0;fore=w-e;t=(v.co-s0).dot(up)/up.length_squared;u=(v.co-e).dot(fore)/fore.length_squared
+ weights={ox.vertex_groups[g.group].name:g.weight for g in v.groups}
+ aw=weights.get(side+'Arm',0)+weights.get(side+'ForeArm',0)
+ if aw<.5 or abs(v.co.x)<17 or v.co.z<84:continue
+ if .18<t<1.03 and u<.05:
+  centre=s0+up*t;radial=v.co-centre
+  if radial.length>9:continue
+  target=6.0*(1-t)+4.8*t
+  blend=min(1,(t-.18)/.16)*min(1,(1.03-t)/.13)
+  if radial.length>0:v.co=centre+radial.normalized()*(radial.length*(1-blend)+target*blend)
+ elif .05<=u<.98:
+  centre=e+fore*u;radial=v.co-centre
+  if radial.length>7:continue
+  if radial.length>0:v.co+=radial.normalized()*.7*min(1,u/.15)*min(1,(.98-u)/.08)
+ox.data.update()
+# Recalculate normals only on the fitted sleeve surface; preserve face/hair normals.
+cn=[tuple(n.vector) for n in ox.data.corner_normals]
+for poly in ox.data.polygons:
+ if poly.material_index==3:
+  for li in poly.loop_indices:cn[li]=(0,0,0)
+ox.data.normals_split_custom_set(cn)
+print('CLOTH_VERTEX_DISPLACEMENT_MAX_CM',max((a.co-b.co).length for a,b in zip(body.data.vertices,ox.data.vertices)))
+
+extras=[]
+def skinned_mesh(name,verts,faces,weights,mat):
+ me=bpy.data.meshes.new(name);me.from_pydata(verts,[],faces);me.update();o=bpy.data.objects.new(name,me);bpy.context.collection.objects.link(o);o.parent=arm;o.data.materials.append(mat)
+ for group in sorted({g for weights_i in weights for g in weights_i}):o.vertex_groups.new(name=group)
+ for i,ws in enumerate(weights):
+  for g,w in ws.items():o.vertex_groups[g].add([i],w,'REPLACE')
+ mod=o.modifiers.new('Same clerk skeleton','ARMATURE');mod.object=arm
+ for f in me.polygons:f.use_smooth=True
+ extras.append(o);return o
+for side in ['Left','Right']:
+ s=arm.data.bones[side+'Arm'].head_local.copy();e=arm.data.bones[side+'ForeArm'].head_local.copy();w=arm.data.bones[side+'Hand'].head_local.copy();up=(e-s).normalized();fore=(w-e).normalized()
+ rings=[]
+ # Only the wrist cuff is a separate fitted garment piece.
+ for t,r in [(.86,3.7),(.90,3.8),(.99,3.8),(1.015,3.6),(1.015,3.25)]:rings.append((e.lerp(w,t),fore,r,{side+'ForeArm':1}))
+ verts=[];faces=[];weights=[];N=24
+ for i,(c,axis,r,ws) in enumerate(rings):
+  # Blend across the elbow so the sleeve bends continuously with the body.
+
+
+
+  tangent=Vector((0,-1,0));tangent=(tangent-axis*tangent.dot(axis)).normalized();cross=axis.cross(tangent).normalized()
+  for j in range(N):
+   angle=math.tau*j/N;v=c+r*(math.cos(angle)*tangent+math.sin(angle)*cross);verts.append(tuple(v));weights.append(ws)
+  if i:
+   for j in range(N):faces.append(((i-1)*N+j,(i-1)*N+(j+1)%N,i*N+(j+1)%N,i*N+j))
+ skinned_mesh(side+' Oxford wrist cuff',verts,faces,weights,oxplain)
+# Follow the actual shirt surface for fitted front details.
+def surface(x,z,lift=.45):
+ hit,loc,normal,idx=body.ray_cast(Vector((x,-60,z)),Vector((0,1,0)))
+ if not hit:raise RuntimeError(f'No shirt surface for fitted detail at {x}, {z}')
+ return (x,loc.y-lift,z)
+verts=[];faces=[]
+for i in range(15):
+ z=85+i*(26/14)
+ for x in [-1.3,1.3]:verts.append(surface(x,z))
+ if i:faces.append(((i-1)*2,(i-1)*2+1,i*2+1,i*2))
+weights=[{'Spine02':1} if v[2]<96 else {'Spine01':1} if v[2]<106 else {'Spine':1} for v in verts]
+skinned_mesh('Oxford full button placket',verts,faces,weights,oxplain)
+# Five-point stitched chest pocket, laid over the shirt rather than floating.
+outline=[(4,107),(10,107),(10,101),(7,100),(4,101)]
+verts=[surface(x,z,.7) for x,z in outline]
+pocket=skinned_mesh('Oxford chest pocket',verts,[tuple(reversed(range(5)))],[{'Spine01':.7,'Spine':.3}]*5,oxplain)
+bevel=pocket.modifiers.new('Pocket cloth thickness','SOLIDIFY');bevel.thickness=.18
+button=cloth('Oxford buttons',1,(.88,.90,.84),False)
+for z in [88,93,98,103,108]:
+ c=Vector(surface(0,z,.9));verts=[tuple(c)]+[tuple(c+Vector((math.cos(i*math.tau/12)*.36,-.1,math.sin(i*math.tau/12)*.36))) for i in range(12)]
+ faces=[(0,i+1,(i+1)%12+1) for i in range(12)];weights=[{'Spine02':1} if z<96 else {'Spine01':1} if z<106 else {'Spine':1}]*13
+ skinned_mesh('Oxford button '+str(z),verts,faces,weights,button)
+
+def outfit(style):
+ body.hide_render=style!='polo';ox.hide_render=style!='oxford'
+ for o in extras:o.hide_render=style!='oxford'
+
+scene.world.use_nodes=True
+scene.world.node_tree.nodes['Background'].inputs['Color'].default_value=(.65,.65,.65,1)
+scene.world.node_tree.nodes['Background'].inputs['Strength'].default_value=.45
+scene.render.resolution_x=256;scene.render.resolution_y=384;scene.cycles.samples=10
+# A real, small rental case for shelf-working poses.
+case_mat=cloth('Rental case',1,(.045,.05,.06),False)
+label_mat=cloth('Rental insert',1,(.62,.66,.60),False)
+def case_box(name,dimensions,mat):
+ bpy.ops.mesh.primitive_cube_add(size=1);o=bpy.context.object;o.name=name;o.parent=arm
+ o.scale=dimensions;bpy.ops.object.transform_apply(location=False,rotation=False,scale=True)
+ o.data.materials.append(mat);bev=o.modifiers.new('Moulded case edges','BEVEL');bev.width=.32;bev.segments=2
+ return o
+case=case_box('Clerk rental case',(13,18,2.7),case_mat)
+label=case_box('Rental case insert',(11.7,16.7,.15),label_mat)
+
+def final_pose(anim,frame=0):
+ if anim=='walk':pose('walk',[1,7,13,19][frame])
+ elif anim=='stockHigh':
+  pose('reach')
+  if frame:aim('RightArm',(-.18,-.45,.85));aim('RightForeArm',(-.02,-.35,.93))
+  aim('RightHand',(0,-.8,.55))
+ elif anim in ['stockMid','type','stockLow']:
+  pose('idle')
+  if anim=='stockLow':
+   aim('Spine02',(0,-.15,1))
+   for side,sign in [('Left',1),('Right',-1)]:
+    aim(side+'UpLeg',(sign*.12,-.58,-.8));aim(side+'Leg',(sign*.03,.4,-.9))
+  for side,sign in [('Left',1),('Right',-1)]:
+   aim(side+'Arm',(sign*.04,-.65,-.74) if anim=='stockLow' else (sign*.04,-.65,-.6) if anim=='type' else (sign*.04,-.8,-.4))
+   aim(side+'ForeArm',(-sign*.45,-.9,-.20+frame*.08) if anim=='stockLow' else (-sign*.35,-1,.04+frame*.05) if anim=='type' else (-sign*.45,-1,.1+frame*.1))
+   aim(side+'Hand',(-sign*.1,-1,-.05))
+   if anim=='type':
+    hand=arm.pose.bones[side+'Hand'];hand.matrix=hand.matrix@Matrix.Rotation(sign*math.pi/2,4,'Y');bpy.context.view_layer.update()
+ elif anim=='talk':
+  pose('talk')
+  if frame:aim('LeftForeArm',(.50,-.8,.50))
+ else:
+  pose('idle')
+  if frame:arm.pose.bones['Head'].rotation_mode='QUATERNION';arm.pose.bones['Head'].rotation_quaternion=Matrix.Rotation(.025,4,'Z').to_quaternion()
+ root.location.z=0;bpy.context.view_layer.update()
+ ev=body.evaluated_get(bpy.context.evaluated_depsgraph_get())
+ root.location.z=-min((ev.matrix_world@v.co).z for v in ev.data.vertices)
+ bpy.context.view_layer.update()
+ hand=arm.pose.bones['RightHand'];rot=hand.matrix.to_quaternion()
+ case.location=hand.head+rot@Vector((0,8,1.3));case.rotation_mode='QUATERNION';case.rotation_quaternion=rot
+ label.location=case.location+rot@Vector((0,0,-1.5));label.rotation_mode='QUATERNION';label.rotation_quaternion=rot
+ case.hide_render=label.hide_render=not anim.startswith('stock')
 
 def save_source():
-    bpy.context.preferences.filepaths.save_version=0
-    # Every surface gets a useful non-overlapping UV layout for later painting.
-    for o in list(bpy.context.scene.objects):
-        if o.type!='MESH':continue
-        bpy.ops.object.select_all(action='DESELECT');o.select_set(True);bpy.context.view_layer.objects.active=o
-        # Unwrap the final cloth surface, since a voxel weld discards the UVs
-        # of its inputs. Other modifiers preserve their authored UV layers.
-        if any(mod.type=='REMESH' for mod in o.modifiers):
-            for mod in list(o.modifiers):
-                bpy.ops.object.modifier_apply(modifier=mod.name)
-        bpy.ops.object.mode_set(mode='EDIT');bpy.ops.mesh.select_all(action='SELECT')
-        bpy.ops.uv.smart_project(island_margin=.02)
-        bpy.ops.object.mode_set(mode='OBJECT')
-    bpy.ops.object.select_all(action='DESELECT')
-    root.select_set(True);bpy.context.view_layer.objects.active=root
-    for screen in bpy.data.screens:
-        for ar in screen.areas:
-            if ar.type=='VIEW_3D':
-                ar.spaces.active.region_3d.view_distance=8
-                ar.spaces.active.region_3d.view_location=(0,0,2.6)
-    bpy.ops.wm.save_as_mainfile(filepath=str(ROOT/'tools/models/video-clerk.blend'))
+ outfit('polo');final_pose('idle')
+ for o in extras:
+  bpy.ops.object.select_all(action='DESELECT');o.select_set(True);bpy.context.view_layer.objects.active=o
+  bpy.ops.object.mode_set(mode='EDIT');bpy.ops.mesh.select_all(action='SELECT');bpy.ops.uv.smart_project(island_margin=.02);bpy.ops.object.mode_set(mode='OBJECT')
+ # Native collections make both garments easy to locate and switch in Blender.
+ for name,objects in [('Polo uniform',[body]),('Oxford uniform',[ox,*extras])]:
+  collection=bpy.data.collections.new(name);scene.collection.children.link(collection)
+  for o in objects:
+   for old in list(o.users_collection):old.objects.unlink(o)
+   collection.objects.link(o)
+   o.hide_set(name=='Oxford uniform')
+ bpy.ops.object.select_all(action='DESELECT');arm.select_set(True);bpy.context.view_layer.objects.active=arm;arm.show_in_front=True
+ for screen in bpy.data.screens:
+  for area in screen.areas:
+   if area.type=='VIEW_3D':
+    area.spaces.active.region_3d.view_distance=8
+    area.spaces.active.region_3d.view_location=(0,0,2.6)
+    area.spaces.active.region_3d.view_rotation=cam.rotation_euler.to_quaternion()
+ bpy.ops.file.pack_all();bpy.context.preferences.filepaths.save_version=0
+ bpy.ops.wm.save_as_mainfile(filepath=str(R/'video-clerk.blend'))
+ for o in [ox,*extras]:o.hide_set(False)
 
 args=sys.argv[sys.argv.index('--')+1:] if '--' in sys.argv else []
+# All vertices, including both garment variants, must have normalized weights.
+for o in [body,ox,*extras]:
+ for v in o.data.vertices:
+  total=sum(g.weight for g in v.groups)
+  if abs(total-1)>1e-5:raise RuntimeError(f'Unnormalized skin weights in {o.name}: {total}')
 save_source()
-if '--preview' in args:
-    scene.render.resolution_x=512;scene.render.resolution_y=768;scene.cycles.samples=32
-    render(OUT/'preview-front.png')
-    root.rotation_euler.z=math.pi/4
-    render(OUT/'preview-quarter.png')
-elif '--preview-type' in args:
-    scene.render.resolution_x=512;scene.render.resolution_y=768;scene.cycles.samples=32
-    pose('type', 0)
-    render(OUT/'preview-type.png')
-elif '--render' in args:
-    dirs=['front','frontSide','side','backSide','back']
-    anims=[('idle',2),('walk',4),('stockHigh',2),('stockMid',2),('stockLow',2),('talk',2),('type',2)]
-    metadata=[]
-    for row,direction in enumerate(dirs):
-        root.rotation_euler.z=row*math.pi/4
-        col=0
-        for anim,count in anims:
-            for f in range(count):
-                pose(anim,f)
-                filename=f'{row:02d}-{col:02d}_{direction}_{anim}{f}.png'
-                render(OUT/filename)
-                metadata.append(dict(row=row,col=col,direction=direction,animation=anim,frame=f,file=filename))
-                col+=1
-    (OUT/'frames.json').write_text(json.dumps(metadata,indent=2)+'\n')
-    # Unlit material-ID render, with identical camera, geometry and occlusion.
-    # The RGB mask is used as coverage, the color pass supplies cloth shading.
-    for m in bpy.data.materials:
-        m.use_nodes=True;m.node_tree.nodes.clear()
-        out=m.node_tree.nodes.new('ShaderNodeOutputMaterial')
-        em=m.node_tree.nodes.new('ShaderNodeEmission')
-        em.inputs['Color'].default_value=(1,1,1,1) if m==polo else (0,0,0,1)
-        m.node_tree.links.new(em.outputs[0],out.inputs['Surface'])
-    scene.cycles.samples=8;scene.cycles.use_denoising=False
-    maskdir=OUT/'mask';maskdir.mkdir(exist_ok=True)
-    for frame in metadata:
-        root.rotation_euler.z=frame['row']*math.pi/4
-        pose(frame['animation'],frame['frame'])
-        render(maskdir/frame['file'])
-    target=ROOT/'public/textures/clerk'
-    target.mkdir(parents=True,exist_ok=True)
-    for source,filename in [(OUT,'color.png'),(maskdir,'livery.png')]:
-        subprocess.run(['node',str(ROOT/'tools/clerk-sheet.mjs'),'stitch',
-                        str(source),str(target/filename)],check=True)
-    subprocess.run(['node',str(ROOT/'tools/clerk-sheet.mjs'),'check',
-                    str(target/'color.png')],check=True)
+if '--source-only' in args:sys.exit(0)
+if '--render' in args:
+ # Neutral cloth plus independent red/green coverage supports arbitrary brands.
+ for m in [polo,trim,oxford,oxcollar,oxplain]:m.node_tree.nodes['Cloth colour'].outputs[0].default_value=(.72,.72,.72,1)
+ dirs=['front','frontSide','side','backSide','back'];anims=[('idle',2),('walk',4),('stockHigh',2),('stockMid',2),('stockLow',2),('talk',2),('type',2)]
+ metadata=[]
+ for row,direction in enumerate(dirs):
+  col=0
+  for anim,count in anims:
+   for frame in range(count):
+    metadata.append({'row':row,'col':col,'direction':direction,'animation':anim,'frame':frame,'file':f'{row:02d}-{col:02d}_{direction}_{anim}{frame}.png'});col+=1
+ for pass_name in ['color','livery']:
+  if pass_name=='livery':
+   for m in bpy.data.materials:
+    m.use_nodes=True;nodes=m.node_tree.nodes;links=m.node_tree.links
+    output=next((n for n in nodes if n.type=='OUTPUT_MATERIAL'),None) or nodes.new('ShaderNodeOutputMaterial');em=nodes.new('ShaderNodeEmission')
+    role=(1,0,0,1) if m in [polo,oxford,oxcollar,oxplain] else (0,1,0,1) if m==trim else (0,0,0,1)
+    em.inputs['Color'].default_value=role
+    if nodes.get('Coverage'):
+     mask=nodes.new('ShaderNodeMixRGB');mask.inputs[1].default_value=(0,0,0,1);mask.inputs[2].default_value=role
+     links.new(nodes['Coverage'].outputs[0],mask.inputs[0]);links.new(mask.outputs[0],em.inputs['Color'])
+    links.new(em.outputs[0],output.inputs['Surface'])
+   scene.cycles.samples=2;scene.cycles.use_denoising=False
+  for style in ['polo','oxford']:
+   dest=OUT/style/pass_name;dest.mkdir(parents=True,exist_ok=True);outfit(style)
+   for entry in metadata:
+    final_pose(entry['animation'],entry['frame']);root.rotation_euler.z=entry['row']*math.pi/4
+    scene.render.filepath=str(dest/entry['file']);bpy.ops.render.render(write_still=True)
+ (OUT/'frames.json').write_text(json.dumps(metadata,indent=2))
+else:
+ scene.render.resolution_x=384;scene.render.resolution_y=576
+ for name,style,anim,angle in [('polo-idle','polo','idle',0),('polo-walk','polo','walk',90),('oxford-idle','oxford','idle',0),('oxford-reach','oxford','stockHigh',45),('oxford-low','oxford','stockLow',90),('polo-type','polo','type',45)]:
+  outfit(style);final_pose(anim,0);root.rotation_euler.z=math.radians(angle);scene.render.filepath=str(OUT/(name+'.png'));bpy.ops.render.render(write_still=True)

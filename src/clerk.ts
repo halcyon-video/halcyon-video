@@ -25,7 +25,7 @@ import { clerkShouldRender } from './clerk-visibility';
  * to face the camera (THREE.Sprite); only the *drawn view* changes.
  *
  * The character art (a stylized female retail clerk: brunette bob, house polo +
- * nametag, khakis, black sneakers) is rendered from an original Blender model.
+ * nametag, khakis, black sneakers) is rendered from a rigged Blender source.
  * `src/clerk-art.ts` retains the grid contract and emergency procedural art;
  * `src/clerk-rendered-atlas.ts` colors the rendered uniform. This class owns
  * only her behavior (navigation, stocking/idle/chat state) and the runtime
@@ -116,7 +116,7 @@ export class StoreClerk {
   // isOnScreen() so the scene's render tier can drop out of full-rate
   // rendering while she moves entirely outside the main camera frustum.
   private onScreen = true;
-  private currentPos = new THREE.Vector3(7.0, 0.0, 1.0); // start at Reg 1
+  private currentPos = new THREE.Vector3(); // initialized from the counter geometry
   private faceYaw = Math.PI;           // yaw to face while idle/stocking
   private idleTimeAccum = 0;
   private idleDuration = 8.0;
@@ -192,6 +192,10 @@ export class StoreClerk {
       terminals: [],
     };
     this.registerSpot = spots.register;
+    // A settings rebuild must not respawn her in a historical counter wall.
+    const start = this.nav?.nearestWalkable(spots.register.x, spots.register.z, 1.1) ?? spots.register;
+    this.currentPos.set(start.x, 0, start.z);
+    this.heading = this.faceYaw = spots.register.yaw;
     this.counterDests = [
       { ...spots.register, kind: 'counter' as const, key: 'counter:register', activity: 'idle' as const },
       ...spots.terminals.map((t, i) => ({ ...t, kind: 'counter' as const, key: `counter:term:${i}`, activity: 'type' as const })),

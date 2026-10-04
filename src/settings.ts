@@ -1,3 +1,4 @@
+import { CLERK_UNIFORM_SETTING } from './clerk-uniform';
 import { REEL_MODE_KEY } from './reel-profile';
 import { STEAM_REVIEW_TIERS } from './steam-catalog';
 // ─── Schema-driven settings registry ───────────────────────────────────────
@@ -457,6 +458,8 @@ export function registerCoreSettings(): void {
       || localStorage.getItem('bb_theme') === 'mom-and-pop',
     hint: 'Separate explicitly rated NC-17 or X movies. Empty rooms stay hidden.',
   });
+
+  registerSetting(CLERK_UNIFORM_SETTING);
 
   // Store Brand -------------------------------------------------------------
   // Brand pack selection lives with the logo editor and its preview.

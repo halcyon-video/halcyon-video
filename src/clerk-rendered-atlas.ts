@@ -3,6 +3,7 @@
 import * as THREE from 'three';
 import { assetUrl } from './asset-url';
 import { getActiveTheme } from './themes';
+import { recolorClerkPixels, resolveClerkUniform } from './clerk-uniform';
 
 function loadImage(path: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
@@ -16,12 +17,14 @@ function loadImage(path: string): Promise<HTMLImageElement> {
 export async function loadRenderedClerkAtlas(): Promise<THREE.CanvasTexture> {
   // Capture the theme before asynchronous work: an old clerk can finish loading
   // during a settings rebuild, and must retain its own palette until disposed.
-  const primary = new THREE.Color(getActiveTheme().palette.primary);
-  primary.convertLinearToSRGB();
-  const tint = [primary.r, primary.g, primary.b];
+  const palette = getActiveTheme().palette;
+  const primary = new THREE.Color(palette.primary).convertLinearToSRGB();
+  const secondary = new THREE.Color(palette.secondary).convertLinearToSRGB();
+  const uniform = resolveClerkUniform(localStorage.getItem('bb_clerk_uniform'));
+  const base = uniform === 'oxford' ? 'textures/clerk/oxford' : 'textures/clerk';
   const [color, mask] = await Promise.all([
-    loadImage('textures/clerk/color.png'),
-    loadImage('textures/clerk/livery.png'),
+    loadImage(`${base}/color.png`),
+    loadImage(`${base}/livery.png`),
   ]);
   if (color.width !== 4096 || color.height !== 1920 ||
       mask.width !== color.width || mask.height !== color.height) {
@@ -35,20 +38,11 @@ export async function loadRenderedClerkAtlas(): Promise<THREE.CanvasTexture> {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.drawImage(color, 0, 0);
   const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  for (let i = 0; i < pixels.data.length; i += 4) {
-    // The unlit pass has black non-uniform surfaces and white cloth, including
-    // the carried case stripe. Alpha belongs entirely to the original render.
-    const amount = coverage[i] / 255;
-    if (!amount || !pixels.data[i + 3]) continue;
-    for (let c = 0; c < 3; c++) {
-      const shade = pixels.data[i + c];
-      const dyed = Math.min(255, shade * (tint[c] * .90 + .10));
-      pixels.data[i + c] = shade + (dyed - shade) * amount;
-    }
-  }
+  recolorClerkPixels(pixels.data, coverage,
+    [primary.r, primary.g, primary.b], [secondary.r, secondary.g, secondary.b], uniform);
   ctx.putImageData(pixels, 0, 0);
   const texture = new THREE.CanvasTexture(canvas);
-  texture.name = 'blender-clerk-atlas';
+  texture.name = `blender-clerk-atlas-${uniform}`;
   texture.colorSpace = THREE.SRGBColorSpace;
   return texture;
 }
