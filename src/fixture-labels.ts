@@ -17,6 +17,10 @@ import type { SlottedFixture } from './fixtures';
  */
 export function slottedFixtureLabel(f: SlottedFixture): string {
   const p = f.placement;
+  if (p.kind === 'game-section') {
+    const platforms = [...new Set(f.getSlots().map(slot => slot.movie.platform).filter(Boolean))];
+    if (platforms.length) return platforms.join(' · ').toUpperCase();
+  }
   return (f.genre || (p.options?.genre as string) || p.id || 'display').toUpperCase();
 }
 
@@ -39,6 +43,7 @@ export function qualifyDuplicateLabels<T extends { label: string }>(
   const seen = new Map<string, number>();
   for (const it of items) {
     if ((counts.get(it.label) ?? 0) < 2) continue;
+    if (fixtureOf(it)?.placement.kind === 'game-section') continue;
     const base = it.label;
     const n = (seen.get(base) ?? 0) + 1;
     seen.set(base, n);

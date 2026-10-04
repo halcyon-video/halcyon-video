@@ -459,12 +459,9 @@ export class EntranceCheckout implements StoreFixture {
       // (duplicating them would coincide with those posts and z-fight).
       //
       // Viewed from outside, the entrance hinges left and opens inward.
-      // The exit keeps its existing outward swing. For the 'sliding' doorStyle the same flag is the
-      // slide direction instead: the pair parts from the centre, each leaf
-      // tucking into a pocket behind the sidelight glass on its own side.
-      const sliding = spec.doorStyle === 'sliding';
+      // The exit swings outward into the vestibule.
       const noFrame = { header: false, jambLeft: false, jambRight: false };
-      this.doors.push(buildVestibuleDoor(this.ctx, group, doorMats, spec, exitX, frontZ, doorH, true, !sliding, -1.4, noFrame));
+      this.doors.push(buildVestibuleDoor(this.ctx, group, doorMats, spec, exitX, frontZ, doorH, true, true, -1.4, noFrame));
       this.doors.push(buildVestibuleDoor(this.ctx, group, doorMats, spec, entrX, frontZ, doorH, true, true, 1.4, noFrame));
 
       // ----- Back wall (Z = backZ): glass too, so the whole chamber is glazed -----
@@ -1695,12 +1692,7 @@ export class EntranceCheckout implements StoreFixture {
     for (const d of this.doors) {
       // Same proximity test updateVestibuleDoors() steers the lerp with.
       const open = this.ctx.camera.position.distanceTo(d.center) < 7.0;
-      if (d.kind === 'slide') {
-        const tx = open ? d.openOffset.x : 0;
-        const tz = open ? d.openOffset.z : 0;
-        if (Math.abs(d.currentOffset.x - tx) > DOOR_SETTLED ||
-            Math.abs(d.currentOffset.z - tz) > DOOR_SETTLED) return true;
-      } else if (Math.abs(d.currentAngle - (open ? d.openAngle : 0)) > DOOR_SETTLED) {
+      if (Math.abs(d.currentAngle - (open ? d.openAngle : 0)) > DOOR_SETTLED) {
         return true; // mid-swing
       }
     }

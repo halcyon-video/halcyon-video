@@ -174,7 +174,7 @@ function constrainWalkStructure(scene: StoreScene, oldX: number, oldZ: number, n
   const r_door = 0.5;
   const minX = 11.0 - storeWidth / 2 + r;
   const maxX = 11.0 + storeWidth / 2 - r;
-  const maxLotZ = 43.0; // walkable up to the far edge of the drive lane (stall row + parked cars beyond)
+  const maxLotZ = scene.exterior?.walkFarZ ?? 43.0; // walkable up to the far edge of the drive lane (stall row + parked cars beyond)
 
   let x = newX;
   let z = newZ;
@@ -272,6 +272,7 @@ const walkObstacleBounds = { minX: 0, maxX: 0, minZ: 0, maxZ: 43 };
 
 export function constrainWalkPosition(scene: StoreScene, oldX: number, oldZ: number, newX: number, newZ: number, storeWidth: number, minZ: number): { x: number; z: number } {
   const structural = constrainWalkStructure(scene, oldX, oldZ, newX, newZ, storeWidth, minZ);
+  walkObstacleBounds.maxZ = scene.exterior?.walkFarZ ?? 43;
   walkObstacleBounds.minX = 11 - storeWidth / 2 + 1.5;
   walkObstacleBounds.maxX = 11 + storeWidth / 2 - 1.5;
   walkObstacleBounds.minZ = minZ;

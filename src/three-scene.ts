@@ -1456,6 +1456,15 @@ export class StoreScene {
       }
     }
 
+    // Keep the selected stock and feature capacities, but face titles in A–Z ribbon order.
+    const wallTitles = this.nrSections.flatMap(section => section.type === 'regular' ? (section.movies ?? []) : (section.movie ? [section.movie] : []));
+    wallTitles.sort((a, b) => a.title.localeCompare(b.title, undefined, { sensitivity: 'base', numeric: true }));
+    let wallTitleIndex = 0;
+    for (const section of this.nrSections) {
+      if (section.type === 'regular') section.movies = (section.movies ?? []).map(() => wallTitles[wallTitleIndex++]);
+      else section.movie = wallTitles[wallTitleIndex++];
+    }
+
     // Keep these arrays populated for storefront posters and other features
     this.recentlyAddedMovies = newReleaseCandidates;
 

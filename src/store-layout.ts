@@ -120,7 +120,7 @@ export function getStoreShellSpec(): StoreShellSpec {
 // so the settings drawer can drive a scene rebuild. The DEFAULT spec (no key
 // set) reproduces the original storefront exactly.
 export interface StorefrontSpec {
-  doorStyle: 'double-swing' | 'sliding' | 'single';
+  doorStyle: 'double-swing' | 'single';
   doorWidth: number;
   /** How the entrance is built — see StoreFormatSpec.entryStyle. */
   entryStyle: 'vestibule' | 'storefront-door';
@@ -237,27 +237,6 @@ export function getStorefrontSpec(storeWidth: number): StorefrontSpec {
   const ls = typeof localStorage !== 'undefined' ? localStorage : null;
   const preset = ls?.getItem('bb_storefront') ?? 'standard';
 
-  if (preset === 'sliding-gray') {
-    return {
-      doorStyle: 'sliding',
-      doorWidth: DEFAULT_DOOR_WIDTH,
-      // Light-silver frame, but FULL-WIDTH panes (#4). This preset used to
-      // pass hasCenterMullion, which halves every 4 ft bay into a pair of 2 ft
-      // panes — from the lot the wing read as a picket fence of posts rather
-      // than a storefront. The era it dresses is the one that could finally
-      // hang big glass, so the mullion is the wrong detail here even though
-      // the silver frame is the right one; the split survives in the spec for
-      // any preset that genuinely wants a divided light.
-      windowBays: defaultWindowBays(storeWidth, DEFAULT_DOOR_WIDTH),
-      frameColor: '#c9ced4',
-      counterStyle: 'laminate-90s',
-      counterTop: 'white',
-      counterShape: 'shield',
-      // Named presets are chain-style looks, choosable regardless of the
-      // active format — always the airlock, same as before entryStyle existed.
-      entryStyle: 'vestibule',
-    };
-  }
   if (preset === 'rounded-counter') {
     return {
       doorStyle: 'single',

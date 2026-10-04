@@ -8,8 +8,6 @@
 //     swinging both in and out, not to a second leaf).
 //   'single'   — a lighter pull-door variant: thinner frame, a vertical pull
 //     handle instead of a push bar, opens one direction only.
-//   'sliding'  — the leaf translates sideways into a pocket instead of
-//     rotating, proving the swappable-door-style path end to end.
 import * as THREE from 'three';
 import { addGlassReflectionPane } from '../glass-reflection';
 import { FixtureContext } from '../fixtures';
@@ -18,18 +16,9 @@ import { createDoorLeafFrame, createDoorPushBarGeometry } from './door-leaf';
 
 export interface VestibuleDoor {
   group: THREE.Group;
-  // The leaf's closed-position local coordinates (doorGroup.position at build
-  // time), so a sliding leaf's open position is basePosition + currentOffset
-  // rather than something re-derived from the group's already-moved position.
-  basePosition: THREE.Vector3;
   center: THREE.Vector3;
-  kind: 'swing' | 'slide';
-  // 'swing': target rotation (radians) when open. 'slide': target local
-  // translation along the wall when open.
   openAngle: number;
-  openOffset: THREE.Vector3;
   currentAngle: number;
-  currentOffset: THREE.Vector3;
   // Proximity latch for the door-open chime: set when the player crosses the
   // open threshold, re-armed (with hysteresis) once they clearly walk away.
   wasOpen: boolean;
@@ -43,7 +32,7 @@ export interface DoorMaterials {
 
 // Build one door opening: the static header/jambs (added straight to `group`,
 // registered as colliders) plus a leaf that update()-time proximity logic
-// swings or slides open (see entrance/index.ts's per-frame door loop).
+// swings open (see entrance/index.ts's per-frame door loop).
 // `alongX`/`hingeOnLeftOrInner` describe the opening's orientation exactly
 // like the original buildSwingingDoor did.
 //
@@ -72,7 +61,6 @@ export function buildVestibuleDoor(
 ): VestibuleDoor {
   const { frameMat, glassMat, chrome } = mats;
   const w = spec.doorWidth;
-  const isSliding = spec.doorStyle === 'sliding';
   const isSingle = spec.doorStyle === 'single';
   const barY = 3.4; // push-bar / handle height
 
@@ -89,7 +77,6 @@ export function buildVestibuleDoor(
   const doorGroup = new THREE.Group();
   let hingeX = doorX;
   let hingeZ = doorZ;
-  if (!isSliding) {
     // Swing/single leaves pivot at a jamb.
     if (alongX) {
       hingeX = hingeOnLeftOrInner ? (doorX - w / 2) : (doorX + w / 2);
@@ -98,11 +85,6 @@ export function buildVestibuleDoor(
       hingeZ = hingeOnLeftOrInner ? (doorZ - w / 2) : (doorZ + w / 2);
       doorGroup.position.set(doorX, 0, hingeZ);
     }
-  } else {
-    // Sliding leaves start centred on the opening; update() translates the
-    // whole group sideways along the wall's run direction to "open" it.
-    doorGroup.position.set(doorX, 0, doorZ);
-  }
   group.add(doorGroup);
 
   const addToDoorGroup = (mesh: THREE.Mesh) => {
@@ -112,7 +94,7 @@ export function buildVestibuleDoor(
 
   const glassThick = isSingle ? 0.035 : 0.05;
   const frameShrink = isSingle ? 0.12 : 0.2;
-  const localOffset = isSliding ? 0 : (alongX ? (hingeOnLeftOrInner ? w / 2 : -w / 2) : (hingeOnLeftOrInner ? w / 2 : -w / 2));
+  const localOffset = (alongX ? (hingeOnLeftOrInner ? w / 2 : -w / 2) : (hingeOnLeftOrInner ? w / 2 : -w / 2));
 
   const leafFrame = new THREE.Mesh(createDoorLeafFrame(w, doorH, isSingle), frameMat);
   leafFrame.name = 'movingDoorLeafFrame';
@@ -199,8 +181,7 @@ export function buildVestibuleDoor(
   }
 
   // Static frame: header + jambs (any of them suppressible via `frame`, see
-  // DoorFrameOpts). The sliding variant also gets a shallow pocket panel
-  // beside the opening the leaf disappears behind when open.
+  // DoorFrameOpts).
   const frameT = isSingle ? 0.08 : 0.16;
   const frameD = isSingle ? 0.38 : 0.30;
   const headerW = isSingle ? w + frameT * 2 : w + 0.3;
@@ -212,52 +193,26 @@ export function buildVestibuleDoor(
     if (wantHeader) box(headerW, headerH, frameD, frameMat, doorX, doorH + 0.10, doorZ);
     if (wantJambLeft) box(frameT, doorH, frameD, frameMat, doorX - w / 2, doorH / 2, doorZ);
     if (wantJambRight) box(frameT, doorH, frameD, frameMat, doorX + w / 2, doorH / 2, doorZ);
-    if (isSliding) {
-      const pocketX = doorX + (hingeOnLeftOrInner ? w : -w);
-      box(w, 0.06, 0.28, frameMat, pocketX, doorH + 0.02, doorZ);
-    }
+
   } else {
     if (wantHeader) box(frameD, headerH, headerW, frameMat, doorX, doorH + 0.10, doorZ);
     if (wantJambLeft) box(frameD, doorH, frameT, frameMat, doorX, doorH / 2, doorZ - w / 2);
     if (wantJambRight) box(frameD, doorH, frameT, frameMat, doorX, doorH / 2, doorZ + w / 2);
-    if (isSliding) {
-      const pocketZ = doorZ + (hingeOnLeftOrInner ? w : -w);
-      box(0.28, 0.06, w, frameMat, doorX, doorH + 0.02, pocketZ);
-    }
+
   }
 
-  if (isSliding) {
-    // Slide toward whichever side the "hinge" flag nominally points away
-    // from, so the leaf tucks into the pocket built above.
-    const dir = hingeOnLeftOrInner ? 1 : -1;
-    const openOffset = alongX ? new THREE.Vector3(dir * w, 0, 0) : new THREE.Vector3(0, 0, dir * w);
-    return {
-      group: doorGroup,
-      basePosition: doorGroup.position.clone(),
-      center: new THREE.Vector3(doorX, doorH / 2, doorZ),
-      kind: 'slide',
-      openAngle: 0,
-      openOffset,
-      currentAngle: 0,
-      currentOffset: new THREE.Vector3(),
-      wasOpen: false,
-    };
-  }
+
 
   return {
     group: doorGroup,
-    basePosition: doorGroup.position.clone(),
     center: new THREE.Vector3(doorX, doorH / 2, doorZ),
-    kind: 'swing',
     openAngle,
-    openOffset: new THREE.Vector3(),
     currentAngle: 0,
-    currentOffset: new THREE.Vector3(),
     wasOpen: false,
   };
 }
 
-// Per-frame: swing or slide every door open/closed based on proximity to
+// Per-frame: swing every door open/closed based on proximity to
 // `playerPos`. Returns true when any door just crossed from closed to open
 // this frame (the caller rings the shop bell on that edge). The re-arm
 // threshold sits past the open one so hovering right at the boundary can't
@@ -273,21 +228,9 @@ export function updateVestibuleDoors(doors: VestibuleDoor[], playerPos: THREE.Ve
     } else if (door.wasOpen && dist > 7.6) {
       door.wasOpen = false;
     }
-    if (door.kind === 'slide') {
-      const targetX = open ? door.openOffset.x : 0;
-      const targetZ = open ? door.openOffset.z : 0;
-      door.currentOffset.x = THREE.MathUtils.lerp(door.currentOffset.x, targetX, 0.12);
-      door.currentOffset.z = THREE.MathUtils.lerp(door.currentOffset.z, targetZ, 0.12);
-      door.group.position.set(
-        door.basePosition.x + door.currentOffset.x,
-        door.basePosition.y,
-        door.basePosition.z + door.currentOffset.z,
-      );
-    } else {
       const targetAngle = open ? door.openAngle : 0;
       door.currentAngle = THREE.MathUtils.lerp(door.currentAngle, targetAngle, 0.1);
       door.group.rotation.y = door.currentAngle;
-    }
   }
   return justOpened;
 }

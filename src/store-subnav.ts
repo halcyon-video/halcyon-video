@@ -1,3 +1,4 @@
+import { gameShelfTargets } from './game-shelf-targets';
 import { clearCounterVantage } from './camera-clearance';
 import { mobileStoreActive } from './mobile-store.ts';
 // The JUMP INDEX — the store's ONE navigation layer, and what you are in the
@@ -282,14 +283,16 @@ function buildDisplayRow(scene: StoreScene): SubNavItem[] {
     // campaign chain came up empty. Both report no slots AND no footprint —
     // never index a destination that isn't physically there.
     if (f.getSlots().length === 0 && !f.getFootprint?.()) return;
-    out.push({
-      label: slottedFixtureLabel(f),
+    const platformTargets = gameShelfTargets(f);
+    const destinations = platformTargets.length ? platformTargets : [{ label: slottedFixtureLabel(f), side: 'front' as const, col: 0, x: p.position.x, z: p.position.z }];
+    for (const destination of destinations) out.push({
+      label: destination.label,
       kind: isEndcapKind(p.kind) ? 'endcap' : 'fixture',
-      libraryIdx: -1, unitIdxInLibrary: -1, side: 'front', col: 0,
+      libraryIdx: -1, unitIdxInLibrary: -1, side: destination.side, col: destination.col,
       fixtureIdx,
-      x: p.position.x,
+      x: destination.x,
       y: Math.max(FIXTURE_CURSOR_MIN_Y, (heights.length > 0 ? heights[heights.length - 1] : 3.4) + FIXTURE_CURSOR_LIFT),
-      z: p.position.z,
+      z: destination.z,
       yaw: p.yaw,
       lookY: heights.length > 0 ? (heights[0] + heights[heights.length - 1]) / 2 + 0.4 : 3.0,
     });
@@ -308,6 +311,12 @@ function buildDisplayRow(scene: StoreScene): SubNavItem[] {
 /** Stand off a fixture's front face and look at it. */
 function faceFixture(scene: StoreScene, item: SubNavItem, dist: number, eyeY: number): void {
   scene.targetCameraPos.set(item.x + dist * Math.sin(item.yaw), eyeY, item.z + dist * Math.cos(item.yaw));
+  if (scene.slottedFixtures[item.fixtureIdx]?.placement.kind === 'game-section') {
+    const halfWidth = scene.getStoreWidth() / 2;
+    scene.targetCameraPos.x = Math.max(11 - halfWidth + 2, Math.min(11 + halfWidth - 2, scene.targetCameraPos.x));
+    scene.targetCameraPos.z = Math.max(scene.backWallZ + 2, Math.min(13, scene.targetCameraPos.z));
+    scene.targetCameraPos.y = Math.max(7.5, eyeY);
+  }
   scene.targetLookAt.set(item.x, item.lookY, item.z);
   scene.cameraGlideLerp = SUBNAV_GLIDE_LERP;
   scene.requestRender();
@@ -589,7 +598,13 @@ export function subNavSelect(scene: StoreScene): boolean {
       faceFixture(scene, item, WALKUP_DIST, WALKUP_EYE_Y);
     }
   } else if (item.kind === 'fixture') {
-    if (!enterFixtureCursor(scene, item.fixtureIdx)) {
+    if (enterFixtureCursor(scene, item.fixtureIdx)) {
+      scene.selectedSide = item.side;
+      scene.selectedCol = item.col;
+      scene.updateColsCount();
+      scene.updateCameraTarget();
+      scene.onSelectionChange?.(scene.getSelectedMovie());
+    } else {
       // Nothing browsable on it (a promo stand's faces are signage, an empty
       // fixture has no slots): walk up to it and leave the cursor alone.
       faceFixture(scene, item, WALKUP_DIST, WALKUP_EYE_Y);

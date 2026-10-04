@@ -145,7 +145,7 @@ export interface StoreFormatSpec {
    * with doorStyle 'single' still hangs two thin leaves side by side; only
    * entryStyle 'storefront-door' actually builds one door.
    */
-  doorStyle: 'double-swing' | 'sliding' | 'single';
+  doorStyle: 'double-swing' | 'single';
   /**
    * How the entrance is BUILT (src/entrance/index.ts).
    *

@@ -1,3 +1,4 @@
+import { fitCasePlaceholder } from './case-placeholder-fit';
 import { setChangedShelfMatrix } from './shelf-instance-matrix';
 // Inspect / flip / hero cases / launch flourish — extracted from StoreScene
 // (three-scene.ts keeps one-line delegating stubs): the Enter-key
@@ -10,9 +11,9 @@ import * as THREE from 'three';
 import { Movie, Episode } from './jellyfin';
 import { requestHeroFrontDetail } from './hero-front-detail';
 import { createInspectionMesh, setInspectionGeometry } from './inspection-mesh';
-import { posterQueue, CASE_MEDIUM, leftmostColorCache, posterPixelCache, getCaseGeometry, getRentalCaseGeometry, createHeroJellyfinMaterials, createHeroRentalMaterials, applyGameCaseArt, backCoverRegions, getSeriesBoxsetGeometry, createHeroSeriesBoxsetMaterials, drawSeriesBrandPanel, drawSeriesEpisodeBackCover, drawSeriesSeasonPanel, gameCaseDims, gameRentalDims } from './video-case';
+import { posterQueue, CASE_MEDIUM, CASE_WIDTH, CASE_HEIGHT, leftmostColorCache, posterPixelCache, getCaseGeometry, getRentalCaseGeometry, createHeroJellyfinMaterials, createHeroRentalMaterials, applyGameCaseArt, backCoverRegions, getSeriesBoxsetGeometry, createHeroSeriesBoxsetMaterials, drawSeriesBrandPanel, drawSeriesEpisodeBackCover, drawSeriesSeasonPanel, gameCaseDims, gameRentalDims } from './video-case';
 import { isWhiteClamshell } from './packaging-formats';
-import { detailedCaseGeometry, withCaseConstructionMaterials } from './packaging-model';
+import { detailedCaseGeometry } from './packaging-model';
 import { syncJewelDressing } from './jewel-case';
 import { AISLE_SHELF_HEIGHTS, WALL_SHELF_HEIGHTS, BACK_WALL_UNIT_IDX, MovieSlot } from './store-layout';
 import { tempPosition, tempRotation, tempQuaternion, tempScale, tempMatrix, _bagFallback, _bagBaseFallback } from './scene-shared';
@@ -23,7 +24,6 @@ import { perfTrace } from './perf-trace';
 import { getJellyseerrConfig, isDiscoveryRequested } from './jellyseerr';
 import { isRequestTitle } from './request-title';
 import { SP_HERO, CT_HERO, updatedMeshes } from './scene-shared';
-import { getGoldCaseMaterials } from './fixtures/gold-clamshell';
 import type { StoreScene } from './three-scene';
 import { counterFrame } from './counter-anchors';
 import { isStreamingChoiceActive, startStreamingServiceChoice, confirmStreamingServiceChoice, cancelStreamingServiceChoice, getStreamingChoiceKey } from './streaming-checkout';
@@ -658,11 +658,8 @@ export function ensureHeroCases(scene: StoreScene, movie: Movie, nrCase = false)
     // Jewel-case platforms carry their clear-lid dressing on the hero mesh;
     // keyed internally, so a movie/cartridge title strips it right back off.
     syncJewelDressing(scene.heroFrontMesh, movie, gameDims);
-    // NR wall slots: the rental copy is the red-sleeve/gold-ticket NEW
-    // RELEASE RENTAL case, matching the wall's instanced back boxes.
-    scene.heroBackMesh.material = nrCase && !movie.streaming
-      ? withCaseConstructionMaterials(getGoldCaseMaterials())
-      : createHeroRentalMaterials(movie, wantDetail !== null, probeIdx);
+    // Every wall and aisle uses the ordinary title-specific store-copy sleeve.
+    scene.heroBackMesh.material = createHeroRentalMaterials(movie, wantDetail !== null, probeIdx);
     scene.applyNrBayWash?.(scene.heroBackMesh);
     perfTrace.end(SP_HERO);
     if (movie.isSeries && !movie.streaming) scene.ensureSeriesEpisodes(movie);
@@ -696,6 +693,10 @@ export function heroFrontMaterials(scene: StoreScene, movie: Movie): THREE.Mater
   if (movie.isSeries && !movie.streaming) return createHeroSeriesBoxsetMaterials(movie, scene.highlightedBackRegionName, probeIdx);
   const heroDetail = scene.mode === 'inspect';
   const mats = createHeroJellyfinMaterials(movie, scene.highlightedBackRegionName, false, heroDetail, probeIdx);
+  if (movie.game && mats[4]?.userData.casePlaceholder) {
+    const dims = gameCaseDims(movie.platform, movie.discCount);
+    mats[4] = fitCasePlaceholder(mats[4] as THREE.MeshStandardMaterial, dims.w / dims.h, CASE_WIDTH / CASE_HEIGHT);
+  }
   // The cover art is the reason you picked the box up, and at shelf resolution it
   // was the softest face on it (see hero-front-detail.ts). Decode it at 3x for
   // the inspected title only. Fire and forget for the same reason as the game

@@ -135,7 +135,6 @@ const PORTRAIT_ASPECT = 2 / 3;  // width / height, matching the poster-card conv
 const PORTRAIT_W = PORTRAIT_H * PORTRAIT_ASPECT;
 const FRAME_PAD = 0.09;         // per side
 const PORTRAIT_FRAMED_W = PORTRAIT_W + FRAME_PAD * 2;
-const PORTRAIT_FRAMED_H = PORTRAIT_H + FRAME_PAD * 2;
 
 type WallId = 'left' | 'back' | 'right';
 
@@ -380,7 +379,13 @@ export function buildWallDecor(scene: StoreScene, storeWidth: number, backWallZ:
 
   const theme = getActiveTheme();
   // One line for both: the strip's centre IS the portraits' centre.
-  const centerY = STRIP_CENTER_Y;
+  // The star badges occupy 8.6–12.2 ft; reserve their whole band including halo.
+  const centerY = theme.id === 'bb-2000' ? (12.5 + scene.ceilingY - 0.7) / 2 : STRIP_CENTER_Y;
+  const PORTRAIT_H = theme.id === 'bb-2000' ? Math.min(PORTRAIT_H_REQUESTED, scene.ceilingY - 0.7 - 12.5 - FRAME_PAD * 2) : Math.min(PORTRAIT_H_REQUESTED, 2 * Math.min(VALANCE_FLOOR_Y - centerY, centerY - BAND_FLOOR_Y));
+  if (PORTRAIT_H <= 0 || centerY - STRIP_H / 2 < 12.2 && theme.id === 'bb-2000') return;
+  const PORTRAIT_W = PORTRAIT_H * PORTRAIT_ASPECT;
+  const PORTRAIT_FRAMED_W = PORTRAIT_W + FRAME_PAD * 2;
+  const PORTRAIT_FRAMED_H = PORTRAIT_H + FRAME_PAD * 2;
 
   // Film strip: one segment per clear span (on whichever of the three walls
   // it belongs to), floating flush on the wall. Always built when décor is

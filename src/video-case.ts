@@ -1,3 +1,4 @@
+import { caseFallbackShader } from './case-fallback-shader';
 import { setMaterialEnvironment } from './material-environment';
 import { waitForExternalGame } from './external-game-state.ts';
 import * as THREE from 'three';
@@ -1602,22 +1603,20 @@ export function createClonedCaseGeometry(
   const baseGeo = rental ? getRentalGeometry(isAnimated, dims) : getGeometry(isAnimated, dims);
   const geo = cloneCaseGeometry(baseGeo);
 
-  // Add aTextureIndex instanced attribute
   const texIndices = new Float32Array(count);
   const texIdxAttr = new THREE.InstancedBufferAttribute(texIndices, 1);
   geo.setAttribute('aTextureIndex', texIdxAttr);
 
-  // Add aSpineColor instanced attribute (default to white/grey)
   const spineColors = new Float32Array(count * 3);
   spineColors.fill(1.0); // start with white
   const spineColorAttr = new THREE.InstancedBufferAttribute(spineColors, 3);
   geo.setAttribute('aSpineColor', spineColorAttr);
 
-  // Add aPosterCropSkip instanced attribute (1 = ignore uPosterCropX)
   const cropSkips = new Float32Array(count);
   if (noPosterCrop) cropSkips.fill(1.0);
   const cropSkipAttr = new THREE.InstancedBufferAttribute(cropSkips, 1);
   geo.setAttribute('aPosterCropSkip', cropSkipAttr);
+  geo.setAttribute('aFallbackAspect', new THREE.InstancedBufferAttribute(new Float32Array(count).fill(dims ? dims.w / dims.h : CASE_WIDTH / CASE_HEIGHT), 1));
 
   return geo;
 }
@@ -2697,6 +2696,7 @@ function initSharedMaterials() {
   const jFrontTex = new THREE.CanvasTexture(jFrontCanvas);
   jFrontTex.colorSpace = THREE.SRGBColorSpace;
   sharedJellyfinFrontPlaceholderMaterial = makePlasticMaterial({ map: jFrontTex });
+  sharedJellyfinFrontPlaceholderMaterial.userData.casePlaceholder = true;
 
   // 5. Jellyfin Back Cover Placeholder
   sharedJellyfinBackPlaceholderMaterial = makePlasticMaterial({ color: '#0f172a' });
@@ -4824,8 +4824,10 @@ export function initGlobalMaterials() {
     shader.vertexShader = `
       attribute float aTextureIndex;
       attribute float aPosterCropSkip;
+      attribute float aFallbackAspect;
       varying float vTextureIndex;
       varying float vPosterCropSkip;
+      varying float vFallbackAspect;
       ${shader.vertexShader}
     `.replace(
       '#include <uv_vertex>',
@@ -4838,6 +4840,7 @@ export function initGlobalMaterials() {
       #include <begin_vertex>
       vTextureIndex = aTextureIndex;
       vPosterCropSkip = aPosterCropSkip;
+      vFallbackAspect = aFallbackAspect;
       `
     );
 
@@ -4848,6 +4851,7 @@ export function initGlobalMaterials() {
       uniform float uPosterCropX;
       varying float vTextureIndex;
       varying float vPosterCropSkip;
+      varying float vFallbackAspect;
       ${shader.fragmentShader}
     `.replace(
       '#include <map_fragment>',
@@ -4870,7 +4874,7 @@ export function initGlobalMaterials() {
         } else if (loadStatus > 0.3) {
           mapTexel = samplePosterBank(false, posterUv, vTextureIndex, posterUvDx, posterUvDy);
         } else {
-          mapTexel = texture(map, posterUv);
+          ${caseFallbackShader(CASE_WIDTH / CASE_HEIGHT)}
         }
         diffuseColor *= mapTexel;
       #else
@@ -4899,8 +4903,10 @@ export function initGlobalMaterials() {
     shader.vertexShader = `
       attribute float aTextureIndex;
       attribute float aPosterCropSkip;
+      attribute float aFallbackAspect;
       varying float vTextureIndex;
       varying float vPosterCropSkip;
+      varying float vFallbackAspect;
       ${shader.vertexShader}
     `.replace(
       '#include <uv_vertex>',
@@ -4913,6 +4919,7 @@ export function initGlobalMaterials() {
       #include <begin_vertex>
       vTextureIndex = aTextureIndex;
       vPosterCropSkip = aPosterCropSkip;
+      vFallbackAspect = aFallbackAspect;
       `
     );
 
@@ -4923,6 +4930,7 @@ export function initGlobalMaterials() {
       uniform float uPosterCropX;
       varying float vTextureIndex;
       varying float vPosterCropSkip;
+      varying float vFallbackAspect;
       ${shader.fragmentShader}
     `.replace(
       '#include <map_fragment>',
@@ -4953,7 +4961,7 @@ export function initGlobalMaterials() {
           } else if (loadStatus > 0.3) {
             mapTexel = samplePosterBank(false, posterUv, vTextureIndex, posterUvDx, posterUvDy);
           } else {
-            mapTexel = texture(map, posterUv);
+            ${caseFallbackShader(CASE_WIDTH / CASE_HEIGHT)}
           }
           diffuseColor *= mapTexel;
         }

@@ -289,6 +289,8 @@ export class StoreClerk {
     this.fade = f;
     const mat = this.sprite.material as THREE.MeshStandardMaterial;
     mat.opacity = f;
+    const fading = f < 1;
+    if (mat.transparent !== fading) { mat.transparent = fading; mat.needsUpdate = true; }
     mat.alphaTest = Math.max(0.01, 0.5 * f);
     this.shadowMat.opacity = 0.34 * f;
     this.group.visible = clerkShouldRender(f, this.suppressed);
@@ -446,7 +448,7 @@ export class StoreClerk {
 
     this.sprite = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshStandardMaterial({
       map: this.spriteTex,
-      transparent: true,
+      transparent: false,
       alphaTest: 0.5,
       roughness: 1, metalness: 0,
       depthWrite: true,
@@ -461,7 +463,7 @@ export class StoreClerk {
     };
     this.sprite.scale.set(SPRITE_WIDTH, SPRITE_HEIGHT, 1);
     this.sprite.position.y = SPRITE_HEIGHT / 2;
-    this.sprite.renderOrder = 2;
+    this.sprite.renderOrder = 0;
     this.group.add(this.sprite);
 
     this.setCell('idle', 0, 0);

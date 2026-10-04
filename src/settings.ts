@@ -715,7 +715,6 @@ export function registerCoreSettings(): void {
     group: 'Store Look',
     values: [
       { id: 'standard', label: 'Standard' },
-      { id: 'sliding-gray', label: 'Sliding Doors / Gray' },
       { id: 'rounded-counter', label: 'Rounded Counter' },
       { id: 'usquare-counter', label: 'Half-Square Counter' },
     ],

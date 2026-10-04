@@ -191,7 +191,7 @@ export function updateCameraTarget(scene: StoreScene) {
         // Fallback guards a stale selectedShelf that outruns this fixture's
         // shelf count (undefined → NaN camera → blank blue frame).
         const shelfY = (fixture && fixture.shelfHeights[scene.selectedShelf]) ?? 3.0;
-        const cameraY = shelfY + 0.4;
+        const cameraY = Math.max(6.3, shelfY + 0.8);
         const lookAtY = shelfY + 0.4;
 
         const xCenterVal = fixture?.placement.position.x ?? 17.0;
@@ -213,6 +213,9 @@ export function updateCameraTarget(scene: StoreScene) {
         const ldx = scene.targetLookAt.x - xCenterVal;
         const ldz = scene.targetLookAt.z - zCenterVal;
         scene.targetLookAt.set(xCenterVal + ldx * c + ldz * s, lookAtY, zCenterVal - ldx * s + ldz * c);
+        const halfWidth = scene.getStoreWidth() / 2;
+        scene.targetCameraPos.x = Math.max(11 - halfWidth + 1.5, Math.min(11 + halfWidth - 1.5, scene.targetCameraPos.x));
+        scene.targetCameraPos.z = Math.max(scene.backWallZ + 1.5, Math.min(13, scene.targetCameraPos.z));
       } else {
         const fixture = scene.slottedFixtures.find(f => f.placement.id === scene.selectedFixtureId);
         const sideNum = scene.selectedSide === 'front' ? 0 : (scene.selectedSide === 'right' ? 1 : (scene.selectedSide === 'back' ? 2 : 3));
@@ -234,7 +237,7 @@ export function updateCameraTarget(scene: StoreScene) {
           scene.targetCameraPos.copy(scene.lookDownCamera);
           scene.targetLookAt.copy(scene.lookDownLookAt);
         } else {
-          const cameraY = shelfY + 0.4;
+          const cameraY = Math.max(6.3, shelfY + 0.8);
           const lookAtY = shelfY + 0.4;
 
           // Fixtures publish their real slot positions. Fit the occupied face,
@@ -298,7 +301,7 @@ export function updateCameraTarget(scene: StoreScene) {
 
       // Dynamic Y height centered on selected back wall shelf
       const shelfY = WALL_SHELF_HEIGHTS[scene.selectedShelf] || 3.5;
-      const cameraY = shelfY + 0.4;
+      const cameraY = Math.max(6.3, shelfY + 0.8);
       const lookAtY = shelfY + 0.4;
 
       // Back up far enough that the section fits the frame horizontally — a
@@ -352,7 +355,7 @@ export function updateCameraTarget(scene: StoreScene) {
 
       // Dynamic Y height centered on selected aisle shelf
       const shelfY = AISLE_SHELF_HEIGHTS[scene.selectedShelf] || 3.0;
-      const cameraY = shelfY + 0.4;
+      const cameraY = Math.max(6.3, shelfY + 0.8);
       const lookAtY = shelfY + 0.4;
       
       const xCenterVal = activeUnit ? activeUnit.xCenter : STORE_CENTER_X;

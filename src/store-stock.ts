@@ -18,7 +18,6 @@ import { updateBackstock, forgetBackstock } from './case-backstock';
 const caseModelSubscriptions = new WeakMap<StoreScene, () => void>();
 import { isPublicDemo } from './demo-mode';
 import { Movie } from './jellyfin';
-import { buildGoldClamshellFillers, getGoldCaseMaterials, repaintGoldCase } from './fixtures/gold-clamshell';
 import { posterQueue, CASE_MEDIUM, CASE_HEIGHT, CASE_DEPTH, textureArrayManager, createClonedCaseGeometry, getGlobalFrontMaterials, getGlobalBackMaterials, updateGlobalMaterialsEnvMap, leftmostColorCache, posterPixelCache, reflectionProbes, isGlobalMaterial, lowResCache, gameShapeKey, gameDimsForShape, gameCaseDims, gameRentalDims, rentalBottomLift, rentalBoxDepth, rentalBoxHeight, beginRebuildDrain, SERIES_DEPTH_MULT } from './video-case';
 import { AISLE_SHELF_HEIGHTS, WALL_SHELF_HEIGHTS, NR_WALL_SLOPE, LEAN_ANGLE, STAGGER_OFFSET, UNIT_SIDE_CAPACITY, BACK_WALL_UNIT_IDX, sideEntrySlot, COPY_X_JITTER_RANGE, unitDepthAtHeight, extraCopiesCount, isUnstockedTitle, seededRandom01, MovieSlot } from './store-layout';
 import { validateCaseFit, type CaseFitPair } from './layout-validator';
@@ -527,13 +526,10 @@ export async function buildAllMovieBoxes(scene: StoreScene) {
     bwFrontMesh.frustumCulled = true;
     initInstancesHidden(bwFrontMesh);
 
-    // NR wall rental copies wear the red-sleeve/gold-ticket NEW RELEASE
-    // RENTAL insert (user direction: behind EVERY New Releases item), not
-    // the generic blue-ticket wrap the aisle back boxes use — and that holds
-    // for animated titles and for games' rental shells alike.
+    // New Releases uses the same ordinary store-copy sleeve as the aisles.
     const bwBackMesh = new THREE.InstancedMesh(
       createClonedCaseGeometry(count, false, true, gameDims?.rental),
-      getGoldCaseMaterials(),
+      getGlobalBackMaterials(false),
       count
     );
     bwBackMesh.castShadow = true;
@@ -1023,15 +1019,6 @@ export async function buildAllMovieBoxes(scene: StoreScene) {
     scene.updateLOD();
   });
 
-  // T25 #26 (superseded): the per-rented-title gold filler group is gone —
-  // the NR wall back meshes above wear the gold materials for every slot.
-  // The call clears any legacy group; the repaint re-runs the palette swap
-  // once the source scans have decoded, or it would stay white paper.
-  buildGoldClamshellFillers(scene);
-  scene.texturesReadyPromise?.then(() => {
-    repaintGoldCase();
-    scene.requestRender();
-  });
   scene.mirrorCubemap.finishStockBuild();
 }
 

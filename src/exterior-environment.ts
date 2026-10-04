@@ -32,6 +32,7 @@ import { STORE_CENTER_X, FRONT_GLASS_Z } from './store-layout';
 
 export interface ExteriorEnvironment {
   group: THREE.Group;
+  walkFarZ: number;
   setOutsideMode(mode: OutsideMode): void;
   // GH #144: retarget the ground-blend ring's color to the active pano's
   // sampled ground (see ground-blend.ts) — called live as panos load/change.
@@ -359,5 +360,5 @@ export function buildExteriorEnvironment(scene: THREE.Scene, storeWidth: number,
     scene.remove(group);
   }
 
-  return { group, setOutsideMode, setGroundColor, refreshShadows, dispose };
+  return { group, walkFarZ: plan.farZ - 1.5, setOutsideMode, setGroundColor, refreshShadows, dispose };
 }

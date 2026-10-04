@@ -1,3 +1,4 @@
+import { gameShelfTargets } from './game-shelf-targets';
 // The entrance overview — the vantage you stand at when the store is not
 // showing you a shelf. Extracted from StoreScene (three-scene.ts keeps
 // one-line delegating stubs): the target list (sections, genre placards,
@@ -91,15 +92,17 @@ export function buildOverviewCursorTargets(scene: StoreScene): OverviewCursorTar
     // they're browsed by walking off their run's entrance-end column
     // (store-nav flow-through).
     if (isEndcapKind(f.placement.kind)) return;
-    fixtureTargets.push({
-      label: slottedFixtureLabel(f),
-      x: f.placement.position.x,
+    const platformTargets = gameShelfTargets(f);
+    const destinations = platformTargets.length ? platformTargets : [{ label: slottedFixtureLabel(f), side: 'front' as const, col: 0, x: f.placement.position.x, z: f.placement.position.z }];
+    for (const destination of destinations) fixtureTargets.push({
+      label: destination.label,
+      x: destination.x,
       y: 5.1,
-      z: f.placement.position.z,
+      z: destination.z,
       libraryIdx: FIXTURE_CURSOR_LIB,
       unitIdxInLibrary: standIdx,
-      side: 'front',
-      col: 0,
+      side: destination.side,
+      col: destination.col,
     });
   });
   // Number the repeats (four game gondolas all call themselves VIDEO GAMES) in
@@ -364,11 +367,11 @@ export function overviewEnterBrowse(scene: StoreScene, query?: string): boolean 
     scene.selectedFixtureId = fixture.placement.id;
     scene.selectedLibraryIdx = scene.libraries.length + 1 + t.unitIdxInLibrary;
     scene.selectedUnitIdx = -1;
-    scene.selectedSide = 'front';
+    scene.selectedSide = t.side;
     // Top-ish row, clamped to what this fixture actually has (the bargain bin
     // has only 2 — a bare `2` would select a slot key that doesn't exist).
     scene.selectedShelf = Math.min(2, fixture.shelfHeights.length - 1);
-    scene.selectedCol = 0;
+    scene.selectedCol = t.col;
     scene.cameraWindowMinCol = 0;
     scene.updateColsCount();
     if (scene.onModeChange) scene.onModeChange(scene.mode);
