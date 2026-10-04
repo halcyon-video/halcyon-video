@@ -72,7 +72,7 @@ import { reportError } from './error-telemetry';
 import { verifySeerrCredentialsLive } from './seerr-service-status';
 import { fetchGames, launchGame, getRommConfig } from './romm';
 import { storeCatalog } from './games-only';
-import { buildStreamingLibraries, resolveEnabledServices } from './streaming-catalog';
+import { buildStreamingLibraries, resolveEnabledServices, resolveStreamingCheckoutUrl } from './streaming-catalog';
 import {
   getStreamingMovies,
   loadStreamingMovies,
@@ -3129,11 +3129,12 @@ async function handleGameLaunch(movie: Movie, startHidden = false, fromCouch = f
 /**
  * The streaming-section equivalent of "play": there is no local copy to
  * stream, so selecting the case opens the service's own page for the title in
- * a new tab/window instead — never checkout, never a bag, never the player.
+ * a new tab/window after the selected checkout ritual.
  * Never throws; a title synthesized without a link (shouldn't happen —
  * synthesizeStreamingMovie always sets one) just logs and does nothing.
  */
 function handleStreamingLaunch(movie: Movie) {
+  if (movie.streamingServiceId && movie.tmdbId) movie.streamingUrl = resolveStreamingCheckoutUrl(movie.streamingServiceId, movie.title, movie.tmdbId, movie.streamingUrl);
   if (!movie.streamingUrl) {
     logToConsole(`[System] "${movie.title}" has no streaming link.`, 'system');
     return;

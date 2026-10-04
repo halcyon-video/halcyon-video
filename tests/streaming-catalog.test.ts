@@ -157,10 +157,10 @@ test('matchProviderId: exact case-insensitive alias match, and null when absent'
   assert.equal(matchProviderId(appletv, [{ id: 350, name: 'Apple TV' }]), 350);
 });
 
-test('buildStreamingUrl: a service with a template uses it; one without falls back to the TMDB watch page', () => {
+test('buildStreamingUrl: Netflix uses movie identity, never title search; other services use their fallback', () => {
   const netflix = DEFAULT_STREAMING_SERVICES.find((d) => d.id === 'netflix')!;
   const url = buildStreamingUrl(netflix, 'The Matrix', 603);
-  assert.equal(url, 'https://www.netflix.com/search?q=The%20Matrix');
+  assert.ok(/^https:\/\/www\.netflix\.com\/title\/\d+$/.test(url) || url === tmdbWatchFallbackUrl(603) + '?locale=US');
 
   const max = DEFAULT_STREAMING_SERVICES.find((d) => d.id === 'max')!;
   assert.equal(buildStreamingUrl(max, 'X', 42), tmdbWatchFallbackUrl(42));
@@ -189,7 +189,7 @@ test('synthesizeStreamingMovie: maps a raw discover item to a shelvable streamin
   assert.equal(movie!.libraryName, 'Movies');
   assert.equal(movie!.streamingServiceId, 'netflix');
   assert.equal(movie!.streamingServiceName, 'NETFLIX');
-  assert.equal(movie!.streamingUrl, 'https://www.netflix.com/search?q=The%20Matrix');
+  assert.equal(movie!.streamingUrl, buildStreamingUrl(DEFAULT_STREAMING_SERVICES[0], 'The Matrix', 603));
   assert.equal(movie!.posterUrl, 'https://image.tmdb.org/t/p/w342/poster.jpg');
   assert.equal(movie!.duration, '2h 16m');
   assert.equal(movie!.rating, 'R');
@@ -201,7 +201,7 @@ test('synthesizeStreamingMovie: maps a raw discover item to a shelvable streamin
   assert.deepEqual(movie!.streamingServices, [{
     id: 'netflix',
     name: 'NETFLIX',
-    url: 'https://www.netflix.com/search?q=The%20Matrix',
+    url: buildStreamingUrl(DEFAULT_STREAMING_SERVICES[0], 'The Matrix', 603),
   }]);
 });
 
@@ -347,4 +347,23 @@ test('Disney checkout repairs retired search links and preserves real entity lin
     'https://www.disneyplus.com/en-us/search/?q=Other'), tmdbWatchFallbackUrl(123));
   assert.equal(resolveStreamingCheckoutUrl('disney', 'Other movie', 123, moana), moana);
   assert.equal(buildStreamingUrl(disney, 'Other movie', 123), tmdbWatchFallbackUrl(123));
+});
+
+
+test('Netflix opens the identified movie and repairs old persisted search links', async () => {
+  const { resolveStreamingCheckoutUrl } = await import('../src/streaming-catalog.ts');
+  const netflix = DEFAULT_STREAMING_SERVICES.find(service => service.id === 'netflix')!;
+  const direct = 'https://www.netflix.com/title/81278442';
+  assert.equal(buildStreamingUrl(netflix, 'The Whisper Man', 860508), direct);
+  assert.equal(buildStreamingUrl(netflix, 'Translated title', 860508), direct);
+  assert.equal(resolveStreamingCheckoutUrl('netflix', 'The Whisper Man', 860508,
+    'https://www.netflix.com/search?q=The%20Whisper%20Man'), direct);
+  assert.equal(resolveStreamingCheckoutUrl('netflix', 'The Whisper Man', 860508,
+    tmdbWatchFallbackUrl(860508)), direct);
+  const supplied = 'https://www.netflix.com/title/81002747';
+  assert.equal(resolveStreamingCheckoutUrl('netflix', 'Spider-Man: Into the Spider-Verse', 324857, supplied), supplied);
+  const fallback = tmdbWatchFallbackUrl(999999999) + '?locale=US';
+  assert.equal(buildStreamingUrl(netflix, 'Same title as another movie', 999999999), fallback);
+  assert.equal(resolveStreamingCheckoutUrl('netflix', 'Unknown', 999999999,
+    'https://www.netflix.com/search?q=Unknown'), fallback);
 });

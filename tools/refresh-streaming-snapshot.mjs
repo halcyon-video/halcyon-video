@@ -25,6 +25,7 @@
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import fs from 'node:fs';
+import { refreshNetflixTitleIds } from './refresh-netflix-title-ids.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const OUT_PATH = path.join(root, 'src/data/streaming-snapshot.json');
@@ -145,6 +146,13 @@ const snapshot = {
 if (services.length !== DEFAULT_STREAMING_SERVICES.length || services.some(s => s.titles.length === 0)) {
   throw new Error('Incomplete service catalogue; previous snapshot preserved');
 }
+try {
+  const ids = services.find(service => service.id === 'netflix')?.titles.map(title => title.tmdbId) || [];
+  console.log('Resolved ' + await refreshNetflixTitleIds(ids) + ' exact Netflix title links.');
+} catch {
+  console.warn('Netflix identifier refresh unavailable; previous map retained and exact movie watch pages cover gaps.');
+}
+
 fs.mkdirSync(path.dirname(OUT_PATH), { recursive: true });
 fs.writeFileSync(OUT_PATH, JSON.stringify(snapshot, null, 2) + '\n');
 

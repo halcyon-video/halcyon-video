@@ -666,3 +666,14 @@ test('a filmed streaming checkout returns to browsing without leaving the record
     else Reflect.deleteProperty(globalThis, 'window');
   }
 });
+
+
+test('a cached Netflix search becomes an exact title link before carrying the movie to checkout', () => {
+  const scene = createMockScene();
+  const movie = createMockMovie({ tmdbId: 860508, title: 'The Whisper Man',
+    streamingUrl: 'https://www.netflix.com/search?q=The%20Whisper%20Man' });
+  assert.equal(startStreamingServiceChoice(scene, movie), true);
+  assert.equal(confirmStreamingServiceChoice(scene), true);
+  assert.equal(movie.streamingUrl, 'https://www.netflix.com/title/81278442');
+  assert.equal(getStreamingCheckoutMovie(scene), movie);
+});

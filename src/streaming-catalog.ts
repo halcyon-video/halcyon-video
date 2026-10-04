@@ -13,6 +13,16 @@
 // carry Tauri/DOM imports) lives in jellyseerr.ts's fetchStreamingMovies,
 // which imports the helpers below rather than the other way around.
 import type { Movie, JellyfinLibrary } from './jellyfin';
+import netflixTitleData from './data/netflix-title-ids.json' with { type: 'json' };
+
+const NETFLIX_TITLE_IDS: Record<string, string> = netflixTitleData.movies;
+
+/** Provider identifiers are distinct from TMDB IDs; never infer them from a title. */
+function netflixTitleUrl(_title: string, tmdbId: number): string {
+  const netflixId = NETFLIX_TITLE_IDS[String(tmdbId)];
+  return netflixId ? `https://www.netflix.com/title/${netflixId}`
+    : `${tmdbWatchFallbackUrl(tmdbId)}?locale=US`;
+}
 
 /** One default streaming service: how to find it in Jellyseerr's watch-provider
  *  list, and how to link a title on it. */
@@ -28,7 +38,7 @@ export interface StreamingServiceDef {
    *  Jellyseerr's GET /api/v1/watchproviders/movies returns. More than one
    *  covers a rename TMDB has made (Max was HBO Max) without guessing. */
   aliases: string[];
-  /** Title-search URL for one title on this service. Omitted = every title on
+  /** Title destination URL for one movie on this service. Omitted = every title on
    *  this service falls back to the TMDB watch-page link (buildStreamingUrl). */
   urlTemplate?: (title: string, tmdbId: number) => string;
 }
@@ -45,7 +55,8 @@ function searchTemplate(base: string, param: string): (title: string) => string 
  * `aliases` below match against that `name` field.
  *
  * `urlTemplate` is set only where the search-URL shape is well-established
- * (Netflix/Hulu's plain "/search?q=" pattern) -- confidence on the
+ * (Hulu's plain "/search?q=" pattern). Netflix uses a bundled provider-ID
+ * mapping or an exact regional movie watch page. Confidence on the
  * other five's exact query param name is LOW (no live instance to verify
  * against in this environment, and at least one of them has changed brand
  * name/URL scheme more than once), so they deliberately fall back to the
@@ -54,7 +65,7 @@ function searchTemplate(base: string, param: string): (title: string) => string 
 export const DEFAULT_STREAMING_SERVICES: StreamingServiceDef[] = [
   {
     id: 'netflix', name: 'NETFLIX', aliases: ['Netflix'],
-    urlTemplate: searchTemplate('https://www.netflix.com/search', 'q'),
+    urlTemplate: netflixTitleUrl,
   },
   {
     id: 'prime', name: 'AMAZON PRIME VIDEO',
@@ -216,7 +227,7 @@ export function buildStreamingUrl(def: StreamingServiceDef, title: string, tmdbI
   return def.urlTemplate ? def.urlTemplate(title, tmdbId) : tmdbWatchFallbackUrl(tmdbId);
 }
 
-/** Repair retired Disney search links from persisted catalogs at checkout.
+/** Repair legacy search links from persisted catalogs at checkout.
  * Verified Moana entity: https://www.disneyplus.com/browse/entity-e8896bfa-1052-41f7-ae2e-00255d77cf05
  * Other Disney titles use watch availability until a real provider deep link is supplied.
  */
@@ -227,7 +238,11 @@ export function resolveStreamingCheckoutUrl(serviceId: string, title: string, tm
       const url = new URL(supplied);
       const retiredDisneySearch = serviceId === 'disney' &&
         /(^|\.)disneyplus\.com$/.test(url.hostname) && /\/search\/?$/.test(url.pathname);
-      if (url.protocol === 'https:' && !retiredDisneySearch) return supplied;
+      const legacyNetflixLink = serviceId === 'netflix' && (
+        (/(^|\.)netflix\.com$/.test(url.hostname) && /\/search\/?$/.test(url.pathname)) ||
+        (/(^|\.)themoviedb\.org$/.test(url.hostname) && url.pathname === `/movie/${tmdbId}/watch`)
+      );
+      if (url.protocol === 'https:' && !retiredDisneySearch && !legacyNetflixLink) return supplied;
     } catch { /* Malformed cached links use the catalog fallback. */ }
   }
   return def ? buildStreamingUrl(def, title, tmdbId) : tmdbWatchFallbackUrl(tmdbId);
