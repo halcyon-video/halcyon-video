@@ -90,6 +90,9 @@ if slug=='clerk-b':
   if hip*.96<c.z<neck*1.03:
    if rgb[1]>rgb[0]*1.20 and rgb[2]>rgb[0]*1.15:p.material_index=1
    elif min(rgb)>.40 and (max(rgb)-min(rgb))/max(rgb)<.32 and (c.z>neck*.90 or abs(c.x)>arm.data.bones['LeftArm'].head_local.x*1.2):p.material_index=2
+ # The raised rear collar extends above the neck joint. Keep this narrow
+ # garment band in secondary trim; facial highlights stay above the head joint.
+  if neck*.97<c.z<min(neck*1.12,arm.data.bones['Head'].head_local.z) and min(rgb)>.40 and (max(rgb)-min(rgb))/max(rgb)<.32:p.material_index=2
  ox=body.copy();ox.data=body.data.copy();bpy.context.collection.objects.link(ox);ox.name='Clerk B Oxford';ox.data.materials[1]=oxmat;ox.data.materials[2]=oxmat;ox.data.materials.append(oxmat)
  for p in ox.data.polygons:
   weights={}

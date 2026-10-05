@@ -156,3 +156,11 @@ optionally `--render-dir <working-render-dir>` and `--render`. Then run
 contains its rigged `source.glb` and receives the editable Blender file, both
 outfit GLBs and geometry/animation reports. Stitch each outfit's color and livery
 passes with the existing `clerk-sheet.mjs` tool before installation.
+
+### Rear collar brand coverage
+
+The polo's raised rear collar uses secondary trim even above the neck joint;
+the Oxford maps the same collar surface to its primary shirt material. The
+authoring classifier includes that garment band. Shipped coverage includes
+rear and oblique collar pixels across idle, walking and working frames, with
+the color atlas retained. Private installed identities use the same coverage.
