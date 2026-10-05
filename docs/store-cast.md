@@ -151,9 +151,16 @@ shadowed opening beneath the vest. `joint-fit.json` records the edited regions.
 `customer-six-beard.py` keeps the original facial mesh intact and replaces the
 individual-hair treatment with one simple dark beard region. It duplicates
 the original facial surface for the pigment, including a fitted upper-lip
-moustache, and keeps the smiling lips and neck clear. The coverage
+moustache connected to the jaw beard at both mouth corners, and keeps the
+smiling lips and neck clear. The coverage
 texture has a softened outline and uniform interior shade. `beard-check.json`
 records the finish and parameters.
+
+`customer-six-neck.py` fits a smooth skin surface to the actual torso
+opening and tucks its upper rim inside the original jaw. Nonfacial overlapping
+source-neck triangles are concealed; original facial geometry, UVs, skin weights
+and albedo remain intact. `neck-fit.json` records the transition. Joint
+validation measures the torso seam through every baked idle and walk sample.
 
 Joint review uses tight waist, ankle and shoulder crops from both front and side
 at every shipped walk phase; the whole-character framing does not establish

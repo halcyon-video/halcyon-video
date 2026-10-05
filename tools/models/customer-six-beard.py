@@ -37,14 +37,15 @@ def apply(arm,folder):
  cheeks=smooth(ax-4.45,.5)*smooth(138.1+.08*np.maximum(0,ax-5)-z)
  top=138.72-.045*ax-.12*np.maximum(0,1-ax);bottom=137.58+.034*ax*ax
  moustache=smooth(5.3-ax,.4)*smooth(top-z,.18)*smooth(z-bottom,.18)
- alpha=.72*smooth(z-131.35,.5)*smooth(10.45-ax,.4)*np.maximum(np.maximum(lower,cheeks),moustache)
+ corners=smooth(ax-4.0,.25)*smooth(5.35-ax,.3)*smooth(138.58-z,.18)
+ alpha=.72*smooth(z-131.35,.5)*smooth(10.45-ax,.4)*np.maximum(np.maximum(np.maximum(lower,cheeks),moustache),corners)
  pixels=np.empty((1024,1024,4),dtype=np.float32);pixels[:,:,:3]=(.028,.012,.006);pixels[:,:,3]=alpha
  texture=bpy.data.images.new('Customer 06 simple beard area',width=1024,height=1024,alpha=True);texture.pixels.foreach_set(pixels.ravel());texture.filepath_raw=str(folder/'stubble.png');texture.file_format='PNG';texture.save();texture.pack()
  m=bpy.data.materials.new('Customer 06 simple dark beard');m.use_nodes=True;new.materials.append(m);n=m.node_tree.nodes;l=m.node_tree.links;n.clear()
  output=n.new('ShaderNodeOutputMaterial');bs=n.new('ShaderNodeBsdfPrincipled');bs.inputs['Roughness'].default_value=1;bs.inputs['Specular IOR Level'].default_value=0
  tex=n.new('ShaderNodeTexImage');tex.image=texture;l.new(tex.outputs['Color'],bs.inputs['Base Color']);l.new(tex.outputs['Alpha'],bs.inputs['Alpha']);l.new(bs.outputs[0],output.inputs['Surface']);m.surface_render_method='DITHERED'
- o['beard_finish']='Simple dark beard area with fitted upper-lip moustache and visible lips'
- (folder/'beard-check.json').write_text(json.dumps({'finish':o['beard_finish'],'uniformCoverage':.72,'follicleNoise':False,'headMeshUnmodified':True,'faceSurfaceOffset':.028,'beardFaces':len(new.polygons)},indent=2)+'\n')
+ o['beard_finish']='Simple connected dark beard and upper-lip moustache with visible lips'
+ (folder/'beard-check.json').write_text(json.dumps({'finish':o['beard_finish'],'mouthCornersConnected':True,'cornerRange':[4.0,5.35],'uniformCoverage':.72,'follicleNoise':False,'headMeshUnmodified':True,'faceSurfaceOffset':.028,'beardFaces':len(new.polygons)},indent=2)+'\n')
 
 if __name__=='__main__':
  folder=ROOT/'tools/models/cast/customer-06';bpy.ops.wm.open_mainfile(filepath=str(folder/'character.blend'));apply(bpy.data.objects['Armature'],folder)
@@ -55,4 +56,4 @@ if __name__=='__main__':
   for tr in obj.animation_data.nla_tracks:tr.mute=tr.name!='idle'
  s.frame_set(0)
  for name,angle in [('front',0),('three-quarter',math.pi/4),('profile',math.pi/2)]:
-  anchor.rotation_euler.z=angle;bpy.context.view_layer.update();s.render.filepath=str(ROOT/'scratch/customer-six-beard-placement'/f'beard-{name}.png');bpy.ops.render.render(write_still=True)
+  anchor.rotation_euler.z=angle;bpy.context.view_layer.update();s.render.filepath=str(ROOT/'scratch/customer-six-neck-beard'/f'beard-{name}.png');bpy.ops.render.render(write_still=True)
