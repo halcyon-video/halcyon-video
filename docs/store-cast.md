@@ -124,14 +124,22 @@ image and original Meshy base remain preserved as provenance, before the tattoo.
 
 ### Customer 06: wardrobe
 
-`tools/models/customer-six-wardrobe.py` fits the brown vest and short maroon
-sleeves to the preserved continuous body topology, eases the old rolled cuffs,
-adds a surface-bound short beard, tapers brown jeans, and replaces sneakers with
-editable leather boot vamps, low shafts, outsoles, stacked heels, harness straps,
-side rings and linked metal chains. Every part carries normalized skin weights.
-`build-cast.py` applies this wardrobe before fitting the original tattoo. Grounding
-uses all actual outfit surfaces, including the new boot heels. The source and
-generation references remain the original identity's provenance.
+`tools/models/customer-six-wardrobe.py` preserves the original head, face, hair,
+hand geometry, UVs and skin weights, plus the fitted stubble. It replaces the
+body wardrobe with smooth continuous arms, rounded short maroon sleeves, a
+crew-neck shirt, a classic collarless brown leather V-neck vest, welded brown
+trousers and low harness boots. The vest has open armholes, shoulder bridges,
+sewn thickness, welt pockets and small snaps; it has no folded collar or lapels.
+Boot soles and vamps follow the foot, while the upper shafts blend into the
+lower leg to keep the trouser joins covered during captured walking.
+
+The checked editable rig can be rebuilt in place with the wardrobe script,
+then `finalize-cast.py` and `render-customer-atlas.py`. The tattoo is fitted again
+to the new anatomical left forearm using its identical body weights.
+Customer 06's delivery sheet is encoded as lossless WebP to keep the newly
+rendered garment edges intact. The original generation references remain
+provenance. The wardrobe report records the preserved identity and construction;
+the animation report checks all 41 samples of both captured clips.
 
 `render-customer-atlas.py` also accepts `clerk-b` to update idle/walking cells in
 both uniforms while retaining existing working cells. Split the shipped atlases

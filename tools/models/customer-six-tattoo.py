@@ -28,7 +28,7 @@ def apply(body,arm,folder):
     n=body.vertex_groups[g.group].name;weights[n]=weights.get(n,0)+g.weight/len(p.vertices)
   uv_center=sum((source_uv[li].uv for li in p.loop_indices),Vector((0,0)))/len(p.loop_indices)
   r,g,b=pixels[min(image.size[1]-1,max(0,int(uv_center.y*image.size[1]))),min(image.size[0]-1,max(0,int(uv_center.x*image.size[0]))),:3]
-  exposed_skin=r>g*1.10 and g>b*1.15
+  exposed_skin=(r>g*1.10 and g>b*1.15) or body.data.materials[p.material_index].name=='Customer 06 exposed upper arms'
   if weights.get('LeftForeArm',0)>.5 and .20<t<1.01 and p.normal.dot(facing)>.15 and exposed_skin:
    faces.append(tuple(p.vertices))
  del pixels

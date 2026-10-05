@@ -2,14 +2,14 @@
   "idle": {
     "samples": 41,
     "maximumFloorErrorFeet": 3.725290298461914e-09,
-    "minimumPalmMedialAlignment": 0.9982010987005197
+    "minimumPalmMedialAlignment": 0.9982010584208183
   },
   "walk": {
     "samples": 41,
-    "maximumFloorErrorFeet": 2.9802322387695312e-08,
-    "minimumPalmMedialAlignment": 0.8979640807956457
+    "maximumFloorErrorFeet": 2.2351741790771484e-08,
+    "minimumPalmMedialAlignment": 0.8979640831239522
   },
   "exports": {
-    "casual": 13340820
+    "casual": 12903060
   }
 }

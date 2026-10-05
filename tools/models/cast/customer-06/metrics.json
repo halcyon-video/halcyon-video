@@ -1,12 +1,12 @@
 {
   "id": "customer-06",
   "sourceVertices": 30559,
-  "weldedVertices": 14341,
-  "triangles": 28610,
+  "weldedVertices": 7259,
+  "triangles": 14258,
   "deformBones": 22,
   "retainedSourceWeightVertices": 0,
   "unweighted": 0,
-  "maxWeightError": 4.470348358154297e-08,
+  "maxWeightError": 4.470348358154297e-8,
   "heightFeet": 5.9,
   "walkSource": "Female1_B03_Walk1",
   "uvLayers": 1,
@@ -15,34 +15,42 @@
   ],
   "poses": {
     "front": {
-      "minZ": 0.0,
+      "minZ": 0,
       "maxZ": 5.962956480681896,
       "width": 2.1348750591278076
     },
     "side": {
-      "minZ": 0.0,
+      "minZ": 0,
       "maxZ": 5.962956480681896,
       "width": 2.1348750591278076
     },
     "back": {
-      "minZ": 0.0,
+      "minZ": 0,
       "maxZ": 5.962956480681896,
       "width": 2.1348750591278076
     },
     "walk-contact": {
-      "minZ": 0.0,
+      "minZ": 0,
       "maxZ": 5.891795912757516,
       "width": 2.4180248975753784
     },
     "walk-passing": {
-      "minZ": 0.0,
+      "minZ": 0,
       "maxZ": 5.917824719101191,
       "width": 2.3009661436080933
     },
     "browse": {
-      "minZ": 0.0,
+      "minZ": 0,
       "maxZ": 5.932982496917248,
       "width": 2.1411945819854736
     }
-  }
+  },
+  "authoredOutfitTriangles": 32157,
+  "wardrobeVersion": 2,
+  "preservedHead": {
+    "sourceNonmanifoldEdges": 58,
+    "faces": 9398,
+    "sha256": "398d4e9d7b8eed14e7db091ed2578ba8a543026d164c61f08d08b49bccfdb9b9"
+  },
+  "headGeometryUVAndWeightsIdentical": true
 }
