@@ -25,3 +25,13 @@ export function customerRoster(value: unknown, offset = 0): readonly string[] {
   const start = ((Math.trunc(offset) % CUSTOMER_IDS.length) + CUSTOMER_IDS.length) % CUSTOMER_IDS.length;
   return Array.from({ length: customerCount(value) }, (_, i) => CUSTOMER_IDS[(start + i) % CUSTOMER_IDS.length]);
 }
+
+/** Asymmetric ink must stay on the anatomical left arm through every turn. */
+export function customerAtlasRows(id: string): 5 | 8 {
+  return id === 'customer-06' ? 8 : 5;
+}
+export function customerSpriteFacing(id: string, octant: number): { row: number; flip: boolean } {
+  return customerAtlasRows(id) === 8
+    ? { row: octant, flip: false }
+    : { row: octant <= 4 ? octant : 8 - octant, flip: octant > 4 };
+}

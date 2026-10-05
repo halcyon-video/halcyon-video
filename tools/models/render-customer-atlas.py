@@ -10,7 +10,7 @@ scene=bpy.context.scene;arm=bpy.data.objects['Armature'];anchor=arm.parent
 scene.render.resolution_x=256;scene.render.resolution_y=384;scene.render.resolution_percentage=100
 scene.cycles.samples=8;scene.cycles.use_denoising=True;scene.cycles.device='CPU'
 out=ROOT/'scratch/cast-render'/slug/'casual/color';out.mkdir(parents=True,exist_ok=True)
-for row in range(5):
+for row in range(8 if slug=='customer-06' else 5):
  col=0
  for clip,count in [('idle',2),('walk',4),('idle',2)]:
   for obj in [arm,anchor]:

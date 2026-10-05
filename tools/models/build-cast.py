@@ -187,6 +187,8 @@ for name,objects in outfits.items():
  for o in objects:
   for old in list(o.users_collection):old.objects.unlink(o)
   col.objects.link(o)
+if slug=='customer-06':
+ tattoo=runpy.run_path(str(ROOT/'tools/models/customer-six-tattoo.py'))['apply'](body,arm,SRC);outfits['casual'].append(tattoo)
 bpy.ops.object.select_all(action='DESELECT');arm.select_set(True);bpy.context.view_layer.objects.active=arm;arm.show_in_front=True
 for screen in bpy.data.screens:
  for area in screen.areas:
@@ -219,7 +221,7 @@ for style in outfits:
     previous=out.inputs['Surface'].links[0].from_socket if out.inputs['Surface'].links else None;em=n.new('ShaderNodeEmission');em.inputs[0].default_value=(1,0,0,1) if m in cloth_materials else (0,1,0,1) if m in trim_materials else (0,0,0,1);l.new(em.outputs[0],out.inputs['Surface']);backup.append((m,out,previous,em))
    scene.cycles.samples=1;scene.cycles.use_denoising=False
   dest=OUT/style/passname;dest.mkdir(parents=True,exist_ok=True)
-  for row in range(5):
+  for row in range(8 if slug=='customer-06' else 5):
    col=0
    for anim,count in anims:
     for f in range(count):

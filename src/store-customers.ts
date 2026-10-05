@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { assetUrl } from './asset-url';
 import { selfLit } from './material-lighting';
-import { customerRoster } from './cast-catalog';
+import { customerRoster, customerAtlasRows, customerSpriteFacing } from './cast-catalog';
 import type { ClerkDest } from './clerk';
 import type { ClerkNavGrid, NavPoint } from './clerk-nav';
 import { UNIT_DEPTH } from './store-layout';
@@ -76,12 +76,13 @@ export class StoreCustomers {
       this.people.push(person);
       new THREE.TextureLoader().load(assetUrl(`textures/cast/${id}/color.webp`), texture => {
         if (this.disposed) { texture.dispose(); return; }
-        if (texture.image.width !== 2048 || texture.image.height !== 1920) {
+        const rows = customerAtlasRows(id);
+        if (texture.image.width !== 2048 || texture.image.height !== rows * 384) {
           texture.dispose(); return;
         }
         texture.colorSpace = THREE.SRGBColorSpace; texture.generateMipmaps = false;
         texture.minFilter = texture.magFilter = THREE.LinearFilter;
-        texture.repeat.set(1 / 8, 1 / 5); texture.offset.set(0, 4 / 5);
+        texture.repeat.set(1 / 8, 1 / rows); texture.offset.set(0, 1 - 1 / rows);
         person.texture = texture; material.map = texture; material.needsUpdate = true;
         mesh.visible = true; group.visible = true; this.wake();
       }, undefined, () => { /* Missing optional art leaves no opaque placeholder. */ });
@@ -143,9 +144,10 @@ export class StoreCustomers {
       const toCamera = Math.atan2(camera.position.x - p.position.x, camera.position.z - p.position.z);
       const angle = ((p.heading - toCamera) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
       const octant = Math.round(angle / (Math.PI / 4)) % 8;
-      const row = octant <= 4 ? octant : 8 - octant, flip = octant > 4;
+      const { row, flip } = customerSpriteFacing(p.id, octant);
+      const rows = customerAtlasRows(p.id);
       const col = moving ? 2 + Math.floor(p.time * 3.16) % 4 : 6 + Math.floor(p.time / 1.5) % 2;
-      const x = (col + (flip ? 1 : 0)) / 8, y = 1 - (row + 1) / 5;
+      const x = (col + (flip ? 1 : 0)) / 8, y = 1 - (row + 1) / rows;
       if (p.texture.offset.x !== x || p.texture.offset.y !== y || p.texture.repeat.x !== (flip ? -1 : 1) / 8) {
         p.texture.repeat.x = (flip ? -1 : 1) / 8; p.texture.offset.set(x, y); this.wake();
       }

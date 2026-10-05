@@ -29,7 +29,9 @@ import puppeteer from 'puppeteer';
 const CUSTOMER = process.argv.includes('--customer');
 const CELL_W = 256;
 const CELL_H = 384;
-const DIRS = ['front', 'frontSide', 'side', 'backSide', 'back'];
+const FULL_DIRECTIONS = CUSTOMER && process.argv.includes('--full-directions');
+const DIRS = ['front', 'frontSide', 'side', 'backSide', 'back',
+  ...(FULL_DIRECTIONS ? ['backSideLeft', 'sideLeft', 'frontSideLeft'] : [])];
 const ANIMS = CUSTOMER ? [['idle', 2], ['walk', 4], ['browse', 2]] : [
   ['idle', 2], ['walk', 4], ['stockHigh', 2], ['stockMid', 2],
   ['stockLow', 2], ['talk', 2], ['type', 2],
@@ -125,7 +127,7 @@ async function split(sheetFile, outDir, opts) {
   writeFileSync(join(outDir, 'grid.json'), JSON.stringify({
     cols: COLS, rows: ROWS, cellW: CELL_W, cellH: CELL_H, scale: opts.scale,
     dirs: DIRS,
-    note: 'Rows are facings, all drawn heading screen-RIGHT; the runtime mirrors them for the other octants. Columns are animation frames.',
+    note: FULL_DIRECTIONS ? 'Eight separately rendered octants; never mirrored. Columns are animation frames.' : 'Five facings; runtime mirrors the other octants. Columns are animation frames.',
     cells: Array.from({ length: ROWS }, (_, row) => Array.from({ length: COLS }, (_, col) => ({
       row, col, dir: DIRS[row], ...COL_LABEL[col], file: cellName(row, col),
     }))).flat(),
@@ -308,6 +310,7 @@ const USAGE = `clerk-sheet — split / restitch / check a clerk sprite sheet
   node tools/clerk-sheet.mjs check  <sheet.png>
 
 Use --customer for the 8-column, 256x384 customer contract.
+Add --full-directions for asymmetric customers with eight separate facing rows.
 Get a sheet to start from by opening the store with ?clerk_template=1.
 The grid is ${COLS} columns (animation frames) x ${ROWS} rows (facings), cells 2:3.
 --scale writes cells larger than the ${CELL_W}x${CELL_H} atlas cell, which is what

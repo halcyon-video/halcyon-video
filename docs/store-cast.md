@@ -15,7 +15,7 @@ The store does not load these 3D source meshes.
 | Customer 03 | Black bob and glasses, mustard sweater, red sneakers | 5.05 |
 | Customer 04 | Stocky red-haired bearded man, plaid shirt, work boots | 5.65 |
 | Customer 05 | High natural puff, plum bomber, white high-tops | 5.85 |
-| Customer 06 | Long brown hair, denim jacket, olive chinos | 5.90 |
+| Customer 06 | Long brown hair, denim jacket, olive chinos, black flaming skull on left forearm | 5.90 |
 | Customer 07 | Older woman, silver bun, rose cardigan | 5.05 |
 | Customer 08 | Side-parted black hair, teal/navy windbreaker, cargo trousers | 5.40 |
 | Customer 09 | Copper braid, green overshirt, brown trousers | 5.80 |
@@ -92,10 +92,10 @@ node tools/clerk-sheet.mjs check public/textures/cast/customer-01/color.webp --c
 Repeat for customer-02 through customer-10. For `clerk-b`, stitch each of the
 `polo` and `oxford` colour/livery directories without `--customer`, then check
 both colour sheets. All characters face Blender -Y, Z is up, floor is Z=0. The
-billboard canvas spans 6.4 feet; actual heights are recorded above. Customer sheets
+billboard canvas spans 6.4 feet; actual heights are recorded above. Most customer sheets
 are 2048×1920: five directions and eight columns (idle 2, walk 4, browse 2), with
 256×384 cells. Customer delivery sheets use WebP with full-quality alpha; decoded RGBA storage is
-15 MiB per identity (45 MiB for the default three, 150 MiB for all ten), without
+15 MiB per identity, except customer 06 as described below (45–54 MiB for the default three, 159 MiB for all ten), without
 mipmaps. Clerk sheets retain the existing 4096×1920, 16-column contract.
 
 The ordinary clerk A source and sprite atlases are unchanged. Customer previews
@@ -106,3 +106,18 @@ API reference: https://docs.meshy.ai/en/api/image-to-3d and
 https://docs.meshy.ai/en/api/rigging. One generation cost 30 credits and one initial
 rig cost five, for 385 existing credits across this eleven-character batch. No
 subscription or additional credit purchase was made.
+
+### Customer 06: left forearm tattoo
+
+An original black-ink flaming skull decal is fitted to the anatomical left lower
+forearm using the underlying body's identical skin weights. The packed Blender
+source and animated GLB include the editable surface and transparent tattoo art.
+`tools/models/customer-six-tattoo.py` reapplies it to an existing checked rig;
+`build-cast.py` also reapplies it when rebuilding the character from its base.
+Run `finalize-cast.py` afterward to refresh the GLB and animation checks.
+
+Customer 06 has eight separately rendered directions to prevent the tattoo from
+swapping arms when turning. Its atlas is 2048×3072 (24 MiB decoded RGBA); use
+`--customer --full-directions` for both clerk-sheet stitch and check. Other
+customers retain their five-direction 2048×1920 sheets. The generated reference
+image and original Meshy base remain preserved as provenance, before the tattoo.
