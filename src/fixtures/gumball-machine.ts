@@ -5,6 +5,8 @@ import type { Footprint } from '../layout-validator';
 import { installDisplayModel } from './display-model';
 import { prepareRetailModel } from './retail-model';
 import { gumballLogo } from './gumball-logo';
+import { onBrandChange } from '../brand-live';
+import { getActiveTheme } from '../themes';
 import { GUMBALL_RADIUS, GUMBALL_HEIGHT, GUMBALL_SCALE } from './gumball-layout';
 
 /** Static set dressing. Detail uses the existing deferred, cancellable model loader. */
@@ -12,6 +14,7 @@ export class GumballMachine implements StoreFixture {
   private group: THREE.Group | null = null;
   private removeModel: (() => void) | null = null;
   private logo: ReturnType<typeof gumballLogo> | null = null;
+  private unsubscribeBrand: (() => void) | null = null;
   private owned: Array<{ dispose(): void }> = [];
   constructor(public placement: FixturePlacement, private ctx: FixtureContext) {}
   build(): void {
@@ -20,6 +23,11 @@ export class GumballMachine implements StoreFixture {
     root.rotation.y = this.placement.yaw;
     const fallback = new THREE.Group(); fallback.scale.setScalar(GUMBALL_SCALE); root.add(fallback);
     const enamel = new THREE.MeshStandardMaterial({ color: this.ctx.activeTheme.palette.primary, roughness: .24, metalness: .12 });
+    // Fallback and imported enamel share this finish; update it in place.
+    this.unsubscribeBrand = onBrandChange(() => {
+      enamel.color.set(getActiveTheme().palette.primary);
+      this.ctx.requestRender();
+    });
     const chrome = new THREE.MeshStandardMaterial({ color: 0xb4bec5, roughness: .21, metalness: .82 });
     // Thin transparent plastic avoids a full-viewport refraction pass on phones.
     const clear = new THREE.MeshStandardMaterial({ color: 0xf7fbff, roughness: .07, transparent: true, opacity: .045, depthWrite: false, side: THREE.DoubleSide });
@@ -32,7 +40,8 @@ export class GumballMachine implements StoreFixture {
     mesh(new THREE.CylinderGeometry(.48,.48,2.5,24),chrome,1.55);
     mesh(new THREE.CylinderGeometry(.7,.6,.7,32),enamel,3.1);
     mesh(new THREE.SphereGeometry(.97,32,18),clear,4.42);
-    mesh(new THREE.CylinderGeometry(.65,.72,.13,32),enamel,5.33);
+    mesh(new THREE.SphereGeometry(.984,32,12,0,Math.PI*2,0,Math.acos(.85/.984)),enamel,4.42);
+    mesh(new THREE.CylinderGeometry(.505,.505,.035,32),chrome,5.267);
     const coin=mesh(new THREE.BoxGeometry(.35,.43,.1),chrome,3.12); coin.position.z=.67;
     const logo = this.logo = gumballLogo(clear, () => this.ctx.requestRender());
     logo.attach(fallback);
@@ -59,6 +68,7 @@ export class GumballMachine implements StoreFixture {
   }
   update(): void {}
   dispose(): void {
+    this.unsubscribeBrand?.(); this.unsubscribeBrand=null;
     this.logo?.dispose(); this.logo=null;
     this.removeModel?.(); this.removeModel=null;
     this.group?.removeFromParent(); this.group=null;

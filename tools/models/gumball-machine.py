@@ -83,10 +83,18 @@ def build(config=None,output=None,source=None):
     outer=config.get('hopper',[(.66,3.28),(.83,3.4),(.90,3.58),(.90,4.87),(.83,5.05),(.66,5.18)])
     shell=outer+[(r-.016,z) for r,z in reversed(outer)]
     lathe('Clear hopper shell',shell,clear)
-    lathe('Lid rim',[(0,5.19),(.69,5.19),(.71,5.23),(.70,5.27),(0,5.27)],chrome)
-    lathe('Domed locking lid',[(0,5.27),(.69,5.27),(.65,5.33),(.54,5.40),(.34,5.46),(.12,5.48),(0,5.48)],enamel)
-    lathe('Lid lock',[(0,5.48),(.045,5.48),(.045,5.5),(0,5.5)],chrome,24)
-    lathe('Hopper tie rod',[(0,3.29),(.019,3.29),(.019,5.19),(0,5.19)],chrome,12)
+    # Fit the rolled seam to the actual hopper opening, with a thin overlap.
+    opening,seat=outer[-1]
+    rim=config.get('lid_rim',[(opening-.012,seat-.008),(opening+.012,seat-.008),
+        (opening+.016,seat+.012),(opening+.009,seat+.026),(opening-.012,seat+.026)])
+    lid=config.get('lid_profile',[(0,seat+.022),(opening+.009,seat+.022),
+        (opening*.93,seat+.10),(opening*.78,seat+.19),(opening*.48,seat+.27),
+        (opening*.17,seat+.30),(0,seat+.30)])
+    lathe('Lid rim',rim,chrome)
+    lathe('Domed locking lid',lid,enamel)
+    lidtop=max(z for r,z in lid)
+    lathe('Lid lock',[(0,lidtop),(.045,lidtop),(.045,lidtop+.02),(0,lidtop+.02)],chrome,24)
+    lathe('Hopper tie rod',[(0,3.29),(.019,3.29),(.019,seat+.022),(0,seat+.022)],chrome,12)
     # The coin face and bottom delivery door both face store-local +Z (Blender -Y).
     cy=config.get('coin_front',-.59)
     h=(bodylo+bodyhi)/2
