@@ -1,0 +1,13 @@
+{
+  "preservedHeadGeometryUVWeightsSHA256": "398d4e9d7b8eed14e7db091ed2578ba8a543026d164c61f08d08b49bccfdb9b9",
+  "protectedFaces": 9398,
+  "replacedGeneratedHeadFaces": 9166,
+  "originalHeadScaleFeet": 0.03641975368301965,
+  "fittedHeadScaleFeet": 0.03641975298523903,
+  "localRigOffset": [
+    5.22837240168883e-09,
+    0.17831897735595703,
+    0.3494110107421875
+  ],
+  "originalMeshDataUnchanged": true
+}

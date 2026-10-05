@@ -12,7 +12,9 @@ def option(name,default):
 SRC=option('--source-dir',ROOT/'tools/models/cast'/slug)
 OUT=option('--render-dir',ROOT/'scratch/cast-render'/slug);OUT.mkdir(parents=True,exist_ok=True)
 bpy.ops.object.select_all(action='SELECT');bpy.ops.object.delete(use_global=False)
-bpy.ops.import_scene.gltf(filepath=str(SRC/'source.glb'))
+source_glb=SRC/('source-wardrobe.glb' if slug=='customer-06' else 'source.glb')
+if not source_glb.exists():raise RuntimeError('Missing approved source model: '+str(source_glb))
+bpy.ops.import_scene.gltf(filepath=str(source_glb))
 arm=next(o for o in bpy.context.scene.objects if o.type=='ARMATURE')
 body=max((o for o in bpy.context.scene.objects if o.type=='MESH' and o.vertex_groups),key=lambda o:len(o.data.vertices))
 for o in list(bpy.context.scene.objects):

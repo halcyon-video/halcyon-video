@@ -1,0 +1,22 @@
+{
+  "status": "SUCCEEDED",
+  "consumed_credits": 30,
+  "task_id": "01a10d3b-3229-7510-b7de-9507d9a6ca6a",
+  "request": {
+    "ai_model": "meshy-7.1",
+    "model_type": "standard",
+    "geometry_resolution": "standard",
+    "should_texture": true,
+    "texture_resolution": "4k",
+    "enable_pbr": false,
+    "should_remesh": true,
+    "target_polycount": 30000,
+    "topology": "triangle",
+    "pose_mode": "a-pose",
+    "image_enhancement": false,
+    "target_formats": [
+      "glb"
+    ],
+    "multi_view_thumbnails": true
+  }
+}

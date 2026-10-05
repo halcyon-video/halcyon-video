@@ -124,22 +124,31 @@ image and original Meshy base remain preserved as provenance, before the tattoo.
 
 ### Customer 06: wardrobe
 
-`tools/models/customer-six-wardrobe.py` preserves the original head, face, hair,
-hand geometry, UVs and skin weights, plus the fitted stubble. It replaces the
-body wardrobe with smooth continuous arms, rounded short maroon sleeves, a
-crew-neck shirt, a classic collarless brown leather V-neck vest, welded brown
-trousers and low harness boots. The vest has open armholes, shoulder bridges,
-sewn thickness, welt pockets and small snaps; it has no folded collar or lapels.
-Boot soles and vamps follow the foot, while the upper shafts blend into the
-lower leg to keep the trouser joins covered during captured walking.
+Customer 06 uses `source-wardrobe.glb`, a new Meshy 7.1 clothed body from
+`reference-wardrobe.png`, with a fitted collarless leather waistcoat, clean short
+maroon sleeves, modeled trouser folds and low harness boots. The replacement
+body follows the same generation and captured-motion pipeline as the other
+regulars; the earlier smooth tube-body construction is retired.
 
-The checked editable rig can be rebuilt in place with the wardrobe script,
-then `finalize-cast.py` and `render-customer-atlas.py`. The tattoo is fitted again
-to the new anatomical left forearm using its identical body weights.
-Customer 06's delivery sheet is encoded as lossless WebP to keep the newly
-rendered garment edges intact. The original generation references remain
-provenance. The wardrobe report records the preserved identity and construction;
-the animation report checks all 41 samples of both captured clips.
+`customer-six-wardrobe.py` calls `customer-six-head.py` to replace the donor's
+head with the checked original in `identity-head.blend`. The original head and
+face vertex positions, UVs, skin weights, packed albedo and fitted stubble remain
+unchanged. `identity-head.json` records the original rig joint and physical mesh
+scale; the adapter fits that same physical head size to the new rig without
+resculpting it. `head-preservation.json` verifies the immutable mesh hash and
+fitted scale. The original `source.glb` and `reference.png` remain provenance.
+
+Reproduce with `build-cast.py -- customer-06`, then `finalize-cast.py` and
+`render-customer-atlas.py`. The original left flaming-skull decal is fitted to
+the new forearm with its identical underlying skin weights. The eight-direction
+atlas uses the existing sprite contract and lossless WebP delivery.
+
+The replacement generation and initial rig consumed 35 existing credits,
+615 to 580, with no purchase. Its sanitized generation, rigging and credit
+receipts are stored beside the source. Review includes front and side views at
+the same camera, lighting and gait phase as customers 04 and 10, plus eight
+phases of the complete walk. These comparisons assess knee, ankle, boot and
+fabric appearance; grounding checks alone do not establish visual quality.
 
 `render-customer-atlas.py` also accepts `clerk-b` to update idle/walking cells in
 both uniforms while retaining existing working cells. Split the shipped atlases
