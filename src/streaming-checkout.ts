@@ -3,6 +3,7 @@ import type { Movie } from './jellyfin.ts';
 import type { StoreScene } from './three-scene.ts';
 import { resolveStreamingCheckoutUrl } from './streaming-catalog.ts';
 import { retailAudio } from './audio.ts';
+import { showClerkToast } from './clerk-toast.ts';
 
 export const STANDARD_INK = '#211d19';
 
@@ -35,6 +36,8 @@ const checkoutMovies = new WeakMap<StoreScene, Movie>();
 /** Row layout bounds for click/tap hit testing on the back texture */
 interface RowRegion {
   index: number;
+  x0: number;
+  x1: number;
   y0: number;
   y1: number;
 }
@@ -161,6 +164,21 @@ export function confirmStreamingServiceChoice(scene: StoreScene): boolean {
   const chosen = state.services[state.selectedIndex] ?? state.services[0];
   const movie = state.movie;
 
+  // Pickup can fail when a local tape already fills the hand. Keep the
+  // printed choice live and leave the title's provider untouched on refusal.
+  scene.setCarryMode(true);
+  const verdict = scene.ensureCarried().take(movie, scene.getActiveSlotKey(), null, performance.now());
+  if (verdict !== 'ok') {
+    const message = verdict === 'full'
+      ? 'Your hands are full — check out or return a carried title before taking this one.'
+      : `You're already carrying "${movie.title}" — check it out or return it first.`;
+    try { retailAudio.playDenyBuzz(); } catch {}
+    showClerkToast(message);
+    scene.onConsoleLog(`[System] ${message}`, 'system');
+    scene.requestRender();
+    return false;
+  }
+
   // Apply chosen service properties to movie
   movie.streamingServiceId = chosen.id;
   movie.streamingServiceName = chosen.name;
@@ -172,8 +190,6 @@ export function confirmStreamingServiceChoice(scene: StoreScene): boolean {
   serviceRowRegions.delete(movie.id);
 
   // Take tape into carried stack and fly to front counter
-  scene.setCarryMode(true);
-  scene.ensureCarried().take(movie, scene.getActiveSlotKey(), null, performance.now());
   checkoutMovies.set(scene, movie);
 
   try { retailAudio.playBoxPickup(); } catch {}
@@ -244,7 +260,7 @@ export function completeStreamingCheckout(scene: StoreScene): boolean {
  */
 export function drawStreamingChoiceOverlays(
   ctx: CanvasRenderingContext2D,
-  L: { dvd2003?: boolean; imgH?: number; back?: [number, number, number, number]; card?: { y: number }; window?: { x: number; y: number; width: number; bottom: number } },
+  L: { dvd2003?: boolean; imgW?: number; imgH?: number; back?: [number, number, number, number]; card?: { y: number }; window?: { x: number; y: number; width: number; bottom: number } },
   movie: Movie,
 ): void {
   ctx.save();
@@ -296,8 +312,12 @@ export function drawStreamingChoiceOverlays(
     ctx.fillText(text, wx, y + 4, wMax);
 
     const canvasH = L.imgH ?? 768;
+    const canvasW = L.imgW ?? 480;
+    const cropLeft = L.back?.[0] ?? 0, cropWidth = (L.back?.[2] ?? 1) - cropLeft;
     const cropTop = L.back?.[1] ?? 0, cropHeight = (L.back?.[3] ?? 1) - cropTop;
-    rows.push({ index: i, y0: (y / canvasH - cropTop) / cropHeight,
+    rows.push({ index: i, x0: (wx / canvasW - cropLeft) / cropWidth,
+      x1: ((wx + wMax) / canvasW - cropLeft) / cropWidth,
+      y0: (y / canvasH - cropTop) / cropHeight,
       y1: ((y + rowH) / canvasH - cropTop) / cropHeight });
     y += rowH;
   }
@@ -345,7 +365,8 @@ export function handleStreamingBackTap(scene: StoreScene, uv: THREE.Vector2): bo
   // Texture V is bottom-up; canvas Y is top-down.
   const canvasY = 1 - uv.y;
 
-  const hitRow = rows.find((r) => canvasY >= r.y0 && canvasY <= r.y1);
+  const hitRow = rows.find((r) => uv.x >= r.x0 && uv.x <= r.x1
+    && canvasY >= r.y0 && canvasY < r.y1);
   if (hitRow) {
     if (hitRow.index === state.selectedIndex) {
       confirmStreamingServiceChoice(scene);
