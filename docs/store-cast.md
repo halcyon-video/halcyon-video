@@ -15,7 +15,7 @@ The store does not load these 3D source meshes.
 | Customer 03 | Black bob and glasses, mustard sweater, red sneakers | 5.05 |
 | Customer 04 | Stocky red-haired bearded man, plaid shirt, work boots | 5.65 |
 | Customer 05 | High natural puff, plum bomber, white high-tops | 5.85 |
-| Customer 06 | Long brown hair, denim jacket, olive chinos, black flaming skull on left forearm | 5.90 |
+| Customer 06 | Long brown hair, thick stubble, maroon T-shirt, brown vest and jeans, low brown harness boots with chains, black flaming skull on left forearm | 5.90 |
 | Customer 07 | Older woman, silver bun, rose cardigan | 5.05 |
 | Customer 08 | Side-parted black hair, teal/navy windbreaker, cargo trousers | 5.40 |
 | Customer 09 | Copper braid, green overshirt, brown trousers | 5.80 |
@@ -50,7 +50,7 @@ vertices whose heat binding fails, normalizes every weight, and corrects the imp
 These are generated bases with scripted Blender authoring, not hand-sculpted
 characters. Faces and individual fingers do not have separate animation controls.
 
-Standing and walking use the existing calibrated ACCAD capture retargeter.
+Standing and walking use the existing calibrated ACCAD capture retargeter. The neutral hand calibration measures each mesh's palm plane from its weighted skin, distributes wrist roll across forearm and hand, and points relaxed palms toward the thighs. The baked idle and walking checks inspect both palms and floor contact at all 41 samples in each clip.
 See `tools/models/motion-sources/README.md` for CC BY 3.0 attribution and the
 source captures. The per-character metrics report exactly how many vertices
 retain source binding; every finished pose is visually reviewed. Male characters use the steady walk; female characters use the
@@ -98,7 +98,7 @@ are 2048×1920: five directions and eight columns (idle 2, walk 4, browse 2), wi
 15 MiB per identity, except customer 06 as described below (45–54 MiB for the default three, 159 MiB for all ten), without
 mipmaps. Clerk sheets retain the existing 4096×1920, 16-column contract.
 
-The ordinary clerk A source and sprite atlases are unchanged. Customer previews
+Clerk A retains its original authored gait, clothing, dimensions and working cells; only neutral hand rotation in its idle and walking frames changes. Customer previews
 and source metrics are generated under `scratch/cast-render`; public verification
 photographs are retained with the development commit's publicity kit.
 
@@ -121,6 +121,23 @@ swapping arms when turning. Its atlas is 2048×3072 (24 MiB decoded RGBA); use
 `--customer --full-directions` for both clerk-sheet stitch and check. Other
 customers retain their five-direction 2048×1920 sheets. The generated reference
 image and original Meshy base remain preserved as provenance, before the tattoo.
+
+### Customer 06: wardrobe
+
+`tools/models/customer-six-wardrobe.py` fits the brown vest and short maroon
+sleeves to the preserved continuous body topology, eases the old rolled cuffs,
+adds a surface-bound short beard, tapers brown jeans, and replaces sneakers with
+editable leather boot vamps, low shafts, outsoles, stacked heels, harness straps,
+side rings and linked metal chains. Every part carries normalized skin weights.
+`build-cast.py` applies this wardrobe before fitting the original tattoo. Grounding
+uses all actual outfit surfaces, including the new boot heels. The source and
+generation references remain the original identity's provenance.
+
+`render-customer-atlas.py` also accepts `clerk-b` to update idle/walking cells in
+both uniforms while retaining existing working cells. Split the shipped atlases
+into its render directories first, then stitch the complete sheets afterward. To preserve working pixels exactly, use ImageMagick crop and append to join the newly rendered first six columns (1536 pixels) to the original remaining ten columns (2560 pixels), for both color and livery; a browser canvas round trip can change transparent RGB values. Refresh the compressed phone clerk pair and its source receipt whenever the clerk A sources change.
+Optional `--source-dir` and `--render-dir` support private installed identities
+without mixing their source or sprites into the public character directories.
 
 ### Private clerk likenesses
 

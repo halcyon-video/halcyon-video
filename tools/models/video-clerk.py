@@ -258,6 +258,12 @@ def final_pose(anim,frame=0):
  else:
   pose('idle')
   if frame:arm.pose.bones['Head'].rotation_mode='QUATERNION';arm.pose.bones['Head'].rotation_quaternion=Matrix.Rotation(.025,4,'Z').to_quaternion()
+ if anim in ['idle','walk']:
+  matrices={b.name:b.matrix.copy() for b in arm.pose.bones}
+  arm.animation_data_clear()
+  for b in arm.pose.bones:b.matrix=matrices[b.name];bpy.context.view_layer.update()
+  import runpy
+  runpy.run_path(str(R/'clerk-captured-motion.py'))['calibrate_hands'](arm,lambda:bpy.context.view_layer.update())
  root.location.z=0;bpy.context.view_layer.update()
  ev=body.evaluated_get(bpy.context.evaluated_depsgraph_get())
  root.location.z=-min((ev.matrix_world@v.co).z for v in ev.data.vertices)
@@ -307,6 +313,7 @@ if '--render' in args:
   col=0
   for anim,count in anims:
    for frame in range(count):
+    if '--hands-only' in args and anim not in ['idle','walk']:col+=1;continue
     metadata.append({'row':row,'col':col,'direction':direction,'animation':anim,'frame':frame,'file':f'{row:02d}-{col:02d}_{direction}_{anim}{frame}.png'});col+=1
  for pass_name in ['color','livery']:
   if pass_name=='livery':

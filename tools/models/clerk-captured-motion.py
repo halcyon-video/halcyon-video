@@ -32,6 +32,36 @@ def load(root):
   captures[name]={'samples':samples,'duration':(end-start)/30,'sourceFrames':[start,end],'source':file,'fps':fps}
  return captures
 
+def calibrate_hands(arm,update):
+ """Measure the actual palm plane, then distribute neutral roll over the wrist.
+ Generated hand bone rolls do not describe the mesh's palm orientation. Use
+ weighted skin geometry (including authored digits) rather than a fixed roll.
+ """
+ import numpy as np
+ body=max((o for o in arm.children if o.type=='MESH' and o.vertex_groups),key=lambda o:len(o.data.vertices))
+ report={}
+ for side,sign in [('Left',1),('Right',-1)]:
+  rest=arm.data.bones[side+'Hand'];names={rest.name,*[b.name for b in rest.children_recursive]}
+  groups={g.index for g in body.vertex_groups if g.name in names}
+  points=np.array([tuple(v.co) for v in body.data.vertices if sum(g.weight for g in v.groups if g.group in groups)>.65])
+  if len(points)<12:raise RuntimeError('Insufficient hand skin for '+side)
+  values,vectors=np.linalg.eigh(np.cov(points.T));normal=Vector(vectors[:,0])
+  # Meshy bases face -Y; choose the palm side nearest the anatomical medial
+  # direction. Front-facing open palms use the same sign on both hands.
+  if normal.dot(Vector((-sign,-.25,0)))<0:normal=-normal
+  local=rest.matrix_local.to_3x3().inverted()@normal
+  hand=arm.pose.bones[rest.name];axis=(hand.tail-hand.head).normalized()
+  actual=hand.matrix.to_3x3()@local;actual=(actual-axis*actual.dot(axis)).normalized()
+  desired=Vector((-sign,-.12,0));desired=(desired-axis*desired.dot(axis)).normalized()
+  angle=math.atan2(axis.dot(actual.cross(desired)),actual.dot(desired))
+  fore=arm.pose.bones[side+'ForeArm'];m=fore.matrix.copy();q=Quaternion((fore.tail-fore.head).normalized(),angle*.65)
+  fore.matrix=Matrix.Translation(m.translation)@q.to_matrix().to_4x4()@m.to_3x3().to_4x4();update()
+  hand=arm.pose.bones[rest.name];m=hand.matrix.copy();q=Quaternion((hand.tail-hand.head).normalized(),angle*.35)
+  hand.matrix=Matrix.Translation(m.translation)@q.to_matrix().to_4x4()@m.to_3x3().to_4x4();update()
+  report[side]={'neutralRollDegrees':math.degrees(angle),'palmNormalLocal':list(local),'planeEigenvalues':list(values)}
+ arm['hand_calibration']=json.dumps(report)
+ return report
+
 def make_retarget(arm,reset,aim,hand_curl,update,root):
  captures=load(root)
  reset()
@@ -48,6 +78,7 @@ def make_retarget(arm,reset,aim,hand_curl,update,root):
   # and toe-off relative to the source's standing calibration.
   b=arm.pose.bones[side+'Foot'];b.matrix=Matrix.Translation(b.head)@arm.data.bones[b.name].matrix_local.to_3x3().to_4x4();update()
   arm.pose.bones[side+'ToeBase'].matrix_basis=Matrix.Identity(4);update()
+ calibrate_hands(arm,update)
  base={b.name:b.matrix.to_quaternion().copy() for b in arm.pose.bones}
  calibration=captures['idle']['samples'][0]['q']
  def apply(name,u):

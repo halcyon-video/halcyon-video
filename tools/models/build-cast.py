@@ -161,7 +161,7 @@ def pose(kind,u):
   if kind=='stockLow':
    for side,sign in [('Left',1),('Right',-1)]:aim(side+'UpLeg',(sign*.1,-.55,-.8));aim(side+'Leg',(sign*.025,.4,-.9))
    aim('Spine02',(0,-.15,1))
- update();ev=body.evaluated_get(bpy.context.evaluated_depsgraph_get());points=[ev.matrix_world@v.co for v in ev.data.vertices];anchor.location.z=-min(v.z for v in points);update()
+ update();objects=[o for o in arm.children if o.type=='MESH' and not o.hide_render and o!=case];points=[ev.matrix_world@ev.data.vertices[i].co for o in objects for ev in [o.evaluated_get(bpy.context.evaluated_depsgraph_get())] for i in {i for p in ev.data.polygons for i in p.vertices}];anchor.location.z=-min(v.z for v in points);update()
  if case:
   case.hide_render=not kind.startswith('stock')
   right=arm.pose.bones['RightHand'];palm=right.matrix@Vector((0,7,0))
@@ -191,6 +191,7 @@ for name,objects in outfits.items():
   for old in list(o.users_collection):old.objects.unlink(o)
   col.objects.link(o)
 if slug=='customer-06':
+ runpy.run_path(str(ROOT/'tools/models/customer-six-wardrobe.py'))['apply'](body,arm,SRC)
  tattoo=runpy.run_path(str(ROOT/'tools/models/customer-six-tattoo.py'))['apply'](body,arm,SRC);outfits['casual'].append(tattoo)
 bpy.ops.object.select_all(action='DESELECT');arm.select_set(True);bpy.context.view_layer.objects.active=arm;arm.show_in_front=True
 for screen in bpy.data.screens:
