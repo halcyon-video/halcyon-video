@@ -1,0 +1,10 @@
+{
+  "version": 5,
+  "armVertices": 1464,
+  "waistVertices": 1786,
+  "ankleVertices": 563,
+  "armRadiusReductionMaximum": 0.22,
+  "waist": "shared pelvis envelope through shirt/waistband transition",
+  "ankle": "shared calf-foot envelope through trouser hem and boot collar",
+  "headUnmodified": true
+}

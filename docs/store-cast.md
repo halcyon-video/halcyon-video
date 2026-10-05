@@ -132,7 +132,7 @@ regulars; the earlier smooth tube-body construction is retired.
 
 `customer-six-wardrobe.py` calls `customer-six-head.py` to replace the donor's
 head with the checked original in `identity-head.blend`. The original head and
-face vertex positions, UVs, skin weights, packed albedo and fitted stubble remain
+face vertex positions, UVs, skin weights, packed head albedo remain
 unchanged. `identity-head.json` records the original rig joint and physical mesh
 scale; the adapter fits that same physical head size to the new rig without
 resculpting it. `head-preservation.json` verifies the immutable mesh hash and
@@ -142,6 +142,20 @@ Reproduce with `build-cast.py -- customer-06`, then `finalize-cast.py` and
 `render-customer-atlas.py`. The original left flaming-skull decal is fitted to
 the new forearm with its identical underlying skin weights. The eight-direction
 atlas uses the existing sprite contract and lossless WebP delivery.
+
+`customer-six-joints.py` fits the body after grafting: it reduces the oversized
+arm radius progressively while retaining the hands, gives the shirt/waistband
+boundary a shared pelvis envelope, and gives the trouser hem and boot collar a
+shared calf-to-foot envelope. A fitted tucked-shirt waist layer covers the
+shadowed opening beneath the vest. `joint-fit.json` records the edited regions.
+`customer-six-beard.py` keeps the original facial mesh intact and replaces the
+solid-looking translucent chin patch with dark follicle coverage. Cheek and
+mouth edges fade through the surface boundary rings; head-bone influence fades
+pigment off the neck. `beard-check.json` records the finish and parameters.
+
+Joint review uses tight waist, ankle and shoulder crops from both front and side
+at every shipped walk phase; the whole-character framing does not establish
+that these joins are sound.
 
 The replacement generation and initial rig consumed 35 existing credits,
 615 to 580, with no purchase. Its sanitized generation, rigging and credit

@@ -1,0 +1,10 @@
+{
+  "finish": "Short dark follicles; feathered cheeks, mouth and neck; no solid chin mask",
+  "follicleScale": 115,
+  "coverageThresholds": [
+    0.26,
+    0.47
+  ],
+  "boundaryFadeRings": 2.2,
+  "headMeshUnmodified": true
+}
