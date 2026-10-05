@@ -145,6 +145,7 @@ import { Footprint } from './layout-validator';
 import { SurfaceRegistry } from './mount-surfaces';
 import { GondolaMaterials } from './shelving';
 import { StoreClerk } from './clerk';
+import { StoreCustomers } from './store-customers';
 import { ClerkNavGrid, NavRect } from './clerk-nav';
 import { setMaxAnisotropy, setCheapMaterials } from './canvas-textures';
 import { readCalibratedQuality, usesPhoneQualityDefault } from './quality-calibrate';
@@ -751,6 +752,7 @@ export class StoreScene {
   public selectedUnitSource: 'shelving' | 'fixture' = 'shelving';
   public selectedFixtureId: string | null = null;
   public clerk: StoreClerk | null = null;
+  public customers: StoreCustomers | null = null;
   // The clerk's walkability grid + the footprint set it was built from, kept
   // for the harness path audit (debugClerkPathAudit).
   public clerkNavGrid: ClerkNavGrid | null = null;
@@ -4641,6 +4643,8 @@ export class StoreScene {
       }
     }
 
+    this.customers?.update(clerkDt, this.camera, time - getLastUserActivity() < CLERK_SLEEP_INPUT_MS && this.mode !== 'backroom', this.mode !== 'inspect');
+
     // Arrow-bob wake gate (issue: library-select idle drain). store-camera
     // keeps the arrow visible for as long as library-select is up, and the
     // bob used to hold the VIDEO tier (via videoPlaying below) forever —
@@ -4787,7 +4791,7 @@ export class StoreScene {
     // multi-hour lockout.
     // !clerkAsleep: while she sleeps her sim is paused, so a stride frozen at
     // WALKING must not pin ACTIVE (same hazard as the backroom gate above).
-    const clerkActive = !!this.clerk && !this.clerkAsleep && this.mode !== 'backroom' && this.mode !== 'inspect' && this.clerk.isMoving() && this.clerk.isOnScreen();
+    const clerkActive = !!this.customers?.isMovingOnScreen() || !!this.clerk && !this.clerkAsleep && this.mode !== 'backroom' && this.mode !== 'inspect' && this.clerk.isMoving() && this.clerk.isOnScreen();
     const arrowVisible = !!this.selectionArrow && this.selectionArrow.visible;
     // Snapshot before the decrement below: an interaction-wake frame (the
     // requestRender() burst any input handler fires) must always composite
@@ -5994,6 +5998,7 @@ export class StoreScene {
     // stale poster/bulb pointers.
     this.marqueeBulbsMesh = null;
     this.posterMarqueeFrames = [];
+    this.customers?.dispose(); this.customers = null;
     this.clerk?.dispose(); this.clerk = null; // tear down her DOM prompt/dialog and GPU textures/materials
     this.entrance?.dispose();
     this.entrance = null;

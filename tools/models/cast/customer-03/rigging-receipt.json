@@ -1,0 +1,9 @@
+{
+  "status": "SUCCEEDED",
+  "consumed_credits": 5,
+  "task_id": "01a10954-cde8-70cb-946b-30e6a42a441c",
+  "request": {
+    "input_task_id": "01a10951-4dcd-7522-90ef-e0b1bd4e14db",
+    "height_meters": 1.62
+  }
+}

@@ -2,6 +2,7 @@
 // while loading; runtime rendering remains the existing single lit billboard.
 import * as THREE from 'three';
 import { assetUrl } from './asset-url';
+import { resolveClerkIdentity } from './cast-catalog';
 import { getActiveTheme } from './themes';
 import { recolorClerkPixels, resolveClerkUniform } from './clerk-uniform';
 
@@ -21,7 +22,9 @@ export async function loadRenderedClerkAtlas(): Promise<THREE.CanvasTexture> {
   const primary = new THREE.Color(palette.primary).convertLinearToSRGB();
   const secondary = new THREE.Color(palette.secondary).convertLinearToSRGB();
   const uniform = resolveClerkUniform(localStorage.getItem('bb_clerk_uniform'));
-  const base = uniform === 'oxford' ? 'textures/clerk/oxford' : 'textures/clerk';
+  const identity = resolveClerkIdentity(localStorage.getItem('bb_clerk_identity'));
+  const base = identity === 'clerk-b' ? `textures/cast/clerk-b/${uniform}`
+    : uniform === 'oxford' ? 'textures/clerk/oxford' : 'textures/clerk';
   const [color, mask] = await Promise.all([
     loadImage(`${base}/color.png`),
     loadImage(`${base}/livery.png`),
@@ -42,7 +45,8 @@ export async function loadRenderedClerkAtlas(): Promise<THREE.CanvasTexture> {
     [primary.r, primary.g, primary.b], [secondary.r, secondary.g, secondary.b], uniform);
   ctx.putImageData(pixels, 0, 0);
   const texture = new THREE.CanvasTexture(canvas);
-  texture.name = `blender-clerk-atlas-${uniform}`;
+  texture.name = identity === 'clerk-a' ? `blender-clerk-atlas-${uniform}` : `blender-clerk-b-atlas-${uniform}`;
+  texture.userData.atlasSpanFeet = identity === 'clerk-b' ? 6.4 : 5.7;
   texture.colorSpace = THREE.SRGBColorSpace;
   return texture;
 }

@@ -77,6 +77,7 @@ import { buildSummerSequelsShelfStrips } from './fixtures/summer-sequels-shelf-s
 import { buildGameRentals2For10Signs } from './fixtures/game-rentals-2for10-signs';
 import { buildPreownedPreorderGamesSigns } from './fixtures/preowned-preorder-games-signs';
 import { buildNewReleaseToppers, type NrTopperRun } from './fixtures/new-release-toppers';
+import { StoreCustomers } from './store-customers';
 import { StoreClerk, ClerkDest } from './clerk';
 import { ClerkNavGrid, NavRect } from './clerk-nav';
 import { neutralizeScanTexture, createBrandLogoBodyTexture, createBrandLogoTextTexture, createNewReleasesSignTexture, createPromoSignTexture, createCeilingTileTexture, createBrickTexture, createStuccoTexture, createStorefrontLogoYellowTexture, createShelfTextures, createShelfBayShadeTexture, createWireMeshTexture, useCheapMaterials, createGlassSurfaceNormalMap, createAcousticPanelTexture, createTrofferLensTexture, createHvacVentTexture } from './canvas-textures';
@@ -2618,6 +2619,10 @@ export function buildStore(scene: StoreScene) {
     clerk.group.userData.aoBlendMask = true;
     scene.scene.add(clerk.group);
     scene.clerk = clerk;
+    if (scene.clerkNavGrid) {
+      scene.customers = new StoreCustomers(scene.clerkNavGrid, scene.plan, clerkFloorDests, () => scene.requestRender());
+      scene.scene.add(scene.customers.group);
+    }
   }
 
   // --- Dynamic Store Signage system ---

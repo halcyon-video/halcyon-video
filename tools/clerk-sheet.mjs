@@ -26,10 +26,11 @@ import puppeteer from 'puppeteer';
 // CELL_W, CELL_H) — that module is the source of truth; this is the copy a
 // plain .mjs can read without a TypeScript loader. `check` fails loudly if a
 // sheet disagrees, which is what catches drift.
+const CUSTOMER = process.argv.includes('--customer');
 const CELL_W = 256;
 const CELL_H = 384;
 const DIRS = ['front', 'frontSide', 'side', 'backSide', 'back'];
-const ANIMS = [
+const ANIMS = CUSTOMER ? [['idle', 2], ['walk', 4], ['browse', 2]] : [
   ['idle', 2], ['walk', 4], ['stockHigh', 2], ['stockMid', 2],
   ['stockLow', 2], ['talk', 2], ['type', 2],
 ];
@@ -52,6 +53,7 @@ const cellName = (row, col) =>
 async function withPage(fn) {
   const browser = await puppeteer.launch({
     headless: 'new',
+    env: { ...process.env, DBUS_SESSION_BUS_ADDRESS: 'unix:path=/dev/null' },
     args: ['--no-sandbox', '--disable-dev-shm-usage'],
   });
   try {
@@ -64,7 +66,7 @@ async function withPage(fn) {
   }
 }
 
-const dataUrl = (file) => `data:image/png;base64,${readFileSync(file).toString('base64')}`;
+const dataUrl = (file) => `data:image/${/\.webp$/i.test(file) ? 'webp' : 'png'};base64,${readFileSync(file).toString('base64')}`;
 
 /**
  * Decode a PNG in the page, park it on `self.__img` for the draw calls that
@@ -209,7 +211,7 @@ async function stitch(inDir, outFile, opts) {
 
   for (const s of soft) console.warn(`WARNING: ${s}`);
   console.log(`wrote ${outFile} — ${CELL_W * COLS}x${CELL_H * ROWS}, ${found.size} cells`);
-  console.log('drop it at public/user-assets/clerk/default.png and reload the store');
+  console.log(CUSTOMER ? 'customer atlas ready for its textures/cast identity directory' : 'drop it at public/user-assets/clerk/default.png and reload the store');
 }
 
 // ── check ───────────────────────────────────────────────────────────────────
@@ -305,6 +307,7 @@ const USAGE = `clerk-sheet — split / restitch / check a clerk sprite sheet
   node tools/clerk-sheet.mjs stitch <dir> <sheet.png> [--allow-missing]
   node tools/clerk-sheet.mjs check  <sheet.png>
 
+Use --customer for the 8-column, 256x384 customer contract.
 Get a sheet to start from by opening the store with ?clerk_template=1.
 The grid is ${COLS} columns (animation frames) x ${ROWS} rows (facings), cells 2:3.
 --scale writes cells larger than the ${CELL_W}x${CELL_H} atlas cell, which is what

@@ -1,0 +1,14 @@
+{
+  "idle": {
+    "samples": 41,
+    "maximumFloorErrorFeet": 0.0
+  },
+  "walk": {
+    "samples": 41,
+    "maximumFloorErrorFeet": 2.9802322387695312e-08
+  },
+  "exports": {
+    "polo": 12509788,
+    "oxford": 12527264
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "id": "customer-08",
+  "sourceVertices": 31332,
+  "weldedVertices": 14435,
+  "triangles": 28805,
+  "deformBones": 22,
+  "retainedSourceWeightVertices": 0,
+  "unweighted": 0,
+  "maxWeightError": 4.470348358154297e-08,
+  "heightFeet": 5.4,
+  "walkSource": "Female1_B03_Walk1",
+  "uvLayers": 1,
+  "outfits": [
+    "casual"
+  ],
+  "poses": {
+    "front": {
+      "minZ": 0.0,
+      "maxZ": 5.421137103810906,
+      "width": 1.9528297185897827
+    },
+    "side": {
+      "minZ": 0.0,
+      "maxZ": 5.421137103810906,
+      "width": 1.9528297185897827
+    },
+    "back": {
+      "minZ": 0.0,
+      "maxZ": 5.421137103810906,
+      "width": 1.9528297185897827
+    },
+    "walk-contact": {
+      "minZ": 0.0,
+      "maxZ": 5.352222837507725,
+      "width": 2.0697843432426453
+    },
+    "walk-passing": {
+      "minZ": 0.0,
+      "maxZ": 5.384614069014788,
+      "width": 2.0158594846725464
+    },
+    "browse": {
+      "minZ": 0.0,
+      "maxZ": 5.401201603934169,
+      "width": 1.9501243233680725
+    }
+  }
+}

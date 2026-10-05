@@ -1,0 +1,47 @@
+{
+  "id": "customer-01",
+  "sourceVertices": 32069,
+  "weldedVertices": 14555,
+  "triangles": 29087,
+  "deformBones": 22,
+  "unweighted": 0,
+  "maxWeightError": 4.470348358154297e-08,
+  "heightFeet": 5.25,
+  "walkSource": "Female1_B02_WalkToStandT2",
+  "uvLayers": 1,
+  "outfits": [
+    "casual"
+  ],
+  "poses": {
+    "front": {
+      "minZ": 0.0,
+      "maxZ": 5.267331391572952,
+      "width": 1.88993638753891
+    },
+    "side": {
+      "minZ": 0.0,
+      "maxZ": 5.267331391572952,
+      "width": 1.88993638753891
+    },
+    "back": {
+      "minZ": 0.0,
+      "maxZ": 5.267331391572952,
+      "width": 1.88993638753891
+    },
+    "walk-contact": {
+      "minZ": 0.0,
+      "maxZ": 5.2349362056702375,
+      "width": 1.9945831894874573
+    },
+    "walk-passing": {
+      "minZ": 0.0,
+      "maxZ": 5.21033063903451,
+      "width": 2.0044846534729004
+    },
+    "browse": {
+      "minZ": 0.0,
+      "maxZ": 5.275917602702975,
+      "width": 1.8861326575279236
+    }
+  }
+}

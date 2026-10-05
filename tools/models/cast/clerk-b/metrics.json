@@ -1,0 +1,63 @@
+{
+  "id": "clerk-b",
+  "sourceVertices": 30460,
+  "weldedVertices": 14501,
+  "triangles": 28921,
+  "deformBones": 22,
+  "unweighted": 0,
+  "maxWeightError": 4.6566128730773926e-08,
+  "heightFeet": 5.65,
+  "walkSource": "Female1_B03_Walk1",
+  "uvLayers": 1,
+  "outfits": [
+    "polo",
+    "oxford"
+  ],
+  "poses": {
+    "front": {
+      "minZ": 0.0,
+      "maxZ": 5.727953568100929,
+      "width": 1.6857500076293945
+    },
+    "side": {
+      "minZ": 0.0,
+      "maxZ": 5.727953568100929,
+      "width": 1.6857500076293945
+    },
+    "back": {
+      "minZ": 0.0,
+      "maxZ": 5.727953568100929,
+      "width": 1.6857500076293945
+    },
+    "walk-contact": {
+      "minZ": 0.0,
+      "maxZ": 5.851609691977501,
+      "width": 1.8808218240737915
+    },
+    "walk-passing": {
+      "minZ": 0.0,
+      "maxZ": 5.615310018882155,
+      "width": 1.7827708721160889
+    },
+    "browse": {
+      "minZ": 0.0,
+      "maxZ": 5.726467579603195,
+      "width": 1.6807377934455872
+    },
+    "stock-high": {
+      "minZ": 0.0,
+      "maxZ": 5.727953568100929,
+      "width": 1.5312826037406921
+    },
+    "stock-mid": {
+      "minZ": 0.0,
+      "maxZ": 5.727953568100929,
+      "width": 1.5053057670593262
+    },
+    "stock-low": {
+      "minZ": 0.0,
+      "maxZ": 5.613374523818493,
+      "width": 1.7325719594955444
+    }
+  }
+}

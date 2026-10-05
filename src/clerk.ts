@@ -546,6 +546,11 @@ export class StoreClerk {
       tex.repeat.copy(this.spriteTex.repeat);
       tex.offset.copy(this.spriteTex.offset);
       tex.center.copy(this.spriteTex.center);
+      // Custom drop-ins retain their original 5.7-foot canvas contract.
+      const height = tex.userData.atlasSpanFeet === 6.4 ? 6.4 : SPRITE_HEIGHT;
+      this.sprite.scale.set(height * CELL_W / CELL_H, height, 1);
+      this.sprite.position.y = height / 2;
+      this._sphere.radius = height * .6;
       const old = this.spriteTex;
       this.spriteTex = tex;
       const mat = this.sprite.material as THREE.MeshStandardMaterial;

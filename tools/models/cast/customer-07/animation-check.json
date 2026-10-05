@@ -1,0 +1,13 @@
+{
+  "idle": {
+    "samples": 41,
+    "maximumFloorErrorFeet": 0.0
+  },
+  "walk": {
+    "samples": 41,
+    "maximumFloorErrorFeet": 1.4901161193847656e-08
+  },
+  "exports": {
+    "casual": 12130712
+  }
+}
