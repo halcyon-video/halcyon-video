@@ -1,8 +1,8 @@
 {
-  "version": 4,
+  "version": 6,
   "collar": false,
   "construction": "Meshy 7.1 clothed body from the corrected original reference; modeled V-neck leather waistcoat, short cotton sleeves, sewn trousers, low harness boots; original head mesh grafted without modifying its vertex positions, UVs or skin weights",
   "bodyVertices": 10162,
   "bodyTriangles": 20261,
-  "identity": "Exact original head and fitted stubble, not the generated donor head"
+  "identity": "Exact original head with a simple fitted beard and upper-lip moustache, not the generated donor head"
 }

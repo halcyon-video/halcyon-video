@@ -149,9 +149,11 @@ boundary a shared pelvis envelope, and gives the trouser hem and boot collar a
 shared calf-to-foot envelope. A fitted tucked-shirt waist layer covers the
 shadowed opening beneath the vest. `joint-fit.json` records the edited regions.
 `customer-six-beard.py` keeps the original facial mesh intact and replaces the
-solid-looking translucent chin patch with dark follicle coverage. Cheek and
-mouth edges fade through the surface boundary rings; head-bone influence fades
-pigment off the neck. `beard-check.json` records the finish and parameters.
+individual-hair treatment with one simple dark beard region. It duplicates
+the original facial surface for the pigment, including a fitted upper-lip
+moustache, and keeps the smiling lips and neck clear. The coverage
+texture has a softened outline and uniform interior shade. `beard-check.json`
+records the finish and parameters.
 
 Joint review uses tight waist, ankle and shoulder crops from both front and side
 at every shipped walk phase; the whole-character framing does not establish

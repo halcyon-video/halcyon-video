@@ -1,10 +1,8 @@
 {
-  "finish": "Short dark follicles; feathered cheeks, mouth and neck; no solid chin mask",
-  "follicleScale": 115,
-  "coverageThresholds": [
-    0.26,
-    0.47
-  ],
-  "boundaryFadeRings": 2.2,
-  "headMeshUnmodified": true
+  "finish": "Simple dark beard area with fitted upper-lip moustache and visible lips",
+  "uniformCoverage": 0.72,
+  "follicleNoise": false,
+  "headMeshUnmodified": true,
+  "faceSurfaceOffset": 0.028,
+  "beardFaces": 1003
 }
