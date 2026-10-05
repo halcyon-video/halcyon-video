@@ -1,6 +1,6 @@
 [package]
 name = "tauri-app"
-version = "0.23.0"
+version = "0.24.0"
 description = "Halcyon Video — a 3D video store for your media server"
 authors = ["Halcyon Video"]
 edition = "2021"
