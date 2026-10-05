@@ -5,6 +5,34 @@ All notable changes to Halcyon Video, generated from commit history by
 it on every version tag push. Deterministic and offline: no entry here was
 written by a model.
 
+## [v0.24.0] — 2026-10-04
+
+### CHANGELOG
+- V0.23.0
+
+### General
+- Restore Steady shelf framing and clear entrance frame faces
+- Support private clerk likeness atlases per uniform
+- Add customer six flaming skull forearm tattoo
+- Add a second rigged clerk and ten customer regulars
+- Use photographic retail surroundings with matched parking
+- Wrap exterior door and window reveals with perimeter frames
+- Use exact Netflix movie links at checkout
+- Correct store glass visibility, game shelf views and release presentation
+- Retarget three female mocap walks and a standing idle
+- Skip unchanged shelf matrices during hero case turns
+- Place clerk walking heels beyond the chest at footfall
+- Correct clerk gait retargeting and use neutral stocking wrists
+- Correct clerk walking posture and rebuild draped shirts
+- Keep real-store startup connected and explain catalog progress
+- Add articulated clerk motion candidate and contact choreography
+- Render a rigged clerk with interchangeable brand-coloured uniforms
+- Guard touch overlays and clarify walking and synopsis text
+- Restore explicit shelf navigation on phones
+- Retire streamed store textures with their rendering owners
+- Match release notes to published Docker version tags
+- Preserve reviewed release copy after tag checkout
+
 ## [v0.23.0] — 2026-10-03
 
 ### General
