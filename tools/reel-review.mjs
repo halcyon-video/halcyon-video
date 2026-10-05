@@ -60,7 +60,12 @@ async function main(){
     const final=path.join(out,'review-'+hash(JSON.stringify(report)));
     const files={'review.json':JSON.stringify(report,null,2)+'\n','review.html':reviewHtml(report,mediaName),'captions.txt':reviewCopy.hooks.join('\n\n')+'\n','press-pitch.txt':reviewCopy.pitch+'\n','feature-sheet.txt':reviewCopy.features.join('\n')+'\n','publication-plan.txt':reviewCopy.sequence.join('\n')+'\n\n'+reviewCopy.measurement+'\n'};
     for(const [name,bytes] of Object.entries(files))await writeFile(path.join(staging,name),bytes,{flag:'wx',mode:0o600});
-    try{await rename(staging,final);}catch(error){if(!['EEXIST','ENOTEMPTY'].includes(error.code))throw error;
+    try{await rename(staging,final);}catch(error){
+      // Windows reports a populated destination directory as EPERM/EACCES.
+      // Admit that case only for a real directory, then verify every byte below.
+      const existing=await lstat(final).catch(()=>null);
+      const existsCodes=['EEXIST','ENOTEMPTY',...(process.platform==='win32'?['EPERM','EACCES']:[])];
+      if(!existsCodes.includes(error.code)||!existing?.isDirectory()||existing.isSymbolicLink())throw error;
       const expected=[...Object.keys(files),...(mediaName?[mediaName]:[])].sort();
       if(JSON.stringify((await readdir(final)).sort())!==JSON.stringify(expected))throw Error('Existing review inventory changed');
       for(const [name,bytes] of Object.entries(files)){const file=path.join(final,name),stat=await lstat(file);if(!stat.isFile()||stat.isSymbolicLink()||await readFile(file,'utf8')!==bytes)throw Error('Existing private review pack differs; it was not overwritten');}

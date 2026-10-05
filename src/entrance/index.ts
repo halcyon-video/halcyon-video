@@ -381,33 +381,58 @@ export class EntranceCheckout implements StoreFixture {
       intervals.forEach(([a, b]) => { verts.add(a); verts.add(b); });
       if (!opts?.transomY && !opts?.singlePanels) panels.forEach(([a, b]) => { if (b - a > 4.5) verts.add((a + b) / 2); });
       opts?.extraMullions?.forEach((v) => verts.add(v));
+      const posts: { at: number; bottom: number; top: number }[] = [];
       verts.forEach((v) => {
         const fullHeight = opts?.splitTransom || !opts?.transomY || Math.abs(v - s0) < 0.01 || Math.abs(v - s1) < 0.01;
         // Only door jambs reach the floor. Fixed sidelight posts sit on the
         // masonry sill instead of cutting a dark stripe through its face.
         const isDoorJamb = intervals.some(([a, b]) => Math.abs(v - a) < 0.01 || Math.abs(v - b) < 0.01);
         const bottom = isDoorJamb ? 0 : (orient === 'Z' && Math.abs(v - s1) < .01 ? opts?.frontSillY ?? sillY : sillY);
-        const top = fullHeight ? wallH : doorH;
+        const top = fullHeight ? wallH : doorH + frameT / 2;
+        posts.push({ at: v, bottom, top });
         along(v, frameT, (top + bottom) / 2, top - bottom, frameD, frameMat);
       });
+
+      // Butt front rails into the posts instead of drawing overlapping box
+      // faces over their intersections. Deep reveal frames made those shared
+      // faces visible all the way across the exterior trim.
+      const rail = (a: number, b: number, y: number, h: number) => {
+        let segments: [number, number][] = [[a, b]];
+        if (orient === 'X' && Math.abs(fixed - frontZ) < .01) {
+          for (const post of posts) {
+            if (post.bottom >= y + h / 2 || post.top <= y - h / 2) continue;
+            const lo = post.at - frameT / 2, hi = post.at + frameT / 2;
+            segments = segments.flatMap(([start, end]): [number, number][] => {
+              if (hi <= start || lo >= end) return [[start, end]];
+              const pieces: [number, number][] = [];
+              if (lo > start) pieces.push([start, lo]);
+              if (hi < end) pieces.push([hi, end]);
+              return pieces;
+            });
+          }
+        }
+        for (const [start, end] of segments) {
+          if (end - start > .001) along((start + end) / 2, end - start, y, h, frameD, frameMat);
+        }
+      };
 
       // horizontal rails: top (continuous), bottom (skips the door gaps),
       // and the door-head line. With a transom the head rail runs the FULL
       // width (one continuous bar over doors and sidelights alike) plus a
       // second full-width rail at the glazing head; otherwise a short head
       // rail across each door opening, as before.
-      along((s0 + s1) / 2, s1 - s0, wallH - frameT / 2, frameT, frameD, frameMat);
-      panels.forEach(([a, b]) => along((a + b) / 2, b - a, sillY + frameT / 2, frameT, frameD, frameMat));
+      if (!opts?.splitTransom) rail(s0, s1, wallH - frameT / 2, frameT);
+      panels.forEach(([a, b]) => rail(a, b, sillY + frameT / 2, frameT));
       if (opts?.transomY) {
         if (opts.splitTransom) {
-          intervals.forEach(([a, b]) => along((a+b)/2, b-a, doorH+.10, .28, frameD, frameMat));
-          along((s0+s1)/2, s1-s0, opts.transomY-.325, .65, frameD, frameMat);
+          intervals.forEach(([a, b]) => rail(a, b, doorH + .10, .28));
+          rail(s0, s1, opts.transomY - .325, .65);
         } else {
-          along((s0 + s1) / 2, s1 - s0, doorH, frameT, frameD, frameMat);
-          along((s0 + s1) / 2, s1 - s0, opts.transomY, frameT, frameD, frameMat);
+          rail(s0, s1, doorH, frameT);
+          if (opts.transomY < wallH - frameT) rail(s0, s1, opts.transomY, frameT);
         }
       } else {
-        intervals.forEach(([a, b]) => along((a + b) / 2, b - a, doorH, frameT, frameD, frameMat));
+        intervals.forEach(([a, b]) => rail(a, b, doorH, frameT));
       }
     };
 

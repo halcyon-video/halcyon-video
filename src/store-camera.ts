@@ -160,6 +160,8 @@ export function updateCameraTarget(scene: StoreScene) {
     const activeLibUnits = scene.shelvingUnits.filter(u => u.libraryIdx === scene.selectedLibraryIdx);
     const isBackWall = (scene.selectedUnitIdx === BACK_WALL_UNIT_IDX);
     const isDisplay = (scene.selectedUnitSource === 'fixture');
+    const steady = localStorage.getItem('bb_browse_camera') !== 'floaty';
+    const browseStandoff = activeStoreFormat().browseStandoff * (steady ? 0.92 : 1);
 
     if (isDisplay) {
       if (scene.selectedFixtureId?.startsWith('game-section')) {
@@ -191,7 +193,7 @@ export function updateCameraTarget(scene: StoreScene) {
         // Fallback guards a stale selectedShelf that outruns this fixture's
         // shelf count (undefined → NaN camera → blank blue frame).
         const shelfY = (fixture && fixture.shelfHeights[scene.selectedShelf]) ?? 3.0;
-        const cameraY = Math.max(6.3, shelfY + 0.8);
+        const cameraY = steady ? shelfY + 0.4 : Math.max(6.3, shelfY + 0.8);
         const lookAtY = shelfY + 0.4;
 
         const xCenterVal = fixture?.placement.position.x ?? 17.0;
@@ -200,7 +202,7 @@ export function updateCameraTarget(scene: StoreScene) {
         const isBack = scene.selectedSide === 'back';
         const dir = isBack ? -1 : 1;
         const shelfDepthAtHeight = unitDepthAtHeight(shelfY);
-        const cameraX = xCenterVal + dir * (shelfDepthAtHeight / 2 + activeStoreFormat().browseStandoff);
+        const cameraX = xCenterVal + dir * (shelfDepthAtHeight / 2 + browseStandoff);
 
         scene.targetCameraPos.set(cameraX, cameraY, zCenterVal + colZ);
         scene.targetLookAt.set(xCenterVal + dir * 0.44, lookAtY, zCenterVal + colZ);
@@ -237,7 +239,7 @@ export function updateCameraTarget(scene: StoreScene) {
           scene.targetCameraPos.copy(scene.lookDownCamera);
           scene.targetLookAt.copy(scene.lookDownLookAt);
         } else {
-          const cameraY = Math.max(6.3, shelfY + 0.8);
+          const cameraY = steady ? shelfY + 0.4 : Math.max(6.3, shelfY + 0.8);
           const lookAtY = shelfY + 0.4;
 
           // Fixtures publish their real slot positions. Fit the occupied face,
@@ -269,7 +271,7 @@ export function updateCameraTarget(scene: StoreScene) {
           const face = count ? front : 1.69;
           const halfWidth = count ? Math.max(hi - center, center - lo) : 1;
           const tanHalfFov = Math.tan(THREE.MathUtils.degToRad(scene.camera.fov / 2));
-          const distance = Math.max(2.2, halfWidth * 1.18 / (tanHalfFov * scene.camera.aspect));
+          const distance = Math.max(steady ? 2.05 : 2.2, halfWidth * (steady ? 1.10 : 1.18) / (tanHalfFov * scene.camera.aspect));
           scene.targetLookAt.set(fx + center * tx + face * nx, lookAtY, fz + center * tz + face * nz);
           scene.targetCameraPos.set(scene.targetLookAt.x + nx * distance, cameraY, scene.targetLookAt.z + nz * distance);
         }
@@ -301,7 +303,7 @@ export function updateCameraTarget(scene: StoreScene) {
 
       // Dynamic Y height centered on selected back wall shelf
       const shelfY = WALL_SHELF_HEIGHTS[scene.selectedShelf] || 3.5;
-      const cameraY = Math.max(6.3, shelfY + 0.8);
+      const cameraY = steady ? shelfY + 0.4 : Math.max(6.3, shelfY + 0.8);
       const lookAtY = shelfY + 0.4;
 
       // Back up far enough that the section fits the frame horizontally — a
@@ -311,8 +313,8 @@ export function updateCameraTarget(scene: StoreScene) {
       const sectionHalfW = ((spanCols - 1) * BOX_SPACING + CASE_WIDTH) / 2;
       const vFovRad = (scene.camera.fov * Math.PI) / 180;
       const hHalfAngle = Math.atan(Math.tan(vFovRad / 2) * scene.camera.aspect);
-      const fitDist = (sectionHalfW * 1.18) / Math.max(0.001, Math.tan(hHalfAngle));
-      const backOff = Math.max(3.8, fitDist);
+      const fitDist = (sectionHalfW * (steady ? 1.10 : 1.18)) / Math.max(0.001, Math.tan(hHalfAngle));
+      const backOff = Math.max(steady ? 3.5 : 3.8, fitDist);
 
       // Back up along the run's own facing normal (cases face local +Z
       // rotated by rotationY): +Z for the back-wall runs, -X for the stepped
@@ -339,7 +341,7 @@ export function updateCameraTarget(scene: StoreScene) {
         scene.cameraWindowMinCol = Math.max(0, Math.min(scene.cameraWindowMinCol, scene.colsCount - windowSize));
       }
 
-      const floaty = localStorage.getItem('bb_browse_camera') === 'floaty';
+      const floaty = !steady;
       const previous = aisleGlides.get(scene);
       let direction = 0;
       if (floaty && activeUnit) {
@@ -355,7 +357,7 @@ export function updateCameraTarget(scene: StoreScene) {
 
       // Dynamic Y height centered on selected aisle shelf
       const shelfY = AISLE_SHELF_HEIGHTS[scene.selectedShelf] || 3.0;
-      const cameraY = Math.max(6.3, shelfY + 0.8);
+      const cameraY = steady ? shelfY + 0.4 : Math.max(6.3, shelfY + 0.8);
       const lookAtY = shelfY + 0.4;
       
       const xCenterVal = activeUnit ? activeUnit.xCenter : STORE_CENTER_X;
@@ -371,7 +373,7 @@ export function updateCameraTarget(scene: StoreScene) {
       const isBack = scene.selectedSide === 'back';
       const dir = (isBack ? -1 : 1) * (activeUnit ? activeUnit.browseSign : 1);
       const shelfDepthAtHeight = unitDepthAtHeight(shelfY);
-      const cameraX = xCenterVal + dir * (shelfDepthAtHeight / 2 + activeStoreFormat().browseStandoff);
+      const cameraX = xCenterVal + dir * (shelfDepthAtHeight / 2 + browseStandoff);
 
       // Straight view, no Z offset (computed in layout space, then rotated to
       // follow this unit's arrangement yaw).
