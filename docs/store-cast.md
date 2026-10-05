@@ -121,3 +121,21 @@ swapping arms when turning. Its atlas is 2048×3072 (24 MiB decoded RGBA); use
 `--customer --full-directions` for both clerk-sheet stitch and check. Other
 customers retain their five-direction 2048×1920 sheets. The generated reference
 image and original Meshy base remain preserved as provenance, before the tattoo.
+
+### Private clerk likenesses
+
+An installed pair at `public/user-assets/clerk/<identity>/<uniform>/color.png`
+and `livery.png` overrides only that clerk and uniform. Both atlases must be
+4096×1920; an absent or invalid pair falls back to the complete shipped pair.
+The coverage mask keeps the selected uniform's brand colors working. Existing
+whole-clerk theme/default drop-ins retain their priority. Hosted builds skip
+private asset probes through the existing user-assets loader.
+
+Personal photographic references and derived models/atlases stay in the ignored
+user-assets tree, never in the public character sources. To author one, use the
+existing `build-cast.py -- clerk-b --source-dir <private-source-dir>` option,
+optionally `--render-dir <working-render-dir>` and `--render`. Then run
+`finalize-cast.py -- clerk-b --source-dir <private-source-dir>`. The source folder
+contains its rigged `source.glb` and receives the editable Blender file, both
+outfit GLBs and geometry/animation reports. Stitch each outfit's color and livery
+passes with the existing `clerk-sheet.mjs` tool before installation.

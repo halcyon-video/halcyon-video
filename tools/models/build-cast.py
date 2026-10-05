@@ -7,7 +7,10 @@ from pathlib import Path
 from mathutils import Vector,Matrix
 ROOT=Path(__file__).resolve().parents[2]
 args=sys.argv[sys.argv.index('--')+1:];slug=args[0]
-SRC=ROOT/'tools/models/cast'/slug;OUT=ROOT/'scratch/cast-render'/slug;OUT.mkdir(parents=True,exist_ok=True)
+def option(name,default):
+ return Path(args[args.index(name)+1]).resolve() if name in args else default
+SRC=option('--source-dir',ROOT/'tools/models/cast'/slug)
+OUT=option('--render-dir',ROOT/'scratch/cast-render'/slug);OUT.mkdir(parents=True,exist_ok=True)
 bpy.ops.object.select_all(action='SELECT');bpy.ops.object.delete(use_global=False)
 bpy.ops.import_scene.gltf(filepath=str(SRC/'source.glb'))
 arm=next(o for o in bpy.context.scene.objects if o.type=='ARMATURE')

@@ -4,7 +4,9 @@ Run after build-cast.py; does not modify the shipped sprite pixels.
 import bpy,json,sys,runpy
 from pathlib import Path
 from mathutils import Matrix,Vector
-ROOT=Path(__file__).resolve().parents[2];slug=sys.argv[-1];folder=ROOT/'tools/models/cast'/slug
+ROOT=Path(__file__).resolve().parents[2]
+args=sys.argv[sys.argv.index('--')+1:];slug=args[0]
+folder=Path(args[args.index('--source-dir')+1]).resolve() if '--source-dir' in args else ROOT/'tools/models/cast'/slug
 bpy.ops.wm.open_mainfile(filepath=str(folder/'character.blend'))
 arm=bpy.data.objects['Armature'];anchor=arm.parent;body=bpy.data.objects.get(slug+' body')
 if body is None:raise RuntimeError('No primary character body')

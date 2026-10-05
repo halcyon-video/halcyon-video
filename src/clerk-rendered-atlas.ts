@@ -2,6 +2,7 @@
 // while loading; runtime rendering remains the existing single lit billboard.
 import * as THREE from 'three';
 import { assetUrl } from './asset-url';
+import { tryLoadUserAssetTexture } from './user-assets';
 import { resolveClerkIdentity } from './cast-catalog';
 import { getActiveTheme } from './themes';
 import { recolorClerkPixels, resolveClerkUniform } from './clerk-uniform';
@@ -15,6 +16,25 @@ function loadImage(path: string): Promise<HTMLImageElement> {
   });
 }
 
+function validPair(pair: HTMLImageElement[]): boolean {
+  return pair.length === 2 && pair.every(image => image.width === 4096 && image.height === 1920);
+}
+
+async function loadInstalledPair(base: string): Promise<HTMLImageElement[] | null> {
+  // Use the existing brand-overlay and hosted-build rules. Never mix a private
+  // color sheet with a shipped coverage mask: both must describe the same body.
+  const images = await Promise.all(['color', 'livery'].map(pass =>
+    new Promise<HTMLImageElement | null>(resolve => {
+      tryLoadUserAssetTexture(`${base}/${pass}.png`, texture => {
+        const image = texture.image as HTMLImageElement;
+        texture.dispose();
+        resolve(image);
+      }, { onMiss: () => resolve(null) });
+    })));
+  return images.every(image => image !== null) && validPair(images as HTMLImageElement[])
+    ? images as HTMLImageElement[] : null;
+}
+
 export async function loadRenderedClerkAtlas(): Promise<THREE.CanvasTexture> {
   // Capture the theme before asynchronous work: an old clerk can finish loading
   // during a settings rebuild, and must retain its own palette until disposed.
@@ -25,12 +45,12 @@ export async function loadRenderedClerkAtlas(): Promise<THREE.CanvasTexture> {
   const identity = resolveClerkIdentity(localStorage.getItem('bb_clerk_identity'));
   const base = identity === 'clerk-b' ? `textures/cast/clerk-b/${uniform}`
     : uniform === 'oxford' ? 'textures/clerk/oxford' : 'textures/clerk';
-  const [color, mask] = await Promise.all([
+  const installed = await loadInstalledPair(`clerk/${identity}/${uniform}`);
+  const [color, mask] = installed ?? await Promise.all([
     loadImage(`${base}/color.png`),
     loadImage(`${base}/livery.png`),
   ]);
-  if (color.width !== 4096 || color.height !== 1920 ||
-      mask.width !== color.width || mask.height !== color.height) {
+  if (!validPair([color, mask])) {
     throw new Error('Rendered clerk atlas must use the 16 by 5 sprite grid');
   }
   const canvas = document.createElement('canvas');
@@ -46,6 +66,7 @@ export async function loadRenderedClerkAtlas(): Promise<THREE.CanvasTexture> {
   ctx.putImageData(pixels, 0, 0);
   const texture = new THREE.CanvasTexture(canvas);
   texture.name = identity === 'clerk-a' ? `blender-clerk-atlas-${uniform}` : `blender-clerk-b-atlas-${uniform}`;
+  texture.userData.installedClerkAtlas = installed !== null;
   texture.userData.atlasSpanFeet = identity === 'clerk-b' ? 6.4 : 5.7;
   texture.colorSpace = THREE.SRGBColorSpace;
   return texture;
