@@ -250,3 +250,11 @@ for #181. Source, packed procedural fibre textures and generator are in
 `tools/models/cleaner-carton.*` and `cleaner-carton-*.png`; no third-party artwork
 or geometry. Dimensions, material roles, UVs, provenance and integration contract:
 `docs/cleaner-carton-model.md`.
+
+## Spiral gumball dispenser
+
+`gumball-machine.glb` is original scripted Blender geometry under the repository
+license, with a barrel hopper, spiral trough, rounded coin cabinet and squat
+plinth. No third-party geometry, imagery, logos or reference reconstruction is
+included. Source and generator: `tools/models/gumball-machine.blend` and `.py`.
+See `docs/gumball-machine-model.md` for the shared runtime envelope and placement.

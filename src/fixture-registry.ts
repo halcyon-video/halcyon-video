@@ -1,3 +1,4 @@
+import { GumballMachine } from './fixtures/gumball-machine';
 import { Clubhouse } from './fixtures/clubhouse';
 import { ChildrenChair } from './fixtures/children-chair';
 import { DepartmentArch } from './fixtures/department-arch';
@@ -108,3 +109,5 @@ registerFixtureKind('two-door-cooler', (placement, ctx) => new TwoDoorCooler(pla
 registerFixtureKind('chest-freezer', (placement, ctx) => new ChestFreezer(placement, ctx));
 registerFixtureKind('candy-wall-gondola', (placement, ctx) => new CandyWallGondola(placement, ctx));
 registerFixtureKind('secondary-service-counter', (placement, ctx) => new SecondaryServiceCounter(placement, ctx));
+
+registerFixtureKind('gumball-machine', (placement, ctx) => new GumballMachine(placement, ctx));

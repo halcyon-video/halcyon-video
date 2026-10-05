@@ -1,3 +1,4 @@
+import { storeGumballPlacement } from './store-gumball';
 import { FRAME_REVEAL_DEPTH, FRAME_REVEAL_CENTER } from './frame-reveal';
 import { materialTextureLoad } from './material-texture-load';
 import quickDrop from './exit-return-spec.json' with { type: 'json' };
@@ -2353,7 +2354,7 @@ export function buildStore(scene: StoreScene) {
     }
     const fixture = createFixture(placement, scene.fixtureContext());
     fixture.build();
-    if (placement.kind in RETAIL_FIXTURE_SPECS) scene.retailFixtures.push(fixture);
+    if (placement.kind in RETAIL_FIXTURE_SPECS || placement.kind === 'gumball-machine') scene.retailFixtures.push(fixture);
     const footprint = fixture.getFootprint?.();
     if (footprint) fixtureFootprints.push(footprint);
     fixtureFootprints.push(...(fixture.getFootprints?.() ?? []));
@@ -2386,6 +2387,7 @@ export function buildStore(scene: StoreScene) {
   };
   const movable = fixturePlacements.filter(p => placementOrder(p)>0);
   fixturePlacements.filter(p => placementOrder(p)===0).forEach(buildFixture);
+  buildFixture(storeGumballPlacement(scene));
   if (activeStoreFormat().floorDisplays) {
     const existing = scene.slottedFixtures.filter(f => f.placement.kind === 'four-sided-display').length;
     const frontMerchandise = frontRefreshmentPlacements([...scene.plan.getUnitFootprints(), ...fixtureFootprints, ...reserved.filter(f=>f.label!=='checkout circulation')],
