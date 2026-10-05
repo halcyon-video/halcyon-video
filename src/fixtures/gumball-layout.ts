@@ -3,8 +3,10 @@ import { validateLayout, type Footprint } from '../layout-validator.ts';
 import { deskGroundPlan } from '../entrance/desk-plan.ts';
 import { vestibuleLayout } from '../vestibule-layout.ts';
 
-export const GUMBALL_RADIUS = 1.05;
-export const GUMBALL_HEIGHT = 5.5;
+export const GUMBALL_HEIGHT = 4;
+// Both editable models are authored at 5.5 ft; scale their full construction uniformly.
+export const GUMBALL_SCALE = GUMBALL_HEIGHT / 5.5;
+export const GUMBALL_RADIUS = 1.05 * GUMBALL_SCALE;
 export interface GumballShelf { footprint: Footprint; frontCap?: boolean; backCap?: boolean }
 type CounterSpec = { counterShape: 'shield' | 'usquare' | 'desk'; entryStyle: 'vestibule' | 'storefront-door'; doorWidth: number };
 

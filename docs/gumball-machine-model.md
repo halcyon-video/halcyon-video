@@ -8,11 +8,16 @@ Installed private models can replace it through
 `public/user-assets/fixtures/gumball-machine/machine.glb`; private references and
 reconstructions remain outside Git.
 
-Scene units are feet. Ground origin is the center of the plinth, height 5.5 ft,
-maximum radius 1.05 ft. Blender X maps to store X, Blender -Y to store +Z and
+Scene units are feet. Ground origin is the center of the plinth. Runtime height is 4 ft, slightly
+below the standard 4.6-ft shelf frame, with a maximum radius of 0.764 ft.
+The editable public and private source models retain their 5.5-ft authoring
+envelope; the loader and built-in fallback uniformly scale by 4/5.5. Collision
+and placement use the scaled envelope. Blender X maps to store X, Blender -Y to store +Z and
 Blender Z to store height. The coin mechanism and delivery door face local +Z.
 Named `Enamel` and `ClearPlastic` finishes are replaced at runtime; enamel uses
-the active store palette. Thin transparent plastic uses alpha blending without
+the active store palette. Thin transparent plastic uses 0.045 opacity and 0.07 roughness, retaining
+subtle highlights while revealing the gumballs and spiral through the shell.
+It uses alpha blending without
 a full-scene refraction render. The helical chute is a solid trough with raised
 edges, and gumballs use a fixed seed. All generated parts carry UVs.
 
@@ -26,7 +31,7 @@ Door depth follows the shared vestibule datum.
 
 The existing detail loader controls queued loading, fallback visibility, shadow
 refresh and cancellation. One cylindrical collision proxy remains through model
-replacement. The floor-plan footprint is the conservative 2.1 ft square, classified
+replacement. The floor-plan footprint is the conservative 1.527 ft square, classified
 as an attached structure so it does not demand a walking lane through its host.
 The fixture enters the scene's owned fixture lifecycle and releases its model,
 fallback, materials and proxy when the store is rebuilt or disposed.

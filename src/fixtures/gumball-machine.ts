@@ -3,7 +3,7 @@ import type { FixturePlacement } from '../store-layout';
 import type { FixtureContext, StoreFixture } from '../fixtures';
 import type { Footprint } from '../layout-validator';
 import { installDisplayModel } from './display-model';
-import { GUMBALL_RADIUS, GUMBALL_HEIGHT } from './gumball-layout';
+import { GUMBALL_RADIUS, GUMBALL_HEIGHT, GUMBALL_SCALE } from './gumball-layout';
 
 /** Static set dressing. Detail uses the existing deferred, cancellable model loader. */
 export class GumballMachine implements StoreFixture {
@@ -15,11 +15,11 @@ export class GumballMachine implements StoreFixture {
     const root = this.group = new THREE.Group(); root.name = this.placement.id;
     root.position.set(this.placement.position.x, 0, this.placement.position.z);
     root.rotation.y = this.placement.yaw;
-    const fallback = new THREE.Group(); root.add(fallback);
+    const fallback = new THREE.Group(); fallback.scale.setScalar(GUMBALL_SCALE); root.add(fallback);
     const enamel = new THREE.MeshStandardMaterial({ color: this.ctx.activeTheme.palette.primary, roughness: .24, metalness: .12 });
     const chrome = new THREE.MeshStandardMaterial({ color: 0xb4bec5, roughness: .21, metalness: .82 });
     // Thin transparent plastic avoids a full-viewport refraction pass on phones.
-    const clear = new THREE.MeshStandardMaterial({ color: 0xe0f2ff, roughness: .13, transparent: true, opacity: .13, depthWrite: false, side: THREE.DoubleSide });
+    const clear = new THREE.MeshStandardMaterial({ color: 0xf7fbff, roughness: .07, transparent: true, opacity: .045, depthWrite: false, side: THREE.DoubleSide });
     this.owned.push(enamel, chrome, clear);
     const mesh = (g: THREE.BufferGeometry, m: THREE.Material, y: number) => {
       this.owned.push(g); const o = new THREE.Mesh(g,m); o.position.y=y;
@@ -40,7 +40,7 @@ export class GumballMachine implements StoreFixture {
     const sources = this.placement.options?.publicModelOnly
       ? ['models/gumball-machine.glb']
       : ['user-assets/fixtures/gumball-machine/machine.glb','models/gumball-machine.glb'];
-    this.removeModel=installDisplayModel(this.ctx,root,fallback,sources,{ Enamel:enamel, ClearPlastic:clear });
+    this.removeModel=installDisplayModel(this.ctx,root,fallback,sources,{ Enamel:enamel, ClearPlastic:clear },new THREE.Vector3().setScalar(GUMBALL_SCALE));
     this.ctx.requestShadowRefresh();
   }
   getFootprint(): Footprint | null {
