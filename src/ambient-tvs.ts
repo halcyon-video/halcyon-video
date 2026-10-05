@@ -4,6 +4,7 @@ import { installTvMount } from './ambient-tv-mount';
 import { isExternalGameActive } from './external-game-state.ts';
 import { publishAmbientPicture, ambientReceiverInFrustum } from './ambient-screen';
 import { selfLit } from './material-lighting';
+import { VideoFrameUploadGate } from './video-frame-upload';
 // Ceiling-hung CRT TVs playing an ambient movie streamed from the store's media
 // server, with HRTF positional audio. Self-contained fixture: owns its <video>
 // element, HLS pipeline, VideoTexture, and AudioContext, and tears them all down
@@ -303,9 +304,8 @@ export class AmbientTvs implements StoreFixture {
   private mediaReleased = false;
   private deferredLoop: HTMLVideoElement | null = null;
   private videoTex: THREE.VideoTexture | null = null;
-  // Last video time we uploaded, so we skip redundant GPU re-uploads of an
-  // unchanged frame when the compositor runs above the video's frame rate.
-  private lastVideoTime = -1;
+  // Native frame callbacks own normal uploads; the gate repairs stale chains.
+  private readonly videoFrameUpload = new VideoFrameUploadGate();
   private audioCtx: AudioContext | null = null;
   private gestureUnlock: (() => void) | null = null;
   private readonly camFwd = new THREE.Vector3();
@@ -1809,9 +1809,7 @@ export class AmbientTvs implements StoreFixture {
     return inFrustum;
   }
 
-  // Per-frame: sync the Web Audio listener with the camera, and force the
-  // VideoTexture upload (requestVideoFrameCallback chain can break after a seek
-  // in Tauri's webview, so we drive needsUpdate manually).
+  // Sync the listener and repair video uploads if native callbacks stall.
   update(_timeMs: number): void {
     for (const feed of this.feeds) feed.update(_timeMs);
     if (this.videoTex && this.video && !this.video.paused) {
@@ -1834,17 +1832,10 @@ export class AmbientTvs implements StoreFixture {
       }
     }
 
-    if (this.videoTex && this.video && !this.video.paused) {
-      // Only re-upload when the decoder has actually advanced to a new frame.
-      // The composite can run at display refresh (clerk/browse/case-pop hold the
-      // ACTIVE tier) while the HLS stream is ~24fps, so an unguarded needsUpdate
-      // re-uploads the same frame via texImage2D several times over — pure waste
-      // on the multi-day idle path.
-      const t = this.video.currentTime;
-      if (t !== this.lastVideoTime) {
-        this.lastVideoTime = t;
-        this.videoTex.needsUpdate = true;
-      }
+    if (this.videoTex && this.video && !this.video.paused && this.video.readyState >= 2 &&
+        this.videoFrameUpload.needsUpload(this.video, this.videoTex.version, _timeMs)) {
+      this.videoTex.needsUpdate = true;
+      this.videoFrameUpload.uploaded(this.videoTex.version);
     }
   }
 

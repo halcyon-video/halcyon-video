@@ -1,4 +1,4 @@
-import { disposeShelfVisibility, initializeHiddenShelfInstances } from './shelf-visibility';
+import { disposeShelfVisibility, initializeHiddenShelfInstances, invalidateShelfVisibility, finishShelfPromotionScan } from './shelf-visibility';
 import { mobileStoreActive } from './mobile-store';
 import { updateStoreLoading } from './store-loading';
 // Movie-box stock instancing — extracted from StoreScene (three-scene.ts
@@ -1062,6 +1062,7 @@ export function rebuildSSAOExclusionList(scene: StoreScene) {
 }
 
 export function rebuildMovieBoxes(scene: StoreScene) {
+  invalidateShelfVisibility(scene);
   // Geometry is changing (placeholder cases cast shadows, shelves are re-stocked):
   // re-bake the shadow map over the next few frames as the layout settles.
   scene.queueStructuralShadowRefresh();
@@ -1290,6 +1291,7 @@ export function restockSlottedFixtures(scene: StoreScene): void {
         if (at >= 0) oldList.splice(at, 1);
       }
       existing.movie = fixtureSlot.movie;
+      requestedPriority.delete(existing);
       existing.noRentalCase =
         fixture.placement.options?.noRentalCase === true || isUnstockedTitle(fixtureSlot.movie);
       let sameMovie = scene.slotsByMovieId.get(fixtureSlot.movie.id);
@@ -1326,6 +1328,7 @@ export function restockSlottedFixtures(scene: StoreScene): void {
     });
   });
   if (touched) {
+    invalidateShelfVisibility(scene);
     scene.mirrorCubemap.stockChanged();
     scene.requestRender();
   }
@@ -1333,7 +1336,7 @@ export function restockSlottedFixtures(scene: StoreScene): void {
 
 const priorityPoint = new THREE.Vector3();
 const requestedPriority = new WeakMap<MovieSlot, number>();
-export function updateLOD(scene: StoreScene) {
+export function updateLOD(scene: StoreScene): boolean {
   const activeEnvMap = reflectionProbes[Math.min(scene.selectedLibraryIdx, 4)] || null;
   updateGlobalMaterialsEnvMap(activeEnvMap);
   scene.entrance?.setEnvMap(activeEnvMap);
@@ -1344,9 +1347,10 @@ export function updateLOD(scene: StoreScene) {
   let requested = 0;
   for (const slot of scene.slotsByPosition.values()) {
     if (slot.hidden) continue;
-    const sx = slot.currentX ?? slot.restingX;
-    const sy = slot.currentY ?? slot.restingY;
-    const sz = slot.currentZ ?? slot.restingZ;
+    // Progressive placement must not cache the unplaced origin as this view.
+    const sx = slot.needsInitialMatrixUpdate ? slot.restingX : slot.currentX;
+    const sy = slot.needsInitialMatrixUpdate ? slot.restingY : slot.currentY;
+    const sz = slot.needsInitialMatrixUpdate ? slot.restingZ : slot.currentZ;
     const dx = sx - camPos.x, dy = sy - camPos.y, dz = sz - camPos.z;
     const distance = dx * dx + dy * dy + dz * dz;
     if (distance > 900) continue;
@@ -1359,4 +1363,7 @@ export function updateLOD(scene: StoreScene) {
     slot.loadShelfDetails(priority);
     if (++requested >= 24) break;
   }
+  const pending = requested >= 24;
+  finishShelfPromotionScan(scene, pending);
+  return pending;
 }

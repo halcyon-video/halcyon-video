@@ -23,6 +23,7 @@ import { getJellyseerrConfig } from './jellyseerr';
 import { stampCollectionGapSticker } from './case-corner-stickers';
 import { perfTrace, perfSlot } from './perf-trace';
 import { LruByteCache } from './lru-byte-cache';
+import { guardPosterRequest } from './poster-request-lifecycle';
 import { reflectionProbes, setReflectionProbes, onProbesReplaced } from './case-env-probes';
 // Re-exported so the probes keep their long-standing import site: three-scene
 // and store-stock have always reached them through this module.
@@ -101,6 +102,10 @@ async function fetchPosterBytes(url: string): Promise<ArrayBuffer | null> {
   const rommConfig = getRommConfig();
   const isRommUrl = rommConfig && targetUrl.startsWith(rommConfig.url);
   const hasTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__ !== undefined;
+  // Plain browser art belongs to the worker: it checks persistent decoded
+  // pixels and image bytes before fetching. Main-thread requests are required
+  // only for authenticated Romm art and Tauri; prefetch bytes still win above.
+  if (!isRommUrl && !hasTauri) return null;
 
   try {
     if (isRommUrl) {
@@ -1319,13 +1324,9 @@ function refreshCaseFinishes() {
  * cache, the shared/global case materials (which the persisted global shader
  * materials captured references to at first init — disposing them would leave
  * those globals pointing at freed textures), and the per-title material
- * caches. (When the rebuild is caused by a MEDIUM change, initCaseMedium
- * separately invalidates the medium-scoped subset of those caches — see
- * disposeMediumScopedCaches below.) The only thing cleared here is the
- * pending poster-load queue, so
- * in-flight callbacks can't fire into the now-destroyed scene's meshes. The
- * texture-array reallocation is handled (and old arrays disposed) by
- * TextureArrayManager.init() in the fresh scene.
+ * caches. A medium change separately invalidates medium-scoped caches.
+ * Retiring the poster queue prevents old decode/upload callbacks from
+ * publishing into replacement meshes; the fresh scene owns array allocation.
  */
 export function clearVideoCaseCache(mode: 'full' | 'rebuild' = 'full') {
   if (mode === 'rebuild') {
@@ -1402,10 +1403,10 @@ export function clearVideoCaseCache(mode: 'full' | 'rebuild' = 'full') {
   heroPosterTextureLRU.clear();
   pinnedPosterTextures.forEach(p => p.tex.dispose());
   pinnedPosterTextures.clear();
-  posterPixelCache.clear();
+  posterPixelCache.clear(); lowResCache.clear(); disposeLowResFrontMaterials();
   // Full teardown (logout / server change): the next scene's catalog is
   // unrelated to the layers on hand, so never reuse them.
-  invalidatePosterLayers();
+  textureArrayManager.dispose();
   disposeCleanDecorTextures();
 
   posterMaterialCache.forEach(mat => mat.dispose());
@@ -1582,8 +1583,6 @@ class WorkerPool {
 
 const workerCount = Math.min(Math.max(navigator.hardwareConcurrency || 4, 2), 8);
 export const posterWorkerPool = new WorkerPool(workerCount);
-
-
 
 // `rental` picks the rental clamshell variant (slightly larger on VHS,
 // see getRentalGeometry) — pass true for the shelf BACK meshes that render
@@ -1865,10 +1864,11 @@ class PosterLoadingQueue {
       const { highResData, lowResData, leftmostColor, edgeBusy } = await posterWorkerPool.decode(
         url, mode, mode === 'cart' ? gameFaceAspect(item.movie.platform) : undefined);
 
+      if (this.queuedItems.get(item.movieId) !== item) return;
       // Priority lane: this task caches the decoded pixels and fires the
       // settle callbacks that texturesReadyPromise (the boot overlay) waits on,
       // so it must not sit behind a bulk re-upload backlog.
-      queueTextureUpload(() => {
+      queueTextureUpload(guardPosterRequest(this.queuedItems, item.movieId, item, () => {
         leftmostColorCache.set(item.movieId, leftmostColor);
         edgeBusyCache.set(item.movieId, edgeBusy);
 
@@ -1904,8 +1904,9 @@ class PosterLoadingQueue {
         this.queuedItems.delete(item.movieId);
         item.callbacks.forEach(cb => cb(finalHighRes));
         item.settledCallbacks.forEach(cb => cb());
-      }, 'priority');
+      }), 'priority');
     } catch (err) {
+      if (this.queuedItems.get(item.movieId) !== item) return;
       console.warn("Failed to load poster image:", err);
       this.queuedItems.delete(item.movieId);
       item.settledCallbacks.forEach(cb => cb());
@@ -2063,23 +2064,22 @@ export function loadDecorPosterTexture(movie: Movie, onReady: (tex: THREE.Textur
   const waiting = cleanDecorPending.get(movie.id);
   if (waiting) { waiting.push(onReady); return; }
   if (!movie.posterUrl) return;
-  cleanDecorPending.set(movie.id, [onReady]);
+  const callbacks = [onReady]; cleanDecorPending.set(movie.id, callbacks);
   const mode: DecodeMode = movie.game
     ? (hasRealGameBox(movie.platform) ? 'fill' : 'cart')
     : 'crop';
   posterWorkerPool.decode(movie.posterUrl, mode, mode === 'cart' ? gameFaceAspect(movie.platform) : undefined)
-    .then(({ highResData }) => {
+    .then(guardPosterRequest(cleanDecorPending, movie.id, callbacks, ({ highResData }: { highResData: Uint8Array }) => {
       const tex = createPosterDataTexture(highResData);
       uploadTextureNow(tex);
       cleanDecorTextures.set(movie.id, tex);
-      const cbs = cleanDecorPending.get(movie.id) ?? [];
       cleanDecorPending.delete(movie.id);
-      cbs.forEach((cb) => cb(tex));
-    })
-    .catch((err) => {
+      callbacks.forEach((cb) => cb(tex));
+    }))
+    .catch(guardPosterRequest(cleanDecorPending, movie.id, callbacks, (err: unknown) => {
       cleanDecorPending.delete(movie.id);
       console.warn('Failed to decode clean decor poster:', err);
-    });
+    }));
 }
 
 function disposeCleanDecorTextures() {

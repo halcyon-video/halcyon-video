@@ -28,7 +28,14 @@ const MAX_URLS = 640;
 const BYTE_BUDGET = 48 * 1024 * 1024;
 const CONCURRENCY = 8;
 
-const pending = new Map<string, Promise<ArrayBuffer | null>>();
+interface PrefetchJob {
+  url: string;
+  promise: Promise<ArrayBuffer | null>;
+  resolve: (bytes: ArrayBuffer | null) => void;
+  controller: AbortController;
+  prioritize?: () => void;
+}
+const pending = new Map<string, PrefetchJob>();
 let bytesFetched = 0;
 let budgetExhausted = false;
 // Pumps still running, and who is waiting for the network to be theirs.
@@ -55,28 +62,42 @@ function prefetchable(url: string): boolean {
  * ORIGINAL url, which is what fetchPosterBytes will ask for.
  */
 export function prefetchPosterBytes(urls: Iterable<string>, resolveUrl: (url: string) => string): number {
-  const queue: string[] = [];
+  const queue: PrefetchJob[] = [];
   for (const url of urls) {
     if (queue.length >= MAX_URLS) break;
     if (!prefetchable(url) || pending.has(url) || taken.has(url)) continue;
-    pending.set(url, Promise.resolve(null)); // placeholder so duplicates in `urls` dedupe
-    queue.push(url);
+    // A consumer can arrive before this URL reaches a network slot. Keep its
+    // handoff pending from enqueue onward instead of reporting a false miss.
+    let resolve: PrefetchJob['resolve'] = () => {};
+    const promise = new Promise<ArrayBuffer | null>(done => { resolve = done; });
+    const job = { url, promise, resolve, controller: new AbortController() };
+    pending.set(url, job);
+    queue.push(job);
   }
   if (queue.length === 0) return 0;
 
   // One pump set per host: a browser holds only six HTTP/1.1 connections to
   // a host, so a slow local queue must not park the slots a second host
   // (a CDN) could be using in parallel.
-  const byHost = new Map<string, string[]>();
-  for (const url of queue) {
+  const byHost = new Map<string, PrefetchJob[]>();
+  for (const job of queue) {
     let host = '';
-    try { host = new URL(resolveUrl(url), location.href).host; } catch { /* relative or odd: one bucket */ }
+    try { host = new URL(resolveUrl(job.url), location.href).host; } catch { /* relative or odd: one bucket */ }
     const list = byHost.get(host) ?? [];
-    list.push(url);
+    list.push(job);
     byHost.set(host, list);
   }
-  const start = (list: string[]) => {
+  const start = (list: PrefetchJob[]) => {
     let next = 0;
+    for (const job of list) {
+      job.prioritize = () => {
+        const index = list.indexOf(job, next);
+        if (index <= next) return;
+        // A visible cover must not wait behind hundreds of speculative URLs.
+        list.splice(index, 1);
+        list.splice(next, 0, job);
+      };
+    }
     const pump = async (): Promise<void> => {
       activePumps++;
       try { await drain(); } finally { pumpDone(); }
@@ -84,17 +105,23 @@ export function prefetchPosterBytes(urls: Iterable<string>, resolveUrl: (url: st
     const drain = async (): Promise<void> => {
       while (next < list.length) {
         await waitForExternalGame();
-        const url = list[next++];
-        if (budgetExhausted) { pending.delete(url); continue; }
-        let resolveIt: (b: ArrayBuffer | null) => void = () => {};
-        pending.set(url, new Promise<ArrayBuffer | null>((res) => { resolveIt = res; }));
+        // Other pumps may consume the final job while this one yields.
+        if (next >= list.length) return;
+        const job = list[next++];
+        job.prioritize = undefined;
+        const { url } = job;
+        // Cleared queues must neither restart downloads nor overwrite a newer
+        // prefetch for the same URL after an external-game or network yield.
+        if (pending.get(url) !== job) continue;
+        if (budgetExhausted) { pending.delete(url); job.resolve(null); continue; }
         let bytes: ArrayBuffer | null = null;
         try {
           // 'high': these gate the reveal, unlike the environment textures the
           // store build starts alongside them.
-          const res = await fetch(resolveUrl(url), { priority: 'high' } as RequestInit);
+          const res = await fetch(resolveUrl(url), { priority: 'high', signal: job.controller.signal } as RequestInit);
           if (res.ok) {
             bytes = await res.arrayBuffer();
+            if (pending.get(url) !== job) continue;
             bytesFetched += bytes.byteLength;
             if (bytesFetched >= BYTE_BUDGET) budgetExhausted = true;
           }
@@ -103,7 +130,8 @@ export function prefetchPosterBytes(urls: Iterable<string>, resolveUrl: (url: st
         }
         // A failed prefetch must not pin a null on the title: drop the entry so
         // fetchPosterBytes falls through to its normal fetch.
-        if (bytes) resolveIt(bytes); else { pending.delete(url); resolveIt(null); }
+        if (pending.get(url) !== job) continue;
+        if (bytes) job.resolve(bytes); else { pending.delete(url); job.resolve(null); }
       }
     };
     for (let i = 0; i < Math.min(CONCURRENCY, list.length); i++) void pump();
@@ -188,18 +216,23 @@ export function sharedDecodePut(key: string, value: SharedDecode): void {
 export function takePrefetchedPosterBytes(url: string): Promise<ArrayBuffer | null> | undefined {
   const done = taken.get(url);
   if (done) return Promise.resolve(done.slice(0));
-  const p = pending.get(url);
-  if (!p) return undefined;
-  return p.then((bytes) => {
+  const job = pending.get(url);
+  if (!job) return undefined;
+  job.prioritize?.();
+  return job.promise.then((bytes) => {
     if (!bytes) return null;
     // First consumer: park the original for the next title, hand out a copy.
-    if (pending.get(url) === p) { pending.delete(url); taken.set(url, bytes); }
+    if (pending.get(url) === job) { pending.delete(url); taken.set(url, bytes); }
     return bytes.slice(0);
   });
 }
 
 /** Forget every prefetched download (call once the boot's texture wait resolves). */
 export function clearPosterPrefetch(): void {
+  for (const job of pending.values()) {
+    job.controller.abort();
+    job.resolve(null);
+  }
   pending.clear();
   taken.clear();
   bytesFetched = 0;
