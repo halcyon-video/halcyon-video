@@ -19,7 +19,8 @@ export function gumballPlacement(shelves: readonly GumballShelf[], storeWidth: n
     : { frontX: 11, frontZ: apexZ };
   const make = (x: number, z: number, yaw: number, host?: string): FixturePlacement => ({
     id: 'gumball-machine', kind: 'gumball-machine', position: { x, z }, yaw,
-    options: { hostShelf: host, placementRule: host ? 'deepest-game-endcap' : 'counter-entrance' },
+    options: { hostShelf: host, placementRule: host ? 'deepest-game-endcap' : 'counter-entrance',
+      customerApproach: { x:x+Math.sin(yaw)*(GUMBALL_RADIUS+1.25), z:z+Math.cos(yaw)*(GUMBALL_RADIUS+1.25) } },
   });
   if (shelves.length) {
     const ends = shelves.flatMap(({ footprint: f, frontCap, backCap }) => [-1, 1].flatMap(sign => {
@@ -39,8 +40,8 @@ export function gumballPlacement(shelves: readonly GumballShelf[], storeWidth: n
       })) return [];
       const depth = f.cz - Math.abs(Math.sin(f.yaw))*f.w/2 - Math.abs(Math.cos(f.yaw))*f.d/2;
       const distance = Math.hypot(counter.frontX - x, counter.frontZ - z);
-      // Keep fixtures square or at 45 degrees while turning the coin face toward the counter.
-      const yaw = Math.round(Math.atan2(counter.frontX-x, counter.frontZ-z)/(Math.PI/4))*Math.PI/4;
+      // The gray coin face opens onto the aisle beyond this exposed end, away from its host.
+      const yaw = Math.round((f.yaw+(sign===1?0:Math.PI))/(Math.PI/4))*Math.PI/4;
       return [{ depth, distance, placement: make(x,z,yaw,f.label) }];
     }));
     ends.sort((a,b) => a.depth-b.depth || a.distance-b.distance || a.placement.position.x-b.placement.position.x);
@@ -49,12 +50,12 @@ export function gumballPlacement(shelves: readonly GumballShelf[], storeWidth: n
     // Keep the machine with games rather than silently selecting the no-games rule.
     const f = [...shelves].sort((a,b) => a.footprint.cz-b.footprint.cz)[0].footprint;
     return make(f.cx + Math.cos(f.yaw)*(f.w/2+GUMBALL_RADIUS+.08),
-      f.cz - Math.sin(f.yaw)*(f.w/2+GUMBALL_RADIUS+.08), -Math.PI/2, f.label);
+      f.cz - Math.sin(f.yaw)*(f.w/2+GUMBALL_RADIUS+.08), f.yaw+Math.PI/2, f.label);
   }
   if (spec.counterShape === 'desk') return make(counter.frontX+GUMBALL_RADIUS+.12, counter.frontZ+1.1, Math.PI/2);
-  if (spec.counterShape === 'usquare') return make(12.7, apexZ-GUMBALL_RADIUS-.12, 0);
+  if (spec.counterShape === 'usquare') return make(12.7, apexZ-GUMBALL_RADIUS-.12, Math.PI);
   // Exterior of the entranceward right shoulder, next to the central peak.
   // Normal clearance uses the square proxy's projected diagonal half-extent.
   const along = 2.4, outward = GUMBALL_RADIUS*Math.SQRT2+.12;
-  return make(11+(along+outward)*Math.SQRT1_2, apexZ+(along-outward)*Math.SQRT1_2, 0);
+  return make(11+(along+outward)*Math.SQRT1_2, apexZ+(along-outward)*Math.SQRT1_2, 3*Math.PI/4);
 }

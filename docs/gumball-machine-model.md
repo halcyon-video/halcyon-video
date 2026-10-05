@@ -24,7 +24,10 @@ edges, and gumballs use a fixed seed. All generated parts carry UVs.
 `store-gumball.ts` reads the built games department and games-only plan shelves.
 The deepest world-Z shelf wins; joined ends and wall-facing ends are excluded.
 The exposed end nearer the counter receives the machine, with its coin face
-turned toward checkout at a multiple of 45 degrees. With no game shelves,
+turned away from its host into the open customer aisle at a multiple of 45
+degrees. Each placement records a customer standing point in front of the gray
+coin mechanism. Counter placements similarly face the customer side, outside
+the counter body. With no game shelves,
 the machine stands beside the shield counter's center peak, entranceward along
 its right shoulder; flat and standalone counters have corresponding anchors.
 Door depth follows the shared vestibule datum.
