@@ -73,17 +73,17 @@
         <!-- Boot Screen Overlay -->
         <div id="boot-overlay" class="visible">
           <div class="store-loading-views" aria-hidden="true">
-            <img id="store-loading-view-a" src="%BASE_URL%loading/store-interior.webp" alt="" fetchpriority="high" />
+            <img id="store-loading-view-a" src="%BASE_URL%loading/store-counter.webp" alt="" fetchpriority="high" />
             <img id="store-loading-view-b" alt="" />
           </div>
           <div class="store-loading-caption">HALCYON VIDEO</div>
           <div class="store-loading-strip">
-            <p id="store-loading-tip">Preparing your store. Your shelves will open when they are ready.</p>
-            <span id="store-loading-label">LOADING <span id="store-loading-percent">0%</span></span>
-            <span id="store-loading-status">Downloading the store</span>
+            <span id="store-loading-label">LOADING</span>
             <div id="store-loading-progress" role="progressbar" aria-label="Loading the store" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
               <canvas id="store-loading-fill" width="1" height="1" aria-hidden="true"></canvas>
             </div>
+            <div class="store-loading-readout"><span id="store-loading-percent">0%</span><span id="store-loading-status">Downloading the store</span></div>
+            <p id="store-loading-tip">Preparing your store. Your shelves will open when they are ready.</p>
           </div>
           <script src="%BASE_URL%loading-screen.js"></script>
       </div>

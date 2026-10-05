@@ -11,7 +11,7 @@
   const label = document.getElementById('store-loading-label');
   const base = new URL('.', document.currentScript.src);
   let value = 0, failed = false, timer, slide = 0, front = 0;
-  const views = ['store-interior.webp', 'store-aisles.webp', 'store-exterior.webp'];
+  const views = ['store-counter.webp', 'store-shelves.webp', 'store-front.webp'];
   const tips = [
     'Preparing your store. Your shelves will open when they are ready.',
     'Make it your own: self-host Halcyon with your Jellyfin or Plex media library.',
@@ -45,7 +45,7 @@
     update,
     reset() {
       // Initial boot calls showBootOverlay after modules load: keep earned progress.
-      if (value > 20 || failed) { value = 0; failed = false; label.innerHTML = 'LOADING <span id="store-loading-percent">0%</span>'; label.removeAttribute('role'); }
+      if (value > 20 || failed) { value = 0; failed = false; label.textContent = 'LOADING'; label.removeAttribute('role'); }
       update(value, 'Preparing your store'); start();
     },
     fail() { failed = true; stop(); label.textContent = 'Unable to start graphics. Close and reopen Halcyon to try again.'; label.setAttribute('role', 'alert'); }
