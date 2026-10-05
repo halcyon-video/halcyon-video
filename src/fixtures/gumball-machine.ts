@@ -3,12 +3,15 @@ import type { FixturePlacement } from '../store-layout';
 import type { FixtureContext, StoreFixture } from '../fixtures';
 import type { Footprint } from '../layout-validator';
 import { installDisplayModel } from './display-model';
+import { prepareRetailModel } from './retail-model';
+import { gumballLogo } from './gumball-logo';
 import { GUMBALL_RADIUS, GUMBALL_HEIGHT, GUMBALL_SCALE } from './gumball-layout';
 
 /** Static set dressing. Detail uses the existing deferred, cancellable model loader. */
 export class GumballMachine implements StoreFixture {
   private group: THREE.Group | null = null;
   private removeModel: (() => void) | null = null;
+  private logo: ReturnType<typeof gumballLogo> | null = null;
   private owned: Array<{ dispose(): void }> = [];
   constructor(public placement: FixturePlacement, private ctx: FixtureContext) {}
   build(): void {
@@ -31,6 +34,8 @@ export class GumballMachine implements StoreFixture {
     mesh(new THREE.SphereGeometry(.97,32,18),clear,4.42);
     mesh(new THREE.CylinderGeometry(.65,.72,.13,32),enamel,5.33);
     const coin=mesh(new THREE.BoxGeometry(.35,.43,.1),chrome,3.12); coin.position.z=.67;
+    const logo = this.logo = gumballLogo(clear, () => this.ctx.requestRender());
+    logo.attach(fallback);
     this.ctx.scene.add(root);
     // One stable collision proxy covers both public and installed models.
     const proxyGeo = new THREE.CylinderGeometry(GUMBALL_RADIUS,GUMBALL_RADIUS,GUMBALL_HEIGHT,24);
@@ -40,7 +45,10 @@ export class GumballMachine implements StoreFixture {
     const sources = this.placement.options?.publicModelOnly
       ? ['models/gumball-machine.glb']
       : ['user-assets/fixtures/gumball-machine/machine.glb','models/gumball-machine.glb'];
-    this.removeModel=installDisplayModel(this.ctx,root,fallback,sources,{ Enamel:enamel, ClearPlastic:clear },new THREE.Vector3().setScalar(GUMBALL_SCALE));
+    this.removeModel=installDisplayModel(this.ctx,root,fallback,sources,{ Enamel:enamel, ClearPlastic:clear },new THREE.Vector3().setScalar(GUMBALL_SCALE), model => {
+      prepareRetailModel(model);
+      logo.attach(model);
+    });
     this.ctx.requestShadowRefresh();
   }
   getFootprint(): Footprint | null {
@@ -51,6 +59,7 @@ export class GumballMachine implements StoreFixture {
   }
   update(): void {}
   dispose(): void {
+    this.logo?.dispose(); this.logo=null;
     this.removeModel?.(); this.removeModel=null;
     this.group?.removeFromParent(); this.group=null;
     this.owned.forEach(o=>o.dispose()); this.owned=[];

@@ -42,3 +42,19 @@ fallback, materials and proxy when the store is rebuilt or disposed.
 Verification: unit coverage of joined/deepest/wall shelves, input-order stability,
 counter shapes and door depth; full build and test suite; exported bounds, UVs
 and manifold solids; isolated fixture views and both placement rules in the store.
+
+The globe carries the active configured store emblem as a small curved sticker.
+`gumball-logo.ts` paints the canonical `getActiveLogoSpec` through `drawLogo`,
+retaining text, colors, silhouette, composed emblem and installed brand artwork.
+It trims the painter's transparent margins and contains the complete mark within
+an envelope 39% of the hopper diameter wide, with a 5:3 width-to-height ratio;
+unusual logo shapes retain their proportions. A static 24-by-16 mesh projects
+onto the actual front glass, so the spherical fallback, public barrel and private
+replacement each keep their own curvature. No source model or glass finish changes.
+Brand edits reuse one canvas texture; canonical image and bundled font readiness repaint the mark,
+and fixture teardown unregisters the listener and disposes decal resources.
+
+Logo verification additionally covers frontal and oblique views of both model
+paths, the built-in fallback, live text/color/emblem changes, installed image
+artwork, and teardown during asynchronous detail/font preparation. Public
+photographs must still be captured with user assets absent.

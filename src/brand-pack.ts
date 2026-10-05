@@ -128,6 +128,7 @@ let packDir: string | null = null;
 const packFamilies = new Map<string, string>();
 // Resolved emblem-image url -> the decoded element (null once it has failed).
 const packImages = new Map<string, HTMLImageElement | null>();
+const pendingImages = new Map<string, Promise<void>>();
 
 function readSetting(key: string): string | null {
   return typeof localStorage !== 'undefined' ? localStorage.getItem(key) : null;
@@ -314,13 +315,27 @@ function runtimeFamilyFor(declared: string): string {
 
 /** Preload one emblem image; resolves either way (a miss must never hang boot). */
 function preloadImage(url: string): Promise<void> {
-  if (typeof Image === 'undefined') return Promise.resolve();
-  return new Promise<void>((resolve) => {
+  if (packImages.has(url) || typeof Image === 'undefined') return Promise.resolve();
+  const pending = pendingImages.get(url);
+  if (pending) return pending;
+  const load = new Promise<void>((resolve) => {
     const img = new Image();
+    // Every emblem is painted into canvas/WebGL. Cross-origin sources need
+    // permission to remain readable; local and data images retain their path.
+    img.crossOrigin = 'anonymous';
     img.onload = () => { packImages.set(url, img); resolve(); };
     img.onerror = () => { packImages.set(url, null); resolve(); };
     img.src = url;
-  });
+  }).finally(() => { pendingImages.delete(url); });
+  pendingImages.set(url, load);
+  return load;
+}
+
+/** Settle a newly configured emblem in the same cache used by drawLogo.
+ * Shared with boot loading; missing images resolve to the canonical fallback. */
+export function ensureBrandImage(src: string): Promise<void> {
+  const url = brandAssetUrl(src);
+  return url ? preloadImage(url) : Promise.resolve();
 }
 
 /**
