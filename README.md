@@ -6,11 +6,13 @@
 [![License](https://img.shields.io/badge/license-GPL--3.0-6a737d)](LICENSE)
 [![Stars](https://img.shields.io/github/stars/halcyon-video/halcyon-video?color=6a737d)](https://github.com/halcyon-video/halcyon-video/stargazers)
 
-<a href="https://ko-fi.com/halcyonvideo"><img src="docs/presentation/marks/kofi.png" alt="Support Halcyon Video on Ko-fi" width="240"></a>
-
 **Next release: date pending.** The presentation below shows the current development build; a release follows owner testing. Published downloads and release notes remain on the [releases page](https://github.com/halcyon-video/halcyon-video/releases).
 
 **The video store you remember, stocked with what you can watch.**
+
+**Free and open source. Nothing to purchase in Halcyon:** no paid edition,
+feature unlocks, or required donation. Your existing media and streaming
+subscriptions remain yours; Halcyon itself costs nothing.
 
 Halcyon Video turns movie night into a visit to the video store. Glide down
 real 3D aisles, pick up a VHS or DVD case, flip it to read the back, and take
@@ -25,7 +27,7 @@ Prefer your own collection? Connect your Jellyfin, Plex, or Emby library,
 and add RomM for a games department. Browse with a keyboard, gamepad,
 TV remote, or phone.
 
-![Halcyon Video at sunset](docs/screenshots/facade-sunset.jpg)
+![STARLIGHT VIDEO with its slate cone canopy and dimensional sign](docs/screenshots/presentation/10-starlight-cone-canopy.png)
 
 Need help or want to show your store? Join the
 [Discord community](https://discord.gg/SN6FnJgQe) for setup help, release
@@ -44,7 +46,7 @@ all ten regulars can browse the aisles alongside you.
 
 ![Later store styling, alternate palette, tall ceiling and wall decoration](docs/screenshots/presentation/05-late-interior.jpg)
 
-![Extruded exterior lettering at sunset](docs/screenshots/presentation/06-letters-exterior.jpg)
+![MOONLIGHT VIDEO with freestanding exterior lettering at sunset](docs/screenshots/presentation/11-moonlight-letters.png)
 
 ![Compact independent shop with wooden shelving and tiled ceiling](docs/screenshots/presentation/07-independent.jpg)
 
@@ -55,8 +57,6 @@ explicit settings. Interior and case demonstrations use the bundled illustrative
 harness stock; game photographs use real RomM metadata. The browser store uses
 its streaming catalog when you enter it. The [earlier screenshot tour](docs/screenshot-tour.md)
 shows additional configurations from version 0.19.0.
-
-[![Watch the storefront and interior flycam tour](docs/screenshots/presentation/02-shield-exterior.jpg)](docs/presentation/flycam.mp4)
 
 [Watch the silent flycam tour](docs/presentation/flycam.mp4) of the running app.
 The footage uses the app’s recorder and illustrative demo stock, with automated
@@ -84,10 +84,17 @@ adds mouse look and WebXR when a headset is available.
 the aisles, past the counter, and across the sales floor. Touch a control to
 return to browsing. The store remains a working place throughout the tour.
 
-**Choose the store you remember.** Build a spacious chain-style store or a
-compact independent shop with wood shelves and a lower ceiling. Switch
-between modeled building facades, and see the windows and exterior in
-daylight, at sunset, or after dark.
+**Ceiling CRT ambience.** Suspended televisions play ambient video above
+the aisles, giving the room that familiar video-store glow and motion. Choose
+the screens and fallback presentation to suit your store.
+
+![Ceiling-mounted CRTs above the rental-store aisles](docs/screenshots/presentation/12-ceiling-crts.png)
+
+**Extreme attention to detail.** Rental cases have format-specific proportions,
+readable spines and printed backs; seasonal displays, dimensional signs,
+period fixtures, a working return chute, receipts and a deforming checkout bag
+make the store feel lived in. Customers browse the floor and the clerk follows
+its actual layout. These details carry through from the facade to the counter.
 
 ![Kids Club shelving and its in-store television](docs/screenshots/v019/06-kids-club.jpg)
 
@@ -95,16 +102,6 @@ daylight, at sunset, or after dark.
 the shelves to titles released by your chosen store date. That date advances
 with real time; an optional setting also matches the store's era to it. Your
 underlying media library stays intact.
-
-## Store copies and checkout
-
-Flip the artwork case and its store-copy sleeve together to read the back.
-Checkout packs the cases into a rental bag, with pickup and carry-out before
-playback or the streaming handoff.
-
-![Store-copy VHS sleeve with readable monochrome metadata](docs/screenshots/presentation/04-store-copy.jpg)
-
-![Rental bag with store copies at the checkout counter](docs/screenshots/presentation/03-rental-bag.jpg)
 
 ## The parts that make it feel like a store
 
@@ -122,9 +119,14 @@ searches by title, director, or genre.
 
 ![The back of a rental case, with its synopsis and movie information](docs/screenshots/v019/04-case-back.jpg)
 
-### Rent it, return it, or take it home
+### Store copies, checkout and carry-out
 
-![The current checkout counter and filled rental bag](docs/screenshots/v019/05-checkout-bag.jpg)
+![Rental bag with store copies at the checkout counter](docs/screenshots/presentation/03-rental-bag.jpg)
+
+Flip the artwork case and its store-copy sleeve together to read the back.
+Streaming checkout chooses one provider before the counter and carry-out.
+
+![Store-copy sleeve with monochrome metadata](docs/screenshots/presentation/04-store-copy.jpg)
 
 Carry several tapes to the counter and the clerk bags them in soft-body
 plastic that deforms around the cases. The checkout sequence ends in a
@@ -155,30 +157,16 @@ become a dedicated department. Cardboard cartons, clamshells, and jewel cases
 use platform-specific proportions; native builds can hand a selected game to
 an emulator.
 
-### Make the store yours
-
-![A coordinated green-and-gold store, including its carpet](docs/screenshots/v019/26-green-gold-interior.jpg)
+### One identity throughout the store
 
 ![Building an original emblem in Emblem Studio](docs/screenshots/v019/29-emblem-studio.jpg)
 
-The fictional Halcyon identity is data, not hard-coded scenery. Build an
-emblem from editable layers in Emblem Studio, then see that same mark on
-the storefront, cases, aisle signs, counters, and checkout bags. Change the
-name, colors, and typeface in the live Brand Editor to repaint the store's
-livery together — from burgundy and cream to green and gold. The carpet can
-follow either brand color through Store Look's Carpet Colour setting.
-
-The default Halcyon identity uses white lettering and trim on a blue, rounded
-rectangle, with the board and lettering level across the store.
-
-An SVG or transparent PNG can replace the emblem entirely. The store name
-and subtitle are editable too: make it your video shop, entertainment store,
-or games destination.
-
-For a larger conversion, a brand pack can supply per-era palettes, fonts,
-surfaces, and scanned wraps. Local assets live in the git-ignored
-`public/user-assets/` directory, so a private store identity cannot wander
-into a commit.
+Build an emblem from editable layers in Emblem Studio, or use an SVG or
+transparent PNG. The Brand Editor changes the name, subtitle, colors and
+typeface across storefronts, rental cases, aisle signs, counters and bags.
+The STARLIGHT and MOONLIGHT storefronts above show two original store names.
+Brand packs can also supply era-specific fonts, palettes, surfaces and wraps;
+private assets stay in the git-ignored `public/user-assets/` directory.
 
 ## What can stock the shelves?
 
@@ -337,7 +325,34 @@ The kiosk service restarts after crashes, reloads for maintenance while idle,
 and renders nothing when the store is still. Halcyon is designed to remain on
 for days rather than burn the GPU behind an unchanged frame.
 
-## TV, phone, and low-power screens
+## Where you can run it
+
+| Device or deployment | Available route |
+|---|---|
+| Windows, macOS and Linux computers | Browser and local launchers; Tauri desktop shell available from source |
+| Android phones and tablets, iPhone and iPad | Browser with touch controls; 3D needs a compatible WebGL browser |
+| Living-room PCs and HTPCs | Browser kiosk, keyboard, gamepad or TV remote; optional local mpv playback |
+| Android TV and Fire TV | Native launcher or Remote Play |
+| Raspberry Pi and older or low-power hardware | HTML/CSS 2.5D mode, or Remote Play from a stronger host |
+| Docker hosts, home servers and NAS systems that support Docker | Serve Halcyon to a browser; rendering happens on the client or Remote Play host |
+| Compatible WebXR headsets | First-person browser mode where WebXR is available |
+
+Apple TV is planned, not shipped. Roku is unsupported. Published desktop
+bundles are also still planned; the source shell is not a finished download.
+
+## Fast browsing and low-power modes
+
+Halcyon is built for responsive shelf browsing and case inspection. Rendering
+quality adapts to measured GPU headroom, and a still store holds its frame
+instead of continuously redrawing. Performance settings expose High, Medium
+and Low quality, reflection options and a 30 FPS cap, so you can trade visual
+detail for less GPU work. Speed depends on your device and store size.
+
+For the lightest local experience, **2.5D mode** renders the same libraries
+and cases in HTML and CSS. **Remote Play** lets another machine do the 3D
+rendering for your phone or television.
+
+### Phone and television controls
 
 On a phone, enter the 3D store in walking mode and use the thumbstick and touch
 controls. Computers start with the whole-store overview. Drag along the cases
@@ -352,13 +367,8 @@ store; private instances give remote visitors their own browser-rendered store.
 Off-LAN sessions can use Halcyon's optional TURN relay. Read the
 [wire protocol and deployment notes](docs/remote-play-protocol.md).
 
-Android TV and Fire TV can use the native launcher in
-[android-tv](android-tv/README.md). Apple TV has a documented
-[native-client plan](tvos/README.md) but is not shipped. Roku is not supported.
-
-For hardware that should not render the 3D room, **2.5D mode** presents the
-same libraries and cases as HTML and CSS. It is the practical Raspberry Pi and
-older-browser route, not a separate catalog.
+See the [Android TV and Fire TV launcher](android-tv/README.md) for native
+setup and the [Apple TV plan](tvos/README.md) for its current status.
 
 ## Hosting security
 
@@ -476,9 +486,12 @@ but neither is presented here as a finished download.
 
 ## Support and project policy
 
-If Halcyon made you grin, the in-store tip jar links to
+Halcyon is free, with nothing to purchase and no paid features. If it made
+you grin, the in-store tip jar links to
 [Ko-fi](https://ko-fi.com/halcyonvideo). It is optional, switchable in Store
 Look, and never gates a feature.
+
+<a href="https://ko-fi.com/halcyonvideo"><img src="docs/presentation/marks/kofi.png" alt="Optional support for Halcyon Video on Ko-fi" width="240"></a>
 
 Bug reports are welcome. The project does not accept pull requests: it is a
 single-owner product shared under an open license, not a design-by-committee
