@@ -292,3 +292,11 @@ visible television fronts reused from this project's original CRT family.
 No external mesh, photographic art or branded skin is included. Source,
 reproduction and placement contracts are in `tools/models/twin-crt-tower.py`,
 `tools/models/twin-crt-tower.blend` and `docs/twin-crt-tower-model.md`.
+
+## Deformable rental-bag rest mesh
+
+`rental-bag-rest.glb` and the matching solver-node data are original scripted
+Blender mesh authoring. The preview includes only an unbranded, generated
+handle-cutout mask. The application retains its existing live printed finish.
+Editable source and reproduction script: `tools/models/rental-bag.blend` and
+`rental-bag.py`. Mapping and verification: `docs/rental-bag-model.md`.

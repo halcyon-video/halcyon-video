@@ -1,3 +1,4 @@
+import authoredBagRest from './model-data/rental-bag-rest.json';
 import { setMaterialEnvironment } from './material-environment';
 // CheckoutBag — the glossy white plastic rental bag on the inner counter, as a
 // real (tiny) soft body. The bag is a "pillow bag" exactly like the physical
@@ -158,6 +159,7 @@ export class CheckoutBag {
   private pos: Float32Array;
   private prev: Float32Array;
   private rest: Float32Array;
+  private stepStart: Float32Array;
   private nodeCount: number;
   // Which sheet each node belongs to: +1 front, -1 back, 0 for the side-seam
   // columns (one node serves both sheets there, so it has no side of its own).
@@ -274,9 +276,15 @@ export class CheckoutBag {
         setN(BT(t, i), colX(i), y, -0.022);
       }
     }
+    const authoredRestFits = authoredBagRest.nodeCount === this.nodeCount
+      && authoredBagRest.nodes.length === rest.length && authoredBagRest.columns === COLS
+      && authoredBagRest.rows === ROWS && authoredBagRest.halfWidth === HALF_W
+      && authoredBagRest.bodyHeight === BODY_H && authoredBagRest.tabRise === TAB_RISE;
+    if (authoredRestFits) rest.set(authoredBagRest.nodes);
     this.rest = rest;
     this.pos = new Float32Array(rest);
     this.prev = new Float32Array(rest);
+    this.stepStart = new Float32Array(rest);
 
     const sheetSide = new Int8Array(this.nodeCount);
     for (let r = 0; r <= ROWS; r++) {
@@ -340,6 +348,7 @@ export class CheckoutBag {
       quad(bv[ROWS][i + 1], bv[ROWS][i], btv[0][i], btv[0][i + 1]);
       quad(btv[0][i + 1], btv[0][i], btv[1][i], btv[1][i + 1]);
     }
+    if (authoredRestFits) index.push(...authoredBagRest.bottomIndices);
     this.vertNode = Int16Array.from(verts);
 
     const geo = new THREE.BufferGeometry();
@@ -354,6 +363,7 @@ export class CheckoutBag {
     geo.setAttribute('uv', new THREE.BufferAttribute(Float32Array.from(uvs), 2));
     geo.setIndex(index);
     geo.computeVertexNormals();
+    geo.userData.authoredBagRest = authoredRestFits;
     this.geo = geo;
 
     // ── Constraints ────────────────────────────────────────────────────────
@@ -622,6 +632,15 @@ export class CheckoutBag {
     const restPos = new THREE.Vector3(slot.x, hy + 0.025, slot.z);
     _e.set(slot.rotX, slot.rotY, slot.rotZ);
     const restQuat = new THREE.Quaternion().setFromEuler(_e);
+    // Seat the padded, tilted collider above the bottom weld. Using just hy
+    // buried its lower corners in the floor pins, creating permanent contact
+    // chatter with mixed case/candy payloads even after the drop had ended.
+    _q.copy(restQuat).invert();
+    _v.set(0, 1, 0).applyQuaternion(_q);
+    const support = Math.abs(_v.x) * (hx + COLLIDE_MARGIN)
+      + Math.abs(_v.y) * (hy + COLLIDE_MARGIN) + Math.abs(_v.z) * (hz + COLLIDE_MARGIN);
+    _v.set(cx, cy, cz).applyQuaternion(restQuat);
+    restPos.y = support + 0.025 - _v.y;
     const fromPos = new THREE.Vector3(slot.x * 0.35, BODY_H + hy * 0.6, slot.z * 0.3);
     _e.set(slot.rotX - 0.35, slot.rotY + 0.55, slot.rotZ + 0.2);
     const fromQuat = new THREE.Quaternion().setFromEuler(_e);
@@ -770,6 +789,7 @@ export class CheckoutBag {
   // ── One fixed 60 Hz solver step ──────────────────────────────────────────
   private step(): void {
     const { pos, prev, rest } = this;
+    this.stepStart.set(pos);
     const n = this.nodeCount;
     const DT2 = (STEP_MS / 1000) * (STEP_MS / 1000);
 
@@ -820,9 +840,6 @@ export class CheckoutBag {
         next += (rest[b + a] - next) * restK;
         prev[b + a] = cur;
         pos[b + a] = next;
-        const v = next - cur;
-        if (v > maxV) maxV = v;
-        else if (-v > maxV) maxV = -v;
       }
       if (pos[b + 1] < FLOOR_Y) {
         pos[b + 1] = FLOOR_Y;
@@ -965,6 +982,10 @@ export class CheckoutBag {
       this.collideItems();
     }
 
+    // Pins and collision projection cancel much of the integration motion.
+    // Compare the final visible pose with the prior pose; the discarded gravity
+    // displacement at pinned nodes must not keep a resting bag awake forever.
+    for (let i = 0; i < pos.length; i++) maxV = Math.max(maxV, Math.abs(pos[i] - this.stepStart[i]));
     this.writeGeometry();
 
     // 5. Sleep once genuinely still (nothing scripted pending).
