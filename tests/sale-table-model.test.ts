@@ -8,10 +8,10 @@ async function model(name: string) {
   const { scene } = await new GLTFLoader().parseAsync(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), '');
   scene.updateMatrixWorld(true); return { root: scene, bytes: bytes.length };
 }
-test('folding table, feet and cloth fit the unchanged footprint and support datum', async () => {
+test('visible table drape fits the unchanged footprint and support datum', async () => {
   const { root, bytes } = await model('sale-table'); assert.ok(bytes < 500_000);
   const b = new T.Box3().setFromObject(root);
-  assert.ok(Math.abs(b.min.y) < 1e-6 && b.max.y <= 2.504);
+  assert.ok(b.min.y > .065 && b.min.y < .08 && b.max.y <= 2.504);
   assert.ok(b.min.x >= -3.1 && b.max.x <= 3.1 && b.min.z >= -1.35 && b.max.z <= 1.35);
   const cloth = root.getObjectByName('DrapeCloth')!; assert.ok(cloth);
   assert.ok(new T.Box3().setFromObject(cloth).min.y > .065, 'hem clears carpet');
@@ -38,7 +38,7 @@ test('wire rack preserves six row supports and named adjustable print clips', as
   }
 });
 test('sale furniture has finite UVs/normals and bounded exported resources', async () => {
-  for (const [name, budget, drawLimit] of [['sale-table', 12_000, 4], ['sale-table-rack', 9_000, 5]] as const) {
+  for (const [name, budget, drawLimit] of [['sale-table', 10_000, 1], ['sale-table-rack', 9_000, 5]] as const) {
     const { root } = await model(name); let triangles = 0, meshes = 0;
     root.traverse(o => {
       if (!(o instanceof T.Mesh)) return;

@@ -1,4 +1,4 @@
-"""Original editable folding sale table, static drape and bent-wire rack.
+"""Original editable draped sale table and bent-wire rack.
 Blender coordinates (x,-store_z,height), feet. Existing runtime anchors retained.
 Reproduce with Blender -b -t 2 --python-exit-code 1 -P /absolute/path/to/this.py.
 """
@@ -9,10 +9,9 @@ ROOT=Path(__file__).resolve().parents[2]
 bpy.ops.object.select_all(action='SELECT');bpy.ops.object.delete(use_global=False)
 bpy.context.preferences.filepaths.save_version=0
 bpy.context.scene.unit_settings.system='IMPERIAL';bpy.context.scene.unit_settings.scale_length=.3048
-bpy.context.scene['provenance']='Original folding-table and wire-rack construction; no source-photo pixels or external geometry.'
+bpy.context.scene['provenance']='Original visible table drape and wire rack; no source-photo pixels or external geometry.'
 M={}
-for name,col,rough,metal in [('TableTop',(.30,.22,.13),.62,0),('TableFrame',(.10,.115,.12),.46,.55),
-    ('TableFeet',(.035,.038,.04),.85,0),('DrapeCloth',(.03,.03,.038),.94,0),('RackWire',(.035,.035,.045),.42,.45)]:
+for name,col,rough,metal in [('DrapeCloth',(.03,.03,.038),.94,0),('RackWire',(.035,.035,.045),.42,.45)]:
     m=bpy.data.materials.new(name);m.diffuse_color=(*col,1);m.use_nodes=True
     p=m.node_tree.nodes['Principled BSDF'];p.inputs['Base Color'].default_value=(*col,1)
     p.inputs['Roughness'].default_value=rough;p.inputs['Metallic'].default_value=metal;M[name]=m
@@ -59,18 +58,9 @@ def finish(parts):
         o['units']='feet';o['construction']='original scripted Blender mesh'
 
 table=[]
-table.append(box('Fitted laminate tabletop',(0,2.455,0),(5.99,.084,2.49),'TableTop',.018))
-for z in [-1.10,1.10]:table.append(box('Underside channel rail '+str(z),(0,2.34,z),(5.68,.13,.055),'TableFrame',.008))
-for x in [-2.18,2.18]:
-    # One bent U leg frame at each end, seated into pivot brackets. Folding
-    # braces and pivots are static physical parts, not a simulation.
-    table.append(tube('Continuous folding leg '+str(x),rounded_path([(x,.085,-.98),(x,2.28,-.84),(x,2.31,.84),(x,.085,.98)],.10),.045,'TableFrame'))
-    for z in [-.98,.98]:table.append(box('Nonmarking foot '+str((x,z)),(x,.065,z),(.14,.13,.18),'TableFeet',.026))
-    for z in [-.84,.84]:
-        table.append(box('Pivot clevis '+str((x,z)),(x,2.335,z),(.20,.13,.14),'TableFrame',.014))
-    direction=-1 if x>0 else 1
-    table.append(tube('Folding diagonal brace '+str(x),[(x,1.12,0),(x+direction*.84,2.34,0)],.025,'TableFrame'))
-    table.append(box('Brace locking sleeve '+str(x),(x+direction*.42,1.73,0),(.11,.15,.065),'TableFrame',.012))
+# The permanent opaque drape conceals the tabletop and folding hardware in
+# customer views. Its top surface supplies the rack's existing support datum;
+# no concealed legs, rails, pivots or braces are authored or exported.
 
 # A single top-and-skirt fabric surface follows the real table perimeter.
 # The static folds widen modestly toward a turned hem one inch above the floor.

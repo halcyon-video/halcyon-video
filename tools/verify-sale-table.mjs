@@ -51,7 +51,7 @@ try{
      assert(slots===JSON.stringify(f.getSlots()),'all case transforms and identity preserved');
      assert(foot===JSON.stringify(f.getFootprint()),'navigation footprint preserved');
      const models=root.children.filter(o=>o.name==='display-model');let draws=0;
-     models.forEach(m=>m.traverse(o=>{if(o.isMesh)draws++;}));assert(draws===5,'four furniture finishes plus one rack batch');
+     models.forEach(m=>m.traverse(o=>{if(o.isMesh)draws++;}));assert(draws===2,'visible cloth plus one rack batch');
     }
     if(mode==='failure')assert(root.children.filter(o=>o.name==='display-fallback'&&o.visible).length===2,'both fallbacks retained');
     f.dispose();f.dispose();once(before,mode+' fallback');assert(!scene.children.length,'removed');

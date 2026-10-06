@@ -1,7 +1,7 @@
 {
   "sale-table": {
-    "parts": 18,
-    "source_polygons": 5470,
+    "parts": 1,
+    "source_polygons": 4592,
     "manifold": true,
     "uv": true,
     "bounds_blender_ft": [
@@ -14,13 +14,13 @@
         1.3278720378875732
       ],
       [
-        0.0,
+        0.07189611345529556,
         2.5021185874938965
       ]
     ],
-    "bytes": 350068,
-    "export_meshes": 4,
-    "triangles": 11240
+    "bytes": 236056,
+    "export_meshes": 1,
+    "triangles": 9516
   },
   "sale-table-rack": {
     "parts": 244,
