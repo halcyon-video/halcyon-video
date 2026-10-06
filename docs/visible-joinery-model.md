@@ -7,8 +7,8 @@ exposed construction is authored. No concealed stand backing, wiring, fasteners,
 wall interiors or removed sliding-door system is introduced.
 
 Source: `tools/models/visible-joinery.py` and `visible-joinery.blend`.
-Runtime: `public/models/visible-joinery.glb`, 131,816 bytes, 1,808 triangles
-across nine reusable parts. All parts have UVs and finite normals. The source
+Runtime: `public/models/visible-joinery.glb`, 142,668 bytes, 1,956 triangles
+across twelve reusable parts. All parts have UVs and finite normals. The source
 checks manifold closed parts and positive volume. Material `ReplaceableFinish`
 is substituted by each consumer's existing finish; no reference imagery,
 external geometry or textures are embedded. Reproduce with Blender in background
@@ -45,3 +45,12 @@ normal build and full test suite; installed phone-viewport views of window,
 baseboard, door and screening-room consumers. Private verification tooling and
 photographs are under `scratch/publicity-kits/finish-models`. These are emulated
 phone views, not physical-device performance measurements.
+
+The second group adds folded metal coping with drip returns, a bent saddle
+bracket for signs that already have feet, and a round-shouldered plaque.
+Existing flush-mounted cards remain flush. The shared finished-panel adapter
+retains all six BoxGeometry material lanes and their UV handedness, including
+the collection plinth's white top and separate printed front. Plaque caps and
+edges retain their existing two material lanes; no lettering is regenerated.
+Roof caps keep the facade's original span and corner stops. Small-shop trim
+keeps the existing fascia and sill anchors, dimensions and palette.

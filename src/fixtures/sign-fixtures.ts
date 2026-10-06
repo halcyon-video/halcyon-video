@@ -1,3 +1,4 @@
+import { finishedPanelGeometry, signBracketGeometry } from '../joinery-model';
 import * as THREE from 'three';
 import { registerSignMount } from './sign-mount';
 import { createExtrudedMaterials, create3DExtrudedSign } from '../sign-builders';
@@ -255,7 +256,7 @@ export function ceilingHangingSign(
 
   // 1. Signboard double-sided box panel
   const panelThick = 0.04;
-  const panelGeo = new THREE.BoxGeometry(width, height, panelThick);
+  const panelGeo = finishedPanelGeometry(width, height, panelThick);
   if (opts.skew) {
     // Shear x by y (x += skew·y): a leaning parallelogram. Applied directly
     // to positions — clearer than makeShear's argument-order trap.
@@ -394,7 +395,7 @@ export function shelfTopperSign(texture: THREE.Texture, width: number, height: n
     backMat   // -Z
   ];
 
-  const panel = new THREE.Mesh(new THREE.BoxGeometry(width, height, panelThick), materials);
+  const panel = new THREE.Mesh(finishedPanelGeometry(width, height, panelThick), materials);
   panel.position.set(0, panelCenterY, 0);
   panel.castShadow = true;
   panel.receiveShadow = true;
@@ -407,7 +408,7 @@ export function shelfTopperSign(texture: THREE.Texture, width: number, height: n
     metalness: 0.8
   });
 
-  const footGeo = new THREE.BoxGeometry(0.04, 0.06, 0.08); // small bracket holding sign
+  const footGeo = signBracketGeometry(); // small bracket holding sign
 
   const footLeft = new THREE.Mesh(footGeo, metalMat);
   footLeft.position.set(-width / 2 + 0.15, 0.03, 0);

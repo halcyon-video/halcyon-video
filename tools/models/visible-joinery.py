@@ -37,6 +37,19 @@ prism('SillCap',[(-.06,-.20),(.052,-.20),(.06,-.188),(.06,.188),(.052,.20),(-.03
 section=[(-.10,-.15),(.10,-.15),(.10,.15),(.066,.15),(.060,.126),(-.060,.126),(-.066,.15),(-.10,.15)]
 prism('WindowVertical',section,1,'y',.002)
 prism('WindowHorizontal',section,1,'x',.002)
+# Folded roof-edge cap. The crown sheds water to exposed drip returns.
+prism('Coping',[(-.15,-.5),(.11,-.5),(.15,-.46),(.15,.46),(.11,.5),(-.15,.5),(-.15,.48),(.105,.48),(.13,.435),(.13,-.435),(.105,-.48),(-.15,-.48)],1)
+# Small continuous folded saddle, only for signs that already have brackets.
+prism('SignBracket',[(-.03,-.04),(-.022,-.04),(-.022,-.007),(.03,-.007),(.03,.007),(-.022,.007),(-.022,.04),(-.03,.04)],.04)
+# Thin round-shouldered plaque; flat printed caps remain separate material lanes.
+outline=[(-.5,0),(.5,0),(.5,.4)]
+for i in range(1,9):
+ t=i/8;outline.append((.5-.1*t*t,.4+.2*t-.1*t*t))
+outline.append((-.4,.5))
+for i in range(1,9):
+ t=i/8;outline.append((-.4-.2*t+.1*t*t,.5-.1*t*t))
+v=[(x,y,z) for z in [0,.01] for x,y in outline];n=len(outline)
+mesh('ArchedPlaque',v,[tuple(reversed(range(n))),tuple(range(n,2*n))]+[(i,(i+1)%n,(i+1)%n+n,i+n) for i in range(n)])
 # Reusable eased solid panel for visible stand shelves and column bands.
 panel('FinishedPanel',1,1,1,bevel=.006)
 # A complete fitted open stand. Shelves butt between sides; top rests above them.

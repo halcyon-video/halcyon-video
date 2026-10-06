@@ -1,3 +1,4 @@
+import { finishedPanelGeometry } from '../joinery-model';
 // Genre fascia blades — the colored sign bands that ride on top of shelving
 // runs, white varsity block letters on a saturated field, straight out of the
 // 1993 store footage: orange for the funny shelves, blue for the dramatic
@@ -241,7 +242,7 @@ export function createFasciaBladeFactory(way: FasciaColorway | null = null): Fas
       const geoKey = length.toFixed(2);
       let geo = geos.get(geoKey);
       if (!geo) {
-        geo = new THREE.BoxGeometry(BLADE_T, FASCIA_BLADE_H, length);
+        geo = finishedPanelGeometry(BLADE_T, FASCIA_BLADE_H, length);
         geos.set(geoKey, geo);
       }
       const trim = edgeMat(plusXLabel);

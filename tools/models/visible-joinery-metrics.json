@@ -1,11 +1,14 @@
 {
-  "bytes": 131816,
-  "triangles": 1808,
+  "bytes": 142668,
+  "triangles": 1956,
   "parts": [
+    "ArchedPlaque",
     "Baseboard",
+    "Coping",
     "DoorPushBar",
     "DoubleDoorLeaf",
     "FinishedPanel",
+    "SignBracket",
     "SillCap",
     "SingleDoorLeaf",
     "TelevisionStand",

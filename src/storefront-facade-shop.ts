@@ -1,3 +1,4 @@
+import { finishedPanelGeometry, copingGeometry } from './joinery-model';
 // The mom-and-pop format's own exterior (GH #110) — StoreFormatSpec.facadeStyle
 // 'storefront'. What shipped in c55c93c narrowed the chain's own brick/glazed-
 // tile/gabled-tower facade instead of building the format its own building:
@@ -73,7 +74,7 @@ export function buildShopfrontFacade(params: ShopFacadeBuildParams): StorefrontF
   const trimMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(trimColor), roughness: 0.55, metalness: 0.05 });
   const coping = new THREE.MeshStandardMaterial({ color: 0x2c2e31, roughness: 0.6, metalness: 0.2 });
   const addBox = (w: number, h: number, d: number, x: number, y: number, z: number, mat: THREE.Material): THREE.Mesh => {
-    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+    const m = new THREE.Mesh(mat === coping ? copingGeometry(w,h,d) : finishedPanelGeometry(w,h,d), mat);
     m.position.set(x, y, z);
     m.castShadow = true;
     m.receiveShadow = true;
