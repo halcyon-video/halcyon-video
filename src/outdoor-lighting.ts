@@ -88,6 +88,9 @@ export class OutdoorLightingRig {
 
   private groundColor = new THREE.Color('#80766b');
   private groundColorListener: ((color: THREE.Color) => void) | null = null;
+  private photographicGround = false;
+  private groundModeListener: ((enabled: boolean) => void) | null = null;
+  setGroundModeListener(fn: (enabled: boolean) => void) { this.groundModeListener = fn; fn(this.photographicGround); }
   getGroundColor() { return this.groundColor; }
   setGroundColorListener(fn: (color: THREE.Color) => void) { this.groundColorListener = fn; }
   private sampleGround(tex: THREE.Texture) {
@@ -322,6 +325,8 @@ export class OutdoorLightingRig {
     let bakeWithSky = true;
     const applyTexture = (tex: THREE.Texture | null) => {
       const image = tex?.image as HTMLImageElement | undefined;
+      this.photographicGround = Boolean(tex?.userData.photographicGround && image && image.width / image.height <= 2.5);
+      this.groundModeListener?.(this.photographicGround);
       if (tex && image && image.width / image.height > 2.5 && this.skyMesh) {
         if (!this.partialSky) {
           this.partialSky = buildPartialPanorama(tex, this.skyMesh.userData.panoramaRadius * .96);
@@ -393,9 +398,12 @@ export class OutdoorLightingRig {
       });
       // Installed private panoramas override the matching time; hosted builds
       // skip these probes and retain the bundled neighborhood.
-      tryLoadUserAssetTexture(`environments/outside/${this.outsideMode}.jpg`, loaded, {
+      const legacy = () => tryLoadUserAssetTexture(`environments/outside/${this.outsideMode}.jpg`, loaded, {
         onMiss: () => tryLoadUserAssetTexture(`environments/outside/${this.outsideMode}.png`, loaded, { onMiss: bundled })
       });
+      tryLoadUserAssetTexture(`environments/outside/ground/${this.outsideMode}.png`, tex => {
+        tex.userData.photographicGround = true; loaded(tex);
+      }, { onMiss: legacy });
     }
 
     // Sync fog and ambient/sun lights if they exist

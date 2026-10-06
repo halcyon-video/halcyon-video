@@ -118,7 +118,7 @@ export function buildParkingLot(parent: THREE.Group, p: ParkingLayout, sidewalkM
     const merged=mergeGeometries(expanded);
     new Set([...geos,...expanded]).forEach(g=>g.dispose());
     if(!merged) throw new Error('Parking surface batch failed');
-    const mesh=new THREE.Mesh(track(merged),mat);mesh.receiveShadow=true;group.add(mesh);
+    const mesh=new THREE.Mesh(track(merged),mat);mesh.receiveShadow=true;mesh.userData.photographicGroundSurface=mat!==shadows;group.add(mesh);
   }
   return {setGroundColor: pavement.setColor, dispose(){owned.forEach(o=>o.dispose());group.removeFromParent();}};
 }

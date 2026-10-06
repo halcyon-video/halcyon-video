@@ -53,6 +53,7 @@ export function buildExteriorRoad(parent: THREE.Object3D, opts: ExteriorRoadOpti
   const lotDepth = farZ - frontZ;
   const group = new THREE.Group();
   group.name = 'exteriorRoad';
+  group.userData.photographicGroundSurface = true;
   parent.add(group);
 
   const disposables: Array<{ dispose(): void }> = [];

@@ -496,6 +496,7 @@ export function buildStore(scene: StoreScene) {
   scene.exterior.setOutsideMode(scene.outdoor.outsideMode);
   scene.exterior.setGroundColor(scene.outdoor.getGroundColor());
   scene.outdoor.setGroundColorListener(color => scene.exterior?.setGroundColor(color));
+  scene.outdoor.setGroundModeListener(enabled => scene.exterior?.setPhotographicGround(enabled));
   dimEnvOutside(scene.exterior.group);
 
   // Initialize 3D wall signage textures and materials

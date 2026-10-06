@@ -1,5 +1,6 @@
 import { buildEntranceBollards } from './entrance-bollards';
 import { selfLit } from './material-lighting';
+import { setPhotographicGround } from './photographic-ground';
 // Nearby physical walks, parking markings, bollards and light spill.
 // The shared photographic panorama supplies pavement and distant scenery.
 import * as THREE from 'three';
@@ -18,6 +19,7 @@ export interface ExteriorEnvironment {
   walkFarZ: number;
   setOutsideMode(mode: OutsideMode): void;
   setGroundColor(color: THREE.Color): void;
+  setPhotographicGround(enabled: boolean): void;
   dispose(): void;
 }
 
@@ -134,5 +136,5 @@ export function buildExteriorEnvironment(scene: THREE.Scene, storeWidth: number,
     scene.remove(group);
   }
 
-  return { group, walkFarZ: plan.farZ - 1.5, setOutsideMode, setGroundColor, dispose };
+  return { group, walkFarZ: plan.farZ - 1.5, setOutsideMode, setGroundColor, setPhotographicGround: enabled => setPhotographicGround(group, enabled), dispose };
 }
