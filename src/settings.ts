@@ -805,6 +805,16 @@ export function registerCoreSettings(): void {
   // T22: carried tapes + front-counter checkout. Default OFF until T23 ships
   // rental mode — when off, the instant play-from-the-shelf flow is untouched.
   registerSetting({
+    key: 'bb_quick_playback',
+    label: 'Quick playback',
+    kind: 'toggle',
+    group: 'Store Look',
+    subpage: 'Browsing & Rentals',
+    default: false,
+    applyMode: 'live',
+    hint: 'Skip checkout and tape return animations. Return to your place on the shelf.',
+  });
+  registerSetting({
     key: 'bb_carry_mode',
     label: 'Carry & checkout',
     kind: 'toggle',

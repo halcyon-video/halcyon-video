@@ -1,3 +1,4 @@
+import { quickPlayback, rememberPlaybackPosition } from './playback-position';
 import { fitCasePlaceholder } from './case-placeholder-fit';
 import { setChangedShelfMatrix } from './shelf-instance-matrix';
 // Inspect / flip / hero cases / launch flourish — extracted from StoreScene
@@ -295,7 +296,7 @@ export function selectAction(scene: StoreScene): 'inspect' | 'play' | 'request' 
     // T22 play-flow guard: with carry mode on, the confirm in inspect view
     // TAKES the tape/case (adds it to the carried stack) instead of playing it.
     // Series boxsets keep their episode-driven instant-play flow.
-    if (scene.carryMode) {
+    if (scene.carryMode && (!quickPlayback() || scene.rentalMode)) {
       scene.takeSelectedTape();
       return 'take';
     }
@@ -315,6 +316,8 @@ export function startPlayAnimation(scene: StoreScene, onComplete: () => void): b
   scene.requestRender();
   if (scene.launchAnim) return false; // already launching — ignore re-trigger
 
+  rememberPlaybackPosition(scene);
+  if (quickPlayback() && !scene.reelMode) { onComplete(); return true; }
   const activeKey = scene.getActiveSlotKey();
   const slot = scene.slotsByPosition.get(activeKey);
   if (!slot) {

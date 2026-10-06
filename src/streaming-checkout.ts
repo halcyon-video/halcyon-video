@@ -1,3 +1,4 @@
+import { quickPlayback, rememberPlaybackPosition, restorePlaybackPosition } from './playback-position.ts';
 import * as THREE from 'three';
 import type { Movie } from './jellyfin.ts';
 import type { StoreScene } from './three-scene.ts';
@@ -190,7 +191,9 @@ export function confirmStreamingServiceChoice(scene: StoreScene): boolean {
   serviceRowRegions.delete(movie.id);
 
   // Take tape into carried stack and fly to front counter
+  rememberPlaybackPosition(scene);
   checkoutMovies.set(scene, movie);
+  if (quickPlayback() && !scene.reelMode) return completeStreamingCheckout(scene);
 
   try { retailAudio.playBoxPickup(); } catch {}
   scene.enterCheckout();
@@ -242,8 +245,8 @@ export function completeStreamingCheckout(scene: StoreScene): boolean {
   scene.entrance?.hideBag();
   scene.clerk?.releaseFromRegister();
   scene.whiteoutEl()?.classList.remove('active', 'instant');
-  if (scene.overviewStart) scene.enterOverview();
-  else scene.returnToEntrance();
+  if (scene.reelMode) { if (scene.overviewStart) scene.enterOverview(); else scene.returnToEntrance(); }
+  else restorePlaybackPosition(scene, false);
   scene.requestRender();
   // Same-tab navigation works after the animation without popup permission,
   // and browser Back brings the visitor back to their store.

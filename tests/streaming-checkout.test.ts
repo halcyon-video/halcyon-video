@@ -43,6 +43,12 @@ function createMockScene(extra: Record<string, any> = {}) {
   const carriedTapes: Movie[] = [];
   const scene: any = {
     mode: 'inspect',
+    pendingReturnDrop: [],
+    hideHeroCases() {}, resetHeroFace() {}, updateColsCount() {}, updateCameraTarget() {},
+    currentCameraPos: { copy() {} }, targetCameraPos: {},
+    currentLookAt: { copy() {} }, targetLookAt: {},
+    camera: { position: { copy() {} }, lookAt() {} },
+    getSelectedMovie() { return null; },
     isFlipped: false,
     heroFace: 0,
     heroSpine: false,
@@ -615,7 +621,7 @@ test('streaming handoff occurs at exit completion, keeps physical tapes, and run
     assert.deepEqual(scene.carried.ids(), [physical.id]);
     assert.equal(scene.checkoutRunning, false);
     assert.equal(scene.checkoutExit, null);
-    assert.equal(scene.mode, 'overview');
+    assert.equal(scene.mode, 'browse');
     assert.equal(completeStreamingCheckout(scene), false);
     assert.equal(navigations.length, 1);
   } finally {

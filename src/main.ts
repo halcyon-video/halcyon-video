@@ -1,3 +1,4 @@
+import { quickPlayback, rememberPlaybackPosition, restorePlaybackPosition } from './playback-position';
 import { installReelRecorder, refreshReelControls, toggleReelRecording, toggleReelCamera, stopReelRecording, reelRecordingActive } from './reel-recorder';
 import { paintStoreLoading, updateStoreLoading, showStoreLoadingFailure } from './store-loading';
 import { mobileStoreActive } from './mobile-store';
@@ -2084,7 +2085,7 @@ async function resolvePlayVersion(movie: Movie): Promise<MovieVersion | null | u
 // skip; either way onDone() (the actual rental/playback kickoff) runs once
 // the screen closes.
 function maybeRunCandyCheckout(onDone: () => void) {
-  if (!getSetting<boolean>('candy_delivery_enabled')) {
+  if (quickPlayback() || !getSetting<boolean>('candy_delivery_enabled')) {
     onDone();
     return;
   }
@@ -3103,6 +3104,7 @@ function handleGapDismiss() {
  * Plays checkout chime when rental goes through. Never throws.
  */
 async function handleGameLaunch(movie: Movie, startHidden = false, fromCouch = false) {
+  if (storeScene && !fromCouch) rememberPlaybackPosition(storeScene);
   if (movie.steamAppId) { await playSteamGame(movie, (message) => logToConsole(`[Steam] ${message}`, 'system')); return; }
   if (isDemoMode) {
     openDemoPlaybackOverlay(movie.title, startHidden, 'game', fromCouch);
@@ -3275,13 +3277,14 @@ function finishPlayback(movie: Movie, fromCouch: boolean): void {
     return;
   }
   storeScene?.resumeAmbientTvs();
-  storeScene?.returnToEntrance();
+  if (storeScene) restorePlaybackPosition(storeScene);
   updateMovieHUD(storeScene?.getSelectedMovie() || null);
-  logToConsole(`[Video] Stopped "${movie.title}". Returned through the entrance.`, 'video');
+  logToConsole(`[Video] Stopped "${movie.title}". Returned to the shelf.`, 'video');
 }
 
 export async function launchVideoPlayback(movie: Movie, overrideItemId?: string, overridePath?: string, startHidden = false, fromCouch = false, version?: MovieVersion) {
   if (storeScene?.reelMode) { showClerkToast('Movie playback is off in Reel Recording Mode.'); return; }
+  if (storeScene && !fromCouch) rememberPlaybackPosition(storeScene);
   // Every entry point, including home rentals and the flat catalog, must
   // dispatch games before any media-server lookup or movie player is opened.
   if (movie.game || movie.steamAppId) {
@@ -3698,6 +3701,7 @@ initDemoPlayback({
   ui,
   scene: () => storeScene,
   log: logToConsole,
+  returnToStore: () => { if (storeScene) restorePlaybackPosition(storeScene); },
   onClosed: () => updateMovieHUD(storeScene?.getSelectedMovie() || null),
 });
 

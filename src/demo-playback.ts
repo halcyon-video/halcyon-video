@@ -34,6 +34,7 @@ export interface DemoPlaybackDeps {
   log(message: string, type: 'system' | 'cec' | 'video'): void;
   /** Run after the card closes — main.ts refreshes the movie HUD here. */
   onClosed(): void;
+  returnToStore?(): void;
 }
 
 let deps: DemoPlaybackDeps | null = null;
@@ -158,7 +159,8 @@ export function closeDemoPlaybackOverlay() {
     if (fromCouch) scene.endBackRoomWatching();
     else {
       scene.resumeAmbientTvs();
-      scene.returnToEntrance();
+      if (deps?.returnToStore) deps.returnToStore();
+      else scene.returnToEntrance();
     }
   }
   launchScene = null;
