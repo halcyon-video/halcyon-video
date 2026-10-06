@@ -74,14 +74,3 @@ export function installCeilingLuminaires(scene: THREE.Scene, anchors: LuminaireA
   (fallback.children[0] as THREE.Mesh | undefined)?.geometry.addEventListener('dispose', stop);
   return root;
 }
-
-/** Joist undersides share the exact attachment plane of the fixture anchors. */
-export function buildLuminaireStructure(scene: THREE.Scene, anchors: LuminaireAnchor[], left: number, right: number): void {
-  if (!anchors.length) return;
-  const rows = [...new Set(anchors.map(a=>a.z))];
-  const geo = new THREE.BoxGeometry(right-left,.35,.16);
-  const mat = new THREE.MeshStandardMaterial({color:0x6d706c,metalness:.35,roughness:.65});
-  const mesh = new THREE.InstancedMesh(geo,mat,rows.length); mesh.name='Exposed ceiling bay joists';
-  rows.forEach((z,i)=>mesh.setMatrixAt(i,new THREE.Matrix4().makeTranslation((left+right)/2,anchors[0].y+.175,z)));
-  mesh.computeBoundingSphere();mesh.receiveShadow=true;scene.add(mesh);
-}

@@ -21,9 +21,11 @@ import { installHvacDiffusers } from './hvac-diffuser-model';
 import { moduleGridPlan } from './ceiling-grid-plan';
 import { installMarqueeModel } from './marquee-bulb-model';
 import { installPosterFrame } from './poster-frame-model';
-import { exposedCeilingEnabled, aimLuminaire, installCeilingLuminaires, buildLuminaireStructure, type LuminaireAnchor } from './ceiling-luminaire';
+import { exposedCeilingEnabled, aimLuminaire, installCeilingLuminaires, type LuminaireAnchor } from './ceiling-luminaire';
 import { NrWallModelBatch } from './nr-wall-model';
 import { selfLit, auditStoreMaterials } from './material-lighting';
+import { exposedStructureBottom, planCeilingStructure, installCeilingStructure } from './ceiling-structure';
+
 // Store shell builder — the room and its exterior, extracted from StoreScene
 // (three-scene.ts keeps one-line delegating stubs): sky dome + facade + parking
 // lot + storefront logo (buildStore), storefront glazing sections
@@ -644,6 +646,7 @@ export function buildStore(scene: StoreScene) {
   const ceilingY = scene.ceilingY;
   const exposed = exposedCeilingEnabled(activeStoreFormat().id, ceilingY, typeof localStorage === 'undefined' ? null : localStorage.getItem('bb_ceiling_structure'));
   const luminaireAnchors: LuminaireAnchor[] = [];
+  const luminaireKeys = new Map<LuminaireAnchor, THREE.SpotLight>();
   const roomHeight = ceilingY - floorY;
   const wallCenterY = (floorY + ceilingY) / 2;
 
@@ -1142,7 +1145,7 @@ export function buildStore(scene: StoreScene) {
         key.target.position.set(kx + 0.7, floorY, kz - 0.5);
         if (exposed && !overKeySoffit &&
             !(scene.hasStep && kx > scene.stepX - 1 && kz < backWallZ + scene.stepDepth + 1)) {
-          const anchor: LuminaireAnchor = {x: kx, y: ceilingY, z: kz, variant: c === 0 ? 'directional' : 'dome'};
+          const anchor: LuminaireAnchor = {x: kx, y: exposedStructureBottom(ceilingY), z: kz, variant: c === 0 ? 'directional' : 'dome'};
           // Keep the suspension assemblies clear of the two hanging CRT rigs
           // and the genre-sign wires (panels themselves are below the shades).
           const tvZ = FRONT_GLASS_Z - floorCeilLen * .30;
@@ -1157,7 +1160,7 @@ export function buildStore(scene: StoreScene) {
             // 4.2 ft sign half-width + .75 ft shade radius, rounded up.
             return Math.hypot(kx-x,kz-z)<3;
           })) continue;
-          luminaireAnchors.push(anchor); aimLuminaire(key, anchor);
+          luminaireAnchors.push(anchor); luminaireKeys.set(anchor, key); aimLuminaire(key, anchor);
           scene.troffers.push({x:kx,z:kz});
         }
         key.castShadow = shadowPicks.has(counterKey ? cols * rows + r : c * rows + r);
@@ -1180,12 +1183,6 @@ export function buildStore(scene: StoreScene) {
     }
   }
 
-  if (exposed) {
-    buildLuminaireStructure(scene.scene, luminaireAnchors, leftEdge, rightWallX);
-    installCeilingLuminaires(scene.scene, luminaireAnchors, () => {
-      scene.queueStructuralShadowRefresh(); scene.requestRender();
-    });
-  }
 
   // 1.6 The cash-wrap soffit — the dropped lit ceiling over the checkout
   // zone, with the mirrored cornice band wrapped around its edge so the ring
@@ -2495,9 +2492,49 @@ export function buildStore(scene: StoreScene) {
   // ...on the formats with the headroom for them (StoreFormatSpec.ceilingTvs).
   // Everything downstream already handles their absence: `scene.ambientTvs?`
   // everywhere, and ▲ at the entrance falls back to the shelf wrap.
+  const beforeTvColliders = scene.shelves.length;
   if (activeStoreFormat().ceilingTvs) {
     scene.ambientTvs = new AmbientTvs(scene.fixtureContext());
     scene.ambientTvs.build();
+  }
+  if (exposed) {
+    // Derive service openings from the actual cabinets, including the shared
+    // three-screen and wall-mounted variants, rather than duplicating anchors.
+    const serviceBoxes = scene.shelves.slice(beforeTvColliders).map(object => {
+      object.updateWorldMatrix(true, true);
+      return new THREE.Box3().setFromObject(object).expandByScalar(.18);
+    });
+    const clearAnchors = luminaireAnchors.filter(anchor => {
+      const envelope = new THREE.Box3(new THREE.Vector3(anchor.x - .8, anchor.y - 2, anchor.z - .8),
+        new THREE.Vector3(anchor.x + .8, anchor.y, anchor.z + .8));
+      if (!serviceBoxes.some(box => box.intersectsBox(envelope))) return true;
+      const key = luminaireKeys.get(anchor)!;
+      scene.scene.remove(key, key.target); key.shadow.dispose();
+      scene.trofferKeyLights.splice(scene.trofferKeyLights.indexOf(key), 1);
+      const index = scene.troffers.findIndex(point => point.x === anchor.x && point.z === anchor.z);
+      if (index >= 0) scene.troffers.splice(index, 1);
+      return false;
+    });
+    const refresh = () => { scene.queueStructuralShadowRefresh(); scene.requestRender(); };
+    const structureBoxes = serviceBoxes.slice();
+    if (wantsCeilingCornice) {
+      const points = ceilingCornicePoints(scene, storeWidth, backWallZ);
+      for (let i = 0; i < points.length; i++) {
+        const a = points[i], b = points[(i + 1) % points.length], dx = b.x - a.x, dz = b.z - a.z, length = Math.hypot(dx, dz);
+        if (length < .01) continue;
+        // The continuous upper chord passes above the trim. Lower members
+        // end at its service face instead of piercing the opaque fascia.
+        const corners: THREE.Vector3[] = [];
+        for (const point of [a, b]) for (const d of [-CORNICE_BAND - .1, .7]) for (const y of [ceilingY - CORNICE_DROP, ceilingY + .01])
+          corners.push(new THREE.Vector3(point.x - dz / length * d, y, point.z + dx / length * d));
+        structureBoxes.push(new THREE.Box3().setFromPoints(corners));
+      }
+    }
+    const structure = planCeilingStructure(leftEdge, rightWallX, backWallZ, FRONT_GLASS_Z,
+      ceilingY, clearAnchors, serviceBoxes, scene.hasStep ? { x: scene.stepX, depth: scene.stepDepth } : undefined,
+      wantsCeilingCornice ? CORNICE_WALL_GAP + CORNICE_BAND : 0, structureBoxes);
+    installCeilingStructure(scene.scene, structure, refresh);
+    installCeilingLuminaires(scene.scene, clearAnchors, refresh);
   }
 
   // --- Store Clerk (billboard sprite) ---

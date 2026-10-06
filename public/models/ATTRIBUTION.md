@@ -309,3 +309,11 @@ under the repository license. They reuse the project's packaging exporter and
 live artwork/material mapping, and embed no images or external mesh data.
 Editable source, generator, metrics and integration contract are documented in
 `docs/packaging-extras-model.md`.
+
+## Exposed ceiling construction
+
+`ceiling-structure.glb` is original scripted Blender geometry: paired-angle joists,
+open webs, duct skins and bends, formed straps, collars and discharge louvers.
+It contains no external meshes, textures or source-photo pixels. The editable
+source, generator, measured cost and installation contract are documented in
+`docs/ceiling-structure-model.md`.

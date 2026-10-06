@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { assetUrl } from './asset-url';
 import { disposeSceneMeshes } from './scene-mesh-disposal';
+import { exposedCeilingEnabled } from './ceiling-luminaire';
+import { activeStoreFormat } from './store-format';
 import type { FixtureContext } from './fixtures';
 
 /** Model coordinates match the existing CRT; only the drop tube changes length. */
@@ -29,6 +31,14 @@ export async function installTvMount(ctx: FixtureContext, ceiling: THREE.Group, 
     stem.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), top.clone().sub(end).normalize());
     joint.position.copy(pivot); joint.quaternion.copy(television.quaternion);
     television.add(cradle); ceiling.add(plate, stem, joint);
+    if (exposedCeilingEnabled(activeStoreFormat().id, ctx.ceilingY, localStorage.getItem('bb_ceiling_structure'))) {
+      // The opaque roof underside is .35 ft above the tile datum. Reuse the
+      // authored drop tube to bridge that now-visible gap without moving TVs.
+      const upperDrop = stem.clone(true); upperDrop.name = 'Exposed roof contact';
+      upperDrop.position.set(end.x, 0, end.z); upperDrop.quaternion.identity(); upperDrop.scale.set(1, .35, 1);
+      upperDrop.traverse(object => { if (object instanceof THREE.Mesh) object.castShadow = object.receiveShadow = true; });
+      ceiling.add(upperDrop);
+    }
     // Retain the unused variant hidden: its materials are shared with the
     // installed parts and the scene owns their eventual single disposal.
     source.visible = false; ceiling.add(source);
