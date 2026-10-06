@@ -4,114 +4,112 @@ import { THEMES, resolveThemeId, getActiveTheme, applyThemeCssVars } from './the
 
 let pending: Promise<string> | null = null;
 
+/** Keep touch taps reliable after a swipe while retaining native keyboard clicks. */
+function activateButton(button: HTMLButtonElement, action: () => void): void {
+  let start: { id: number; x: number; y: number } | null = null;
+  let touchActivatedAt = -Infinity;
+  // Touch activation is explicit; suppress the browser's later compatibility click.
+  button.addEventListener('touchstart', event => event.preventDefault(), { passive:false });
+  button.addEventListener('pointerdown', event => {
+    if (event.pointerType === 'touch' && event.isPrimary) start = { id:event.pointerId, x:event.clientX, y:event.clientY };
+  });
+  button.addEventListener('pointercancel', () => { start = null; });
+  button.addEventListener('pointerup', event => {
+    const tap = start; start = null;
+    if (!tap || tap.id !== event.pointerId || Math.hypot(event.clientX-tap.x, event.clientY-tap.y) > 12 || button.disabled) return;
+    touchActivatedAt = performance.now(); button.click();
+  });
+  button.addEventListener('click', event => {
+    // A browser may also synthesize a compatibility click after the touch tap.
+    if (event.detail > 0 && performance.now() - touchActivatedAt < 500) return;
+    action();
+  });
+}
+
 /** One choice per mobile visit. Catalog, fonts and scene modules load behind it;
  * construction of the era-dependent room waits at initializeStoreScene. */
 export function beginMobileEraChoice(): void {
   if (pending) return;
+  applyThemeCssVars(getActiveTheme());
   const dialog = document.createElement('dialog');
   dialog.id = 'mobile-era-choice';
   dialog.setAttribute('aria-labelledby', 'mobile-era-title');
-  const style = document.createElement('style');
-  style.textContent = `
-    #mobile-era-choice {
-      box-sizing: border-box; width: min(92vw, 440px); max-height: 90dvh;
-      overflow: auto; margin: auto; padding: 28px 24px 26px; color: #fff8e6;
-      background: var(--bb-primary, #172b56);
-      border: 4px solid var(--bb-secondary, #efc34e);
-      border-radius: 0;
-      box-shadow: 0 0 0 2px #000, 0 16px 40px rgba(0, 0, 0, 0.85);
-      font-family: var(--font-title, 'Bebas Neue', Arial, sans-serif);
-    }
-    #mobile-era-choice::backdrop {
-      background: rgba(4, 7, 14, 0.92);
-      backdrop-filter: blur(4px);
-    }
-    #mobile-era-choice h1 {
-      margin: 0 0 8px; font-family: var(--font-title, 'Bebas Neue', Arial, sans-serif);
-      font-size: clamp(34px, 8vw, 44px); line-height: 1; letter-spacing: 0.08em;
-      text-transform: uppercase; color: #fff;
-      text-shadow: 0 2px 0 #000, 0 4px 10px rgba(0, 0, 0, 0.7);
-    }
-    #mobile-era-choice p {
-      font-family: var(--font-body, 'Outfit', Arial, sans-serif);
-      font-size: clamp(15px, 3.8vw, 17px); line-height: 1.45;
-      margin: 0 0 22px; color: #f2e9d2;
-      text-shadow: 0 1px 2px #000;
-    }
-    #mobile-era-choice label {
-      display: block; font-family: var(--font-title, 'Bebas Neue', Arial, sans-serif);
-      font-size: 20px; letter-spacing: 0.12em; text-transform: uppercase;
-      margin-bottom: 8px; color: var(--bb-secondary, #efc34e);
-      text-shadow: 0 1px 2px #000;
-    }
-    .mobile-era-select-wrap {
-      position: relative; width: 100%; box-sizing: border-box;
-    }
-    #mobile-era-choice select {
-      box-sizing: border-box; width: 100%; min-height: 64px;
-      padding: 10px 48px 10px 18px;
-      font-family: var(--font-title, 'Bebas Neue', Arial, sans-serif);
-      font-size: 32px; font-weight: 700; letter-spacing: 0.08em;
-      line-height: 1; border-radius: 0;
-      border: 3px solid var(--bb-secondary, #efc34e);
-      background: #0d162a; color: #fff;
-      box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.8);
-      cursor: pointer; appearance: none; -webkit-appearance: none;
-    }
-    .mobile-era-select-arrow {
-      position: absolute; right: 16px; top: 50%; transform: translateY(-50%);
-      pointer-events: none; width: 0; height: 0;
-      border-left: 9px solid transparent; border-right: 9px solid transparent;
-      border-top: 11px solid var(--bb-secondary, #efc34e);
-    }
-    #mobile-era-choice select option {
-      background: #0d162a; color: #fff;
-      font-family: var(--font-title, 'Bebas Neue', Arial, sans-serif);
-      font-size: 26px; padding: 10px;
-    }
-    #mobile-era-choice button {
-      box-sizing: border-box; width: 100%; min-height: 54px;
-      margin-top: 24px; padding: 12px 18px;
-      font-family: var(--font-title, 'Bebas Neue', Arial, sans-serif);
-      font-size: 24px; font-weight: 700; letter-spacing: 0.12em;
-      text-transform: uppercase; border-radius: 0;
-      background: var(--bb-secondary, #efc34e); color: #0a1120;
-      border: 3px solid #fff;
-      box-shadow: 0 4px 0 #9f7d20, 0 6px 16px rgba(0, 0, 0, 0.6);
-      cursor: pointer; transition: transform 0.08s ease, box-shadow 0.08s ease;
-    }
-    #mobile-era-choice button:active {
-      transform: translateY(2px);
-      box-shadow: 0 2px 0 #9f7d20, 0 3px 8px rgba(0, 0, 0, 0.6);
-    }
-    #mobile-era-choice select:focus-visible,
-    #mobile-era-choice button:focus-visible {
-      outline: 3px solid #fff; outline-offset: 3px;
-    }
-  `;
-  const heading = document.createElement('h1'); heading.id = 'mobile-era-title'; heading.textContent = 'Choose your year';
-  const intro = document.createElement('p'); intro.textContent = 'Step into your favorite era of Halcyon Video.';
-  const label = document.createElement('label'); label.htmlFor = 'mobile-era-year'; label.textContent = 'Store year';
-  const wrap = document.createElement('div'); wrap.className = 'mobile-era-select-wrap';
-  const select = document.createElement('select'); select.id = 'mobile-era-year';
-  const arrow = document.createElement('span'); arrow.className = 'mobile-era-select-arrow'; arrow.setAttribute('aria-hidden', 'true');
-  for (const theme of Object.values(THEMES)) {
+  const years = Object.values(THEMES).flatMap(theme => {
     const year = /^bb-(\d{4})$/.exec(theme.id)?.[1];
-    if (year) select.add(new Option(year, theme.id));
-  }
-  select.value = resolveThemeId(getSetting<string>('bb_theme'));
-  if (!select.value) select.selectedIndex = 0;
-  wrap.append(select, arrow);
-  const enter = document.createElement('button'); enter.type = 'button'; enter.textContent = 'Enter the store';
-  dialog.append(style, heading, intro, label, wrap, enter);
+    return year ? [{ id: theme.id, year, medium: theme.defaultMedium.toUpperCase() }] : [];
+  }).sort((a, b) => Number(a.year) - Number(b.year));
+  let index = Math.max(0, years.findIndex(year => year.id === resolveThemeId(getSetting<string>('bb_theme'))));
+  const header = document.createElement('header'); header.className = 'mobile-era-heading';
+  const heading = document.createElement('h1'); heading.id = 'mobile-era-title'; heading.setAttribute('aria-label', 'Choose your store year');
+  const titleLine = document.createElement('span'); titleLine.className = 'mobile-era-fit'; titleLine.textContent = 'CHOOSE YOUR'; heading.append(titleLine);
+  header.append(heading);
+  const body = document.createElement('div'); body.className = 'mobile-era-body';
+  const intro = document.createElement('p'); intro.className = 'mobile-era-intro'; const storeLine = document.createElement('span'); storeLine.className = 'mobile-era-fit'; storeLine.textContent = 'STORE YEAR'; intro.append(storeLine); intro.setAttribute('aria-hidden', 'true');
+  const carousel = document.createElement('div'); carousel.className = 'mobile-era-carousel'; carousel.tabIndex = 0;
+  carousel.setAttribute('role', 'group'); carousel.setAttribute('aria-roledescription', 'carousel');
+  carousel.setAttribute('aria-label', 'Store year'); carousel.setAttribute('aria-describedby', 'mobile-era-hint');
+  const makeStep = (direction: -1 | 1) => {
+    const button = document.createElement('button'); button.type = 'button'; button.className = 'mobile-era-step';
+    button.dataset.direction = String(direction);
+    const chevron = document.createElement('span'); chevron.className = 'mobile-era-chevron'; chevron.textContent = direction < 0 ? '‹' : '›'; chevron.setAttribute('aria-hidden', 'true');
+    const neighbor = document.createElement('span'); neighbor.className = 'mobile-era-neighbor'; neighbor.setAttribute('aria-hidden', 'true');
+    button.append(chevron, neighbor); activateButton(button, () => move(direction));
+    return button;
+  };
+  const previous = makeStep(-1); const next = makeStep(1);
+  const current = document.createElement('div'); current.className = 'mobile-era-current'; current.setAttribute('aria-live', 'polite'); current.setAttribute('aria-atomic', 'true');
+  const year = document.createElement('span'); year.id = 'mobile-era-year';
+  current.append(year); carousel.append(previous, current, next);
+  const hint = document.createElement('p'); hint.id = 'mobile-era-hint'; hint.className = 'mobile-era-hint'; hint.textContent = 'Swipe or use the arrows to explore the years.';
+  const enter = document.createElement('button'); enter.type = 'button'; enter.className = 'mobile-era-enter';
+  const render = () => {
+    const selected = years[index]; year.textContent = selected.year; hint.textContent = `${selected.medium} store · Swipe or use the arrows`;
+    enter.textContent = 'ENTER STORE'; enter.setAttribute('aria-label', `Enter the ${selected.year} store`);
+    for (const [button, offset] of [[previous, -1], [next, 1]] as const) {
+      const neighbor = years[index + offset]; button.disabled = !neighbor;
+      button.setAttribute('aria-label', neighbor ? `Choose ${neighbor.year}` : offset < 0 ? 'First year' : 'Last year');
+      button.querySelector('.mobile-era-neighbor')!.textContent = neighbor?.year ?? '—';
+    }
+  };
+  const move = (direction: number) => { index = Math.max(0, Math.min(years.length - 1, index + direction)); render(); };
+  carousel.addEventListener('keydown', event => {
+    if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') { event.preventDefault(); move(event.key === 'ArrowLeft' ? -1 : 1); }
+    else if (event.key === 'Home' || event.key === 'End') { event.preventDefault(); index = event.key === 'Home' ? 0 : years.length - 1; render(); }
+    else if (event.key === 'Enter' && event.target === carousel) { event.preventDefault(); enter.click(); }
+  });
+  let swipeStart: { id: number; x: number; y: number } | null = null;
+  carousel.addEventListener('pointerdown', event => {
+    if ((event.target as Element).closest('button') || !event.isPrimary) return;
+    swipeStart = { id: event.pointerId, x: event.clientX, y: event.clientY }; carousel.setPointerCapture(event.pointerId);
+  });
+  carousel.addEventListener('pointerup', event => {
+    if (!swipeStart || swipeStart.id !== event.pointerId) return;
+    const dx = event.clientX - swipeStart.x; const dy = event.clientY - swipeStart.y; swipeStart = null;
+    if (carousel.hasPointerCapture(event.pointerId)) carousel.releasePointerCapture(event.pointerId);
+    if (Math.abs(dx) >= 35 && Math.abs(dx) > Math.abs(dy) * 1.25) move(dx < 0 ? 1 : -1);
+  });
+  carousel.addEventListener('pointercancel', () => { swipeStart = null; });
+  render(); body.append(intro, carousel, hint); dialog.append(header, body, enter);
   // Keep underlying boot-skip / store keyboard handlers out of this choice.
   for (const event of ['click','keydown','pointerdown','pointerup']) dialog.addEventListener(event, e => e.stopPropagation());
   dialog.addEventListener('cancel', e => e.preventDefault());
-  pending = new Promise(resolve => enter.addEventListener('click', () => {
-    if (!THEMES[select.value]) return;
-    dialog.close(); dialog.remove(); resolve(select.value);
-  }, { once:true }));
-  document.body.append(dialog); dialog.showModal(); select.focus();
+  pending = new Promise(resolve => activateButton(enter, () => {
+    if (!dialog.isConnected) return;
+    dialog.close(); dialog.remove(); resolve(years[index].id);
+  }));
+  document.body.append(dialog); dialog.showModal();
+  const fitLines = () => {
+    for (const line of [titleLine, storeLine]) {
+      line.style.fontSize = '';
+      const naturalWidth = line.getBoundingClientRect().width;
+      const available = line.parentElement!.clientWidth;
+      if (naturalWidth > 0) line.style.fontSize = `${Math.min(window.innerHeight <= 520 ? 48 : 120, parseFloat(getComputedStyle(line).fontSize) * available / naturalWidth)}px`;
+    }
+  };
+  const observer = new ResizeObserver(fitLines); observer.observe(dialog);
+  void document.fonts.ready.then(() => { if (dialog.isConnected) fitLines(); });
+  enter.addEventListener('click', () => observer.disconnect(), { once:true });
+  fitLines(); carousel.focus();
 }
 
 /** Consume once so later settings changes and rebuilds retain their own era. */
