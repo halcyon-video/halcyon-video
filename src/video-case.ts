@@ -1,3 +1,4 @@
+import { createSeriesCaseGeometry } from './series-case-model';
 import { caseFallbackShader } from './case-fallback-shader';
 import { setMaterialEnvironment } from './material-environment';
 import { waitForExternalGame } from './external-game-state.ts';
@@ -714,7 +715,8 @@ export function gameShapeKey(platform?: string, discCount?: number): string {
 }
 
 /** Dims for a batch key from gameShapeKey(); falls back to the generic shell. */
-export function gameDimsForShape(shapeKey: string): { retail: { w: number; h: number; d: number }; rental: { w: number; h: number; d: number } } {
+export function gameDimsForShape(shapeKey: string): { retail: CaseDimensions; rental: CaseDimensions } {
+  if (shapeKey === 'series') return { retail: { ...CASE_DIMS[CASE_MEDIUM], family: 'series-boxset' }, rental: CASE_DIMS[CASE_MEDIUM] };
   return gameShapeRegistry.get(shapeKey) || gameShapeRegistry.get('cart')!;
 }
 export let CASE_WIDTH = CASE_DIMS[CASE_MEDIUM].w;
@@ -5367,12 +5369,8 @@ export const SERIES_DEPTH_MULT = 3.5;
 
 let seriesBoxsetGeometry: THREE.BufferGeometry | null = null;
 export function getSeriesBoxsetGeometry(): THREE.BufferGeometry {
-  if (!seriesBoxsetGeometry) {
-    // Keep the ordinary case's corner rounding — dims.d * 0.28 would round a
-    // boxset-deep case into a pill.
-    const radius = CASE_MEDIUM === 'vhs' ? 0.008 : CASE_DEPTH * 0.28;
-    seriesBoxsetGeometry = new RoundedBoxGeometry(CASE_WIDTH, CASE_HEIGHT, CASE_DEPTH * SERIES_DEPTH_MULT, 2, radius);
-  }
+  if (!seriesBoxsetGeometry) seriesBoxsetGeometry = createSeriesCaseGeometry(
+    { w: CASE_WIDTH, h: CASE_HEIGHT, d: CASE_DEPTH * SERIES_DEPTH_MULT }, CASE_MEDIUM === 'vhs' ? .008 : CASE_DEPTH * .28);
   return seriesBoxsetGeometry;
 }
 

@@ -25,7 +25,7 @@ test('explicit packaging overrides legacy library styling without genre/aspect i
 
 test('retains the supported platform inventory and variable-carton fallbacks', () => {
   assert.deepEqual(Object.keys(GAME_BOX_IN).sort(), ['NES','SNES','SUPER FAMICOM','NINTENDO 64','GAME BOY','GAME BOY COLOR','GAME BOY ADVANCE','GENESIS','SEGA MASTER SYSTEM','ATARI','TURBOGRAFX-16','ARCADE','PLAYSTATION','SEGA SATURN','SEGA CD','DREAMCAST','PLAYSTATION 2','GAMECUBE','XBOX','NINTENDO 3DS','NINTENDO DSI','NINTENDO SWITCH','PSP','WII U','PC GAMES'].sort());
-  assert.equal(gameConstruction('SNES'), undefined);
+  assert.equal(gameConstruction('SNES'), 'game-carton');
   assert.equal(gameConstruction('UNRECOGNIZED'), undefined);
   assert.equal(gameConstruction('PLAYSTATION', 4), 'jewel-fat');
   assert.equal(gameConstruction('PLAYSTATION', 1), 'jewel-single');

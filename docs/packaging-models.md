@@ -63,11 +63,11 @@ width × height × depth. Wide cartons still scale uniformly to the existing
 
 | Platforms | Nominal dimensions | Runtime construction / qualification |
 |---|---|---|
-| NES; ATARI; ARCADE | 5 × 7 × 1 | Existing carton/fallback; ARCADE is a rental proxy, not a universal arcade retail box |
-| SNES; NINTENDO 64 | 7.5 × 5.25 × 1.1 | Existing landscape paperboard; NA nominal |
-| SUPER FAMICOM | 4.2 × 7.5 × 1.1 | Existing portrait paperboard; JP nominal |
-| GAME BOY; GAME BOY COLOR | 4.75 × 5.25 × .9 | Existing paperboard |
-| GAME BOY ADVANCE | 4.8 × 5.4 × .9 | Existing paperboard |
+| NES; ATARI; ARCADE | 5 × 7 × 1 | Authored carton; ARCADE keeps fallback and is a rental proxy, not a universal arcade retail box |
+| SNES; NINTENDO 64 | 7.5 × 5.25 × 1.1 | Authored landscape paperboard; NA nominal |
+| SUPER FAMICOM | 4.2 × 7.5 × 1.1 | Authored portrait paperboard; JP nominal |
+| GAME BOY; GAME BOY COLOR | 4.75 × 5.25 × .9 | Authored paperboard |
+| GAME BOY ADVANCE | 4.8 × 5.4 × .9 | Authored paperboard |
 | GENESIS | 5.5 × 7.5 × 1.2 | Molded hinged shell profile; later cardboard editions are not inferred |
 | SEGA MASTER SYSTEM | 5.5 × 7 × 1 | Molded hinged shell profile |
 | TURBOGRAFX-16 | 5.5 × 4.9 × .9 | Existing fallback; package combinations vary |

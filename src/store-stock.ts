@@ -59,7 +59,8 @@ function aisleMeshKey(libIdx: number, unitIdx: number, side: 'front' | 'back', m
   const base = `${libIdx}_${unitIdx}_${side}`;
   return movie.game
     ? `${base}${AISLE_SHAPE_SEP}${gameShapeKey(movie.platform, movie.discCount)}`
-    : isWhiteClamshell(movie, CASE_MEDIUM) ? `${base}${AISLE_SHAPE_SEP}white` : base;
+    : movie.isSeries && !movie.streaming ? `${base}${AISLE_SHAPE_SEP}series`
+      : isWhiteClamshell(movie, CASE_MEDIUM) ? `${base}${AISLE_SHAPE_SEP}white` : base;
 }
 
 /** The shape half of an aisle batch key, or null for ordinary movie stock. */
@@ -298,7 +299,7 @@ export async function buildAllMovieBoxes(scene: StoreScene) {
       const shape = gameShapeKey(movie.platform, movie.discCount);
       return isMovieAnimated ? `${base}_${shape}_animated` : `${base}_${shape}_regular`;
     }
-    return isMovieAnimated ? `${base}_animated` : `${base}_regular`;
+    return movie.isSeries && !movie.streaming ? `${base}_series` : isMovieAnimated ? `${base}_animated` : `${base}_regular`;
   };
   const fixtureMeshSlotCounts = new Map<string, number>();
   scene.slottedFixtures.forEach(fixture => {
@@ -350,6 +351,7 @@ export async function buildAllMovieBoxes(scene: StoreScene) {
     const base = isBackWallMovieAnimated(movie) ? 'back_wall_animated' : 'back_wall_regular';
     return movie.game
       ? `${base}${AISLE_SHAPE_SEP}${gameShapeKey(movie.platform, movie.discCount)}`
+      : movie.isSeries && !movie.streaming ? `${base}${AISLE_SHAPE_SEP}series`
       : isWhiteClamshell(movie, CASE_MEDIUM) ? `${base}${AISLE_SHAPE_SEP}white` : base;
   };
   const backWallCounts = new Map<string, number>();
@@ -442,13 +444,13 @@ export async function buildAllMovieBoxes(scene: StoreScene) {
       } else {
         // Regular and animated front/back meshes for custom fixtures — each
         // variant sized to actual usage, unused variants skipped (#105)
-        for (const variant of ['regular', 'animated'] as const) {
+        for (const variant of ['regular', 'animated', 'series'] as const) {
           const variantKey = `${key}_${variant}`;
           const used = fixtureMeshSlotCounts.get(variantKey) || 0;
           if (used === 0) continue;
           const isAnim = variant === 'animated';
 
-          const frontMesh = new THREE.InstancedMesh(createClonedCaseGeometry(used, isAnim), getGlobalFrontMaterials(isAnim), used);
+          const frontMesh = new THREE.InstancedMesh(createClonedCaseGeometry(used, isAnim, false, variant === 'series' ? gameDimsForShape('series').retail : undefined), getGlobalFrontMaterials(isAnim), used);
           frontMesh.castShadow = true;
           frontMesh.receiveShadow = true;
           frontMesh.frustumCulled = true;
@@ -480,7 +482,7 @@ export async function buildAllMovieBoxes(scene: StoreScene) {
       const gameDims = shape ? gameDimsForShape(shape) : null;
       const frontMesh = new THREE.InstancedMesh(
         gameDims
-          ? createClonedCaseGeometry(capacity, isAnimated, false, gameDims.retail, shape !== 'white')
+          ? createClonedCaseGeometry(capacity, isAnimated, false, gameDims.retail, shape !== 'white' && shape !== 'series')
           : createClonedCaseGeometry(capacity, isAnimated),
         getGlobalFrontMaterials(isAnimated),
         capacity
@@ -517,7 +519,7 @@ export async function buildAllMovieBoxes(scene: StoreScene) {
 
     const bwFrontMesh = new THREE.InstancedMesh(
       gameDims
-        ? createClonedCaseGeometry(count, isAnim, false, gameDims.retail, shape !== 'white')
+        ? createClonedCaseGeometry(count, isAnim, false, gameDims.retail, shape !== 'white' && shape !== 'series')
         : createClonedCaseGeometry(count, isAnim),
       getGlobalFrontMaterials(isAnim),
       count

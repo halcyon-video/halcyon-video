@@ -300,3 +300,12 @@ Blender mesh authoring. The preview includes only an unbranded, generated
 handle-cutout mask. The application retains its existing live printed finish.
 Editable source and reproduction script: `tools/models/rental-bag.blend` and
 `rental-bag.py`. Mapping and verification: `docs/rental-bag-model.md`.
+
+## Paperboard cartons and season slipboxes
+
+`packaging-game-carton-{stock,hero}.glb` and
+`packaging-series-boxset-{stock,hero}.glb` are original scripted Blender geometry
+under the repository license. They reuse the project's packaging exporter and
+live artwork/material mapping, and embed no images or external mesh data.
+Editable source, generator, metrics and integration contract are documented in
+`docs/packaging-extras-model.md`.

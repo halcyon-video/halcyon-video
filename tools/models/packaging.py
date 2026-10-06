@@ -185,50 +185,54 @@ def sleeve(detail):
  # the open mouth and does not turn the sleeve into a solid block.
  profile('Recessed-tape',[(W-.008,H-.014,.003,-D/2+.004),(W-.008,H-.014,.003,D/2-.004)],7,1,True)
 
-families={'jewel-single':(.4666667,.4083333,.0333333),'jewel-fat':(.4666667,.4083333,.06),'vhs-white':(5.5/12,8.75/12,1.25/12),'vhs-rental':(.403,.727,.104),'dvd-keepcase':(.445,.667,.045),'vhs-slipcase':(.365,.667,.092)}
-for family,(W,H,D) in families.items():
- for detail in [False,True]:
-  name='packaging-'+family+('-hero' if detail else '-stock');collection=bpy.data.collections.new(name);bpy.context.scene.collection.children.link(collection);parts=[]
-  if family=='vhs-slipcase':sleeve(detail)
-  else:shell(family,detail)
-  if family=='vhs-white':
-   for ob in parts:
-    for i,mat in enumerate(ob.data.materials):
-     if mat==mats[3]:ob.data.materials[i]=white_mat
-  # Verify source mesh topology, UVs and orientation before exporting.
-  tris=0;solids=0
-  for ob in parts:
-   bm=bmesh.new();bm.from_mesh(ob.data)
-   if not any(e.is_boundary for e in bm.edges):
-    assert all(e.is_manifold for e in bm.edges),ob.name
-    assert bm.calc_volume(signed=True)>0,ob.name
-    solids+=1
-   assert all(f.calc_area()>1e-12 for f in bm.faces),ob.name
-   bm.free();ob.data.calc_loop_triangles();tris+=len(ob.data.loop_triangles)
-  bpy.ops.object.select_all(action='DESELECT')
-  for ob in parts:ob.select_set(True)
-  bpy.context.view_layer.objects.active=parts[0]
-  path=ROOT/'public/models'/f'{name}.glb'
-  bpy.ops.export_scene.gltf(filepath=str(path),export_format='GLB',use_selection=True,export_yup=True,export_extras=True,export_texcoords=True,export_normals=True,export_materials='EXPORT',export_cameras=False,export_lights=False)
-  records[name]={'bytes':path.stat().st_size,'triangles':tris,'parts':len(parts),'closedSolids':solids,'dimensionsFeet':[W,H,D],'textures':0}
-  collection.hide_viewport=True
-for c in bpy.data.collections:
- if c.name.startswith('packaging-'):
-  c.hide_render = c.hide_viewport = c.name != 'packaging-jewel-single-hero'
-for ob in bpy.context.selected_objects:ob.select_set(False)
-primary=bpy.data.collections['packaging-jewel-single-hero']
-for ob in primary.objects:ob.select_set(True)
-bpy.context.view_layer.objects.active=primary.objects[0]
-for screen in bpy.data.screens:
- for area in screen.areas:
-  if area.type=='VIEW_3D':
-   area.spaces.active.region_3d.view_location=(0,0,0)
-   area.spaces.active.region_3d.view_distance=1.05
-   area.spaces.active.region_3d.view_rotation=Euler((1.3,0,-.5)).to_quaternion()
-   area.spaces.active.shading.color_type='MATERIAL'
-bpy.context.scene.unit_settings.system='IMPERIAL'
-bpy.context.scene.unit_settings.scale_length=.3048
-bpy.context.preferences.filepaths.save_version=0
-bpy.ops.wm.save_as_mainfile(filepath=str(ROOT/'tools/models/packaging.blend'))
-(ROOT/'tools/models/packaging-costs.json').write_text(json.dumps(records,indent=2)+'\n')
-print(json.dumps(records,indent=2))
+def export_current(name):
+ # Verify source mesh topology, UVs and orientation before exporting.
+ tris=0;solids=0
+ for ob in parts:
+  bm=bmesh.new();bm.from_mesh(ob.data)
+  if not any(e.is_boundary for e in bm.edges):
+   assert all(e.is_manifold for e in bm.edges),ob.name
+   assert bm.calc_volume(signed=True)>0,ob.name
+   solids+=1
+  assert all(f.calc_area()>1e-12 for f in bm.faces),ob.name
+  bm.free();ob.data.calc_loop_triangles();tris+=len(ob.data.loop_triangles)
+ bpy.ops.object.select_all(action='DESELECT')
+ for ob in parts:ob.select_set(True)
+ bpy.context.view_layer.objects.active=parts[0]
+ path=ROOT/'public/models'/f'{name}.glb'
+ bpy.ops.export_scene.gltf(filepath=str(path),export_format='GLB',use_selection=True,export_yup=True,export_extras=True,export_texcoords=True,export_normals=True,export_materials='EXPORT',export_cameras=False,export_lights=False)
+ records[name]={'bytes':path.stat().st_size,'triangles':tris,'parts':len(parts),'closedSolids':solids,'dimensionsFeet':[W,H,D],'textures':0}
+
+if __name__=='__main__':
+ families={'jewel-single':(.4666667,.4083333,.0333333),'jewel-fat':(.4666667,.4083333,.06),'vhs-white':(5.5/12,8.75/12,1.25/12),'vhs-rental':(.403,.727,.104),'dvd-keepcase':(.445,.667,.045),'vhs-slipcase':(.365,.667,.092)}
+ for family,(W,H,D) in families.items():
+  for detail in [False,True]:
+   name='packaging-'+family+('-hero' if detail else '-stock');collection=bpy.data.collections.new(name);bpy.context.scene.collection.children.link(collection);parts=[]
+   if family=='vhs-slipcase':sleeve(detail)
+   else:shell(family,detail)
+   if family=='vhs-white':
+    for ob in parts:
+     for i,mat in enumerate(ob.data.materials):
+      if mat==mats[3]:ob.data.materials[i]=white_mat
+   export_current(name)
+   collection.hide_viewport=True
+ for c in bpy.data.collections:
+  if c.name.startswith('packaging-'):
+   c.hide_render = c.hide_viewport = c.name != 'packaging-jewel-single-hero'
+ for ob in bpy.context.selected_objects:ob.select_set(False)
+ primary=bpy.data.collections['packaging-jewel-single-hero']
+ for ob in primary.objects:ob.select_set(True)
+ bpy.context.view_layer.objects.active=primary.objects[0]
+ for screen in bpy.data.screens:
+  for area in screen.areas:
+   if area.type=='VIEW_3D':
+    area.spaces.active.region_3d.view_location=(0,0,0)
+    area.spaces.active.region_3d.view_distance=1.05
+    area.spaces.active.region_3d.view_rotation=Euler((1.3,0,-.5)).to_quaternion()
+    area.spaces.active.shading.color_type='MATERIAL'
+ bpy.context.scene.unit_settings.system='IMPERIAL'
+ bpy.context.scene.unit_settings.scale_length=.3048
+ bpy.context.preferences.filepaths.save_version=0
+ bpy.ops.wm.save_as_mainfile(filepath=str(ROOT/'tools/models/packaging.blend'))
+ (ROOT/'tools/models/packaging-costs.json').write_text(json.dumps(records,indent=2)+'\n')
+ print(json.dumps(records,indent=2))
