@@ -6,6 +6,10 @@
 [![License](https://img.shields.io/badge/license-GPL--3.0-6a737d)](LICENSE)
 [![Stars](https://img.shields.io/github/stars/halcyon-video/halcyon-video?color=6a737d)](https://github.com/halcyon-video/halcyon-video/stargazers)
 
+<a href="https://ko-fi.com/halcyonvideo"><img src="docs/presentation/marks/kofi.png" alt="Support Halcyon Video on Ko-fi" width="240"></a>
+
+**Next release: date pending.** The presentation below shows the current development build; a release follows owner testing. Published downloads and release notes remain on the [releases page](https://github.com/halcyon-video/halcyon-video/releases).
+
 **The video store you remember, stocked with what you can watch.**
 
 Halcyon Video turns movie night into a visit to the video store. Glide down
@@ -27,23 +31,36 @@ Need help or want to show your store? Join the
 [Discord community](https://discord.gg/SN6FnJgQe) for setup help, release
 notes, and the `#your-store` gallery.
 
-## A look inside version 0.19.0
+## Make the store your own
 
-Version 0.19.0 brings a more compact independent shop, revised checkout
-counters and shelving, updated Kids Club details, and balanced interior and
-exterior lighting. The default signs now use a level, rounded white-on-blue
-emblem throughout the store. Phone browsing follows continuous swipes through
-the overview and along the shelves.
+Choose an emblem, colours, dimensional exterior sign, storefront architecture,
+store era and environment. Carpet dye and wall paint, ceilings, counters,
+shelving and decoration can be configured independently. A few customers or
+all ten regulars can browse the aisles alongside you.
 
-![The compact independent video shop at sunset](docs/screenshots/v019/14-independent-sunset.jpg)
+![Shield emblem, sage walls, warm carpet and customers in the 1993 store](docs/screenshots/presentation/01-shield-interior.jpg)
 
-![Inside the independent shop, with close-set wooden shelves and its own counter](docs/screenshots/v019/15-independent-interior.jpg)
+![Dimensional shield sign and the daylight brick storefront](docs/screenshots/presentation/02-shield-exterior.jpg)
 
-See the **[full screenshot tour](docs/screenshot-tour.md)** for 32 current views:
-the four chain-store eras, independent shop, building facades, cases, checkout,
-custom branding, and phone screens. Read the
-[0.19.0 release notes](https://github.com/halcyon-video/halcyon-video/releases/tag/v0.19.0)
-for the full change list.
+![Later store styling, alternate palette, tall ceiling and wall decoration](docs/screenshots/presentation/05-late-interior.jpg)
+
+![Extruded exterior lettering at sunset](docs/screenshots/presentation/06-letters-exterior.jpg)
+
+![Compact independent shop with wooden shelving and tiled ceiling](docs/screenshots/presentation/07-independent.jpg)
+
+![Independent storefront after dark](docs/screenshots/presentation/08-independent-exterior.jpg)
+
+These are captures of the running app with its original public assets and
+explicit settings. Interior and case demonstrations use the bundled illustrative
+harness stock; game photographs use real RomM metadata. The browser store uses
+its streaming catalog when you enter it. The [earlier screenshot tour](docs/screenshot-tour.md)
+shows additional configurations from version 0.19.0.
+
+[![Watch the storefront and interior flycam tour](docs/screenshots/presentation/02-shield-exterior.jpg)](docs/presentation/flycam.mp4)
+
+[Watch the silent flycam tour](docs/presentation/flycam.mp4) of the running app.
+The footage uses the app’s recorder and illustrative demo stock, with automated
+keyboard flight. It shows the current development build, not a dated release.
 
 ## A media library you can walk through
 
@@ -52,7 +69,7 @@ for the full change list.
 The room is built from your catalog. Libraries become aisles, genres become
 sections, popular titles get deeper stock, and multiple quality versions
 collapse into one box. Choose VHS or DVD cases, three shelf arrangements,
-four period fit-outs, day through night lighting, and one of several modeled
+period fit-outs, day through night lighting, and one of several modeled
 storefronts without changing the library underneath.
 
 ![The later-era store and its revised counter layout](docs/screenshots/v019/12-2010-sales-floor.jpg)
@@ -78,6 +95,16 @@ daylight, at sunset, or after dark.
 the shelves to titles released by your chosen store date. That date advances
 with real time; an optional setting also matches the store's era to it. Your
 underlying media library stays intact.
+
+## Store copies and checkout
+
+Flip the artwork case and its store-copy sleeve together to read the back.
+Checkout packs the cases into a rental bag, with pickup and carry-out before
+playback or the streaming handoff.
+
+![Store-copy VHS sleeve with readable monochrome metadata](docs/screenshots/presentation/04-store-copy.jpg)
+
+![Rental bag with store copies at the checkout counter](docs/screenshots/presentation/03-rental-bag.jpg)
 
 ## The parts that make it feel like a store
 
@@ -121,7 +148,7 @@ the store.
 
 ### A real games department
 
-![The RomM games department](docs/screenshots/games-department.jpg)
+![The RomM games department](docs/screenshots/presentation/09-games.jpg)
 
 Point Halcyon at [RomM](https://github.com/rommapp/romm) and enabled platforms
 become a dedicated department. Cardboard cartons, clamshells, and jewel cases
@@ -155,20 +182,38 @@ into a commit.
 
 ## What can stock the shelves?
 
+<p>
+<a href="https://jellyfin.org/"><img src="docs/presentation/marks/jellyfin.svg" alt="Jellyfin" height="42"></a>&nbsp;&nbsp;
+<a href="https://www.plex.tv/"><img src="docs/presentation/marks/plex-on-dark.png" alt="Plex" height="34"></a>&nbsp;&nbsp;
+<a href="https://emby.media/"><img src="docs/presentation/marks/emby.png" alt="Emby" height="38"></a>
+</p>
+
+Works with Jellyfin, Plex and Emby servers. These marks identify compatible
+services; Halcyon Video is an independent project, not an official client or
+endorsed product. Plex and the Plex logo are trademarks of Plex and used under
+a license. [Logo sources and usage guidance](docs/presentation/marks/README.md).
+
 | Source | What Halcyon does with it |
 |---|---|
 | **Jellyfin** | Movies, series, art, versions, playback, resume points, and watch history |
 | **Plex** | The same core store through Plex code sign-in and server discovery |
 | **Emby** | Direct server sign-in, member cards, movies, series, artwork, playback, resume points, and saved store settings |
 | **Streaming services** | Zero-setup browsing, service choice at checkout, and a link to that service |
-| **Jellyseerr / Overseerr** | Collection gaps, discovery stock, requests, and staff picks |
+| **Jellyseerr / Overseerr / Seerr** | Collection gaps, discovery stock, requests, and staff picks |
 | **RomM** | Platform bays, game packaging, cover scans, and optional emulator launch |
+| **Steam** | An opt-in personal games shelf and launch through native support or the approved Steam Companion |
 | **Nothing yet** | A working opening-day store locally, or the stocked hosted demo |
+
+The built-in streaming choices are Netflix, Amazon Prime Video, Disney+, Hulu,
+Max / HBO Max, Apple TV+ / Apple TV, Paramount+ and Peacock. Availability depends
+on region and the catalog source. These are discovery and link-out integrations;
+you still need the provider's own access or subscription. Streaming-service
+logos are not bundled or used in this presentation.
 
 Streaming aisles do not require Jellyfin, Plex, Jellyseerr, or a TMDB key.
 The setup terminal asks which services you use and stocks the store from a bundled
-snapshot. Browse the films first; checkout reveals the available services so
-you can choose one before the handoff. A configured TMDB or Jellyseerr source
+snapshot. Browse the films first; the store-copy sleeve shows availability and lets you
+choose one service before completing checkout and the handoff. A configured TMDB or Jellyseerr source
 can refresh that data later.
 There is no built-in folder scanner; shelving personal files requires Jellyfin, Plex,
 or Emby.
@@ -294,12 +339,11 @@ for days rather than burn the GPU behind an unchanged frame.
 
 ## TV, phone, and low-power screens
 
-On a phone, start in the whole-store overview. Swipe to move the destination
-cursor, tap it to enter a shelf, and drag along the cases to browse. Streaming
-service choices appear when you check out a title. Choose a service and the
-counter hands you off to its site.
+On a phone, enter the 3D store in walking mode and use the thumbstick and touch
+controls. Computers start with the whole-store overview. Drag along the cases
+to browse; choose a streaming service on the store-copy sleeve, take the title
+to the counter, and carry the rental bag outside before opening its provider.
 
-<img src="docs/screenshots/v019/30-phone-overview.jpg" alt="Halcyon store overview in a portrait phone viewport" width="300"> <img src="docs/screenshots/v019/31-phone-case.jpg" alt="Inspecting a rental case in a portrait phone viewport" width="300">
 
 
 **Remote Play** streams the live canvas and audio over WebRTC while control
