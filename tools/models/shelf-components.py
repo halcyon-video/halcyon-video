@@ -94,11 +94,39 @@ cap=sweep('EndPanel', [(-1.074,0),(1.074,0),(1.08,.006),(1.08,.20),
 bpy.context.view_layer.objects.active=cap
 bevel=cap.modifiers.new('Finished cap edges','BEVEL');bevel.width=.008;bevel.segments=3
 bpy.ops.object.modifier_apply(modifier=bevel.name)
+# Positive-X half-depth variants for single-faced wall fixtures (#160). Each is cut
+# from the finished full part at the centre plane, so its outer edge easing, tapers
+# and toe are identical; the cut edge is a closed flat face, not eased or open.
+# Same local contract as the full parts: X from 0 outward, Y up, native 5ft height.
+def half_part(src, name):
+    mesh = src.data.copy(); mesh.name = name
+    bm = bmesh.new(); bm.from_mesh(mesh)
+    cut = bmesh.ops.bisect_plane(bm, geom=list(bm.verts)+list(bm.edges)+list(bm.faces),
+        plane_co=(0,0,0), plane_no=(1,0,0), clear_inner=True)
+    rim = [e for e in cut['geom_cut'] if isinstance(e, bmesh.types.BMEdge)]
+    bmesh.ops.holes_fill(bm, edges=rim, sides=len(rim))
+    bmesh.ops.recalc_face_normals(bm, faces=list(bm.faces))
+    assert all(e.is_manifold for e in bm.edges), name
+    assert min(v.co.x for v in bm.verts) > -1e-6, name
+    bm.to_mesh(mesh); bm.free()
+    obj = bpy.data.objects.new(name, mesh)
+    bpy.context.collection.objects.link(obj)
+    bpy.context.view_layer.objects.active = obj
+    obj.select_set(True)
+    bpy.ops.object.mode_set(mode='EDIT')
+    bpy.ops.mesh.select_all(action='SELECT')
+    bpy.ops.uv.smart_project(island_margin=.02)
+    bpy.ops.object.mode_set(mode='OBJECT')
+    obj.select_set(False)
+    return obj
+half_part(panel, 'UprightHalf')
+half_part(cap, 'EndPanelHalf')
 # Steel C-standard, closed thin-wall profile rather than a solid dark bar.
 standard=sweep('Standard', [(-.07,-.045),(.07,-.045),(.07,.045),(.042,.045),
     (.042,.032),(.056,.032),(.056,-.031),(-.056,-.031),(-.056,.032),(-.042,.032),(-.042,.045),(-.07,.045)])
 # Formed steel foot with a rolled top edge. Runs across the aisle depth.
-sweep('Foot', [(-.5,0),(.5,0),(.5,.10),(.46,.15),(-.46,.15),(-.5,.10)],.14)
+foot=sweep('Foot', [(-.5,0),(.5,0),(.5,.10),(.46,.15),(-.46,.15),(-.5,.10)],.14)
+half_part(foot, 'FootHalf')
 
 # Separate internal lower-tier backings; outer uprights/end panels above are unchanged.
 for name,angle in [('BackrestLower',25),('BackrestSecond',18)]:

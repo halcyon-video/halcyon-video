@@ -40,9 +40,11 @@ test('clasps share hardware, preserve pick objects, and release late/failed load
   const cancel = installClaspHardware(targets, material, () => wake++);
   cancel();
   const late = await asset(); let lateReleases = 0;
-  late.scene.traverse(o => { if (o instanceof THREE.Mesh) o.geometry.addEventListener('dispose', () => lateReleases++); });
+  const lateGeometry = new Set<THREE.BufferGeometry>();
+  late.scene.traverse(o => { if (o instanceof THREE.Mesh) lateGeometry.add(o.geometry); });
+  lateGeometry.forEach(g => g.addEventListener('dispose', () => lateReleases++));
   success(late);
-  assert.equal(lateReleases, 16); assert.equal(wake, 1); assert.equal(targets[0].children.length, 0);
+  assert.equal(lateReleases, lateGeometry.size); assert.equal(wake, 1); assert.equal(targets[0].children.length, 0);
   const failed = installClaspHardware(targets, material, () => wake++);
   failure(); assert.equal(wake, 1); assert.equal(targets[0].parent, parent); failed();
   const malformed = installClaspHardware(targets, material, () => wake++);

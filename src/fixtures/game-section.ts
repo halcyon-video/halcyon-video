@@ -245,9 +245,9 @@ export class GameSection implements SlottedFixture {
       frontCap.receiveShadow = true;
       this.group.add(frontCap);
       this.ctx.addCollider(frontCap);
-      if (this.faces === 'both') shelfModels.add(frontCap, [{ kind: 'cap', depth: unitDepth,
+      shelfModels.add(frontCap, [{ kind: 'cap', depth: unitDepth,
         topDepth: capTopDepth, height: UNIT_FRAME_HEIGHT, length: .1,
-        y: -frameCenterY, physicalUV: isWireFrame }], capMats, true);
+        y: -frameCenterY, physicalUV: isWireFrame, half: this.faces === 'front' }], capMats, true);
     }
 
     if (this.hasBackCap) {
@@ -259,9 +259,9 @@ export class GameSection implements SlottedFixture {
       backCap.receiveShadow = true;
       this.group.add(backCap);
       this.ctx.addCollider(backCap);
-      if (this.faces === 'both') shelfModels.add(backCap, [{ kind: 'cap', depth: unitDepth,
+      shelfModels.add(backCap, [{ kind: 'cap', depth: unitDepth,
         topDepth: capTopDepth, height: UNIT_FRAME_HEIGHT, length: .1,
-        y: -frameCenterY, physicalUV: isWireFrame }], capMats, true);
+        y: -frameCenterY, physicalUV: isWireFrame, half: this.faces === 'front' }], capMats, true);
     }
 
     // 2. Central Backing Wall — solid in every theme, matching the movie aisles.
@@ -386,11 +386,11 @@ export class GameSection implements SlottedFixture {
         div.castShadow = true;
         this.group!.add(div);
         this.ctx.addCollider(div);
-        if (this.faces === 'both') shelfModels.add(div, isWireFrame ? [
-          { kind: 'standard', depth: .14, length: .09, height: UNIT_FRAME_HEIGHT, y: -frameCenterY },
-          { kind: 'foot', depth: unitDepth - .12, length: .14, y: -frameCenterY },
+        shelfModels.add(div, isWireFrame ? [
+          { kind: 'standard', depth: .14, length: .09, height: UNIT_FRAME_HEIGHT, y: -frameCenterY, half: this.faces === 'front' },
+          { kind: 'foot', depth: unitDepth - .12, length: .14, y: -frameCenterY, half: this.faces === 'front' },
         ] : [{ kind: 'upright', depth: unitDepth, topDepth: frameTopDepth,
-          height: UNIT_FRAME_HEIGHT, length: .04, y: -frameCenterY }], isWireFrame ? stripMat : baseShelfMat);
+          height: UNIT_FRAME_HEIGHT, length: .04, y: -frameCenterY, half: this.faces === 'front' }], isWireFrame ? stripMat : baseShelfMat);
       };
 
       for (let s = 0; s < numSections - 1; s++) {

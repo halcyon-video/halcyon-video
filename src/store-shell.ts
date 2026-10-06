@@ -1,4 +1,5 @@
 import { baseboardGeometry, sillGeometry, windowFrameGeometry } from './joinery-model';
+import { WOOD_GRAIN_FLAG, woodToeBoard, woodWallBacking, woodWallDeck, woodWallUpright } from './wood-shelf-model';
 import { storeGumballPlacement } from './store-gumball';
 import { FRAME_REVEAL_DEPTH, FRAME_REVEAL_CENTER } from './frame-reveal';
 import { materialTextureLoad } from './material-texture-load';
@@ -1898,6 +1899,8 @@ export function buildStore(scene: StoreScene) {
     normalMap: shelfNormalTex,
     normalScale: new THREE.Vector2(0.3, 0.3),
   });
+  // Timber boards lay their grain along the board: kit parts read this flag.
+  if (shelfWood) sharedShelfMat.userData[WOOD_GRAIN_FLAG] = true;
   // The 2000s wire-black frame reads the pale strip as a leftover white lip
   // on every shelf edge, so there it becomes a satin GUNMETAL front bar
   // matching the reworked wire frame (see shelving.ts) instead of flat
@@ -1931,6 +1934,8 @@ export function buildStore(scene: StoreScene) {
       positions.setZ(i, nrDepthAt(positions.getY(i) + NR_PANEL_CY) - backWallShelfDepth / 2);
     }
     geometry.computeVertexNormals();
+    // Timber: authored finished boards replace the slabs, tapered the same way.
+    if (shelfWood) woodWallUpright(geometry as THREE.BoxGeometry, 0.04, NR_PANEL_H, backWallShelfDepth, nrDepthAt);
   }
 
   // Left-wall unit shelf width, sized from the ADAPTIVE column count
@@ -1977,14 +1982,17 @@ export function buildStore(scene: StoreScene) {
   // MeshStandard for the same reason as sharedShelfMat above: the backing
   // spans the entire New Releases wall — a huge screen area — and the baked
   // bay-shade map does the visual work, not the clearcoat lobe.
+  const nrShadeTex = createShelfBayShadeTexture([...WALL_SHELF_HEIGHTS], 0, NR_PANEL_H);
+  if (shelfWood) { nrShadeTex.channel = 1; nrShadeTex.colorSpace = THREE.NoColorSpace; }
   const nrBackingMat = new THREE.MeshStandardMaterial({
-    // The map here is the baked per-bay SHADE, not an albedo, so the panel's
-    // colour has to come from the material: timber tone on a wood format, the
-    // melamine off-white otherwise.
-    color: shelfWood ? new THREE.Color(shelfWood.hex) : new THREE.Color(0xf8f2e8),
-    map: createShelfBayShadeTexture([...WALL_SHELF_HEIGHTS], 0, NR_PANEL_H),
-    roughness: 0.65,
-    metalness: 0.1,
+    // Melamine keeps baked bay-shade map as albedo; timber uses physical wood grain
+    // on UV0 with baked bay-shade AO on normalized UV1.
+    color: shelfWood ? 0xffffff : new THREE.Color(0xf8f2e8),
+    map: shelfWood ? shelfAlbedoTex : nrShadeTex,
+    aoMap: shelfWood ? nrShadeTex : null,
+    aoMapIntensity: shelfWood ? 1.0 : 0.0,
+    roughness: shelfWood ? 0.62 : 0.65,
+    metalness: shelfWood ? 0.0 : 0.1,
     roughnessMap: shelfRoughnessTex,
     normalMap: shelfNormalTex,
     normalScale: new THREE.Vector2(0.3, 0.3),
@@ -2050,6 +2058,8 @@ export function buildStore(scene: StoreScene) {
         positions.setY(i, positions.getY(i) - .01125 + NR_WALL_SLOPE * (positions.getZ(i) - depth / 2));
       }
       shelfGeo.computeVertexNormals();
+      // Timber: the authored board takes the same slope when it arrives.
+      if (shelfWood) woodWallDeck(shelfGeo, length, .0625, depth, NR_WALL_SLOPE, -.01125);
       const shelf = new THREE.Mesh(shelfGeo, sharedShelfMat);
       shelf.position.set(0, yPos, nrCenterZAt(yPos));
       shelf.receiveShadow = true;
@@ -2064,6 +2074,8 @@ export function buildStore(scene: StoreScene) {
         backing.name = 'lower-tier internal backing';
         backing.castShadow = backing.receiveShadow = true;
         group.add(backing); scene.shelves.push(backing); nrFallback.push(backing);
+        // The corporate wall model owns these; timber stamps the shelf kit's own backrest.
+        if (shelfWood) shelfModels.add(backing, [{ kind: 'backrest', row, depth: 0, length }]);
       }
 
       const strip = new THREE.Mesh(new THREE.BoxGeometry(length, 0.03, 0.02), nrClaspMat);
@@ -2108,7 +2120,8 @@ export function buildStore(scene: StoreScene) {
     // backing is the one surface the sun can't rake and GTAO's contact
     // radius can't reach, so with a flat material it rendered as a single
     // uniform sheet floating behind the cases.
-    const backBacking = new THREE.Mesh(new THREE.BoxGeometry(length, NR_PANEL_H, 0.04), nrBackingMat);
+    const backBacking = new THREE.Mesh(shelfWood ? woodWallBacking(length, NR_PANEL_H, 0.04)
+      : new THREE.BoxGeometry(length, NR_PANEL_H, 0.04), nrBackingMat);
     backBacking.position.set(0, NR_PANEL_CY, WALL_CLEARANCE);
     backBacking.receiveShadow = true;
     backBacking.castShadow = true;
@@ -2146,6 +2159,19 @@ export function buildStore(scene: StoreScene) {
       div.castShadow = true;
       group.add(div);
       scene.shelves.push(div);
+    }
+
+    if (shelfWood) {
+      // A modest recessed toe below the lowest deck; deliberately not a collider.
+      // Sized from the actual bottom deck underside at its recessed Z.
+      const y0 = WALL_SHELF_HEIGHTS[0];
+      const recessZ = nrFrontZAt(y0) - .12;
+      const toeH = y0 - .0425 + NR_WALL_SLOPE * (recessZ - .02 - nrFrontZAt(y0));
+      const toe = new THREE.Mesh(woodToeBoard(length - .004, toeH, .04), sharedShelfMat);
+      toe.name = 'wood-wall-toe';
+      toe.position.set(0, toeH / 2, recessZ);
+      toe.castShadow = toe.receiveShadow = true;
+      group.add(toe);
     }
 
     group.position.copy(centerPos);

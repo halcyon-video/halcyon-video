@@ -46,3 +46,6 @@ hardware sections are plausible construction assumptions, not factory measuremen
 
 Price channel end stops, rear clips, game/wall integration and clickable clasp
 hardware are documented in [shelf-hardware-model.md](shelf-hardware-model.md).
+
+Wooden wall boards, physical grain mapping and single-faced game variants are
+documented in [wood-and-game-shelves.md](wood-and-game-shelves.md).

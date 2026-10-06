@@ -317,3 +317,11 @@ open webs, duct skins and bends, formed straps, collars and discharge louvers.
 It contains no external meshes, textures or source-photo pixels. The editable
 source, generator, measured cost and installation contract are documented in
 `docs/ceiling-structure-model.md`.
+
+## Wooden and single-faced shelf variants
+
+The original shelf-components kit includes closed half-depth upright, end-panel
+and foot variants. Wooden wall boards reuse the original visible-joinery profiles.
+These are scripted Blender geometry under the repository license, with existing
+procedural finishes and no additional image assets. Source and installation
+contracts are in `docs/wood-and-game-shelves.md`.

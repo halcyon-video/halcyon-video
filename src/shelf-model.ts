@@ -4,6 +4,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { assetUrl } from './asset-url';
 import { splitTrapezoidGroups } from './sign-builders';
+import { applyWoodGrainUV, isWoodGrainMaterial, applyWoodGrainToFlaggedGroups } from './wood-shelf-model';
 
 export interface ShelfPart {
   kind: 'deck' | 'rail' | 'wire' | 'slat' | 'upright' | 'spine' | 'standard' | 'foot' | 'cap' | 'backrest';
@@ -19,6 +20,8 @@ export interface ShelfPart {
   topDepth?: number;
   physicalUV?: boolean;
   row?: number;
+  /** Positive-X half-depth upright/cap for a single-faced fixture: cut at the centre plane. */
+  half?: boolean;
 }
 interface Replacement { fallback: THREE.Mesh; parts: ShelfPart[]; material: THREE.Material | THREE.Material[]; inPlace: boolean }
 
@@ -60,7 +63,11 @@ export class ShelfModelBatch {
         (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => ownedMats.add(m));
       });
       try {
-        if (disposed || ['Deck', 'Rail', 'Wire', 'Bracket', 'Slat', 'Upright', 'Spine', 'Standard', 'Foot', 'EndPanel', 'RailClip', 'RailEndStop', 'BackrestLower', 'BackrestSecond'].some(name => !kit.has(name))) return;
+        // Half-depth parts are required only by the fixtures that stamp them, so an
+        // older kit still serves every full-depth fixture.
+        const required = ['Deck', 'Rail', 'Wire', 'Bracket', 'Slat', 'Upright', 'Spine', 'Standard', 'Foot', 'EndPanel', 'RailClip', 'RailEndStop', 'BackrestLower', 'BackrestSecond'];
+        if (entries.some(e => e.parts.some(p => p.half))) required.push('UprightHalf', 'EndPanelHalf', 'FootHalf');
+        if (disposed || required.some(name => !kit.has(name))) return;
         const fittedCaps = new Set<THREE.BufferGeometry>();
         for (const entry of entries) {
           const { fallback, material } = entry;
@@ -69,13 +76,15 @@ export class ShelfModelBatch {
             fallback.name = 'modeled-gondola-end-panel';
             continue;
           }
-          const pieces = entry.parts.flatMap(p => modelPart(kit, p));
+          const grain = isWoodGrainMaterial(material);
+          const pieces = entry.parts.flatMap(p => modelPart(kit, p, grain));
           if (!pieces.length) continue;
           const geometry = mergeGeometries(pieces);
           pieces.forEach(g => g.dispose());
           if (!geometry) continue;
           if (entry.inPlace) {
             splitTrapezoidGroups(geometry);
+            applyWoodGrainToFlaggedGroups(geometry, material, 'y');
             // Preserve the registered click/collision object and its material
             // faces. All caps in this build share this fitted profile.
             // Release any already-uploaded fallback attributes before replacing
@@ -113,10 +122,10 @@ export class ShelfModelBatch {
   }
 }
 
-function modelPart(kit: Map<string, THREE.BufferGeometry>, p: ShelfPart): THREE.BufferGeometry[] {
+function modelPart(kit: Map<string, THREE.BufferGeometry>, p: ShelfPart, grain = false): THREE.BufferGeometry[] {
   const result: THREE.BufferGeometry[] = [];
   const place = (name: string, sx: number, sy: number, sz: number,
-    x = 0, y = 0, z = 0, yaw = 0) => {
+    x = 0, y = 0, z = 0, yaw = 0, woodGrain = false) => {
     const source = kit.get(name);
     if (!source) throw new Error(`Shelf kit missing ${name}`);
     const g = source.index ? source.toNonIndexed() : source.clone();
@@ -131,6 +140,7 @@ function modelPart(kit: Map<string, THREE.BufferGeometry>, p: ShelfPart): THREE.
           (Math.abs(normal.getY(i)) > .5 ? pos.getZ(i) : pos.getY(i)) / 4);
       }
     }
+    if (woodGrain) applyWoodGrainUV(g, 'z');
     g.rotateY(yaw);
     g.translate(x, y, z);
     g.rotateX(p.pitch ?? 0);
@@ -139,7 +149,8 @@ function modelPart(kit: Map<string, THREE.BufferGeometry>, p: ShelfPart): THREE.
     result.push(g);
   };
   if (p.kind === 'upright' || p.kind === 'spine' || p.kind === 'cap') {
-    const source = kit.get(p.kind === 'cap' ? 'EndPanel' : p.kind === 'upright' ? 'Upright' : 'Spine')!;
+    const half = p.half && p.kind !== 'spine' ? 'Half' : '';
+    const source = kit.get((p.kind === 'cap' ? 'EndPanel' : p.kind === 'upright' ? 'Upright' : 'Spine') + half)!;
     const g = source.index ? source.toNonIndexed() : source.clone();
     const pos = g.getAttribute('position');
     for (let i = 0; i < pos.count; i++) {
@@ -154,25 +165,28 @@ function modelPart(kit: Map<string, THREE.BufferGeometry>, p: ShelfPart): THREE.
     if (p.kind === 'cap') {
       const uv = g.getAttribute('uv');
       for (let i = 0; i < pos.count; i++) {
-        uv.setXY(i, p.physicalUV ? pos.getX(i) : pos.getX(i) / p.depth + .5,
+        // A half cap shows only its positive-X face, so art spans that visible width.
+        uv.setXY(i, p.physicalUV ? pos.getX(i) : p.half ? pos.getX(i) / (p.depth / 2) : pos.getX(i) / p.depth + .5,
           p.physicalUV ? pos.getY(i) : pos.getY(i) / (p.height ?? 5));
       }
     }
     g.computeVertexNormals();
+    // Timber: uprights and end panels run their grain vertically, spines along their length.
+    if (grain && p.kind !== 'cap') applyWoodGrainUV(g, p.kind === 'upright' ? 'y' : 'auto');
     g.rotateY(p.yaw ?? 0);
     g.translate(p.x ?? 0, p.y ?? 0, p.z ?? 0);
     result.push(g);
   } else if (p.kind === 'backrest') {
-    place(p.row === 0 ? 'BackrestLower' : 'BackrestSecond', 1, 1, p.length);
+    place(p.row === 0 ? 'BackrestLower' : 'BackrestSecond', 1, 1, p.length, 0, 0, 0, 0, grain);
   } else if (p.kind === 'standard') {
     // Turn the authored C extrusion upright. A rolled foot carries its load.
     const g = kit.get('Standard')!.clone();
     g.scale(1, 1, p.height ?? 5); g.rotateX(Math.PI / 2);
-    g.translate(p.x ?? 0, (p.y ?? 0) + (p.height ?? 5) / 2, p.z ?? 0);
+    g.translate((p.x ?? 0) + (p.half ? .07 : 0), (p.y ?? 0) + (p.height ?? 5) / 2, p.z ?? 0);
     result.push(g.index ? g.toNonIndexed() : g);
     if (g.index) g.dispose();
   } else if (p.kind === 'foot') {
-    place('Foot', p.depth, 1, 1);
+    place(p.half ? 'FootHalf' : 'Foot', p.depth, 1, 1);
   } else if (p.kind === 'deck') {
     // Stretch the flat span only: the six-thousandth-foot eased edge stays
     // the same physical radius across shallow and deep shelves.
@@ -184,6 +198,7 @@ function modelPart(kit: Map<string, THREE.BufferGeometry>, p: ShelfPart): THREE.
       pos.setX(i, x + Math.sign(x) * (p.depth - 1) / 2);
       pos.setZ(i, pos.getZ(i) * p.length);
     }
+    if (grain) { g.computeVertexNormals(); applyWoodGrainUV(g, 'z'); }
     g.rotateX(p.pitch ?? 0);
     g.rotateY(p.yaw ?? 0);
     g.translate(p.x ?? 0, p.y ?? 0, p.z ?? 0);
