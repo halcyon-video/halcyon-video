@@ -1,0 +1,24 @@
+{
+  "textureSha256": "d6cc2463226b7f2f037ab9375a30a250ecda2deab98c01407d87806ec99506a3",
+  "textureWidth": 4096,
+  "textureHeight": 4096,
+  "method": "Import the approved skin-color-only albedo into the existing GLB image slot; retain all geometry, UVs, weights, bind matrices, animation and material parameters.",
+  "evidence": [
+    {
+      "source": "source-meshy.glb",
+      "originalSha256": "1c5d3477fd45d42aced0133c6b199c4465fbde1ffcbe69f434c2b1d759cac7ed",
+      "outputSha256": "324c39f2eed9a881e8c74845f08a00736cc542e63ef45e5ff6bc41a64f505a4b",
+      "meshUvsWeightsBonesAndAnimationsUnchanged": true,
+      "materialParametersUnchanged": true,
+      "textureExactlyApprovedDelivery": true
+    },
+    {
+      "source": "source-meshy-idle.glb",
+      "originalSha256": "c24cb282d1966e3c5d5f2437f82f0cbdf1e62cb2fed2e1f497f9dc8defa8c733",
+      "outputSha256": "5cd2242286a5199550dbe41a8e09ccbb5d6fc6c3f91f811feba782754c8fdfb7",
+      "meshUvsWeightsBonesAndAnimationsUnchanged": true,
+      "materialParametersUnchanged": true,
+      "textureExactlyApprovedDelivery": true
+    }
+  ]
+}

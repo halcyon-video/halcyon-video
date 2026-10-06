@@ -142,6 +142,18 @@ into its render directories first, then stitch the complete sheets afterward. To
 Optional `--source-dir` and `--render-dir` support private installed identities
 without mixing their source or sprites into the public character directories.
 
+### Customer 06 skin color
+
+The current base-color albedo darkens only the existing peach skin colors by
+ten percent, keeping the original 4096 by 4096 UV layout and every unselected
+pixel unchanged. Eye whites, dark facial details, clothes and the forearm tattoo
+retain their original pixels. The correction is embedded in both existing
+source GLBs; geometry, UVs, skin weights, bind matrices, material parameters
+and animation remain byte-identical. `skin-tone-check.json` records the color
+selection and image hashes, and `skin-tone-import-check.json` records the
+unchanged model and animation data. Rebuild the Blender file and sprites using
+the existing customer 06 reproduction commands above.
+
 ### Private clerk likenesses
 
 An installed pair at `public/user-assets/clerk/<identity>/<uniform>/color.png`
