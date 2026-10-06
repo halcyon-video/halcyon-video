@@ -266,3 +266,12 @@ geometry data is exported from the same Blender source. No downloaded geometry,
 reference photographs, brand graphics or external textures are included.
 See `docs/counter-accessories-model.md` for physical construction, preserved
 runtime anchors, named materials, measured costs and verification.
+
+## Folding sale table and bent-wire rack
+
+`sale-table.glb` and `sale-table-rack.glb` are original Halcyon scripted Blender
+construction under the repository license. The editable source, generator and
+metrics are `tools/models/sale-table.blend`, `.py` and `-metrics.json`.
+No downloaded mesh, external texture or source-photo pixels are embedded.
+See `docs/sale-table-model.md` for the preserved stock/footprint contract,
+inferred hidden construction, measured costs and actual consumer verification.

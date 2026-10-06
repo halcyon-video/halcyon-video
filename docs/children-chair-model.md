@@ -1,11 +1,10 @@
 # Molded children’s chair (#281)
 
-The chair asset and guarded fixture component are delivered. **The complete
-issue remains blocked on the children’s nook host**: current store plans do
-not build one. See `children-section-arch-model.md` (#206). No production
-placement, installed-nook photograph or actual nook navigation is claimed.
-The placement helper deliberately receives no host from current store plans.
-Building the nook/arch is a separate work order.
+The original chair asset and fixture are installed by the admitted 1990 corner
+clubhouse. `src/fixtures/clubhouse.ts` supplies the reserved, carpeted host and
+owns the pair's lifetime and navigation footprints. See `clubhouse-model.md`
+for the current enclosure and admission rules. Other eras, independent formats,
+undersized stores and unstocked family corners do not receive these chairs.
 
 ## Original construction and source
 
@@ -52,8 +51,8 @@ individual chairs, leaving the space between them open.
 
 ## Finish, loading and ownership
 
-`ChairPlastic` is replaced by the active theme’s `palette.accent` (cream in the
-current default palette). MeshStandardMaterial uses nonmetallic plastic with
+`ChairPlastic` is replaced by the active theme’s `palette.secondary`.
+MeshStandardMaterial uses nonmetallic plastic with
 nominal roughness 0.4. The existing `finishEquipmentSurfaces` supplies two
 128×128 repeating textures: fine bump grain and roughness variation. Imported
 UV0 remains available for future art; UV1 drives the fine plastic finish.
@@ -70,22 +69,20 @@ Measured asset: 172,444 bytes, 6,438 triangles, one material, one primitive/draw
 The pair renders 12,876 triangles in one draw; shadow passes are additional.
 The retained fallback and collision geometry are owned and released too.
 
-## Future host contract and current omission
+## Current host contract
 
 `childrenChairPlacements(host)` requires explicit reserved red-carpet space,
-family stock, and at least 8 × 11.5 ft of clear host rectangle. Local -Z is the
-TV side. At the minimum depth the row sits at Z=-3.5 and faces the TV. The back
-1.5 ft is reserved for the TV; the chair proxy leaves 0.185 ft beyond that zone.
-A central 5-ft turning circle and a 3-ft-wide front approach remain clear of the
-chair proxies. Host rotation is supported.
+family stock, the 1990 theme, and at least 8 × 11.5 ft of clear host rectangle.
+The current 14 × 14 ft clubhouse places the pair at host-local (-2.5,-2.5),
+rotated -135 degrees toward its corner TV cabinet. Host rotation is supported.
+The clubhouse reserves surrounding shelves, cabinet and entrance space.
 
 These are conservative design dimensions, not measurements from the photo and
-not a substitute for validating surrounding shelves, the actual TV, portal,
-clerk destinations and browse cameras once #206 reserves a real host. A missing,
-undersized, unreserved or unstocked host returns no placement. No corners are
-implicitly occupied; current small and full stores omit the chair.
+not a historical survey. A missing, undersized, unreserved or unstocked host
+returns no placement. The current layout admits the clubhouse only in a
+sufficiently wide corporate 1990 store with family stock and ceiling clearance.
 
-## Verification
+## Original asset verification
 
 The shipped-GLB test checks scale, floor datum, material, UV availability and
 size/triangle budgets. Blender verifies a connected manifold solid. The existing
@@ -96,8 +93,10 @@ released its imported geometry and installed nothing. Missing-GLB fallback was
 photographed and the GLB restored. Navigation unit tests passed (7).
 
 Front, side, rear, underside, pair and fallback photographs were inspected.
-Small/full store checks reported zero layout errors with 28/39 navigation
+At the original asset-only stage, small/full store checks reported zero layout errors with 28/39 navigation
 rectangles and no child chair. These are omission checks, not installed-nook
 navigation. Private harness lighting-stage photos are explicitly previews.
 Public result photographs are kept in `scratch/publicity-kits/issue-281/`, from
 a camp without private user-assets. Reference photographs remain private.
+Current host integration and its later placement verification are documented in
+`clubhouse-model.md`; the original omission checks above are not its evidence.

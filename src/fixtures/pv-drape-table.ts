@@ -54,6 +54,8 @@ import { popKitVisible } from '../pop-period';
 import { markSignMesh } from '../sign-builders';
 import { tryLoadUserAssetTexture } from '../user-assets';
 import { BB_ARCHIVO_BLACK } from '../bundled-fonts';
+import { installDisplayModel } from './display-model';
+import { prepareRetailModel } from './retail-model';
 
 // ─── Measured geometry (feet) ───────────────────────────────────────────────
 // 30-in banquet table, 6 x 2.5 ft top. Scale anchor: the DVD keepcase in the
@@ -261,6 +263,7 @@ export class PvDrapeTable implements SlottedFixture {
   private group: THREE.Group | null = null;
   private disposables: Array<{ dispose(): void }> = [];
   private slotMovies: Movie[][] = [];   // [side][row*COLS + col]
+  private releaseModels: Array<() => void> = [];
 
   constructor(placement: FixturePlacement, ctx: FixtureContext) {
     this.placement = placement;
@@ -286,6 +289,7 @@ export class PvDrapeTable implements SlottedFixture {
   }
 
   build(): void {
+    this.dispose();
     if (!this.inPeriod()) return;
     this.initMovies();
 
@@ -294,6 +298,7 @@ export class PvDrapeTable implements SlottedFixture {
     group.position.set(this.placement.position.x, 0, this.placement.position.z);
     group.rotation.y = this.placement.yaw;
     this.group = group;
+    const tableFallback = new THREE.Group(); group.add(tableFallback);
 
     // ── Drape ────────────────────────────────────────────────────────────────
     // Near-black cotton twill: matte, no sheen, no metalness. vertexColors
@@ -306,7 +311,7 @@ export class PvDrapeTable implements SlottedFixture {
     const drape = new THREE.Mesh(drapeGeo, drapeMat);
     drape.castShadow = true;
     drape.receiveShadow = true;
-    group.add(drape);
+    tableFallback.add(drape);
 
     // Table top, under the rack — the drape covers this too in the photos.
     const topGeo = new THREE.PlaneGeometry(TABLE_W, TABLE_D);
@@ -316,10 +321,12 @@ export class PvDrapeTable implements SlottedFixture {
     top.rotation.x = -Math.PI / 2;
     top.position.y = TABLE_H;
     top.receiveShadow = true;
-    group.add(top);
+    tableFallback.add(top);
 
     // ── Stepped wire rack ────────────────────────────────────────────────────
-    group.add(this.buildRack());
+    const rackFallback = new THREE.Group(); group.add(rackFallback);
+    const rack = this.buildRack(); rackFallback.add(rack);
+    this.disposables.push(rack); // InstancedMesh owns its GPU instance buffer.
 
     // ── Offer rail across the ridge ──────────────────────────────────────────
     group.add(this.buildRailSign());
@@ -327,6 +334,27 @@ export class PvDrapeTable implements SlottedFixture {
     this.ctx.scene.add(group);
     this.ctx.addCollider(drape);
     this.ctx.requestShadowRefresh();
+    const cloth = drapeMat.clone(); cloth.vertexColors = false;
+    this.disposables.push(cloth);
+    this.releaseModels.push(installDisplayModel(this.ctx, group, tableFallback,
+      'models/sale-table.glb', { DrapeCloth: cloth }));
+    this.releaseModels.push(installDisplayModel(this.ctx, group, rackFallback,
+      'models/sale-table-rack.glb', { RackWire: rack.material as THREE.Material },
+      new THREE.Vector3(1, 1, 1), model => {
+        const stemTop = this.signBottomY() + .12;
+        model.traverse(o => {
+          if (!(o instanceof THREE.Mesh)) return;
+          const stem = o.name.startsWith('Offer_stem');
+          if (!stem && !o.name.startsWith('Offer_clip')) return;
+          const pos = o.geometry.attributes.position;
+          for (let i = 0; i < pos.count; i++) {
+            const y = pos.getY(i);
+            pos.setY(i, stem ? 3.355 + (y - 3.355) * (stemTop - 3.355) / .65 : y + stemTop - 4.005);
+          }
+          o.geometry.computeVertexNormals(); o.geometry.computeBoundingBox(); o.geometry.computeBoundingSphere();
+        });
+        prepareRetailModel(model);
+      }));
   }
 
   // Every rail, cross wire, fence upright and leg of the rack in ONE
@@ -559,6 +587,7 @@ export class PvDrapeTable implements SlottedFixture {
   }
 
   dispose(): void {
+    this.releaseModels.forEach(release => release()); this.releaseModels = [];
     if (this.group) {
       this.ctx.scene.remove(this.group);
       this.group = null;

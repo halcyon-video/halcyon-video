@@ -1,9 +1,10 @@
 # Hanging snack pouch kit
 
-Original generic flexible packaging, authored in Blender for issue #277. This
-asset-only candidate is a reusable kit; its presence does **not** establish that
-the application loads it or that the issue is complete. Runtime integration and
-consumer lifecycle verification are a separate handoff.
+Original generic flexible packaging, authored in Blender for issue #277 and
+installed on the public queue rack and gondola. The photographed slatwall-wing
+variant remains separate, incomplete scope. The final section records current
+runtime coverage and its verification; the earlier candidate section records
+the original asset-only stage.
 
 ## Provenance and construction
 

@@ -1,0 +1,48 @@
+{
+  "sale-table": {
+    "parts": 18,
+    "source_polygons": 5470,
+    "manifold": true,
+    "uv": true,
+    "bounds_blender_ft": [
+      [
+        -3.0761590003967285,
+        3.0761590003967285
+      ],
+      [
+        -1.3278720378875732,
+        1.3278720378875732
+      ],
+      [
+        0.0,
+        2.5021185874938965
+      ]
+    ],
+    "bytes": 350068,
+    "export_meshes": 4,
+    "triangles": 11240
+  },
+  "sale-table-rack": {
+    "parts": 244,
+    "source_polygons": 5198,
+    "manifold": true,
+    "uv": true,
+    "bounds_blender_ft": [
+      [
+        -2.9725000858306885,
+        2.9725000858306885
+      ],
+      [
+        -1.2649999856948853,
+        1.2649999856948853
+      ],
+      [
+        2.497722864151001,
+        4.017000198364258
+      ]
+    ],
+    "bytes": 415208,
+    "export_meshes": 5,
+    "triangles": 8540
+  }
+}
