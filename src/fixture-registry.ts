@@ -1,3 +1,4 @@
+import { TwinCrtTower } from './twin-crt-tower';
 import { GumballMachine } from './fixtures/gumball-machine';
 import { Clubhouse } from './fixtures/clubhouse';
 import { ChildrenChair } from './fixtures/children-chair';
@@ -111,3 +112,5 @@ registerFixtureKind('candy-wall-gondola', (placement, ctx) => new CandyWallGondo
 registerFixtureKind('secondary-service-counter', (placement, ctx) => new SecondaryServiceCounter(placement, ctx));
 
 registerFixtureKind('gumball-machine', (placement, ctx) => new GumballMachine(placement, ctx));
+
+registerFixtureKind('twin-crt-tower', (placement, ctx) => new TwinCrtTower(placement, ctx));

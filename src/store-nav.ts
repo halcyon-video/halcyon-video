@@ -269,7 +269,7 @@ export function moveLeftInternal(scene: StoreScene) {
     scene.moveEndcapSelection(-1, 0);
   } else if (scene.mode === 'browse') {
     if (scene.selectedUnitSource === 'fixture') {
-      if (scene.slottedFixtures.find(f => f.placement.id === scene.selectedFixtureId)?.placement.kind === 'release-cart') {
+      if (['release-cart','twin-crt-tower'].includes(scene.slottedFixtures.find(f => f.placement.id === scene.selectedFixtureId)?.placement.kind ?? '')) {
         scene.selectedCol = (scene.selectedCol - 1 + scene.colsCount) % scene.colsCount;
         scene.updateCameraTarget();
         return;
@@ -447,7 +447,7 @@ export function moveRightInternal(scene: StoreScene) {
     scene.moveEndcapSelection(1, 0);
   } else if (scene.mode === 'browse') {
     if (scene.selectedUnitSource === 'fixture') {
-      if (scene.slottedFixtures.find(f => f.placement.id === scene.selectedFixtureId)?.placement.kind === 'release-cart') {
+      if (['release-cart','twin-crt-tower'].includes(scene.slottedFixtures.find(f => f.placement.id === scene.selectedFixtureId)?.placement.kind ?? '')) {
         scene.selectedCol = (scene.selectedCol + 1 + scene.colsCount) % scene.colsCount;
         scene.updateCameraTarget();
         return;

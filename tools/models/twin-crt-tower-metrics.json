@@ -1,0 +1,53 @@
+{
+  "triangles": 16796,
+  "vertices": 8920,
+  "material_roles": [
+    "BezelABS",
+    "CabinetABS",
+    "PocketBack",
+    "TowerAccent",
+    "TowerBase",
+    "TowerFoot",
+    "TowerSteel",
+    "VentRecess",
+    "mat16",
+    "mat17"
+  ],
+  "bytes": 1167364,
+  "bounds_blender": [
+    [
+      -1.33,
+      1.33
+    ],
+    [
+      -0.69931,
+      0.71491
+    ],
+    [
+      0.0,
+      8.21
+    ]
+  ],
+  "trayHeightsFt": [
+    0.9,
+    1.79,
+    2.68,
+    3.57,
+    4.46,
+    5.3500000000000005
+  ],
+  "stockRows": [
+    1,
+    2,
+    3,
+    4
+  ],
+  "columns": 5,
+  "stockCapacity": 20,
+  "nominalFootprintFt": [
+    2.8,
+    1.5
+  ],
+  "scaleConfidence": "approximate",
+  "hiddenConstruction": false
+}

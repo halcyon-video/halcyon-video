@@ -284,3 +284,11 @@ and the fitted open television stand. Editable source and generator are in
 `tools/models/visible-joinery.blend` and `visible-joinery.py`; dimensions,
 consumer ownership and verification are in `docs/visible-joinery-model.md`.
 No external geometry, source imagery or texture assets are included.
+
+## Twin-monitor merchandise tower
+
+`twin-crt-tower.glb` is original Blender-authored display construction, with
+visible television fronts reused from this project's original CRT family.
+No external mesh, photographic art or branded skin is included. Source,
+reproduction and placement contracts are in `tools/models/twin-crt-tower.py`,
+`tools/models/twin-crt-tower.blend` and `docs/twin-crt-tower-model.md`.
