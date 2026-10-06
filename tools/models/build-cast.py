@@ -11,8 +11,12 @@ def option(name,default):
  return Path(args[args.index(name)+1]).resolve() if name in args else default
 SRC=option('--source-dir',ROOT/'tools/models/cast'/slug)
 OUT=option('--render-dir',ROOT/'scratch/cast-render'/slug);OUT.mkdir(parents=True,exist_ok=True)
+if slug=='customer-06':
+ if not (SRC/'source-meshy.glb').exists():raise RuntimeError('Customer six requires the complete Meshy character and service-authored animations')
+ runpy.run_path(str(ROOT/'tools/models/import-meshy-character.py'))['build'](SRC,slug)
+ sys.exit(0)
 bpy.ops.object.select_all(action='SELECT');bpy.ops.object.delete(use_global=False)
-source_glb=SRC/('source-wardrobe.glb' if slug=='customer-06' else 'source.glb')
+source_glb=SRC/'source.glb'
 if not source_glb.exists():raise RuntimeError('Missing approved source model: '+str(source_glb))
 bpy.ops.import_scene.gltf(filepath=str(source_glb))
 arm=next(o for o in bpy.context.scene.objects if o.type=='ARMATURE')
@@ -195,9 +199,6 @@ for name,objects in outfits.items():
  for o in objects:
   for old in list(o.users_collection):old.objects.unlink(o)
   col.objects.link(o)
-if slug=='customer-06':
- runpy.run_path(str(ROOT/'tools/models/customer-six-wardrobe.py'))['apply'](body,arm,SRC)
- tattoo=runpy.run_path(str(ROOT/'tools/models/customer-six-tattoo.py'))['apply'](body,arm,SRC);outfits['casual'].append(tattoo)
 bpy.ops.object.select_all(action='DESELECT');arm.select_set(True);bpy.context.view_layer.objects.active=arm;arm.show_in_front=True
 for screen in bpy.data.screens:
  for area in screen.areas:

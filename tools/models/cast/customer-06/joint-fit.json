@@ -6,5 +6,7 @@
   "armRadiusReductionMaximum": 0.22,
   "waist": "shared pelvis envelope through shirt/waistband transition",
   "ankle": "shared calf-foot envelope through trouser hem and boot collar",
-  "headUnmodified": true
+  "headUnmodified": true,
+  "retired": true,
+  "currentPipeline": "Complete Meshy character; see meshy-import-check.json"
 }

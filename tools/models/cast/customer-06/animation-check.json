@@ -1,15 +1,14 @@
 {
   "idle": {
     "samples": 41,
-    "maximumFloorErrorFeet": 3.725290298461914e-09,
-    "minimumPalmMedialAlignment": 0.9982009933446534
+    "maximumFloorErrorFeet": 1.4901161193847656e-08,
+    "durationSeconds": 9.96666768391927,
+    "motionSource": "Meshy animation library"
   },
   "walk": {
     "samples": 41,
-    "maximumFloorErrorFeet": 2.9802322387695312e-08,
-    "minimumPalmMedialAlignment": 0.8979639881290495
-  },
-  "exports": {
-    "casual": 24795724
+    "maximumFloorErrorFeet": 7.450580596923828e-09,
+    "durationSeconds": 1.0333332697550455,
+    "motionSource": "Meshy animation library"
   }
 }

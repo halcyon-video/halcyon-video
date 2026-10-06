@@ -1,0 +1,14 @@
+{
+  "task_id": "01a10e6c-bc37-7540-bd6d-79732f71cff7",
+  "status": "SUCCEEDED",
+  "consumed_credits": 9,
+  "request": {
+    "ai_model": "nano-banana-pro",
+    "prompt": "Edit image 1 only. This is the full-body customer-six character for a stylized video-store game. Image 2 is a supporting identity reference for his EXACT face and hair. Keep image 1 face proportions, large brown eyes, eyebrows, nose, smile, skin tone, wavy brown shoulder-length hair, classic brown COLLARLESS V-neck leather vest, maroon short-sleeve crew-neck shirt, brown denim trousers, harness boots, body proportions and A pose. Replace the dotted stubble with ONE simple dark-brown full beard region, wrapping the jaw and chin and including a moustache ABOVE the upper lip. Connect the moustache to the beard on both sides of the mouth; keep the smiling lips visible. No individual hair strands, speckles, floating chin mask or separate moustache strips. Give him a natural narrow neck that joins his head and flows smoothly into his shoulders and torso inside the shirt collar, with continuous matching skin tone and no gaps or projecting neck tubes. All limbs join the torso cleanly. Add his small original black flaming-skull tattoo to the anatomical LEFT outer forearm only. Preserve the clean low-poly faceted cartoon style and exact face identity. Entire single character visible head to boot soles, front view, arms apart about 35 degrees, plain neutral light-grey background, soft even studio lighting, no text, no extra objects.",
+    "aspect_ratio": "3:4"
+  },
+  "references": [
+    "reference-wardrobe.png",
+    "reference.png"
+  ]
+}

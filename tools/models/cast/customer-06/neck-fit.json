@@ -4,5 +4,7 @@
   "concealedOriginalNeckFaces": 586,
   "headGeometryUVWeightsUnmodified": true,
   "bodyMeshUnmodified": true,
-  "construction": "smooth neck surface matched to the actual torso boundary and tucked inside the unchanged original jaw"
+  "construction": "smooth neck surface matched to the actual torso boundary and tucked inside the unchanged original jaw",
+  "retired": true,
+  "currentPipeline": "Complete Meshy character; see meshy-import-check.json"
 }

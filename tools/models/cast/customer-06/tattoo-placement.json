@@ -90,5 +90,7 @@
     2634,
     2638,
     2639
-  ]
+  ],
+  "retired": true,
+  "currentPipeline": "Complete Meshy character; see meshy-import-check.json"
 }

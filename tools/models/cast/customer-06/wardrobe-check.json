@@ -5,5 +5,7 @@
   "bodyVertices": 10162,
   "bodyTriangles": 20261,
   "identity": "Exact original head with a connected simple beard and upper-lip moustache",
-  "neck": "Fitted skin bridge between the original neck and replacement torso"
+  "neck": "Fitted skin bridge between the original neck and replacement torso",
+  "retired": true,
+  "currentPipeline": "Complete Meshy character; see meshy-import-check.json"
 }

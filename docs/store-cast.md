@@ -107,71 +107,34 @@ https://docs.meshy.ai/en/api/rigging. One generation cost 30 credits and one ini
 rig cost five, for 385 existing credits across this eleven-character batch. No
 subscription or additional credit purchase was made.
 
-### Customer 06: left forearm tattoo
+### Customer 06: complete Meshy character
 
-An original black-ink flaming skull decal is fitted to the anatomical left lower
-forearm using the underlying body's identical skin weights. The packed Blender
-source and animated GLB include the editable surface and transparent tattoo art.
-`tools/models/customer-six-tattoo.py` reapplies it to an existing checked rig;
-`build-cast.py` also reapplies it when rebuilding the character from its base.
-Run `finalize-cast.py` afterward to refresh the GLB and animation checks.
+Customer 06 is generated, textured, rigged and animated entirely by Meshy.
+The original identity reference and the classic collarless vest reference guide
+Meshy's corrected image. The result includes a simple connected beard and
+moustache, a coherent neck and torso, maroon short sleeves, brown trousers,
+harness boots and the left forearm flaming-skull tattoo.
 
-Customer 06 has eight separately rendered directions to prevent the tattoo from
-swapping arms when turning. Its atlas is 2048×3072 (24 MiB decoded RGBA); use
-`--customer --full-directions` for both clerk-sheet stitch and check. Other
-customers retain their five-direction 2048×1920 sheets. The generated reference
-image and original Meshy base remain preserved as provenance, before the tattoo.
+`reference-meshy.png` is the Meshy-edited reference; `source-meshy.glb`
+is the complete Meshy-delivered walking character; `source-meshy-idle.glb` supplies the
+compatible standing motion. Both use an identical native skeleton with native neutral Idle 3 and rig-supplied Walking
+animations. Sanitized service and credit receipts are retained beside it.
+`import-meshy-character.py` preserves the original mesh vertices, UVs,
+skin weights and materials. Local processing only applies uniform scene-unit
+scale, sprite-centering and floor-placement transforms, playback labels, camera
+and lighting. The former local head graft, neck bridge, beard paint and clothing
+repair scripts are retired.
 
-### Customer 06: wardrobe
-
-Customer 06 uses `source-wardrobe.glb`, a new Meshy 7.1 clothed body from
-`reference-wardrobe.png`, with a fitted collarless leather waistcoat, clean short
-maroon sleeves, modeled trouser folds and low harness boots. The replacement
-body follows the same generation and captured-motion pipeline as the other
-regulars; the earlier smooth tube-body construction is retired.
-
-`customer-six-wardrobe.py` calls `customer-six-head.py` to replace the donor's
-head with the checked original in `identity-head.blend`. The original head and
-face vertex positions, UVs, skin weights, packed head albedo remain
-unchanged. `identity-head.json` records the original rig joint and physical mesh
-scale; the adapter fits that same physical head size to the new rig without
-resculpting it. `head-preservation.json` verifies the immutable mesh hash and
-fitted scale. The original `source.glb` and `reference.png` remain provenance.
-
-Reproduce with `build-cast.py -- customer-06`, then `finalize-cast.py` and
-`render-customer-atlas.py`. The original left flaming-skull decal is fitted to
-the new forearm with its identical underlying skin weights. The eight-direction
-atlas uses the existing sprite contract and lossless WebP delivery.
-
-`customer-six-joints.py` fits the body after grafting: it reduces the oversized
-arm radius progressively while retaining the hands, gives the shirt/waistband
-boundary a shared pelvis envelope, and gives the trouser hem and boot collar a
-shared calf-to-foot envelope. A fitted tucked-shirt waist layer covers the
-shadowed opening beneath the vest. `joint-fit.json` records the edited regions.
-`customer-six-beard.py` keeps the original facial mesh intact and replaces the
-individual-hair treatment with one simple dark beard region. It duplicates
-the original facial surface for the pigment, including a fitted upper-lip
-moustache connected to the jaw beard at both mouth corners, and keeps the
-smiling lips and neck clear. The coverage
-texture has a softened outline and uniform interior shade. `beard-check.json`
-records the finish and parameters.
-
-`customer-six-neck.py` fits a smooth skin surface to the actual torso
-opening and tucks its upper rim inside the original jaw. Nonfacial overlapping
-source-neck triangles are concealed; original facial geometry, UVs, skin weights
-and albedo remain intact. `neck-fit.json` records the transition. Joint
-validation measures the torso seam through every baked idle and walk sample.
-
-Joint review uses tight waist, ankle and shoulder crops from both front and side
-at every shipped walk phase; the whole-character framing does not establish
-that these joins are sound.
-
-The replacement generation and initial rig consumed 35 existing credits,
-615 to 580, with no purchase. Its sanitized generation, rigging and credit
-receipts are stored beside the source. Review includes front and side views at
-the same camera, lighting and gait phase as customers 04 and 10, plus eight
-phases of the complete walk. These comparisons assess knee, ankle, boot and
-fabric appearance; grounding checks alone do not establish visual quality.
+Run `build-cast.py -- customer-06`, `finalize-cast.py -- customer-06`
+and `render-customer-atlas.py -- customer-06` for reproduction. The sprite
+contract remains eight separately rendered directions in a 2048 by 3072 lossless
+WebP sheet, so the left tattoo is never mirrored onto the other arm.
+`meshy-import-check.json` records unchanged source mesh signatures,
+source-authored clips and checked floor placement. The importer verifies identical
+bind matrices before copying the unmodified standing action onto the walking rig.
+The correction used 67 existing credits, including rejected motion trials, with
+no purchase. Earlier source files and
+receipts remain historical provenance and are not part of the current pipeline.
 
 `render-customer-atlas.py` also accepts `clerk-b` to update idle/walking cells in
 both uniforms while retaining existing working cells. Split the shipped atlases

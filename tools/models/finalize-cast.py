@@ -7,6 +7,10 @@ from mathutils import Matrix,Vector
 ROOT=Path(__file__).resolve().parents[2]
 args=sys.argv[sys.argv.index('--')+1:];slug=args[0]
 folder=Path(args[args.index('--source-dir')+1]).resolve() if '--source-dir' in args else ROOT/'tools/models/cast'/slug
+if slug=='customer-06':
+ if not (folder/'source-meshy.glb').exists():raise RuntimeError('Customer six requires the complete Meshy source')
+ runpy.run_path(str(ROOT/'tools/models/import-meshy-character.py'))['export'](folder)
+ sys.exit(0)
 bpy.ops.wm.open_mainfile(filepath=str(folder/'character.blend'))
 arm=bpy.data.objects['Armature'];anchor=arm.parent;body=bpy.data.objects.get(slug+' body')
 if body is None:raise RuntimeError('No primary character body')
