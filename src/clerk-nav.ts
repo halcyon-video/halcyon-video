@@ -152,16 +152,27 @@ export class ClerkNavGrid {
     return best;
   }
 
-  /** True when the straight segment a→b stays on walkable cells (sampled). */
+  private cellOpen(col:number,row:number):boolean {
+    return col>=0&&row>=0&&col<this.cols&&row<this.rows&&!this.blocked[row*this.cols+col];
+  }
+  /** Visit every crossed cell, including both sides of a grid-corner crossing. */
   segmentWalkable(a: NavPoint, b: NavPoint): boolean {
-    const dx = b.x - a.x, dz = b.z - a.z;
-    const len = Math.hypot(dx, dz);
-    const steps = Math.max(1, Math.ceil(len / (this.cell * 0.5)));
-    for (let i = 0; i <= steps; i++) {
-      const t = i / steps;
-      if (!this.isWalkable(a.x + dx * t, a.z + dz * t)) return false;
+    const dx=b.x-a.x,dz=b.z-a.z,stepX=Math.sign(dx),stepZ=Math.sign(dz);
+    let c=Math.floor((a.x-this.minX)/this.cell),r=Math.floor((a.z-this.minZ)/this.cell);
+    const endC=Math.floor((b.x-this.minX)/this.cell),endR=Math.floor((b.z-this.minZ)/this.cell);
+    let crossX=dx?((c+(stepX>0?1:0))*this.cell+this.minX-a.x)/dx:Infinity;
+    let crossZ=dz?((r+(stepZ>0?1:0))*this.cell+this.minZ-a.z)/dz:Infinity;
+    const deltaX=dx?this.cell/Math.abs(dx):Infinity,deltaZ=dz?this.cell/Math.abs(dz):Infinity;
+    for(let n=0;n<=this.cols+this.rows;n++) {
+      if(!this.cellOpen(c,r))return false;
+      if(c===endC&&r===endR)return true;
+      if(Math.abs(crossX-crossZ)<1e-12) {
+        if(!this.cellOpen(c+stepX,r)||!this.cellOpen(c,r+stepZ))return false;
+        c+=stepX;r+=stepZ;crossX+=deltaX;crossZ+=deltaZ;
+      } else if(crossX<crossZ){c+=stepX;crossX+=deltaX;}
+      else {r+=stepZ;crossZ+=deltaZ;}
     }
-    return true;
+    return false;
   }
 
   /**
@@ -171,6 +182,37 @@ export class ClerkNavGrid {
    * grid clearance). Returns null when no route exists. Never called per
    * frame — only on destination changes.
    */
+  findPathAvoiding(sx: number, sz: number, tx: number, tz: number,
+    people: readonly (NavPoint & { radius: number })[]): NavPoint[] | null {
+    // Reuse the established A* and string-pulling with temporary occupied cells.
+    // Calls are synchronous, so clerk paths never observe the temporary mask.
+    const marked: number[] = [];
+    for (const person of people) {
+      // Mark whole intersecting cells, not just centres inside the circle.
+      // Otherwise string-pulling can graze a cell corner inside body clearance.
+      const radius=person.radius+this.cell*Math.SQRT1_2;
+      const awayX=sx-person.x,awayZ=sz-person.z,startDistance=Math.hypot(awayX,awayZ);
+      const startIndex=this.cellOf(sx,sz);
+      const minC=Math.max(0,Math.floor((person.x-radius-this.minX)/this.cell));
+      const maxC=Math.min(this.cols-1,Math.ceil((person.x+radius-this.minX)/this.cell));
+      const minR=Math.max(0,Math.floor((person.z-radius-this.minZ)/this.cell));
+      const maxR=Math.min(this.rows-1,Math.ceil((person.z+radius-this.minZ)/this.cell));
+      for(let r=minR;r<=maxR;r++)for(let c=minC;c<=maxC;c++) {
+        const index=r*this.cols+c,point=this.centreOf(index);
+        if(this.blocked[index]||Math.hypot(point.x-person.x,point.z-person.z)>radius)continue;
+        // A start inside the conservative mask needs a continuous escape,
+        // rather than an isolated handful of open cells. Carve its outward
+        // half-plane: every admitted cell stays farther from the other body.
+        if(index===startIndex)continue;
+        const outward=((point.x-sx)*awayX+(point.z-sz)*awayZ)/Math.max(startDistance,.001);
+        if(startDistance<radius&&outward>=0)continue;
+        this.blocked[index]=1;marked.push(index);
+      }
+    }
+    try { return this.findPath(sx,sz,tx,tz); }
+    finally { for(const index of marked)this.blocked[index]=0; }
+  }
+
   findPath(sx: number, sz: number, tx: number, tz: number): NavPoint[] | null {
     const start = this.nearestWalkable(sx, sz, 4.0);
     const goal = this.nearestWalkable(tx, tz, 2.5);

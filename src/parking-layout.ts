@@ -1,5 +1,5 @@
 // Shared world-space plan for pavement, paint, vehicles and concrete edges (feet).
-export interface ParkingSpace { x: number; z: number; yaw: number }
+export interface ParkingSpace { x: number; z: number; yaw: number; accessible?: boolean; reserved?: boolean }
 export function parkingLayout(storeWidth: number, sidewalkDepth: number, backWallZ: number, centerX = 11, frontZ = 15) {
   const stallWidth = 9, stallDepth = 18, laneDepth = 24, sideWalk = 4;
   const left = centerX - storeWidth / 2 - sideWalk;

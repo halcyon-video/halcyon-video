@@ -1,5 +1,6 @@
 import { CLERK_UNIFORM_SETTING } from './clerk-uniform';
 import { CLERK_IDENTITY_SETTING, CUSTOMER_SETTING } from './cast-catalog';
+import { CUSTOMER_PREFERENCE_SETTINGS } from './customer-preferences';
 import { REEL_MODE_KEY } from './reel-profile';
 import { STEAM_REVIEW_TIERS } from './steam-catalog';
 // ─── Schema-driven settings registry ───────────────────────────────────────
@@ -463,6 +464,7 @@ export function registerCoreSettings(): void {
   registerSetting(CLERK_UNIFORM_SETTING);
   registerSetting(CLERK_IDENTITY_SETTING);
   registerSetting(CUSTOMER_SETTING);
+  CUSTOMER_PREFERENCE_SETTINGS.forEach(registerSetting);
 
   // Store Brand -------------------------------------------------------------
   // Brand pack selection lives with the logo editor and its preview.

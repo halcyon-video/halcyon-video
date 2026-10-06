@@ -17,6 +17,7 @@ import { STORE_CENTER_X, FRONT_GLASS_Z } from './store-layout';
 export interface ExteriorEnvironment {
   group: THREE.Group;
   walkFarZ: number;
+  parking: ReturnType<typeof parkingLayout>;
   setOutsideMode(mode: OutsideMode): void;
   setGroundColor(color: THREE.Color): void;
   setPhotographicGround(enabled: boolean): void;
@@ -136,5 +137,5 @@ export function buildExteriorEnvironment(scene: THREE.Scene, storeWidth: number,
     scene.remove(group);
   }
 
-  return { group, walkFarZ: plan.farZ - 1.5, setOutsideMode, setGroundColor, setPhotographicGround: enabled => setPhotographicGround(group, enabled), dispose };
+  return { group, parking: plan, walkFarZ: plan.farZ - 1.5, setOutsideMode, setGroundColor, setPhotographicGround: enabled => setPhotographicGround(group, enabled), dispose };
 }
