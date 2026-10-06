@@ -1,3 +1,4 @@
+@import './streaming-handoff.css';
 /* Typefaces are BUNDLED, never fetched (owner mandate 2026-08-06).
  *
  * This file used to open with an @import from fonts.googleapis.com. Vite passes

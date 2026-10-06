@@ -7,6 +7,8 @@ export function configureFlatInput(isBlocked: () => boolean): void {
 }
 
 export function flatInputTarget(): HTMLElement | null {
+  const handoff = document.querySelector<HTMLDialogElement>('#streaming-handoff[open]');
+  if (handoff) return handoff;
   const root = document.getElementById('canvas-container');
   if (!root?.classList.contains('flat-store-root') || blocked()) return null;
   const surface = root.querySelector<HTMLElement>('.flat-detail-overlay')

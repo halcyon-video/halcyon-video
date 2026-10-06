@@ -608,8 +608,19 @@ test('streaming handoff occurs at exit completion, keeps physical tapes, and run
   const physical = createMockMovie({ id: 'physical-tape', streaming: false });
   scene.carried.take(physical);
   const navigations: string[] = [];
+  const elements: any[] = [];
+  const previousDocument = Object.getOwnPropertyDescriptor(globalThis, 'document');
+  Object.defineProperty(globalThis, 'document', { configurable: true, value: {
+    activeElement: null, getElementById: () => null,
+    body: { append: () => {} },
+    createElement: (tagName: string) => {
+      const element: any = { tagName, setAttribute() {}, addEventListener() {},
+        append() {}, showModal() {}, focus() {} };
+      elements.push(element); return element;
+    },
+  }});
   const previousWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
-  Object.defineProperty(globalThis, 'window', { configurable: true, value: { location: { assign: (url: string) => navigations.push(url) } } });
+  Object.defineProperty(globalThis, 'window', { configurable: true, value: { location: { assign: (url: string) => navigations.push(url) }, addEventListener() {} } });
   try {
     startStreamingServiceChoice(scene, movie);
     confirmStreamingServiceChoice(scene);
@@ -617,14 +628,20 @@ test('streaming handoff occurs at exit completion, keeps physical tapes, and run
     scene.checkoutRunning = true;
     scene.checkoutExit = { start: 0, ids: [] };
     assert.equal(completeStreamingCheckout(scene), true);
-    assert.deepEqual(navigations, [movie.streamingUrl]);
+    assert.deepEqual(navigations, [], 'checkout must preserve the store page');
+    const link = elements.find(element => element.tagName === 'a');
+    assert.equal(link.href, movie.streamingUrl);
+    assert.equal(link.target, '_blank');
+    assert.equal(link.rel, 'noopener noreferrer');
     assert.deepEqual(scene.carried.ids(), [physical.id]);
     assert.equal(scene.checkoutRunning, false);
     assert.equal(scene.checkoutExit, null);
     assert.equal(scene.mode, 'browse');
     assert.equal(completeStreamingCheckout(scene), false);
-    assert.equal(navigations.length, 1);
+    assert.equal(elements.filter(element => element.tagName === 'dialog').length, 1);
   } finally {
+    if (previousDocument) Object.defineProperty(globalThis, 'document', previousDocument);
+    else Reflect.deleteProperty(globalThis, 'document');
     if (previousWindow) Object.defineProperty(globalThis, 'window', previousWindow);
     else Reflect.deleteProperty(globalThis, 'window');
   }

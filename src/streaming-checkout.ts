@@ -1,3 +1,4 @@
+import { showStreamingHandoff } from './streaming-handoff.ts';
 import { quickPlayback, rememberPlaybackPosition, restorePlaybackPosition } from './playback-position.ts';
 import * as THREE from 'three';
 import type { Movie } from './jellyfin.ts';
@@ -248,12 +249,10 @@ export function completeStreamingCheckout(scene: StoreScene): boolean {
   if (scene.reelMode) { if (scene.overviewStart) scene.enterOverview(); else scene.returnToEntrance(); }
   else restorePlaybackPosition(scene, false);
   scene.requestRender();
-  // Same-tab navigation works after the animation without popup permission,
-  // and browser Back brings the visitor back to their store.
-  // Keep the store and its recorder alive after the filmed exit walk.
+  // The filmed exit keeps the recorder running; visitors get a user-activated
+  // external link so delayed checkout never replaces their store or hits a popup blocker.
   if (scene.reelMode) return true;
-  try { window.location.assign(url); }
-  catch { scene.onConsoleLog(`[System] Couldn't open the streaming service for "${movie.title}".`, 'system'); }
+  showStreamingHandoff(movie.title, movie.streamingServiceName || 'Your streaming service', url);
   return true;
 }
 

@@ -1,0 +1,33 @@
+#streaming-handoff {
+  box-sizing: border-box;
+  width: min(440px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  overflow: auto;
+  padding: 24px;
+  border: 3px double #dccb99;
+  border-radius: 0;
+  background: #211d19;
+  color: #fff4d6;
+  font: 18px/1.5 Arial, sans-serif;
+  text-align: center;
+  box-shadow: 0 6px 0 #080706;
+}
+#streaming-handoff::backdrop { background: rgb(0 0 0 / 65%); }
+#streaming-handoff h2 { margin: 0 0 16px; font-size: 22px; }
+#streaming-handoff p { overflow-wrap: anywhere; }
+#streaming-handoff a, #streaming-handoff button {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  margin-top: 16px;
+  padding: 12px 8px;
+  border: 2px solid #dccb99;
+  border-radius: 0;
+  background: #fff4d6;
+  color: #211d19;
+  font: bold 16px/1.4 Arial, sans-serif;
+  text-decoration: none;
+  cursor: pointer;
+}
+#streaming-handoff button { background: transparent; color: #fff4d6; }
+#streaming-handoff :focus-visible { outline: 3px solid white; outline-offset: 4px; }
