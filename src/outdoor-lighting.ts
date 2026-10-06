@@ -11,6 +11,8 @@ import * as THREE from 'three';
 import { panoramaProfile, PANORAMA_ROTATION_Y, type OutsideMode } from './exterior-panorama-profile';
 import { Reflector } from 'three/examples/jsm/objects/Reflector.js';
 import { assetUrl } from './asset-url';
+import { tryLoadUserAssetTexture } from './user-assets';
+import { buildPartialPanorama } from './partial-panorama';
 import { CEILING_Y } from './store-layout';
 
 export type { OutsideMode } from './exterior-panorama-profile';
@@ -79,6 +81,7 @@ export class OutdoorLightingRig {
   private skyTint = new THREE.Color('#ffffff');
 
   private skyTextureLoader = new THREE.TextureLoader();
+  private partialSky: THREE.Mesh | null = null;
   // Keyed by resolved asset URL, shared across every mode's pool — a pano is
   // only ever fetched once per session even if its mode is revisited.
   private skyTex = new Map<string, THREE.Texture>();
@@ -121,6 +124,9 @@ export class OutdoorLightingRig {
     this.outsideMode = mode;
     this.rollSunPlacement();
     this.applySunPlacement();
+    // Explicit time changes must allocate/refresh depth maps before drawing
+    // newly lit exterior lamps on GPUs that enforce shadow sampler types.
+    this.deps.getRenderer().shadowMap.needsUpdate = true;
     this.updateSkybox();
   }
 
@@ -180,6 +186,7 @@ export class OutdoorLightingRig {
 
   updateSkybox() {
     if (this.disposed) return;
+    this.skyBakeController?.abort();
     const request = ++this.skyTextureRequest;
     if (!this.skyMesh) return;
     const scene = this.deps.getScene();
@@ -312,7 +319,38 @@ export class OutdoorLightingRig {
     // same cache by resolved URL (see skyTex).
     const texture = this.skyTex.get(texUrl) ?? null;
 
+    let bakeWithSky = true;
     const applyTexture = (tex: THREE.Texture | null) => {
+      const image = tex?.image as HTMLImageElement | undefined;
+      if (tex && image && image.width / image.height > 2.5 && this.skyMesh) {
+        if (!this.partialSky) {
+          this.partialSky = buildPartialPanorama(tex, this.skyMesh.userData.panoramaRadius * .96);
+          this.partialSky.userData.aspect = image.width / image.height;
+          this.skyMesh.add(this.partialSky);
+        } else {
+          (this.partialSky.material as THREE.MeshBasicMaterial).map = tex;
+          this.partialSky.userData.mode = tex.userData.panoramaMode;
+          this.partialSky.scale.y = this.partialSky.userData.aspect / (image.width / image.height);
+        }
+        this.sampleGround(tex);
+        const key = 'bundled:' + texUrl;
+        const background = (base: THREE.Texture) => {
+          if (this.disposed || request !== this.skyTextureRequest) { base.dispose(); return; }
+          base.colorSpace = THREE.SRGBColorSpace;
+          this.skyTex.set(key, base);
+          const material = this.skyMesh!.material as THREE.MeshBasicMaterial;
+          material.map = base; material.color.set('#ffffff'); material.needsUpdate = true;
+          bakeWithSky = true; this.queueSkyBake();
+        };
+        const cached = this.skyTex.get(key);
+        bakeWithSky = Boolean(cached);
+        if (cached) {
+          const material = this.skyMesh.material as THREE.MeshBasicMaterial;
+          material.map = cached; material.color.set('#ffffff'); material.needsUpdate = true;
+        } else this.skyTextureLoader.load(texUrl, background);
+        return;
+      }
+      this.clearPartialPanorama();
       if (this.skyMesh && this.skyMesh.material instanceof THREE.MeshBasicMaterial) {
         this.skyMesh.material.map = tex;
         // White at noon / sunset/night (the panos carry their own color);
@@ -327,9 +365,7 @@ export class OutdoorLightingRig {
     if (texture) {
       applyTexture(texture);
     } else {
-      this.skyTextureLoader.load(
-        texUrl,
-        (loadedTex) => {
+      const loaded = (loadedTex: THREE.Texture) => {
           // A slow pano may outlive this store or a later day/night choice.
           // It must not revive retired GPU resources or repaint a newer sky.
           if (this.disposed || request !== this.skyTextureRequest) { loadedTex.dispose(); return; }
@@ -343,19 +379,23 @@ export class OutdoorLightingRig {
           loadedTex.wrapS = THREE.RepeatWrapping;
           // GroundedSkybox already reverses its sphere geometry; do not mirror the image.
 
+          loadedTex.userData.panoramaMode = this.outsideMode;
           this.skyTex.set(texUrl, loadedTex);
 
           applyTexture(loadedTex);
           // Sky arrived after the light traverse below already ran, so the scene
           // is fully in its new state now — fold it into the environment.
-          this.queueSkyBake();
-        },
-        undefined,
-        (err) => {
-          if (this.disposed || request !== this.skyTextureRequest) return;
-          console.error(`Failed to load skybox texture: ${texUrl}`, err);
-        }
-      );
+          if (bakeWithSky) this.queueSkyBake();
+      };
+      const bundled = () => this.skyTextureLoader.load(texUrl, loaded, undefined, (err) => {
+        if (this.disposed || request !== this.skyTextureRequest) return;
+        console.error(`Failed to load skybox texture: ${texUrl}`, err);
+      });
+      // Installed private panoramas override the matching time; hosted builds
+      // skip these probes and retain the bundled neighborhood.
+      tryLoadUserAssetTexture(`environments/outside/${this.outsideMode}.jpg`, loaded, {
+        onMiss: () => tryLoadUserAssetTexture(`environments/outside/${this.outsideMode}.png`, loaded, { onMiss: bundled })
+      });
     }
 
     // Sync fog and ambient/sun lights if they exist
@@ -384,7 +424,7 @@ export class OutdoorLightingRig {
     // Sky texture was already cached → the scene is fully in its new state here;
     // re-bake the environment so ambient light and reflections follow the mode.
     // (On a cache miss the async loader callback above does this instead.)
-    if (texture) this.queueSkyBake();
+    if (texture && bakeWithSky) this.queueSkyBake();
   }
 
   // StoreScene lowers this to 1 on software GL: each bounce is 6 cube-face
@@ -545,7 +585,16 @@ export class OutdoorLightingRig {
     previous?.dispose();
   }
 
+  private clearPartialPanorama() {
+    if (!this.partialSky) return;
+    this.partialSky.removeFromParent();
+    this.partialSky.geometry.dispose();
+    (this.partialSky.material as THREE.Material).dispose();
+    this.partialSky = null;
+  }
+
   dispose() {
+    this.clearPartialPanorama();
     this.disposed = true;
     this.skyBakeController?.abort();
     this.envRenderTarget?.dispose();
