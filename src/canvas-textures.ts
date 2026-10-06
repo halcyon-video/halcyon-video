@@ -3,6 +3,7 @@
 // walls). Every function here is stateless — it paints a canvas and returns
 // textures; where the texture goes and how it repeats is the caller's business.
 import * as THREE from 'three';
+import { writeHeightNormalPixels } from './height-normal-pixels';
 import { getActiveTheme, type StoreTheme } from './themes';
 import { getActiveLogoSpec, storefrontBrandGold } from './logo-spec';
 import { dressing93Active } from './genre-colors';
@@ -62,19 +63,7 @@ export function heightToNormalTexture(src: HTMLCanvasElement, strength = 1.5): T
   const octx = out.getContext('2d')!;
   const outImg = octx.createImageData(w, h);
   const O = outImg.data;
-  const at = (x: number, y: number) => data[(((y + h) % h) * w + ((x + w) % w)) * 4] / 255;
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      const dx = (at(x - 1, y) - at(x + 1, y)) * strength;
-      const dy = (at(x, y - 1) - at(x, y + 1)) * strength;
-      const len = Math.hypot(dx, dy, 1);
-      const i = (y * w + x) * 4;
-      O[i] = (-dx / len * 0.5 + 0.5) * 255;
-      O[i + 1] = (-dy / len * 0.5 + 0.5) * 255;
-      O[i + 2] = (1 / len * 0.5 + 0.5) * 255;
-      O[i + 3] = 255;
-    }
-  }
+  writeHeightNormalPixels(data, O, w, h, strength);
   octx.putImageData(outImg, 0, 0);
   const tex = new THREE.CanvasTexture(out);
   tex.wrapS = THREE.RepeatWrapping;
