@@ -3,12 +3,9 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import {setPhotographicGround} from '../src/photographic-ground.ts';
 
-test('photographic ground retains shadow receivers, props and geometry, then restores surfaces',()=>{
- const root=new THREE.Group(), surface=new THREE.Mesh(new THREE.PlaneGeometry(10,10)), shadow=new THREE.Mesh(new THREE.PlaneGeometry(10,10),new THREE.ShadowMaterial()), prop=new THREE.Group();
- surface.userData.photographicGroundSurface=true;root.add(surface,shadow,prop);
- const geometry=surface.geometry;
- setPhotographicGround(root,true);
- assert.equal(surface.visible,false);assert.equal(shadow.visible,true);assert.equal(prop.visible,true);assert.equal(surface.geometry,geometry);
- setPhotographicGround(root,false);assert.equal(surface.visible,true);
- surface.geometry.dispose();shadow.geometry.dispose();(shadow.material as THREE.Material).dispose();
+test('hybrid ground keeps sidewalk, lot and shadows visible and only toggles the extended surface',()=>{
+ const root=new THREE.Group(),sidewalk=new THREE.Group(),extension=new THREE.Group(),shadow=new THREE.Group();
+ sidewalk.userData.photographicGroundSurface=true;extension.userData.extendedPavement=true;extension.visible=false;root.add(sidewalk,extension,shadow);
+ setPhotographicGround(root,true);assert(sidewalk.visible&&extension.visible&&shadow.visible);
+ setPhotographicGround(root,false);assert(sidewalk.visible&&shadow.visible);assert.equal(extension.visible,false);
 });

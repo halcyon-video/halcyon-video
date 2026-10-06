@@ -13,6 +13,7 @@ import { Reflector } from 'three/examples/jsm/objects/Reflector.js';
 import { assetUrl } from './asset-url';
 import { tryLoadUserAssetTexture } from './user-assets';
 import { buildPartialPanorama } from './partial-panorama';
+import { setPanoramaProjection, disposeInactivePanoramaGeometry } from './panorama-projection';
 import { CEILING_Y } from './store-layout';
 
 export type { OutsideMode } from './exterior-panorama-profile';
@@ -327,6 +328,7 @@ export class OutdoorLightingRig {
       const image = tex?.image as HTMLImageElement | undefined;
       this.photographicGround = Boolean(tex?.userData.photographicGround && image && image.width / image.height <= 2.5);
       this.groundModeListener?.(this.photographicGround);
+      if (this.skyMesh) setPanoramaProjection(this.skyMesh, this.photographicGround);
       if (tex && image && image.width / image.height > 2.5 && this.skyMesh) {
         if (!this.partialSky) {
           this.partialSky = buildPartialPanorama(tex, this.skyMesh.userData.panoramaRadius * .96);
@@ -602,6 +604,7 @@ export class OutdoorLightingRig {
   }
 
   dispose() {
+    if (this.skyMesh) disposeInactivePanoramaGeometry(this.skyMesh);
     this.clearPartialPanorama();
     this.disposed = true;
     this.skyBakeController?.abort();
