@@ -105,7 +105,6 @@ Volkswagen brochure photograph was inspected for period construction only;
 this is not a branded replica. See `docs/car-hatchback-model.md` for reference
 links, dimensions, material roles, placement and full-lot resource costs.
 
-<<<<<<< HEAD
 ### Concrete sidewalk, curb and gutter kit (#265)
 
 `curb-kit.glb` is original generic Halcyon geometry, authored by scripted Blender
@@ -135,7 +134,6 @@ Original generic scripted Blender mesh for #263; no external geometry or texture
 - Dimensions are design estimates fitted to the existing 13-foot lamp anchors, not measured period hardware.
 - Geometry and delivery contract: `docs/parking-lamp-model.md`. Distributed under the repository's license.
 
-=======
 ## Parked sports coupe
 
 `car_sports.glb` is now original Halcyon scripted Blender geometry under this
@@ -149,7 +147,6 @@ and street-facing orientation, and replaced in full. Nissan's
 was inspected as a period design study only. See
 `docs/sports-coupe-model.md` for dimensions, provenance limits, geometry costs
 and the preserved normalization, finish, fallback and lifecycle contracts.
->>>>>>> f438edb (fix(halcyon): resolve #268 - Blender: replace the lot’s period sports coupe with an editable model)
 
 ## Projection reel (#245)
 
@@ -258,3 +255,14 @@ license, with a barrel hopper, spiral trough, rounded coin cabinet and squat
 plinth. No third-party geometry, imagery, logos or reference reconstruction is
 included. Source and generator: `tools/models/gumball-machine.blend` and `.py`.
 See `docs/gumball-machine-model.md` for the shared runtime envelope and placement.
+
+## Counter mug, acrylic holders and cleaner tray
+
+`tip-mug.glb`, `acrylic-l-holder.glb`, `acrylic-tent-holder.glb` and
+`cleaner-display-tray.glb` are original scripted Blender mesh authoring under
+the repository license. Editable source and generator are
+`tools/models/counter-accessories.blend` and `.py`. The synchronous acrylic
+geometry data is exported from the same Blender source. No downloaded geometry,
+reference photographs, brand graphics or external textures are included.
+See `docs/counter-accessories-model.md` for physical construction, preserved
+runtime anchors, named materials, measured costs and verification.

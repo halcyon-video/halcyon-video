@@ -1,0 +1,230 @@
+{
+  "tip-mug": {
+    "bytes": 142012,
+    "parts": [
+      {
+        "name": "Mug continuous body",
+        "triangles": 3258,
+        "manifold": true,
+        "uv": true,
+        "bounds_blender_ft": [
+          [
+            -0.2770000100135803,
+            0.16500000655651093
+          ],
+          [
+            -0.16500000655651093,
+            0.16500000655651093
+          ],
+          [
+            0.0,
+            0.3619999885559082
+          ]
+        ]
+      },
+      {
+        "name": "Folded generic tip note 1",
+        "triangles": 320,
+        "manifold": true,
+        "uv": true,
+        "bounds_blender_ft": [
+          [
+            -0.1112104058265686,
+            0.030241291970014572
+          ],
+          [
+            -0.08685101568698883,
+            0.007475773338228464
+          ],
+          [
+            0.1198631078004837,
+            0.41999998688697815
+          ]
+        ]
+      },
+      {
+        "name": "Folded generic tip note 2",
+        "triangles": 320,
+        "manifold": true,
+        "uv": true,
+        "bounds_blender_ft": [
+          [
+            -0.029940973967313766,
+            0.10917913913726807
+          ],
+          [
+            -0.04662579298019409,
+            0.0826936587691307
+          ],
+          [
+            0.11999999731779099,
+            0.4200729429721832
+          ]
+        ]
+      }
+    ],
+    "triangles": 3898,
+    "provenance": "original Blender authoring"
+  },
+  "acrylic-l-holder": {
+    "bytes": 27704,
+    "parts": [
+      {
+        "name": "Heat bent L holder",
+        "triangles": 260,
+        "manifold": true,
+        "uv": true,
+        "bounds_blender_ft": [
+          [
+            -0.550000011920929,
+            0.550000011920929
+          ],
+          [
+            -0.0368461050093174,
+            0.3100000023841858
+          ],
+          [
+            0.0,
+            0.9036601781845093
+          ]
+        ]
+      },
+      {
+        "name": "Rounded insert seat",
+        "triangles": 108,
+        "manifold": true,
+        "uv": true,
+        "bounds_blender_ft": [
+          [
+            -0.550000011920929,
+            0.550000011920929
+          ],
+          [
+            -0.02337551675736904,
+            0.012728117406368256
+          ],
+          [
+            0.07532093673944473,
+            0.09735941886901855
+          ]
+        ]
+      }
+    ],
+    "triangles": 368,
+    "provenance": "original Blender authoring"
+  },
+  "acrylic-tent-holder": {
+    "bytes": 18156,
+    "parts": [
+      {
+        "name": "Continuous bent tent shell",
+        "triangles": 244,
+        "manifold": true,
+        "uv": true,
+        "bounds_blender_ft": [
+          [
+            -0.5199999809265137,
+            0.5199999809265137
+          ],
+          [
+            -0.19364817440509796,
+            0.19364817440509796
+          ],
+          [
+            0.0,
+            1.0065548419952393
+          ]
+        ]
+      }
+    ],
+    "triangles": 244,
+    "provenance": "original Blender authoring"
+  },
+  "cleaner-display-tray": {
+    "bytes": 52656,
+    "parts": [
+      {
+        "name": "Folded tray deck and retaining lips",
+        "triangles": 260,
+        "manifold": true,
+        "uv": true,
+        "bounds_blender_ft": [
+          [
+            -1.100000023841858,
+            1.100000023841858
+          ],
+          [
+            -0.25,
+            0.26899999380111694
+          ],
+          [
+            0.33000001311302185,
+            1.1699999570846558
+          ]
+        ]
+      },
+      {
+        "name": "Folded hollow base riser",
+        "triangles": 220,
+        "manifold": true,
+        "uv": true,
+        "bounds_blender_ft": [
+          [
+            -1.0800000429153442,
+            1.0800000429153442
+          ],
+          [
+            -0.2199999988079071,
+            0.2199999988079071
+          ],
+          [
+            0.0,
+            0.33500000834465027
+          ]
+        ]
+      },
+      {
+        "name": "Folded end cheek -1",
+        "triangles": 120,
+        "manifold": true,
+        "uv": true,
+        "bounds_blender_ft": [
+          [
+            -1.0999999046325684,
+            -1.0820000171661377
+          ],
+          [
+            -0.23199999332427979,
+            0.23100000619888306
+          ],
+          [
+            0.3499999940395355,
+            0.9196268916130066
+          ]
+        ]
+      },
+      {
+        "name": "Folded end cheek 1",
+        "triangles": 120,
+        "manifold": true,
+        "uv": true,
+        "bounds_blender_ft": [
+          [
+            1.0820000171661377,
+            1.0999999046325684
+          ],
+          [
+            -0.23199999332427979,
+            0.23100000619888306
+          ],
+          [
+            0.3499999940395355,
+            0.9196268916130066
+          ]
+        ]
+      }
+    ],
+    "triangles": 720,
+    "provenance": "original Blender authoring"
+  }
+}

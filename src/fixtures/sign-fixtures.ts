@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { registerSignMount } from './sign-mount';
 import { createExtrudedMaterials, create3DExtrudedSign } from '../sign-builders';
+import acrylicHolderMeshes from '../../public/models/acrylic-holders.geometry.json';
 
 const backTextureCache = new WeakMap<THREE.Texture, THREE.Texture>();
 
@@ -170,26 +171,17 @@ export function acrylicTentSign(texture: THREE.Texture, width: number, height: n
   });
   acrylicMat.userData.envGainTarget = 0.76;
 
-  const sheetGeo = new THREE.PlaneGeometry(width + 0.04, height + 0.04);
-
-  const sheetFront = new THREE.Mesh(sheetGeo, acrylicMat);
-  sheetFront.position.set(0, centerY, zOffset + 0.005);
-  sheetFront.rotation.x = -angle;
-  group.add(sheetFront);
-
-  const sheetBack = new THREE.Mesh(sheetGeo, acrylicMat);
-  sheetBack.position.set(0, centerY, -zOffset - 0.005);
-  sheetBack.rotation.x = angle;
-  group.add(sheetBack);
-
-  // Bottom acrylic connection base
-  const baseW = width + 0.04;
-  const baseD = zOffset * 2 + 0.02;
-  const baseGeo = new THREE.PlaneGeometry(baseW, baseD);
-  const base = new THREE.Mesh(baseGeo, acrylicMat);
-  base.position.set(0, 0.001, 0);
-  base.rotation.x = -Math.PI / 2;
-  group.add(base);
+  // Exact Blender-exported thick bent section. Synchronous geometry keeps the
+  // existing sign ownership and live paper surfaces without another async load.
+  for (const part of acrylicHolderMeshes['acrylic-tent-holder']) {
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(part.position, 3));
+    geometry.setAttribute('normal', new THREE.Float32BufferAttribute(part.normal, 3));
+    geometry.setAttribute('uv', new THREE.Float32BufferAttribute(part.uv, 2));
+    geometry.scale((width + .04) / 1.04, height, height);
+    const shell = new THREE.Mesh(geometry, acrylicMat); shell.name = 'authored-acrylic-tent';
+    group.add(shell);
+  }
 
   return group;
 }

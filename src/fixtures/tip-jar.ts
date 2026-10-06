@@ -26,6 +26,8 @@ import { markSignMesh } from '../sign-builders';
 import { addGlassReflectionPane } from '../glass-reflection';
 import { getActiveTheme, themeTrimDarkHex } from '../themes';
 import { ensureTipCardFont, paintTipCardCanvas, TIP_CARD_ASPECT, tipJarEnabled } from '../tip-jar';
+import { installDisplayModel } from './display-model';
+import { onBrandChange } from '../brand-live';
 
 type Disposable = { geo?: THREE.BufferGeometry; mat?: THREE.Material; tex?: THREE.Texture };
 
@@ -79,6 +81,8 @@ export class TipJar implements StoreFixture {
   private cardTex: THREE.CanvasTexture | null = null;
   /** Everything a walk-mode raycast may legitimately land on. */
   private targets: THREE.Object3D[] = [];
+  private removeModels: Array<() => void> = [];
+  private unsubscribeBrand: (() => void) | null = null;
 
   constructor(placement: FixturePlacement, ctx: FixtureContext) {
     this.placement = placement;
@@ -86,6 +90,7 @@ export class TipJar implements StoreFixture {
   }
 
   build(): void {
+    this.dispose();
     if (!tipJarEnabled()) return;
     const options = this.placement.options || {};
     // Same convention as the rewinder and the cleaner display: the counter is
@@ -98,6 +103,14 @@ export class TipJar implements StoreFixture {
     group.position.set(this.placement.position.x, surfaceY, this.placement.position.z);
     group.rotation.y = this.placement.yaw;
     this.group = group;
+    group.name = 'counter-tip-jar';
+    const mugRoot = new THREE.Group(); mugRoot.name = 'tip-mug';
+    mugRoot.position.x = CUP_X; group.add(mugRoot);
+    const mugFallback = new THREE.Group(); mugRoot.add(mugFallback);
+    // The old visible construction remains only until the authored mesh is ready.
+    const addMugFallback = (mesh: THREE.Mesh) => {
+      mesh.position.x -= CUP_X; mugFallback.add(mesh);
+    };
 
     // ── The mug ────────────────────────────────────────────────────────────
     // Glazed stoneware in the house color with a brass band under the lip and
@@ -113,7 +126,7 @@ export class TipJar implements StoreFixture {
     cup.position.set(CUP_X, CUP_H / 2, 0);
     cup.castShadow = true;
     cup.receiveShadow = true;
-    group.add(cup);
+    addMugFallback(cup);
     this.disposables.push({ geo: cupGeo, mat: cupMat });
 
     // Bottom, so the open cylinder isn't see-through from a low angle.
@@ -124,7 +137,7 @@ export class TipJar implements StoreFixture {
     const cupFloor = new THREE.Mesh(floorGeo, floorMat);
     cupFloor.rotation.x = -Math.PI / 2;
     cupFloor.position.set(CUP_X, 0.012, 0);
-    group.add(cupFloor);
+    addMugFallback(cupFloor);
     this.disposables.push({ geo: floorGeo, mat: floorMat });
 
     // Torus lies in XY by default and its arc starts at +X, so the gap
@@ -134,7 +147,7 @@ export class TipJar implements StoreFixture {
     handle.position.set(CUP_X - CUP_R_TOP * 0.92, CUP_H * 0.52, 0);
     handle.rotation.set(0, 0, Math.PI * 0.425);
     handle.castShadow = true;
-    group.add(handle);
+    addMugFallback(handle);
     this.disposables.push({ geo: handleGeo });
 
     const bandGeo = new THREE.CylinderGeometry(CUP_R_TOP * 1.01, CUP_R_TOP * 1.01, CUP_H * 0.09, 24, 1, true);
@@ -145,7 +158,7 @@ export class TipJar implements StoreFixture {
     const band = new THREE.Mesh(bandGeo, bandMat);
     band.position.set(CUP_X, CUP_H * 0.82, 0);
     band.receiveShadow = true;
-    group.add(band);
+    addMugFallback(band);
     this.disposables.push({ geo: bandGeo, mat: bandMat });
 
     // Two folded bills standing out of the mouth. Coins at the bottom of a
@@ -161,7 +174,7 @@ export class TipJar implements StoreFixture {
       bill.position.set(CUP_X + dx, CUP_H * 1.02, dz);
       bill.rotation.set(tilt, spin, 0);
       bill.receiveShadow = true;
-      group.add(bill);
+      addMugFallback(bill);
     }
     this.disposables.push({ geo: billGeo, mat: billMat });
 
@@ -215,12 +228,13 @@ export class TipJar implements StoreFixture {
     holder.position.set(CARD_X, ACRYLIC_T, 0);
     holder.rotation.x = -CARD_LEAN;
     group.add(holder);
+    const holderFallback = new THREE.Group(); holder.add(holderFallback);
 
     // Back panel: the sheet the print is held against.
     const backGeo = new THREE.BoxGeometry(PANEL_W, PANEL_H, ACRYLIC_T);
     const backPanel = new THREE.Mesh(backGeo, acrylicMat);
     backPanel.position.set(0, PANEL_H / 2, -ACRYLIC_T / 2 - 0.001);
-    holder.add(backPanel);
+    holderFallback.add(backPanel);
     this.disposables.push({ geo: backGeo });
 
     // The print itself, resting on the lip.
@@ -242,7 +256,10 @@ export class TipJar implements StoreFixture {
     frontFace.position.set(0, HOLDER_LIP_H + CARD_H / 2, CARD_T + 0.006);
     frontFace.renderOrder = 2;
     holder.add(frontFace);
-    addGlassReflectionPane(frontFace, holder, { envMapIntensity: 1.1, roughness: 0.04 });
+    const reflection = addGlassReflectionPane(frontFace, holder, { envMapIntensity: 1.1, roughness: 0.04 });
+    if (reflection) for (const mat of Array.isArray(reflection.material) ? reflection.material : [reflection.material]) {
+      this.disposables.push({ mat });
+    }
     this.disposables.push({ geo: faceGeo });
 
     // The lip the insert stands on — the visible tell that this is a holder
@@ -250,7 +267,7 @@ export class TipJar implements StoreFixture {
     const lipGeo = new THREE.BoxGeometry(PANEL_W, 0.016, 0.034);
     const lip = new THREE.Mesh(lipGeo, acrylicMat);
     lip.position.set(0, HOLDER_LIP_H - 0.008, 0.017);
-    holder.add(lip);
+    holderFallback.add(lip);
     this.disposables.push({ geo: lipGeo });
 
     // Foot: the flat sheet the panel rises from, running back under the lean.
@@ -263,8 +280,27 @@ export class TipJar implements StoreFixture {
 
     // The holder is as clickable as the card: in walk mode you point at the
     // object, not at the 12 in of print inside it.
-    this.targets = [cup, band, card, backPanel, frontFace, foot];
+    this.targets = [mugRoot, card, holderFallback, frontFace, foot];
     this.ctx.scene.add(group);
+    const interiorMat = new THREE.MeshStandardMaterial({ color: 0xe4dfcf, roughness: .28 });
+    this.disposables.push({ mat: interiorMat });
+    this.removeModels.push(installDisplayModel(this.ctx, mugRoot, mugFallback,
+      'models/tip-mug.glb', { MugGlaze: cupMat, MugAccent: bandMat, MugInterior: interiorMat, TipPaper: billMat }));
+    const support = new THREE.Group(); support.name = 'tip-card-holder';
+    support.position.x = CARD_X; group.add(support); this.targets.push(support);
+    // Fallback transform preserves the existing print's world frame. Only the
+    // hardware is replaced: the card, QR map and reflection surface stay live.
+    const oldSupport = new THREE.Group(); support.add(oldSupport);
+    group.updateMatrixWorld(true); oldSupport.attach(holderFallback); oldSupport.attach(foot);
+    this.removeModels.push(installDisplayModel(this.ctx, support, oldSupport,
+      'models/acrylic-l-holder.glb', { Acrylic: acrylicMat }));
+    this.unsubscribeBrand = onBrandChange(() => {
+      const active = getActiveTheme();
+      cupMat.color.set(active.palette.primary); bandMat.color.set(active.palette.secondary);
+      floorMat.color.set(themeTrimDarkHex(active));
+      if (this.cardTex) { paintTipCardCanvas(this.cardTex.image as HTMLCanvasElement); this.cardTex.needsUpdate = true; }
+      this.ctx.requestRender();
+    });
     this.ctx.requestShadowRefresh();
   }
 
@@ -275,7 +311,11 @@ export class TipJar implements StoreFixture {
 
   /** True when a walk-mode raycast hit belongs to this fixture. */
   hitTest(object: THREE.Object3D): boolean {
-    return this.targets.some((t) => t === object);
+    for (let node: THREE.Object3D | null = object; node; node = node.parent) {
+      if (this.targets.includes(node)) return true;
+      if (node === this.group) break;
+    }
+    return false;
   }
 
   // Sits ON the counter band (see build()'s surfaceY), like the rewinder and
@@ -289,6 +329,8 @@ export class TipJar implements StoreFixture {
   }
 
   dispose(): void {
+    this.unsubscribeBrand?.(); this.unsubscribeBrand = null;
+    this.removeModels.forEach(release => release()); this.removeModels = [];
     if (this.group) {
       this.ctx.scene.remove(this.group);
       this.group = null;
