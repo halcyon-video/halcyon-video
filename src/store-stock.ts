@@ -11,6 +11,7 @@ import { updateStoreLoading } from './store-loading';
 import * as THREE from 'three';
 import { isWhiteClamshell, WHITE_CLAMSHELL_DIMS } from './packaging-formats';
 import { onCaseModelsChanged } from './packaging-model';
+import { onJoineryModelsChanged } from './joinery-model';
 import { rentalRestZ, shelfCasePacking } from './packaging-fit';
 import { shelfLeanAngle, lowerShelfProjection, LOWER_BACKREST_HEIGHT } from './shelf-profile';
 import { activeStoreFormat } from './store-format';
@@ -215,9 +216,9 @@ export function updateColsCount(scene: StoreScene) {
 export async function buildAllMovieBoxes(scene: StoreScene) {
   scene.mirrorCubemap.beginStockBuild();
   scene.clearMovieBoxes();
-  caseModelSubscriptions.set(scene, onCaseModelsChanged(() => {
-    scene.queueStructuralShadowRefresh(); scene.requestRender();
-  }));
+  const changed = () => { scene.queueStructuralShadowRefresh(); scene.requestRender(); };
+  const stopCases = onCaseModelsChanged(changed), stopJoinery = onJoineryModelsChanged(changed);
+  caseModelSubscriptions.set(scene, () => { stopCases(); stopJoinery(); });
   scene.slotsByPosition.clear();
   scene.movieInstancesMap.clear();
   scene.slotsByMovieId.clear();

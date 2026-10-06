@@ -1,3 +1,4 @@
+import { baseboardGeometry, sillGeometry, windowFrameGeometry } from './joinery-model';
 import { storeGumballPlacement } from './store-gumball';
 import { FRAME_REVEAL_DEPTH, FRAME_REVEAL_CENTER } from './frame-reveal';
 import { materialTextureLoad } from './material-texture-load';
@@ -218,7 +219,7 @@ scene: StoreScene,
     wall.receiveShadow = true;
     group.add(wall);
     // Navy sill cap on top of the knee wall
-    const cap = new THREE.Mesh(new THREE.BoxGeometry(segW, 0.12, 0.4), kneeTrimMat);
+    const cap = new THREE.Mesh(sillGeometry(segW), kneeTrimMat);
     cap.position.set(cxSeg, KNEE_H + 0.06, -.15);
     cap.castShadow = true;
     cap.receiveShadow = true;
@@ -226,7 +227,7 @@ scene: StoreScene,
     // Navy base kick — #134: matches baseboardMat's 0.3ft height exactly
     // (below, in the room-shell baseboards) so this window wall's trim
     // lines up with the solid walls' at every corner instead of stepping.
-    const kick = new THREE.Mesh(new THREE.BoxGeometry(segW, 0.3, 0.34), kneeTrimMat);
+    const kick = new THREE.Mesh(baseboardGeometry(segW, 0.3, 0.34), kneeTrimMat);
     kick.position.set(cxSeg, 0.15, -.15);
     kick.receiveShadow = true;
     group.add(kick);
@@ -234,7 +235,7 @@ scene: StoreScene,
 
   // Outer border frames
   // Bottom horizontal frame — the glazing sill sits on the knee wall
-  const bottomFrameGeo = new THREE.BoxGeometry(width, frameThickness, FRAME_REVEAL_DEPTH);
+  const bottomFrameGeo = windowFrameGeometry(width, frameThickness, FRAME_REVEAL_DEPTH);
   const bottomFrame = new THREE.Mesh(bottomFrameGeo, frameMat);
   bottomFrame.position.set(0, KNEE_H + frameThickness / 2, -FRAME_REVEAL_CENTER);
   bottomFrame.castShadow = true;
@@ -252,7 +253,7 @@ scene: StoreScene,
   // sill. They used to run the full height to the floor, which buried a
   // charcoal strip down the face of the knee wall at every section end
   // (feedback/041's "strange black bars extending to the floor").
-  const verticalFrameGeo = new THREE.BoxGeometry(frameThickness, height - KNEE_H, FRAME_REVEAL_DEPTH);
+  const verticalFrameGeo = windowFrameGeometry(frameThickness, height - KNEE_H, FRAME_REVEAL_DEPTH);
   const leftFrame = new THREE.Mesh(verticalFrameGeo, frameMat);
   leftFrame.position.set(-width / 2 + frameThickness / 2, KNEE_H + (height - KNEE_H) / 2, -FRAME_REVEAL_CENTER);
   leftFrame.castShadow = true;
@@ -266,7 +267,7 @@ scene: StoreScene,
   group.add(rightFrame);
 
   // Grid vertical dividers — only through the glazed span above the knee wall
-  const dividerGeo = new THREE.BoxGeometry(frameThickness, height - KNEE_H, frameDepth);
+  const dividerGeo = windowFrameGeometry(frameThickness, height - KNEE_H, frameDepth);
   for (let c = 1; c < numCols; c++) {
     const dividerX = -width / 2 + (width / numCols) * c;
     const divider = new THREE.Mesh(dividerGeo, frameMat);
@@ -1800,7 +1801,7 @@ export function buildStore(scene: StoreScene) {
 
   // Back baseboard — full width; the side runs below start 0.04 ft off the
   // back wall so the corners butt cleanly against this run's front face.
-  const bbBackGeo = new THREE.BoxGeometry(storeWidth, 0.3, 0.04);
+  const bbBackGeo = baseboardGeometry(storeWidth, 0.3, 0.04);
   const bbBack = new THREE.Mesh(bbBackGeo, baseboardMat);
   bbBack.position.set(STORE_CENTER_X, floorY + 0.15, backWallZ + 0.02);
   scene.scene.add(bbBack);
@@ -1813,13 +1814,13 @@ export function buildStore(scene: StoreScene) {
   // bbBack (full storeWidth) and the right-wall run already.
   if (scene.hasStep) {
     const bbStepFrontRight = rightEdgeX - 2 * BB_HALF; // clears the right run's near edge (rightEdgeX-0.04)
-    const bbStepFront = new THREE.Mesh(new THREE.BoxGeometry(bbStepFrontRight - scene.stepX, 0.3, 0.04), baseboardMat);
+    const bbStepFront = new THREE.Mesh(baseboardGeometry(bbStepFrontRight - scene.stepX, 0.3, 0.04), baseboardMat);
     bbStepFront.position.set((scene.stepX + bbStepFrontRight) / 2, floorY + 0.15, stepWallZ + 0.03);
     scene.scene.add(bbStepFront);
 
     const bbStepSideNear = backWallZ + 0.04; // clears bbBack's far edge (backWallZ+0.04)
     const bbStepSideFar = stepWallZ + 0.01; // touches bbStepFront's near edge (stepWallZ+0.01)
-    const bbStepSide = new THREE.Mesh(new THREE.BoxGeometry(bbStepSideFar - bbStepSideNear, 0.3, 0.04), baseboardMat);
+    const bbStepSide = new THREE.Mesh(baseboardGeometry(bbStepSideFar - bbStepSideNear, 0.3, 0.04), baseboardMat);
     bbStepSide.position.set(scene.stepX - 0.03, floorY + 0.15, (bbStepSideNear + bbStepSideFar) / 2);
     bbStepSide.rotation.y = Math.PI / 2;
     scene.scene.add(bbStepSide);
@@ -1847,7 +1848,7 @@ export function buildStore(scene: StoreScene) {
       : [[rearStart, FRONT_KICK_INNER_Z]];
     segs.forEach(([z0, z1]) => {
       if (z1 - z0 < 0.05) return;
-      const seg = new THREE.Mesh(new THREE.BoxGeometry(z1 - z0, 0.3, 0.04), baseboardMat);
+      const seg = new THREE.Mesh(baseboardGeometry(z1 - z0, 0.3, 0.04), baseboardMat);
       seg.position.set(wallX + inward * BB_HALF, floorY + 0.15, (z0 + z1) / 2);
       seg.rotation.y = inward * Math.PI / 2;
       scene.scene.add(seg);

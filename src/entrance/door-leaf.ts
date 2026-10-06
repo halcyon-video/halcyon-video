@@ -1,3 +1,4 @@
+import { joineryGeometry, stretchJoinery } from '../joinery-model.ts';
 import * as THREE from 'three';
 
 /** A continuous aluminum leaf with a recessed glass pocket and a deep bottom rail. */
@@ -18,7 +19,11 @@ export function createDoorLeafFrame(width: number, height: number, single = fals
     bevelSegments: 1, steps: 1, curveSegments: 1,
   });
   geometry.translate(0, 0, -.0575);
-  return geometry;
+  return joineryGeometry(geometry, single ? 'SingleDoorLeaf' : 'DoubleDoorLeaf', g => {
+    stretchJoinery(g,'x',3.2,width,.30);
+    const p = g.getAttribute('position');
+    for (let i=0;i<p.count;i++) { const y=p.getY(i); if(y>3.5) p.setY(i,y+height-7); }
+  });
 }
 
 /** A black horizontal push bar with shallow returns reaching the leaf stiles. */
@@ -52,5 +57,5 @@ export function createDoorPushBarGeometry(width: number): THREE.ExtrudeGeometry 
   geometry.translate(0, 0, -barHeight / 2);
   // +Z faces away from the glazing; the return ends seat on the leaf at Z=0.
   geometry.rotateX(Math.PI / 2);
-  return geometry;
+  return joineryGeometry(geometry, 'DoorPushBar', g => stretchJoinery(g,'x',3.2,width,.26));
 }

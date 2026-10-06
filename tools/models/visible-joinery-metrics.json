@@ -1,0 +1,17 @@
+{
+  "bytes": 131816,
+  "triangles": 1808,
+  "parts": [
+    "Baseboard",
+    "DoorPushBar",
+    "DoubleDoorLeaf",
+    "FinishedPanel",
+    "SillCap",
+    "SingleDoorLeaf",
+    "TelevisionStand",
+    "WindowHorizontal",
+    "WindowVertical"
+  ],
+  "units": "feet",
+  "hiddenConstruction": false
+}

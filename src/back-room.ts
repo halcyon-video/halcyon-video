@@ -1,3 +1,4 @@
+import { joineryGeometry, stretchJoinery } from './joinery-model';
 import { selfLit } from './material-lighting';
 // T23 — The rental-mode "home" pocket: where you spend the lockout after
 // checking out. Built as a DETACHED POCKET far outside the store shell
@@ -27,6 +28,7 @@ import { selfLit } from './material-lighting';
 // with the sized primitive stand-ins and upgrades automatically when the real
 // GLBs land in public/models/.
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { Movie } from './jellyfin';
 import {
   CASE_MEDIUM,
@@ -443,17 +445,18 @@ export class BackRoom {
     const stand = new THREE.Group();
     const standZ = -5.3;
     stand.position.set(0, 0, standZ);
-    const mk = (w: number, h: number, d: number, x: number, y: number, z: number) => {
-      const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), standMat);
-      m.position.set(x, y, z);
-      this.addOwned(m, stand);
-    };
     const standW = Math.max(3.2, tv.size.x + 0.7);
-    mk(standW, 0.14, 1.8, 0, 1.53, 0);       // top slab (top at 1.6)
-    mk(standW, 0.16, 1.8, 0, 0.08, 0);       // bottom slab
-    mk(0.14, 1.6, 1.8, -standW / 2 + 0.07, 0.8, 0); // sides
-    mk(0.14, 1.6, 1.8, standW / 2 - 0.07, 0.8, 0);
-    mk(standW - 0.3, 0.08, 1.6, 0, 0.62, 0); // middle shelf
+    const parts: THREE.BufferGeometry[] = [];
+    const mk = (w: number, h: number, d: number, x: number, y: number) => {
+      const g = new THREE.BoxGeometry(w,h,d); g.translate(x,y,0); parts.push(g);
+    };
+    mk(standW,.14,1.8,0,1.53); mk(standW-.28,.16,1.8,0,.08);
+    mk(.14,1.46,1.8,-standW/2+.07,.73); mk(.14,1.46,1.8,standW/2-.07,.73);
+    mk(standW-.28,.08,1.6,0,.62);
+    const fallback = mergeGeometries(parts)!; parts.forEach(g => g.dispose());
+    const geometry = joineryGeometry(fallback, 'TelevisionStand', g => stretchJoinery(g,'x',3.2,standW,.15));
+    const cabinet = new THREE.Mesh(geometry, standMat); cabinet.name = 'screening-room-stand';
+    this.addOwned(cabinet, stand);
     this.group.add(stand);
 
     // TV on the stand, turned to face the couch (+z; props are prepped -z).

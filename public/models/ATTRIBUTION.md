@@ -275,3 +275,12 @@ metrics are `tools/models/sale-table.blend`, `.py` and `-metrics.json`.
 No downloaded mesh, external texture or source-photo pixels are embedded.
 See `docs/sale-table-model.md` for the preserved stock/footprint contract,
 visible geometry, measured costs and actual consumer verification.
+
+## Visible architectural joinery
+
+`visible-joinery.glb` is original scripted Blender mesh authoring: eased window
+and sill profiles, coved skirting, door rings and push bars, finished trim panels,
+and the fitted open television stand. Editable source and generator are in
+`tools/models/visible-joinery.blend` and `visible-joinery.py`; dimensions,
+consumer ownership and verification are in `docs/visible-joinery-model.md`.
+No external geometry, source imagery or texture assets are included.
