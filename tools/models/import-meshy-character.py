@@ -35,8 +35,10 @@ def build(folder,slug='customer-06'):
   if set(b.name for b in arm.data.bones)!=set(b.name for b in idle_arm.data.bones):raise RuntimeError('Meshy native animation skeletons differ')
   difference=max(abs(arm.data.bones[b.name].matrix_local[i][j]-b.matrix_local[i][j]) for b in idle_arm.data.bones for i in range(4) for j in range(4))
   if difference>1e-6:raise RuntimeError('Meshy native bind poses differ; do not retarget locally')
-  native=next(t.strips[0] for t in idle_arm.animation_data.nla_tracks if 'idle' in t.name.lower());action=native.action;action.use_fake_user=True;start=native.action_frame_start;end=native.action_frame_end
-  track=arm.animation_data.nla_tracks.new();track.name='idle';strip=track.strips.new('idle',0,action);strip.action_frame_start=start;strip.action_frame_end=end;strip.frame_end=end-start
+  tracks=list(idle_arm.animation_data.nla_tracks);moving=[t for t in tracks if t.strips[0].frame_end-t.strips[0].frame_start>1.01];tracks=moving or tracks
+  if len(tracks)!=1:raise RuntimeError('Meshy idle source must contain one authored motion')
+  native=tracks[0].strips[0];action=native.action;action.use_fake_user=True;start=native.action_frame_start;end=native.action_frame_end
+  track=arm.animation_data.nla_tracks.new();track.name='idle';strip=track.strips.new('idle',0,action);strip.action_frame_start=start;strip.action_frame_end=end;strip.frame_end=max(native.frame_end-native.frame_start,end-start)
   for o in added:bpy.data.objects.remove(o,do_unlink=True)
  for track in arm.animation_data.nla_tracks:
   kind='idle' if 'idle' in track.name.lower() else 'walk' if 'walk' in track.name.lower() else None
@@ -51,7 +53,7 @@ def build(folder,slug='customer-06'):
  def bounds():
   bpy.context.view_layer.update();dg=bpy.context.evaluated_depsgraph_get()
   return [ev.matrix_world@ev.data.vertices[i].co for o in meshes for ev in [o.evaluated_get(dg)] for i in {i for p in ev.data.polygons for i in p.vertices}]
- s.frame_set(0);points=bounds();height=max(v.z for v in points)-min(v.z for v in points);scale=5.90/height;anchor.scale=(scale,)*3
+ s.frame_set(0);points=bounds();height=max(v.z for v in points)-min(v.z for v in points);scale=json.loads((folder/'scene-scale.json').read_text())['uniformScale'] if (folder/'scene-scale.json').exists() else 5.90/height;anchor.scale=(scale,)*3
  records={};proof={}
  for kind in ['idle','walk']:
   select_clip(arm,anchor,kind);end=durations[kind];seq=[]
@@ -68,7 +70,7 @@ def build(folder,slug='customer-06'):
   for f in range(41):
    time=f/40*durations[kind];s.frame_set(int(time),subframe=time%1);points=bounds();error=max(error,abs(min(v.z for v in points)))
   if error>.01:raise RuntimeError('Scene placement failed '+str(error))
-  proof[kind]={'samples':41,'maximumFloorErrorFeet':error,'durationSeconds':durations[kind]/30,'motionSource':'Meshy animation library'}
+  proof[kind]={'samples':41,'maximumFloorErrorFeet':error,'durationSeconds':durations[kind]/30,'motionSource':'Meshy rig-supplied standing pose' if kind=='idle' and durations[kind]<=1.01 else 'Meshy animation library'}
  for name,o in source_names.items():
   if fingerprint(o)!=baseline[name]:raise RuntimeError('Meshy mesh data changed during import')
  arm['meshy_import_only']=True;select_clip(arm,anchor,'idle');s.frame_set(0)

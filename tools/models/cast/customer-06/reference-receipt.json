@@ -1,14 +1,13 @@
 {
-  "task_id": "01a10e6c-bc37-7540-bd6d-79732f71cff7",
+  "task_id": "01a10ef1-f157-71da-a6b3-abc6e8dc4028",
   "status": "SUCCEEDED",
   "consumed_credits": 9,
   "request": {
     "ai_model": "nano-banana-pro",
-    "prompt": "Edit image 1 only. This is the full-body customer-six character for a stylized video-store game. Image 2 is a supporting identity reference for his EXACT face and hair. Keep image 1 face proportions, large brown eyes, eyebrows, nose, smile, skin tone, wavy brown shoulder-length hair, classic brown COLLARLESS V-neck leather vest, maroon short-sleeve crew-neck shirt, brown denim trousers, harness boots, body proportions and A pose. Replace the dotted stubble with ONE simple dark-brown full beard region, wrapping the jaw and chin and including a moustache ABOVE the upper lip. Connect the moustache to the beard on both sides of the mouth; keep the smiling lips visible. No individual hair strands, speckles, floating chin mask or separate moustache strips. Give him a natural narrow neck that joins his head and flows smoothly into his shoulders and torso inside the shirt collar, with continuous matching skin tone and no gaps or projecting neck tubes. All limbs join the torso cleanly. Add his small original black flaming-skull tattoo to the anatomical LEFT outer forearm only. Preserve the clean low-poly faceted cartoon style and exact face identity. Entire single character visible head to boot soles, front view, arms apart about 35 degrees, plain neutral light-grey background, soft even studio lighting, no text, no extra objects.",
+    "prompt": "Edit only the BODY POSE of this exact full-body low-poly cartoon character. Preserve his exact head, face, eyes, smile, connected beard and moustache, wavy brown hair, classic collarless brown vest, maroon T-shirt, brown trousers, harness boots and left forearm skull tattoo. Place him in a relaxed upright symmetrical standing stance: low level shoulders, torso vertical, shoulder joints above hips, straight knees, parallel feet hip-width apart. Both upper arms hang almost vertically DOWN beside ribs, about 8 degrees away from the torso, with only a narrow visible gap for rigging. Straight relaxed elbows, palms face the sides of thighs, fingers point down. Both arms equal length and both hands level at mid thigh. Arms stay beside the body, neither behind it nor across stomach. Preserve original body proportions. Single character fully visible, head through boot soles, front view, plain light-gray background. No text. The exact SAME face and head must remain recognizable.",
     "aspect_ratio": "3:4"
   },
   "references": [
-    "reference-wardrobe.png",
-    "reference.png"
+    "previous Meshy character front render"
   ]
 }

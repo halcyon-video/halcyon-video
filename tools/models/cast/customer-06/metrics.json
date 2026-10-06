@@ -1,7 +1,7 @@
 {
   "pipeline": "Meshy reference, complete geometry, materials, rig and animations; local import/render only",
   "sourceMeshDataSHA256": {
-    "char1": "3cd10b3b940ec0a1bb638ae3aa4833e370b2ca85fb8e3a1e1c9faff0a5fb060f"
+    "char1": "a38bbcdab23fc959cecdc9469a3b884005dc9c5ea9be41b92c5461d49ad828ce"
   },
   "meshDataUnchanged": true,
   "materialsUnchanged": true,
@@ -13,18 +13,18 @@
     "camera and lighting"
   ],
   "meshes": 1,
-  "vertices": 31293,
-  "triangles": 29142,
+  "vertices": 30411,
+  "triangles": 28457,
   "clips": {
     "idle": {
       "samples": 41,
-      "maximumFloorErrorFeet": 1.4901161193847656e-08,
-      "durationSeconds": 9.96666768391927,
-      "motionSource": "Meshy animation library"
+      "maximumFloorErrorFeet": 2.1316282072803006e-14,
+      "durationSeconds": 0.03333333333333333,
+      "motionSource": "Meshy rig-supplied standing pose"
     },
     "walk": {
       "samples": 41,
-      "maximumFloorErrorFeet": 7.450580596923828e-09,
+      "maximumFloorErrorFeet": 1.6763806343078613e-08,
       "durationSeconds": 1.0333332697550455,
       "motionSource": "Meshy animation library"
     }

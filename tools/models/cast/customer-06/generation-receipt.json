@@ -1,18 +1,19 @@
 {
+  "task_id": "01a10ef2-f702-72be-a4e0-73ad1fe58afa",
   "status": "SUCCEEDED",
-  "consumed_credits": 30,
-  "task_id": "01a10953-0e5d-730d-a2e8-c6b09298f360",
+  "consumed_credits": 35,
   "request": {
+    "input_task_id": "01a10ef1-f157-71da-a6b3-abc6e8dc4028",
     "ai_model": "meshy-7.1",
     "model_type": "standard",
-    "geometry_resolution": "standard",
+    "geometry_resolution": "2k",
     "should_texture": true,
     "texture_resolution": "4k",
     "enable_pbr": false,
     "should_remesh": true,
     "target_polycount": 30000,
     "topology": "triangle",
-    "pose_mode": "a-pose",
+    "pose_mode": "",
     "image_enhancement": false,
     "target_formats": [
       "glb"

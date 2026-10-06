@@ -1,13 +1,13 @@
 {
   "idle": {
     "samples": 41,
-    "maximumFloorErrorFeet": 1.4901161193847656e-08,
-    "durationSeconds": 9.96666768391927,
-    "motionSource": "Meshy animation library"
+    "maximumFloorErrorFeet": 2.1316282072803006e-14,
+    "durationSeconds": 0.03333333333333333,
+    "motionSource": "Meshy rig-supplied standing pose"
   },
   "walk": {
     "samples": 41,
-    "maximumFloorErrorFeet": 7.450580596923828e-09,
+    "maximumFloorErrorFeet": 1.6763806343078613e-08,
     "durationSeconds": 1.0333332697550455,
     "motionSource": "Meshy animation library"
   }

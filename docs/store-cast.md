@@ -109,32 +109,32 @@ subscription or additional credit purchase was made.
 
 ### Customer 06: complete Meshy character
 
-Customer 06 is generated, textured, rigged and animated entirely by Meshy.
-The original identity reference and the classic collarless vest reference guide
-Meshy's corrected image. The result includes a simple connected beard and
-moustache, a coherent neck and torso, maroon short sleeves, brown trousers,
-harness boots and the left forearm flaming-skull tattoo.
+Customer 06 is generated, textured and rigged entirely by Meshy. The corrected
+reference keeps his recognizable face, brown hair, connected beard and moustache,
+classic collarless brown vest, maroon shirt, brown trousers, harness boots and
+left forearm tattoo. Meshy generated the model directly in the reference's
+neutral standing stance, with lower shoulders and arms beside the thighs.
 
-`reference-meshy.png` is the Meshy-edited reference; `source-meshy.glb`
-is the complete Meshy-delivered walking character; `source-meshy-idle.glb` supplies the
-compatible standing motion. Both use an identical native skeleton with native neutral Idle 3 and rig-supplied Walking
-animations. Sanitized service and credit receipts are retained beside it.
-`import-meshy-character.py` preserves the original mesh vertices, UVs,
-skin weights and materials. Local processing only applies uniform scene-unit
-scale, sprite-centering and floor-placement transforms, playback labels, camera
-and lighting. The former local head graft, neck bridge, beard paint and clothing
-repair scripts are retired.
+`reference-meshy.png` is the Meshy-edited reference. `source-meshy-idle.glb`
+is Meshy's rigged standing delivery, including its constant baseline clip;
+`source-meshy.glb` is the same rig's supplied walking delivery. Standing holds
+the Meshy-authored pose. No local bone poses or motion corrections are authored.
+Both sources share an identical native skeleton and bind matrices.
 
-Run `build-cast.py -- customer-06`, `finalize-cast.py -- customer-06`
-and `render-customer-atlas.py -- customer-06` for reproduction. The sprite
-contract remains eight separately rendered directions in a 2048 by 3072 lossless
-WebP sheet, so the left tattoo is never mirrored onto the other arm.
-`meshy-import-check.json` records unchanged source mesh signatures,
-source-authored clips and checked floor placement. The importer verifies identical
-bind matrices before copying the unmodified standing action onto the walking rig.
-The correction used 67 existing credits, including rejected motion trials, with
-no purchase. Earlier source files and
-receipts remain historical provenance and are not part of the current pipeline.
+`import-meshy-character.py` preserves Meshy's mesh vertices, UVs, skin weights
+and materials. Local processing applies uniform scene scale, floor placement,
+sprite centering, playback labels, cameras and lighting. The former local head
+graft, neck bridge, beard paint and clothing repair scripts remain retired.
+
+Run `build-cast.py -- customer-06`, `finalize-cast.py -- customer-06` and
+`render-customer-atlas.py -- customer-06` for reproduction. The sprite contract
+is eight separately rendered directions in a 2048 by 3072 lossless WebP sheet;
+the left tattoo is never mirrored onto the other arm. `meshy-import-check.json`
+records unchanged delivered source data, imported clips and floor placement
+checks at 41 samples per clip. Sanitized service receipts are retained beside
+the model. The original rebuild and subsequent corrections, including rejected
+trials, used 201 existing credits with no purchase. Older receipts remain
+historical provenance and are outside the current source pipeline.
 
 `render-customer-atlas.py` also accepts `clerk-b` to update idle/walking cells in
 both uniforms while retaining existing working cells. Split the shipped atlases

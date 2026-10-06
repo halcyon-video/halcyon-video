@@ -1,12 +1,8 @@
 {
-  "task_id": "01a10e94-cff0-7521-bed4-9e4e60ec53db",
+  "task_id": "01a10ef4-3237-7657-92d8-7a67fae5a5f3",
   "status": "SUCCEEDED",
-  "consumed_credits": 3,
-  "request": {
-    "rig_task_id": "01a10e71-5cf8-76fa-8f9a-108390cc231b",
-    "action_id": 243
-  },
-  "actions": [
-    "Idle_3"
-  ]
+  "source": "Meshy rigging delivery",
+  "idle": "Armature|clip0|baselayer: supplied neutral standing pose",
+  "walk": "Meshy rig-supplied basic walking",
+  "localBoneEdits": 0
 }
