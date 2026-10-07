@@ -189,7 +189,7 @@ export function buildCounterProps93(scene: StoreScene): void {
   // render paths below.
   // (Sign-anchor yaws face the CUSTOMER, so their tangent runs the opposite
   // way along the band from the counter-spine rotY the props above use.)
-  if (bandLeft) {
+  if (bandLeft && scene.activeTheme.id === 'bb-1993') {
     const tie = bandLeft.pos.clone().add(tangent(bandLeft.yaw).multiplyScalar(1.1));
     const spots = BALLOON_COLORS.map((color, i) => {
       const angle = (i / BALLOON_COLORS.length) * Math.PI * 2;
