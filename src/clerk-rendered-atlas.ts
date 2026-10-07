@@ -38,10 +38,11 @@ async function loadInstalledPair(base: string): Promise<HTMLImageElement[] | nul
 export async function loadRenderedClerkAtlas(): Promise<THREE.CanvasTexture> {
   // Capture the theme before asynchronous work: an old clerk can finish loading
   // during a settings rebuild, and must retain its own palette until disposed.
-  const palette = getActiveTheme().palette;
+  const theme = getActiveTheme();
+  const palette = theme.palette;
   const primary = new THREE.Color(palette.primary).convertLinearToSRGB();
   const secondary = new THREE.Color(palette.secondary).convertLinearToSRGB();
-  const uniform = resolveClerkUniform(localStorage.getItem('bb_clerk_uniform'));
+  const uniform = resolveClerkUniform(theme.id);
   const identity = resolveClerkIdentity(localStorage.getItem('bb_clerk_identity'));
   const base = identity === 'clerk-b' ? `textures/cast/clerk-b/${uniform}`
     : uniform === 'oxford' ? 'textures/clerk/oxford' : 'textures/clerk';
