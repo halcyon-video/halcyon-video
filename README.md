@@ -37,8 +37,14 @@ notes, and the `#your-store` gallery.
 
 Choose an emblem, colours, dimensional exterior sign, storefront architecture,
 store era and environment. Carpet dye and wall paint, ceilings, counters,
-shelving and decoration can be configured independently. A few customers or
-all ten regulars can browse the aisles alongside you.
+shelving and decoration can be configured independently. Ten regulars have their
+own browsing tastes, with automatic traffic that is quiet in the morning and
+busiest at sunset. Customer habits and population need no setup.
+
+Store Settings gives each choice one home: Catalog for streaming apps, carried
+libraries and release dates; Browsing & Rentals for camera and checkout behavior;
+and Overhead TVs for programs and feeds. Store Look, Store Brand, Playback,
+Video Games, Performance and Connection keep their own controls.
 
 ![Shield emblem, sage walls, warm carpet and customers in the 1993 store](docs/screenshots/presentation/01-shield-interior.jpg)
 
@@ -98,7 +104,7 @@ its actual layout. These details carry through from the facade to the counter.
 
 ![Kids Club shelving and its in-store television](docs/screenshots/v019/06-kids-club.jpg)
 
-**Choose when it is.** The manager terminal's media release-date pin limits
+**Choose when it is.** The Catalog menu's release-date pin limits
 the shelves to titles released by your chosen store date. That date advances
 with real time; an optional setting also matches the store's era to it. Your
 underlying media library stays intact.

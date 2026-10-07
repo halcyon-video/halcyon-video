@@ -51,8 +51,7 @@ export const COUNTER_TERMINAL_LABELS: Record<string, string> = {
 
 /** The home screen omits Help (inside Settings) and the retired staff page. */
 export function counterTerminalRows(powerRows: string[]): string[] {
-  const rows = powerRows.filter((id) => id !== 'btn-controls' && id !== 'btn-service');
-  rows.splice(rows.indexOf('btn-cancel'), 0, 'btn-overhead-tvs', 'btn-streaming', 'btn-media-date');
+  const rows = powerRows.filter((id) => !['btn-controls', 'btn-service', 'btn-flat-mode', 'btn-overhead-tvs', 'btn-streaming', 'btn-media-date'].includes(id));
   return rows;
 }
 

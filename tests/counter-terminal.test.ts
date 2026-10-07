@@ -64,7 +64,7 @@ test('the demo manager ring seats without clipping (#133)', () => {
 
 test('the home screen folds help into settings and retires the staff shortcut', () => {
   const rows = counterTerminalRows(['btn-settings', 'btn-controls', 'btn-flat-mode', 'btn-service', 'btn-cancel']);
-  assert.deepEqual(rows, ['btn-settings', 'btn-flat-mode', 'btn-overhead-tvs', 'btn-streaming', 'btn-media-date', 'btn-cancel']);
+  assert.deepEqual(rows, ['btn-settings', 'btn-cancel']);
 });
 
 test('a list too long even at floor pitch reports a smaller maxLines', () => {

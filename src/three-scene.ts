@@ -146,6 +146,7 @@ import { SurfaceRegistry } from './mount-surfaces';
 import { GondolaMaterials } from './shelving';
 import { StoreClerk } from './clerk';
 import { StoreCustomers } from './store-customers';
+import { refreshStoreCustomers } from './store-customer-flow';
 import { ClerkNavGrid, NavRect } from './clerk-nav';
 import { setMaxAnisotropy, setCheapMaterials } from './canvas-textures';
 import { readCalibratedQuality, usesPhoneQualityDefault } from './quality-calibrate';
@@ -2798,9 +2799,11 @@ export class StoreScene {
   }
 
   public setOutsideMode(mode: OutsideMode) {
+    const changed = mode !== this.getOutsideMode();
     this.requestRender();
     this.outdoor.setOutsideMode(mode);
     this.exterior?.setOutsideMode(mode);
+    if (changed) refreshStoreCustomers(this);
   }
 
   // Runs once per scene build (called from buildStore(), right after every
