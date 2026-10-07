@@ -1,14 +1,8 @@
-import type { SettingDef } from './settings';
-
 export type ClerkUniform = 'polo' | 'oxford';
-export const CLERK_UNIFORM_SETTING: SettingDef = {
-  key: 'bb_clerk_uniform', label: 'Clerk Uniform', kind: 'cycle',
-  group: 'Store Look', values: [{ id: 'polo', label: 'Polo' }, { id: 'oxford', label: 'Oxford Shirt' }],
-  default: 'polo', applyMode: 'rebuild-scene',
-  hint: 'Uniform colours follow the store brand; khakis stay the same.',
-};
-export function resolveClerkUniform(value: unknown): ClerkUniform {
-  return value === 'oxford' ? 'oxford' : 'polo';
+
+/** Uniforms are part of the era, never a saved customer preference. */
+export function resolveClerkUniform(themeId: unknown): ClerkUniform {
+  return themeId === 'bb-1990' || themeId === 'bb-1993' ? 'oxford' : 'polo';
 }
 
 /** Red covers primary cloth; green covers the polo collar and cuffs. */

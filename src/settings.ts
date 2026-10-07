@@ -1,4 +1,3 @@
-import { CLERK_UNIFORM_SETTING } from './clerk-uniform';
 import { CLERK_IDENTITY_SETTING } from './cast-catalog';
 import { organizeSetting } from './settings-navigation';
 import { REEL_MODE_KEY } from './reel-profile';
@@ -462,7 +461,6 @@ export function registerCoreSettings(): void {
     hint: 'Separate explicitly rated NC-17 or X movies. Empty rooms stay hidden.',
   });
 
-  registerSetting(CLERK_UNIFORM_SETTING);
   registerSetting(CLERK_IDENTITY_SETTING);
 
   // Store Brand -------------------------------------------------------------
