@@ -325,3 +325,9 @@ and foot variants. Wooden wall boards reuse the original visible-joinery profile
 These are scripted Blender geometry under the repository license, with existing
 procedural finishes and no additional image assets. Source and installation
 contracts are in `docs/wood-and-game-shelves.md`.
+
+`tv-wall-bank.glb` is original generic asymmetric wall-bank casework under the
+repository license. The editable source and reproducible Blender script are
+`tools/models/tv-wall-bank.blend` and `tools/models/tv-wall-bank.py`.
+No downloaded geometry, imagery, marks or textures are included. Existing live
+screen and bezel modules remain runtime-owned. See `docs/tv-wall-bank-model.md`.

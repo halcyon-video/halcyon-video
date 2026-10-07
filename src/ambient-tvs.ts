@@ -1,6 +1,7 @@
 import { AUTO_TV, groupTvPrograms, loadTvPrograms, tvProgramMovie, type TvProgram } from './ambient-tv-program';
 import { compactAssets } from './mobile-assets';
 import { installTvMount } from './ambient-tv-mount';
+import { installWallBankHousing } from './ambient-wall-bank';
 import { isExternalGameActive } from './external-game-state.ts';
 import { publishAmbientPicture, ambientReceiverInFrustum } from './ambient-screen';
 import { selfLit } from './material-lighting';
@@ -328,6 +329,7 @@ export class AmbientTvs implements StoreFixture {
   private disposed = false;
   private bodyDetailLifetime = new AbortController();
   private cancelBodyDetail: (() => void) | undefined;
+  private removeWallBankModel: (() => void) | null = null;
   // The movie on this feed. Explicit screen programs create child feeds,
   // shared by screens assigned the same program. TV peek resolves its own feed.
   private playingMovie: Movie | null = null;
@@ -1518,7 +1520,8 @@ export class AmbientTvs implements StoreFixture {
       housing.position.z = this.ctx.backWallZ;
       housing.castShadow = true;
       housing.receiveShadow = true;
-      this.ctx.scene.add(housing);
+      this.removeWallBankModel?.();
+      this.removeWallBankModel = installWallBankHousing(this.ctx, housing, bankY);
       this.ctx.addCollider(housing);
     }
 
@@ -1948,6 +1951,7 @@ export class AmbientTvs implements StoreFixture {
     this.screenFeeds = [];
     this.publishPicture(null);
     this.disposed = true; // gates the async GLB upgrade against a dead scene
+    this.removeWallBankModel?.(); this.removeWallBankModel = null;
     this.cancelBodyDetail?.();
     this.bodyDetailLifetime.abort();
     if (this.gestureUnlock) {
