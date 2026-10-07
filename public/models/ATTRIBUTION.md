@@ -13,7 +13,7 @@ used for the store's prop dressing.
 | File | Model | Author | License |
 |---|---|---|---|
 | `retro_tv.glb` | [Retro TV](https://poly.pizza/m/2tfjTOK1Lh4) | Alex Safayan | [CC-BY 3.0](https://creativecommons.org/licenses/by/3.0/) |
-| `car_sedan.glb` | [Car](https://poly.pizza/m/Cz6yDaUcM9) | Quaternius | CC0 |
+| `car_sedan.glb` | Original unbadged compact period sedan (#266) | Halcyon contributors | Repository license; [source and contract](../../docs/car-sedan-model.md) |
 | `car_sports.glb` | [Sports Car](https://poly.pizza/m/1mkmFkAz5v) | Quaternius | CC0 |
 
 | `car_hatchback.glb` | [Car Hatchback](https://poly.pizza/m/BG0KAhmGDt) | Kay Lousberg | CC0 |
