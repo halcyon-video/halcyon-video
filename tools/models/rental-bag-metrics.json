@@ -1,0 +1,12 @@
+{
+  "nodes": 340,
+  "triangles": 646,
+  "bytes": 18884,
+  "footprintFt": [
+    1.6,
+    1.76
+  ],
+  "binding": "unchanged 340-node lattice",
+  "bottomTriangles": 22,
+  "alphaMode": "BLEND"
+}

@@ -442,12 +442,3 @@ export function beginMobileDrag(scene: StoreScene, x: number, y: number) {
     },
   };
 }
-
-// Follow a flight into a shelf as well as active drags, at a bounded cadence.
-// No new vectors or catalog arrays in the render loop.
-const artworkTime = new WeakMap<StoreScene, number>();
-export function mobileArtworkTick(scene: StoreScene, time: number): void {
-  if (!mobileStoreActive() || time - (artworkTime.get(scene) ?? -Infinity) < 180) return;
-  artworkTime.set(scene, time);
-  scene.updateLOD();
-}

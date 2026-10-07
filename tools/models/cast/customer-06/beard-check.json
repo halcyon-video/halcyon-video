@@ -1,0 +1,15 @@
+{
+  "finish": "Simple connected dark beard and upper-lip moustache with visible lips",
+  "mouthCornersConnected": true,
+  "cornerRange": [
+    4,
+    5.35
+  ],
+  "uniformCoverage": 0.72,
+  "follicleNoise": false,
+  "headMeshUnmodified": true,
+  "faceSurfaceOffset": 0.028,
+  "beardFaces": 966,
+  "retired": true,
+  "currentPipeline": "Complete Meshy character; see meshy-import-check.json"
+}

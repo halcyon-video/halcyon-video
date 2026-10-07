@@ -1,5 +1,5 @@
-import { CLERK_UNIFORM_SETTING } from './clerk-uniform';
-import { CLERK_IDENTITY_SETTING, CUSTOMER_SETTING } from './cast-catalog';
+import { CLERK_IDENTITY_SETTING } from './cast-catalog';
+import { organizeSetting } from './settings-navigation';
 import { REEL_MODE_KEY } from './reel-profile';
 import { STEAM_REVIEW_TIERS } from './steam-catalog';
 // ─── Schema-driven settings registry ───────────────────────────────────────
@@ -62,7 +62,7 @@ import { getAmbientTvStatus, formatAmbientTvStatus } from './ambient-tv-status';
 
 export type SettingKind = 'toggle' | 'cycle' | 'text' | 'secret' | 'readout';
 export type ApplyMode = 'live' | 'rebuild-scene' | 'reload';
-export type SettingGroup = 'Connection' | 'Store Look' | 'Store Brand' | 'Playback' | 'Performance' | 'Video Games';
+export type SettingGroup = 'Connection' | 'Store Look' | 'Store Brand' | 'Playback' | 'Performance' | 'Video Games' | 'Catalog' | 'Browsing & Rentals' | 'Overhead TVs';
 
 export interface SettingChoice {
   id: string;
@@ -123,6 +123,7 @@ const registry = new Map<string, SettingDef>();
 const order: string[] = [];
 
 export function registerSetting(def: SettingDef): void {
+  def = organizeSetting(def);
   if (!registry.has(def.key)) order.push(def.key);
   registry.set(def.key, def as SettingDef);
 }
@@ -163,12 +164,12 @@ export function subpagesInGroup(group: SettingGroup): string[] {
 
 /** Groups that currently have at least one visible setting, in a fixed order. */
 export function visibleGroups(): SettingGroup[] {
-  const wanted: SettingGroup[] = ['Store Look', 'Store Brand', 'Playback', 'Video Games', 'Performance', 'Connection'];
+  const wanted: SettingGroup[] = ['Catalog', 'Store Look', 'Store Brand', 'Browsing & Rentals', 'Playback', 'Overhead TVs', 'Video Games', 'Performance', 'Connection'];
   // Store Brand has no registry rows — its page is the custom logo-editor
   // panel (buildStoreBrandPanel below), so it's always visible. The public
   // demo has no servers to connect to, so its Connection group is hidden.
   return wanted.filter((g) =>
-    !(isDemoMode && g === 'Connection') && (g === 'Store Brand' || settingsInGroup(g).length > 0 || subpagesInGroup(g).length > 0));
+    !(isDemoMode && g === 'Connection') && (g === 'Catalog' || g === 'Store Brand' || settingsInGroup(g).length > 0 || subpagesInGroup(g).length > 0));
 }
 
 /**
@@ -460,9 +461,7 @@ export function registerCoreSettings(): void {
     hint: 'Separate explicitly rated NC-17 or X movies. Empty rooms stay hidden.',
   });
 
-  registerSetting(CLERK_UNIFORM_SETTING);
   registerSetting(CLERK_IDENTITY_SETTING);
-  registerSetting(CUSTOMER_SETTING);
 
   // Store Brand -------------------------------------------------------------
   // Brand pack selection lives with the logo editor and its preview.
@@ -617,7 +616,7 @@ export function registerCoreSettings(): void {
     default: 'day',
     applyMode: 'live',
     apply: (value, scene) => scene.setOutsideMode(value as 'morning' | 'day' | 'night' | 'sunset'),
-    hint: 'Time of day seen through the storefront windows.',
+    hint: 'Store lighting and automatic customer traffic: quiet mornings, busiest at sunset.',
   });
 
   registerSetting({
@@ -804,6 +803,16 @@ export function registerCoreSettings(): void {
 
   // T22: carried tapes + front-counter checkout. Default OFF until T23 ships
   // rental mode — when off, the instant play-from-the-shelf flow is untouched.
+  registerSetting({
+    key: 'bb_quick_playback',
+    label: 'Quick playback',
+    kind: 'toggle',
+    group: 'Store Look',
+    subpage: 'Browsing & Rentals',
+    default: false,
+    applyMode: 'live',
+    hint: 'Skip checkout and tape return animations. Return to your place on the shelf.',
+  });
   registerSetting({
     key: 'bb_carry_mode',
     label: 'Carry & checkout',

@@ -1,0 +1,8 @@
+{
+  "task_id": "01a10ef4-3237-7657-92d8-7a67fae5a5f3",
+  "status": "SUCCEEDED",
+  "source": "Meshy rigging delivery",
+  "idle": "Armature|clip0|baselayer: supplied neutral standing pose",
+  "walk": "Meshy rig-supplied basic walking",
+  "localBoneEdits": 0
+}

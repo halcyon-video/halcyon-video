@@ -1,0 +1,51 @@
+{
+  "TrussChord": {
+    "triangles": 40,
+    "manifold": true,
+    "vertices": 24,
+    "material": "StructuralPaint"
+  },
+  "TrussWeb": {
+    "triangles": 28,
+    "manifold": true,
+    "vertices": 16,
+    "material": "StructuralPaint"
+  },
+  "DuctSpan": {
+    "triangles": 92,
+    "manifold": true,
+    "vertices": 48,
+    "material": "DuctMetal"
+  },
+  "DuctCollar": {
+    "triangles": 92,
+    "manifold": true,
+    "vertices": 48,
+    "material": "DuctMetal"
+  },
+  "DuctElbow": {
+    "triangles": 620,
+    "manifold": true,
+    "vertices": 312,
+    "material": "DuctMetal"
+  },
+  "DuctStrap": {
+    "triangles": 164,
+    "manifold": true,
+    "vertices": 84,
+    "material": "DuctMetal"
+  },
+  "DuctOutlet": {
+    "triangles": 200,
+    "manifold": true,
+    "vertices": 120,
+    "material": "OutletRecess"
+  },
+  "resources": {
+    "bytes": 84260,
+    "triangles": 1236,
+    "textures": 0,
+    "parts": 7,
+    "materialRoles": 3
+  }
+}

@@ -1,3 +1,4 @@
+import { finishedPanelGeometry } from '../joinery-model';
 // Vestibule door builder (T05): one glass door leaf + its static frame,
 // honoring StorefrontSpec.doorStyle/doorWidth. Extracted out of the old
 // entrance.ts monolith's `buildSwingingDoor` closure so `doorStyle` can pick
@@ -65,7 +66,7 @@ export function buildVestibuleDoor(
   const barY = 3.4; // push-bar / handle height
 
   const box = (bw: number, bh: number, bd: number, mat: THREE.Material, x: number, y: number, z: number): THREE.Mesh => {
-    const m = new THREE.Mesh(new THREE.BoxGeometry(bw, bh, bd), mat);
+    const m = new THREE.Mesh(finishedPanelGeometry(bw, bh, bd), mat);
     m.position.set(x, y, z);
     m.castShadow = !(mat instanceof THREE.MeshPhysicalMaterial && (mat as THREE.MeshPhysicalMaterial).transparent);
     m.receiveShadow = true;
@@ -119,7 +120,7 @@ export function buildVestibuleDoor(
       // Vertical pull handles on both interior and exterior near the leaf's free edge (latch stile).
       const latchOffset = hingeOnLeftOrInner ? (w / 2 - 0.22) : -(w / 2 - 0.22);
       for (const zSide of [-0.09, 0.09]) {
-        const handleMesh = new THREE.Mesh(new THREE.BoxGeometry(0.06, 1.1, 0.08), chrome);
+        const handleMesh = new THREE.Mesh(finishedPanelGeometry(0.06, 1.1, 0.08), chrome);
         handleMesh.position.set(localOffset + latchOffset, barY, zSide);
         handleMesh.castShadow = true;
         handleMesh.receiveShadow = true;
@@ -156,7 +157,7 @@ export function buildVestibuleDoor(
     if (isSingle) {
       const latchOffset = hingeOnLeftOrInner ? (w / 2 - 0.22) : -(w / 2 - 0.22);
       for (const xSide of [-0.09, 0.09]) {
-        const handleMesh = new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.1, 0.06), chrome);
+        const handleMesh = new THREE.Mesh(finishedPanelGeometry(0.08, 1.1, 0.06), chrome);
         handleMesh.position.set(xSide, barY, localOffset + latchOffset);
         handleMesh.castShadow = true;
         handleMesh.receiveShadow = true;

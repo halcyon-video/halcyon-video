@@ -1,3 +1,4 @@
+import { finishedPanelGeometry, plaqueGeometry } from './joinery-model';
 // Freestanding aisle shelving (the double-sided gondola islands): white
 // shelves with pricing strips, trapezoid section dividers, centre backing
 // wall, per-section category signboards, and the blue/white end caps at the
@@ -283,6 +284,7 @@ export function buildAisleShelving(deps: AisleShelvingDeps): void {
       for (let i = 0; i < uv.count; i++) {
         uv.setXY(i, pos.getX(i) / w + 0.5, pos.getY(i) / h);
       }
+      geo = plaqueGeometry(geo,w,h,FLUSH_TOPPER_DEPTH,r);
       flushTopperGeos.set(key, geo);
     }
     return geo;
@@ -694,7 +696,7 @@ export function buildAisleShelving(deps: AisleShelvingDeps): void {
       // carries the no-feet ruling: it sits FLUSH on the shelf frame's top).
       const signWidth = TICKET_BOARD_W;
       const signHeight = TICKET_BOARD_H;
-      const signGeo = getBoxTemplate(TICKET_BOARD_T, signHeight, signWidth);
+      const signGeo = finishedPanelGeometry(TICKET_BOARD_T, signHeight, signWidth);
       const signMesh = new THREE.Mesh(signGeo, [
         getSectionLabelMat(plusXLabel),  // +X
         getSectionLabelMat(minusXLabel), // -X

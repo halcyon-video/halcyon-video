@@ -1,0 +1,13 @@
+{
+  "task_id": "01a10ef1-f157-71da-a6b3-abc6e8dc4028",
+  "status": "SUCCEEDED",
+  "consumed_credits": 9,
+  "request": {
+    "ai_model": "nano-banana-pro",
+    "prompt": "Edit only the BODY POSE of this exact full-body low-poly cartoon character. Preserve his exact head, face, eyes, smile, connected beard and moustache, wavy brown hair, classic collarless brown vest, maroon T-shirt, brown trousers, harness boots and left forearm skull tattoo. Place him in a relaxed upright symmetrical standing stance: low level shoulders, torso vertical, shoulder joints above hips, straight knees, parallel feet hip-width apart. Both upper arms hang almost vertically DOWN beside ribs, about 8 degrees away from the torso, with only a narrow visible gap for rigging. Straight relaxed elbows, palms face the sides of thighs, fingers point down. Both arms equal length and both hands level at mid thigh. Arms stay beside the body, neither behind it nor across stomach. Preserve original body proportions. Single character fully visible, head through boot soles, front view, plain light-gray background. No text. The exact SAME face and head must remain recognizable.",
+    "aspect_ratio": "3:4"
+  },
+  "references": [
+    "previous Meshy character front render"
+  ]
+}

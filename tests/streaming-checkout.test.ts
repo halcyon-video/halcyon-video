@@ -43,6 +43,12 @@ function createMockScene(extra: Record<string, any> = {}) {
   const carriedTapes: Movie[] = [];
   const scene: any = {
     mode: 'inspect',
+    pendingReturnDrop: [],
+    hideHeroCases() {}, resetHeroFace() {}, updateColsCount() {}, updateCameraTarget() {},
+    currentCameraPos: { copy() {} }, targetCameraPos: {},
+    currentLookAt: { copy() {} }, targetLookAt: {},
+    camera: { position: { copy() {} }, lookAt() {} },
+    getSelectedMovie() { return null; },
     isFlipped: false,
     heroFace: 0,
     heroSpine: false,
@@ -53,6 +59,7 @@ function createMockScene(extra: Record<string, any> = {}) {
       take(movie: Movie) {
         carriedTapes.push(movie);
         this.count = carriedTapes.length;
+        return 'ok';
       },
       topMovie() {
         return carriedTapes[carriedTapes.length - 1] ?? null;
@@ -346,7 +353,7 @@ test('handleStreamingBackTap: selects service row on tap and confirms on second 
   // Row 0 is at y≈230-258, Row 1 is at y≈258-286 on a 768-high canvas.
   // In UV coordinates: uv.y = 1 - (canvasY / 768).
   // For canvasY = 270 (row 1): uv.y = 1 - 270/768 ≈ 0.648.
-  const uvRow1 = { x: 0.2, y: 1 - 270 / 768 } as any;
+  const uvRow1 = { x: 0.5, y: 1 - 270 / 768 } as any;
 
   // First tap selects row 1
   assert.equal(handleStreamingBackTap(scene, uvRow1), true);
@@ -401,6 +408,7 @@ test('clearStreamingCheckoutMovie: falls back to clearAll when drop is not avail
       take(movie: Movie) {
         carriedTapes.push(movie);
         this.count = carriedTapes.length;
+        return 'ok';
       },
       topMovie() {
         return carriedTapes[carriedTapes.length - 1] ?? null;
@@ -600,8 +608,19 @@ test('streaming handoff occurs at exit completion, keeps physical tapes, and run
   const physical = createMockMovie({ id: 'physical-tape', streaming: false });
   scene.carried.take(physical);
   const navigations: string[] = [];
+  const elements: any[] = [];
+  const previousDocument = Object.getOwnPropertyDescriptor(globalThis, 'document');
+  Object.defineProperty(globalThis, 'document', { configurable: true, value: {
+    activeElement: null, getElementById: () => null,
+    body: { append: () => {} },
+    createElement: (tagName: string) => {
+      const element: any = { tagName, setAttribute() {}, addEventListener() {},
+        append() {}, showModal() {}, focus() {} };
+      elements.push(element); return element;
+    },
+  }});
   const previousWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
-  Object.defineProperty(globalThis, 'window', { configurable: true, value: { location: { assign: (url: string) => navigations.push(url) } } });
+  Object.defineProperty(globalThis, 'window', { configurable: true, value: { location: { assign: (url: string) => navigations.push(url) }, addEventListener() {} } });
   try {
     startStreamingServiceChoice(scene, movie);
     confirmStreamingServiceChoice(scene);
@@ -609,14 +628,20 @@ test('streaming handoff occurs at exit completion, keeps physical tapes, and run
     scene.checkoutRunning = true;
     scene.checkoutExit = { start: 0, ids: [] };
     assert.equal(completeStreamingCheckout(scene), true);
-    assert.deepEqual(navigations, [movie.streamingUrl]);
+    assert.deepEqual(navigations, [], 'checkout must preserve the store page');
+    const link = elements.find(element => element.tagName === 'a');
+    assert.equal(link.href, movie.streamingUrl);
+    assert.equal(link.target, '_blank');
+    assert.equal(link.rel, 'noopener noreferrer');
     assert.deepEqual(scene.carried.ids(), [physical.id]);
     assert.equal(scene.checkoutRunning, false);
     assert.equal(scene.checkoutExit, null);
-    assert.equal(scene.mode, 'overview');
+    assert.equal(scene.mode, 'browse');
     assert.equal(completeStreamingCheckout(scene), false);
-    assert.equal(navigations.length, 1);
+    assert.equal(elements.filter(element => element.tagName === 'dialog').length, 1);
   } finally {
+    if (previousDocument) Object.defineProperty(globalThis, 'document', previousDocument);
+    else Reflect.deleteProperty(globalThis, 'document');
     if (previousWindow) Object.defineProperty(globalThis, 'window', previousWindow);
     else Reflect.deleteProperty(globalThis, 'window');
   }
@@ -676,4 +701,56 @@ test('a cached Netflix search becomes an exact title link before carrying the mo
   assert.equal(confirmStreamingServiceChoice(scene), true);
   assert.equal(movie.streamingUrl, 'https://www.netflix.com/title/81278442');
   assert.equal(getStreamingCheckoutMovie(scene), movie);
+});
+
+test('a rejected streaming pickup preserves the service choice and the existing carried movie', () => {
+  for (const verdict of ['full', 'duplicate']) {
+    const messages: string[] = [];
+    const scene = createMockScene({onConsoleLog: (message: string) => messages.push(message)});
+    const physical = createMockMovie({id: 'already-carried', streaming: false});
+    scene.carried.take(physical);
+    const take = scene.carried.take.bind(scene.carried);
+    scene.carried.take = () => verdict;
+    const movie = createMockMovie({streamingServices: [
+      {id: 'netflix', name: 'NETFLIX', url: 'https://www.netflix.com/title/1'},
+      {id: 'prime', name: 'PRIME', url: 'https://www.amazon.com/gp/video'},
+    ]});
+    const original = {id: movie.streamingServiceId, name: movie.streamingServiceName, url: movie.streamingUrl};
+    startStreamingServiceChoice(scene, movie);
+    stepStreamingServiceChoice(scene, 1);
+    assert.equal(confirmStreamingServiceChoice(scene), false);
+    assert.equal(scene.mode, 'inspect');
+    assert.equal(scene.isFlipped, true);
+    assert.equal(getStreamingChoiceState(scene)?.selectedIndex, 1);
+    assert.equal(isStreamingChoiceActive(movie), true);
+    assert.equal(getStreamingCheckoutMovie(scene), null);
+    assert.deepEqual(scene.carried.ids(), [physical.id]);
+    assert.deepEqual({id: movie.streamingServiceId, name: movie.streamingServiceName, url: movie.streamingUrl}, original);
+    assert.ok(messages.at(-1)?.includes(verdict === 'full' ? 'hands are full' : 'already carrying'));
+    scene.carried.take = take;
+    assert.equal(confirmStreamingServiceChoice(scene), true, 'choice remains usable after the visitor makes room');
+    assert.equal(scene.mode, 'checkout');
+    clearStreamingCheckoutMovie(scene);
+  }
+});
+
+test('service taps require the printed row width in a cropped back panel', () => {
+  const scene = createMockScene(), movie = createMockMovie();
+  startStreamingServiceChoice(scene, movie);
+  getStreamingChoiceState(scene)!.services.push({id: 'prime', name: 'PRIME'});
+  const ctx: any = {save(){},restore(){},beginPath(){},moveTo(){},lineTo(){},stroke(){},fillText(){}};
+  drawStreamingChoiceOverlays(ctx, {imgW: 1024, imgH: 683, back: [.1,.05,.6,.95],
+    window: {x: 160, y: 140, width: 300, bottom: 389}}, movie);
+  const y = 1 - (250 / 683 - .05) / .9;
+  for (const x of [0, (159 / 1024 - .1) / .5, (461 / 1024 - .1) / .5, 1]) {
+    assert.equal(handleStreamingBackTap(scene, {x, y} as any), false);
+    assert.equal(getStreamingChoiceState(scene)?.selectedIndex, 0);
+    assert.equal(scene.mode, 'inspect');
+  }
+  const x = (300 / 1024 - .1) / .5;
+  assert.equal(handleStreamingBackTap(scene, {x, y} as any), true);
+  assert.equal(getStreamingChoiceState(scene)?.selectedIndex, 1);
+  assert.equal(handleStreamingBackTap(scene, {x, y} as any), true);
+  assert.equal(scene.mode, 'checkout');
+  clearStreamingCheckoutMovie(scene);
 });

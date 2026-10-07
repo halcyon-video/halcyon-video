@@ -1,3 +1,4 @@
+import { quickPlayback, rememberPlaybackPosition, restorePlaybackPosition } from './playback-position';
 import { installReelRecorder, refreshReelControls, toggleReelRecording, toggleReelCamera, stopReelRecording, reelRecordingActive } from './reel-recorder';
 import { paintStoreLoading, updateStoreLoading, showStoreLoadingFailure } from './store-loading';
 import { mobileStoreActive } from './mobile-store';
@@ -152,10 +153,11 @@ import {
   EMBLEM_OPEN_ROW_KEY, isEmblemStudioOpen,
 } from './emblem-editor';
 import {
-  counterTerminalClose, counterTerminalInput, counterTerminalOpen, initCounterTerminalFlow,
+  counterTerminalClose, counterTerminalInput, counterTerminalOpen, counterTerminalOpenPage, initCounterTerminalFlow,
 } from './counter-terminal-flow';
 import { PROJECT_PAGE_BUTTON_ID, PROJECT_PAGE_URL, counterTerminalRows } from './counter-terminal';
 import { SettingsSurface } from './settings-surface';
+import { GROUP_HINTS, SUBPAGE_HINTS, SETTINGS_ACTIONS } from './settings-navigation';
 import { buildControlsHelpPanel, HELP_ROW_PREFIX } from './controls-help';
 import type { CandyRow } from './fixtures/period-fixtures';
 import { getCandyDeliveryAdapter } from './candy-delivery';
@@ -672,8 +674,8 @@ const ui = {
 let powerMenuIndex = 0;
 // Demo mode replaces the unusable logout/exit rows with the standing project route (#133).
 const powerButtons = isDemoMode
-  ? ['btn-settings', 'btn-controls', 'btn-flat-mode', 'btn-suspend', 'btn-cec-toggle', PROJECT_PAGE_BUTTON_ID, 'btn-cancel']
-  : ['btn-settings', 'btn-controls', 'btn-flat-mode', 'btn-suspend', 'btn-cec-toggle', 'btn-logout', 'btn-exit', 'btn-cancel'];
+  ? ['btn-settings', 'btn-suspend', 'btn-cec-toggle', PROJECT_PAGE_BUTTON_ID, 'btn-cancel']
+  : ['btn-settings', 'btn-suspend', 'btn-cec-toggle', 'btn-logout', 'btn-exit', 'btn-cancel'];
 
 // The single CEC row toggles the display: we track the last state WE commanded
 // (there's no CEC status read-back) and alternate standby/wake. If reality
@@ -1139,27 +1141,6 @@ let settingsPage: SettingGroup | 'Controls' | null = null;
 const settingsSurface = new SettingsSurface();
 let settingsSubpage: string | null = null;
 
-/** One-line blurbs under each category row on the index page. */
-const GROUP_HINTS: Record<SettingGroup, string> = {
-  'Store Look': 'Theme, shelf arrangement, and store layout.',
-  'Store Brand': 'Design your own video-store logo and signage.',
-  'Playback': 'Audio language, captions, and candy delivery.',
-  'Video Games': 'Enable the game section and pick platforms.',
-  'Performance': 'Graphics quality, render mode, FPS cap and counter.',
-  'Connection': 'Media server, Jellyseerr and Romm servers.',
-};
-
-/** One-line blurbs under each sub-page's "›" row on its group page. */
-const SUBPAGE_HINTS: Record<string, string> = {
-  'Movie Cases': 'Media format, rental case art, and cover designs.',
-  'Color & Lighting': 'Color response, warmth, and film look.',
-  'Browsing & Rentals': 'Entrance view and rental behavior.',
-  'Building & Storefront': 'Ceiling, corner step, walls, bulbs, storefront style.',
-  'Platforms': 'Which consoles get a section on the Video Games shelf.',
-  'Store Libraries': 'Which server libraries this store carries as aisles.',
-  'Overhead TVs': 'Which libraries feed the ceiling TVs. All off = family picks.',
-};
-
 /** Build the drawer DOM for the current page. Rows are updated in place. */
 function generateSettingsDrawer() {
   const groupsEl = document.getElementById('settings-groups');
@@ -1355,6 +1336,8 @@ function generateSettingsDrawer() {
     } else if (settingsSubpage !== null) {
       for (const def of settingsInSubpage(settingsPage, settingsSubpage)) appendDefRow(def);
     } else {
+      for (const action of SETTINGS_ACTIONS.filter(a => a.group === settingsPage && getSetting<string>('bb_render_mode') !== 'flat'))
+        groupEl.appendChild(makeRow(action.id, action.label, action.hint, '›'));
       // Group page: plain rows in registration order, with each sub-page
       // collapsed into a single "<name> ›" row at its first member's slot.
       const subpagesSeen = new Set<string>();
@@ -1491,6 +1474,13 @@ function activateSetting(key: string, dir: number) {
   if (key.startsWith(BRAND_ROW_PREFIX)) {
     // Store Brand rows carry their own controls; settings.ts routes dir.
     activateBrandRow(key, dir);
+    return;
+  }
+  const action = SETTINGS_ACTIONS.find(a => a.id === key);
+  if (action) {
+    if (dir < 0) return;
+    void Promise.resolve(closeSettingsDrawer(false)).then(() =>
+      counterTerminalOpenPage(action.id, () => openSettingsDrawer(action.group)));
     return;
   }
   const def = allSettings().find((d) => d.key === key);
@@ -1699,12 +1689,11 @@ function closeSettingsDrawer(returnToTerminal = true) {
     settingsPendingGameRefetch = false;
     logToConsole('[Settings] Restarting to apply settings...', 'system');
     showBootOverlay();
-    void finishConnectionEditsAndReload();
-    return;
+    return finishConnectionEditsAndReload();
   }
   if (settingsPendingRebuild) {
     settingsPendingRebuild = false;
-    rebuildStoreScene();
+    return rebuildStoreScene();
   }
 }
 
@@ -2084,7 +2073,7 @@ async function resolvePlayVersion(movie: Movie): Promise<MovieVersion | null | u
 // skip; either way onDone() (the actual rental/playback kickoff) runs once
 // the screen closes.
 function maybeRunCandyCheckout(onDone: () => void) {
-  if (!getSetting<boolean>('candy_delivery_enabled')) {
+  if (quickPlayback() || !getSetting<boolean>('candy_delivery_enabled')) {
     onDone();
     return;
   }
@@ -3103,6 +3092,7 @@ function handleGapDismiss() {
  * Plays checkout chime when rental goes through. Never throws.
  */
 async function handleGameLaunch(movie: Movie, startHidden = false, fromCouch = false) {
+  if (storeScene && !fromCouch) rememberPlaybackPosition(storeScene);
   if (movie.steamAppId) { await playSteamGame(movie, (message) => logToConsole(`[Steam] ${message}`, 'system')); return; }
   if (isDemoMode) {
     openDemoPlaybackOverlay(movie.title, startHidden, 'game', fromCouch);
@@ -3275,13 +3265,14 @@ function finishPlayback(movie: Movie, fromCouch: boolean): void {
     return;
   }
   storeScene?.resumeAmbientTvs();
-  storeScene?.returnToEntrance();
+  if (storeScene) restorePlaybackPosition(storeScene);
   updateMovieHUD(storeScene?.getSelectedMovie() || null);
-  logToConsole(`[Video] Stopped "${movie.title}". Returned through the entrance.`, 'video');
+  logToConsole(`[Video] Stopped "${movie.title}". Returned to the shelf.`, 'video');
 }
 
 export async function launchVideoPlayback(movie: Movie, overrideItemId?: string, overridePath?: string, startHidden = false, fromCouch = false, version?: MovieVersion) {
   if (storeScene?.reelMode) { showClerkToast('Movie playback is off in Reel Recording Mode.'); return; }
+  if (storeScene && !fromCouch) rememberPlaybackPosition(storeScene);
   // Every entry point, including home rentals and the flat catalog, must
   // dispatch games before any media-server lookup or movie player is opened.
   if (movie.game || movie.steamAppId) {
@@ -3698,6 +3689,7 @@ initDemoPlayback({
   ui,
   scene: () => storeScene,
   log: logToConsole,
+  returnToStore: () => { if (storeScene) restorePlaybackPosition(storeScene); },
   onClosed: () => updateMovieHUD(storeScene?.getSelectedMovie() || null),
 });
 

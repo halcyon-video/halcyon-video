@@ -17,7 +17,8 @@ export function buildParkingLot(parent: THREE.Group, p: ParkingLayout, sidewalkM
     for (let i=0; i<pos.count; i++) {
       // Every concrete surface shares the entrance's existing slab texture.
       const repeat = mat === sidewalkMat ? sidewalkMat.map?.repeat : null;
-      uv.setXY(i, pos.getX(i)/4.5/(repeat?.x || 1), -pos.getZ(i)/4.5/(repeat?.y || 1));
+      const tileSize=mat===asphaltMat?8:4.5;
+      uv.setXY(i, pos.getX(i)/tileSize/(repeat?.x || 1), -pos.getZ(i)/tileSize/(repeat?.y || 1));
     }
     const list = batches.get(mat) || []; list.push(geo); batches.set(mat, list);
   }
@@ -118,7 +119,7 @@ export function buildParkingLot(parent: THREE.Group, p: ParkingLayout, sidewalkM
     const merged=mergeGeometries(expanded);
     new Set([...geos,...expanded]).forEach(g=>g.dispose());
     if(!merged) throw new Error('Parking surface batch failed');
-    const mesh=new THREE.Mesh(track(merged),mat);mesh.receiveShadow=true;group.add(mesh);
+    const mesh=new THREE.Mesh(track(merged),mat);mesh.receiveShadow=true;mesh.userData.photographicGroundSurface=mat!==shadows;group.add(mesh);
   }
   return {setGroundColor: pavement.setColor, dispose(){owned.forEach(o=>o.dispose());group.removeFromParent();}};
 }

@@ -1,14 +1,16 @@
 {
   "idle": {
     "samples": 41,
-    "maximumFloorErrorFeet": 0.0
+    "maximumFloorErrorFeet": 0.0,
+    "minimumPalmMedialAlignment": 0.9982008355436847
   },
   "walk": {
     "samples": 41,
-    "maximumFloorErrorFeet": 2.9802322387695312e-08
+    "maximumFloorErrorFeet": 2.9802322387695312e-08,
+    "minimumPalmMedialAlignment": 0.897963940165937
   },
   "exports": {
-    "polo": 12509788,
-    "oxford": 12527264
+    "polo": 12511840,
+    "oxford": 12529308
   }
 }

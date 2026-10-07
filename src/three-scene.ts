@@ -21,7 +21,7 @@ import { fitSteppedCornerDepth } from './stepped-corner-clearance';
 import { placementBudget } from './progressive-placement';
 import { tickShelfVisibility, disposeShelfVisibility } from './shelf-visibility';
 import { mobileWalkInput } from './mobile-walk';
-import { mobileStoreActive, mobileStoreTap, mobileArtworkTick } from './mobile-store';
+import { mobileStoreActive, mobileStoreTap } from './mobile-store';
 import * as THREE from 'three';
 import { paintStoreLoading } from './store-loading';
 import { installDirectLightVisibility } from './direct-light-visibility';
@@ -146,6 +146,7 @@ import { SurfaceRegistry } from './mount-surfaces';
 import { GondolaMaterials } from './shelving';
 import { StoreClerk } from './clerk';
 import { StoreCustomers } from './store-customers';
+import { refreshStoreCustomers } from './store-customer-flow';
 import { ClerkNavGrid, NavRect } from './clerk-nav';
 import { setMaxAnisotropy, setCheapMaterials } from './canvas-textures';
 import { readCalibratedQuality, usesPhoneQualityDefault } from './quality-calibrate';
@@ -2798,9 +2799,11 @@ export class StoreScene {
   }
 
   public setOutsideMode(mode: OutsideMode) {
+    const changed = mode !== this.getOutsideMode();
     this.requestRender();
     this.outdoor.setOutsideMode(mode);
     this.exterior?.setOutsideMode(mode);
+    if (changed) refreshStoreCustomers(this);
   }
 
   // Runs once per scene build (called from buildStore(), right after every
@@ -3065,7 +3068,7 @@ export class StoreScene {
 
 
   // Camera settings transitions based on interaction states (standardized to feet, shelf-relative)
-  public updateLOD() { return stock.updateLOD(this); }
+  public updateLOD(): boolean { return stock.updateLOD(this); }
 
   // Dump-tub (bargain bin) browsing, in one place.
   //
@@ -4581,7 +4584,6 @@ export class StoreScene {
       this.camera.position.copy(this.currentCameraPos);
       this.camera.lookAt(this.currentLookAt);
     }
-    mobileArtworkTick(this, time);
     tickShelfVisibility(this, time);
     if (this.headlight) {
       this._headlightOffset.set(2.0, 1.5, 0);

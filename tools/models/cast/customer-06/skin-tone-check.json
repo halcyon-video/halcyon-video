@@ -1,0 +1,12 @@
+{
+  "method": "Ten percent RGB brightness reduction limited to existing peach skin colors; original dimensions, spatial placement and every unselected pixel preserved.",
+  "requiresOwnerException": true,
+  "inputSize": [
+    4096,
+    4096
+  ],
+  "skinPixels": 2736122,
+  "unselectedPixelsByteExact": true,
+  "sourceSha256": "af22e0a6ba3c63208932dcb565f84b64397f184b3a7dcbfc7cdcc40287d6eb51",
+  "outputSha256": "d6cc2463226b7f2f037ab9375a30a250ecda2deab98c01407d87806ec99506a3"
+}

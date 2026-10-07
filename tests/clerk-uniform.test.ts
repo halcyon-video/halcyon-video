@@ -2,10 +2,14 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { resolveClerkUniform, recolorClerkPixels } from '../src/clerk-uniform.ts';
 
-test('uniform selection tolerates missing and stale stored choices', () => {
+test('store era selects Oxford for 1990 and 1993, then polo', () => {
   assert.equal(resolveClerkUniform(null), 'polo');
   assert.equal(resolveClerkUniform('unknown'), 'polo');
-  assert.equal(resolveClerkUniform('oxford'), 'oxford');
+  assert.equal(resolveClerkUniform('bb-1990'), 'oxford');
+  assert.equal(resolveClerkUniform('bb-1993'), 'oxford');
+  assert.equal(resolveClerkUniform('bb-2000'), 'polo');
+  assert.equal(resolveClerkUniform('bb-2010'), 'polo');
+  assert.equal(resolveClerkUniform('oxford'), 'polo');
 });
 test('brand changes leave skin, khakis, and transparency untouched', () => {
   const pixels = new Uint8ClampedArray([178,123,80,255, 140,115,72,255, 200,200,200,0]);

@@ -1,3 +1,4 @@
+import { quickPlayback, rememberPlaybackPosition } from './playback-position';
 import { CANDY_CARTON_BAG, candyCartonFinishes, upgradeCandyCartonGeometry } from './fixtures/candy-carton';
 import { vestibuleLayout, vestibuleSide } from './vestibule-layout.ts';
 // Checkout & carry flow — extracted from StoreScene (three-scene.ts keeps
@@ -176,6 +177,7 @@ export function takeTapeIntoCarry(scene: StoreScene, movie: Movie, slot: MovieSl
     showClerkToast(`You've already got "${movie.title}" right there in your hands.`);
     return false;
   }
+  rememberPlaybackPosition(scene);
   const startPose = slot ? scene.slotBackBoxPose(slot) : null;
   carried.take(movie, slot?.key ?? null, startPose, performance.now());
   retailAudio.playBoxPickup();
@@ -376,6 +378,7 @@ export function confirmCheckout(scene: StoreScene): boolean {
       return false;
     }
   }
+  if (quickPlayback() && !scene.reelMode) { scene.finishCheckout(carried.carryIds()); return true; }
   const now = performance.now();
   const bag = scene.entrance?.bagMouthWorld ??
     _checkoutBagFallback.set(11.0, 3.9, scene.deskApexZ() + 3.0);

@@ -17,8 +17,8 @@ import { isExternalGameActive, onExternalGameChange } from './external-game-stat
 // two modules don't form a cycle.
 
 import * as THREE from 'three';
-import { perfTrace, perfSlot } from './perf-trace';
-import { drainUploadSteps, type UploadStep } from './upload-budget';
+import { perfTrace, perfSlot } from './perf-trace.ts';
+import { drainUploadSteps, type UploadStep } from './upload-budget.ts';
 
 const SP_UPLOAD = perfSlot('texUploadMs');  // uploadTextureNow (initTexture + mipmaps)
 const CT_UPLOAD = perfSlot('texUploadN');
@@ -666,6 +666,7 @@ export function invalidatePosterLayers() {
 }
 
 class TextureArrayManager {
+  private allocationGeneration = 0;
   private movieToIndex = new Map<string, number>();
   private nextIndex = 0;
   public maxMovies = 0;
@@ -762,6 +763,7 @@ class TextureArrayManager {
       return;
     }
 
+    this.allocationGeneration++;
     // Release the previous allocation before reallocating. Without this, a
     // no-reload scene rebuild leaks the old DataArrayTextures on the GPU every
     // time (they'd fail the 5x-rebuild memory baseline test).
@@ -894,6 +896,18 @@ class TextureArrayManager {
     for (const mat of caseMaterialUniformProvider?.() ?? []) updateUniforms(mat);
   }
 
+  /** Full teardown releases CPU mirrors as well as GPU objects; rebuilds keep them. */
+  public dispose(): void {
+    this.allocationGeneration++;
+    this.lowResArray?.dispose(); this.highResArray?.dispose(); this.loadedFlagsTexture?.dispose();
+    this.lowResArray = null; this.highResArray = null; this.loadedFlagsTexture = null; this.loadedFlags = null;
+    this.movieToIndex.clear(); this.lowResUploaded.clear(); this.highResQueued.clear();
+    this.nextIndex = 0; this.maxMovies = 0; this.lowResBase = 0; this.unpaintedIndex = 0;
+    this.shortfall = 0; this.layerBudget = 0; this.layerBudgetWarned = false;
+    invalidatePosterLayers();
+    this.bindUniforms();
+  }
+
   public getIndex(movieId: string): number {
     if (this.movieToIndex.has(movieId)) {
       return this.movieToIndex.get(movieId)!;
@@ -971,7 +985,9 @@ class TextureArrayManager {
     if (this.isHighBank(idx) && this.lowResBase !== 0) return;
     if (this.lowResUploaded.has(idx)) return;
     this.lowResUploaded.add(idx);
+    const generation = this.allocationGeneration;
     queueTextureUpload(() => {
+      if (generation !== this.allocationGeneration) return;
       const r = getUploadRenderer();
       if (r) this.updateLowRes(r, movieId, pixelData);
       this.setLowResLoaded(movieId, true);
@@ -988,11 +1004,13 @@ class TextureArrayManager {
     if (!force && this.highResQueued.has(idx)) return;
     if (!force && this.loadedFlags && this.loadedFlags[idx] >= 255) return;
     this.highResQueued.add(idx);
+    const generation = this.allocationGeneration;
     let stream: Generator<void> | null = null;
     let target: THREE.DataArrayTexture | null = null;
     let owner: THREE.WebGLRenderer | null = null;
     let layer = -1;
     queueTextureUpload(() => {
+      if (generation !== this.allocationGeneration) return;
       const r = getUploadRenderer();
       // Rebuilds can replace the renderer/array between slices. Restart against
       // the current allocation and resolve the movie index again, never publish

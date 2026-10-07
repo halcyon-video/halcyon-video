@@ -1,0 +1,60 @@
+# Gumball machine
+
+An original, unbranded spiral dispenser ships as `public/models/gumball-machine.glb`.
+Its editable source and reproducible Blender mesh authoring script live in
+`tools/models/gumball-machine.blend` and `tools/models/gumball-machine.py`.
+The public design has a barrel hopper, rounded coin cabinet and a squat plinth.
+Installed private models can replace it through
+`public/user-assets/fixtures/gumball-machine/machine.glb`; private references and
+reconstructions remain outside Git.
+
+Scene units are feet. Ground origin is the center of the plinth. Runtime height is 4 ft, slightly
+below the standard 4.6-ft shelf frame, with a maximum radius of 0.764 ft.
+The editable public and private source models retain their 5.5-ft authoring
+envelope; the loader and built-in fallback uniformly scale by 4/5.5. Collision
+and placement use the scaled envelope. Blender X maps to store X, Blender -Y to store +Z and
+Blender Z to store height. The coin mechanism and delivery door face local +Z.
+Named `Enamel` and `ClearPlastic` finishes are replaced at runtime; enamel uses
+the active store palette. Thin transparent plastic uses 0.045 opacity and 0.07 roughness, retaining
+subtle highlights while revealing the gumballs and spiral through the shell.
+It uses alpha blending without
+a full-scene refraction render. The helical chute is a solid trough with raised
+edges, and gumballs use a fixed seed. All generated parts carry UVs.
+
+`store-gumball.ts` reads the built games department and games-only plan shelves.
+The deepest world-Z shelf wins; joined ends and wall-facing ends are excluded.
+The exposed end nearer the counter receives the machine, with its coin face
+turned away from its host into the open customer aisle at a multiple of 45
+degrees. Each placement records a customer standing point in front of the gray
+coin mechanism. Counter placements similarly face the customer side, outside
+the counter body. With no game shelves,
+the machine stands beside the shield counter's center peak, entranceward along
+its right shoulder; flat and standalone counters have corresponding anchors.
+Door depth follows the shared vestibule datum.
+
+The existing detail loader controls queued loading, fallback visibility, shadow
+refresh and cancellation. One cylindrical collision proxy remains through model
+replacement. The floor-plan footprint is the conservative 1.527 ft square, classified
+as an attached structure so it does not demand a walking lane through its host.
+The fixture enters the scene's owned fixture lifecycle and releases its model,
+fallback, materials and proxy when the store is rebuilt or disposed.
+
+Verification: unit coverage of joined/deepest/wall shelves, input-order stability,
+counter shapes and door depth; full build and test suite; exported bounds, UVs
+and manifold solids; isolated fixture views and both placement rules in the store.
+
+The globe carries the active configured store emblem as a small curved sticker.
+`gumball-logo.ts` paints the canonical `getActiveLogoSpec` through `drawLogo`,
+retaining text, colors, silhouette, composed emblem and installed brand artwork.
+It trims the painter's transparent margins and contains the complete mark within
+an envelope 39% of the hopper diameter wide, with a 5:3 width-to-height ratio;
+unusual logo shapes retain their proportions. A static 24-by-16 mesh projects
+onto the actual front glass, so the spherical fallback, public barrel and private
+replacement each keep their own curvature. No source model or glass finish changes.
+Brand edits reuse one canvas texture; canonical image and bundled font readiness repaint the mark,
+and fixture teardown unregisters the listener and disposes decal resources.
+
+Logo verification additionally covers frontal and oblique views of both model
+paths, the built-in fallback, live text/color/emblem changes, installed image
+artwork, and teardown during asynchronous detail/font preparation. Public
+photographs must still be captured with user assets absent.

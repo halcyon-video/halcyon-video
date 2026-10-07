@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { registerBrandRepaint } from './brand-live';
 import { getActiveTheme } from './themes';
 import { formatShelfWood } from './format-surfaces';
+import { WOOD_GRAIN_FLAG } from './wood-shelf-model';
 
 // ── The one chokepoint every sign mesh goes through ────────────────────────
 //
@@ -436,6 +437,7 @@ export function createLibraryEndCapMaterial(isBack: boolean = false): THREE.Mesh
         roughness: sideRoughness,
         metalness: sideMetalness
       });
+  if (wood) sideMat.userData[WOOD_GRAIN_FLAG] = true;
 
   if (isBack) {
     return [sideMat, sideMat, sideMat];

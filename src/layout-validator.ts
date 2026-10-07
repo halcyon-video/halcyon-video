@@ -86,8 +86,8 @@ function localAxes(fp: Footprint): { x: number; z: number }[] {
 }
 
 // Half-extent of `fp` as measured along an arbitrary (unit) world-space axis.
-function projectHalfExtent(fp: Footprint, axis: { x: number; z: number }): number {
-  const [ax, az] = localAxes(fp);
+function projectHalfExtent(fp: Footprint, axes: { x: number; z: number }[], axis: { x: number; z: number }): number {
+  const [ax, az] = axes;
   return Math.abs((fp.w / 2) * (ax.x * axis.x + ax.z * axis.z))
        + Math.abs((fp.d / 2) * (az.x * axis.x + az.z * axis.z));
 }
@@ -100,15 +100,15 @@ function projectHalfExtent(fp: Footprint, axis: { x: number; z: number }): numbe
 // If any axis separates them, they don't intersect (reported gap = the
 // largest per-axis separation found, a lower bound on — and in the common
 // edge-aligned case, equal to — the true minimum distance between them).
-function satOverlap(a: Footprint, b: Footprint): { overlaps: boolean; depth: number; gap: number } {
+function satOverlap(a: Footprint, b: Footprint, aAxes: { x: number; z: number }[], bAxes: { x: number; z: number }[]): { overlaps: boolean; depth: number; gap: number } {
   const dx = b.cx - a.cx, dz = b.cz - a.cz;
-  const axes = [...localAxes(a), ...localAxes(b)];
   let separated = false;
   let maxGap = 0;
   let minDepth = Infinity;
-  for (const axis of axes) {
+  for (let i = 0; i < 4; i++) {
+    const axis = i < 2 ? aAxes[i] : bAxes[i - 2];
     const centerDist = Math.abs(dx * axis.x + dz * axis.z);
-    const totalHalf = projectHalfExtent(a, axis) + projectHalfExtent(b, axis);
+    const totalHalf = projectHalfExtent(a, aAxes, axis) + projectHalfExtent(b, bAxes, axis);
     const overlapOnAxis = totalHalf - centerDist;
     if (overlapOnAxis < 0) {
       separated = true;
@@ -142,6 +142,12 @@ export function validateLayout(
 ): LayoutViolation[] {
   const minWalkway = opts?.minWalkway ?? 1.5;
   const violations: LayoutViolation[] = [];
+
+  // A footprint's orientation is constant throughout one validation. Reusing
+  // its axes avoids ten trigonometric/array rebuilds for every object pair.
+  // Keep this cache local: callers may move or rotate the same objects later.
+  const axes = footprints.map(localAxes);
+  const radii = footprints.map(fp => Math.hypot(fp.w / 2, fp.d / 2));
 
   // 1. Bounds: does any corner poke past a wall? Report the worst penetration
   // per wall per footprint (not per corner, so a fully-outside rect reports
@@ -188,11 +194,21 @@ export function validateLayout(
     }
   }
 
-  // 2. Pairwise overlap + walkway clearance, O(n^2) over ~50 rects, once per build.
+  // 2. Pairwise overlap + walkway clearance, once per build.
   for (let i = 0; i < footprints.length; i++) {
     for (let j = i + 1; j < footprints.length; j++) {
       const a = footprints[i], b = footprints[j];
-      const result = satOverlap(a, b);
+      const walkwayApplies =
+        WALKWAY_KINDS.has(a.kind) && WALKWAY_KINDS.has(b.kind) && !(a.kind === 'shelving' && b.kind === 'shelving');
+      const required = Math.max(walkwayApplies ? minWalkway : 0, a.clearance ?? 0, b.clearance ?? 0);
+      // One of a rectangle's two perpendicular axes projects at least 1/sqrt(2)
+      // of the centre distance. Each projected half-extent is at most its
+      // bounding radius, so this conservative test proves a SAT gap greater
+      // than the requested clearance. Nearby pairs still use the exact SAT.
+      const farEnough = Math.SQRT2 * (radii[i] + radii[j] + required + TOUCH_TOL);
+      const dx = b.cx - a.cx, dz = b.cz - a.cz;
+      if (dx * dx + dz * dz > farEnough * farEnough) continue;
+      const result = satOverlap(a, b, axes[i], axes[j]);
       if (result.overlaps) {
         if (result.depth > TOUCH_TOL) {
           violations.push({ severity: 'error', a: a.label, b: b.label, message: `overlaps by ${result.depth.toFixed(2)} ft` });
@@ -203,13 +219,6 @@ export function validateLayout(
         // design); an explicit per-footprint clearance (floor displays/bins)
         // applies against EVERYTHING, counter structure included, and takes
         // the larger of the two demands.
-        const walkwayApplies =
-          WALKWAY_KINDS.has(a.kind) && WALKWAY_KINDS.has(b.kind) && !(a.kind === 'shelving' && b.kind === 'shelving');
-        const required = Math.max(
-          walkwayApplies ? minWalkway : 0,
-          a.clearance ?? 0,
-          b.clearance ?? 0,
-        );
         if (required > 0 && result.gap > TOUCH_TOL && result.gap < required) {
           violations.push({ severity: 'warn', a: a.label, b: b.label, message: `only ${result.gap.toFixed(2)} ft clearance (min ${required.toFixed(1)} ft)` });
         }

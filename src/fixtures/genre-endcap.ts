@@ -1,3 +1,4 @@
+import { finishedPanelGeometry } from '../joinery-model';
 // The staff-picks genre endcap: a shallow display shelf butted flush against
 // the entrance-facing END of an aisle run, stocked by the staff-picks engine
 // (staff-picks.ts) with watch-history recommendations for THAT run's genre —
@@ -248,7 +249,7 @@ export function buildEndcapFooter(
     // Print on +Z only; the white lip on +Y survives the dressing.
     mats = [body, body, topLip, body, front, body];
   }
-  const plinth = new THREE.Mesh(new THREE.BoxGeometry(w, ENDCAP_FOOTER_H, d), mats);
+  const plinth = new THREE.Mesh(finishedPanelGeometry(w, ENDCAP_FOOTER_H, d), mats);
   plinth.position.set(0, ENDCAP_FOOTER_H / 2, zBack + d / 2);
   plinth.castShadow = true;
   plinth.receiveShadow = true;

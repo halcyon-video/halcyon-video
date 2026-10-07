@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { tickShelfVisibility, disposeShelfVisibility, initializeHiddenShelfInstances } from '../src/shelf-visibility.ts';
+import { tickShelfVisibility, disposeShelfVisibility, initializeHiddenShelfInstances, invalidateShelfVisibility, finishShelfPromotionScan } from '../src/shelf-visibility.ts';
 
 test('visible shelf artwork survives old distance cutoffs and camera zoom', () => {
   const material = new THREE.MeshStandardMaterial();
@@ -65,4 +65,44 @@ test('unplaced stock does not poison the bounds of partly populated shelves', ()
     new THREE.Matrix4().multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
   assert.equal(frustum.intersectsObject(mesh), true);
   geometry.dispose(); material.dispose();
+});
+
+
+test('a completed stationary view parks scans and invalidates on movement, zoom and stock', () => {
+  let loads = 0;
+  const camera = new THREE.PerspectiveCamera(60, 1, .1, 100);
+  const scene = { camera, selectedLibraryIdx: 0, slotsByPosition: new Map([['a', {}]]),
+    unitSideFrontMeshMap: new Map(), unitSideBackMeshMap: new Map(),
+    updateLOD: () => { loads++; finishShelfPromotionScan(scene as any, false); return false; }, requestRender: () => {} };
+  tickShelfVisibility(scene as any, 0);
+  for (let time = 100; time <= 10_000; time += 100) tickShelfVisibility(scene as any, time);
+  assert.equal(loads, 1, '100 idle ticks must not rescan the catalog');
+  let time = 10_100;
+  const rescan = () => { tickShelfVisibility(scene as any, time); time += 100; };
+  camera.position.x = 1; rescan(); assert.equal(loads, 2);
+  camera.rotation.y = .25; rescan(); assert.equal(loads, 3);
+  camera.fov = 40; camera.updateProjectionMatrix(); rescan(); assert.equal(loads, 4);
+  scene.slotsByPosition.set('b', {}); rescan(); assert.equal(loads, 5);
+  scene.selectedLibraryIdx = 1; rescan(); assert.equal(loads, 6);
+  invalidateShelfVisibility(scene as any); rescan(); assert.equal(loads, 7, 'same-count restocks invalidate');
+  rescan(); assert.equal(loads, 7);
+  disposeShelfVisibility(scene as any);
+});
+
+test('bounded promotion batches drain without camera motion and explicit scans resume draining', () => {
+  let remaining = 70, loads = 0;
+  const camera = new THREE.PerspectiveCamera();
+  const scene = { camera, selectedLibraryIdx: 0, slotsByPosition: new Map(),
+    unitSideFrontMeshMap: new Map(), unitSideBackMeshMap: new Map(),
+    updateLOD: () => { loads++; const batch = Math.min(24, remaining); remaining -= batch;
+      finishShelfPromotionScan(scene as any, batch === 24); return batch === 24; },
+    requestRender: () => {} };
+  for (let time = 0; time <= 1000; time += 100) tickShelfVisibility(scene as any, time);
+  assert.equal(remaining, 0); assert.equal(loads, 3);
+  remaining = 50;
+  camera.updateMatrixWorld();
+  scene.updateLOD();
+  for (let time = 1100; time <= 2000; time += 100) tickShelfVisibility(scene as any, time);
+  assert.equal(remaining, 0); assert.equal(loads, 6, 'explicit scans remain effective and hand pending batches to the scheduler');
+  disposeShelfVisibility(scene as any);
 });

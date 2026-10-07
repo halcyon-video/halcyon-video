@@ -81,6 +81,7 @@ export interface CounterTerminalDeps {
 let deps: CounterTerminalDeps | null = null;
 let mode: 'menu' | 'date' | 'streaming' | 'tvs' = 'menu';
 let menuIndex = 0;
+let pageReturn: (() => void) | null = null;
 let dateState: MediaDateScreenState | null = null;
 let streamingState: SetupScreen | null = null;
 let tvState: TvProgramScreen | null = null;
@@ -195,9 +196,26 @@ export function counterTerminalOpen(): void {
   deps.log('[Terminal] Manager terminal open at the counter.');
 }
 
+/** Settings actions share the existing keyboard-friendly terminal editors. */
+export function counterTerminalOpenPage(id: string, onBack: () => void): void {
+  counterTerminalOpen();
+  if (!deps?.ui.isCounterTerminalOpen) return;
+  pageReturn = onBack;
+  if (id === STREAMING_BUTTON_ID) enterStreamingScreen();
+  else if (id === MEDIA_DATE_BUTTON_ID) enterDateScreen();
+  else enterTvScreen();
+}
+function returnFromPage(): void {
+  if (!pageReturn) { render(); return; }
+  const back = pageReturn;
+  counterTerminalClose();
+  back();
+}
+
 export function counterTerminalClose(): void {
   if (!deps || !deps.ui.isCounterTerminalOpen) return;
   leaveSubScreens();
+  pageReturn = null;
   deps.ui.isCounterTerminalOpen = false;
   // Hands the camera back and resets the CRT to its idle rental screen.
   deps.scene()?.exitSearchMode();
@@ -265,7 +283,7 @@ export async function counterTerminalInput(kind: MediaDateKey): Promise<void> {
       await deps.rebuild();
       return;
     }
-    if (action === 'back') leaveTvScreen();
+    if (action === 'back') { leaveTvScreen(); returnFromPage(); return; }
     render();
     return;
   }
@@ -276,7 +294,7 @@ export async function counterTerminalInput(kind: MediaDateKey): Promise<void> {
     // a sub-screen and Back means "up a level" — the menu it opened from.
     if (kind === 'back') {
       leaveStreamingScreen();
-      render();
+      returnFromPage();
       return;
     }
     const { state, action } = setupScreenKey(streamingState, kind);
@@ -294,7 +312,7 @@ export async function counterTerminalInput(kind: MediaDateKey): Promise<void> {
     if (action === 'clear') return clearPin();
     if (action === 'back') {
       leaveDateScreen();
-      render();
+      returnFromPage();
       return;
     }
     render();

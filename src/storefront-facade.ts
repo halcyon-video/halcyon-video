@@ -1,3 +1,4 @@
+import { copingGeometry } from './joinery-model';
 import { buildWallCourtesyTelephone } from './fixtures/wall-courtesy-telephone';
 import { installDisplayModel } from './fixtures/display-model';
 import { buildRooftopHVAC } from './rooftop-hvac';
@@ -168,7 +169,7 @@ export function buildStorefrontFacade(params: FacadeBuildParams): StorefrontFaca
     x: number, y: number, z: number,
     mat: THREE.Material, shadows = true,
   ): THREE.Mesh => {
-    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+    const m = new THREE.Mesh(mat === coping ? copingGeometry(w,h,d) : new THREE.BoxGeometry(w,h,d), mat);
     m.position.set(x, y, z);
     if (mat === glazedTile) mapFacadeUV(m.geometry, m.position);
     m.castShadow = shadows;

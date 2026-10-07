@@ -53,6 +53,7 @@ export function buildExteriorRoad(parent: THREE.Object3D, opts: ExteriorRoadOpti
   const lotDepth = farZ - frontZ;
   const group = new THREE.Group();
   group.name = 'exteriorRoad';
+  group.userData.photographicGroundSurface = true;
   parent.add(group);
 
   const disposables: Array<{ dispose(): void }> = [];
@@ -100,6 +101,7 @@ export function buildExteriorRoad(parent: THREE.Object3D, opts: ExteriorRoadOpti
   const pavement = track(createMatchedPavement());
   pavement.setColor(opts.initialGroundColor);
   const roadMat = pavement.material;
+  pavement.setRepeat(roadWidth/8,ROAD_DEPTH/8);
   const road = new THREE.Mesh(track(new THREE.PlaneGeometry(roadWidth, ROAD_DEPTH)), roadMat);
   road.rotation.x = -Math.PI / 2;
   road.position.set(centerX, opts.customEdges ? -.09 : -.03, roadStartZ + ROAD_DEPTH / 2);

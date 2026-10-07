@@ -11,8 +11,14 @@ def option(name,default):
  return Path(args[args.index(name)+1]).resolve() if name in args else default
 SRC=option('--source-dir',ROOT/'tools/models/cast'/slug)
 OUT=option('--render-dir',ROOT/'scratch/cast-render'/slug);OUT.mkdir(parents=True,exist_ok=True)
+if slug=='customer-06':
+ if not (SRC/'source-meshy.glb').exists():raise RuntimeError('Customer six requires the complete Meshy character and service-authored animations')
+ runpy.run_path(str(ROOT/'tools/models/import-meshy-character.py'))['build'](SRC,slug)
+ sys.exit(0)
 bpy.ops.object.select_all(action='SELECT');bpy.ops.object.delete(use_global=False)
-bpy.ops.import_scene.gltf(filepath=str(SRC/'source.glb'))
+source_glb=SRC/'source.glb'
+if not source_glb.exists():raise RuntimeError('Missing approved source model: '+str(source_glb))
+bpy.ops.import_scene.gltf(filepath=str(source_glb))
 arm=next(o for o in bpy.context.scene.objects if o.type=='ARMATURE')
 body=max((o for o in bpy.context.scene.objects if o.type=='MESH' and o.vertex_groups),key=lambda o:len(o.data.vertices))
 for o in list(bpy.context.scene.objects):
@@ -90,6 +96,9 @@ if slug=='clerk-b':
   if hip*.96<c.z<neck*1.03:
    if rgb[1]>rgb[0]*1.20 and rgb[2]>rgb[0]*1.15:p.material_index=1
    elif min(rgb)>.40 and (max(rgb)-min(rgb))/max(rgb)<.32 and (c.z>neck*.90 or abs(c.x)>arm.data.bones['LeftArm'].head_local.x*1.2):p.material_index=2
+ # The raised rear collar extends above the neck joint. Keep this narrow
+ # garment band in secondary trim; facial highlights stay above the head joint.
+  if neck*.97<c.z<min(neck*1.12,arm.data.bones['Head'].head_local.z) and min(rgb)>.40 and (max(rgb)-min(rgb))/max(rgb)<.32:p.material_index=2
  ox=body.copy();ox.data=body.data.copy();bpy.context.collection.objects.link(ox);ox.name='Clerk B Oxford';ox.data.materials[1]=oxmat;ox.data.materials[2]=oxmat;ox.data.materials.append(oxmat)
  for p in ox.data.polygons:
   weights={}
@@ -161,7 +170,7 @@ def pose(kind,u):
   if kind=='stockLow':
    for side,sign in [('Left',1),('Right',-1)]:aim(side+'UpLeg',(sign*.1,-.55,-.8));aim(side+'Leg',(sign*.025,.4,-.9))
    aim('Spine02',(0,-.15,1))
- update();ev=body.evaluated_get(bpy.context.evaluated_depsgraph_get());points=[ev.matrix_world@v.co for v in ev.data.vertices];anchor.location.z=-min(v.z for v in points);update()
+ update();objects=[o for o in arm.children if o.type=='MESH' and not o.hide_render and o!=case];points=[ev.matrix_world@ev.data.vertices[i].co for o in objects for ev in [o.evaluated_get(bpy.context.evaluated_depsgraph_get())] for i in {i for p in ev.data.polygons for i in p.vertices}];anchor.location.z=-min(v.z for v in points);update()
  if case:
   case.hide_render=not kind.startswith('stock')
   right=arm.pose.bones['RightHand'];palm=right.matrix@Vector((0,7,0))
@@ -190,8 +199,6 @@ for name,objects in outfits.items():
  for o in objects:
   for old in list(o.users_collection):old.objects.unlink(o)
   col.objects.link(o)
-if slug=='customer-06':
- tattoo=runpy.run_path(str(ROOT/'tools/models/customer-six-tattoo.py'))['apply'](body,arm,SRC);outfits['casual'].append(tattoo)
 bpy.ops.object.select_all(action='DESELECT');arm.select_set(True);bpy.context.view_layer.objects.active=arm;arm.show_in_front=True
 for screen in bpy.data.screens:
  for area in screen.areas:

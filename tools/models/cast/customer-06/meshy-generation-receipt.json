@@ -1,0 +1,23 @@
+{
+  "task_id": "01a10e6e-6c82-7252-85b3-f63af77fe1b6",
+  "status": "SUCCEEDED",
+  "consumed_credits": 35,
+  "request": {
+    "input_task_id": "01a10e6c-bc37-7540-bd6d-79732f71cff7",
+    "ai_model": "meshy-7.1",
+    "model_type": "standard",
+    "geometry_resolution": "2k",
+    "should_texture": true,
+    "texture_resolution": "4k",
+    "enable_pbr": false,
+    "should_remesh": true,
+    "target_polycount": 30000,
+    "topology": "triangle",
+    "pose_mode": "a-pose",
+    "image_enhancement": false,
+    "target_formats": [
+      "glb"
+    ],
+    "multi_view_thumbnails": true
+  }
+}

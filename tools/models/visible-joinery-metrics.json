@@ -1,0 +1,20 @@
+{
+  "bytes": 142668,
+  "triangles": 1956,
+  "parts": [
+    "ArchedPlaque",
+    "Baseboard",
+    "Coping",
+    "DoorPushBar",
+    "DoubleDoorLeaf",
+    "FinishedPanel",
+    "SignBracket",
+    "SillCap",
+    "SingleDoorLeaf",
+    "TelevisionStand",
+    "WindowHorizontal",
+    "WindowVertical"
+  ],
+  "units": "feet",
+  "hiddenConstruction": false
+}

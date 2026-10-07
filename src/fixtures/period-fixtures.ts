@@ -1,6 +1,7 @@
 import { candyPouchRows, installCandyRackPouches } from './candy-pouch';
 import { CANDY_CARTON_RACK, candyCartonFinishes, upgradeCandyCartonGeometry } from './candy-carton';
 import { CLEANER_CARTON, installCleanerCartons } from './cleaner-carton';
+import { installDisplayModel } from './display-model';
 export { buildPreviouslyViewedTub } from './previously-viewed-tub';
 import { createCandyRackFinish } from './candy-rack-finish';
 import { installCandyPowerWing } from './candy-power-wing';
@@ -839,6 +840,7 @@ export class TapeCleanerDisplay implements StoreFixture {
   private group: THREE.Group | null = null;
   private disposables: Disposable[] = [];
   private releaseCartons: (() => void) | null = null;
+  private releaseTray: (() => void) | null = null;
 
   constructor(placement: FixturePlacement, ctx: FixtureContext) {
     this.placement = placement;
@@ -868,7 +870,7 @@ export class TapeCleanerDisplay implements StoreFixture {
     base.position.y = 0.175;
     base.castShadow = true;
     base.receiveShadow = true;
-    group.add(base);
+    const trayFallback = new THREE.Group(); trayFallback.add(base); group.add(trayFallback);
     this.disposables.push({ geo: baseGeo, mat: baseMat });
 
     // Cleaner boxes: the house-colour face texture on the front (+Z) and the
@@ -918,6 +920,8 @@ export class TapeCleanerDisplay implements StoreFixture {
       this.ctx.requestShadowRefresh();
       this.ctx.requestRender();
     });
+    this.releaseTray = installDisplayModel(this.ctx, group, trayFallback,
+      'models/cleaner-display-tray.glb', { TrayBoard: baseMat });
   }
 
   // Sits ON the checkout counter band (see build()'s surfaceY) — like
@@ -933,6 +937,8 @@ export class TapeCleanerDisplay implements StoreFixture {
   }
 
   dispose(): void {
+    this.releaseTray?.();
+    this.releaseTray = null;
     this.releaseCartons?.();
     this.releaseCartons = null;
     const stock = this.group?.getObjectByName('cleaner-carton-fallback');

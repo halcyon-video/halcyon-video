@@ -263,6 +263,50 @@
     ],
     "uv": true
   },
+  "UprightHalf": {
+    "triangles": 104,
+    "vertices": 54,
+    "bounds_blender_ft": [
+      [
+        0.0,
+        1.0796781778335571
+      ],
+      [
+        -0.019999999552965164,
+        0.019999999552965164
+      ],
+      [
+        0.0,
+        5.0
+      ]
+    ],
+    "materials": [
+      "ShelfFinish"
+    ],
+    "uv": true
+  },
+  "EndPanelHalf": {
+    "triangles": 236,
+    "vertices": 120,
+    "bounds_blender_ft": [
+      [
+        0.0,
+        1.0800000429153442
+      ],
+      [
+        -0.05000000074505806,
+        0.05000000074505806
+      ],
+      [
+        0.0,
+        5.0
+      ]
+    ],
+    "materials": [
+      "ShelfFinish"
+    ],
+    "uv": true
+  },
   "Standard": {
     "triangles": 44,
     "vertices": 24,
@@ -291,6 +335,28 @@
     "bounds_blender_ft": [
       [
         -0.5,
+        0.5
+      ],
+      [
+        -0.07000000029802322,
+        0.07000000029802322
+      ],
+      [
+        0.0,
+        0.15000000596046448
+      ]
+    ],
+    "materials": [
+      "ShelfFinish"
+    ],
+    "uv": true
+  },
+  "FootHalf": {
+    "triangles": 16,
+    "vertices": 10,
+    "bounds_blender_ft": [
+      [
+        0.0,
         0.5
       ],
       [

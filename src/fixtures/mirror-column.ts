@@ -1,3 +1,4 @@
+import { finishedPanelGeometry } from '../joinery-model';
 // Four-sided mirrored column — a clad structural pillar standing in the open
 // sales floor, every face a mirror.
 //
@@ -90,7 +91,7 @@ export class MirrorColumn implements StoreFixture {
     this.disposables.push(trimMat, coreMat);
 
     const box = (w: number, h: number, d: number, y: number, mat: THREE.Material) => {
-      const geo = new THREE.BoxGeometry(w, h, d);
+      const geo = mat === trimMat ? finishedPanelGeometry(w, h, d) : new THREE.BoxGeometry(w, h, d);
       this.disposables.push(geo);
       const mesh = new THREE.Mesh(geo, mat);
       mesh.position.set(0, y + h / 2, 0);

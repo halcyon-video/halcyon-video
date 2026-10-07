@@ -1,0 +1,50 @@
+{
+  "packaging-game-carton-stock": {
+    "bytes": 10744,
+    "triangles": 72,
+    "parts": 3,
+    "closedSolids": 3,
+    "dimensionsFeet": [
+      0.4166666666666667,
+      0.5833333333333334,
+      0.08333333333333333
+    ],
+    "textures": 0
+  },
+  "packaging-game-carton-hero": {
+    "bytes": 10760,
+    "triangles": 72,
+    "parts": 3,
+    "closedSolids": 3,
+    "dimensionsFeet": [
+      0.4166666666666667,
+      0.5833333333333334,
+      0.08333333333333333
+    ],
+    "textures": 0
+  },
+  "packaging-series-boxset-stock": {
+    "bytes": 12824,
+    "triangles": 76,
+    "parts": 5,
+    "closedSolids": 5,
+    "dimensionsFeet": [
+      0.445,
+      0.667,
+      0.1575
+    ],
+    "textures": 0
+  },
+  "packaging-series-boxset-hero": {
+    "bytes": 12864,
+    "triangles": 76,
+    "parts": 5,
+    "closedSolids": 5,
+    "dimensionsFeet": [
+      0.445,
+      0.667,
+      0.1575
+    ],
+    "textures": 0
+  }
+}

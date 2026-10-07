@@ -1,3 +1,4 @@
+import { popKitVisible } from './pop-period';
 import { counterDatumShift } from './vestibule-layout.ts';
 import { fitDepartmentArch, type DepartmentArchHost } from './fixtures/department-arch-layout';
 // Service-wall dressing follows the live facade/door datum, not a fixed floor placement.
@@ -357,7 +358,8 @@ export function promoStandPlacements(backWallZ: number): FixturePlacement[] {
       },
     });
   }
-  return stands;
+  return popKitVisible(2011,2012) ? stands.map(p => p.id === 'promo-stand-front'
+    ? {...p,kind:'twin-crt-tower',options:{...p.options,noRentalCase:true}} : p) : stands;
 }
 
 // ── Counter-shape-dependent placements ──────────────────────────────────────
@@ -392,6 +394,7 @@ export function promoStandPlacements(backWallZ: number): FixturePlacement[] {
 const FLOOR_DISPLAY_KINDS = new Set([
   'queue-vitrine',
   'catalog-podium',
+  'twin-crt-tower',
   'four-sided-display',      // promo floor stands
   'bargain-bin',             // dump tub
   'pv-drape-table',          // previously-viewed drape table

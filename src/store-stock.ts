@@ -1,4 +1,4 @@
-import { disposeShelfVisibility, initializeHiddenShelfInstances } from './shelf-visibility';
+import { disposeShelfVisibility, initializeHiddenShelfInstances, invalidateShelfVisibility, finishShelfPromotionScan } from './shelf-visibility';
 import { mobileStoreActive } from './mobile-store';
 import { updateStoreLoading } from './store-loading';
 // Movie-box stock instancing — extracted from StoreScene (three-scene.ts
@@ -11,6 +11,7 @@ import { updateStoreLoading } from './store-loading';
 import * as THREE from 'three';
 import { isWhiteClamshell, WHITE_CLAMSHELL_DIMS } from './packaging-formats';
 import { onCaseModelsChanged } from './packaging-model';
+import { onJoineryModelsChanged } from './joinery-model';
 import { rentalRestZ, shelfCasePacking } from './packaging-fit';
 import { shelfLeanAngle, lowerShelfProjection, LOWER_BACKREST_HEIGHT } from './shelf-profile';
 import { activeStoreFormat } from './store-format';
@@ -58,7 +59,8 @@ function aisleMeshKey(libIdx: number, unitIdx: number, side: 'front' | 'back', m
   const base = `${libIdx}_${unitIdx}_${side}`;
   return movie.game
     ? `${base}${AISLE_SHAPE_SEP}${gameShapeKey(movie.platform, movie.discCount)}`
-    : isWhiteClamshell(movie, CASE_MEDIUM) ? `${base}${AISLE_SHAPE_SEP}white` : base;
+    : movie.isSeries && !movie.streaming ? `${base}${AISLE_SHAPE_SEP}series`
+      : isWhiteClamshell(movie, CASE_MEDIUM) ? `${base}${AISLE_SHAPE_SEP}white` : base;
 }
 
 /** The shape half of an aisle batch key, or null for ordinary movie stock. */
@@ -215,9 +217,9 @@ export function updateColsCount(scene: StoreScene) {
 export async function buildAllMovieBoxes(scene: StoreScene) {
   scene.mirrorCubemap.beginStockBuild();
   scene.clearMovieBoxes();
-  caseModelSubscriptions.set(scene, onCaseModelsChanged(() => {
-    scene.queueStructuralShadowRefresh(); scene.requestRender();
-  }));
+  const changed = () => { scene.queueStructuralShadowRefresh(); scene.requestRender(); };
+  const stopCases = onCaseModelsChanged(changed), stopJoinery = onJoineryModelsChanged(changed);
+  caseModelSubscriptions.set(scene, () => { stopCases(); stopJoinery(); });
   scene.slotsByPosition.clear();
   scene.movieInstancesMap.clear();
   scene.slotsByMovieId.clear();
@@ -297,7 +299,7 @@ export async function buildAllMovieBoxes(scene: StoreScene) {
       const shape = gameShapeKey(movie.platform, movie.discCount);
       return isMovieAnimated ? `${base}_${shape}_animated` : `${base}_${shape}_regular`;
     }
-    return isMovieAnimated ? `${base}_animated` : `${base}_regular`;
+    return movie.isSeries && !movie.streaming ? `${base}_series` : isMovieAnimated ? `${base}_animated` : `${base}_regular`;
   };
   const fixtureMeshSlotCounts = new Map<string, number>();
   scene.slottedFixtures.forEach(fixture => {
@@ -349,6 +351,7 @@ export async function buildAllMovieBoxes(scene: StoreScene) {
     const base = isBackWallMovieAnimated(movie) ? 'back_wall_animated' : 'back_wall_regular';
     return movie.game
       ? `${base}${AISLE_SHAPE_SEP}${gameShapeKey(movie.platform, movie.discCount)}`
+      : movie.isSeries && !movie.streaming ? `${base}${AISLE_SHAPE_SEP}series`
       : isWhiteClamshell(movie, CASE_MEDIUM) ? `${base}${AISLE_SHAPE_SEP}white` : base;
   };
   const backWallCounts = new Map<string, number>();
@@ -441,13 +444,13 @@ export async function buildAllMovieBoxes(scene: StoreScene) {
       } else {
         // Regular and animated front/back meshes for custom fixtures — each
         // variant sized to actual usage, unused variants skipped (#105)
-        for (const variant of ['regular', 'animated'] as const) {
+        for (const variant of ['regular', 'animated', 'series'] as const) {
           const variantKey = `${key}_${variant}`;
           const used = fixtureMeshSlotCounts.get(variantKey) || 0;
           if (used === 0) continue;
           const isAnim = variant === 'animated';
 
-          const frontMesh = new THREE.InstancedMesh(createClonedCaseGeometry(used, isAnim), getGlobalFrontMaterials(isAnim), used);
+          const frontMesh = new THREE.InstancedMesh(createClonedCaseGeometry(used, isAnim, false, variant === 'series' ? gameDimsForShape('series').retail : undefined), getGlobalFrontMaterials(isAnim), used);
           frontMesh.castShadow = true;
           frontMesh.receiveShadow = true;
           frontMesh.frustumCulled = true;
@@ -479,7 +482,7 @@ export async function buildAllMovieBoxes(scene: StoreScene) {
       const gameDims = shape ? gameDimsForShape(shape) : null;
       const frontMesh = new THREE.InstancedMesh(
         gameDims
-          ? createClonedCaseGeometry(capacity, isAnimated, false, gameDims.retail, shape !== 'white')
+          ? createClonedCaseGeometry(capacity, isAnimated, false, gameDims.retail, shape !== 'white' && shape !== 'series')
           : createClonedCaseGeometry(capacity, isAnimated),
         getGlobalFrontMaterials(isAnimated),
         capacity
@@ -516,7 +519,7 @@ export async function buildAllMovieBoxes(scene: StoreScene) {
 
     const bwFrontMesh = new THREE.InstancedMesh(
       gameDims
-        ? createClonedCaseGeometry(count, isAnim, false, gameDims.retail, shape !== 'white')
+        ? createClonedCaseGeometry(count, isAnim, false, gameDims.retail, shape !== 'white' && shape !== 'series')
         : createClonedCaseGeometry(count, isAnim),
       getGlobalFrontMaterials(isAnim),
       count
@@ -1062,6 +1065,7 @@ export function rebuildSSAOExclusionList(scene: StoreScene) {
 }
 
 export function rebuildMovieBoxes(scene: StoreScene) {
+  invalidateShelfVisibility(scene);
   // Geometry is changing (placeholder cases cast shadows, shelves are re-stocked):
   // re-bake the shadow map over the next few frames as the layout settles.
   scene.queueStructuralShadowRefresh();
@@ -1290,6 +1294,7 @@ export function restockSlottedFixtures(scene: StoreScene): void {
         if (at >= 0) oldList.splice(at, 1);
       }
       existing.movie = fixtureSlot.movie;
+      requestedPriority.delete(existing);
       existing.noRentalCase =
         fixture.placement.options?.noRentalCase === true || isUnstockedTitle(fixtureSlot.movie);
       let sameMovie = scene.slotsByMovieId.get(fixtureSlot.movie.id);
@@ -1326,6 +1331,7 @@ export function restockSlottedFixtures(scene: StoreScene): void {
     });
   });
   if (touched) {
+    invalidateShelfVisibility(scene);
     scene.mirrorCubemap.stockChanged();
     scene.requestRender();
   }
@@ -1333,7 +1339,7 @@ export function restockSlottedFixtures(scene: StoreScene): void {
 
 const priorityPoint = new THREE.Vector3();
 const requestedPriority = new WeakMap<MovieSlot, number>();
-export function updateLOD(scene: StoreScene) {
+export function updateLOD(scene: StoreScene): boolean {
   const activeEnvMap = reflectionProbes[Math.min(scene.selectedLibraryIdx, 4)] || null;
   updateGlobalMaterialsEnvMap(activeEnvMap);
   scene.entrance?.setEnvMap(activeEnvMap);
@@ -1344,9 +1350,10 @@ export function updateLOD(scene: StoreScene) {
   let requested = 0;
   for (const slot of scene.slotsByPosition.values()) {
     if (slot.hidden) continue;
-    const sx = slot.currentX ?? slot.restingX;
-    const sy = slot.currentY ?? slot.restingY;
-    const sz = slot.currentZ ?? slot.restingZ;
+    // Progressive placement must not cache the unplaced origin as this view.
+    const sx = slot.needsInitialMatrixUpdate ? slot.restingX : slot.currentX;
+    const sy = slot.needsInitialMatrixUpdate ? slot.restingY : slot.currentY;
+    const sz = slot.needsInitialMatrixUpdate ? slot.restingZ : slot.currentZ;
     const dx = sx - camPos.x, dy = sy - camPos.y, dz = sz - camPos.z;
     const distance = dx * dx + dy * dy + dz * dz;
     if (distance > 900) continue;
@@ -1359,4 +1366,7 @@ export function updateLOD(scene: StoreScene) {
     slot.loadShelfDetails(priority);
     if (++requested >= 24) break;
   }
+  const pending = requested >= 24;
+  finishShelfPromotionScan(scene, pending);
+  return pending;
 }

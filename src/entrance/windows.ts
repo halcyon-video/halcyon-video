@@ -1,3 +1,4 @@
+import { baseboardGeometry, sillGeometry, windowFrameGeometry } from '../joinery-model';
 import { FRAME_REVEAL_DEPTH, FRAME_REVEAL_CENTER } from '../frame-reveal';
 import { windowGlassGeometry, type WindowAperture } from '../window-glass-geometry';
 // Storefront window-bay builder (T05): the customer-facing glazed front wall
@@ -118,7 +119,7 @@ export function buildWindowBays(
     wall.castShadow = true;
     wall.receiveShadow = true;
     group.add(wall);
-    const cap = new THREE.Mesh(new THREE.BoxGeometry(segW, 0.12, 0.4), kneeTrimMat);
+    const cap = new THREE.Mesh(sillGeometry(segW), kneeTrimMat);
     cap.position.set(cxSeg, KNEE_H + 0.06, -.15);
     cap.castShadow = true;
     cap.receiveShadow = true;
@@ -127,7 +128,7 @@ export function buildWindowBays(
     // (three-scene.ts) so the two read as one continuous baseboard height
     // instead of stepping up/down at every corner where a window wall meets
     // a solid one.
-    const kick = new THREE.Mesh(new THREE.BoxGeometry(segW, 0.3, 0.34), kneeTrimMat);
+    const kick = new THREE.Mesh(baseboardGeometry(segW, 0.3, 0.34), kneeTrimMat);
     kick.position.set(cxSeg, 0.15, -.15);
     kick.castShadow = true;
     kick.receiveShadow = true;
@@ -142,13 +143,13 @@ export function buildWindowBays(
     divider.position.set((lo+hi)/2, height/2, -.15);
     divider.castShadow = divider.receiveShadow = true;
     group.add(divider);
-    const kick = new THREE.Mesh(new THREE.BoxGeometry(hi-lo, .3, .34), kneeTrimMat);
+    const kick = new THREE.Mesh(baseboardGeometry(hi-lo, .3, .34), kneeTrimMat);
     kick.position.set((lo+hi)/2, .15, -.15);
     group.add(kick);
   }
 
   // Per-wing glass + frames + dividers.
-  const mullionGeo = new THREE.BoxGeometry(frameThickness * 0.7, height - KNEE_H, frameDepth * 0.7);
+  const mullionGeo = windowFrameGeometry(frameThickness * 0.7, height - KNEE_H, frameDepth * 0.7);
   wings.forEach((wing) => {
     const wingW = wing.hi - wing.lo;
     const wingC = (wing.lo + wing.hi) / 2;
@@ -169,14 +170,14 @@ export function buildWindowBays(
     // Outer border frames (per wing): sill on the knee wall, head, and the
     // two verticals. Both posts sit within their pane opening, so the
     // adjacent masonry cannot bury the entrance-side frame.
-    const horizGeo = new THREE.BoxGeometry(wingW, frameThickness, FRAME_REVEAL_DEPTH);
+    const horizGeo = windowFrameGeometry(wingW, frameThickness, FRAME_REVEAL_DEPTH);
     const bottomFrame = new THREE.Mesh(horizGeo, frameMat);
     bottomFrame.position.set(wingC, KNEE_H + frameThickness / 2, -FRAME_REVEAL_CENTER);
     const topFrame = new THREE.Mesh(horizGeo, frameMat);
     topFrame.position.set(wingC, height - frameThickness / 2, -FRAME_REVEAL_CENTER);
     // Both ends sit on the knee wall; the entrance owns its floor-reaching
     // door jambs. Extending a wing frame downward splits the brick footer.
-    const vertSillGeo = new THREE.BoxGeometry(frameThickness, height - KNEE_H, FRAME_REVEAL_DEPTH);
+    const vertSillGeo = windowFrameGeometry(frameThickness, height - KNEE_H, FRAME_REVEAL_DEPTH);
     const sillVertY = KNEE_H + (height - KNEE_H) / 2;
     const leftVert = new THREE.Mesh(vertSillGeo, frameMat);
     leftVert.position.set(
@@ -199,7 +200,7 @@ export function buildWindowBays(
 
     // Grid vertical dividers between panes — only through the glazed span
     // above the knee wall.
-    const dividerGeo = new THREE.BoxGeometry(frameThickness, height - KNEE_H, frameDepth);
+    const dividerGeo = windowFrameGeometry(frameThickness, height - KNEE_H, frameDepth);
     for (let i = 1; i < edges.length - 1; i++) {
       const divider = new THREE.Mesh(dividerGeo, frameMat);
       divider.position.set(edges[i], KNEE_H + (height - KNEE_H) / 2, 0);

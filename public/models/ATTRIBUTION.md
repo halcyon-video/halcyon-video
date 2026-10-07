@@ -105,7 +105,6 @@ Volkswagen brochure photograph was inspected for period construction only;
 this is not a branded replica. See `docs/car-hatchback-model.md` for reference
 links, dimensions, material roles, placement and full-lot resource costs.
 
-<<<<<<< HEAD
 ### Concrete sidewalk, curb and gutter kit (#265)
 
 `curb-kit.glb` is original generic Halcyon geometry, authored by scripted Blender
@@ -135,7 +134,6 @@ Original generic scripted Blender mesh for #263; no external geometry or texture
 - Dimensions are design estimates fitted to the existing 13-foot lamp anchors, not measured period hardware.
 - Geometry and delivery contract: `docs/parking-lamp-model.md`. Distributed under the repository's license.
 
-=======
 ## Parked sports coupe
 
 `car_sports.glb` is now original Halcyon scripted Blender geometry under this
@@ -149,7 +147,6 @@ and street-facing orientation, and replaced in full. Nissan's
 was inspected as a period design study only. See
 `docs/sports-coupe-model.md` for dimensions, provenance limits, geometry costs
 and the preserved normalization, finish, fallback and lifecycle contracts.
->>>>>>> f438edb (fix(halcyon): resolve #268 - Blender: replace the lot’s period sports coupe with an editable model)
 
 ## Projection reel (#245)
 
@@ -250,3 +247,81 @@ for #181. Source, packed procedural fibre textures and generator are in
 `tools/models/cleaner-carton.*` and `cleaner-carton-*.png`; no third-party artwork
 or geometry. Dimensions, material roles, UVs, provenance and integration contract:
 `docs/cleaner-carton-model.md`.
+
+## Spiral gumball dispenser
+
+`gumball-machine.glb` is original scripted Blender geometry under the repository
+license, with a barrel hopper, spiral trough, rounded coin cabinet and squat
+plinth. No third-party geometry, imagery, logos or reference reconstruction is
+included. Source and generator: `tools/models/gumball-machine.blend` and `.py`.
+See `docs/gumball-machine-model.md` for the shared runtime envelope and placement.
+
+## Counter mug, acrylic holders and cleaner tray
+
+`tip-mug.glb`, `acrylic-l-holder.glb`, `acrylic-tent-holder.glb` and
+`cleaner-display-tray.glb` are original scripted Blender mesh authoring under
+the repository license. Editable source and generator are
+`tools/models/counter-accessories.blend` and `.py`. The synchronous acrylic
+geometry data is exported from the same Blender source. No downloaded geometry,
+reference photographs, brand graphics or external textures are included.
+See `docs/counter-accessories-model.md` for physical construction, preserved
+runtime anchors, named materials, measured costs and verification.
+
+## Draped sale table and bent-wire rack
+
+`sale-table.glb` and `sale-table-rack.glb` are original Halcyon scripted Blender
+construction under the repository license. The editable source, generator and
+metrics are `tools/models/sale-table.blend`, `.py` and `-metrics.json`.
+No downloaded mesh, external texture or source-photo pixels are embedded.
+See `docs/sale-table-model.md` for the preserved stock/footprint contract,
+visible geometry, measured costs and actual consumer verification.
+
+## Visible architectural joinery
+
+`visible-joinery.glb` is original scripted Blender mesh authoring: eased window
+and sill profiles, coved skirting, door rings and push bars, finished trim panels,
+and the fitted open television stand. Editable source and generator are in
+`tools/models/visible-joinery.blend` and `visible-joinery.py`; dimensions,
+consumer ownership and verification are in `docs/visible-joinery-model.md`.
+No external geometry, source imagery or texture assets are included.
+
+## Twin-monitor merchandise tower
+
+`twin-crt-tower.glb` is original Blender-authored display construction, with
+visible television fronts reused from this project's original CRT family.
+No external mesh, photographic art or branded skin is included. Source,
+reproduction and placement contracts are in `tools/models/twin-crt-tower.py`,
+`tools/models/twin-crt-tower.blend` and `docs/twin-crt-tower-model.md`.
+
+## Deformable rental-bag rest mesh
+
+`rental-bag-rest.glb` and the matching solver-node data are original scripted
+Blender mesh authoring. The preview includes only an unbranded, generated
+handle-cutout mask. The application retains its existing live printed finish.
+Editable source and reproduction script: `tools/models/rental-bag.blend` and
+`rental-bag.py`. Mapping and verification: `docs/rental-bag-model.md`.
+
+## Paperboard cartons and season slipboxes
+
+`packaging-game-carton-{stock,hero}.glb` and
+`packaging-series-boxset-{stock,hero}.glb` are original scripted Blender geometry
+under the repository license. They reuse the project's packaging exporter and
+live artwork/material mapping, and embed no images or external mesh data.
+Editable source, generator, metrics and integration contract are documented in
+`docs/packaging-extras-model.md`.
+
+## Exposed ceiling construction
+
+`ceiling-structure.glb` is original scripted Blender geometry: paired-angle joists,
+open webs, duct skins and bends, formed straps, collars and discharge louvers.
+It contains no external meshes, textures or source-photo pixels. The editable
+source, generator, measured cost and installation contract are documented in
+`docs/ceiling-structure-model.md`.
+
+## Wooden and single-faced shelf variants
+
+The original shelf-components kit includes closed half-depth upright, end-panel
+and foot variants. Wooden wall boards reuse the original visible-joinery profiles.
+These are scripted Blender geometry under the repository license, with existing
+procedural finishes and no additional image assets. Source and installation
+contracts are in `docs/wood-and-game-shelves.md`.

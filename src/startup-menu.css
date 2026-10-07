@@ -1,0 +1,56 @@
+/* Startup typography and surfaces share the active house palette. */
+:root {
+  --startup-display: 'Archivo Black', Arial, sans-serif;
+  --startup-body: Arial, var(--font-body), sans-serif;
+  --startup-blue: var(--bb-primary, #172b56);
+  --startup-accent: var(--bb-yellow);
+}
+#mobile-era-choice {
+  box-sizing: border-box; width: min(94vw, 660px); max-height: 92dvh;
+  margin: auto; padding: 0; overflow: auto; border: 0; border-radius: 0;
+  color: #fff; background: var(--startup-blue); font-family: var(--startup-body);
+}
+#mobile-era-choice::backdrop { background: #030b16e8; }
+.mobile-era-heading {
+  padding: 34px 3% 20px; color: var(--startup-blue); background: var(--startup-accent);
+}
+#mobile-era-title, .mobile-era-intro { margin: 0; text-align: center; line-height: 1; font-family: var(--startup-display); font-weight: 400; }
+.mobile-era-fit { display: inline-block; white-space: nowrap; font-size: 64px; line-height: 1.05; letter-spacing: -.025em; }
+.mobile-era-body { padding: 18px 3% 0; text-align: center; }
+.mobile-era-intro { margin-bottom: 4px; }
+.mobile-era-carousel {
+  display: grid; grid-template-columns: 44px minmax(0, 1fr) 44px;
+  align-items: center; gap: 5px; touch-action: pan-y;
+}
+.mobile-era-current { min-width: 0; padding: 4px 0 0; }
+#mobile-era-year { font: 400 clamp(58px, 23vw, 142px)/1.04 var(--startup-display); letter-spacing: -.055em; }
+.mobile-era-step {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 7px; min-height: 86px; width: 100%; padding: 4px 0;
+  border: 0; background: transparent; color: #fff; cursor: pointer;
+}
+.mobile-era-chevron { color: var(--startup-accent); font: 400 46px/1 Arial, sans-serif; }
+.mobile-era-step:hover .mobile-era-chevron { color: #fff; }
+.mobile-era-neighbor { font: 700 12px var(--startup-body); font-variant-numeric: tabular-nums; }
+.mobile-era-step:disabled { visibility: hidden; }
+.mobile-era-hint { margin: 8px 0 18px; color: #fff; font: 400 13px/1.35 var(--startup-body); }
+.mobile-era-enter {
+  display: block; width: 100%; min-height: 54px; margin: 0;
+  padding: 14px 3%; border: 0; border-radius: 0;
+  background: var(--startup-accent); color: var(--startup-blue);
+  cursor: pointer; font: 400 21px/1.2 var(--startup-display); text-transform: uppercase;
+}
+.mobile-era-step, .mobile-era-enter { touch-action: manipulation; }
+.mobile-era-enter:hover { text-decoration: underline; }
+#mobile-era-choice button:focus-visible { outline: 3px solid #fff; outline-offset: -5px; }
+.mobile-era-carousel:focus-visible { outline: none; }
+.mobile-era-carousel:focus-visible #mobile-era-year { text-decoration: underline; text-decoration-color: var(--startup-accent); text-decoration-thickness: 3px; text-underline-offset: 8px; }
+@media (max-height: 520px) {
+  .mobile-era-heading { padding-top: 12px; padding-bottom: 10px; }
+  .mobile-era-body { padding-top: 10px; }
+  .mobile-era-fit { max-height: 50px; font-size: 48px; }
+  #mobile-era-year { font-size: 76px; }
+  .mobile-era-step { min-height: 64px; gap: 0; }
+  .mobile-era-hint { margin-bottom: 10px; font-size: 12px; }
+  .mobile-era-enter { min-height: 46px; padding-block: 10px; font-size: 19px; }
+}

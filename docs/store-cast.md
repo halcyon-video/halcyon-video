@@ -15,7 +15,7 @@ The store does not load these 3D source meshes.
 | Customer 03 | Black bob and glasses, mustard sweater, red sneakers | 5.05 |
 | Customer 04 | Stocky red-haired bearded man, plaid shirt, work boots | 5.65 |
 | Customer 05 | High natural puff, plum bomber, white high-tops | 5.85 |
-| Customer 06 | Long brown hair, denim jacket, olive chinos, black flaming skull on left forearm | 5.90 |
+| Customer 06 | Long brown hair, thick stubble, maroon T-shirt, brown vest and jeans, low brown harness boots with chains, black flaming skull on left forearm | 5.90 |
 | Customer 07 | Older woman, silver bun, rose cardigan | 5.05 |
 | Customer 08 | Side-parted black hair, teal/navy windbreaker, cargo trousers | 5.40 |
 | Customer 09 | Copper braid, green overshirt, brown trousers | 5.80 |
@@ -50,7 +50,7 @@ vertices whose heat binding fails, normalizes every weight, and corrects the imp
 These are generated bases with scripted Blender authoring, not hand-sculpted
 characters. Faces and individual fingers do not have separate animation controls.
 
-Standing and walking use the existing calibrated ACCAD capture retargeter.
+Standing and walking use the existing calibrated ACCAD capture retargeter. The neutral hand calibration measures each mesh's palm plane from its weighted skin, distributes wrist roll across forearm and hand, and points relaxed palms toward the thighs. The baked idle and walking checks inspect both palms and floor contact at all 41 samples in each clip.
 See `tools/models/motion-sources/README.md` for CC BY 3.0 attribution and the
 source captures. The per-character metrics report exactly how many vertices
 retain source binding; every finished pose is visually reviewed. Male characters use the steady walk; female characters use the
@@ -98,7 +98,7 @@ are 2048×1920: five directions and eight columns (idle 2, walk 4, browse 2), wi
 15 MiB per identity, except customer 06 as described below (45–54 MiB for the default three, 159 MiB for all ten), without
 mipmaps. Clerk sheets retain the existing 4096×1920, 16-column contract.
 
-The ordinary clerk A source and sprite atlases are unchanged. Customer previews
+Clerk A retains its original authored gait, clothing, dimensions and working cells; only neutral hand rotation in its idle and walking frames changes. Customer previews
 and source metrics are generated under `scratch/cast-render`; public verification
 photographs are retained with the development commit's publicity kit.
 
@@ -107,20 +107,52 @@ https://docs.meshy.ai/en/api/rigging. One generation cost 30 credits and one ini
 rig cost five, for 385 existing credits across this eleven-character batch. No
 subscription or additional credit purchase was made.
 
-### Customer 06: left forearm tattoo
+### Customer 06: complete Meshy character
 
-An original black-ink flaming skull decal is fitted to the anatomical left lower
-forearm using the underlying body's identical skin weights. The packed Blender
-source and animated GLB include the editable surface and transparent tattoo art.
-`tools/models/customer-six-tattoo.py` reapplies it to an existing checked rig;
-`build-cast.py` also reapplies it when rebuilding the character from its base.
-Run `finalize-cast.py` afterward to refresh the GLB and animation checks.
+Customer 06 is generated, textured and rigged entirely by Meshy. The corrected
+reference keeps his recognizable face, brown hair, connected beard and moustache,
+classic collarless brown vest, maroon shirt, brown trousers, harness boots and
+left forearm tattoo. Meshy generated the model directly in the reference's
+neutral standing stance, with lower shoulders and arms beside the thighs.
 
-Customer 06 has eight separately rendered directions to prevent the tattoo from
-swapping arms when turning. Its atlas is 2048×3072 (24 MiB decoded RGBA); use
-`--customer --full-directions` for both clerk-sheet stitch and check. Other
-customers retain their five-direction 2048×1920 sheets. The generated reference
-image and original Meshy base remain preserved as provenance, before the tattoo.
+`reference-meshy.png` is the Meshy-edited reference. `source-meshy-idle.glb`
+is Meshy's rigged standing delivery, including its constant baseline clip;
+`source-meshy.glb` is the same rig's supplied walking delivery. Standing holds
+the Meshy-authored pose. No local bone poses or motion corrections are authored.
+Both sources share an identical native skeleton and bind matrices.
+
+`import-meshy-character.py` preserves Meshy's mesh vertices, UVs, skin weights
+and materials. Local processing applies uniform scene scale, floor placement,
+sprite centering, playback labels, cameras and lighting. The former local head
+graft, neck bridge, beard paint and clothing repair scripts remain retired.
+
+Run `build-cast.py -- customer-06`, `finalize-cast.py -- customer-06` and
+`render-customer-atlas.py -- customer-06` for reproduction. The sprite contract
+is eight separately rendered directions in a 2048 by 3072 lossless WebP sheet;
+the left tattoo is never mirrored onto the other arm. `meshy-import-check.json`
+records unchanged delivered source data, imported clips and floor placement
+checks at 41 samples per clip. Sanitized service receipts are retained beside
+the model. The original rebuild and subsequent corrections, including rejected
+trials, used 201 existing credits with no purchase. Older receipts remain
+historical provenance and are outside the current source pipeline.
+
+`render-customer-atlas.py` also accepts `clerk-b` to update idle/walking cells in
+both uniforms while retaining existing working cells. Split the shipped atlases
+into its render directories first, then stitch the complete sheets afterward. To preserve working pixels exactly, use ImageMagick crop and append to join the newly rendered first six columns (1536 pixels) to the original remaining ten columns (2560 pixels), for both color and livery; a browser canvas round trip can change transparent RGB values. Refresh the compressed phone clerk pair and its source receipt whenever the clerk A sources change.
+Optional `--source-dir` and `--render-dir` support private installed identities
+without mixing their source or sprites into the public character directories.
+
+### Customer 06 skin color
+
+The current base-color albedo darkens only the existing peach skin colors by
+ten percent, keeping the original 4096 by 4096 UV layout and every unselected
+pixel unchanged. Eye whites, dark facial details, clothes and the forearm tattoo
+retain their original pixels. The correction is embedded in both existing
+source GLBs; geometry, UVs, skin weights, bind matrices, material parameters
+and animation remain byte-identical. `skin-tone-check.json` records the color
+selection and image hashes, and `skin-tone-import-check.json` records the
+unchanged model and animation data. Rebuild the Blender file and sprites using
+the existing customer 06 reproduction commands above.
 
 ### Private clerk likenesses
 
@@ -139,3 +171,11 @@ optionally `--render-dir <working-render-dir>` and `--render`. Then run
 contains its rigged `source.glb` and receives the editable Blender file, both
 outfit GLBs and geometry/animation reports. Stitch each outfit's color and livery
 passes with the existing `clerk-sheet.mjs` tool before installation.
+
+### Rear collar brand coverage
+
+The polo's raised rear collar uses secondary trim even above the neck joint;
+the Oxford maps the same collar surface to its primary shirt material. The
+authoring classifier includes that garment band. Shipped coverage includes
+rear and oblique collar pixels across idle, walking and working frames, with
+the color atlas retained. Private installed identities use the same coverage.
