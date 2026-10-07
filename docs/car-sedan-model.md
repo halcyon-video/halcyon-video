@@ -90,17 +90,24 @@ identical on low, medium and high quality tiers.
 | Color-pass draws | 9 | 9 |
 | Embedded textures | 0 | 0 |
 
-Double-sided transparent glazing adds a second color-pass draw. At the full
-supported ten-regular admission (five of each vehicle), the measured parked
-geometry totals **47,840 triangles, 80 batches and 90 color draws**. The previous
-ten-hatchback equivalent was 46,040 triangles with the same batch/draw counts;
-the increase is 1,800 triangles, approximately 3.9 percent. Sixteen geometries and
-24 materials are referenced by those parked cars; paint is the only cloned finish.
-The adapter additionally retains six fallback geometries/materials and the two
-source paint materials for reuse. Total source/fallback/parked ownership is 22
-geometries and 32 materials, with no vehicle textures. Costs exclude shadow passes,
-customer sprites and the rest of the store; they are not a frame-time benchmark.
-The photographed day admits four regulars and shows two hatchbacks plus two sedans.
+Double-sided transparent glazing adds a second color-pass draw. The current
+supported peak is eight sunset customers (four of each vehicle): aggregating the
+measured actual per-car geometry gives **38,272 triangles, 64 batches and 72 color
+draws**. The previous eight-hatchback equivalent was 36,832 triangles with the
+same batch/draw counts; the increase is 1,440 triangles, approximately 3.9 percent.
+Sixteen geometries and 22 materials are referenced by those parked cars; paint is
+the only cloned finish. The adapter additionally retains six fallback
+geometries/materials and the two source paint materials for reuse. Total
+source/fallback/parked ownership at that peak is 22 geometries and 30 materials,
+with no vehicle textures.
+
+A separate ten-identity stress admission (five of each vehicle) measured 47,840
+triangles, 80 batches, 90 color draws, 16 referenced geometries and 24 referenced
+materials. This exceeds the current time-of-day roster maximum; it tests the
+shared adapter and parking capacity, not a claim of ten simultaneous visitors in
+the shipped consumer. Costs exclude shadow passes, customer sprites and the rest
+of the store; they are not a frame-time benchmark. The photographed day admits
+four regulars and shows two hatchbacks plus two sedans.
 
 ## Verification evidence
 
@@ -109,7 +116,7 @@ rear lamp orientation, finite normals, UVs, all eight roles and bounded resource
 cost. Targeted customer tests cover mixed stable identity, future-year filtering,
 narrow-stall selection, excluded bays, full capacity, admission and ownership
 through browse/checkout/departure/re-entry. The private adapter probe loads both
-actual assets and measures every assigned envelope/ground/yaw at full admission,
+actual assets and measures every assigned envelope/ground/yaw at ten-identity stress admission,
 then exercises missing sedan, independent completion, exact fallback bounds,
 paint ownership, teardown during pending loads, late success/error and tier
 coherence. The required build runs the enforced budget/provider/slot gates.
