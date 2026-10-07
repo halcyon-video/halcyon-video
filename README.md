@@ -6,7 +6,7 @@
 [![License](https://img.shields.io/badge/license-GPL--3.0-6a737d)](LICENSE)
 [![Stars](https://img.shields.io/github/stars/halcyon-video/halcyon-video?color=6a737d)](https://github.com/halcyon-video/halcyon-video/stargazers)
 
-**Next release: date pending.** The presentation below shows the current development build; a release follows owner testing. Published downloads and release notes remain on the [releases page](https://github.com/halcyon-video/halcyon-video/releases).
+**Current release: 0.25.0.** Explore the store configurations below, then see [release notes and downloads](https://github.com/halcyon-video/halcyon-video/releases/tag/v0.25.0).
 
 **The video store you remember, stocked with what you can watch.**
 
@@ -66,7 +66,7 @@ shows additional configurations from version 0.19.0.
 
 [Watch the silent flycam tour](docs/presentation/flycam.mp4) of the running app.
 The footage uses the app’s recorder and illustrative demo stock, with automated
-keyboard flight. It shows the current development build, not a dated release.
+keyboard flight. The capture revision and recording details are documented beside the video.
 
 ## A media library you can walk through
 
