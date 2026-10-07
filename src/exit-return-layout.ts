@@ -1,7 +1,8 @@
 import quickDrop from './exit-return-spec.json' with { type: 'json' };
 import type { Footprint } from './layout-validator.ts';
 export interface ExitGeometry { xL: number; frontZ: number; sideDoorZ: number; doorW: number; hasChamber: boolean }
-/** Returns station against the glass; an angled customer face opens beside the exit. */
+export const RETURN_WINDOW_CLEARANCE = .45;
+/** Returns station clear of the glass; an angled customer face opens beside the exit. */
 export function exitReturnLayout(storeWidth: number,vest: ExitGeometry): Footprint | null {
   if (!vest.hasChamber) return null;
   const right=vest.xL-.15;
@@ -10,7 +11,7 @@ export function exitReturnLayout(storeWidth: number,vest: ExitGeometry): Footpri
   // Uniform plan scaling preserves the model's 45-degree customer faces.
   const depth=width*11.5/15.5;
   return {label:'structure:exit-return-counter',kind:'structure',cx:right-width/2,
-    cz:vest.frontZ-(depth+quickDrop.glassOffset)/2,w:width,d:depth+quickDrop.glassOffset,yaw:0};
+    cz:vest.frontZ-RETURN_WINDOW_CLEARANCE-(depth+quickDrop.glassOffset)/2,w:width,d:depth+quickDrop.glassOffset,yaw:0};
 }
 
 /** Physical millwork only: preserve the open interior and vestibule-side staff entrance. */

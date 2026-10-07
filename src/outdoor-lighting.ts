@@ -326,7 +326,7 @@ export class OutdoorLightingRig {
     let bakeWithSky = true;
     const applyTexture = (tex: THREE.Texture | null) => {
       const image = tex?.image as HTMLImageElement | undefined;
-      this.photographicGround = Boolean(tex?.userData.photographicGround && image && image.width / image.height <= 2.5);
+      this.photographicGround = Boolean(image && image.width / image.height <= 2.5);
       this.groundModeListener?.(this.photographicGround);
       if (this.skyMesh) setPanoramaProjection(this.skyMesh, this.photographicGround);
       if (tex && image && image.width / image.height > 2.5 && this.skyMesh) {

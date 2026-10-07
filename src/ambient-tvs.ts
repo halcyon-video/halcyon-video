@@ -1534,7 +1534,7 @@ export class AmbientTvs implements StoreFixture {
       g.position.set(x, bankY, bankZ); // screens face +Z (no rotation)
 
       const bezel = new THREE.Mesh(
-        makeBezelFrame(outerW, outerH, screenW + 0.04, screenH + 0.04, bezelDepth, 0.06),
+        makeBezelFrame(outerW, outerH, screenW - 0.06, screenH - 0.06, bezelDepth, 0.06),
         blackBezelMat,
       );
       bezel.castShadow = true;

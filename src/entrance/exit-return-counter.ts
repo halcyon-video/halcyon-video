@@ -10,7 +10,7 @@ import { installDisplayModel } from '../fixtures/display-model';
 import { prepareRetailModel } from '../fixtures/retail-model';
 import { getRentalCaseGeometry, createHeroRentalMaterials, CASE_DEPTH } from '../video-case';
 
-import { exitReturnLayout, exitReturnSegments, type ExitGeometry } from '../exit-return-layout';
+import { exitReturnLayout, exitReturnSegments, RETURN_WINDOW_CLEARANCE, type ExitGeometry } from '../exit-return-layout';
 
 /** The countertop, not the stock, forms the exit passage. Employee side is +Z. */
 export function buildExitReturnCounter(ctx: FixtureContext, parent: THREE.Group, vest: ExitGeometry): Footprint[] {
@@ -57,8 +57,8 @@ export function buildExitReturnCounter(ctx: FixtureContext, parent: THREE.Group,
         const p=o.geometry.getAttribute('position');
         // Pin 217: the exterior metal face stands one millimetre proud of
         // the z=15 glazing, not several inches out in the walkway.
-        const receiverFront = quickDrop.glassOffset + quickDrop.faceClearance;
-        for(let i=0;i<p.count;i++) if(p.getZ(i)>0) p.setZ(i,p.getZ(i)/.18328084*receiverFront/(length/15.5));
+        const receiverFront = quickDrop.glassOffset + quickDrop.faceClearance + RETURN_WINDOW_CLEARANCE;
+        for(let i=0;i<p.count;i++) if(p.getZ(i)>.181 && Math.abs(p.getX(i)-quickDrop.receiverX)<quickDrop.receiverWidth/2+.001) p.setZ(i,p.getZ(i)/.18328084*receiverFront/(length/15.5));
         p.needsUpdate=true;o.geometry.computeVertexNormals();o.geometry.computeBoundingSphere();
       });
       prepareRetailModel(model);
