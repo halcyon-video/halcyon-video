@@ -31,6 +31,14 @@ export async function installTvMount(ctx: FixtureContext, ceiling: THREE.Group, 
     stem.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), top.clone().sub(end).normalize());
     joint.position.copy(pivot); joint.quaternion.copy(television.quaternion);
     television.add(cradle); ceiling.add(plate, stem, joint);
+    const enclosure = cradle.getObjectByName('TripleHousing');
+    if (enclosure) {
+      television.updateWorldMatrix(true, true);
+      const bounds = new THREE.Box3().setFromObject(enclosure, true);
+      // Low rooms retain the established open cradle and unchanged CRTs.
+      // Only the optional outer skins are omitted when their clearance fails.
+      enclosure.visible = bounds.min.y >= 7 && bounds.max.y <= ctx.ceilingY - .1;
+    }
     if (exposedCeilingEnabled(activeStoreFormat().id, ctx.ceilingY, localStorage.getItem('bb_ceiling_structure'))) {
       // The opaque roof underside is .35 ft above the tile datum. Reuse the
       // authored drop tube to bridge that now-visible gap without moving TVs.
@@ -47,7 +55,7 @@ export async function installTvMount(ctx: FixtureContext, ceiling: THREE.Group, 
       if (mesh.isMesh) { mesh.castShadow = true; mesh.receiveShadow = true; }
     });
     for (const part of fallback) part.visible = false;
-    ceiling.userData.tvMount = {variant: triple ? 'triple' : 'single', dropFeet: length,
+    ceiling.userData.tvMount = {variant: triple ? 'triple' : 'single', enclosure: enclosure?.visible ?? false, dropFeet: length,
       ceilingAttachment: top.toArray(), cabinetAttachment: pivot.toArray()};
     ctx.requestShadowRefresh(); ctx.requestRender();
   } catch (error) {

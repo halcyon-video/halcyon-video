@@ -81,8 +81,45 @@ box('Suspension spreader',(0,1.36,0),(6.1,.13,.45),steel,triple)
 for x in [-2.75,2.75]:
  box('Spreader tie',(x,1.29,0),(.4,.09,1.4),steel,triple)
  for z in [-.64,.64]:cyl('Spreader rivet',(x,1.34,z),.045,.03,zinc,triple)
+housing=group('TripleHousing');housing.parent=triple
+# #209 fitted outer housing extends this existing shared cradle, not a new cage.
+# Actual approved installed cabinets occupy X -4.199..4.212, Y -1.418..1.360,
+# Z -1.566..1.153 in the common centre-CRT frame. Monitors stay unchanged.
+# Flat developed sheet grids have connected faces and actual pierced apertures.
+def sheet(name,us,vs,skip,point,thickness,reverse=False):
+ vertices=[point(u,v) for v in vs for u in us];faces=[];stride=len(us)
+ for j in range(len(vs)-1):
+  for i in range(len(us)-1):
+   if skip(i,j):continue
+   face=(j*stride+i,j*stride+i+1,(j+1)*stride+i+1,(j+1)*stride+i)
+   faces.append(tuple(reversed(face)) if reverse else face)
+ me=bpy.data.meshes.new(name);me.from_pydata(vertices,[],faces);me.update()
+ o=bpy.data.objects.new(name,me);bpy.context.collection.objects.link(o)
+ bpy.ops.object.select_all(action='DESELECT');o.select_set(True)
+ bpy.context.view_layer.objects.active=o
+ mod=o.modifiers.new('Formed sheet thickness and fitted returns','SOLIDIFY');mod.thickness=thickness;mod.offset=-1;mod.use_even_offset=True
+ bpy.ops.object.modifier_apply(modifier=mod.name)
+ return finish(o,name,steel,housing)
+sheet('Shared front pressing with three clear CRT recesses',
+ [-4.28,-4.075,-1.425,-1.325,1.325,1.425,4.075,4.28],[-1.48,-1.175,1.175,1.415],
+ lambda i,j:j==1 and i in [1,3,5],lambda x,y:(x,-1.25,y),.10)
+sheet('Shared upper formed cover with swivel aperture',
+ [-4.28,-.275,.275,4.28],[-1.66,-.275,.275,1.25],
+ lambda i,j:i==1 and j==1,lambda x,z:(x,-z,1.415),.035,True)
+box('Shared lower formed cover',(0,-1.465,-.205),(8.56,.035,2.91),steel,housing)
+# Keep the entire rear CRT depth path open: no continuous rear slab.
+sheet('Open rear perimeter return',[-4.28,-4.15,4.15,4.28],[-1.48,-1.35,1.285,1.415],
+ lambda i,j:i==1 and j==1,lambda x,y:(x,1.66,y),.055,True)
+ventYs=[-1.48,-1.1,-.72,-.64,-.52,-.44,-.32,-.24,-.12,-.04,.08,.16,.28,.36,.48,.56,.68,.76,.88,.96,1.1,1.415]
+for side in [-1,1]:
+ sheet(('Left' if side<0 else 'Right')+' pierced ventilation end cap',
+ [-1.66,-1.42,1.04,1.25],ventYs,lambda i,j:i==1 and j in range(2,19,2),
+ lambda z,y:(side*4.28,-z,y),.045,side>0)
+ for y,z in [(1.25,1.14),(-1.31,-1.55)]:
+  cyl('Visible end cap fastener',(side*4.29,y,z),.034,.024,zinc,housing,'x')
+
 # Consolidate each articulated part by material: small stable draw-call budget.
-for parent in [plate,stem,cradle,joint,triple]:
+for parent in [plate,stem,cradle,joint,triple,housing]:
  for material in [steel,zinc,rubber]:
   objects=[o for o in parent.children if o.type=='MESH' and o.data.materials[0]==material]
   if not objects:continue
@@ -98,6 +135,8 @@ for area in bpy.context.screen.areas:
 out=ROOT/'public/models/tv-suspension.glb';out.parent.mkdir(parents=True,exist_ok=True)
 bpy.ops.wm.save_as_mainfile(filepath=str(ROOT/'tools/models/tv-suspension.blend'))
 bpy.ops.export_scene.gltf(filepath=str(out),export_format='GLB',export_yup=True,export_apply=True)
-tris=sum(len(o.data.polygons) for o in bpy.data.objects if o.type=='MESH')
-metrics={'bytes':out.stat().st_size,'polygons':tris,'meshes':len([o for o in bpy.data.objects if o.type=='MESH']),'units':'feet','cabinetEnvelope':[2.6,2.2,2.2],'cradleBounds':[2.8,2.56,1.7]}
+tris=0
+for o in bpy.data.objects:
+ if o.type=='MESH':o.data.calc_loop_triangles();tris+=len(o.data.loop_triangles)
+metrics={'bytes':out.stat().st_size,'triangles':tris,'meshes':len([o for o in bpy.data.objects if o.type=='MESH']),'units':'feet','proceduralCabinetEnvelope':[2.6,2.2,2.2],'measuredApprovedCrtEnvelope':[2.9112194,2.7778583,2.7181931],'cradleBounds':[2.8,2.56,1.7]}
 (ROOT/'tools/models/tv-suspension-metrics.json').write_text(json.dumps(metrics,indent=2)+'\n');print(metrics)

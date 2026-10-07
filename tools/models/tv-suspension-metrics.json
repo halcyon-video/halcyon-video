@@ -1,12 +1,17 @@
 {
-  "bytes": 518424,
-  "polygons": 3538,
-  "meshes": 12,
+  "bytes": 842400,
+  "triangles": 12808,
+  "meshes": 14,
   "units": "feet",
-  "cabinetEnvelope": [
+  "proceduralCabinetEnvelope": [
     2.6,
     2.2,
     2.2
+  ],
+  "measuredApprovedCrtEnvelope": [
+    2.9112194,
+    2.7778583,
+    2.7181931
   ],
   "cradleBounds": [
     2.8,
