@@ -32,13 +32,14 @@ test('confirmed preferences are individual, configurable, with safe malformed ov
   assert.deepEqual(CUSTOMER_PREFERENCES['customer-08'].favored,['games']);
   assert.deepEqual(CUSTOMER_PREFERENCES['customer-07'].favored,['thrillers']);
   assert.deepEqual(CUSTOMER_PREFERENCES['customer-04'].favored,['action']);
-  const profile=customerPreference('customer-07','{"customer-07":{"favored":["ACTION"],"secondary":["games",7]}}');
-  assert.equal(customerPreferenceWeight(profile,['action']),6);
-  assert.equal(customerPreferenceWeight(profile,['games']),3);
-  assert.equal(customerPreferenceWeight(profile,['comedy']),1);
-  assert.deepEqual(customerPreference('customer-08','broken'),CUSTOMER_PREFERENCES['customer-08']);
-  assert.deepEqual(customerPreference('customer-08',null,'all').favored,[]);
-  assert.deepEqual(customerPreference('customer-08',null,'action').favored,['action']);
+  for (let i = 1; i <= 10; i++) {
+    const profile = customerPreference('customer-'+String(i).padStart(2,'0'));
+    assert.ok(profile.favored.length > 0);
+    assert.equal(customerPreferenceWeight(profile, profile.favored), 6);
+    assert.equal(customerPreferenceWeight(profile, profile.secondary), 3);
+    assert.equal(customerPreferenceWeight(profile, ['unstocked']), 1);
+  }
+  assert.equal(new Set(Object.values(CUSTOMER_PREFERENCES).map(p => p.favored.join(','))).size, 10);
 });
 test('parking assignment stays stable, excludes reserved/access bays, refuses full lot and future/oversized models',()=>{
   const spaces=parkingLayout(44,4.7,-45).spaces.slice(0,4).map((s,i)=>({...s,accessible:i===0,reserved:i===1}));

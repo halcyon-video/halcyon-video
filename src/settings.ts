@@ -1,6 +1,6 @@
 import { CLERK_UNIFORM_SETTING } from './clerk-uniform';
-import { CLERK_IDENTITY_SETTING, CUSTOMER_SETTING } from './cast-catalog';
-import { CUSTOMER_PREFERENCE_SETTINGS } from './customer-preferences';
+import { CLERK_IDENTITY_SETTING } from './cast-catalog';
+import { organizeSetting } from './settings-navigation';
 import { REEL_MODE_KEY } from './reel-profile';
 import { STEAM_REVIEW_TIERS } from './steam-catalog';
 // ─── Schema-driven settings registry ───────────────────────────────────────
@@ -63,7 +63,7 @@ import { getAmbientTvStatus, formatAmbientTvStatus } from './ambient-tv-status';
 
 export type SettingKind = 'toggle' | 'cycle' | 'text' | 'secret' | 'readout';
 export type ApplyMode = 'live' | 'rebuild-scene' | 'reload';
-export type SettingGroup = 'Connection' | 'Store Look' | 'Store Brand' | 'Playback' | 'Performance' | 'Video Games';
+export type SettingGroup = 'Connection' | 'Store Look' | 'Store Brand' | 'Playback' | 'Performance' | 'Video Games' | 'Catalog' | 'Browsing & Rentals' | 'Overhead TVs';
 
 export interface SettingChoice {
   id: string;
@@ -124,6 +124,7 @@ const registry = new Map<string, SettingDef>();
 const order: string[] = [];
 
 export function registerSetting(def: SettingDef): void {
+  def = organizeSetting(def);
   if (!registry.has(def.key)) order.push(def.key);
   registry.set(def.key, def as SettingDef);
 }
@@ -164,12 +165,12 @@ export function subpagesInGroup(group: SettingGroup): string[] {
 
 /** Groups that currently have at least one visible setting, in a fixed order. */
 export function visibleGroups(): SettingGroup[] {
-  const wanted: SettingGroup[] = ['Store Look', 'Store Brand', 'Playback', 'Video Games', 'Performance', 'Connection'];
+  const wanted: SettingGroup[] = ['Catalog', 'Store Look', 'Store Brand', 'Browsing & Rentals', 'Playback', 'Overhead TVs', 'Video Games', 'Performance', 'Connection'];
   // Store Brand has no registry rows — its page is the custom logo-editor
   // panel (buildStoreBrandPanel below), so it's always visible. The public
   // demo has no servers to connect to, so its Connection group is hidden.
   return wanted.filter((g) =>
-    !(isDemoMode && g === 'Connection') && (g === 'Store Brand' || settingsInGroup(g).length > 0 || subpagesInGroup(g).length > 0));
+    !(isDemoMode && g === 'Connection') && (g === 'Catalog' || g === 'Store Brand' || settingsInGroup(g).length > 0 || subpagesInGroup(g).length > 0));
 }
 
 /**
@@ -463,8 +464,6 @@ export function registerCoreSettings(): void {
 
   registerSetting(CLERK_UNIFORM_SETTING);
   registerSetting(CLERK_IDENTITY_SETTING);
-  registerSetting(CUSTOMER_SETTING);
-  CUSTOMER_PREFERENCE_SETTINGS.forEach(registerSetting);
 
   // Store Brand -------------------------------------------------------------
   // Brand pack selection lives with the logo editor and its preview.
@@ -619,7 +618,7 @@ export function registerCoreSettings(): void {
     default: 'day',
     applyMode: 'live',
     apply: (value, scene) => scene.setOutsideMode(value as 'morning' | 'day' | 'night' | 'sunset'),
-    hint: 'Time of day seen through the storefront windows.',
+    hint: 'Store lighting and automatic customer traffic: quiet mornings, busiest at sunset.',
   });
 
   registerSetting({

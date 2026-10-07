@@ -9,18 +9,13 @@ export const CLERK_IDENTITY_SETTING: SettingDef = {
   values: [{ id: 'clerk-a', label: 'Chestnut Bob' }, { id: 'clerk-b', label: 'Black Quiff' }],
   default: 'clerk-a', applyMode: 'rebuild-scene', hint: 'Choose the employee working this store.',
 };
-export const CUSTOMER_SETTING: SettingDef = {
-  key: 'bb_customers', label: 'Customers', kind: 'cycle', group: 'Store Look',
-  values: [{ id: 'quiet', label: 'A Few Browsers' }, { id: 'busy', label: 'All Ten Regulars' }, { id: 'off', label: 'Off' }],
-  default: 'quiet', applyMode: 'rebuild-scene', hint: 'Regulars browse the stocked aisles.',
-};
 export function resolveClerkIdentity(value: unknown): 'clerk-a' | 'clerk-b' {
   return value === 'clerk-b' ? 'clerk-b' : 'clerk-a';
 }
 export function customerCount(value: unknown): number {
-  return value === 'off' ? 0 : value === 'busy' ? 10 : 3;
+  return value === 'morning' ? 2 : value === 'sunset' ? 8 : value === 'night' ? 5 : 4;
 }
-/** All ten identities participate in quiet stores, with no duplicate per visit. */
+/** All ten identities participate in the time-of-day rotation, with no duplicate per visit. */
 export function customerRoster(value: unknown, offset = 0): readonly string[] {
   const start = ((Math.trunc(offset) % CUSTOMER_IDS.length) + CUSTOMER_IDS.length) % CUSTOMER_IDS.length;
   return Array.from({ length: customerCount(value) }, (_, i) => CUSTOMER_IDS[(start + i) % CUSTOMER_IDS.length]);

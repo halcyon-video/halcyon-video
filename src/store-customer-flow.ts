@@ -8,7 +8,7 @@ import { customerCount } from './cast-catalog';
 
 export function installStoreCustomers(scene: StoreScene): void {
   const nav=scene.clerkNavGrid, exterior=scene.exterior, frame=scene.entrance?.getCounterFrame();
-  if(!nav||!exterior||!frame||!customerCount(localStorage.getItem('bb_customers')))return;
+  if(!nav||!exterior||!frame||!customerCount(scene.getOutsideMode()))return;
   const checkoutPoint=nav.nearestWalkable(frame.fx-frame.nx*2.3,frame.fz-frame.nz*2.3,1);
   // The shared clerk grid excludes the vestibule. Its store-side door approach
   // is the admission/departure boundary, never a path through its glass walls.
@@ -22,6 +22,14 @@ export function installStoreCustomers(scene: StoreScene): void {
   const simulation=new CustomerSimulation(nav,stops,parking,checkout,exit);
   const vehicles=new CustomerVehicles(parking,()=>{scene.queueStructuralShadowRefresh();scene.requestRender();});
   exterior.group.add(vehicles.group);
-  scene.customers=new StoreCustomers(simulation,vehicles,()=>scene.requestRender());
+  scene.customers=new StoreCustomers(simulation,vehicles,()=>scene.requestRender(),scene.getOutsideMode());
   scene.scene.add(scene.customers.group);
+}
+
+export function refreshStoreCustomers(scene: StoreScene): void {
+  if (!scene.customers) return;
+  scene.customers.dispose();
+  scene.customers = null;
+  installStoreCustomers(scene);
+  scene.queueStructuralShadowRefresh();
 }

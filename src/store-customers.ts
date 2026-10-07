@@ -23,7 +23,7 @@ export class StoreCustomers {
   private readonly sphere=new THREE.Sphere(new THREE.Vector3(),3.2);
   private disposed=false;
   private active=false;
-  constructor(readonly simulation:CustomerSimulation, readonly vehicles:CustomerVehicles, private readonly wake:()=>void) {
+  constructor(readonly simulation:CustomerSimulation, readonly vehicles:CustomerVehicles, private readonly wake:()=>void, outsideMode = 'day') {
     const canvas=document.createElement('canvas');canvas.width=canvas.height=64;
     const ctx=canvas.getContext('2d')!;
     const gradient=ctx.createRadialGradient(32,32,2,32,32,30);
@@ -32,7 +32,7 @@ export class StoreCustomers {
     this.shadowTexture=new THREE.CanvasTexture(canvas);
     this.shadowMaterial=selfLit(new THREE.MeshBasicMaterial({map:this.shadowTexture,transparent:true,opacity:.30,depthWrite:false}),'shadow');
     this.group.name='store-customers';this.group.userData.excludeFromSSAO=true;this.group.userData.aoBlendMask=true;
-    for(const [i,id] of customerRoster(localStorage.getItem('bb_customers'),new Date().getDate()).entries()) {
+    for(const [i,id] of customerRoster(outsideMode,new Date().getDate()).entries()) {
       const material=new THREE.MeshStandardMaterial({transparent:false,alphaTest:.5,roughness:1,metalness:0,depthWrite:true});
       const mesh=new THREE.Mesh(this.geometry,material);mesh.name=id;mesh.position.y=3.2;mesh.receiveShadow=true;
       mesh.onBeforeRender=(_renderer,_scene,camera)=>{camera.getWorldQuaternion(mesh.quaternion);mesh.updateMatrixWorld(true);};
@@ -46,7 +46,7 @@ export class StoreCustomers {
         if(texture.image.width!==2048||texture.image.height!==rows*384){texture.dispose();return;}
         // A failed/missing sprite never occupies a parking space. Conversely,
         // admission without both a reachable destination and a car is refused.
-        person.state=this.simulation.add(id,customerPreference(id,localStorage.getItem('bb_customer_preferences'),localStorage.getItem('bb_customer_favorite_'+id.slice(-2))));
+        person.state=this.simulation.add(id,customerPreference(id));
         if(!person.state){texture.dispose();return;}
         texture.colorSpace=THREE.SRGBColorSpace;texture.generateMipmaps=false;texture.minFilter=texture.magFilter=THREE.LinearFilter;
         texture.repeat.set(1/8,1/rows);texture.offset.set(0,1-1/rows);
