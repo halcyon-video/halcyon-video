@@ -53,9 +53,10 @@ reviewed build-time HTTPS origin, never a query value or inferred referrer. When
 present, the receiver constructs the canonical title/browse route itself. When
 absent or invalid, the notice explains that return configuration is missing and
 directs visitors to browser Back. It does not fabricate an owned hostname.
-The existing hosted release may not understand this new receiver until the owner
-releases it; the bridge discloses that limitation. It never claims the currently
-hosted app has selected the title.
+The receiver first shipped in release `v0.23.0` and is live in the hosted store
+deployed from `v0.25.0` (Pages deploy 2026-10-07; the served bundle contains the
+`catalog` parser and its 256-character bound). The bridge still words this
+conservatively and never claims the hosted app has selected the title.
 
 The bridge loads no store iframe, canvas, video, model or texture. Its 72,474-byte
 960×540 WebP still was captured using the existing shot tool from an asset-free
@@ -79,8 +80,8 @@ the valid empty-store start, optional existing media servers, browsing, and the
 difference between provider link-out and actual playback. There is no LAN scan,
 connection form, credential collection or pairing backend in the public site.
 
-The current published release verified while writing this increment was
-`v0.22.0` (2026-09-23), with no release assets attached. The README is the current
+The current published release, re-checked 2026-10-10, is `v0.25.0`
+(2026-10-07), still with no release assets attached. The README is the current
 installation guide; links do not promise a prebuilt desktop download. This wave
 does not claim a fresh-reader install of that release or physical-phone tests.
 
@@ -108,8 +109,8 @@ Fixture watch links remain disabled, so no real provider conversion is claimed.
 ## Remaining release gates
 
 Project-specific catalog/image permissions and deployment decisions from
-#354–#356 remain closed. An explicitly configured canonical catalog origin,
-released receiver, physical-phone
+#354–#356 are still unresolved (the owner chose a pages.dev preview address first on 2026-10-11). The receiver is released (see above). An explicitly
+configured canonical catalog origin (blocked on #356), physical-phone
 flat-to-3D-to-return acceptance, and a fresh-reader installation of a named
 release are still required before #357 can be complete. The public site has not
 been published by this increment. Existing root rendering work is independent.
