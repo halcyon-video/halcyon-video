@@ -1,7 +1,9 @@
 # Customer visits and parking
 
 Regulars choose actual stocked shelf sections, reserve their destination and keep
-2.6 feet between floor positions. Temporary occupied cells use the shared clerk
+2.6 feet between bodies on the floor. Reserved browsing positions sit at least
+four feet apart, so neighbouring sections never hold a shoulder-to-shoulder
+pair; the counter and door keep their own turn-taking. Temporary occupied cells use the shared clerk
 A* grid; segment checks visit every crossed grid cell, including corner crossings.
 A remaining route reserves its corridor until it is traversed, so crossing or
 opposing paths wait their turn. Counter turns and the entrance have explicit

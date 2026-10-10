@@ -4,6 +4,8 @@ import type { CustomerParking } from './customer-parking.ts';
 import { customerRouteObstacles, customerRoutesSeparated } from './customer-route.ts';
 
 export const CUSTOMER_SEPARATION = 2.6;
+/** Two shoppers parked at neighbouring sections read as a pair, not a store. */
+export const BROWSE_SPACING = 4;
 export interface CustomerStop extends NavPoint { id: string; yaw: number; departments: readonly string[] }
 export interface CustomerNavigation {
   isWalkable(x: number, z: number): boolean;
@@ -60,7 +62,9 @@ export class CustomerSimulation {
   private available(stop: CustomerStop, person?: CustomerState): boolean {
     if (this.reservations.has(stop.id) && this.reservations.get(stop.id) !== person?.id) return false;
     if (!this.clear(stop, person)) return false;
-    return this.people.every(p => p === person || !p.active || !p.stop || distance(stop, p.stop) >= CUSTOMER_SEPARATION);
+    // The counter and door keep their own turn-taking; shelf positions keep elbow room.
+    const spacing = stop === this.checkout || stop === this.exit ? CUSTOMER_SEPARATION : BROWSE_SPACING;
+    return this.people.every(p => p === person || !p.active || !p.stop || distance(stop, p.stop) >= spacing);
   }
   private select(person: CustomerState, from: NavPoint): {stop: CustomerStop; path: NavPoint[]} | null {
     const candidates: { stop: CustomerStop; weight: number }[] = [];

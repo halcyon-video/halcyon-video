@@ -4,7 +4,7 @@ const require=createRequire(import.meta.url);
 import assert from 'node:assert/strict';
 import { CustomerParking, CUSTOMER_VEHICLES, customerStoreYear } from '../src/customer-parking.ts';
 import { customerDepartment, customerPreference, customerPreferenceWeight, CUSTOMER_PREFERENCES, FAVORED_WEIGHT, SECONDARY_WEIGHT } from '../src/customer-preferences.ts';
-import { CustomerSimulation, CUSTOMER_SEPARATION, type CustomerStop } from '../src/customer-simulation.ts';
+import { BROWSE_SPACING, CustomerSimulation, CUSTOMER_SEPARATION, type CustomerStop } from '../src/customer-simulation.ts';
 import { parkingLayout } from '../src/parking-layout.ts';
 import { ClerkNavGrid } from '../src/clerk-nav.ts';
 
@@ -36,7 +36,9 @@ function invariant(sim:CustomerSimulation) {
   }
   for(let i=0;i<active.length;i++)for(let j=i+1;j<active.length;j++) {
     assert.ok(Math.hypot(active[i].x-active[j].x,active[i].z-active[j].z)>=CUSTOMER_SEPARATION-1e-7,'customer overlap');
-    if(active[i].stop&&active[j].stop)assert.notEqual(active[i].stop.id,active[j].stop.id);
+    const a=active[i].stop,b=active[j].stop;
+    if(a&&b)assert.notEqual(a.id,b.id);
+    if(a?.departments.length&&b?.departments.length)assert.ok(Math.hypot(a.x-b.x,a.z-b.z)>=BROWSE_SPACING-1e-7,'browsing positions bunched');
   }
   for(const [id,owner] of sim.reservations)assert.ok(active.some(p=>p.id===owner&&p.stop?.id===id),'no abandoned reservation');
 }
