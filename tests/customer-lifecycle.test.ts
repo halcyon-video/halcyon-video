@@ -1,7 +1,9 @@
 import test from 'node:test';
+import { createRequire } from 'node:module';
+const require=createRequire(import.meta.url);
 import assert from 'node:assert/strict';
 import { CustomerParking, CUSTOMER_VEHICLES, customerStoreYear } from '../src/customer-parking.ts';
-import { customerPreference, customerPreferenceWeight, CUSTOMER_PREFERENCES } from '../src/customer-preferences.ts';
+import { customerDepartment, customerPreference, customerPreferenceWeight, CUSTOMER_PREFERENCES, FAVORED_WEIGHT, SECONDARY_WEIGHT } from '../src/customer-preferences.ts';
 import { CustomerSimulation, CUSTOMER_SEPARATION, type CustomerStop } from '../src/customer-simulation.ts';
 import { parkingLayout } from '../src/parking-layout.ts';
 import { ClerkNavGrid } from '../src/clerk-nav.ts';
@@ -13,6 +15,16 @@ function fixture(count=10,spaces=20,year=1993) {
   const parking=new CustomerParking(parkingLayout(68,4.7,-45).spaces.slice(0,spaces),year);
   const simulation=new CustomerSimulation(nav,stops,parking,stop('checkout',-5,5,[]),stop('exit',5,10,[]));
   return {nav,stops,parking,simulation};
+}
+function productionFloor() {
+  const {readFileSync}=require('node:fs') as typeof import('node:fs');
+  const f=JSON.parse(readFileSync(new URL('./fixtures/customer-floor.json',import.meta.url),'utf8'));
+  const rects=f.blockedRows.flatMap((spans:number[],r:number)=>{
+    const row=[];
+    for(let i=0;i<spans.length;i+=2)row.push({cx:f.bounds.minX+(spans[i]+spans[i+1])*f.cell/2,cz:f.bounds.minZ+(r+.5)*f.cell,w:(spans[i+1]-spans[i])*f.cell,d:f.cell,yaw:0});
+    return row;
+  });
+  return {f,nav:new ClerkNavGrid(f.bounds,rects,{cellSize:f.cell,clearance:0,wallMargin:0})};
 }
 function invariant(sim:CustomerSimulation) {
   const active=sim.people.filter(p=>p.active);
@@ -35,9 +47,12 @@ test('confirmed preferences are individual, configurable, with safe malformed ov
   for (let i = 1; i <= 10; i++) {
     const profile = customerPreference('customer-'+String(i).padStart(2,'0'));
     assert.ok(profile.favored.length > 0);
-    assert.equal(customerPreferenceWeight(profile, profile.favored), 6);
-    assert.equal(customerPreferenceWeight(profile, profile.secondary), 3);
+    assert.equal(customerPreferenceWeight(profile, profile.favored), FAVORED_WEIGHT);
+    assert.equal(customerPreferenceWeight(profile, profile.secondary), SECONDARY_WEIGHT);
     assert.equal(customerPreferenceWeight(profile, ['unstocked']), 1);
+    // An all-genre shelf that merely contains the favorite is not a favored department.
+    const mixed=[...profile.favored,'foreign','western','musical','war','history','sports','music'];
+    assert.ok(customerPreferenceWeight(profile, mixed) < SECONDARY_WEIGHT);
   }
   assert.equal(new Set(Object.values(CUSTOMER_PREFERENCES).map(p => p.favored.join(','))).size, 10);
 });
@@ -127,22 +142,41 @@ test('remaining route reservations reject crossing, head-on and too-close parall
   assert.equal(customerRoutesSeparated([{x:0,z:0}],[{x:-10,z:0},{x:10,z:0}],2.6),false);
 });
 
-test('public production floor completes repeated visits with six different admission orders',async()=>{
-  const {readFileSync}=await import('node:fs');
-  const f=JSON.parse(readFileSync(new URL('./fixtures/customer-floor.json',import.meta.url),'utf8'));
-  const rects=f.blockedRows.flatMap((spans:number[],r:number)=>{
-    const row=[];
-    for(let i=0;i<spans.length;i+=2)row.push({cx:f.bounds.minX+(spans[i]+spans[i+1])*f.cell/2,cz:f.bounds.minZ+(r+.5)*f.cell,w:(spans[i+1]-spans[i])*f.cell,d:f.cell,yaw:0});
-    return row;
-  });
+test('public production floor completes repeated visits with six different admission orders',()=>{
   for(let order=0;order<6;order++){
-    const nav=new ClerkNavGrid(f.bounds,rects,{cellSize:f.cell,clearance:0,wallMargin:0});
+    const {f,nav}=productionFloor();
     const sim=new CustomerSimulation(nav,f.stops,new CustomerParking(f.spaces,1993),f.checkout,f.exit);
     for(let j=0;j<10;j++){const id='customer-'+String((j+order)%10+1).padStart(2,'0');assert.ok(sim.add(id,customerPreference(id)));}
     for(let frame=0;frame<60000;frame++){sim.update(.1);invariant(sim);}
     assert.ok(sim.people.every(p=>p.trips>=2),JSON.stringify({order,people:sim.people.map(p=>({id:p.id,trips:p.trips,phase:p.phase,blocked:p.blocked}))}));
     sim.dispose();assert.equal(sim.parking.assignments.size,0);
   }
+});
+
+test('regulars show their own departments over repeated visits on the production floor',()=>{
+  const {f,nav}=productionFloor();
+  const sim=new CustomerSimulation(nav,f.stops,new CustomerParking(f.spaces,1993),f.checkout,f.exit);
+  const ids=Array.from({length:8},(_,i)=>'customer-'+String(i+1).padStart(2,'0'));
+  for(const id of ids)assert.ok(sim.add(id,customerPreference(id)));
+  const pure=(departments:readonly string[],wanted:readonly string[])=>departments.length===1&&wanted.includes(customerDepartment(departments[0]));
+  const seen=new Map<string,{favored:number,total:number}>(),last=new Map<string,unknown>();
+  for(let frame=0;frame<60000;frame++){
+    sim.update(.1);
+    for(const p of sim.people){
+      if(!p.active||p.phase!=='browsing'||last.get(p.id)===p.stop)continue;
+      last.set(p.id,p.stop);const t=seen.get(p.id)??{favored:0,total:0};seen.set(p.id,t);
+      t.total++;if(pure(p.stop!.departments,p.profile.favored))t.favored++;
+    }
+  }
+  let checked=0;
+  for(const id of ids){
+    const profile=customerPreference(id),base=f.stops.filter((s:{departments:string[]})=>pure(s.departments,profile.favored)).length/f.stops.length;
+    if(!base)continue; // Thrillers/romance/drama have no dedicated shelf here: alternatives only.
+    const t=seen.get(id)!;checked++;
+    assert.ok(t.favored/t.total>=Math.max(.25,base*2.5),`${id} ${JSON.stringify(t)} base ${base.toFixed(2)}`);
+    assert.ok(t.favored<t.total*.8,`${id} is not locked to one department`);
+  }
+  assert.ok(checked>=5);
 });
 
 test('a shopper beside a wall can escape a nearby conservative body mask',()=>{

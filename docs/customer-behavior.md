@@ -15,8 +15,10 @@ Preferences are explicit identity data in `customer-preferences.ts`. Customer 08
 and customer 04 (plaid shirt) favors action. The other seven have individually
 authored primary and secondary tastes, covering comedy, drama, romance, horror,
 science fiction, documentary and animation. Favored sections
-have weight six, secondary choices weight three, and other available departments
-weight one. Department weights are divided across their available positions so
+have weight twelve, secondary choices weight four, and other available departments
+weight one. An unlabeled all-genre section earns only the matching share of its
+departments, so a mixed shelf holding one comedy is not every comedy fan's
+favorite. Department weights are divided across their available positions so
 a longer aisle does not overwhelm a smaller department. Missing, unreachable or
 occupied choices leave alternatives available. Nothing derives preferences from
 age or gender.
