@@ -179,7 +179,9 @@ export function frontRefreshmentPlacements(obstacles: Footprint[], bounds: Bound
     const span=rotated?spec.d:spec.w, u=along+span/2; along+=span;
     if (rotated) result.push({id:`${kind}-front`,kind,position:point(u,0),yaw:yaw+Math.PI/2});
     else for (const side of [1,-1]) result.push({id:`${kind}-${side===1?'front':'rear'}`,kind,
-      position:point(u,side*spec.d/2),yaw:yaw+(side===1?0:Math.PI)});
+      position:point(u,side*spec.d/2),yaw:yaw+(side===1?0:Math.PI),
+      // The rear gondola's +X end faces the open pocket behind the queue rack.
+      ...(kind==='candy-wall-gondola'&&side===-1?{options:{slatwallWing:true}}:{})});
   }
   result.push({id:'candy-display-front',kind:'candy-display',position:point(-width/2+queueWidth/2,queueDepth/2),yaw,
     options:{rows:5,footprintWidth:queueWidth,footprintDepth:queueDepth,dispenserPacks:true}});

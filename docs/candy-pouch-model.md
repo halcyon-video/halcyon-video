@@ -1,10 +1,10 @@
 # Hanging snack pouch kit
 
 Original generic flexible packaging, authored in Blender for issue #277 and
-installed on the public queue rack and gondola. The photographed slatwall-wing
-variant remains separate, incomplete scope. The final section records current
-runtime coverage and its verification; the earlier candidate section records
-the original asset-only stage.
+installed on the public queue rack, the gondola's upper tiers and a slatwall
+wing on the rear concessions gondola's open end. The final sections record
+current runtime coverage and its verification; the earlier candidate section
+records the original asset-only stage.
 
 ## Provenance and construction
 
@@ -51,6 +51,8 @@ file initially isolates the small pouch; other named groups can be unhidden.
 | GondolaCrossbar | X −1.85 to +1.85; .0125-ft tube radius | 28 |
 | RackSideRail | Z −.64 to +.64; .0125-ft tube radius | 28 |
 | RackCrownRail | Z ±.2449173967; .0125-ft tube radius | 28 |
+| SlatwallWing | board .0625 × 4.6 × 1.5 ft on a .4-ft kick; caps, ties | 516 |
+| SlatwallHook | .07 × .128 ft bracket + .75-ft wire, one piece | 152 |
 
 These dimensions are integration design choices near the low end of the issue's
 low-confidence photo estimate, not physical measurements of a commercial bag.
@@ -197,8 +199,7 @@ measurements. The public store's normal warmup/detail-release lifecycle was
 preserved; an omitted release in an excluded private screenshot harness was
 identified and documented separately, without changing the product scheduler.
 
-This is **partial issue #277 progress**, not delivery of the photographed
-slatwall-wing hanging bags. The separate 1993 folded bulk-tray wing retains its
+The photographed slatwall wing is delivered separately below. The separate 1993 folded bulk-tray wing retains its
 own stock and geometry. The optional private rack counterpart retains its
 compatible centred-carton side facings; a test using public substitute hardware
 proved the legacy branch, but the real private wing's geometry and supports
@@ -206,3 +207,48 @@ were not inspected here. Its actual source, backing/hooks, hanger fit and
 private/public-safe integration still require a distinct bounded assignment.
 Neither compatibility path should be described as a newly modeled hanging wing.
 Count-only checkout-bag assortment and physics also remain unchanged.
+
+## Slatwall wing (photographed 2006 queue-side wing)
+
+The 2006 photograph's queue-side wing is a beige grooved slatwall end on the
+candy gondola carrying three or four tiers of bags on slatwall hooks. The kit
+now carries that as two more named groups. Both are original construction
+estimates following common 3/4-inch slatwall practice, not measurements of the
+photographed panel, and they carry no source pixels or marks.
+
+- `SlatwallWing` — origin at the board's inner face, floor level, centred on
+  the gondola end; +X faces the aisle. A single closed extrusion forms the
+  .0625-ft board from y .4 to 5.0 ft across Z ±.75, with 18 real J-slots at
+  .5 + .25k ft: a .024-ft lip opening .022 deep, then a cavity to .045 deep
+  running .02 ft further down behind the face. Steel edge caps butt-join (top
+  cap over both sides), a black kick is set back .012 ft for a shadow line, and
+  two flat-bar ties at 1.0 and 4.6 ft reach .11 ft back to the gondola's rear
+  standard face (store x 1.89, z −.65). Slot anchors are exported.
+- `SlatwallHook` — one mesh with two welded closed shells: a die-formed
+  bracket whose neck passes the slot lip and whose down-leg sits inside the
+  cavity (inside the slot section on every side, no interpenetration), and the
+  .006-ft wire running .75 ft out to a rounded upturn. Origin is the wire
+  centre at the board face, .06 ft below the engaged slot. Load anchors sit at
+  .40 and .62 ft, where the full pouch's wire-rest point coincides.
+
+Runtime (`installCandyGondolaSlatwallWing`): the concessions run gives only the
+rear gondola `slatwallWing: true`; its +X end faces the open pocket behind the
+queue rack. Hooks engage the 1.75/2.75/3.75/4.75-ft slots in two columns at
+Z ±.37; each carries two full pouches, alternating the gondola's two existing
+pouch prints by tier. Bag bottoms land at 1, 2, 3 and 4 ft. The board uses a
+fixture-owned beige laminate, the kick the gondola plinth material, and caps,
+ties and hooks the gondola's steel. Nothing is replaced, so a failed or
+cancelled load leaves the plain gondola end; the wing appears only once ready,
+after the gondola model, and is released with the fixture.
+
+Cost: 16 bags (14,208 triangles, two instanced draws by print), 8 hooks
+(1,216 triangles, one instanced draw) and the wing structure merged per
+material role (516 triangles, three draws): 15,940 triangles in six draws. No
+textures are added. The whole kit GLB is now 2,900 triangles in ten named
+groups, four material roles and 143,384 bytes, still with no embedded images.
+
+The gondola's footprint and collision grow by .8187 ft toward local +X only
+(`slatwallWingFootprint`), covering hook tips; the extended footprint passes
+the same front-run layout validation against the queue rack and checkout as
+before. Tests check slot pitch, wire-rest coincidence, aisle-facing prints,
+bag separation and containment inside the wing footprint.
