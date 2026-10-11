@@ -10,7 +10,7 @@ import { isWhiteClamshell } from './packaging-formats';
 import { retailAudio } from './audio';
 import { isPublicDemo } from './demo-mode';
 import { mobileStoreActive } from './mobile-store';
-import { compileProgramsInStages, prepareStaticTextures, yieldForPrograms } from './program-warmup';
+import { compileProgramsInStages, prepareStaticTextures, shadowDepthProgramViews, submitPostPrograms, yieldForPrograms } from './program-warmup';
 
 const stagedInitialRooms = new WeakSet<StoreScene>();
 const preparing = new WeakSet<StoreScene>();
@@ -20,19 +20,36 @@ export const runtimeProgramsPreparing = (scene: StoreScene): boolean => preparin
 export async function prepareInitialViewPrograms(scene: StoreScene): Promise<void> {
   // Returning rentals and saved alternate roots can move through other views
   // before entry; retain their full-room preparation instead of guessing a frame.
+  // The first shadow bake draws every caster with Three's derived depth
+  // materials; prepare those programs in the same parallel batches.
+  const shadows = scene.renderer.shadowMap.enabled
+    ? shadowDepthProgramViews(scene.scene, scene.renderer.shadowMap.type, scene.programWarmupController.signal).children : [];
+  // Likewise the post chain: queued now, its links finish with the room's.
+  if (scene.composer) submitPostPrograms(scene.renderer, scene.composer, scene.camera);
   if (!['overview', 'walk-around'].includes(scene.mode) || scene.returnDropWatch) {
-    await compileProgramsInStages(scene.renderer, scene.scene, scene.camera,
-      scene.composer?.readBuffer ?? null, scene.programWarmupController.signal);
+    const roots = new THREE.Group();
+    roots.children = [scene.scene, ...shadows];
+    try {
+      await compileProgramsInStages(scene.renderer, scene.scene, scene.camera,
+        scene.composer?.readBuffer ?? null, scene.programWarmupController.signal, roots);
+    } finally { roots.children = []; }
     return;
   }
   stagedInitialRooms.add(scene);
   if (!scene.isWalkAroundMode) scene.snapCamera();
   const roots = new THREE.Group();
-  roots.children = initialProgramObjects(scene.scene, scene.camera);
+  roots.children = [...initialProgramObjects(scene.scene, scene.camera), ...shadows];
   try {
     await compileProgramsInStages(scene.renderer, scene.scene, scene.camera,
       scene.composer?.readBuffer ?? null, scene.programWarmupController.signal, roots,
       (fraction, detail) => updateStoreLoading(70 + 14 * fraction, detail));
+    // Models that finished downloading during that pass joined the view after
+    // its snapshot. Prepare them too instead of linking inside the first frame;
+    // everything already prepared is a program-cache hit.
+    roots.children = initialProgramObjects(scene.scene, scene.camera);
+    await compileProgramsInStages(scene.renderer, scene.scene, scene.camera,
+      scene.composer?.readBuffer ?? null, scene.programWarmupController.signal, roots,
+      (_fraction, detail) => updateStoreLoading(84, detail));
   } finally { roots.children = []; }
 }
 

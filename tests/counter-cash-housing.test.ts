@@ -8,7 +8,7 @@ import ts from 'typescript';
 async function subject() {
   let source = await readFile(new URL('../src/fixtures/counter-cash-housing.ts', import.meta.url), 'utf8');
   const mounts = await readFile(new URL('../src/entrance/counter-mounts.ts', import.meta.url), 'utf8');
-  source = source.replace("import { assetUrl } from '../asset-url';", "const assetUrl = (p: string) => '/base/' + p;")
+  source = source.replace("import { assetUrl, dropInCandidates } from '../asset-url';", "const assetUrl = (p: string) => '/base/' + p; const dropInCandidates = (p: string[]) => p;")
     .replace("import { brandPackDir } from '../brand-pack';", "const brandPackDir = () => 'brand';")
     .replace("import { counterMount, placeOnCounterMount } from '../entrance/counter-mounts';", mounts.replace("import * as THREE from 'three';", ''))
     .replace("import { extractHousingContact, refreshEquipmentContact } from './counter-equipment-contact';", 'const extractHousingContact = () => null; const refreshEquipmentContact = () => {};')

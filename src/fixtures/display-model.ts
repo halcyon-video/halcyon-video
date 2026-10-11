@@ -1,7 +1,7 @@
 import { compactAssets } from '../mobile-assets';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { assetUrl } from '../asset-url';
+import { assetUrl, dropInCandidates } from '../asset-url';
 import { prepareRetailModel } from './retail-model';
 import type { FixtureContext } from '../fixtures';
 
@@ -96,7 +96,8 @@ export function installDisplayModel(
   };
   const load = () => new Promise<void>(complete => {
     if (cancelled) { complete(); return; }
-    const paths = typeof file === 'string' ? [file] : file;
+    const paths = dropInCandidates(typeof file === 'string' ? [file] : [...file]);
+    if (!paths.length) { complete(); return; }
     const attempt = (index: number): void => {
       if (cancelled) { complete(); return; }
       new GLTFLoader().load(assetUrl(paths[index]), result => {

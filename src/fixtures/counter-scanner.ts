@@ -3,7 +3,7 @@ import { finishEquipmentSurfaces } from './equipment-surfaces';
 // remains the existing undecorated desk; this adds no interaction target.
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { assetUrl } from '../asset-url';
+import { assetUrl, dropInCandidates } from '../asset-url';
 import { brandPackDir } from '../brand-pack';
 import type { StoreScene } from '../three-scene';
 
@@ -17,7 +17,7 @@ export function installCounterScanner(scene: StoreScene, parent: THREE.Group): v
   if (!anchor) return;
   const rel = 'fixtures/late-era-fixtures-2012/scanner/model.glb';
   const pack = brandPackDir();
-  const candidates = [...(pack ? [`user-assets/${pack}/${rel}`] : []), `user-assets/${rel}`];
+  const candidates = dropInCandidates([...(pack ? [`user-assets/${pack}/${rel}`] : []), `user-assets/${rel}`]);
   const attached = () => {
     let root: THREE.Object3D = parent;
     while (root.parent) root = root.parent;

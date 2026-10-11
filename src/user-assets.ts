@@ -6,19 +6,10 @@
 // stays silent. Surface PBR sets additionally fall back to the CC0 scans
 // shipped at public/textures/surfaces/ before the procedural maps win.
 import * as THREE from 'three';
-import { assetUrl } from './asset-url';
+import { assetUrl, HOSTED_BUILD } from './asset-url';
 import { brandPackDir } from './brand-pack';
 import { tryLoadShippedSurfaceKtx2 } from './surface-textures';
 
-// The HOSTED build (VITE_DEMO=1 baked at build time — the GitHub Pages
-// deploy, see deploy-demo.yml) is built from the public repo, whose
-// public/user-assets/ tree is git-ignored: every drop-in probe it could make
-// is a guaranteed 404. On a home connection that was ~70 requests (signs,
-// surfaces, brand) per boot, each a 404 page, all sharing the pipe with the
-// covers the reveal waits on. Build-time flag on purpose, NOT the runtime
-// `?demo=1` switch (demo-mode.ts), so a local run with drop-ins installed
-// still sees them in demo mode.
-const HOSTED_BUILD = typeof import.meta.env !== 'undefined' && import.meta.env.VITE_DEMO === '1';
 
 // A shared download is independent of each material's repeat, color space and disposal.
 const imageLoads = new Map<string, Promise<HTMLImageElement>>();

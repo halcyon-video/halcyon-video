@@ -94,7 +94,7 @@ export function createShagCarpetTextures(baseHex: string): SurfaceTextureSet {
   // material here.
   const height = document.createElement('canvas');
   height.width = height.height = S;
-  const h = height.getContext('2d')!;
+  const h = height.getContext('2d', { willReadFrequently: true })!;
   h.fillStyle = '#787878';
   h.fillRect(0, 0, S, S);
   for (let i = 0; i < 7000; i++) {
@@ -226,7 +226,7 @@ export function createWoodPanelTextures(baseHex: string): SurfaceTextureSet {
   // grooves cut hard between them.
   const height = document.createElement('canvas');
   height.width = height.height = S;
-  const h = height.getContext('2d')!;
+  const h = height.getContext('2d', { willReadFrequently: true })!;
   h.fillStyle = '#8c8c8c';
   h.fillRect(0, 0, S, S);
   for (let b = 0; b < BOARDS; b++) {
@@ -350,7 +350,7 @@ export function createWoodShelfTextures(baseHex: string): SurfaceTextureSet {
   // Shallow grain relief only — this is sanded, sealed veneer, not sawn timber.
   const height = document.createElement('canvas');
   height.width = height.height = S;
-  const h = height.getContext('2d')!;
+  const h = height.getContext('2d', { willReadFrequently: true })!;
   h.fillStyle = '#8a8a8a';
   h.fillRect(0, 0, S, S);
   for (let i = 0; i < 700; i++) {

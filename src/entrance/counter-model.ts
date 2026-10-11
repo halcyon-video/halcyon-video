@@ -5,7 +5,7 @@ import { refreshTelephoneContact } from '../fixtures/telephone-surfaces';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { getActiveTheme } from '../themes';
 import { brandPackDir } from '../brand-pack';
-import { assetUrl } from '../asset-url';
+import { assetUrl, dropInCandidates } from '../asset-url';
 import type { FixtureContext } from '../fixtures';
 import type { StorefrontSpec } from '../store-layout';
 
@@ -26,7 +26,7 @@ export function installCounterModel(
   const filename = `checkout-counter-${shape}-${rounded ? 'rounded' : 'laminate'}${edition}.glb`;
   const rel = `fixtures/checkout-counter/${getActiveTheme().id}-${shape}-${rounded ? 'rounded' : 'laminate'}.glb`;
   const pack = brandPackDir();
-  const paths = [...(pack ? [`user-assets/${pack}/${rel}`] : []), `user-assets/${rel}`, `models/${filename}`];
+  const paths = dropInCandidates([...(pack ? [`user-assets/${pack}/${rel}`] : []), `user-assets/${rel}`, `models/${filename}`]);
   // Request every candidate together: on a slow first visit, a missing drop-in's
   // 404 queues behind optional model downloads and holds the startup splash.
   // Drop-ins keep their priority; the bundled bytes are merely already arriving.

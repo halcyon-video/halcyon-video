@@ -3,7 +3,7 @@ import { finishEquipmentSurfaces } from './equipment-surfaces';
 // controls face +Z. The existing counter owns placement and navigation.
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { assetUrl } from '../asset-url';
+import { assetUrl, dropInCandidates } from '../asset-url';
 import { counterMount, placeOnCounterMount } from '../entrance/counter-mounts';
 import { brandPackDir } from '../brand-pack';
 import type { StoreScene } from '../three-scene';
@@ -51,7 +51,7 @@ export function buildImpactPrinter93(
   // second. A missing/corrupt optional model leaves the built-in fixture up.
   const rel = 'fixtures/impact-printer-1993/model.glb';
   const pack = brandPackDir();
-  const candidates = pack ? [`user-assets/${pack}/${rel}`, `user-assets/${rel}`] : [`user-assets/${rel}`];
+  const candidates = dropInCandidates(pack ? [`user-assets/${pack}/${rel}`, `user-assets/${rel}`] : [`user-assets/${rel}`]);
   const isAttached = () => {
     let root: THREE.Object3D = group;
     while (root.parent) root = root.parent;
