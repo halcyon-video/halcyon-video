@@ -1,6 +1,6 @@
 {
   "buildNode": "22.19.0",
   "astro": "7.3.3",
-  "wrangler": "4.144.0",
-  "wranglerStatus": "planned-not-invoked; activation requires a fresh compatibility and permission review"
+  "wrangler": "4.149.0",
+  "wranglerStatus": "installed from deployment/wrangler/package-lock.json only by the trusted cloud-preview job; production upload not activated"
 }

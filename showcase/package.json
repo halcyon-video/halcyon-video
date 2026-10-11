@@ -17,6 +17,7 @@
     "package:preview": "node --experimental-strip-types tools/package-preview.ts",
     "readiness:report": "node --experimental-strip-types tools/readiness-report.ts",
     "deployment:plan": "node --experimental-strip-types tools/deployment-plan.ts",
+    "deployment:cloud-preview-gate": "node --experimental-strip-types tools/cloud-preview-gate.ts",
     "publish:fixture": "node --experimental-strip-types tools/publish-fixture.ts",
     "typecheck": "astro check"
   },
