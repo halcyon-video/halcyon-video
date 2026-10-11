@@ -331,3 +331,11 @@ repository license. The editable source and reproducible Blender script are
 `tools/models/tv-wall-bank.blend` and `tools/models/tv-wall-bank.py`.
 No downloaded geometry, imagery, marks or textures are included. Existing live
 screen and bezel modules remain runtime-owned. See `docs/tv-wall-bank-model.md`.
+
+## Alcove doorway and partition trim (#231)
+
+`alcove-partition.glb` — original generic model authored for Halcyon using Blender
+scripted mesh construction; no third-party assets or branded reference derivatives.
+Editable source and generator: `tools/models/alcove-partition.blend` and `.py`.
+Dimensions, material roles and integration: `docs/alcove-partition-model.md`.
+Distributed under the project license.

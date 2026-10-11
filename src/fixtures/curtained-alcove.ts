@@ -30,6 +30,7 @@ import { createSignTextTexture, createHandLetteredSignTexture } from '../canvas-
 import { formatShelfWood } from '../format-surfaces';
 import { themeTrimDarkHex } from '../themes';
 import { installAlcoveCurtain } from './alcove-curtain-model';
+import { installAlcovePartition, AlcoveMouldingRun } from './alcove-partition-model';
 
 
 /** Default room size, feet. Deep enough to stand in, small enough to be a corner. */
@@ -59,6 +60,7 @@ export class CurtainedAlcove implements StoreFixture {
   private disposables: Array<{ dispose(): void }> = [];
   private wallFootprints: Footprint[] = [];
   private removeCurtainModel: (() => void) | null = null;
+  private removePartitionModel: (() => void) | null = null;
 
   constructor(placement: FixturePlacement, ctx: FixtureContext) {
     this.placement = placement;
@@ -129,7 +131,9 @@ export class CurtainedAlcove implements StoreFixture {
     // 1. The partition PARALLEL to the back wall (the room's face onto the sales
     //    floor). Solid: the doorway is in the return leg, so this face can carry
     //    the whole width and the room is never seen into from the aisles.
-    slab(roomW, ceilingY, WALL_T, cx, ceilingY / 2, frontZ);
+    //    It runs half a wall thickness past the return leg's centre line so the
+    //    sales-floor corner is closed rather than a pocket.
+    slab(roomW + WALL_T / 2, ceilingY, WALL_T, cx - side * WALL_T / 4, ceilingY / 2, frontZ);
 
     // 2. The RETURN leg, running back to the store's back wall, with the doorway
     //    cut out of it: a jamb pier either side, a header over the top.
@@ -150,6 +154,11 @@ export class CurtainedAlcove implements StoreFixture {
 
     // 3. The BEADED CURTAIN in the opening, with an instanced fallback.
     this.buildBeadCurtain(group, innerX, side, doorCenterZ);
+
+    // 2b. Authored trim over the partitions: door surround, jamb linings, rail
+    //     brackets, header cap, skirting and crown. Additive: the box walls above
+    //     remain the colliders and the fallback.
+    this.buildPartitionTrim(group, innerX, outerX, side, doorCenterZ, frontZ, backZ, ceilingY, wood);
 
     // 4. Header board over the doorway, facing the sales floor, and the age
     //    placard beside it. The board says what the room is; the placard says
@@ -236,6 +245,42 @@ export class CurtainedAlcove implements StoreFixture {
     this.removeCurtainModel = installAlcoveCurtain(this.ctx, group, mesh, planeX, doorCenterZ);
   }
 
+  private buildPartitionTrim(
+    group: THREE.Group, innerX: number, outerX: number, side: 1 | -1, doorCenterZ: number,
+    frontZ: number, backZ: number, ceilingY: number, wood: ReturnType<typeof formatShelfWood>,
+  ): void {
+    const trimMat = new THREE.MeshStandardMaterial({
+      color: new THREE.Color(wood ? wood.endPanelHex : 0xd8d2c6), roughness: wood ? 0.7 : 0.55, metalness: 0,
+    });
+    this.disposables.push(trimMat);
+    const t = WALL_T / 2;
+    const runs: AlcoveMouldingRun[] = [];
+    const along = (kind: AlcoveMouldingRun['kind'], x: number, z: number, length: number, yaw: number) =>
+      runs.push({ kind, x, z, length, yaw });
+    // Front partition (runs along X); room face looks to -Z, sales face to +Z.
+    const roomA = innerX + side * t, salesA = innerX - side * t;
+    for (const [a, zf, yaw] of [[roomA, frontZ - t, Math.PI / 2], [salesA, frontZ + t, -Math.PI / 2]] as const) {
+      for (const kind of ['skirting', 'crown'] as const) {
+        along(kind, (a + outerX) / 2, zf, Math.abs(outerX - a), yaw);
+      }
+    }
+    // Return leg (runs along Z). Skirting stops at the door casing's plinth blocks.
+    const stop = DOOR_W / 2 + 0.29;
+    const faces = [
+      { x: innerX + side * t, yaw: side > 0 ? 0 : Math.PI, end: frontZ - t },
+      { x: innerX - side * t, yaw: side > 0 ? Math.PI : 0, end: frontZ + t },
+    ];
+    for (const f of faces) {
+      along('crown', f.x, (backZ + f.end) / 2, f.end - backZ, f.yaw);
+      const lo = doorCenterZ - stop, hi = doorCenterZ + stop;
+      along('skirting', f.x, (backZ + lo) / 2, lo - backZ, f.yaw);
+      along('skirting', f.x, (hi + f.end) / 2, f.end - hi, f.yaw);
+    }
+    this.removePartitionModel = installAlcovePartition(this.ctx, group, trimMat, {
+      planeX: innerX, doorCenterZ, side, ceilingY, runs,
+    });
+  }
+
   /** Header board over the doorway plus the age placard beside it. */
   private buildSignage(group: THREE.Group, planeX: number, side: 1 | -1, doorCenterZ: number): void {
     // The board faces INTO the store, i.e. along -side in X.
@@ -292,7 +337,8 @@ export class CurtainedAlcove implements StoreFixture {
     });
     this.disposables.push(placGeo, placMat, placTex);
     const plac = new THREE.Mesh(placGeo, placMat);
-    plac.position.set(faceX, 4.7, doorCenterZ - (DOOR_W / 2 + 0.62));
+    // Clear of the door casing (0.24 ft) plus a hand's width.
+    plac.position.set(faceX, 4.7, doorCenterZ - (DOOR_W / 2 + 0.865));
     plac.rotation.y = yaw;
     group.add(plac);
   }
@@ -315,6 +361,8 @@ export class CurtainedAlcove implements StoreFixture {
   dispose(): void {
     this.removeCurtainModel?.();
     this.removeCurtainModel = null;
+    this.removePartitionModel?.();
+    this.removePartitionModel = null;
     if (this.group) {
       this.ctx.scene.remove(this.group);
       this.group = null;
