@@ -815,7 +815,7 @@ function paintCleanerFace(canvas: HTMLCanvasElement): void {
   c.fillRect(0, h * 0.90, w, h * 0.10);
 }
 
-function createCleanerFaceTexture(onRepaint: () => void): THREE.CanvasTexture {
+export function createCleanerFaceTexture(onRepaint: () => void): THREE.CanvasTexture {
   const canvas = document.createElement('canvas');
   canvas.height = CLEANER_FACE_H_PX;
   canvas.width = Math.round(CLEANER_FACE_H_PX * (CLEANER_W / CLEANER_H));

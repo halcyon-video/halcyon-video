@@ -68,6 +68,8 @@ export function createFixture(placement: FixturePlacement, ctx: FixtureContext):
   return factory(clonedPlacement, ctx);
 }
 
+import { TapeCleanerSidekick } from './fixtures/tape-cleaner-sidekick';
+
 // Statically register standard/default fixture kinds
 registerFixtureKind('four-sided-display', (placement, ctx) => new FourSidedDisplay(placement, ctx));
 // CandyDisplay owns the optional 1993 cardboard wing and shared stock/selection.
@@ -75,6 +77,7 @@ registerFixtureKind('candy-display', (placement, ctx) => new CandyDisplay(placem
 registerFixtureKind('previously-viewed-bin', (placement, ctx) => new PreviouslyViewedBin(placement, ctx));
 registerFixtureKind('tape-rewinder', (placement, ctx) => new TapeRewinder(placement, ctx));
 registerFixtureKind('tape-cleaner-display', (placement, ctx) => new TapeCleanerDisplay(placement, ctx));
+registerFixtureKind('tape-cleaner-sidekick', (placement, ctx) => new TapeCleanerSidekick(placement, ctx));
 registerFixtureKind('game-section', (placement, ctx) => new GameSection(placement, ctx));
 registerFixtureKind('bargain-bin', (placement, ctx) => new BargainBin(placement, ctx));
 registerFixtureKind('genre-endcap', (placement, ctx) => new GenreEndcap(placement, ctx));

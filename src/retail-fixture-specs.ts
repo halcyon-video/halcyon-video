@@ -9,6 +9,7 @@ export const RETAIL_FIXTURE_SPECS = {
   'two-door-cooler': { w: 4.2, h: 6.5, d: 2.6, clearance: 1.5 },
   'chest-freezer': { w: 3.9, h: 2.8, d: 2.3, clearance: 1.5 },
   'candy-wall-gondola': { w: 4, h: 5, d: 1.6, clearance: 1.5 },
+  'tape-cleaner-sidekick': { w: 2.1, h: 5.2, d: 1.0, clearance: 1.5 },
   'secondary-service-counter': { w: 5.4, h: 3.8, d: 2.9, clearance: 1.5 },
 } as const;
 export type RetailFixtureKind = keyof typeof RETAIL_FIXTURE_SPECS;

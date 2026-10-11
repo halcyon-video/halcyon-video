@@ -45,6 +45,10 @@ export const DEFAULT_FIXTURE_PLACEMENTS: FixturePlacement[] = [
   // Entrance rope rails stay dormant until the owner chooses their location.
   // Reserved left checkout bay, opposite the sale table; clear of the queue.
   { id: 'release-cart-checkout', kind: 'release-cart', position: { x: -5, z: 3 }, yaw: 0, options: { noRentalCase: true } },
+  // #199 floor-standing head-cleaner sidekick, back to the left side wall ahead of
+  // the vestibule, facing into the store. Reserved position; the validator
+  // checks its footprint like any other floor fixture.
+  { id: 'tape-cleaner-sidekick', kind: 'tape-cleaner-sidekick', position: { x: 1.0, z: 11.5 }, yaw: Math.PI / 2 },
   // Floor displays are SPREAD down the store's open central corridor (the
   // island-free CENTER_WALKWAY, x roughly 3..19) instead of bunched in the back
   // area. The corridor runs clear from just behind the checkout counter's apex
