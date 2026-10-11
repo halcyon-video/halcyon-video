@@ -131,7 +131,7 @@ bpy.ops.export_scene.gltf(filepath=str(glb),export_format='GLB',use_selection=Tr
 o.data.calc_loop_triangles()
 cs=[o.matrix_world@v.co for v in o.data.vertices]
 report={'parts':n_parts,'triangles':len(o.data.loop_triangles),'vertices':len(o.data.vertices),
- 'material_roles':sorted(m.name for m in o.data.materials),'glb_bytes':glb.stat().st_size,
+ 'material_roles':sorted(m.name for m in o.data.materials),'glbBytes':glb.stat().st_size,
  'bounds_blender_xyz':[[round(min(c[i] for c in cs),4),round(max(c[i] for c in cs),4)] for i in range(3)],
  'tiers':[{'trayTopY':t,'cartonCenterY':round(t+CARTON_H/2,4),'cartonZ':CARTON_Z,'cartonX':COLS} for t in TIER_Y]}
 (ROOT/'tools/models/tape-cleaner-sidekick-metrics.json').write_text(json.dumps(report,indent=2)+'\n')

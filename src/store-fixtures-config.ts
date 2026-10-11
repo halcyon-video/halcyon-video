@@ -416,6 +416,7 @@ const FLOOR_DISPLAY_KINDS = new Set([
   'two-door-cooler',
   'chest-freezer',
   'candy-wall-gondola',
+  'tape-cleaner-sidekick',
   'secondary-service-counter',
 ]);
 
