@@ -35,6 +35,7 @@ import { RotatingMerchandiser } from './fixtures/rotating-merchandiser';
 import { TwoDoorCooler } from './fixtures/two-door-cooler';
 import { ChestFreezer } from './fixtures/chest-freezer';
 import { CandyWallGondola } from './fixtures/candy-wall-gondola';
+import { NowShowingLightbox } from './fixtures/now-showing-lightbox';
 import { SecondaryServiceCounter } from './fixtures/secondary-service-counter';
 
 export interface PlacedFixture extends StoreFixture {
@@ -110,6 +111,8 @@ registerFixtureKind('two-door-cooler', (placement, ctx) => new TwoDoorCooler(pla
 registerFixtureKind('chest-freezer', (placement, ctx) => new ChestFreezer(placement, ctx));
 registerFixtureKind('candy-wall-gondola', (placement, ctx) => new CandyWallGondola(placement, ctx));
 registerFixtureKind('secondary-service-counter', (placement, ctx) => new SecondaryServiceCounter(placement, ctx));
+
+registerFixtureKind('now-showing-lightbox', (placement, ctx) => new NowShowingLightbox(placement, ctx));
 
 registerFixtureKind('gumball-machine', (placement, ctx) => new GumballMachine(placement, ctx));
 

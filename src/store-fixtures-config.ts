@@ -34,6 +34,11 @@ export const DEFAULT_FIXTURE_PLACEMENTS: FixturePlacement[] = [
   // Keep its registered fixture and model available for later reactivation.
   // Neutral 1993 apparel on the existing rear vestibule glazing. Height and
   // glass datum are resolved by the fixture; no floor or stock footprint.
+  // Hanging double-sided NOW SHOWING lightbox (#242), 1993 era onward: over the
+  // open aisle mouth behind the counter apex, frame bottom at 6.9 ft so it clears
+  // eye line; nothing beneath it. Rods tie off at the ceiling.
+  { id: 'now-showing-lightbox', kind: 'now-showing-lightbox', position: { x: STORE_CENTER_X, z: -9 }, yaw: 0,
+    options: { themes: ['bb-1993', 'bb-2000', 'bb-2010'] } },
   { id: 'counter-apparel', kind: 'counter-apparel', position: { x: 15.5, z: 8.54 }, yaw: Math.PI },
   // Open entrance foreground, before the aisle ends. Parallel to the runner;
   // neither end closes the entrance. #222 continues to own vestibule mats.

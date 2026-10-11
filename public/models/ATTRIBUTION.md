@@ -339,3 +339,8 @@ scripted mesh construction; no third-party assets or branded reference derivativ
 Editable source and generator: `tools/models/alcove-partition.blend` and `.py`.
 Dimensions, material roles and integration: `docs/alcove-partition-model.md`.
 Distributed under the project license.
+`now-showing-lightbox.glb` is an original generic hanging poster lightbox under
+the repository license: moulded frame, bulb sockets, hollow box, rods and header
+plaque. Editable source `tools/models/now-showing-lightbox.blend`, reproducible
+script `tools/models/now-showing-lightbox.py`. No downloaded geometry, imagery,
+marks or textures. See `docs/now-showing-lightbox-model.md`.
