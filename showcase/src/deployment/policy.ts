@@ -25,13 +25,13 @@ export function deploymentDecision(policy:DeploymentPolicy,target:string,sourceS
   if(!/^[a-f0-9]{40}$/.test(sourceSha))return {allowed:false,publishes:false,reasons:['A full verified source commit is required.']};
   if(target==='local-preview')return {allowed:true,publishes:false,reasons:['Loopback fixture simulation only. No hosting API is enabled.']};
   if(target==='cloud-preview'){
-    // A noindex fixture preview on the provider's own preview address. It never needs the canonical
-    // host or real-data permission, because it publishes only the committed fixture catalog.
+    // The provider's own preview address, which only redirects to the hosted 3D store. It never
+    // needs the canonical host or real-data permission, because it publishes no catalog at all.
     const reasons=[];
     if(!policy.cloudPreviewEnabled)reasons.push('Cloud preview is not enabled.');
     if(!policy.cloudflareAccountId||!policy.cloudflareProjectName)reasons.push('The intended Cloudflare account and project are not recorded.');
     if(policy.previewProtection==='unconfigured')reasons.push('Preview access needs an owner decision; noindex is not authentication.');
-    return reasons.length?{allowed:false,publishes:false,reasons}:{allowed:true,publishes:true,reasons:['Fixture-only noindex preview on the provider preview address.']};
+    return reasons.length?{allowed:false,publishes:false,reasons}:{allowed:true,publishes:true,reasons:['Noindex redirect to the hosted 3D store on the provider preview address.']};
   }
   const reasons=['Network publishing is not activated.'];
   if(!policy.sourcePermissionReference)reasons.push('Project-specific source and image permission is unresolved.');
