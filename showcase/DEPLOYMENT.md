@@ -5,6 +5,31 @@ artifact and local rollback rehearsal, not a deployed Cloudflare site. The
 existing 3D GitHub Pages workflow and links are unchanged. No domain, hosting
 project, credential, paid plan, scheduled refresh or master release was created.
 
+## Cloud fixture preview (activated 2026-10-11)
+
+The owner chose a free Cloudflare Pages preview address before any domain
+decision (2026-10-11), created the Cloudflare account and added
+`CLOUDFLARE_API_TOKEN` (Pages Edit) and `CLOUDFLARE_ACCOUNT_ID` as secrets of
+the `showcase-production` GitHub environment. `policy.json` now records
+`cloudPreviewEnabled: true`, the `halcyon-showcase` Pages project, and
+`previewProtection: public-noindex`: the preview is publicly reachable, every
+response carries `X-Robots-Tag: noindex, nofollow`, and it is not access control.
+The account ID itself stays in the environment (`environment-secret`).
+
+`.github/workflows/showcase-preview.yml` runs only for devbjackson's pushes to
+`dev` in this repository. It repeats the full showcase check and browser tests,
+packages the fixture bundle, then `deployment:cloud-preview-gate` refuses unless
+the policy allows `cloud-preview` for that exact commit, the bundle still matches
+its seal, and its snapshot is the committed fixture. Only then does the pinned
+Wrangler from `deployment/wrangler/package-lock.json` upload that one `site/`
+directory with `--branch dev`, which Cloudflare treats as a preview deployment.
+The project's production branch is `master`, and no step deploys to it. Secrets
+appear only in the upload step. The job summary records the real deployment ID
+and preview address.
+
+Still closed: production, the canonical host, real catalog data (#354) and the
+daily refresh. `networkPublishingEnabled` stays false.
+
 ## Current decisions and boundaries
 
 `deployment/policy.json` records the unresolved canonical host, Cloudflare

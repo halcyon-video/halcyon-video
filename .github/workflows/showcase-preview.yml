@@ -1,0 +1,78 @@
+name: Deploy showcase preview
+
+# Trusted dev pushes rebuild and re-verify the fixture showcase, then upload exactly that sealed
+# bundle as a noindex Cloudflare Pages preview. Production, the canonical host and the daily
+# refresh stay closed in showcase/deployment/policy.json; this workflow cannot open them.
+on:
+  push:
+    branches: [dev]
+    paths: ['showcase/**', 'src/streaming-catalog.ts', 'src/catalog-handoff.ts', 'tests/catalog-handoff.test.ts', '.github/workflows/showcase-preview.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+concurrency:
+  group: showcase-cloud-preview
+  cancel-in-progress: false
+
+jobs:
+  preview:
+    if: github.repository == 'halcyon-video/halcyon-video' && github.ref == 'refs/heads/dev' && github.actor == 'devbjackson'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment:
+      name: showcase-production
+      url: ${{ steps.deploy.outputs.alias }}
+    defaults:
+      run:
+        shell: bash
+        working-directory: showcase
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22.19.0'
+          cache: npm
+          cache-dependency-path: |
+            showcase/package-lock.json
+            showcase/deployment/wrangler/package-lock.json
+      - run: npm ci --no-fund
+      - run: npm audit --audit-level=low
+      - run: npm run check
+      - run: npx --no-install playwright install --with-deps chromium
+      - run: npm run test:browser
+      - name: Package and gate the verified fixture bundle
+        id: bundle
+        run: |
+          directory="$(npm run --silent package:preview -- "$SOURCE_COMMIT" | tail -n 1 | jq -r .directory)"
+          site="$(npm run --silent deployment:cloud-preview-gate -- "$directory" "$SOURCE_COMMIT")"
+          echo "site=$site" >> "$GITHUB_OUTPUT"
+        env:
+          SOURCE_COMMIT: ${{ github.sha }}
+      - name: Install the pinned Pages transport
+        working-directory: showcase/deployment/wrangler
+        run: npm ci --no-fund --ignore-scripts && npm audit --audit-level=low
+      - name: Upload the sealed bundle as a dev preview
+        id: deploy
+        working-directory: showcase/deployment/wrangler
+        run: |
+          project="$(jq -r .cloudflareProjectName ../policy.json)"
+          mkdir -p "$WRANGLER_OUTPUT_FILE_DIRECTORY"
+          if ! npx --no-install wrangler pages project list | grep -qE "(^|[[:space:]│|])${project}([[:space:]│|]|$)"; then
+            npx --no-install wrangler pages project create "$project" --production-branch master
+          fi
+          npx --no-install wrangler pages deploy "$SITE" --project-name "$project" --branch dev --commit-hash "$SOURCE_COMMIT" --commit-dirty=false
+          record="$(jq -c 'select(.type == "pages-deploy-detailed")' "$WRANGLER_OUTPUT_FILE_DIRECTORY"/*.json | tail -n 1)"
+          test -n "$record"
+          echo "alias=$(jq -r '.alias // .url' <<<"$record")" >> "$GITHUB_OUTPUT"
+          printf '### Cloud preview deployed\n\nDeployment: %s\n\nPreview: %s\n\nAlias: %s\n' \
+            "$(jq -r .deployment_id <<<"$record")" "$(jq -r .url <<<"$record")" "$(jq -r '.alias // "none"' <<<"$record")" >> "$GITHUB_STEP_SUMMARY"
+        env:
+          SITE: ${{ steps.bundle.outputs.site }}
+          SOURCE_COMMIT: ${{ github.sha }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          WRANGLER_OUTPUT_FILE_DIRECTORY: ${{ runner.temp }}/wrangler-output
+          WRANGLER_SEND_METRICS: 'false'
