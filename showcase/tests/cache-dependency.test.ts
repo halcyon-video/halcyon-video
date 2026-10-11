@@ -12,8 +12,9 @@ const walk = (dir: string): string[] => readdirSync(dir).flatMap((name) => {
 });
 
 test('Astro never asks the cache library whether a request is served without revalidation', () => {
+  // Both methods contain the max-stale branch; satisfiesWithoutRevalidation delegates to evaluateRequest.
   const files = walk(join(root, 'node_modules/astro/dist')).filter((file) => file.endsWith('.js'));
-  const users = files.filter((file) => readFileSync(file, 'utf8').includes('satisfiesWithoutRevalidation'));
+  const users = files.filter((file) => /satisfiesWithoutRevalidation|evaluateRequest/.test(readFileSync(file, 'utf8')));
   assert.deepEqual(users, []);
 });
 
