@@ -707,7 +707,7 @@ if (!tvControls && isTouchPrimary()) {
       // What the latency knob actually reads back as, per receiver.
       receivers: pc.getReceivers().map((r) => ({
         kind: r.track?.kind ?? '?',
-        jitterBufferTarget: (r as any).jitterBufferTarget ?? null,
+        jitterBufferTarget: r.jitterBufferTarget ?? null,
         playoutDelayHint: (r as any).playoutDelayHint ?? null,
       })),
     };
