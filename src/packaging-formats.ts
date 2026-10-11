@@ -2,7 +2,7 @@
 // These dimensions are nominal closed cases in feet; see the model contract.
 export type PackagingFormat = 'vhs-slipcase' | 'vhs-white-clamshell' | 'bluray-keepcase';
 export type CaseModelFamily = 'vhs-slipcase' | 'vhs-white' | 'vhs-rental' | 'dvd-keepcase' | 'bluray-keepcase' | 'jewel-single' | 'jewel-fat' | 'game-carton' | 'series-boxset';
-export interface CaseDimensions { w: number; h: number; d: number; family?: CaseModelFamily }
+export interface CaseDimensions { w: number; h: number; d: number; family?: CaseModelFamily; jewel?: boolean }
 export const WHITE_CLAMSHELL_DIMS: CaseDimensions = Object.freeze({ w: 5.5 / 12, h: 8.75 / 12, d: 1.25 / 12, family: 'vhs-white' });
 // Blu-ray keepcase: DVD footprint width, shorter and thinner than the DVD case.
 // A proposed physical variant (docs/packaging-bluray-model.md), selected only by

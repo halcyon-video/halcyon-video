@@ -582,7 +582,7 @@ export function gameCaseDims(platform?: string, discCount?: number): { w: number
     // keeps the molded d*0.28 round-over. The memo above makes this identity-
     // stable, and the class fallbacks (shared with the movie CASE_DIMS
     // objects) are never marked.
-    if (isJewelCasePlatform(platform)) (dims as any).jewel = true;
+    if (isJewelCasePlatform(platform)) (dims as CaseDimensions).jewel = true;
     (dims as CaseDimensions).family = gameConstruction(platform, discCount);
     gameBoxDimsCache.set(key, dims);
   }
@@ -2529,7 +2529,7 @@ function getFallbackGeometry(isAnimated: boolean = false, dims?: { w: number; h:
       // case/clamshell reads soft and wrong on them. Cache-key safe: the
       // marker rides the memoised dims object, so equal dims always carry
       // the same flag.
-      const jewel = (dims as any).jewel === true;
+      const jewel = (dims as CaseDimensions).jewel === true;
       const radius = isAnimated ? dims.d * 0.28
         : jewel ? dims.d * 0.06
         : (CASE_MEDIUM === 'vhs' ? 0.008 : dims.d * 0.28);
