@@ -720,7 +720,7 @@ export class AmbientTvs implements StoreFixture {
   private armDecodeLivenessCheck(video: HTMLVideoElement): void {
     this.clearLivenessWatchdog();
     let sawFrame = false;
-    const rvfc = (video as any).requestVideoFrameCallback;
+    const rvfc = video.requestVideoFrameCallback;
     if (typeof rvfc === 'function') {
       rvfc.call(video, () => { sawFrame = true; });
     }
