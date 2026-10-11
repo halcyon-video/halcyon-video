@@ -88,7 +88,7 @@ export interface Title {
   discCount?: number;
   // Explicit physical edition, independent of genre/studio/poster aspect.
   // Currently the movie VHS path accepts the distinct large white clamshell.
-  packaging?: 'vhs-slipcase' | 'vhs-white-clamshell';
+  packaging?: 'vhs-slipcase' | 'vhs-white-clamshell' | 'bluray-keepcase';
   // Audio/subtitle streams of the primary media source (already fetched with
   // the catalog) — drives the in-app player's track picker. Absent for series
   // containers, games, and discovery titles.

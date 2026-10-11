@@ -8,7 +8,7 @@ import { assetUrl } from './asset-url';
 import type { CaseDimensions, CaseModelFamily } from './packaging-formats';
 
 type Spec = { family: CaseModelFamily; dims: CaseDimensions; detail: boolean; offsetX: number };
-const roles: Record<string, number> = { Opening: 0, PaperSpine: 1, Top: 2, Shell: 3, WhiteShell: 3, PaperFront: 4, PaperBack: 5, ClearRim: 6, Tray: 7, PaperEdge: 8 };
+const roles: Record<string, number> = { Opening: 0, PaperSpine: 1, Top: 2, Shell: 3, WhiteShell: 3, PaperFront: 4, PaperBack: 5, ClearRim: 6, Tray: 7, PaperEdge: 8, BlueShell: 9 };
 const loads = new Map<string, Promise<THREE.BufferGeometry | null>>();
 const geometries = new Map<string, THREE.BufferGeometry>();
 const listeners = new Set<() => void>();
@@ -54,7 +54,7 @@ function source(family: CaseModelFamily, detail: boolean): Promise<THREE.BufferG
         chunks.push(part);
         const role = roles[m.name];
         if (role === undefined) throw new Error(`${name} unknown role ${m.name}`);
-        indices.push(detail || role === 6 ? role : role >= 7 ? 3 : role);
+        indices.push(detail || role === 6 || role === 9 ? role : role >= 7 ? 3 : role);
       }
     });
     const merged = mergeGeometries(chunks, true);
@@ -166,10 +166,11 @@ export function caseConstructionMaterials(): THREE.Material[] {
     new THREE.MeshPhysicalMaterial({ name: 'ClearRim', color: 0xabb8c1, roughness: .18, clearcoat: .85, clearcoatRoughness: .12, envMapIntensity: .65 }),
     new THREE.MeshStandardMaterial({ name: 'Tray', color: 0x15191c, roughness: .48 }),
     new THREE.MeshStandardMaterial({ name: 'PaperEdge', color: 0xc8c4b9, roughness: .86 }),
+    new THREE.MeshPhysicalMaterial({ name: 'BlueShell', color: 0x1b4f96, roughness: .24, clearcoat: .7, clearcoatRoughness: .15, envMapIntensity: .6 }),
   ];
 }
 export function withCaseConstructionMaterials(mats: THREE.Material[]): THREE.Material[] {
-  return mats.length >= 9 ? mats : [...mats, ...caseConstructionMaterials()];
+  return mats.length >= 10 ? mats : [...mats, ...caseConstructionMaterials()];
 }
 export function isCaseConstructionMaterial(m: THREE.Material): boolean { return !!finishes?.includes(m); }
 export function clearCaseModels(): void {

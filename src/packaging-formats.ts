@@ -1,9 +1,13 @@
 // Physical packaging is catalog metadata, independent of cover aspect/genre.
 // These dimensions are nominal closed cases in feet; see the model contract.
-export type PackagingFormat = 'vhs-slipcase' | 'vhs-white-clamshell';
-export type CaseModelFamily = 'vhs-slipcase' | 'vhs-white' | 'vhs-rental' | 'dvd-keepcase' | 'jewel-single' | 'jewel-fat' | 'game-carton' | 'series-boxset';
+export type PackagingFormat = 'vhs-slipcase' | 'vhs-white-clamshell' | 'bluray-keepcase';
+export type CaseModelFamily = 'vhs-slipcase' | 'vhs-white' | 'vhs-rental' | 'dvd-keepcase' | 'bluray-keepcase' | 'jewel-single' | 'jewel-fat' | 'game-carton' | 'series-boxset';
 export interface CaseDimensions { w: number; h: number; d: number; family?: CaseModelFamily }
 export const WHITE_CLAMSHELL_DIMS: CaseDimensions = Object.freeze({ w: 5.5 / 12, h: 8.75 / 12, d: 1.25 / 12, family: 'vhs-white' });
+// Blu-ray keepcase: DVD footprint width, shorter and thinner than the DVD case.
+// A proposed physical variant (docs/packaging-bluray-model.md), selected only by
+// explicit catalog metadata. The art face is the cover below the header band.
+export const BLURAY_KEEPCASE_DIMS: CaseDimensions = Object.freeze({ w: .445, h: .6227, d: .036, family: 'bluray-keepcase' });
 export const JEWEL_FAT_DEPTH_IN = 0.72;
 const PAPER = new Set(['NES', 'SNES', 'SUPER FAMICOM', 'NINTENDO 64', 'GAME BOY', 'GAME BOY COLOR', 'GAME BOY ADVANCE', 'ATARI']);
 const JEWEL = new Set(['PLAYSTATION', 'SEGA SATURN', 'SEGA CD', 'DREAMCAST']);
@@ -15,6 +19,11 @@ export function isWhiteClamshell(movie: { game?: boolean; isSeries?: boolean; pa
   // Preserve the operator's established library styling; this is presentation,
   // not evidence that any particular release shipped in this physical edition.
   return movie.libraryName === 'Animated Movies';
+}
+/** Blu-ray retail stock: explicit `packaging: 'bluray-keepcase'` on a DVD-medium movie.
+ *  Never inferred from genre, aspect or library; VHS stores, games and series ignore it. */
+export function isBluRayCase(movie: { game?: boolean; isSeries?: boolean; packaging?: PackagingFormat }, medium: string): boolean {
+  return medium === 'dvd' && !movie.game && !movie.isSeries && movie.packaging === 'bluray-keepcase';
 }
 export function gameConstruction(platform?: string, discCount = 1): CaseModelFamily | undefined {
   if (platform && PAPER.has(platform)) return 'game-carton';
