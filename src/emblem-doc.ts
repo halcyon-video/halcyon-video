@@ -188,7 +188,7 @@ export const EMBLEM_KINDS: EmblemLayerKind[] = [
 
 // ─── Construction and normalization ─────────────────────────────────────────
 
-const clamp = (v: number, lo: number, hi: number) => (v < lo ? lo : v > hi ? hi : v);
+export const clamp = (v: number, lo: number, hi: number) => (v < lo ? lo : v > hi ? hi : v);
 
 /** Monotonic within a session; ids only need to be unique inside one doc. */
 let layerSeq = 0;
