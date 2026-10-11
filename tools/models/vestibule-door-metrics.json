@@ -1,0 +1,53 @@
+{
+  "triangles": 6516,
+  "meshes": 22,
+  "nonManifoldEdges": {
+    "DoubleFrame": 0,
+    "DoubleBead": 0,
+    "DoubleSeal": 0,
+    "DoubleHinges": 0,
+    "DoublePushBar": 0,
+    "DoublePullBar": 0,
+    "DoubleCloser": 0,
+    "DoubleJamb": 0,
+    "DoubleJambSeal": 0,
+    "DoubleHeader": 0,
+    "DoubleHeaderSeal": 0,
+    "SingleFrame": 0,
+    "SingleBead": 0,
+    "SingleSeal": 0,
+    "SingleHinges": 0,
+    "SinglePushHandle": 0,
+    "SinglePullHandle": 0,
+    "SingleCloser": 0,
+    "SingleJamb": 0,
+    "SingleJambSeal": 0,
+    "SingleHeader": 0,
+    "SingleHeaderSeal": 0
+  },
+  "materialRoles": [
+    "DoorAluminium",
+    "DoorChrome",
+    "DoorSeal",
+    "DoorCloser"
+  ],
+  "units": "feet",
+  "boundsAxes": "Blender X, negative store depth, height",
+  "bounds": [
+    [
+      -1.5329999923706055,
+      -0.22949999570846558,
+      -0.125
+    ],
+    [
+      1.5139999389648438,
+      0.22949999570846558,
+      7.0
+    ]
+  ],
+  "variants": {
+    "DoorDouble": 3.2,
+    "DoorSingle": 3.0
+  },
+  "provenance": "Original scripted Blender mesh authoring (tools/models/vestibule-door.py); not a brand replica."
+}

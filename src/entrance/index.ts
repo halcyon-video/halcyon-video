@@ -1779,6 +1779,7 @@ export class EntranceCheckout implements StoreFixture {
     this.bag = null;
     this.returnSlot?.dispose();
     this.returnSlot = null;
+    this.doors.forEach(d => d.dispose?.());
     this.doors = [];
   }
 }
