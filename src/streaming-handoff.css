@@ -1,5 +1,7 @@
 #streaming-handoff {
   box-sizing: border-box;
+  /* The page-wide margin reset would pin the modal to the top-left corner. */
+  margin: auto;
   width: min(440px, calc(100vw - 32px));
   max-height: calc(100dvh - 32px);
   overflow: auto;
@@ -14,7 +16,8 @@
 }
 #streaming-handoff::backdrop { background: rgb(0 0 0 / 65%); }
 #streaming-handoff h2 { margin: 0 0 16px; font-size: 22px; }
-#streaming-handoff p { overflow-wrap: anywhere; }
+#streaming-handoff p { margin: 0 0 12px; overflow-wrap: anywhere; }
+#streaming-handoff .streaming-handoff-title { font-weight: bold; }
 #streaming-handoff a, #streaming-handoff button {
   display: block;
   box-sizing: border-box;

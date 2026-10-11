@@ -125,6 +125,7 @@ export function startStreamingServiceChoice(scene: StoreScene, movie: Movie): bo
   const services = getAvailableStreamingServices(movie);
   if (services.length === 0) {
     scene.onConsoleLog('[System] No streaming services currently available for this title.', 'system');
+    showClerkToast(`Sorry, hon — "${movie.title}" isn't streaming on any of your services right now.`);
     return false;
   }
   const state: StreamingServiceChoiceState = {

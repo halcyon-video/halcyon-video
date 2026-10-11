@@ -74,6 +74,7 @@ import { verifySeerrCredentialsLive } from './seerr-service-status';
 import { fetchGames, launchGame, getRommConfig } from './romm';
 import { storeCatalog } from './games-only';
 import { buildStreamingLibraries, resolveEnabledServices, resolveStreamingCheckoutUrl } from './streaming-catalog';
+import { showStreamingHandoff } from './streaming-handoff';
 import {
   getStreamingMovies,
   loadStreamingMovies,
@@ -2671,7 +2672,9 @@ async function initializeStoreScene(preservePosterCache = false) {
       if (movie.game) {
         void handleGameLaunch(movie, false);
       } else if (movie.streaming) {
-        handleStreamingLaunch(movie);
+        // Checkout completes after an animation, outside the visitor's tap:
+        // hand over a real link rather than a popup the browser may block.
+        if (movie.streamingUrl) showStreamingHandoff(movie.title, movie.streamingServiceName || 'Your streaming service', movie.streamingUrl);
         scene.returnToEntrance();
       } else {
         void launchVideoPlayback(movie);
