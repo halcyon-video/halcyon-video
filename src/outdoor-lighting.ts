@@ -1,4 +1,6 @@
 import { captureEnvironmentInSlices } from './cube-capture';
+import { yieldForPrograms } from './program-warmup';
+import { getLastUserActivity } from './user-activity';
 // Outside world + interior light energy: the sky dome texture per mode
 // (day/night/sunset), the per-visit sun placement, and the baked-environment
 // pipeline (PMREM capture of the actual store) that supplies ambient light and
@@ -31,6 +33,8 @@ export interface OutdoorLightingDeps {
   getHeadlight: () => THREE.DirectionalLight | null;
   // Extra objects to hide while baking (e.g. the floating selection arrow).
   getBakeHidden: () => THREE.Object3D[];
+  // Held movement and camera motion remain active after the last input event.
+  isInteractionActive: () => boolean;
   // After a re-bake the per-library reflection probes (case-material env maps)
   // were captured under stale lighting — the scene recaptures and re-applies.
   onEnvironmentRebaked: (captureProbes?: boolean) => void;
@@ -576,7 +580,10 @@ export class OutdoorLightingRig {
     if (!this.envBakeReady || this.disposed) return;
     this.skyBakeController?.abort();
     const controller = new AbortController(); this.skyBakeController = controller;
-    const wait = () => new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+    const wait = async () => {
+      do { await yieldForPrograms(controller.signal); }
+      while (this.deps.isInteractionActive() || performance.now() - getLastUserActivity() < 2500);
+    };
     void this.rebakeEnvironmentInSlices(wait, controller.signal).catch(error => {
       if (!controller.signal.aborted && !this.disposed) console.warn('Exterior lighting refresh failed:', error);
     });

@@ -492,6 +492,7 @@ export class StoreScene {
     getCeilingY: () => this.ceilingY,
     getHeadlight: () => this.headlight ?? null,
     getBakeHidden: () => (this.selectionArrow ? [this.selectionArrow] : []),
+    isInteractionActive: () => this.reflectionInteractionActive || !!this.launchAnim,
     onEnvironmentRebaked: (captureProbes = true) => {
       mirrors.updateMirrorThrottle(this, true);
       this.requestRender();
