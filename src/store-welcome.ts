@@ -72,7 +72,7 @@ export function welcomeHUDText(isTouch: boolean): string {
  */
 export function triggerHostedWelcome(deps: WelcomeDeps = {}): boolean {
   const isDemo = deps.isDemo ?? (
-    (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_DEMO === '1') ||
+    (typeof import.meta !== 'undefined' && import.meta.env?.VITE_DEMO === '1') ||
     (typeof location !== 'undefined' && new URLSearchParams(location.search).get('demo') === '1')
   );
 
