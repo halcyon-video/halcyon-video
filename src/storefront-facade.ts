@@ -2,6 +2,7 @@ import { copingGeometry } from './joinery-model';
 import { buildWallCourtesyTelephone } from './fixtures/wall-courtesy-telephone';
 import { installDisplayModel } from './fixtures/display-model';
 import { buildRooftopHVAC } from './rooftop-hvac';
+import { buildGutterDownspout } from './gutter-downspout';
 import { selfLit } from './material-lighting';
 import { BB_ARCHIVO_BLACK } from './bundled-fonts';
 // Exterior envelope shared by the architectural styles. Window openings,
@@ -477,6 +478,16 @@ export function buildStorefrontFacade(params: FacadeBuildParams): StorefrontFaca
   const rooftop = buildRooftopHVAC(params.context, storeWidth, backWallZ, ceilingY);
   group.add(rooftop);
   group.addEventListener('removed', () => rooftop.userData.dispose?.());
+
+  // Proposed roof drainage on the plain rear wall, near its left corner (no
+  // glazing, door or tile band there): veneer face 0.625 ft and fascia face
+  // 0.75 ft outside the back wall plane.
+  const downspout = buildGutterDownspout(params.context, {
+    x: leftEdgeX + 2, z: backWallZ - .625, yaw: Math.PI / 2, step: .125,
+    roofY: ceilingY + .85, stepY: fasciaBot,
+  });
+  group.add(downspout);
+  group.addEventListener('removed', () => downspout.userData.dispose?.());
 
   // The brand cabinet sits over the entry, below the peak. Separate gable
   // and fascia bounds also keep optional freestanding letters inside the wall.

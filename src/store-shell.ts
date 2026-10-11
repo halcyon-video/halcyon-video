@@ -417,6 +417,7 @@ export function buildStore(scene: StoreScene) {
   // see StoreFormatSpec.facadeStyle and storefront-facade-shop.ts.
   const facade = isShopFacade
     ? buildShopfrontFacade({
+        context: scene.fixtureContext(),
         storeWidth,
         backWallZ: scene.backWallZ,
         ceilingY: scene.ceilingY,

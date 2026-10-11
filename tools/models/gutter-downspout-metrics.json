@@ -1,0 +1,59 @@
+{
+  "units": "feet",
+  "textures": 0,
+  "meshes": [
+    {
+      "name": "DownspoutHead",
+      "triangles": 204,
+      "boundaryEdges": 0
+    },
+    {
+      "name": "DownspoutOffset",
+      "triangles": 128,
+      "boundaryEdges": 0
+    },
+    {
+      "name": "DownspoutFoot",
+      "triangles": 128,
+      "boundaryEdges": 0
+    },
+    {
+      "name": "DownspoutRunPipe",
+      "triangles": 64,
+      "boundaryEdges": 0
+    },
+    {
+      "name": "DownspoutSleeve",
+      "triangles": 64,
+      "boundaryEdges": 0
+    },
+    {
+      "name": "DownspoutSplashBlock",
+      "triangles": 48,
+      "boundaryEdges": 0
+    },
+    {
+      "name": "DownspoutStrap",
+      "triangles": 128,
+      "boundaryEdges": 0
+    },
+    {
+      "name": "DownspoutFlangeScrews",
+      "triangles": 224,
+      "boundaryEdges": 0
+    }
+  ],
+  "blenderBounds": [
+    [
+      -0.30000001192092896,
+      -0.49000000953674316,
+      -1.5
+    ],
+    [
+      2.3499999046325684,
+      0.49000000953674316,
+      0.5799999833106995
+    ]
+  ],
+  "bytes": 67732
+}

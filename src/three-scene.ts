@@ -62,6 +62,7 @@ import { MirrorCubemapLifecycle, stockPlacementSettled } from './mirror-cubemap-
 import { BeautyPass, PartialComposite } from './partial-composite';
 import { FixtureContext, SlottedFixture, StoreFixture } from './fixtures';
 import { disposeRooftopHVAC } from './rooftop-hvac';
+import { disposeGutterDownspout } from './gutter-downspout';
 import { setWindowAwningLighting, disposeWindowAwnings } from './storefront-awning';
 import { setFacadeEntryLighting, disposeFacadeEntry } from './storefront-entry-model';
 import { OverviewCursors, OverviewCursorTarget } from './overview-cursors';
@@ -6056,6 +6057,7 @@ export class StoreScene {
     disposeWindowAwnings(this.scene);
     disposeFacadeEntry(this.scene);
     disposeRooftopHVAC(this.scene);
+    disposeGutterDownspout(this.scene);
     this.scene.getObjectByName('serviceDoor')?.userData.dispose?.();
     mirrors.disposeMirrorTargets(this);
     disposeSceneMeshes(this.scene);
