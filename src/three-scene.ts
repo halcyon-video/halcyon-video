@@ -2,7 +2,7 @@ import { setChangedShelfMatrix } from './shelf-instance-matrix';
 import { releaseUploadRenderer } from './poster-textures';
 import { reelModeEnabled, reelSetting } from './reel-profile';
 import { updateReelFlight, reelFlightKey, reelFlightMouse } from './store-reel-flight';
-import { loadMobileRoomLighting, updateMobileRoomLighting } from './mobile-room-lighting';
+import { BAKED_ROOM_CUBE_SIZE, loadMobileRoomLighting, mobileRoomLightingExpected, updateMobileRoomLighting } from './mobile-room-lighting';
 import { refreshStockedReflections, reflectionRefreshRunning } from './stocked-reflection-refresh';
 import { streamingInspectPose } from './streaming-case-pose';
 import { isExternalGameActive } from './external-game-state.ts';
@@ -2054,7 +2054,11 @@ export class StoreScene {
     const pmremGenerator = new THREE.PMREMGenerator(this.renderer);
     pmremGenerator.compileEquirectangularShader();
     const roomEnv = new RoomEnvironment();
-    const bootstrapRT = pmremGenerator.fromScene(roomEnv, 0.04);
+    // Phones swap in the shipped baked map once it downloads, often while the
+    // opening view's programs are preparing. Match its CubeUV size so that swap
+    // keeps the same lit-material variants instead of recompiling the room.
+    const bootstrapRT = pmremGenerator.fromScene(roomEnv, 0.04, 0.1, 100,
+      mobileRoomLightingExpected() ? { size: BAKED_ROOM_CUBE_SIZE } : {});
     this.scene.environment = bootstrapRT.texture;
     // Held only until the constructor's first outdoor.bakeEnvironment() call
     // installs the real baked environment, then disposed (issue #121).

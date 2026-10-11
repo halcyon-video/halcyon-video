@@ -16,11 +16,19 @@ export function updateMobileRoomLighting(scene: THREE.Scene, mode: string): void
  * it never renders six room views or recompiles the store to bake reflections.
  * Floor/wall contact AO and static cast shadows remain layout-specific.
  */
+/** Cube face size of every shipped baked map (384×512 CubeUV). A bootstrap
+ * environment at this size shares its shader variant, so the map's arrival
+ * mid-preparation cannot invalidate the prepared lit-material programs. */
+export const BAKED_ROOM_CUBE_SIZE = 128;
+export function mobileRoomLightingExpected(): boolean {
+  return compactAssets() && (localStorage.getItem('bb_outside') || 'day') === 'day'
+    && typeof DecompressionStream !== 'undefined';
+}
+
 export function loadMobileRoomLighting(scene: THREE.Scene, signal: AbortSignal, render: () => void, mode: () => string): () => void {
   let texture: THREE.DataTexture | undefined, disposed = false;
   const era = getActiveTheme().id;
-  if (!compactAssets() ||
-      (localStorage.getItem('bb_outside') || 'day') !== 'day' || typeof DecompressionStream === 'undefined') return () => {};
+  if (!mobileRoomLightingExpected()) return () => {};
   const original = scene.environment;
   void Promise.all([
     fetch(assetUrl(`lighting/${era}/store-environment.json`), {signal}).then(r => { if (!r.ok) throw Error('Lighting metadata unavailable'); return r.json(); }),
@@ -37,6 +45,7 @@ export function loadMobileRoomLighting(scene: THREE.Scene, signal: AbortSignal, 
   ]).then(([meta, buffer]) => {
     if (disposed || signal.aborted || scene.environment !== original) return;
     if (!Number.isInteger(meta.width) || !Number.isInteger(meta.height) || meta.width * meta.height * 8 !== buffer.byteLength) throw Error('Invalid baked lighting');
+    if (meta.height !== 4 * BAKED_ROOM_CUBE_SIZE) console.warn('[lighting] Baked map size differs from the bootstrap; lit programs will recompile');
     texture = new THREE.DataTexture(new Uint16Array(buffer), meta.width, meta.height, THREE.RGBAFormat, THREE.HalfFloatType);
     texture.name = `Offline daytime ${era} store lighting`;
     texture.mapping = THREE.CubeUVReflectionMapping;

@@ -27,8 +27,18 @@ export function installCounterModel(
   const rel = `fixtures/checkout-counter/${getActiveTheme().id}-${shape}-${rounded ? 'rounded' : 'laminate'}.glb`;
   const pack = brandPackDir();
   const paths = [...(pack ? [`user-assets/${pack}/${rel}`] : []), `user-assets/${rel}`, `models/${filename}`];
+  // Request every candidate together: on a slow first visit, a missing drop-in's
+  // 404 queues behind optional model downloads and holds the startup splash.
+  // Drop-ins keep their priority; the bundled bytes are merely already arriving.
+  const requests = paths.map(path => fetch(assetUrl(path)).then(response => {
+    if (!response.ok) throw new Error(`${response.status} ${response.statusText} for ${path}`);
+    return response.arrayBuffer();
+  }));
+  requests.forEach(request => request.catch(() => {}));
+  const loader = new GLTFLoader();
   return new Promise(resolve => {
-    const load = (index: number) => new GLTFLoader().load(assetUrl(paths[index]), ({ scene: model }) => {
+    const load = (index: number): void => { requests[index].then(buffer => loader.parse(buffer,
+      THREE.LoaderUtils.extractUrlBase(assetUrl(paths[index])), ({ scene: model }) => {
       // A settings rebuild can detach the entrance while this request is in flight.
       let root: THREE.Object3D = parent;
       while (root.parent) root = root.parent;
@@ -85,14 +95,16 @@ export function installCounterModel(
       ctx.requestShadowRefresh();
       ctx.requestRender();
       resolve(model);
-    }, undefined, (error) => {
+    }, failed)).catch(failed); // parse throws synchronously on a non-glTF fallback page
+    function failed(error: unknown) {
       let root: THREE.Object3D = parent;
       while (root.parent) root = root.parent;
       if (root !== ctx.scene) { resolve(null); return; }
       if (index + 1 < paths.length) { load(index + 1); return; }
       resolve(null);
       ctx.log(`Counter model unavailable; using built-in counter. ${String(error)}`, 'system');
-    });
+    }
+    };
     load(0);
   });
 }
