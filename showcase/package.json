@@ -31,5 +31,8 @@
     "@types/node": "22.19.0",
     "typescript": "6.0.3",
     "yaml": "2.9.1"
+  },
+  "overrides": {
+    "http-cache-semantics": "4.3.0"
   }
 }
