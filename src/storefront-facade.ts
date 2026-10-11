@@ -1,5 +1,6 @@
 import { copingGeometry } from './joinery-model';
 import { buildWallCourtesyTelephone } from './fixtures/wall-courtesy-telephone';
+import { buildStaffLadder, STAFF_LADDER } from './fixtures/staff-ladder';
 import { installDisplayModel } from './fixtures/display-model';
 import { buildRooftopHVAC } from './rooftop-hvac';
 import { buildGutterDownspout } from './gutter-downspout';
@@ -409,6 +410,10 @@ export function buildStorefrontFacade(params: FacadeBuildParams): StorefrontFaca
     group.addEventListener('removed', cleanupDoor);
     // Independent static wall prop; door/frame and exit/navigation stay unchanged.
     buildWallCourtesyTelephone(params.context, group, rightEdgeX, rightSideDoorZone(sideRibbon)!.z0);
+
+    // Staff ladder leaning on the brick beside the stoop, behind the door
+    // exclusion zone (stoop spans doorZ +/- 2.2; ladder is 1.44 wide).
+    buildStaffLadder(params.context, group, rightEdgeX + .63, doorZ - 2.2 - .5 - STAFF_LADDER.width / 2);
 
     // EXIT sign above the door, built to real US exit-sign proportions: a
     // 15.5in x 8.75in face (aspect ~1.78) carrying RED "EXIT" at the NFPA 101 /

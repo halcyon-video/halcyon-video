@@ -1,0 +1,33 @@
+{
+  "bytes": 258076,
+  "triangles": 6132,
+  "drawCalls": 4,
+  "materials": [
+    "LadderRailWood",
+    "LadderRungWood",
+    "LadderEndGrain",
+    "LadderHardware"
+  ],
+  "images": 0,
+  "blenderBoundsFeet": [
+    [
+      -0.7200000286102295,
+      -0.05744600296020508,
+      0.0
+    ],
+    [
+      0.7200000286102295,
+      1.75826895236969,
+      6.997499465942383
+    ]
+  ],
+  "storeDimensionsFeet": {
+    "width": 1.440000057220459,
+    "height": 6.997499465942383,
+    "depth": 1.815714955329895
+  },
+  "wallOffsetFeet": 1.758268918991089,
+  "leanDegrees": 14.0,
+  "railLengthFeet": 7.2,
+  "allPrimitivesHaveUV": true
+}
