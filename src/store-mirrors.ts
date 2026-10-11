@@ -22,6 +22,7 @@ type MirrorState = {
   targets: MirrorRenderTarget; mode: MirrorReflectionMode; frame: number;
   camera: THREE.PerspectiveCamera; cubes: CubeMirror[];
   probe: THREE.Texture | null; fallback: THREE.MeshStandardMaterial | null;
+  warm: { material: THREE.MeshBasicMaterial; target: THREE.WebGLCubeRenderTarget } | null;
 };
 let reflectorRendering = false;
 const states = new WeakMap<StoreScene, MirrorState>();
@@ -33,7 +34,26 @@ export function disposeMirrorTargets(scene: StoreScene): void {
   for (const cube of state?.cubes ?? []) cube.material.dispose();
   state?.fallback?.map?.dispose();
   state?.fallback?.dispose();
+  state?.warm?.material.dispose();
+  state?.warm?.target.dispose();
   states.delete(scene);
+}
+
+/** Cube mirrors swap onto their env-mapped basic material only when the room
+ * probe first bakes, mid-session, so its program compiled on that frame. Boot
+ * warm-up draws this stand-in instead; the real materials reuse the program by
+ * cache key. Retained until teardown: disposing the last holder frees it. */
+export function mirrorCubeWarmupMaterial(scene: StoreScene): THREE.MeshBasicMaterial | null {
+  const state = states.get(scene);
+  const cube = state?.mode === 'cubemap' ? state.cubes[0] : undefined;
+  if (!state || !cube || state.probe) return null;
+  if (!state.warm) {
+    const target = new THREE.WebGLCubeRenderTarget(1);
+    const material = cube.material.clone();
+    material.envMap = target.texture;
+    state.warm = { material, target };
+  }
+  return state.warm.material;
 }
 export type MirrorEntry = MirrorScheduleEntry & {
   material: THREE.ShaderMaterial; group: MirrorEntry[]; panels: THREE.Mesh[]; r: any; original: (...a: any[]) => void; rendered: boolean;
@@ -202,7 +222,7 @@ export function installMirrorThrottle(scene: StoreScene) {
   disposeMirrorTargets(scene);
   const state: MirrorState = {
     targets: new MirrorRenderTarget(), mode: reflectionMode(), frame: 0,
-    camera: new THREE.PerspectiveCamera(), cubes: [], probe: null, fallback: null,
+    camera: new THREE.PerspectiveCamera(), cubes: [], probe: null, fallback: null, warm: null,
   };
   states.set(scene, state);
   scene.mirrors.length = 0;

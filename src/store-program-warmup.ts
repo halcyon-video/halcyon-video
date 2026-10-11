@@ -10,6 +10,7 @@ import { isWhiteClamshell } from './packaging-formats';
 import { retailAudio } from './audio';
 import { isPublicDemo } from './demo-mode';
 import { mobileStoreActive } from './mobile-store';
+import { mirrorCubeWarmupMaterial } from './store-mirrors';
 import { compileProgramsInStages, prepareStaticTextures, yieldForPrograms } from './program-warmup';
 
 const stagedInitialRooms = new WeakSet<StoreScene>();
@@ -120,6 +121,12 @@ export async function warmupRuntimePrograms(scene: StoreScene) {
       const bagWarm = new THREE.Mesh(geo, bagMat);
       bagWarm.frustumCulled = false;
       warmScene.add(bagWarm);
+    }
+    const mirrorMat = mirrorCubeWarmupMaterial(scene);
+    if (mirrorMat) {
+      const mirrorWarm = new THREE.Mesh(geo, mirrorMat);
+      mirrorWarm.frustumCulled = false;
+      warmScene.add(mirrorWarm);
     }
     warmScene.position.set(11, -60, 0);
     scene.scene.add(warmScene);
