@@ -5,6 +5,56 @@ All notable changes to Halcyon Video, generated from commit history by
 it on every version tag push. Deterministic and offline: no entry here was
 written by a model.
 
+## [v0.26.0] — 2026-10-11
+
+### CHANGELOG
+- V0.25.0
+
+### General
+- Prepare 0.26.0 and repair return-counter release checks
+- Remove Related Movies recommendation endcaps
+- Fix attract door crossings, exit flow and store presentation
+- Send the showcase preview address straight to the 3D store (issue #356)
+- Deploy trusted dev showcase builds as a noindex Cloudflare Pages preview (issue #356)
+- Pause exterior environment captures during held movement (Closes [#383](https://github.com/halcyon-video/halcyon-video/issues/383))
+- Guard both max-stale entry points and correct the 4.3.0 cache disposition (#381)
+- Declare the jewel-case marker on CaseDimensions
+- Read requestVideoFrameCallback through its DOM type in ambient TVs
+- Read RTCRtpReceiver.jitterBufferTarget without an any cast
+- Fold romm.ts's four inline Tauri-shell checks into one helper
+- Share one clamp helper between the emblem doc and canvas modules
+- Type the hosted-welcome VITE_DEMO check without an any cast
+- Satisfy retail fixture contract tests for the tape-cleaner sidekick
+- Add floor-standing tape-cleaner sidekick fixture modelled in Blender (Closes [#199](https://github.com/halcyon-video/halcyon-video/issues/199))
+- Model the vestibule door leaf, hinges, bars, closer and jamb sections in Blender
+- Record released catalog receiver in showcase handoff (issue #357)
+- Rebuild the exit-sign housing as a lightbox with diffuser seat, gasket, end plates, canopy and screws (Closes [#224](https://github.com/halcyon-video/halcyon-video/issues/224))
+- Model the mirror column's base, corner posts, seat rails and cap (Closes [#229](https://github.com/halcyon-video/halcyon-video/issues/229))
+- Model the wooden staff ladder and lean it against the service-door wall (Closes [#233](https://github.com/halcyon-video/halcyon-video/issues/233))
+- Model the hanging now-showing poster lightbox and hang it over the aisle mouth (Closes [#242](https://github.com/halcyon-video/halcyon-video/issues/242))
+- Author the alcove doorway surround, jamb linings, rail brackets and partition mouldings (Closes [#231](https://github.com/halcyon-video/halcyon-video/issues/231))
+- Model the Blu-ray keepcase and select it from explicit packaging metadata (Closes [#249](https://github.com/halcyon-video/halcyon-video/issues/249))
+- Drain every facade roof through a scupper, conductor head and downpipe (Closes [#259](https://github.com/halcyon-video/halcyon-video/issues/259))
+- Power each ceiling TV through a boxed, clipped and strain-relieved feed (Closes [#260](https://github.com/halcyon-video/halcyon-video/issues/260))
+- Resolve the showcase cache dependency audit and record its reachability (Closes [#374](https://github.com/halcyon-video/halcyon-video/issues/374))
+- Follow the fixed window clearance in the vestibule layout test (Closes [#380](https://github.com/halcyon-video/halcyon-video/issues/380))
+- Cut hosted phone cold entry by about five seconds (issue #361)
+- Keep prepared phone shaders valid and start the counter model early
+- State the streaming checkout destination truthfully and hand it over once
+- Hang snack pouches on a slatwall wing at the concessions gondola end (Closes [#277](https://github.com/halcyon-video/halcyon-video/issues/277))
+- Gate live catalog publishing on a committed owner source decision (issue #354)
+- Keep reserved browsing positions four feet apart (Closes [#377](https://github.com/halcyon-video/halcyon-video/issues/377))
+- Weight shopper preferences by matching departments on mixed shelves
+- Position slim glazing frames over the masonry seam
+- Correct storefront glazing, sunset bloom and exterior ground
+- Author fitted casework for the asymmetric three-screen wall bank
+- Add fitted enclosure to the shared suspended CRT frame
+- Clarify supported vehicle roster peak and stress costs
+- Add original period sedan to customer-owned parking (Closes [#266](https://github.com/halcyon-video/halcyon-video/issues/266))
+- Let paired rental cases settle without seam contact jitter (Closes [#253](https://github.com/halcyon-video/halcyon-video/issues/253))
+- Update vulnerable showcase dependency resolutions
+- Document automatic customer populations and authored tastes
+
 ## [v0.25.0] — 2026-10-06
 
 ### CHANGELOG
