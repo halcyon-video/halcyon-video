@@ -23,7 +23,7 @@ import { BROWSE_WINDOW_SIZE, AISLE_SHELF_HEIGHTS, WALL_SHELF_HEIGHTS, UNIT_SIDE_
 import { retailAudio } from './audio';
 import { perfTrace } from './perf-trace';
 import { SP_INPUT, TOP_WRAP_GLIDE_LERP } from './scene-shared';
-import { isEndcapKind } from './fixtures/genre-endcap';
+import { isEndcapKind } from './fixtures/endcap-shelf';
 import { enterEndcapCursor } from './browse-cursor';
 import { enterTvPeek, exitTvPeek, tvPeekActive, tvPeekCycle, tvPeekSelect, debugTvPeek, forgetTvPeek } from './store-tv-peek';
 import {
@@ -87,7 +87,7 @@ export function rowStartUnit(libUnits: ShelvingUnit[], rowGroupId: number): Shel
 }
 
 /**
- * The genre endcap standing in the cross-aisle gap between two chunks of one
+ * The collection endcap standing in the cross-aisle gap between two chunks of one
  * row, if one was built there: caps mount on a chunk's isLineFront unit, and
  * the deeper chunk (the higher lineId) is the one whose mouth opens onto the
  * gap. Crossing the gap along the front face steps onto it, same as walking
@@ -95,13 +95,13 @@ export function rowStartUnit(libUnits: ShelvingUnit[], rowGroupId: number): Shel
  */
 function gapEndcapBetween(scene: StoreScene, a: ShelvingUnit, b: ShelvingUnit): SceneFixture | null {
   if (a.lineId === b.lineId) return null;
-  return genreEndcapForLine(scene, Math.max(a.lineId, b.lineId));
+  return endcapForLine(scene, Math.max(a.lineId, b.lineId));
 }
 
 type SceneFixture = StoreScene['slottedFixtures'][number];
 
-/** The genre endcap standing at this line's entrance end, if one was built. */
-function genreEndcapForLine(scene: StoreScene, lineId: number): SceneFixture | null {
+/** The collection endcap standing at this line's entrance end, if one was built. */
+function endcapForLine(scene: StoreScene, lineId: number): SceneFixture | null {
   return (
     scene.slottedFixtures.find(
       (f) => isEndcapKind(f.placement.kind) && f.placement.options?.lineId === lineId
@@ -110,21 +110,21 @@ function genreEndcapForLine(scene: StoreScene, lineId: number): SceneFixture | n
 }
 
 /**
- * Step off a run's entrance-end column onto its genre endcap — the landing
+ * Step off a run's entrance-end column onto its collection endcap — the landing
  * itself lives in browse-cursor.ts (enterEndcapCursor), shared with the
  * sub-nav jump index, which enters an endcap by this exact route.
  */
-const enterGenreEndcapFromShelf = enterEndcapCursor;
+const enterEndcapFromShelf = enterEndcapCursor;
 
 /**
- * Step off a genre endcap's edge column back onto the browse snake, in
+ * Step off a collection endcap's edge column back onto the browse snake, in
  * reading order: Left past column 0 continues to the PREVIOUS line's back
  * face (its reading end); Right past the last column continues to the
  * endcap's own line's front face at column 0. The #45 closed loop stays a
  * loop with a three-column stop — never a per-line island. Returns false
  * (caller clamps) when the requested side has no shelf to land on.
  */
-function exitGenreEndcapToShelf(scene: StoreScene, fixture: SceneFixture, exitTo: 'prevBack' | 'lineFront'): boolean {
+function exitEndcapToShelf(scene: StoreScene, fixture: SceneFixture, exitTo: 'prevBack' | 'lineFront'): boolean {
   const opts = fixture.placement.options ?? {};
   const libraryIdx = typeof opts.libraryIdx === 'number' ? opts.libraryIdx : -1;
   const lineId = typeof opts.lineId === 'number' ? opts.lineId : -1;
@@ -305,11 +305,11 @@ export function moveLeftInternal(scene: StoreScene) {
           scene.selectedCol--;
           scene.updateCameraTarget();
         } else {
-          // Genre endcaps have one face; their edge columns step back onto
+          // Collection endcaps have one face; their edge columns step back onto
           // the browse snake instead of rotating to an empty side.
           const fixture = scene.slottedFixtures.find(f => f.placement.id === scene.selectedFixtureId);
           if (isEndcapKind(fixture?.placement.kind)) {
-            exitGenreEndcapToShelf(scene, fixture!, 'prevBack');
+            exitEndcapToShelf(scene, fixture!, 'prevBack');
             return;
           }
           if (fixture?.placement.kind === 'pv-drape-table') {
@@ -357,7 +357,7 @@ export function moveLeftInternal(scene: StoreScene) {
         if (prevUnit && prevUnit.rowGroupId === currentUnit.rowGroupId) {
           const gapCap = gapEndcapBetween(scene, prevUnit, currentUnit);
           if (gapCap) {
-            enterGenreEndcapFromShelf(scene, gapCap, 'left');
+            enterEndcapFromShelf(scene, gapCap, 'left');
             return;
           }
           // Transition to the front side of the previous unit in the same row
@@ -369,13 +369,13 @@ export function moveLeftInternal(scene: StoreScene) {
           scene.updateCameraTarget();
         } else {
           // We reached the beginning of the front side of this line/row.
-          // A genre endcap at this run's entrance end joins the path here:
+          // A collection endcap at this run's entrance end joins the path here:
           // walking off the shelf end steps onto it, and crossing it
           // continues to where this edge always led (see
-          // exitGenreEndcapToShelf).
-          const mouthCap = genreEndcapForLine(scene, currentUnit.lineId);
+          // exitEndcapToShelf).
+          const mouthCap = endcapForLine(scene, currentUnit.lineId);
           if (mouthCap) {
-            enterGenreEndcapFromShelf(scene, mouthCap, 'left');
+            enterEndcapFromShelf(scene, mouthCap, 'left');
             return;
           }
           // If there is a previous line/row in the library:
@@ -476,11 +476,11 @@ export function moveRightInternal(scene: StoreScene) {
           scene.selectedCol++;
           scene.updateCameraTarget();
         } else {
-          // Genre endcaps: edge columns exit to the browse snake (see
+          // Collection endcaps: edge columns exit to the browse snake (see
           // moveLeftInternal's mirror branch).
           const fixture = scene.slottedFixtures.find(f => f.placement.id === scene.selectedFixtureId);
           if (isEndcapKind(fixture?.placement.kind)) {
-            exitGenreEndcapToShelf(scene, fixture!, 'lineFront');
+            exitEndcapToShelf(scene, fixture!, 'lineFront');
             return;
           }
           if (fixture?.placement.kind === 'pv-drape-table') {
@@ -525,7 +525,7 @@ export function moveRightInternal(scene: StoreScene) {
         if (nextUnit && nextUnit.rowGroupId === currentUnit.rowGroupId) {
           const gapCap = gapEndcapBetween(scene, currentUnit, nextUnit);
           if (gapCap) {
-            enterGenreEndcapFromShelf(scene, gapCap, 'right');
+            enterEndcapFromShelf(scene, gapCap, 'right');
             return;
           }
           // Transition to the front side of the next unit in the same row
@@ -558,9 +558,9 @@ export function moveRightInternal(scene: StoreScene) {
             const nextRowUnit = libUnits.find(u => u.rowGroupId !== currentUnit.rowGroupId && u.unitIdxInLibrary > currentUnit.unitIdxInLibrary);
             if (nextRowUnit) {
               const nextRowFirst = rowStartUnit(libUnits, nextRowUnit.rowGroupId);
-              const mouthCap = genreEndcapForLine(scene, nextRowFirst.lineId);
+              const mouthCap = endcapForLine(scene, nextRowFirst.lineId);
               if (mouthCap) {
-                enterGenreEndcapFromShelf(scene, mouthCap, 'right');
+                enterEndcapFromShelf(scene, mouthCap, 'right');
                 return;
               }
               // Transition to the front side of the next row's screen-order start unit
@@ -603,13 +603,13 @@ export function moveRightInternal(scene: StoreScene) {
           // end of this line's reading order. Continue on the next line's
           // front side if the library has one — via the NEXT line's genre
           // endcap when it has one (that endcap is inserted in this exact
-          // edge; see exitGenreEndcapToShelf).
+          // edge; see exitEndcapToShelf).
           const nextRowUnit = libUnits.find(u => u.rowGroupId !== currentUnit.rowGroupId && u.unitIdxInLibrary > currentUnit.unitIdxInLibrary);
           if (nextRowUnit) {
             const nextRowFirst = rowStartUnit(libUnits, nextRowUnit.rowGroupId);
-            const mouthCap = genreEndcapForLine(scene, nextRowFirst.lineId);
+            const mouthCap = endcapForLine(scene, nextRowFirst.lineId);
             if (mouthCap) {
-              enterGenreEndcapFromShelf(scene, mouthCap, 'right');
+              enterEndcapFromShelf(scene, mouthCap, 'right');
               return;
             }
             // Transition to the front side of the next row's screen-order start unit

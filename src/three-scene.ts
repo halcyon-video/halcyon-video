@@ -88,7 +88,7 @@ import {
   StoreShellSpec,
   getStoreShellSpec,
   StorefrontSpec,
-  FixturePlacement, newReleasesWallSpan, wallAllowsFeatureSections,
+  newReleasesWallSpan, wallAllowsFeatureSections,
 } from './store-layout';
 import { activeMediaCutoff } from './media-release-date';
 import { titleMatchKeys } from './staff-picks';
@@ -678,10 +678,8 @@ export class StoreScene {
   // T18: Romm video-game stock for the VIDEO GAMES section (see romm.ts and the
   // game-section fixture). Empty when Romm isn't configured/reachable.
   public gameMovies: Movie[] = [];
-  // Watch-history staff picks (see staff-picks.ts): owned titles wearing the
-  // sticker (ranked), and not-in-library order candidates for the genre
-  // endcaps. Both empty when there's no watch history / no Jellyseerr.
-  // Public: read by store-clerk-flow's staffPickEndcapPlacements().
+  // Ranked watch-history candidates for deliberate recommendations and
+  // inline request suggestions. Empty without watch history or an integration.
   public staffPickOwned: Movie[] = [];
   public staffPickMovies: Movie[] = [];
   // New Releases wall composition: `recentlyAddedMovies` fills the "row per
@@ -1730,15 +1728,12 @@ export class StoreScene {
     };
   }
 
-  /** Staff-picks genre endcap placements — see store-clerk-flow.ts. */
-  public staffPickEndcapPlacements(excludeLineIds?: Set<number>): FixturePlacement[] { return clerkFlow.staffPickEndcapPlacements(this, excludeLineIds); }
-
   /**
    * Late-arriving staff picks (the loader lost boot's race against a slow
    * Jellyseerr): just record the ranked owned pool. Owned winners are
    * deliberately unmarked — no sticker restamp (user direction after pin
-   * 012). Endcaps are build-time fixtures — they appear next boot,
-   * instantly, off the loader's cache.
+   * 012). The ranked pool is available
+   * to deliberate recommendations and inline catalog suggestions.
    */
   public applyStaffPicks(picks: { ownedPicks: Movie[] }): void {
     if (picks.ownedPicks.length === 0) return;

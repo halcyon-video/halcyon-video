@@ -30,7 +30,7 @@ export interface FixtureContext {
   // configured/reachable, so the VIDEO GAMES section simply never builds.
   gameMovies: Movie[];
   // Watch-history recommendation candidates NOT in the library (see
-  // staff-picks.ts) -- the genre endcaps resolve their order-candidate stock
+  // staff-picks.ts) -- the inline suggestions resolve their order-candidate stock
   // ids against this pool. Empty when there's no watch history or Jellyseerr.
   staffPickMovies: Movie[];
   log: (msg: string, type: 'system' | 'cec' | 'video') => void;

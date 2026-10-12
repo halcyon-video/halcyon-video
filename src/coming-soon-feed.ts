@@ -68,7 +68,7 @@ export interface ComingSoonFeedOptions {
   requestedIds?: Set<number>;
   /**
    * Pools outside `libraries` that carry the same flags — the staff-picks
-   * endcap order candidates (FixtureContext.staffPickMovies) never get shelved
+   * ranked request candidates (FixtureContext.staffPickMovies) never get shelved
    * into a library, so they'd otherwise be invisible to the board.
    */
   extra?: Movie[];

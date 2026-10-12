@@ -20,7 +20,6 @@ import {
 } from './fixtures/period-fixtures';
 import { GameSection } from './fixtures/game-section';
 import { BargainBin } from './fixtures/bargain-bin';
-import { GenreEndcap } from './fixtures/genre-endcap';
 import { CollectionEndcap } from './fixtures/collection-endcap';
 import { GoldClamshellDisplay } from './fixtures/gold-clamshell';
 import { PvDrapeTable } from './fixtures/pv-drape-table';
@@ -80,7 +79,6 @@ registerFixtureKind('tape-cleaner-display', (placement, ctx) => new TapeCleanerD
 registerFixtureKind('tape-cleaner-sidekick', (placement, ctx) => new TapeCleanerSidekick(placement, ctx));
 registerFixtureKind('game-section', (placement, ctx) => new GameSection(placement, ctx));
 registerFixtureKind('bargain-bin', (placement, ctx) => new BargainBin(placement, ctx));
-registerFixtureKind('genre-endcap', (placement, ctx) => new GenreEndcap(placement, ctx));
 registerFixtureKind('collection-endcap', (placement, ctx) => new CollectionEndcap(placement, ctx));
 registerFixtureKind('gold-clamshell', (placement, ctx) => new GoldClamshellDisplay(placement, ctx));
 registerFixtureKind('pv-drape-table', (placement, ctx) => new PvDrapeTable(placement, ctx));

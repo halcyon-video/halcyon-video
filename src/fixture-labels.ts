@@ -26,8 +26,7 @@ export function slottedFixtureLabel(f: SlottedFixture): string {
 
 /**
  * Qualify repeated labels IN PLACE. Several fixtures share a title in an
- * uncategorized store (every genre endcap falls back to "Related Movies", every
- * game gondola to "Video Games"), and a row of identical tickets is unusable.
+ * store (several game gondolas can share "Video Games"), and a row of identical tickets is unusable.
  * Prefer the aisle a repeat belongs to; a qualifier that just repeats the title
  * ("MOVIES · MOVIES") disambiguates nothing, so those get numbered instead.
  *

@@ -38,7 +38,7 @@ import { mobileStoreActive } from './mobile-store.ts';
 //          (no genre placards) simply yields none and the row degrades to
 //          libraries — no separate code path. This row is viewed from the
 //          entrance overview's vantage; stepping it pans ticket-to-ticket.
-//   Row 2  DISPLAYS — every slotted floor fixture: genre endcaps, collection
+//   Row 2  DISPLAYS — every slotted floor fixture: collection endcaps, collection
 //          endcaps, promo floor stands, bargain bins, drape tables, game
 //          gondolas. Moving the highlight GLIDES the camera to face that
 //          fixture, so stepping the row is literally walking the displays.
@@ -68,7 +68,7 @@ import { OVERVIEW_POS } from './scene-shared';
 import { FIELD_Z_FRONT, FRONT_GLASS_Z } from './store-layout';
 import { isMomAndPop } from './store-format';
 import { aimOverviewAt } from './store-camera';
-import { isEndcapKind } from './fixtures/genre-endcap';
+import { isEndcapKind } from './fixtures/endcap-shelf';
 import { slottedFixtureLabel, qualifyDuplicateLabels } from './fixture-labels';
 import { retailAudio } from './audio';
 import type { StoreScene } from './three-scene';

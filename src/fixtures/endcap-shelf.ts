@@ -1,18 +1,6 @@
 import { finishedPanelGeometry } from '../joinery-model';
-// The staff-picks genre endcap: a shallow display shelf butted flush against
-// the entrance-facing END of an aisle run, stocked by the staff-picks engine
-// (staff-picks.ts) with watch-history recommendations for THAT run's genre —
-// owned titles you haven't watched (rentable, wearing the STAFF PICK
-// starburst) interleaved with not-in-library order candidates (empty boxes,
-// orderable through the same requestMovie flow as collection gaps). The
-// classic video-store endcap, aimed by TMDB's people-also-liked data.
-//
-// Placements are COMPUTED, not configured: StoreScene.staffPickEndcapPlacements()
-// derives one per qualifying line-front shelving unit from the StorePlan, so
-// every arrangement (straight/diagonal/herringbone) gets correctly-oriented
-// endcaps for free. Three columns per shelf on purpose — the browse cursor's
-// fixture path assumes 3 columns (see StoreScene.updateColsCount), so the
-// whole rack is reachable without touching the nav code.
+// Shared aisle-end shelving construction for collection displays. Header
+// identity belongs to the concrete collection fixture, not this furniture.
 import * as THREE from 'three';
 import { installDisplayModel } from './display-model';
 import { Movie } from '../jellyfin';
@@ -20,8 +8,7 @@ import { FixturePlacement, BOX_SPACING, UNIT_DEPTH, unitDepthAtHeight } from '..
 
 import { FixtureContext, SlottedFixture, FixtureSlot } from '../fixtures';
 import { Footprint } from '../layout-validator';
-import { markSignMesh, createTrapezoidGeometry } from '../sign-builders';
-import { createCategorySignTexture } from '../canvas-textures';
+import { createTrapezoidGeometry } from '../sign-builders';
 import { CASE_HEIGHT, CASE_DEPTH } from '../video-case';
 import { isDiscoveryRequested } from '../jellyseerr';
 import { getActiveTheme } from '../themes';
@@ -61,7 +48,7 @@ export function getRequestedTagTexture(): THREE.Texture {
 }
 
 // Core depth + shelf overhang = the footprint depth. Shared with
-// StoreScene.staffPickEndcapPlacements(), which must place the core so the
+// collectionEndcapPlacements(), which must place the core so the
 // footprint's back edge lands EXACTLY on the shelving unit's end (touching
 // within the validator's 1cm tolerance — a gap would trip the fixture-vs-
 // shelving walkway warning, an overlap the collision error).
@@ -111,9 +98,9 @@ const MIN_SHELF_WIDTH = 2 * (BOX_SPACING + 0.23);
 // browse flow-through, the front-cap suppression and the clerk stand-point
 // suppression all key on "is this an endcap", never on which variant. Adding a
 // variant means adding it HERE, not editing four scene modules.
-export const ENDCAP_KINDS = ['genre-endcap', 'collection-endcap'] as const;
+export const ENDCAP_KINDS = ['collection-endcap'] as const;
 export function isEndcapKind(kind: string | undefined): boolean {
-  return kind === 'genre-endcap' || kind === 'collection-endcap';
+  return kind === 'collection-endcap';
 }
 
 // ─── The endcap footer plinth ───────────────────────────────────────────────
@@ -257,20 +244,14 @@ export function buildEndcapFooter(
   return tex;
 }
 
-export class GenreEndcap implements SlottedFixture {
+export abstract class EndcapShelf implements SlottedFixture {
   public placement: FixturePlacement;
   public shelfHeights: number[] = SHELF_HEIGHTS;
   public capacity = SHELF_HEIGHTS.length * COLS;
-  public genre = 'Related Movies';
-
-  // Topper sign text — "Related Movies" or "Related Shows", chosen by
-  // StoreScene.staffPickEndcapPlacements() from the aisle's library type.
-  private title = 'Related Movies';
+  public genre = '';
 
   protected ctx: FixtureContext;
   protected group: THREE.Group | null = null;
-  private signTex: THREE.Texture | null = null;
-  private placardTex: THREE.Texture | null = null;
   /** Set only when a footer plinth with a dressed front was built. */
   protected footerTex: THREE.Texture | null = null;
   private movies: Movie[] = [];
@@ -283,7 +264,6 @@ export class GenreEndcap implements SlottedFixture {
     this.ctx = ctx;
     const options = this.placement.options || {};
     if (typeof options.genre === 'string') this.genre = options.genre;
-    if (typeof options.title === 'string') this.title = options.title;
   }
 
   build(): void {
@@ -372,7 +352,7 @@ export class GenreEndcap implements SlottedFixture {
     this.ctx.addCollider(this.group);
     this.ctx.requestShadowRefresh();
     this.disposeModel = installDisplayModel(this.ctx, this.group, furniture,
-      `models/genre-endcap-${ENDCAP_TOP_WIDTH < ENDCAP_WIDTH ? 'tapered' : 'straight'}.glb`,
+      `models/endcap-shelf-${ENDCAP_TOP_WIDTH < ENDCAP_WIDTH ? 'tapered' : 'straight'}.glb`,
       { DisplayBody: coreMat, DisplayShelf: shelfMat, DisplayTrim: stripeMat });
   }
 
@@ -398,50 +378,8 @@ export class GenreEndcap implements SlottedFixture {
     });
   }
 
-  /**
-   * The endcap's HEADER — the one parameter of the endcap grammar that varies
-   * by what the endcap is for (see collection-endcap.ts for the 1990
-   * franchise-card variant). Called from build() with the carcass dimensions;
-   * anything it adds goes on `this.group` and is disposed with it.
-   *
-   * Default: the "Related Movies"/"Related Shows" identity, with the genre on
-   * a smaller placard below when the run is sectioned (a tiny library's endcap
-   * is just the picks). Both signs live ABOVE the core: the top shelf stocks
-   * at eye level, so a placard on the core face would hide behind the cases.
-   */
-  protected buildHeader(_coreWidth: number, coreHeight: number, coreDepth: number): void {
-    if (!this.group) return;
-    const genreLabel = typeof this.placement.options?.genreLabel === 'string'
-      ? (this.placement.options.genreLabel as string)
-      : null;
-    // Card size first, then the texture cut to that card's aspect: the ticket
-    // art carries a round stub notch and measured margins, so a sheet built for
-    // some other aspect would show up as an oval and wrong borders.
-    // Sized off the CROWN, not the base: the header is a topper sitting on the
-    // carcass's top edge, and the carcass tapers (see ENDCAP_TOP_WIDTH), so a
-    // card cut to the base width would overhang the crown it stands on.
-    const isWood = !!formatShelfWood();
-    const signW = Math.min(ENDCAP_TOP_WIDTH, 2.0), signH = 0.55;
-    this.signTex = createCategorySignTexture(this.title, undefined, false, signW / signH);
-    const signMat = new THREE.MeshStandardMaterial({ map: this.signTex, roughness: isWood ? 0.8 : 0.6, metalness: 0.0 });
-    const sign = markSignMesh(
-      new THREE.Mesh(new THREE.BoxGeometry(signW, signH, 0.06), signMat)
-    );
-    sign.position.set(0, coreHeight + (genreLabel ? 0.65 : 0.33), coreDepth / 2 + 0.03);
-    this.group.add(sign);
-
-    if (genreLabel) {
-      const placW = Math.min(ENDCAP_TOP_WIDTH, 1.6), placH = 0.4;
-      this.placardTex = createCategorySignTexture(genreLabel, undefined, false, placW / placH);
-      const placardMat = new THREE.MeshStandardMaterial({ map: this.placardTex, roughness: isWood ? 0.8 : 0.6, metalness: 0.0 });
-      const placard = markSignMesh(
-        new THREE.Mesh(new THREE.BoxGeometry(placW, placH, 0.05), placardMat)
-      );
-      placard.position.set(0, coreHeight + 0.18, coreDepth / 2 + 0.03);
-      this.group.add(placard);
-    }
-
-  }
+  /** A concrete collection display supplies its own header composition. */
+  protected abstract buildHeader(coreWidth: number, coreHeight: number, coreDepth: number): void;
 
   update(_timeMs: number): void {
     // Static furniture.
@@ -467,10 +405,6 @@ export class GenreEndcap implements SlottedFixture {
 
   /** Release whatever buildHeader() allocated (paired override point). */
   protected disposeHeader(): void {
-    this.signTex?.dispose();
-    this.signTex = null;
-    this.placardTex?.dispose();
-    this.placardTex = null;
     this.footerTex?.dispose();
     this.footerTex = null;
   }
@@ -486,7 +420,7 @@ export class GenreEndcap implements SlottedFixture {
     return !!this.placement.options?.footer;
   }
 
-  // Back edge = the core's back face, which staffPickEndcapPlacements() lands
+  // Back edge = the core's back face, which collectionEndcapPlacements() lands
   // exactly on the shelving unit's end; front edge = whichever reaches further
   // into the walkway, the shelf overhang or the footer plinth.
   getFootprint(): Footprint {

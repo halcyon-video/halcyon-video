@@ -46,13 +46,13 @@ import { ABOVE_R_LIBRARY_ID } from '../above-r-room';
 // the first place. Adding a second presentation means adding a photo first.
 //
 // ── Architecture: a variant, not a second fixture ───────────────────────────
-// A collection endcap IS a genre endcap with a different header and different
-// stock curation — same carcass, same shelves, same slot geometry, same browse
-// flow-through. So it subclasses GenreEndcap and overrides exactly the two
+// Collection displays use the shared EndcapShelf furniture and supply their own
+// header and stock curation — the same shelves, slot geometry and browse
+// flow-through. The collection fixture overrides exactly the two
 // things the photo shows differing (`buildHeader`, `coreMaterial`), instead of
 // re-implementing a 350-line fixture that would then drift. Everything the
 // scene keys on ("is this an endcap?") goes through `isEndcapKind` in
-// genre-endcap.ts, so adding a third variant later touches this list and
+// endcap-shelf.ts, so adding a third variant later touches this list and
 // nothing else.
 //
 // ── Gating ──────────────────────────────────────────────────────────────────
@@ -77,7 +77,7 @@ import { Movie } from '../jellyfin';
 import { FixturePlacement, shelfTitleCompare } from '../store-layout';
 import { FixtureContext } from '../fixtures';
 import { markSignMesh } from '../sign-builders';
-import { GenreEndcap, ENDCAP_CORE_DEPTH, ENDCAP_CORE_HEIGHT, ENDCAP_WIDTH, buildEndcapFooter } from './genre-endcap';
+import { EndcapShelf, ENDCAP_CORE_DEPTH, ENDCAP_CORE_HEIGHT, ENDCAP_WIDTH, buildEndcapFooter } from './endcap-shelf';
 import { getActiveTheme, themeTrimDarkHex, type StoreTheme } from '../themes';
 import { tryLoadUserAssetTexture, tryLoadUserSignArtTexture } from '../user-assets';
 import type { StoreScene } from '../three-scene';
@@ -95,7 +95,7 @@ import { installStandeeConstruction } from './standee-construction';
 export const MIN_COLLECTION_TITLES = 4;
 /**
  * Ceiling on collection endcaps per store. Run ends are a scarce resource that
- * the staff-picks genre endcaps also want, and a store whose every aisle end
+ * other displays can use, and a store whose every aisle end
  * is a franchise shrine stops reading as a video store. Two or three is what
  * the photos show.
  */
@@ -929,7 +929,7 @@ function getKitTexture(face: KitFace): THREE.Texture {
   return tex;
 }
 
-export class CollectionEndcap extends GenreEndcap {
+export class CollectionEndcap extends EndcapShelf {
   /** The collection this end is dedicated to (raw Jellyfin BoxSet name). */
   public collectionName: string;
   private headerTex: THREE.Texture | null = null;
@@ -991,7 +991,7 @@ export class CollectionEndcap extends GenreEndcap {
 
     // ── The footer plinth, ribbon-dressed ───────────────────────────────────
     // The kit's green base with the GIVE-THE-GIFT ribbon — the same plinth
-    // GenreEndcap arms via `options.footer` for its plain 80s form, dressed
+    // EndcapShelf arms via `options.footer` for its plain 80s form, dressed
     // here because a collection end IS the kit (photo 2580265323, both bases).
     this.footerTex = buildEndcapFooter(this.group, coreWidth, coreDepth, {
       color: FOOTER_GREEN,
@@ -1176,7 +1176,7 @@ export class CollectionEndcap extends GenreEndcap {
     super.disposeHeader();
     // The slat texture AND the four kit-sheet textures (tree/tag, front/back)
     // are module-shared and outlive the fixture — never disposed here, same
-    // contract as genre-endcap's REQUESTED tag texture. Only the two textures
+    // contract as endcap-shelf's REQUESTED tag texture. Only the two textures
     // this fixture owns outright go back.
     this.coreTex = null;
     this.headerTex?.dispose();
@@ -1254,23 +1254,7 @@ export function qualifyingCollections(scene: StoreScene): CollectionCandidate[] 
   return out;
 }
 
-/**
- * How many run ends this store will hand to collections. A RESERVATION, taken
- * before the staff-picks deal — not leftovers.
- *
- * Leftovers do not work: staffPickEndcapPlacements deals its discovery pool
- * round-robin across EVERY qualifying run end, so with any real watch history
- * nothing is ever left over and a collection endcap would be code that never
- * runs. The chain's own stores show the opposite priority anyway — the 1990
- * photo's franchise end is at the mouth of an aisle, in the best spot in the
- * store.
- *
- * So collections take up to MAX_COLLECTION_ENDCAPS ends and never more than
- * HALF of them: genre endcaps always keep the majority of the store's aisle
- * ends, and a store with a single usable end keeps it for the staff picks.
- * (The staff-picks deal re-spreads its pool over the ends it does get, so the
- * surviving genre endcaps come out better stocked, not thinner.)
- */
+/** Reserve a bounded share of aisle ends for seasonal collection displays. */
 export function collectionEndcapReservation(totalRunEnds: number): number {
   return Math.max(0, Math.min(MAX_COLLECTION_ENDCAPS, Math.floor(totalRunEnds / 2)));
 }
@@ -1279,9 +1263,7 @@ export function collectionEndcapReservation(totalRunEnds: number): number {
  * Placements for the collection endcaps (fixtures registered as
  * `collection-endcap`).
  *
- * Runs BEFORE staffPickEndcapPlacements, which is then handed these lineIds to
- * exclude. Both selectors read the SAME host list
- * (StorePlan.openLineFrontEnds), so "an endcap fits here" means one thing.
+ * Host geometry comes from StorePlan.openLineFrontEnds.
  *
  * Deterministic: candidate order comes from stock counts + a name hash, host
  * order from the plan, so the same catalog lays the same store out every boot.
@@ -1296,9 +1278,7 @@ export function collectionEndcapReservation(totalRunEnds: number): number {
  * format is attested IN A PHOTO. There is no non-holiday header to fall back
  * on and inventing one is precisely the card-on-a-stick failure that ruling
  * was written after, so out of season the fixture simply doesn't deploy: the
- * run end goes back into the pool and the staff-picks genre endcap takes it
- * (this selector runs first and hands its lineIds to that one as exclusions,
- * so an empty return needs no other change). Force the season for shots with
+ * run end keeps its ordinary shelving cap. Force the season for shots with
  * `--set bb_promo_date=2026-12-10`, same override the promo stands use.
  */
 export function collectionEndcapPlacements(scene: StoreScene): FixturePlacement[] {
@@ -1311,7 +1291,7 @@ export function collectionEndcapPlacements(scene: StoreScene): FixturePlacement[
 
   // Run ends dealt alternating across the two shelving fields (store centreline
   // x=11) so the franchises don't all land on one side — the same spread rule
-  // the genre endcaps use.
+  // the shared shelf construction uses.
   const allEnds = scene.plan.openLineFrontEnds();
   const reservation = collectionEndcapReservation(allEnds.length);
   // PER-LIBRARY cap, and the reason the store still reads right: a collection
@@ -1319,7 +1299,7 @@ export function collectionEndcapPlacements(scene: StoreScene): FixturePlacement[
   // library would otherwise take every Movies end — leaving the staff-picks
   // deal only the small libraries' ends, whose matched pools then fail its
   // MIN_PICKS test and build nothing. Measured on the --full harness: 3 of 7
-  // ends taken that way dropped the genre endcaps from 5 to 1. Half of each
+  // ends taken that way used almost every aisle end. Half of each
   // library's own ends, rounded down, keeps every aisle's mouth shared.
   const endsPerLib = new Map<number, number>();
   for (const e of allEnds) endsPerLib.set(e.unit.libraryIdx, (endsPerLib.get(e.unit.libraryIdx) ?? 0) + 1);
@@ -1365,7 +1345,7 @@ export function collectionEndcapPlacements(scene: StoreScene): FixturePlacement[
 
     const u = end.unit;
     // Core centred so the footprint's back edge lands exactly on the unit's
-    // end face (see genre-endcap.ts's abutment contract).
+    // end face (see endcap-shelf.ts's abutment contract).
     const pos = scene.plan.unitToWorld(u, u.xCenter, end.frontLocalZ + ENDCAP_CORE_DEPTH / 2);
     const label = collectionWordmark(coll.name);
     placements.push({

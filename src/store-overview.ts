@@ -21,7 +21,7 @@ import { BROWSE_WINDOW_SIZE, AISLE_SHELF_HEIGHTS, SECTION_COLS, UNIT_SIDE_CAPACI
 import { OVERVIEW_POS } from './scene-shared';
 import { openSubNav, closeSubNav, forgetSubNav, subNavSelect } from './store-subnav';
 import { aimOverviewAt } from './store-camera';
-import { isEndcapKind } from './fixtures/genre-endcap';
+import { isEndcapKind } from './fixtures/endcap-shelf';
 import { slottedFixtureLabel, qualifyDuplicateLabels } from './fixture-labels';
 import type { StoreScene } from './three-scene';
 import { counterFrame } from './counter-anchors';

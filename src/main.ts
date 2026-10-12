@@ -256,7 +256,7 @@ function refreshStoreCatalog() {
   }
   logToConsole(`[System] Media Release Date: store pinned to ${toDateOnly(cutoff)} — later releases are absent.`, 'system');
 }
-// Watch-history staff picks (stickers + genre endcaps) -- see staff-picks.ts.
+// Watch-history staff picks (ranked candidates) -- see staff-picks.ts.
 // Computed right before the 3D scene is built; stays empty without watch
 // history or a Jellyseerr integration (real or synthetic).
 let staffPicks: StaffPicks = EMPTY_STAFF_PICKS;
@@ -2545,11 +2545,10 @@ async function initializeStoreScene(preservePosterCache = false) {
     // waits for its covers; the public store reveals while they load. Until then, the
     // boot overlay stays up and `storeScene?.` call sites elsewhere are all
     // no-ops, so neither the view nor input can reach the half-dressed scene.
-    // Watch-history staff picks (stickers + genre endcaps, see
+    // Watch-history staff picks (ranked candidates, see
     // staff-picks.ts): computed here so login, demo, and settings-rebuild
     // boots all get them. Raced like the other Jellyseerr loaders — never
-    // blocks boot; a lost race still stickers the shelves live on arrival
-    // (endcaps then appear next boot, instantly, off the loader's cache).
+    // blocks boot; a late ranked pool remains available to recommendations.
     {
       const TIMEOUT_MS = 15_000;
       const work = loadStaffPicks(storeLibraries, isDemoMode ? { posterFor: demoPoster } : {})

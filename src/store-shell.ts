@@ -73,7 +73,7 @@ import { buildCounterProps93 } from './fixtures/counter-props-93';
 import { buildStorefrontDressing93 } from './fixtures/storefront-dressing-93';
 import { buildStorefrontCampaignPoster, campaignBannerSpan } from './fixtures/storefront-campaign-poster';
 import { buildSecurityCamera93 } from './fixtures/security-camera-93';
-import { isEndcapKind } from './fixtures/genre-endcap';
+import { isEndcapKind } from './fixtures/endcap-shelf';
 import { collectionEndcapPlacements } from './fixtures/collection-endcap';
 import { buildMembershipOvalHanger } from './fixtures/membership-oval-hanger';
 import { buildRentingBetterHangers } from './fixtures/renting-better-hanger';
@@ -2211,14 +2211,8 @@ export function buildStore(scene: StoreScene) {
   // 4. Freestanding aisle gondolas: structure + signage for every planned
   // unit (see shelving.ts — swap buildAisleShelving for a different
   // shelving-unit style).
-  // Staff-picks genre endcaps are computed BEFORE the shelving build so each
-  // hosting run can skip its own blue front cap — the endcap's back panel
-  // mounts on the exact same plane and the two z-fight (feedback pin 010).
-  // COLLECTION endcaps reserve their ends FIRST — capped at half the store's
-  // run ends (collectionEndcapReservation), so the staff-picks deal that
-  // follows always keeps the majority. None build when the media server
-  // surfaced no collections: that is the gate, not a failure (see
-  // fixtures/collection-endcap.ts).
+  // Collection displays reserve their host ends before the shelving build
+  // so their back panels replace the plain blue caps without overlap.
   const collectionEndcaps = collectionEndcapPlacements(scene);
   const endcapHostLineIds = new Set<number>();
   for (const p of collectionEndcaps) {
@@ -2228,10 +2222,6 @@ export function buildStore(scene: StoreScene) {
     ? momAndPopPlantPlacements(scene.getStoreWidth(), scene.backWallZ,
       scene.plan.openLineFrontEnds().filter(end => !endcapHostLineIds.has(end.unit.lineId))) : [];
   const plantLineIds = new Set(plantPlacements.map(p => p.options!.lineId));
-  const endcapPlacements = scene.staffPickEndcapPlacements(new Set([...endcapHostLineIds, ...plantLineIds as Set<number>]));
-  for (const p of endcapPlacements) {
-    if (typeof p.options?.lineId === 'number') endcapHostLineIds.add(p.options.lineId);
-  }
   buildAisleShelving({
     shelfModels,
     scene: scene.scene,
@@ -2299,11 +2289,7 @@ export function buildStore(scene: StoreScene) {
     // decides where the desk stands (see counterAnchoredPlacements).
     ...counterAnchoredPlacements(scene.storefrontSpec, storeWidth),
     ...(scene.gameMovies.length > 0 ? gameSectionPlacements(scene.getStoreWidth()) : []),
-    // Staff-picks genre endcaps at aisle-run ends — computed above, before
-    // the shelving build; present only when the watch-history engine
-    // produced stock.
-    ...endcapPlacements,
-    // ...and the franchise-collection ends, on whatever run ends were left.
+    // Franchise collection displays at their reserved run ends.
     ...collectionEndcaps,
     // The back room, on the formats that have one (GH #33).
     ...(scene.plan.aboveRRoom ? curtainedAlcovePlacements(scene.plan.aboveRRoom.depth) : []),

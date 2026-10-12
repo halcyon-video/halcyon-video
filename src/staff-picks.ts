@@ -9,8 +9,8 @@
 // one, however popular. The winners become
 //   - a ranked owned pool (deliberately unmarked on the shelf — no flag, no
 //     sticker; user direction after pin 012), and
-//   - synthesized not-in-library Movies for the genre endcaps
-//     (genre-endcap.ts), orderable through the same requestMovie flow as
+//   - synthesized not-in-library Movies for inline suggestions,
+//     orderable through the same requestMovie flow as
 //     collection gaps — these DO wear the FOR YOU starburst.
 //
 // Pure functions over plain data, no THREE import and no runtime import of

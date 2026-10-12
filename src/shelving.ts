@@ -26,7 +26,7 @@ import {
 } from './fixtures/ticket-board-sign';
 import { createTrapezoidGeometry, splitTrapezoidGroups, createLibraryEndCapMaterial, markSignMesh } from './sign-builders';
 import { createFasciaBladeFactory, FASCIA_BLADE_H } from './fixtures/genre-fascia';
-import { ENDCAP_CORE_HEIGHT } from './fixtures/genre-endcap';
+import { ENDCAP_CORE_HEIGHT } from './fixtures/endcap-shelf';
 import { dressing93Active } from './genre-colors';
 
 import { getActiveTheme } from './themes';
@@ -158,7 +158,7 @@ export interface AisleShelvingDeps {
   // fixtures/shelf-clasp.ts). Optional so a caller that doesn't want them
   // simply omits it.
   registerClasp?: (placement: ClaspPlacement) => void;
-  // Runs (by lineId) whose front end hosts a genre endcap fixture: the
+  // Runs (by lineId) whose front end hosts a collection endcap fixture: the
   // fixture's back panel mounts on the same plane the run's own blue front
   // cap occupies, so the cap is skipped there — two coplanar panels z-fight.
   suppressFrontCapLineIds?: Set<number>;
