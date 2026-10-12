@@ -71,6 +71,7 @@ export function updateLookDownPresent(scene: StoreScene) {
 }
 
 export function updateCameraTarget(scene: StoreScene) {
+  if (scene.selectedUnitSource === 'fixture') scene.updateColsCount();
   scene.updateLOD();
   // Any retargeting (user navigation, mode change) cuts the return-drop
   // watch short — the player's intent wins over the diegetic beat. The

@@ -1,3 +1,4 @@
+import { terracedDisplayGeometry } from './terraced-display';
 import { createFeatureFilmTopper } from './feature-film-topper';
 import * as THREE from 'three';
 import { installDisplayModel } from './display-model';
@@ -73,10 +74,13 @@ export class FourSidedDisplay implements SlottedFixture {
         heights.push(1.5 + i * 0.9);
       }
     }
-    this.profile = (options.footprintSize == null || options.footprintSize === 2) ? localFloorDisplayProfile(placement.id) : null;
+    this.profile = (options.footprintSize == null || options.footprintSize === 2) ? localFloorDisplayProfile(placement.id, getActiveTheme().id) : null;
     this.shelfHeights = this.profile?.shelfHeights ?? heights;
-    this.capacity = 4 * this.shelfHeights.length * 3; // 4 sides, N shelves, 3 columns per shelf
+    this.capacity = 4 * this.shelfHeights.reduce((sum, _, row) => sum + this.rowColumns(row), 0);
   }
+
+  private rowColumns(row: number): number { return this.profile?.shelfColumns?.[row] ?? FACE_COLS; }
+  public columnsForShelf(row: number): number { return this.rowColumns(row); }
 
   build(): void {
     if (!this.ensureCampaign()) return; // no viable campaign -> no stand
@@ -105,7 +109,7 @@ export class FourSidedDisplay implements SlottedFixture {
     // panes blend by mesh sort order instead of popping against each other.
     const theme = getActiveTheme();
     const featureFilm = this.campaign?.id.startsWith('feature-title:') ? this.campaign.faces[0]?.movies[0] : undefined;
-    const opaqueShelves = Boolean(this.profile?.dark && !featureFilm);
+    const opaqueShelves = Boolean(this.profile?.terraced || (this.profile?.dark && !featureFilm));
     const acrylicMat = new THREE.MeshPhysicalMaterial({
       color: 0xf4f8ff,
       transparent: true,
@@ -129,7 +133,7 @@ export class FourSidedDisplay implements SlottedFixture {
     if (opaqueShelves) acrylicMat.dispose();
 
     const coreMat = new THREE.MeshStandardMaterial({
-      color: new THREE.Color(featureFilm ? 0x111111 : this.profile?.dark ? themeTrimDarkHex(theme) : theme.palette.primary),
+      color: new THREE.Color(this.profile?.light ? 0xf0eee7 : featureFilm ? 0x111111 : this.profile?.dark ? themeTrimDarkHex(theme) : theme.palette.primary),
       roughness: 0.4,
       metalness: 0.05
     });
@@ -220,6 +224,14 @@ export class FourSidedDisplay implements SlottedFixture {
       this.group!.add(topper);
     });
 
+    if (this.profile?.terraced) {
+      const old = furniture.children.slice();
+      old.forEach(part => { part.traverse(o => { if (o instanceof THREE.Mesh) o.geometry.dispose(); }); furniture.remove(part); });
+      const shell = new THREE.Mesh(terracedDisplayGeometry(this.profile), coreMat);
+      shell.castShadow = shell.receiveShadow = true;
+      furniture.add(shell);
+      bandMat.dispose(); plinthMat.dispose();
+    }
     this.ctx.scene.add(this.group);
     this.ctx.addCollider(this.group);
     this.ctx.requestShadowRefresh();
@@ -227,7 +239,7 @@ export class FourSidedDisplay implements SlottedFixture {
     if (this.profile || (footprintSize === 2 && this.shelfHeights.join(',') === '1.5,2.4,3.3')) {
       this.disposeModel = installDisplayModel(this.ctx, this.group, furniture,
         this.profile?.model ?? 'models/four-sided-merchandiser.glb',
-        { DisplayBody: coreMat, DisplayShelf: opaqueShelves ? plinthMat : acrylicMat, DisplayTrim: bandMat, DisplayHardware: plinthMat });
+        { DisplayBody: coreMat, DisplayShelf: this.profile?.terraced ? coreMat : opaqueShelves ? plinthMat : acrylicMat, DisplayTrim: this.profile?.terraced ? coreMat : bandMat, DisplayHardware: this.profile?.terraced ? coreMat : plinthMat });
     }
   }
 
@@ -312,18 +324,18 @@ export class FourSidedDisplay implements SlottedFixture {
         // empty on a part-filled face. Invert to fill top-first, exactly as the
         // person-endcap ("actor spotlight") rows do — the shortfall belongs on
         // the bottom row, where it reads as a shelf not yet restocked.
-        const rowFromTop = (this.shelfHeights.length - 1) - shelfIdx;
 
-        for (let col = 0; col < FACE_COLS; col++) {
+        const columns = this.rowColumns(shelfIdx);
+        for (let col = 0; col < columns; col++) {
           // Per-face slot index — the same row-major order layoutFace() fills,
           // so a short campaign's repeated titles stack down a column.
-          const slotIdx = rowFromTop * FACE_COLS + col;
+          const slotIdx = this.shelfHeights.slice(shelfIdx + 1).reduce((sum, _, i) => sum + this.rowColumns(shelfIdx + 1 + i), 0) + col;
           const movie = faceMovies[slotIdx];
           if (!movie) continue;
 
           // col 0 is the viewer's LEFT: with (1 - col) the first title of each
           // row landed on the right, so a top-down fill still read right-to-left.
-          const localX = (col - 1) * BOX_SPACING;
+          const localX = (col - (columns - 1) / 2) * BOX_SPACING;
           const localZ = (this.profile?.shelfCenters[shelfIdx] ?? baseLocalZ) + (boxHeight / 2 + 0.02) * Math.sin(rotationX);
           const localY = shelfY + (boxHeight / 2 + 0.02) * Math.cos(rotationX);
 
@@ -367,7 +379,7 @@ export class FourSidedDisplay implements SlottedFixture {
       chain,
       this.ctx.libraries,
       this.shelfHeights.length,
-      FACE_COLS,
+      Math.max(...this.shelfHeights.map((_, row) => this.rowColumns(row))),
     );
 
     this.faceLabels = [];
