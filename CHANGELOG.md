@@ -5,6 +5,56 @@ All notable changes to Halcyon Video, generated from commit history by
 it on every version tag push. Deterministic and offline: no entry here was
 written by a model.
 
+## [v0.25.0] — 2026-10-06
+
+### CHANGELOG
+- V0.24.0
+
+### General
+- Keep counter balloons exclusive to the 1993 era
+- Choose clerk uniforms automatically from store era
+- Keep exterior terrain within the authored parking area
+- Simplify terminal settings and automate customer traffic
+- Docs: focus store tour, device support and free pricing
+- Reserve customer destinations and pair parking with visits
+- Docs: present store configurations, games and flycam tour
+- Complete wooden bookcases and single-faced game shelf models (Closes [#154](https://github.com/halcyon-video/halcyon-video/issues/154), [#160](https://github.com/halcyon-video/halcyon-video/issues/160))
+- Use a poster layout and year carousel for startup
+- Keep the store open during streaming checkout
+- Improve startup year selector and full-screen loading presentation
+- Complete the optional exposed ceiling with authored trusses and ducts (Closes [#284](https://github.com/halcyon-video/halcyon-video/issues/284))
+- Model paperboard game cartons and season slipboxes (Closes [#251](https://github.com/halcyon-video/halcyon-video/issues/251), [#252](https://github.com/halcyon-video/halcyon-video/issues/252))
+- Author the deformable rental-bag rest mesh
+- Add the late-period twin-monitor merchandise tower (Closes [#216](https://github.com/halcyon-video/halcyon-video/issues/216))
+- Reduce repeated store layout and surface preparation work
+- Model display supports and folded facade trim (Closes [#162](https://github.com/halcyon-video/halcyon-video/issues/162), [#238](https://github.com/halcyon-video/halcyon-video/issues/238), [#257](https://github.com/halcyon-video/halcyon-video/issues/257), [#258](https://github.com/halcyon-video/halcyon-video/issues/258))
+- Add quick playback and restore the previous shelf position
+- Model visible door, window and room joinery (Closes [#214](https://github.com/halcyon-video/halcyon-video/issues/214), [#218](https://github.com/halcyon-video/halcyon-video/issues/218), [#230](https://github.com/halcyon-video/halcyon-video/issues/230))
+- Slightly darken customer six's skin colors
+- Omit concealed hardware from the draped sale table (Closes [#167](https://github.com/halcyon-video/halcyon-video/issues/167))
+- Model the draped sale table and its bent-wire merchandise rack (Closes [#167](https://github.com/halcyon-video/halcyon-video/issues/167), [#168](https://github.com/halcyon-video/halcyon-video/issues/168))
+- Model the counter mug, acrylic holders and optional cleaner tray (Closes [#182](https://github.com/halcyon-video/halcyon-video/issues/182), [#234](https://github.com/halcyon-video/halcyon-video/issues/234))
+- Restore storefront sidewalk and extend textured terrain beneath panoramas
+- Give customer six a Meshy-authored neutral standing stance
+- Support photographic ground with retained shadow and layout geometry
+- Rebuild customer six entirely through Meshy
+- Support private panoramas and refresh shadows on time changes
+- Fit customer six neck and connect the full beard
+- Fit a simple full beard and upper lip on customer six
+- Fit customer six clothing joints and refine short stubble
+- Replace customer six body while preserving his original head
+- Rebuild customer six with a classic collarless vest
+- Match gumball enamel to live store colors and fit the hopper cap
+- Fix streaming checkout pickup refusals and printed row taps
+- Add configured store logo to the gumball globe
+- Fix rear clerk collar brand-color coverage
+- Face gumball coin mechanism toward the customer aisle
+- Update customer six wardrobe and neutral cast hand poses
+- Set gumball machine to four feet and clarify its glass
+- Add spiral gumball machine with games endcap and counter placement
+- Refresh phone clerk artwork and console-style loading
+- Avoid redundant artwork work and release retired poster resources
+
 ## [v0.24.0] — 2026-10-04
 
 ### CHANGELOG
