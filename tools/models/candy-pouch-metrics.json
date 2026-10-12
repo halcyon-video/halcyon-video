@@ -253,10 +253,160 @@
           0.2449173927307129
         ]
       }
+    },
+    {
+      "name": "SlatwallWing",
+      "triangles": 516,
+      "parts": 7,
+      "manifold": true,
+      "boundsFeet": {
+        "min": [
+          -0.10999999940395355,
+          0.0,
+          -0.7580000162124634
+        ],
+        "max": [
+          0.06650000065565109,
+          5.007999897003174,
+          0.7580000162124634
+        ]
+      },
+      "anchors": {
+        "Anchor_SlatwallWing_GondolaEnd": [
+          0.0,
+          0.0,
+          -0.0
+        ],
+        "Anchor_SlatwallWing_Slot00": [
+          0.0625,
+          0.5,
+          -0.0
+        ],
+        "Anchor_SlatwallWing_Slot01": [
+          0.0625,
+          0.75,
+          -0.0
+        ],
+        "Anchor_SlatwallWing_Slot02": [
+          0.0625,
+          1.0,
+          -0.0
+        ],
+        "Anchor_SlatwallWing_Slot03": [
+          0.0625,
+          1.25,
+          -0.0
+        ],
+        "Anchor_SlatwallWing_Slot04": [
+          0.0625,
+          1.5,
+          -0.0
+        ],
+        "Anchor_SlatwallWing_Slot05": [
+          0.0625,
+          1.75,
+          -0.0
+        ],
+        "Anchor_SlatwallWing_Slot06": [
+          0.0625,
+          2.0,
+          -0.0
+        ],
+        "Anchor_SlatwallWing_Slot07": [
+          0.0625,
+          2.25,
+          -0.0
+        ],
+        "Anchor_SlatwallWing_Slot08": [
+          0.0625,
+          2.5,
+          -0.0
+        ],
+        "Anchor_SlatwallWing_Slot09": [
+          0.0625,
+          2.75,
+          -0.0
+        ],
+        "Anchor_SlatwallWing_Slot10": [
+          0.0625,
+          3.0,
+          -0.0
+        ],
+        "Anchor_SlatwallWing_Slot11": [
+          0.0625,
+          3.25,
+          -0.0
+        ],
+        "Anchor_SlatwallWing_Slot12": [
+          0.0625,
+          3.5,
+          -0.0
+        ],
+        "Anchor_SlatwallWing_Slot13": [
+          0.0625,
+          3.75,
+          -0.0
+        ],
+        "Anchor_SlatwallWing_Slot14": [
+          0.0625,
+          4.0,
+          -0.0
+        ],
+        "Anchor_SlatwallWing_Slot15": [
+          0.0625,
+          4.25,
+          -0.0
+        ],
+        "Anchor_SlatwallWing_Slot16": [
+          0.0625,
+          4.5,
+          -0.0
+        ],
+        "Anchor_SlatwallWing_Slot17": [
+          0.0625,
+          4.75,
+          -0.0
+        ]
+      }
+    },
+    {
+      "name": "SlatwallHook",
+      "triangles": 152,
+      "parts": 1,
+      "manifold": true,
+      "boundsFeet": {
+        "min": [
+          -0.03500000014901161,
+          -0.05999999865889549,
+          -0.03999999910593033
+        ],
+        "max": [
+          0.03500000014901161,
+          0.06800000369548798,
+          0.7559999823570251
+        ]
+      },
+      "anchors": {
+        "Anchor_SlatwallHook_LoadFront": [
+          0.0,
+          0.0,
+          0.6200000047683716
+        ],
+        "Anchor_SlatwallHook_LoadRear": [
+          0.0,
+          0.0,
+          0.4000000059604645
+        ],
+        "Anchor_SlatwallHook_Mount": [
+          0.0,
+          0.0,
+          -0.0
+        ]
+      }
     }
   ],
   "embeddedTextures": 0,
   "construction": "Original generic sealed pouch and welded/bent-wire support kit. Visible pillow silhouette informed by reference; holes, sealed thickness, rear fin and support joints are estimates.",
-  "triangles": 2232,
-  "glbBytes": 96580
+  "triangles": 2900,
+  "glbBytes": 143384
 }

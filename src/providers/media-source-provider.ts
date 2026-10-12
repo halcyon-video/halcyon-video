@@ -88,7 +88,7 @@ export interface Title {
   discCount?: number;
   // Explicit physical edition, independent of genre/studio/poster aspect.
   // Currently the movie VHS path accepts the distinct large white clamshell.
-  packaging?: 'vhs-slipcase' | 'vhs-white-clamshell';
+  packaging?: 'vhs-slipcase' | 'vhs-white-clamshell' | 'bluray-keepcase';
   // Audio/subtitle streams of the primary media source (already fetched with
   // the catalog) — drives the in-app player's track picker. Absent for series
   // containers, games, and discovery titles.
@@ -152,7 +152,7 @@ export interface Title {
   runTimeTicks?: number;
   // Set by the staff-picks engine on an OWNED title that the aggregated
   // watch-history recommendations surfaced: its case wears the STAFF PICK
-  // sticker (video-case.ts) and it's eligible for the genre endcaps.
+  // sticker (video-case.ts) and it's eligible for the inline suggestions.
   staffPick?: boolean;
   // Top-billed cast as person references (id + portrait URL), captured
   // alongside `actors` (name-only) so wall décor (wall-decor.ts) can tally the
@@ -323,7 +323,7 @@ export interface ProviderCapabilities {
   transcoding: boolean;
   /** Per-user watch state (played / play count / last played). The staff-picks
    *  engine's anchors come from here, so a backend with this false builds no
-   *  staff-pick stickers and no genre endcaps. */
+   *  staff-pick stickers or recommendation candidates. */
   watchState: boolean;
   /** Server reports a resume position, so playback can start where the user
    *  left off rather than at 0:00. */

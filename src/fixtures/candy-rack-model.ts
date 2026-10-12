@@ -1,7 +1,7 @@
 // Original Blender hardware, with stock/selection owned by CandyDisplay.
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { assetUrl } from '../asset-url';
+import { assetUrl, HOSTED_BUILD } from '../asset-url';
 import type { FixtureContext } from '../fixtures';
 
 export const CANDY_TRAY_ANGLE = -Math.PI / 15;
@@ -33,9 +33,9 @@ export function installCandyRackModel(
   let privateHardware = false;
   const load = async () => {
     // Optional local reconstruction. A partial pair must never mix two designs.
-    const local = await Promise.allSettled(['frame', 'tray'].map(part =>
+    const local = HOSTED_BUILD ? [] : await Promise.allSettled(['frame', 'tray'].map(part =>
       loader.loadAsync(assetUrl(`user-assets/fixtures/candy-queue-rack/candy-rack-${part}.glb`))));
-    if (local.every(r => r.status === 'fulfilled')) { privateHardware = true; return local; }
+    if (local.length && local.every(r => r.status === 'fulfilled')) { privateHardware = true; return local; }
     for (const result of local) if (result.status === 'fulfilled') {
       result.value.scene.traverse(object => {
         if (!(object instanceof THREE.Mesh)) return;

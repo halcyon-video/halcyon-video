@@ -1281,7 +1281,7 @@ export function createCarpetTextures(palette = getActiveTheme().palette): {
   // Fibre height field -> normal map (directional pile).
   const carpetHeight = document.createElement('canvas');
   carpetHeight.width = CARPET; carpetHeight.height = CARPET;
-  const chCtx = carpetHeight.getContext('2d')!;
+  const chCtx = carpetHeight.getContext('2d', { willReadFrequently: true })!;
   chCtx.fillStyle = '#808080'; chCtx.fillRect(0, 0, CARPET, CARPET);
   chCtx.lineWidth = 1;
   for (let i = 0; i < 9000; i++) {
@@ -1364,7 +1364,7 @@ export function createWallTextures(palette: Partial<{ wall: string }> = getActiv
   // Orange-peel height -> normal map.
   const wallHeight = document.createElement('canvas');
   wallHeight.width = WALLT; wallHeight.height = WALLT;
-  const whCtx = wallHeight.getContext('2d')!;
+  const whCtx = wallHeight.getContext('2d', { willReadFrequently: true })!;
   whCtx.fillStyle = '#808080'; whCtx.fillRect(0, 0, WALLT, WALLT);
   for (let i = 0; i < 2500; i++) {
     const x = Math.random() * WALLT, y = Math.random() * WALLT, r = 2 + Math.random() * 5;
@@ -1425,7 +1425,7 @@ export function createStuccoTexture(): {
   // Stucco height -> normal map (for rough plaster stipple relief)
   const heightCanvas = document.createElement('canvas');
   heightCanvas.width = SIZE; heightCanvas.height = SIZE;
-  const hCtx = heightCanvas.getContext('2d')!;
+  const hCtx = heightCanvas.getContext('2d', { willReadFrequently: true })!;
   hCtx.fillStyle = '#808080';
   hCtx.fillRect(0, 0, SIZE, SIZE);
   for (let i = 0; i < 6000; i++) {
@@ -1526,7 +1526,7 @@ export function createBrickTexture(bond: 'running' | 'soldier' = 'running'): {
   // relief that catches grazing light.
   const heightCanvas = document.createElement('canvas');
   heightCanvas.width = SIZE; heightCanvas.height = SIZE;
-  const hCtx = heightCanvas.getContext('2d')!;
+  const hCtx = heightCanvas.getContext('2d', { willReadFrequently: true })!;
   hCtx.fillStyle = '#606060'; // recessed mortar
   hCtx.fillRect(0, 0, SIZE, SIZE);
   paintBricks(hCtx, () => {
@@ -1773,7 +1773,7 @@ export function createShelfTextures(): {
   const heightCanvas = document.createElement('canvas');
   heightCanvas.width = S;
   heightCanvas.height = S;
-  const hCtx = heightCanvas.getContext('2d')!;
+  const hCtx = heightCanvas.getContext('2d', { willReadFrequently: true })!;
   hCtx.fillStyle = '#808080';
   hCtx.fillRect(0, 0, S, S);
 

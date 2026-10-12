@@ -13,6 +13,7 @@ import {
   resolveStreamingSource,
   matchProviderId,
   buildStreamingUrl,
+  streamingDestinationKind,
   tmdbWatchFallbackUrl,
   fallbackToSnapshotOnFailure,
   synthesizeStreamingMovie,
@@ -366,4 +367,13 @@ test('Netflix opens the identified movie and repairs old persisted search links'
   assert.equal(buildStreamingUrl(netflix, 'Same title as another movie', 999999999), fallback);
   assert.equal(resolveStreamingCheckoutUrl('netflix', 'Unknown', 999999999,
     'https://www.netflix.com/search?q=Unknown'), fallback);
+});
+
+test('checkout destinations are classified truthfully for the handoff', () => {
+  assert.equal(streamingDestinationKind('https://www.netflix.com/title/80100172'), 'title');
+  assert.equal(streamingDestinationKind('https://www.disneyplus.com/browse/entity-e8896bfa-1052-41f7-ae2e-00255d77cf05'), 'title');
+  assert.equal(streamingDestinationKind('https://www.hulu.com/search?q=Heat'), 'search');
+  assert.equal(streamingDestinationKind(tmdbWatchFallbackUrl(949)), 'watch-options');
+  assert.equal(streamingDestinationKind(`${tmdbWatchFallbackUrl(949)}?locale=US`), 'watch-options');
+  assert.equal(streamingDestinationKind('not a url'), 'watch-options');
 });

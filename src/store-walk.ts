@@ -67,6 +67,15 @@ export function resolveWalkRaycastHit(
 ): boolean {
   for (const hit of intersects) {
     if (hit.distance > WALK_INTERACT_RANGE) break; // sorted by distance — nothing reachable left
+    // Fixture-owned interaction is shared by mouse, touch, keyboard and VR.
+    let target: THREE.Object3D | null = hit.object;
+    while (target) {
+      if (typeof target.userData.walkActivate === 'function') {
+        target.userData.walkActivate();
+        return true;
+      }
+      target = target.parent;
+    }
     // Recommendation clasps are plain meshes, so they'd be skipped by the
     // instanceId guard below — check them first. This is the main way the
     // clasps get used: you're walking the aisles when you want one.

@@ -16,7 +16,7 @@ export function buildParkingLot(parent: THREE.Group, p: ParkingLayout, sidewalkM
     const pos = geo.getAttribute('position'), uv = geo.getAttribute('uv');
     for (let i=0; i<pos.count; i++) {
       // Every concrete surface shares the entrance's existing slab texture.
-      const repeat = mat === sidewalkMat ? sidewalkMat.map?.repeat : null;
+      const repeat = mat === sidewalkMat || mat === nearWalkMat ? sidewalkMat.map?.repeat : null;
       const tileSize=mat===asphaltMat?8:4.5;
       uv.setXY(i, pos.getX(i)/tileSize/(repeat?.x || 1), -pos.getZ(i)/tileSize/(repeat?.y || 1));
     }
@@ -29,6 +29,7 @@ export function buildParkingLot(parent: THREE.Group, p: ParkingLayout, sidewalkM
   // below its slab and the street-side grass, with the right driveway open.
   const pavement = track(createMatchedPavement());
   const asphaltMat = pavement.material;
+  const nearWalkMat = track(sidewalkMat.clone());
   const shadows = track(selfLit(new THREE.ShadowMaterial({opacity:.35,depthWrite:false,fog:false}), 'shadow'));
   shadows.name = 'panorama-parking-shadows';
   for (const mat of [asphaltMat, shadows]) {
@@ -43,7 +44,7 @@ export function buildParkingLot(parent: THREE.Group, p: ParkingLayout, sidewalkM
   apron.lineTo(p.right,-p.rearZ); apron.lineTo(p.right-4,-p.rearZ);
   apron.lineTo(p.right-4,-p.frontZ); apron.lineTo(p.left+4,-p.frontZ);
   apron.lineTo(p.left+4,-p.rearZ); apron.closePath();
-  shapeMesh(apron,sidewalkMat,0,.16);
+  shapeMesh(apron,nearWalkMat,0,.16);
   // Street-facing grass island: broad verge with rounded curb returns.
   const grass = new THREE.Shape(); const radius=6, end=p.drivewayMinX;
   grass.moveTo(p.minX,-(p.farZ-radius));
@@ -68,7 +69,8 @@ export function buildParkingLot(parent: THREE.Group, p: ParkingLayout, sidewalkM
   shapeMesh(rect(end,p.streetZ-5,p.maxX,p.streetZ),sidewalkMat,-.075);
 
   const curbMat = track(new THREE.MeshStandardMaterial({color:'#6d6a60',roughness:.85,map:sidewalkMat.map}));
-  function curb(path: THREE.Path, width=.4) {
+  const nearCurbMat = track(curbMat.clone());
+  function curb(path: THREE.Path, width=.4, near = false) {
     const points=path.getPoints(36);
     const outer: THREE.Vector2[] = [], inner: THREE.Vector2[] = [];
     points.forEach((v,i)=>{
@@ -76,14 +78,14 @@ export function buildParkingLot(parent: THREE.Group, p: ParkingLayout, sidewalkM
       const n=new THREE.Vector2(-d.y,d.x).multiplyScalar(width/2);
       outer.push(v.clone().add(n)); inner.push(v.clone().sub(n));
     });
-    shapeMesh(new THREE.Shape([...outer,...inner.reverse()]),curbMat,.035,.2);
+    shapeMesh(new THREE.Shape([...outer,...inner.reverse()]),near ? nearCurbMat : curbMat,.035,.2);
   }
   // Building walk edge leaves a six-foot opening at the entrance ramp.
   for (const side of [-1,1]) {
     const x=side<0?p.left:p.right;
     const path=new THREE.Path(); path.moveTo(x,-p.rearZ); path.lineTo(x,-(p.nearZ-3));
     path.quadraticCurveTo(x,-p.nearZ,x-side*3,-p.nearZ);
-    path.lineTo(p.centerX+side*3,-p.nearZ); curb(path);
+    path.lineTo(p.centerX+side*3,-p.nearZ); curb(path,.4,true);
   }
   const edge=new THREE.Path(); edge.moveTo(p.minX,-p.rearZ); edge.lineTo(p.minX,-(p.farZ-radius));
   edge.quadraticCurveTo(p.minX,-p.farZ,p.minX+radius,-p.farZ); edge.lineTo(end-radius,-p.farZ);
@@ -100,7 +102,7 @@ export function buildParkingLot(parent: THREE.Group, p: ParkingLayout, sidewalkM
   ramp.translate(p.centerX,0,p.nearZ+2.5); ramp.computeVertexNormals();
   const rampUV = ramp.getAttribute('uv'), repeat = sidewalkMat.map?.repeat;
   for (let i=0; i<rp.count; i++) rampUV.setXY(i,rp.getX(i)/4.5/(repeat?.x||1),-rp.getZ(i)/4.5/(repeat?.y||1));
-  const concrete=batches.get(sidewalkMat)||[]; concrete.push(ramp); batches.set(sidewalkMat,concrete);
+  const concrete=batches.get(nearWalkMat)||[]; concrete.push(ramp); batches.set(nearWalkMat,concrete);
 
   // One paint batch, including the central pedestrian aisle's diagonal hatching.
   const paint = track(new THREE.MeshStandardMaterial({color:'#dfdfd3',roughness:.95}));
@@ -119,7 +121,7 @@ export function buildParkingLot(parent: THREE.Group, p: ParkingLayout, sidewalkM
     const merged=mergeGeometries(expanded);
     new Set([...geos,...expanded]).forEach(g=>g.dispose());
     if(!merged) throw new Error('Parking surface batch failed');
-    const mesh=new THREE.Mesh(track(merged),mat);mesh.receiveShadow=true;mesh.userData.photographicGroundSurface=mat!==shadows;group.add(mesh);
+    const mesh=new THREE.Mesh(track(merged),mat===nearWalkMat ? sidewalkMat : mat);mesh.receiveShadow=true;mesh.userData.photographicGroundSurface=mat!==shadows && mat!==nearWalkMat && mat!==nearCurbMat;group.add(mesh);
   }
   return {setGroundColor: pavement.setColor, dispose(){owned.forEach(o=>o.dispose());group.removeFromParent();}};
 }

@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import type { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
+import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 
 const preparedPrograms = new WeakSet<THREE.WebGLProgram>();
 
@@ -186,5 +188,111 @@ export async function prepareStaticTextures(
     }
   } finally {
     textures.forEach(texture => texture.removeEventListener('dispose', onDispose));
+  }
+}
+
+const SHADOW_SIDE: Record<number, THREE.Side> = {
+  [THREE.FrontSide]: THREE.BackSide, [THREE.BackSide]: THREE.FrontSide, [THREE.DoubleSide]: THREE.DoubleSide,
+};
+
+/** Shadow casters wearing the depth material Three's shadow pass derives for
+ * them (WebGLShadowMap.getDepthMaterial), one view per program signature.
+ * renderer.compile never visits the shadow pass, so without these views its
+ * depth programs link synchronously inside the first shadow bake. A disposed
+ * material releases its program, so these live until `signal` aborts.
+ * Directional/spot shadows only; point-light distance materials are not used.
+ */
+export function shadowDepthProgramViews(
+  root: THREE.Object3D, shadowType: THREE.ShadowMapType, signal: AbortSignal,
+): THREE.Group {
+  const views = new THREE.Group();
+  if (signal.aborted) return views;
+  const owned: THREE.Material[] = [];
+  const seen = new Set<string>();
+  const vsm = shadowType === THREE.VSMShadowMap;
+  root.traverse(object => {
+    const mesh = object as THREE.Mesh;
+    if (!mesh.material || !(mesh.isMesh || (object as THREE.Line).isLine || (object as THREE.Points).isPoints)) return;
+    if (!(mesh.castShadow || (vsm && mesh.receiveShadow)) || (mesh as THREE.BatchedMesh).isBatchedMesh) return;
+    const geometry = mesh.geometry;
+    const kind = [(mesh as THREE.InstancedMesh).isInstancedMesh ? 'i' : '', (mesh as THREE.SkinnedMesh).isSkinnedMesh ? 's' : '',
+      (mesh as THREE.InstancedMesh).instanceColor ? 'c' : '', mesh.isMesh ? 'm' : object.type,
+      Object.keys(geometry?.morphAttributes ?? {}).join('+'), geometry?.morphAttributes?.position?.length ?? 0].join('');
+    for (const material of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
+      if (!material?.visible) continue;
+      const m = material as THREE.MeshStandardMaterial;
+      const custom = mesh.customDepthMaterial;
+      const side = custom ? custom.side : vsm ? (m.shadowSide ?? m.side) : (m.shadowSide ?? SHADOW_SIDE[m.side]);
+      const signature = custom ? `custom:${custom.uuid}:${kind}` : [kind, side, m.map?.channel, (m.map as THREE.VideoTexture | null)?.isVideoTexture && m.map?.colorSpace,
+        m.alphaMap?.channel, m.alphaTest > 0 || m.alphaToCoverage, m.displacementMap?.channel, m.wireframe,
+        m.clipShadows && m.clippingPlanes?.length].join('|');
+      if (seen.has(signature)) continue;
+      seen.add(signature);
+      let depth = custom;
+      if (!depth) {
+        const d = new THREE.MeshDepthMaterial();
+        d.side = side; d.wireframe = m.wireframe;
+        d.map = m.map ?? null; d.alphaMap = m.alphaMap ?? null;
+        d.alphaTest = m.alphaToCoverage ? .5 : m.alphaTest;
+        d.displacementMap = m.displacementMap ?? null;
+        d.displacementScale = m.displacementScale ?? 1; d.displacementBias = m.displacementBias ?? 0;
+        d.clipShadows = m.clipShadows; d.clippingPlanes = m.clippingPlanes; d.clipIntersection = m.clipIntersection;
+        owned.push(d);
+        depth = d;
+      }
+      const view = Object.create(object) as THREE.Mesh;
+      view.material = depth;
+      view.children = [];
+      view.userData = {};
+      views.children.push(view);
+    }
+  });
+  signal.addEventListener('abort', () => owned.forEach(m => m.dispose()), { once: true });
+  return views;
+}
+
+/** Submit the post-processing chain's programs to the driver alongside the
+ * room's; the composer otherwise links each one synchronously in its first
+ * frame. Each pass compiles against the target it draws to (the last enabled
+ * pass draws to the screen). OutputPass derives its defines from renderer
+ * state inside render(), so that runs once with its draw skipped.
+ */
+export function submitPostPrograms(renderer: THREE.WebGLRenderer, composer: EffectComposer, camera: THREE.Camera): void {
+  // Like FullScreenQuad's triangle: no normals (they are part of the program key).
+  const geometry = new THREE.PlaneGeometry(2, 2);
+  geometry.deleteAttribute('normal');
+  const quad = new THREE.Mesh(geometry);
+  const previous = renderer.getRenderTarget();
+  const face = renderer.getActiveCubeFace(), mip = renderer.getActiveMipmapLevel();
+  try {
+    composer.passes.forEach((pass, index) => {
+      if (!pass.enabled) return;
+      const toScreen = composer.renderToScreen && composer.isLastEnabledPass(index);
+      if (pass instanceof OutputPass) {
+        const fsQuad = (pass as unknown as { _fsQuad: { render: (r: THREE.WebGLRenderer) => void } })._fsQuad;
+        const draw = fsQuad.render;
+        fsQuad.render = () => {};
+        try { pass.render(renderer, composer.writeBuffer, composer.readBuffer, 0, false); } finally { fsQuad.render = draw; }
+      }
+      // Full-screen materials sit on the pass itself or one level down
+      // (e.g. a custom pass's { quad, mat } copy pair).
+      const materials = new Set<THREE.Material>();
+      for (const value of Object.values(pass)) {
+        if (value instanceof THREE.Material) materials.add(value);
+        else if (value && typeof value === 'object' && !(value instanceof THREE.Object3D)) {
+          for (const inner of [(value as { mat?: unknown }).mat, (value as { material?: unknown }).material]) {
+            if (inner instanceof THREE.Material) materials.add(inner);
+          }
+        }
+      }
+      renderer.setRenderTarget(toScreen ? null : composer.writeBuffer);
+      for (const material of materials) {
+        quad.material = material;
+        renderer.compile(quad, camera);
+      }
+    });
+  } finally {
+    renderer.setRenderTarget(previous, face, mip);
+    quad.geometry.dispose();
   }
 }

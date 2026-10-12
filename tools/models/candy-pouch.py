@@ -20,6 +20,8 @@ def material(name,color,rough,metal=0):
  return m
 laminate=material('SnackPouchLaminate',(.76,.71,.59),.43)
 steel=material('PouchSupportSteel',(.17,.18,.19),.38,.7)
+board=material('SlatwallBoard',(.80,.72,.56),.55)
+kick=material('SlatwallKickBase',(.05,.05,.055),.7)
 def group(name):
  o=bpy.data.objects.new(name,None);scene.collection.objects.link(o);groups.append(o);return o
 
@@ -34,7 +36,7 @@ def anchor(parent,name,p):
  o=bpy.data.objects.new(name,None);scene.collection.objects.link(o);o.parent=parent;o.location=(p[0],-p[2],p[1]);o.empty_display_type='PLAIN_AXES';o.empty_display_size=.025
  return o
 
-def tube(name,points,radius,parent,sides=8):
+def tube_geometry(points,radius,sides=8):
  pts=[Vector(p) for p in points];vs=[];fs=[];last=None
  for i,p in enumerate(pts):
   tangent=(pts[min(i+1,len(pts)-1)]-pts[max(i-1,0)]).normalized();u=tangent.cross(Vector((0,1,0)))
@@ -46,7 +48,22 @@ def tube(name,points,radius,parent,sides=8):
  for i in range(len(pts)-1):
   for k in range(sides):fs.append((i*sides+k,i*sides+(k+1)%sides,(i+1)*sides+(k+1)%sides,(i+1)*sides+k))
  fs.extend([tuple(reversed(range(sides))),tuple((len(pts)-1)*sides+k for k in range(sides))])
- return finish(name,vs,fs,steel,parent)
+ return vs,fs
+
+def tube(name,points,radius,parent,sides=8):
+ vs,fs=tube_geometry(points,radius,sides);return finish(name,vs,fs,steel,parent)
+
+def prism(profile,axis,a,b):
+ # Closed extrusion of a simple 2D section; caps may be concave n-gons.
+ n=len(profile);vs=[];fs=[]
+ for t in (a,b):
+  for u,v in profile:vs.append({'x':(t,u,v),'z':(u,v,t)}[axis])
+ fs.append(tuple(reversed(range(n))));fs.append(tuple(n+k for k in range(n)))
+ for k in range(n):fs.append((k,(k+1)%n,n+(k+1)%n,n+k))
+ return vs,fs
+
+def box(x0,x1,y0,y1,z0,z1):
+ return prism([(x0,y0),(x1,y0),(x1,y1),(x0,y1)],'z',z0,z1)
 
 for label,w,h,d in [('Small',.42,7/12,.15),('Full',.50,.72,.20)]:
  parent=group('Pouch'+label);parent['boundsFeet']=[w,h,d];parent['origin']='bottom centre; +Z front';parent['estimatedConstruction']=True
@@ -96,6 +113,50 @@ for name,half in [('RackCrossbar',1.43),('GondolaCrossbar',1.85)]:
 for name,half in [('RackSideRail',.64),('RackCrownRail',SIDE_TOP)]:
  p=group(name);tube(name+'_continuous_tube',[(0,0,-half),(0,0,half)],.0125,p)
  for side in [-1,1]:anchor(p,f'Anchor_{name}_'+('Front' if side<0 else 'Rear'),(0,0,side*half))
+
+# Slatwall wing: grooved end board for the candy gondola's open end (2006
+# reference: bags hung on slatwall hooks beside the queue). Original
+# construction estimates; board thickness and slot section follow common
+# 3/4-in slatwall practice, not a measured panel. Local X=0 is the board's
+# inner face against the gondola end; +X faces the aisle; Z spans the depth.
+SLAT_T=.0625;SLAT_Y0=.4;SLAT_Y1=5.0;SLAT_HALF=.75
+SLOTS=[.5+.25*k for k in range(18)]
+p=group('SlatwallWing');p['boundsFeet']=[SLAT_T,SLAT_Y1,2*SLAT_HALF];p['origin']='inner board face, floor, gondola end centre; +X aisle'
+section=[(0,SLAT_Y0),(SLAT_T,SLAT_Y0)]
+for y in SLOTS:
+ # J-slot: narrow lip opening, then a cavity running down behind the face,
+ # which is what a hook bracket's lip drops into.
+ section+=[(SLAT_T,y-.012),(SLAT_T-.022,y-.012),(SLAT_T-.022,y-.032),(SLAT_T-.045,y-.032),(SLAT_T-.045,y+.012),(SLAT_T,y+.012)]
+section+=[(SLAT_T,SLAT_Y1),(0,SLAT_Y1)]
+finish('SlatwallBoard_grooved_panel',*prism(section,'z',-SLAT_HALF,SLAT_HALF),board,p)
+# Steel edge caps: butt-jointed, the top cap runs over both side caps.
+for side in (-1,1):
+ z0,z1=sorted((side*SLAT_HALF,side*(SLAT_HALF+.008)))
+ finish(f'SlatwallEdgeCap_{"Rear" if side<0 else "Front"}',*box(-.004,SLAT_T+.004,SLAT_Y0,SLAT_Y1,z0,z1),steel,p)
+finish('SlatwallEdgeCap_Top',*box(-.004,SLAT_T+.004,SLAT_Y1,SLAT_Y1+.008,-SLAT_HALF-.008,SLAT_HALF+.008),steel,p)
+# Kick base, set back from the board face for a shadow line like the gondola toe.
+finish('SlatwallKick_base',*box(0,SLAT_T-.012,0,SLAT_Y0,-SLAT_HALF,SLAT_HALF),kick,p)
+# Flat-bar ties from the gondola's rear standard face (store x 1.89) to the board.
+for i,y in enumerate((1.0,4.6)):
+ finish(f'SlatwallTie_{i}',*box(-.11,0,y-.04,y+.04,-.656,-.644),steel,p)
+anchor(p,'Anchor_SlatwallWing_GondolaEnd',(0,0,0))
+for i,y in enumerate(SLOTS):anchor(p,f'Anchor_SlatwallWing_Slot{i:02d}',(SLAT_T,y,0))
+
+# One-piece slatwall hook: a die-formed bracket whose lip drops into the slot
+# cavity, with the bent wire welded to its face. Origin is the wire centre at
+# the board face; the slot it engages is .06 ft above. +Z leaves the board.
+p=group('SlatwallHook');p['wireRadiusFeet']=.006;p['slotAboveFeet']=.06
+G=.06
+bracket=[(.012,-.06),(.012,G+.008),(-.04,G+.008),(-.04,G-.028),(-.026,G-.028),(-.026,G-.008),(0,G-.008),(0,-.06)]
+bv,bf=prism([(y,z) for z,y in bracket],'x',-.035,.035)
+pts=[(0,0,.010),(0,0,.30),(0,0,.75-.012)]
+for i in range(1,5):
+ a=i*math.pi/8;pts.append((0,.012*(1-math.cos(a)),.75-.012+.012*math.sin(a)))
+pts.append((0,.018,.75))
+wv,wf=tube_geometry(pts,.006)
+off=len(bv)
+finish('SlatwallHook_bracket_and_wire',bv+wv,bf+[tuple(i+off for i in f) for f in wf],steel,p)
+anchor(p,'Anchor_SlatwallHook_Mount',(0,0,0));anchor(p,'Anchor_SlatwallHook_LoadRear',(0,0,.40));anchor(p,'Anchor_SlatwallHook_LoadFront',(0,0,.62))
 
 metrics={'units':'feet','axes':'glTF X across, Y up, +Z front; Blender (x,-z,y)','neckDropFeet':NECK_DROP,'rackCrossbarOffsetFeet':ROOT_OFFSET,'groups':[],'embeddedTextures':0,'construction':'Original generic sealed pouch and welded/bent-wire support kit. Visible pillow silhouette informed by reference; holes, sealed thickness, rear fin and support joints are estimates.'}
 for parent in groups:

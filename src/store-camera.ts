@@ -132,7 +132,7 @@ export function updateCameraTarget(scene: StoreScene) {
 
   const xCenter = isNewReleasesSelect ? STORE_CENTER_X : (isDisplaySelect ? STORE_CENTER_X : scene.getLibraryXCenter(scene.selectedLibraryIdx));
   // This library's primary island; the camera spins about the same centre it does.
-  const primaryUnit = scene.shelvingUnits.find(u => u.libraryIdx === scene.selectedLibraryIdx && u.unitIdxInLibrary === 0);
+  const primaryUnit = scene.plan.unitsForLibrary(scene.selectedLibraryIdx)[0];
 
   if (scene.mode === 'library-select') {
     // Security-cam establishing view — the ONLY library-select framing since
@@ -157,7 +157,7 @@ export function updateCameraTarget(scene: StoreScene) {
       scene.applyUnitRotation(scene.targetLookAt, primaryUnit);
     }
   } else if (scene.mode === 'browse') {
-    const activeLibUnits = scene.shelvingUnits.filter(u => u.libraryIdx === scene.selectedLibraryIdx);
+    const activeLibUnits = scene.plan.unitsForLibrary(scene.selectedLibraryIdx);
     const isBackWall = (scene.selectedUnitIdx === BACK_WALL_UNIT_IDX);
     const isDisplay = (scene.selectedUnitSource === 'fixture');
     const steady = localStorage.getItem('bb_browse_camera') !== 'floaty';
@@ -419,7 +419,7 @@ export function updateCameraTarget(scene: StoreScene) {
     }
   } else if (scene.mode === 'inspect') {
     const isDisplay = scene.selectedUnitSource === 'fixture';
-    const activeLibUnits = scene.shelvingUnits.filter(u => u.libraryIdx === scene.selectedLibraryIdx);
+    const activeLibUnits = scene.plan.unitsForLibrary(scene.selectedLibraryIdx);
     const isBackWall = (scene.selectedUnitIdx === BACK_WALL_UNIT_IDX);
     
     const fixture = isDisplay ? scene.slottedFixtures.find(f => f.placement.id === scene.selectedFixtureId) : null;
@@ -747,9 +747,7 @@ export function updateSelectionArrow(scene: StoreScene) {
     scene.selectionArrowBaseY = 8.4; // New Releases wall shelves are taller
   } else {
     wx = scene.getLibraryXCenter(scene.selectedLibraryIdx);
-    const primaryUnit = scene.shelvingUnits.find(
-      u => u.libraryIdx === scene.selectedLibraryIdx && u.unitIdxInLibrary === 0
-    );
+    const primaryUnit = scene.plan.unitsForLibrary(scene.selectedLibraryIdx)[0];
     wz = primaryUnit ? scene.aisleZCenter(primaryUnit) : scene.aislePivotZ;
     scene.selectionArrowBaseY = 6.8; // just above the end caps / aisle signs
   }

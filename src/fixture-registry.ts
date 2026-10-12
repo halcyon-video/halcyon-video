@@ -20,7 +20,6 @@ import {
 } from './fixtures/period-fixtures';
 import { GameSection } from './fixtures/game-section';
 import { BargainBin } from './fixtures/bargain-bin';
-import { GenreEndcap } from './fixtures/genre-endcap';
 import { CollectionEndcap } from './fixtures/collection-endcap';
 import { GoldClamshellDisplay } from './fixtures/gold-clamshell';
 import { PvDrapeTable } from './fixtures/pv-drape-table';
@@ -35,6 +34,7 @@ import { RotatingMerchandiser } from './fixtures/rotating-merchandiser';
 import { TwoDoorCooler } from './fixtures/two-door-cooler';
 import { ChestFreezer } from './fixtures/chest-freezer';
 import { CandyWallGondola } from './fixtures/candy-wall-gondola';
+import { NowShowingLightbox } from './fixtures/now-showing-lightbox';
 import { SecondaryServiceCounter } from './fixtures/secondary-service-counter';
 
 export interface PlacedFixture extends StoreFixture {
@@ -67,6 +67,8 @@ export function createFixture(placement: FixturePlacement, ctx: FixtureContext):
   return factory(clonedPlacement, ctx);
 }
 
+import { TapeCleanerSidekick } from './fixtures/tape-cleaner-sidekick';
+
 // Statically register standard/default fixture kinds
 registerFixtureKind('four-sided-display', (placement, ctx) => new FourSidedDisplay(placement, ctx));
 // CandyDisplay owns the optional 1993 cardboard wing and shared stock/selection.
@@ -74,9 +76,9 @@ registerFixtureKind('candy-display', (placement, ctx) => new CandyDisplay(placem
 registerFixtureKind('previously-viewed-bin', (placement, ctx) => new PreviouslyViewedBin(placement, ctx));
 registerFixtureKind('tape-rewinder', (placement, ctx) => new TapeRewinder(placement, ctx));
 registerFixtureKind('tape-cleaner-display', (placement, ctx) => new TapeCleanerDisplay(placement, ctx));
+registerFixtureKind('tape-cleaner-sidekick', (placement, ctx) => new TapeCleanerSidekick(placement, ctx));
 registerFixtureKind('game-section', (placement, ctx) => new GameSection(placement, ctx));
 registerFixtureKind('bargain-bin', (placement, ctx) => new BargainBin(placement, ctx));
-registerFixtureKind('genre-endcap', (placement, ctx) => new GenreEndcap(placement, ctx));
 registerFixtureKind('collection-endcap', (placement, ctx) => new CollectionEndcap(placement, ctx));
 registerFixtureKind('gold-clamshell', (placement, ctx) => new GoldClamshellDisplay(placement, ctx));
 registerFixtureKind('pv-drape-table', (placement, ctx) => new PvDrapeTable(placement, ctx));
@@ -110,6 +112,8 @@ registerFixtureKind('two-door-cooler', (placement, ctx) => new TwoDoorCooler(pla
 registerFixtureKind('chest-freezer', (placement, ctx) => new ChestFreezer(placement, ctx));
 registerFixtureKind('candy-wall-gondola', (placement, ctx) => new CandyWallGondola(placement, ctx));
 registerFixtureKind('secondary-service-counter', (placement, ctx) => new SecondaryServiceCounter(placement, ctx));
+
+registerFixtureKind('now-showing-lightbox', (placement, ctx) => new NowShowingLightbox(placement, ctx));
 
 registerFixtureKind('gumball-machine', (placement, ctx) => new GumballMachine(placement, ctx));
 

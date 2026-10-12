@@ -1,0 +1,8 @@
+{
+  "name": "halcyon-showcase-wrangler",
+  "private": true,
+  "description": "Pinned Cloudflare Pages transport for the showcase preview deploy. Installed only by the trusted preview job, never by the site build.",
+  "devDependencies": {
+    "wrangler": "4.149.0"
+  }
+}

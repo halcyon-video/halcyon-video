@@ -14,6 +14,7 @@ import { addGlassReflectionPane } from '../glass-reflection';
 import { FixtureContext } from '../fixtures';
 import { StorefrontSpec } from '../store-layout';
 import { createDoorLeafFrame, createDoorPushBarGeometry } from './door-leaf';
+import { installVestibuleDoorModel } from './door-model';
 
 export interface VestibuleDoor {
   group: THREE.Group;
@@ -23,6 +24,7 @@ export interface VestibuleDoor {
   // Proximity latch for the door-open chime: set when the player crosses the
   // open threshold, re-armed (with hysteresis) once they clearly walk away.
   wasOpen: boolean;
+  dispose?: () => void;
 }
 
 export interface DoorMaterials {
@@ -65,6 +67,8 @@ export function buildVestibuleDoor(
   const isSingle = spec.doorStyle === 'single';
   const barY = 3.4; // push-bar / handle height
 
+  const fallbackStatic: THREE.Object3D[] = [];
+  const fallbackLeaf: THREE.Object3D[] = [];
   const box = (bw: number, bh: number, bd: number, mat: THREE.Material, x: number, y: number, z: number): THREE.Mesh => {
     const m = new THREE.Mesh(finishedPanelGeometry(bw, bh, bd), mat);
     m.position.set(x, y, z);
@@ -72,6 +76,7 @@ export function buildVestibuleDoor(
     m.receiveShadow = true;
     group.add(m);
     ctx.addCollider(m);
+    fallbackStatic.push(m);
     return m;
   };
 
@@ -88,9 +93,10 @@ export function buildVestibuleDoor(
     }
   group.add(doorGroup);
 
-  const addToDoorGroup = (mesh: THREE.Mesh) => {
+  const addToDoorGroup = (mesh: THREE.Mesh, procedural = true) => {
     doorGroup.add(mesh);
     ctx.addCollider(mesh);
+    if (procedural) fallbackLeaf.push(mesh);
   };
 
   const glassThick = isSingle ? 0.035 : 0.05;
@@ -109,7 +115,7 @@ export function buildVestibuleDoor(
     glassMesh.position.set(localOffset, doorH / 2, 0);
     glassMesh.castShadow = false;
     glassMesh.receiveShadow = true;
-    addToDoorGroup(glassMesh);
+    addToDoorGroup(glassMesh, false);
     // Reflection the leaf's 0.06-opacity glass can't show on its own — see
     // glass-reflection.ts. FrontSide because the leaf is a slab (outward
     // normals; the far faces depth-reject behind the near one), and it goes on
@@ -147,7 +153,7 @@ export function buildVestibuleDoor(
     glassMesh.position.set(0, doorH / 2, localOffset);
     glassMesh.castShadow = false;
     glassMesh.receiveShadow = true;
-    addToDoorGroup(glassMesh);
+    addToDoorGroup(glassMesh, false);
     // Reflection the leaf's 0.06-opacity glass can't show on its own — see
     // glass-reflection.ts. FrontSide because the leaf is a slab (outward
     // normals; the far faces depth-reject behind the near one), and it goes on
@@ -204,12 +210,20 @@ export function buildVestibuleDoor(
 
 
 
+  const model = installVestibuleDoorModel(ctx, {
+    group, doorGroup, frameMat, chrome, single: isSingle, width: w, doorH, alongX, hingeOnLeftOrInner,
+    localOffset, doorX, doorZ,
+    frame: { header: wantHeader, jambLeft: wantJambLeft, jambRight: wantJambRight },
+    fallbackLeaf, fallbackStatic,
+  });
+
   return {
     group: doorGroup,
     center: new THREE.Vector3(doorX, doorH / 2, doorZ),
     openAngle,
     currentAngle: 0,
     wasOpen: false,
+    dispose: model.dispose,
   };
 }
 

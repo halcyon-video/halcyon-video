@@ -10,8 +10,7 @@ import { activeStoreFormat } from './store-format';
 import * as THREE from 'three';
 import { Movie } from './jellyfin';
 import { posterQueue, CASE_HEIGHT, CASE_DEPTH, posterPixelCache, releaseEndcapPosterTexture, getCaseGeometry, getRentalCaseGeometry, createHeroJellyfinMaterials, restampCollectionGapCase } from './video-case';
-import { LEAN_ANGLE, UNIT_FRAME_HEIGHT, unitDepthAtHeight, BACK_WALL_UNIT_IDX, SECTION_CAPACITY, MovieSlot, storeCategory, FixturePlacement, ShelvingUnit } from './store-layout';
-import { ENDCAP_CORE_DEPTH } from './fixtures/genre-endcap';
+import { LEAN_ANGLE, UNIT_FRAME_HEIGHT, unitDepthAtHeight, BACK_WALL_UNIT_IDX, SECTION_CAPACITY, MovieSlot, storeCategory, ShelvingUnit } from './store-layout';
 import { getLastUserActivity } from './user-activity';
 import { showClerkToast, hideClerkToast } from './carried-tapes';
 import { type ClaspTarget } from './fixtures/shelf-clasp';
@@ -469,9 +468,9 @@ export function showPersonEndcap(scene: StoreScene, person: string, kind: 'actor
   };
 
   // Locate the initiating shelving unit run.
-  let activeUnit = scene.shelvingUnits.find(u => u.libraryIdx === scene.selectedLibraryIdx && u.unitIdxInLibrary === scene.selectedUnitIdx);
+  let activeUnit: ShelvingUnit | undefined = scene.plan.unitsForLibrary(scene.selectedLibraryIdx)[scene.selectedUnitIdx];
   if (!activeUnit || scene.selectedUnitIdx === BACK_WALL_UNIT_IDX) {
-    activeUnit = scene.shelvingUnits.find(u => u.libraryIdx === scene.selectedLibraryIdx && u.isLineFront);
+    activeUnit = scene.plan.unitsForLibrary(scene.selectedLibraryIdx).find(u => u.isLineFront);
   }
   if (!activeUnit) {
     activeUnit = scene.shelvingUnits.find(u => u.isLineFront);
@@ -485,7 +484,7 @@ export function showPersonEndcap(scene: StoreScene, person: string, kind: 'actor
   // Find the front endcap mesh of this run.
   let leftCap: THREE.Mesh | undefined;
   if (activeUnit) {
-    const frontUnit = scene.shelvingUnits.find(u => u.libraryIdx === activeUnit.libraryIdx && u.lineId === activeUnit.lineId && u.isLineFront);
+    const frontUnit = scene.plan.unitsForLibrary(activeUnit.libraryIdx).find(u => u.lineId === activeUnit.lineId && u.isLineFront);
     if (frontUnit) {
       leftCap = scene.libraryEndCaps.find(cap => cap.userData.lineId === frontUnit.lineId && canHostActor(cap));
     }
@@ -969,201 +968,4 @@ export function debugClerkPathAudit(scene: StoreScene, seconds = 420): boolean {
     (violations.length ? ` first=${violations[0].label}@(${violations[0].x.toFixed(1)},${violations[0].z.toFixed(1)})t=${violations[0].t.toFixed(1)}` : ''));
   scene.requestRender();
   return ok;
-}
-
-/** One qualifying line-front run end during the staff-picks endcap deal. */
-interface EndcapCandidate {
-  u: ShelvingUnit;
-  frontLocalZ: number;
-  genreLabel: string | null;
-  endcapTitle: string;
-  discovery: Movie[];
-  libraryName: string | undefined;
-  worldX: number;
-  picks: Movie[];
-  di: number;
-}
-
-/**
- * Compute placements for genre endcap fixtures (fixtures/genre-endcap.ts):
- * line-front shelving units whose entrance-facing end opens onto real
- * walkway, stocked with THAT run's genre from the staff-picks DISCOVERY pool
- * — not-in-library order candidates only, each title on at most one endcap.
- * Owned picks never stand here: a "Related Movies" endcap showing a film
- * three aisles over reads as the store not knowing its own stock (feedback
- * pin 012) — owned winners advertise from the aisle shelf via their FOR YOU
- * sticker instead. Picks are dealt ROUND-ROBIN across every qualifying run
- * end, alternating between the two shelving fields, so the first-iterated
- * side can't drain the pool and leave the far half of the store bare
- * (feedback pin 010). Computed from the StorePlan so every arrangement gets
- * correctly-oriented endcaps; [] when the engine found nothing.
- */
-export function staffPickEndcapPlacements(
-  scene: StoreScene,
-  // Run ends already reserved by the collection endcaps (which are dealt
-  // first, capped at half the store's ends — see fixtures/collection-endcap.ts).
-  excludeLineIds: Set<number> = new Set(),
-): FixturePlacement[] {
-  const discoveryPool = scene.staffPickMovies;
-  if (discoveryPool.length === 0) return [];
-
-  // Each discovery pick belongs to ONE library: the one whose stock's genre
-  // profile it best matches. Matching on "any genre overlap" let animated
-  // recommendations stand on the general Movies aisles (user feedback after
-  // pin 010) — a big library's genre set covers nearly everything. Profile =
-  // SHARE of the library's real stock carrying each genre, so a dedicated
-  // library (Animation ~1.0) outbids a general one (Animation ~0.05)
-  // regardless of size; equal scores fall to the larger library.
-  const libProfiles = scene.libraries.filter(lib => lib.id !== ABOVE_R_LIBRARY_ID).map((lib) => {
-    const real = (lib?.movies ?? []).filter(
-      (m) => !m.collectionGap && !m.discovery && !m.comingSoon && !m.game
-    );
-    const share = new Map<string, number>();
-    for (const m of real) {
-      for (const g of m.genres) {
-        const k = g.toLowerCase();
-        share.set(k, (share.get(k) ?? 0) + 1);
-      }
-    }
-    for (const [k, n] of share) share.set(k, n / Math.max(1, real.length));
-    return { name: lib?.name, share, size: real.length };
-  });
-  const discoveryHome = new Map<string, string | undefined>();
-  for (const m of discoveryPool) {
-    let bestName: string | undefined;
-    let bestScore = 0;
-    let bestSize = -1;
-    for (const p of libProfiles) {
-      let s = 0;
-      for (const g of m.genres) s += p.share.get(g.toLowerCase()) ?? 0;
-      if (s > bestScore + 1e-9 || (s > 0 && Math.abs(s - bestScore) <= 1e-9 && p.size > bestSize)) {
-        bestScore = s;
-        bestName = p.name;
-        bestSize = p.size;
-      }
-    }
-    discoveryHome.set(m.id, bestName);
-  }
-
-  // Hostable run ends come from the plan (StorePlan.openLineFrontEnds), which
-  // is also what the collection endcaps read — one definition of "an endcap
-  // can stand here", shared by both selectors.
-  const candidates: EndcapCandidate[] = [];
-  for (const end of scene.plan.openLineFrontEnds()) {
-    if (excludeLineIds.has(end.unit.lineId)) continue;
-    const { unit: u, frontLocalZ, genreLabel, worldX } = end;
-    const lib = scene.libraries[u.libraryIdx];
-    // The endcap brands itself off the aisle's library: a shows library
-    // reads "Related Shows", a movie library "Related Movies".
-    const realStock = (lib?.movies ?? []).filter(
-      (m) => !m.collectionGap && !m.discovery && !m.comingSoon && !m.game
-    );
-    const seriesCount = realStock.reduce((n, m) => n + (m.isSeries ? 1 : 0), 0);
-    const endcapTitle = seriesCount * 2 > realStock.length ? 'Related Shows' : 'Related Movies';
-    const libGenres = new Set((lib?.genres ?? []).map((g) => g.toLowerCase()));
-    const discovery = discoveryPool.filter(
-      (m) =>
-        discoveryHome.get(m.id) === lib?.name &&
-        (genreLabel
-          ? storeCategory(m) === genreLabel
-          : m.genres.some((g) => libGenres.has(g.toLowerCase())))
-    );
-    if (discovery.length === 0) continue;
-    candidates.push({
-      u, frontLocalZ, genreLabel, endcapTitle, discovery,
-      libraryName: lib?.name,
-      worldX,
-      picks: [], di: 0,
-    });
-  }
-  if (candidates.length === 0) return [];
-
-  // Deal order alternates the two shelving fields (store centreline x=11) so
-  // both sides of the centre walkway seat endcaps before the pool runs out.
-  const leftField = candidates.filter((c) => c.worldX < 11);
-  const rightField = candidates.filter((c) => c.worldX >= 11);
-  const dealOrder: EndcapCandidate[] = [];
-  for (let i = 0; i < Math.max(leftField.length, rightField.length); i++) {
-    if (i < leftField.length) dealOrder.push(leftField[i]);
-    if (i < rightField.length) dealOrder.push(rightField[i]);
-  }
-
-  const CAPACITY = 9;
-  // A near-empty endcap reads as broken stock, not curation.
-  const MIN_PICKS = 3;
-
-  // One pick per candidate per round, best-ranked first within each endcap.
-  const dealTo = (active: EndcapCandidate[]): void => {
-    const usedIds = new Set<string>();
-    for (const c of active) { c.picks = []; c.di = 0; }
-    let dealt = true;
-    while (dealt) {
-      dealt = false;
-      for (const c of active) {
-        if (c.picks.length >= CAPACITY) continue;
-        while (c.di < c.discovery.length && usedIds.has(c.discovery[c.di].id)) c.di++;
-        if (c.di < c.discovery.length) {
-          const taken = c.discovery[c.di++];
-          usedIds.add(taken.id);
-          c.picks.push(taken);
-          dealt = true;
-        }
-      }
-    }
-  };
-
-  // Deal, drop under-stocked runs, re-deal to the survivors — repeats until
-  // every remaining endcap clears MIN_PICKS. A pool too small for even one
-  // spread falls back to a single endcap on the best-supplied run (the old
-  // greedy behaviour) rather than building none.
-  let active = dealOrder.slice();
-  for (;;) {
-    dealTo(active);
-    const survivors = active.filter((c) => c.picks.length >= MIN_PICKS);
-    if (survivors.length === active.length) break;
-    if (survivors.length === 0) {
-      let best = active[0];
-      for (const c of active) {
-        if (c.discovery.length > best.discovery.length) best = c;
-      }
-      active = [best];
-      dealTo(active);
-      if (best.picks.length < MIN_PICKS) active = [];
-      break;
-    }
-    active = survivors;
-  }
-
-  const placements: FixturePlacement[] = [];
-  for (const c of active) {
-    // Core centred so the footprint's back edge lands exactly on the unit's
-    // end face (see genre-endcap.ts's abutment contract).
-    const pos = scene.plan.unitToWorld(c.u, c.u.xCenter, c.frontLocalZ + ENDCAP_CORE_DEPTH / 2);
-    placements.push({
-      id: `staff-endcap-${c.u.lineId}`,
-      kind: 'genre-endcap',
-      position: { x: pos.x, z: pos.z },
-      yaw: c.u.yaw,
-      options: {
-        genre: c.genreLabel ? `${c.endcapTitle}: ${c.genreLabel}` : c.endcapTitle,
-        genreLabel: c.genreLabel ?? undefined,
-        title: c.endcapTitle,
-        libraryName: c.libraryName,
-        pickIds: c.picks.map((m) => m.id),
-        // lineId: read back in buildStore (the hosting run suppresses its own
-        // blue front cap — same plane would z-fight, pin 010) and by
-        // store-nav's browse flow-through, which also needs the aisle's real
-        // library index to step back off the endcap onto the shelves.
-        lineId: c.u.lineId,
-        libraryIdx: c.u.libraryIdx,
-      },
-    });
-  }
-  if (placements.length > 0) {
-    scene.onConsoleLog(
-      `[StaffPicks] ${placements.length} genre endcap(s) placed at aisle-run ends.`,
-      'system'
-    );
-  }
-  return placements;
 }

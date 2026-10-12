@@ -1,9 +1,10 @@
 import type { ParkingSpace } from './parking-layout.ts';
 
 export interface CustomerVehicle { id: string; modelYear: number; length: number; width: number; height: number; asset: string }
-/** Existing original three-door mesh; uniform scaling restores its 14-foot envelope. */
+/** Original period models; lengths are uniformly normalized to the parking contract. */
 export const CUSTOMER_VEHICLES: readonly CustomerVehicle[] = [
   { id: 'period-hatchback', modelYear: 1987, length: 14, width: 4.38 * 14 / 9, height: 3.35 * 14 / 9, asset: 'car_hatchback.glb' },
+  { id: 'period-sedan', modelYear: 1987, length: 14, width: 6.10, height: 4.72, asset: 'car_sedan.glb' },
 ];
 export interface CustomerParkingAssignment { customerId: string; spaceId: number; space: ParkingSpace; vehicle: CustomerVehicle; color: number }
 const COLORS = [0x9c3731, 0x385e79, 0xb2a68a, 0x527054, 0xccccbf, 0x493c50, 0x876b42, 0x243c54, 0x778584, 0x813e42];
@@ -24,12 +25,17 @@ export class CustomerParking {
     stallWidth = 9, stallDepth = 18, vehicles = CUSTOMER_VEHICLES) {
     this.spaces=spaces;this.year=year;this.stallWidth=stallWidth;this.stallDepth=stallDepth;this.vehicles=vehicles;
   }
+  eligible(vehicle: CustomerVehicle): boolean {
+    return vehicle.modelYear <= this.year && vehicle.length + .6 <= this.stallDepth && vehicle.width + .6 <= this.stallWidth;
+  }
   reserve(customerId: string): CustomerParkingAssignment | null {
     const existing = this.assignments.get(customerId);
     if (existing) return existing;
-    const vehicle = this.vehicles.find(v => v.modelYear <= this.year && v.length + .6 <= this.stallDepth && v.width + .6 <= this.stallWidth);
-    if (!vehicle) return null;
     const index = Number(customerId.slice(-2)) || 1;
+    const eligible = this.vehicles.filter(v => this.eligible(v));
+    if (!eligible.length) return null;
+    // Select only among period/capacity-compatible models before reserving a space.
+    const vehicle = eligible[(index - 1) % eligible.length];
     // Stable search order per identity; no vehicle enters an excluded/reserved bay.
     for (let n = 0; n < this.spaces.length; n++) {
       const spaceId = (index - 1 + n) % this.spaces.length, space = this.spaces[spaceId];

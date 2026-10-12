@@ -1,0 +1,91 @@
+name: Deploy showcase preview
+
+# Trusted dev pushes upload the store entry to the Cloudflare Pages preview address: every path
+# redirects straight to the hosted 3D store, so the flat catalog is never published (owner decision
+# 2026-10-11). Superseded preview deployments are deleted so no older upload stays reachable.
+# Production, the canonical host and the daily refresh stay closed in
+# showcase/deployment/policy.json; this workflow cannot open them.
+on:
+  push:
+    branches: [dev]
+    paths: ['showcase/deployment/**', 'showcase/src/deployment/**', 'showcase/tools/cloud-preview-gate.ts', 'showcase/package.json', 'src/catalog-handoff.ts', '.github/workflows/showcase-preview.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+concurrency:
+  group: showcase-cloud-preview
+  cancel-in-progress: false
+
+jobs:
+  preview:
+    if: github.repository == 'halcyon-video/halcyon-video' && github.ref == 'refs/heads/dev' && github.actor == 'devbjackson'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment:
+      name: showcase-production
+      url: ${{ steps.deploy.outputs.alias }}
+    defaults:
+      run:
+        shell: bash
+        working-directory: showcase
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22.19.0'
+          cache: npm
+          cache-dependency-path: showcase/deployment/wrangler/package-lock.json
+      - name: Gate and write the store entry
+        id: entry
+        run: |
+          site="$(npm run --silent deployment:cloud-preview-gate -- "$RUNNER_TEMP/store-entry" "$SOURCE_COMMIT")"
+          test "$(ls -A "$site" | LC_ALL=C sort | tr '\n' ' ')" = "_headers _redirects index.html "
+          echo "site=$site" >> "$GITHUB_OUTPUT"
+        env:
+          SOURCE_COMMIT: ${{ github.sha }}
+      - name: Install the pinned Pages transport
+        working-directory: showcase/deployment/wrangler
+        run: npm ci --no-fund --ignore-scripts && npm audit --audit-level=low
+      - name: Upload the store entry as the dev preview and delete superseded uploads
+        id: deploy
+        working-directory: showcase/deployment/wrangler
+        run: |
+          project="$(jq -r .cloudflareProjectName ../policy.json)"
+          mkdir -p "$WRANGLER_OUTPUT_FILE_DIRECTORY"
+          if ! npx --no-install wrangler pages project list | grep -qE "(^|[[:space:]│|])${project}([[:space:]│|]|$)"; then
+            npx --no-install wrangler pages project create "$project" --production-branch master
+          fi
+          npx --no-install wrangler pages deploy "$SITE" --project-name "$project" --branch dev --commit-hash "$SOURCE_COMMIT" --commit-dirty=false
+          record="$(jq -c 'select(.type == "pages-deploy-detailed")' "$WRANGLER_OUTPUT_FILE_DIRECTORY"/*.json | tail -n 1)"
+          test -n "$record"
+          current="$(jq -r .deployment_id <<<"$record")"
+          test -n "$current" && test "$current" != null
+          echo "alias=$(jq -r '.alias // .url' <<<"$record")" >> "$GITHUB_OUTPUT"
+          api="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/$project/deployments"
+          auth="Authorization: Bearer $CLOUDFLARE_API_TOKEN"
+          stale=""
+          for page in $(seq 1 40); do
+            batch="$(curl -fsS -H "$auth" "$api?env=preview&per_page=25&page=$page")"
+            jq -e '.success == true' <<<"$batch" >/dev/null
+            ids="$(jq -r --arg current "$current" '.result[] | select(.environment == "preview" and .id != $current) | .id' <<<"$batch")"
+            [ -z "$ids" ] || stale+="$ids"$'\n'
+            [ "$(jq '.result | length' <<<"$batch")" -eq 25 ] || break
+          done
+          pruned=0
+          while read -r id; do
+            [ -n "$id" ] || continue
+            curl -fsS -X DELETE -H "$auth" "$api/$id?force=true" | jq -e '.success == true' >/dev/null
+            pruned=$((pruned + 1))
+          done <<<"$stale"
+          printf '### Cloud preview deployed\n\nDeployment: %s\n\nPreview: %s\n\nAlias: %s\n\nSuperseded preview uploads deleted: %s\n' \
+            "$current" "$(jq -r .url <<<"$record")" "$(jq -r '.alias // "none"' <<<"$record")" "$pruned" >> "$GITHUB_STEP_SUMMARY"
+        env:
+          SITE: ${{ steps.entry.outputs.site }}
+          SOURCE_COMMIT: ${{ github.sha }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          WRANGLER_OUTPUT_FILE_DIRECTORY: ${{ runner.temp }}/wrangler-output
+          WRANGLER_SEND_METRICS: 'false'

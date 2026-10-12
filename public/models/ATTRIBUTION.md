@@ -13,7 +13,7 @@ used for the store's prop dressing.
 | File | Model | Author | License |
 |---|---|---|---|
 | `retro_tv.glb` | [Retro TV](https://poly.pizza/m/2tfjTOK1Lh4) | Alex Safayan | [CC-BY 3.0](https://creativecommons.org/licenses/by/3.0/) |
-| `car_sedan.glb` | [Car](https://poly.pizza/m/Cz6yDaUcM9) | Quaternius | CC0 |
+| `car_sedan.glb` | Original unbadged compact period sedan (#266) | Halcyon contributors | Repository license; [source and contract](../../docs/car-sedan-model.md) |
 | `car_sports.glb` | [Sports Car](https://poly.pizza/m/1mkmFkAz5v) | Quaternius | CC0 |
 
 | `car_hatchback.glb` | [Car Hatchback](https://poly.pizza/m/BG0KAhmGDt) | Kay Lousberg | CC0 |
@@ -325,3 +325,22 @@ and foot variants. Wooden wall boards reuse the original visible-joinery profile
 These are scripted Blender geometry under the repository license, with existing
 procedural finishes and no additional image assets. Source and installation
 contracts are in `docs/wood-and-game-shelves.md`.
+
+`tv-wall-bank.glb` is original generic asymmetric wall-bank casework under the
+repository license. The editable source and reproducible Blender script are
+`tools/models/tv-wall-bank.blend` and `tools/models/tv-wall-bank.py`.
+No downloaded geometry, imagery, marks or textures are included. Existing live
+screen and bezel modules remain runtime-owned. See `docs/tv-wall-bank-model.md`.
+
+## Alcove doorway and partition trim (#231)
+
+`alcove-partition.glb` — original generic model authored for Halcyon using Blender
+scripted mesh construction; no third-party assets or branded reference derivatives.
+Editable source and generator: `tools/models/alcove-partition.blend` and `.py`.
+Dimensions, material roles and integration: `docs/alcove-partition-model.md`.
+Distributed under the project license.
+`now-showing-lightbox.glb` is an original generic hanging poster lightbox under
+the repository license: moulded frame, bulb sockets, hollow box, rods and header
+plaque. Editable source `tools/models/now-showing-lightbox.blend`, reproducible
+script `tools/models/now-showing-lightbox.py`. No downloaded geometry, imagery,
+marks or textures. See `docs/now-showing-lightbox-model.md`.

@@ -10,6 +10,8 @@ import {buildCatalogArtifacts} from '../src/catalog/artifacts.ts';
 import {createBundle,verifyBundle,digest,inspectStaticOutput} from '../src/deployment/artifact.ts';
 import {switchLocal,readLocalCurrent,startLocalPreview} from '../src/deployment/local.ts';
 import {validatePolicy,deploymentDecision} from '../src/deployment/policy.ts';
+import {storeEntryFiles} from '../src/deployment/store-entry.ts';
+import {HOSTED_STORE_URL} from '../../src/catalog-handoff.ts';
 import {verifiedSource} from '../src/deployment/source.ts';
 const toolchain={node:'v22.19.0',astro:'7.3.3'},sourceA='a'.repeat(40),sourceB='b'.repeat(40);
 const encode=(value:unknown)=>JSON.stringify(value);
@@ -36,13 +38,24 @@ async function setup(t:any,variant='a'){
 test('fixture-only policy cannot be opened by credentials, production or refresh inputs',async()=>{
   const policy=validatePolicy(JSON.parse(await readFile(new URL('../deployment/policy.json',import.meta.url),'utf8')));
   assert.equal(deploymentDecision(policy,'local-preview',sourceA).allowed,true);
-  for(const target of ['cloud-preview','production','data-refresh','unknown']){
+  for(const target of ['production','data-refresh','unknown']){
     const result=deploymentDecision(policy,target,sourceA);assert.equal(result.allowed,false);assert.equal(result.publishes,false);
   }
   assert.throws(()=>validatePolicy({...policy,networkPublishingEnabled:true}),/not activated/);
   assert.throws(()=>validatePolicy({...policy,dailyRefreshEnabled:true}),/not activated/);
   assert.equal(deploymentDecision({...policy,approvedMasterSha:sourceA},'data-refresh',sourceB).allowed,false);
   assert.equal(deploymentDecision(policy,'local-preview','short').allowed,false);
+});
+test('cloud preview opens only for an enabled, recorded, owner-decided store redirect',async()=>{
+  const policy=validatePolicy(JSON.parse(await readFile(new URL('../deployment/policy.json',import.meta.url),'utf8')));
+  assert.deepEqual(deploymentDecision(policy,'cloud-preview',sourceA),{allowed:true,publishes:true,reasons:['Noindex redirect to the hosted 3D store on the provider preview address.']});
+  assert.equal(policy.networkPublishingEnabled,false);assert.equal(policy.canonicalHost,null);assert.equal(policy.approvedMasterSha,null);
+  for(const change of [{cloudPreviewEnabled:false},{previewProtection:'unconfigured'},{cloudflareProjectName:null},{cloudflareAccountId:null}])
+    assert.equal(deploymentDecision({...policy,...change} as any,'cloud-preview',sourceA).allowed,false);
+  assert.equal(deploymentDecision(policy,'cloud-preview','short').allowed,false);
+  assert.throws(()=>validatePolicy({...policy,cloudPreviewEnabled:'yes'}),/explicitly/);
+  assert.throws(()=>validatePolicy({...policy,cloudflareAccountId:'not-an-id'}),/account/);
+  assert.throws(()=>validatePolicy({...policy,cloudflareProjectName:'https://example.pages.dev'}),/project name/);
 });
 test('bundle seals exact source, complete catalog and every public byte',async t=>{
   const f=await setup(t),first=await createBundle(f.dist,join(f.store,'bundles'),sourceA,toolchain);
@@ -133,4 +146,34 @@ test('artifact workflow is parseable, pinned, secret-free and cannot deploy',asy
   assert.deepEqual(upload.with.path.trim().split('\n'),['showcase/input/deployment/bundles/','showcase/input/readiness/metadata.json','showcase/input/readiness/reports/']);assert.equal(steps.find((step:any)=>step.env?.SOURCE_COMMIT)?.env.SOURCE_COMMIT,'${{ github.sha }}');
   const readiness=steps.find((step:any)=>step.name==='Write readiness receipts and prove the launch gate stays closed');assert.match(readiness.run,/--require-launch-ready/);assert.match(readiness.run,/-eq 75/);
   assert(steps.findIndex((step:any)=>step.run==='npm run test:browser')<steps.findIndex((step:any)=>step.name==='Package verified fixture output'));
+});
+test('preview workflow is trusted-dev-only, pinned, gated, uploads only the store entry and keeps production closed',async()=>{
+  const text=await readFile(new URL('../../.github/workflows/showcase-preview.yml',import.meta.url),'utf8');
+  const document=parseDocument(text);assert.deepEqual(document.errors,[]);const workflow=document.toJS();
+  assert.deepEqual(workflow.permissions,{contents:'read'});assert.deepEqual(Object.keys(workflow.on).sort(),['push','workflow_dispatch']);
+  assert.deepEqual(workflow.on.push.branches,['dev']);assert.equal(workflow.concurrency['cancel-in-progress'],false);
+  const job=workflow.jobs.preview;assert.match(job.if,/github.ref == 'refs\/heads\/dev'/);assert.match(job.if,/github.actor == 'devbjackson'/);assert.match(job.if,/github.repository == 'halcyon-video\/halcyon-video'/);
+  const steps=job.steps;for(const step of steps)if(step.uses)assert.match(step.uses,/@[a-f0-9]{40}$/);
+  assert.equal(steps[0].with['persist-credentials'],false);assert.doesNotMatch(text,/pull_request|schedule:|wrangler-action|npx --yes|id-token:|package:preview|showcase\/dist/);
+  const index=(name:string)=>steps.findIndex((step:any)=>step.run===name||step.name===name);
+  const gate=index('Gate and write the store entry'),deploy=index('Upload the store entry as the dev preview and delete superseded uploads');
+  assert(gate>0&&gate<deploy);assert.match(steps[gate].run,/deployment:cloud-preview-gate/);
+  for(const [index,step] of steps.entries())if(index!==deploy)assert.doesNotMatch(JSON.stringify(step),/secrets\./);
+  assert.equal(steps[deploy].env.SITE,'${{ steps.entry.outputs.site }}');
+  assert.match(steps[deploy].run,/pages deploy "\$SITE"/);assert.match(steps[deploy].run,/--branch dev/);assert.doesNotMatch(steps[deploy].run,/--branch (master|main)/);
+  assert.match(steps[deploy].run,/\.environment == "preview" and \.id != \$current/);
+  const lock=JSON.parse(await readFile(new URL('../deployment/wrangler/package-lock.json',import.meta.url),'utf8'));
+  const tools=JSON.parse(await readFile(new URL('../deployment/toolchain.json',import.meta.url),'utf8'));
+  assert.equal(lock.packages['node_modules/wrangler'].version,tools.wrangler);
+});
+test('store entry sends every path straight to the hosted 3D store and nothing else',()=>{
+  const files=storeEntryFiles();
+  assert.deepEqual(Object.keys(files).sort(),['_headers','_redirects','index.html']);
+  assert.equal(files._redirects,`/* ${HOSTED_STORE_URL} 302\n`);
+  assert.match(files._headers,/^\/\*\n  X-Robots-Tag: noindex, nofollow\n/);
+  assert.match(files['index.html'],/<meta name="robots" content="noindex, nofollow">/);
+  assert(files['index.html'].includes(`<meta http-equiv="refresh" content="0; url=${HOSTED_STORE_URL}">`));
+  assert.doesNotMatch(Object.values(files).join(''),/data\/|browse|catalog|<script/i);
+  for(const bad of ['http://example.com/','https://example.com/?catalog=1','https://example.com/#x','https://user@example.com/','https://example.com/a"b','example.com'])
+    assert.throws(()=>storeEntryFiles(bad));
 });

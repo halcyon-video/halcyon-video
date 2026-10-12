@@ -24,7 +24,7 @@
 // (an edit, a resize, a pointer move during a drag) and coalesced to one per
 // frame there. A redraw re-flattens the composition, which is cached on the
 // document's JSON, so a drag that changes nothing re-uses the same art.
-import { emblemLayerPathD } from './emblem-doc';
+import { clamp, emblemLayerPathD } from './emblem-doc';
 import type { EmblemLayer } from './emblem-doc';
 import { emblemArtCanvas, emblemColorsFromSpec, emblemSilhouette } from './emblem-render';
 import { getActiveLogoSpec } from './logo-spec';
@@ -94,7 +94,6 @@ export interface EmblemCanvasHandle {
   dispose(): void;
 }
 
-const clamp = (v: number, lo: number, hi: number) => (v < lo ? lo : v > hi ? hi : v);
 const rotate = (p: Pt, rad: number): Pt => ({
   x: p.x * Math.cos(rad) - p.y * Math.sin(rad),
   y: p.x * Math.sin(rad) + p.y * Math.cos(rad),

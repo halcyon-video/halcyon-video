@@ -7,7 +7,7 @@ import { isPublicDemo } from './demo-mode';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { Movie, Episode } from './jellyfin';
 import { loadGameFaceTexture, isTwoFlapSpine, jewelSpineComposite, uprightSpine } from './game-case-art';
-import { isJewelCasePlatform, JEWEL_FAT_DEPTH_IN, gameConstruction, WHITE_CLAMSHELL_DIMS, isWhiteClamshell, type CaseDimensions, GAME_BOX_IN } from './packaging-formats';
+import { BLURAY_KEEPCASE_DIMS, isJewelCasePlatform, JEWEL_FAT_DEPTH_IN, gameConstruction, WHITE_CLAMSHELL_DIMS, isWhiteClamshell, type CaseDimensions, GAME_BOX_IN } from './packaging-formats';
 import { modelCaseGeometry, cloneCaseGeometry, withCaseConstructionMaterials, clearCaseModels, isCaseConstructionMaterial } from './packaging-model';
 import { getReviewSnippetForMovie } from './review-snippets';
 import { getActiveTheme } from './themes';
@@ -582,7 +582,7 @@ export function gameCaseDims(platform?: string, discCount?: number): { w: number
     // keeps the molded d*0.28 round-over. The memo above makes this identity-
     // stable, and the class fallbacks (shared with the movie CASE_DIMS
     // objects) are never marked.
-    if (isJewelCasePlatform(platform)) (dims as any).jewel = true;
+    if (isJewelCasePlatform(platform)) (dims as CaseDimensions).jewel = true;
     (dims as CaseDimensions).family = gameConstruction(platform, discCount);
     gameBoxDimsCache.set(key, dims);
   }
@@ -614,6 +614,7 @@ export function gameFaceAspect(platform?: string): number {
  * discCount is deliberately not a parameter: the multi-disc FAT box is a retail
  * shape only — the shell it sits in never changes.
  */
+export const BLURAY_RENTAL_DIMS = GAME_CLASS_DIMS.disc; // store copy behind a Blu-ray case: DVD-size keep case
 export function gameRentalDims(platform?: string): { w: number; h: number; d: number } {
   return GAME_CLASS_DIMS[isDiscPlatform(platform) ? 'disc' : 'cart'];
 }
@@ -700,6 +701,7 @@ export function rentalBoxDepth(
 // front of a shell that is the same size for every game of its media class.
 const gameShapeRegistry = new Map<string, { retail: { w: number; h: number; d: number }; rental: { w: number; h: number; d: number } }>([
   ['white', { retail: WHITE_CLAMSHELL_DIMS, rental: GAME_CLASS_DIMS.cart }],
+  ['bluray', { retail: BLURAY_KEEPCASE_DIMS, rental: GAME_CLASS_DIMS.disc }],
   ['disc', { retail: GAME_CLASS_DIMS.disc, rental: GAME_CLASS_DIMS.disc }],
   ['cart', { retail: GAME_CLASS_DIMS.cart, rental: GAME_CLASS_DIMS.cart }],
 ]);
@@ -2527,7 +2529,7 @@ function getFallbackGeometry(isAnimated: boolean = false, dims?: { w: number; h:
       // case/clamshell reads soft and wrong on them. Cache-key safe: the
       // marker rides the memoised dims object, so equal dims always carry
       // the same flag.
-      const jewel = (dims as any).jewel === true;
+      const jewel = (dims as CaseDimensions).jewel === true;
       const radius = isAnimated ? dims.d * 0.28
         : jewel ? dims.d * 0.06
         : (CASE_MEDIUM === 'vhs' ? 0.008 : dims.d * 0.28);

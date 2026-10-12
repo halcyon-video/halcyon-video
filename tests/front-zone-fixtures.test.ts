@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { prepareRetailModel } from '../src/fixtures/retail-model.ts';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { frontRefreshmentPlacements, placeFloorSaleTable } from '../src/floor-merchandising.ts';
+import { slatwallWingFootprint } from '../src/fixtures/candy-pouch.ts';
 import { RETAIL_FIXTURE_SPECS, retailFixtureFootprint, type RetailFixtureKind } from '../src/retail-fixture-specs.ts';
 import { validateLayout, type Footprint } from '../src/layout-validator.ts';
 
@@ -52,6 +53,7 @@ for (const width of [28,42,62,90]) test(`front run follows a ${width}-foot store
   const footprints=plan.map(p=>p.kind==='bargain-bin'
     ? {label:p.id,kind:'fixture' as const,cx:p.position.x,cz:p.position.z,w:3,d:3,yaw:p.yaw,clearance:3}
     : p.kind==='candy-display' ? {label:p.id,kind:'fixture' as const,cx:p.position.x,cz:p.position.z,w:3,d:1.6,yaw:p.yaw,clearance:1.5}
+    : p.options?.slatwallWing ? slatwallWingFootprint(retailFixtureFootprint(p.kind as RetailFixtureKind,p))
     : retailFixtureFootprint(p.kind as RetailFixtureKind,p));
   assert.deepEqual(validateLayout([...footprints,checkout],bounds).filter(v=>v.a!==checkout.label||v.b),[]);
   assert.equal(new Set(plan.map(p=>p.id)).size,plan.length);
@@ -60,6 +62,8 @@ for (const width of [28,42,62,90]) test(`front run follows a ${width}-foot store
     assert.ok(row.every(Boolean));
     for(const p of row) assert.equal(p.yaw,Math.PI/4+(p.kind==='two-door-cooler'?Math.PI/2:0));
     assert.equal(plan.filter(p=>p.kind==='candy-wall-gondola').length,2);
+    // Only the rear gondola's open end, beside the queue rack's back, takes the slatwall wing.
+    assert.deepEqual(plan.filter(p=>p.options?.slatwallWing).map(p=>p.id),['candy-wall-gondola-rear']);
     assert.equal(plan.filter(p=>p.kind==='acrylic-popcorn-bin').length,2);
     assert.equal(plan.filter(p=>p.kind==='candy-display').length,1);
     assert.ok(plan.every(p=>p.kind!=='chest-freezer'));

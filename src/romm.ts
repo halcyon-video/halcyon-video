@@ -24,6 +24,11 @@ import { isGamesOnly } from './games-only';
 import { isPlatformEnabled } from './game-platforms';
 import { fetchGamesFromSnapshot } from './games-snapshot';
 
+/** True inside the Tauri desktop shell (no vite dev middleware there). */
+function inTauriShell(): boolean {
+  return typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__ !== undefined;
+}
+
 export { isPlatformEnabled };
 
 export interface RommConfig {
@@ -105,8 +110,7 @@ async function rommRequest(
   timeoutMs: number = REQUEST_TIMEOUT_MS
 ): Promise<any> {
   const url = `${config.url}${path}`;
-  const hasTauri =
-    typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__ !== undefined;
+  const hasTauri = inTauriShell();
 
   let responseStr: string;
   if (hasTauri) {
@@ -252,8 +256,7 @@ function coverUrl(config: RommConfig, rom: any, platformId?: number): string | u
   const primary = raw ? absolutize(raw) : absolutize(remote!);
   const fallback = raw && remote ? remote : undefined;
 
-  const hasTauri =
-    typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__ !== undefined;
+  const hasTauri = inTauriShell();
   if (hasTauri) return primary; // no vite middleware in the Tauri shell
 
   // The poster worker unwraps this marker into header-addressed same-origin
@@ -301,8 +304,7 @@ const GAME_ART_MEDIA: ReadonlyArray<{ key: keyof GameArtUrls; media: string }> =
 function gameArtUrls(config: RommConfig, rom: any, platformId?: number): GameArtUrls | undefined {
   const ss = rom.ss_metadata;
   if (!ss || typeof ss !== 'object') return undefined;
-  const hasTauri =
-    typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__ !== undefined;
+  const hasTauri = inTauriShell();
 
   const out: GameArtUrls = {};
   for (const { key, media } of GAME_ART_MEDIA) {
@@ -612,8 +614,7 @@ function rommRomId(movie: Movie): number | null {
  * Returns 'error' on any failure. Never throws.
  */
 export async function launchGame(movie: Movie): Promise<LaunchResult> {
-  const hasTauri =
-    typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__ !== undefined;
+  const hasTauri = inTauriShell();
 
   const template = hasTauri ? (localStorage.getItem('romm_launch_cmd') || '').trim() : '';
   if (template && movie.launchPath) {

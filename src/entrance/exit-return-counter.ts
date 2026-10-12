@@ -1,3 +1,4 @@
+import { FRAME_REVEAL_CENTER } from '../frame-reveal';
 import quickDrop from '../exit-return-spec.json' with { type: 'json' };
 import { addFastReturnWindow } from './fast-return-window';
 import * as THREE from 'three';
@@ -10,12 +11,15 @@ import { installDisplayModel } from '../fixtures/display-model';
 import { prepareRetailModel } from '../fixtures/retail-model';
 import { getRentalCaseGeometry, createHeroRentalMaterials, CASE_DEPTH } from '../video-case';
 
-import { exitReturnLayout, exitReturnSegments, type ExitGeometry } from '../exit-return-layout';
+import { exitReturnLayout, exitReturnSegments, returnWindowPane, RETURN_WINDOW_CLEARANCE, type ExitGeometry } from '../exit-return-layout';
 
 /** The countertop, not the stock, forms the exit passage. Employee side is +Z. */
 export function buildExitReturnCounter(ctx: FixtureContext, parent: THREE.Group, vest: ExitGeometry): Footprint[] {
   const footprint=exitReturnLayout(ctx.storeWidth,vest);if(!footprint)return [];
   const length=footprint.w;
+  const pane=returnWindowPane(ctx.storefrontSpec,footprint);
+  const metal=new THREE.MeshStandardMaterial({color:0x9fa5ab,roughness:.36,metalness:.85});
+  metal.name='CounterReturnMetal';
   const segments=exitReturnSegments(footprint);
   const root=new THREE.Group();root.name='exit-return-counter';
   root.position.set(footprint.cx,0,footprint.cz+footprint.d/2-quickDrop.glassOffset);root.rotation.y=footprint.yaw;parent.add(root);
@@ -40,6 +44,17 @@ export function buildExitReturnCounter(ctx: FixtureContext, parent: THREE.Group,
   backsplash.name='White window backsplash';
   backsplash.position.set(0,quickDrop.worktopHeight+quickDrop.backsplashHeight/2,quickDrop.glassOffset-quickDrop.backsplashDepth/2);
   backsplash.castShadow=backsplash.receiveShadow=true;fallback.add(backsplash);
+  if(pane) {
+    // Loading/offline fallback retains the insert and its through-slot.
+    const shape=new THREE.Shape();
+    const lo=pane.lo-footprint.cx,hi=pane.hi-footprint.cx;
+    shape.moveTo(lo,2.1);shape.lineTo(hi,2.1);shape.lineTo(hi,quickDrop.hoodBackHeight);shape.lineTo(lo,quickDrop.hoodBackHeight);shape.closePath();
+    const slot=new THREE.Path(),x=quickDrop.receiverX*length/15.5,half=(quickDrop.receiverWidth/2-.09)*length/15.5;
+    slot.moveTo(x-half,3.22);slot.lineTo(x-half,quickDrop.hoodBackHeight-.08);slot.lineTo(x+half,quickDrop.hoodBackHeight-.08);slot.lineTo(x+half,3.22);slot.closePath();shape.holes.push(slot);
+    const insert=new THREE.Mesh(new THREE.ExtrudeGeometry(shape,{depth:quickDrop.faceClearance,bevelEnabled:false}),metal);
+    insert.name='Full pane metal return insert fallback';insert.position.z=quickDrop.glassOffset+RETURN_WINDOW_CLEARANCE+FRAME_REVEAL_CENTER;
+    insert.castShadow=insert.receiveShadow=true;fallback.add(insert);
+  }
   const unsubscribe=onBrandChange(()=>{const t=getActiveTheme();body.color.set(t.palette.counterBody);
     worktop.color.set(0xf4f4f0);top.color.set(t.palette.counterTop);stripe.color.set(t.palette.secondary);});
   ctx.addCollider(fallback);
@@ -50,16 +65,33 @@ export function buildExitReturnCounter(ctx: FixtureContext, parent: THREE.Group,
     ...(!hosted ? [`user-assets/${rel}`] : []), 'models/exit-return-counter.glb'];
   const releaseWindow = addFastReturnWindow(ctx,root,length/15.5);
   const release = installDisplayModel(ctx,root,fallback,paths,
-    {CounterBody:body,CounterTop:top,CounterWorktop:worktop,CounterInlay:stripe,CounterPlinth:plinth},new THREE.Vector3(length/15.5,1,length/15.5),model=>{
-      // The plan scales with the store; the receiver must still pass through z=15 glazing.
+    {CounterBody:body,CounterTop:top,CounterWorktop:worktop,CounterInlay:stripe,CounterPlinth:plinth,CounterReturnMetal:metal},new THREE.Vector3(length/15.5,1,length/15.5),model=>{
+      // The plan scales with the store; the receiver must still pass through the moved glazing.
       model.traverse(o=>{
         if (!(o instanceof THREE.Mesh)) return;
         const p=o.geometry.getAttribute('position');
         // Pin 217: the exterior metal face stands one millimetre proud of
-        // the z=15 glazing, not several inches out in the walkway.
-        const receiverFront = quickDrop.glassOffset + quickDrop.faceClearance;
-        for(let i=0;i<p.count;i++) if(p.getZ(i)>0) p.setZ(i,p.getZ(i)/.18328084*receiverFront/(length/15.5));
-        p.needsUpdate=true;o.geometry.computeVertexNormals();o.geometry.computeBoundingSphere();
+        // the glazing, not several inches out in the walkway.
+        const receiverFront = quickDrop.glassOffset + quickDrop.faceClearance + RETURN_WINDOW_CLEARANCE + FRAME_REVEAL_CENTER;
+        const materials=Array.isArray(o.material)?o.material:[o.material];
+        const allMetal=materials.length===1 && materials[0]===metal;
+        const metalVertices=new Set<number>();
+        for(const group of o.geometry.groups) {
+          if(materials[group.materialIndex??0]!==metal)continue;
+          for(let at=group.start;at<group.start+group.count;at++)metalVertices.add(o.geometry.index?.getX(at)??at);
+        }
+        for(let i=0;i<p.count;i++) {
+          const x=p.getX(i),z=p.getZ(i),scale=length/15.5,isMetal=allMetal||metalVertices.has(i);
+          if(isMetal && pane) {
+            // Keep the actual slot aligned with the chute; only the insert's
+            // outer edges fit the full clear width between the pane stiles.
+            if(x<quickDrop.receiverX-1.99) p.setX(i,(pane.lo-footprint.cx)/scale);
+            if(x>quickDrop.receiverX+1.99) p.setX(i,(pane.hi-footprint.cx)/scale);
+          }
+          if(z>=quickDrop.glassOffset-.001 && (isMetal || Math.abs(x-quickDrop.receiverX)<quickDrop.receiverWidth/2+.001))
+            p.setZ(i,(isMetal?z-quickDrop.glassOffset:0)+(receiverFront-quickDrop.faceClearance)/scale);
+        }
+        p.needsUpdate=true;o.geometry.computeVertexNormals();o.geometry.computeBoundingBox();o.geometry.computeBoundingSphere();
       });
       prepareRetailModel(model);
     });
@@ -87,7 +119,7 @@ export function buildExitReturnCounter(ctx: FixtureContext, parent: THREE.Group,
   });
   parent.addEventListener('removed',function retire(){
     parent.removeEventListener('removed',retire);unsubscribe();release();releaseWindow();geometry.dispose();stacks.forEach(stack=>stack.dispose());
-    fallback.traverse(o=>{if(o instanceof THREE.Mesh)o.geometry.dispose();});body.dispose();top.dispose();plinth.dispose();worktop.dispose();stripe.dispose();root.removeFromParent();
+    fallback.traverse(o=>{if(o instanceof THREE.Mesh)o.geometry.dispose();});body.dispose();top.dispose();plinth.dispose();metal.dispose();worktop.dispose();stripe.dispose();root.removeFromParent();
   });
   ctx.requestShadowRefresh();
   return segments;

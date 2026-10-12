@@ -39,7 +39,7 @@ export function prepareRetailModel(model: THREE.Group): void {
   const inverseRoot = model.matrixWorld.clone().invert();
   const groups = new Map<THREE.Material, Map<number, THREE.Mesh[]>>();
   model.traverse(o => {
-    if (!(o instanceof THREE.Mesh) || !o.visible || o instanceof THREE.SkinnedMesh ||
+    if (!(o instanceof THREE.Mesh) || !o.visible || o.userData.retailAnimated || o instanceof THREE.SkinnedMesh ||
       o instanceof THREE.InstancedMesh || o.morphTargetInfluences?.length ||
       Array.isArray(o.material) || o.material.transparent) return;
     // A finish can be shared by parts with different shadow policies.
@@ -87,7 +87,7 @@ export function prepareRetailModel(model: THREE.Group): void {
   // Only these opted-in static studies freeze local transforms. The model root
   // stays live for placement/corrections and parent motion still propagates.
   model.traverse(o => {
-    if (o === model) return;
+    if (o === model || o.userData.retailAnimated) return;
     o.updateMatrix();
     o.matrixAutoUpdate = false;
   });

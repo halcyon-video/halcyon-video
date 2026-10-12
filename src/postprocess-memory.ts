@@ -11,6 +11,12 @@ export function omitPostprocessDepth(target: WebGLRenderTarget): void {
 }
 
 export function omitBloomDepth(pass: UnrealBloomPass): void {
+  // Bound the bloom input, preserving the original HDR scene and highlight hue.
+  // A sharp sunset reflection must not turn into an unbounded blurred fireball.
+  pass.materialHighPassFilter.fragmentShader = pass.materialHighPassFilter.fragmentShader.replace(
+    'float v = luminance( texel.xyz );',
+    'texel.rgb *= min(1.0, 4.0 / max(max(texel.r, texel.g), max(texel.b, 0.0001))); float v = luminance( texel.xyz );',
+  );
   omitPostprocessDepth(pass.renderTargetBright);
   pass.renderTargetsHorizontal.forEach(omitPostprocessDepth);
   pass.renderTargetsVertical.forEach(omitPostprocessDepth);

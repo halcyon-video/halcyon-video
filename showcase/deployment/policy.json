@@ -2,12 +2,13 @@
   "schemaVersion": 1,
   "project": "halcyon-showcase",
   "networkPublishingEnabled": false,
+  "cloudPreviewEnabled": true,
   "canonicalHost": null,
-  "cloudflareAccountId": null,
-  "cloudflareProjectName": null,
+  "cloudflareAccountId": "environment-secret",
+  "cloudflareProjectName": "halcyon-showcase",
   "sourcePermissionReference": null,
   "approvedMasterSha": null,
   "monthlyHostingCeilingUsd": 5,
-  "previewProtection": "unconfigured",
+  "previewProtection": "public-noindex",
   "dailyRefreshEnabled": false
 }

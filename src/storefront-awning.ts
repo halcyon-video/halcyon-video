@@ -47,7 +47,7 @@ export function buildWindowAwnings(ctx: FixtureContext, entryHalfWidth: number):
   }
   const canvas = document.createElement('canvas');
   canvas.width = 2048; canvas.height = 512;
-  const c = canvas.getContext('2d')!;
+  const c = canvas.getContext('2d', { willReadFrequently: true })!;
   const letterTexture = new THREE.CanvasTexture(canvas);
   letterTexture.colorSpace = THREE.SRGBColorSpace;
   letterTexture.anisotropy = 8;

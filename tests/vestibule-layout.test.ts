@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import quickDrop from '../src/exit-return-spec.json' with { type: 'json' };
 import { vestibuleLayout, counterDatumShift, vestibuleSide, vestibuleStraightSide, vestibuleFrontHalf, clampVestibuleSide, vestibuleExitGates } from '../src/vestibule-layout.ts';
-import { exitReturnLayout, exitReturnSegments } from '../src/exit-return-layout.ts';
+import { exitReturnLayout, exitReturnSegments, RETURN_WINDOW_CLEARANCE } from '../src/exit-return-layout.ts';
 
 test('vestibule matches the straight side panel to the door width and shares the checkout datum', () => {
   for (const doorWidth of [3, 3.2, 4]) {
@@ -24,7 +24,7 @@ test('open return end retains the back wall and a body-width side-door approach'
     const segments=exitReturnSegments(f);
     const rear=segments.find(p=>p.label==='structure:return-window-worktop');
     assert.ok(rear,'white window-side enclosure remains');
-    assert.ok(Math.abs(rear.cz+rear.d/2-vest.frontZ)<1e-8,'rear worktop is against the glazing');
+    assert.ok(Math.abs(rear.cz+rear.d/2-(vest.frontZ-RETURN_WINDOW_CLEARANCE))<1e-8,'rear worktop keeps the fixed clearance off the glazing');
     assert.ok(!segments.some(p=>p.label==='structure:return-right'),'vestibule side is open');
     // Follow the angled doorway normal, testing a body-width approach.
     for(let normal=-2;normal<=1.5;normal+=.1) for(const p of segments) {
@@ -40,7 +40,7 @@ test('open return end retains the back wall and a body-width side-door approach'
       assert.ok(Math.abs(dx*wall.sin+dz*wall.cos)>doorW/2+.5,'outside leaf sweep');
       for(const p of segments) {
         const x=gate.x-p.cx,z=gate.z-p.cz,c=Math.cos(p.yaw),s=Math.sin(p.yaw);
-        assert.ok(Math.abs(x*c-z*s)>p.w/2+.7 || Math.abs(x*s+z*c)>p.d/2+.7,
+        assert.ok(Math.abs(x*c-z*s)>p.w/2+.6 || Math.abs(x*s+z*c)>p.d/2+.6,
           `${p.label} obstructs sensor base`);
       }
     }

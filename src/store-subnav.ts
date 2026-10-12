@@ -38,7 +38,7 @@ import { mobileStoreActive } from './mobile-store.ts';
 //          (no genre placards) simply yields none and the row degrades to
 //          libraries — no separate code path. This row is viewed from the
 //          entrance overview's vantage; stepping it pans ticket-to-ticket.
-//   Row 2  DISPLAYS — every slotted floor fixture: genre endcaps, collection
+//   Row 2  DISPLAYS — every slotted floor fixture: collection endcaps, collection
 //          endcaps, promo floor stands, bargain bins, drape tables, game
 //          gondolas. Moving the highlight GLIDES the camera to face that
 //          fixture, so stepping the row is literally walking the displays.
@@ -68,7 +68,7 @@ import { OVERVIEW_POS } from './scene-shared';
 import { FIELD_Z_FRONT, FRONT_GLASS_Z } from './store-layout';
 import { isMomAndPop } from './store-format';
 import { aimOverviewAt } from './store-camera';
-import { isEndcapKind } from './fixtures/genre-endcap';
+import { isEndcapKind } from './fixtures/endcap-shelf';
 import { slottedFixtureLabel, qualifyDuplicateLabels } from './fixture-labels';
 import { retailAudio } from './audio';
 import type { StoreScene } from './three-scene';
@@ -243,7 +243,7 @@ function buildLibraryRow(scene: StoreScene): SubNavItem[] {
     });
   }
   for (let libIdx = 0; libIdx < scene.libraries.length; libIdx++) {
-    const units = scene.shelvingUnits.filter((u) => u.libraryIdx === libIdx);
+    const units = scene.plan.unitsForLibrary(libIdx);
     if (units.length === 0) continue;
     // The library ticket floats over the run's averaged centre (the overview's
     // uncategorized-library placement) whether or not genre tickets join it.
@@ -342,7 +342,7 @@ function faceFixture(scene: StoreScene, item: SubNavItem, dist: number, eyeY: nu
  */
 function aisleVantage(scene: StoreScene, item: SubNavItem): { x: number; z: number } | null {
   if (item.kind !== 'library' && item.kind !== 'genre') return null;
-  const units = scene.shelvingUnits.filter((u) => u.libraryIdx === item.libraryIdx);
+  const units = scene.plan.unitsForLibrary(item.libraryIdx);
   const unit = units[item.unitIdxInLibrary];
   if (!unit) return null;
   // A physical row can be poured as several units (and several lineId chunks);
@@ -587,7 +587,7 @@ export function subNavSelect(scene: StoreScene): boolean {
     const libIdx = typeof opts.libraryIdx === 'number' ? opts.libraryIdx : -1;
     const lineId = typeof opts.lineId === 'number' ? opts.lineId : -1;
     const host = libIdx >= 0
-      ? scene.shelvingUnits.filter((u) => u.libraryIdx === libIdx).find((u) => u.lineId === lineId)
+      ? scene.plan.unitsForLibrary(libIdx).find((u) => u.lineId === lineId)
       : undefined;
     if (fixture && host) {
       // Stand at the hosting run's entrance column first, then step onto the

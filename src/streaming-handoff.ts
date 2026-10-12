@@ -1,4 +1,6 @@
 
+import { streamingDestinationKind } from './streaming-catalog.ts';
+
 /** A real, user-activated link survives popup blockers and keeps the store alive. */
 export function showStreamingHandoff(title: string, service: string, url: string): void {
   (document.getElementById('streaming-handoff') as HTMLDialogElement | null)?.close();
@@ -11,19 +13,27 @@ export function showStreamingHandoff(title: string, service: string, url: string
   heading.textContent = 'READY TO WATCH';
   const movie = document.createElement('p');
   movie.textContent = title;
+  movie.className = 'streaming-handoff-title';
   const hint = document.createElement('p');
-  hint.textContent = `${service} opens in a separate tab. Close that tab or switch back here to return to the store.`;
+  // Say what the link really is: only an exact title page claims the movie.
+  const kind = streamingDestinationKind(url);
+  const where = kind === 'title' ? `Opens this movie's page on ${service} in a separate tab.`
+    : kind === 'search' ? `Opens ${service}'s search for this movie in a separate tab.`
+    : `Opens TMDB's watch options for this movie in a separate tab, where ${service} is listed.`;
+  hint.textContent = `${where} Your ${service} account and subscription apply there. Close that tab or switch back here to return to the store.`;
   const link = document.createElement('a');
   link.href = url;
   link.target = '_blank';
   link.rel = 'noopener noreferrer';
-  link.textContent = 'OPEN STREAMING SERVICE';
+  link.textContent = kind === 'title' ? `OPEN ON ${service.toUpperCase()}`
+    : kind === 'search' ? `SEARCH ${service.toUpperCase()}` : 'SEE WATCH OPTIONS';
   const back = document.createElement('button');
   back.type = 'button';
   back.textContent = 'BACK TO STORE';
   const close = () => dialog.close();
   back.addEventListener('click', close);
-  link.addEventListener('click', () => back.focus());
+  // One handoff, one tab: the dialog leaves once its link has been followed.
+  link.addEventListener('click', () => { setTimeout(close, 0); }, { once: true });
   const keys = (event: KeyboardEvent) => {
     if (!dialog.open || event.ctrlKey || event.metaKey || event.altKey) return;
     event.stopImmediatePropagation();

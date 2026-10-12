@@ -1,7 +1,10 @@
+import { vestibuleHalfWidth, type StorefrontSpec } from './store-layout.ts';
+import { windowBayLayout } from './storefront-window-layout.ts';
 import quickDrop from './exit-return-spec.json' with { type: 'json' };
 import type { Footprint } from './layout-validator.ts';
 export interface ExitGeometry { xL: number; frontZ: number; sideDoorZ: number; doorW: number; hasChamber: boolean }
-/** Returns station against the glass; an angled customer face opens beside the exit. */
+export const RETURN_WINDOW_CLEARANCE = .45;
+/** Returns station clear of the glass; an angled customer face opens beside the exit. */
 export function exitReturnLayout(storeWidth: number,vest: ExitGeometry): Footprint | null {
   if (!vest.hasChamber) return null;
   const right=vest.xL-.15;
@@ -10,7 +13,7 @@ export function exitReturnLayout(storeWidth: number,vest: ExitGeometry): Footpri
   // Uniform plan scaling preserves the model's 45-degree customer faces.
   const depth=width*11.5/15.5;
   return {label:'structure:exit-return-counter',kind:'structure',cx:right-width/2,
-    cz:vest.frontZ-(depth+quickDrop.glassOffset)/2,w:width,d:depth+quickDrop.glassOffset,yaw:0};
+    cz:vest.frontZ-RETURN_WINDOW_CLEARANCE-(depth+quickDrop.glassOffset)/2,w:width,d:depth+quickDrop.glassOffset,yaw:0};
 }
 
 /** Physical millwork only: preserve the open interior and vestibule-side staff entrance. */
@@ -29,4 +32,12 @@ export function exitReturnSegments(f: Footprint): Footprint[] {
     segment([7.75,quickDrop.glassOffset/sx],[-7.75,quickDrop.glassOffset/sx],-quickDrop.worktopFront+quickDrop.glassOffset/sx,'window-worktop'),
     segment([-6.95,-5.35],[-2,-10.3],1.3,'inner-worktop-left'),
     segment([-2,-10.3],[2.4,-5.9],1.3,'inner-worktop-right')];
+}
+
+/** The receiver's metal insert replaces the lower part of its actual pane. */
+export function returnWindowPane(spec: StorefrontSpec, counter: Footprint) {
+  const receiverX = counter.cx + quickDrop.receiverX * counter.w / 15.5;
+  const panes = windowBayLayout(spec.windowBays, {center: 0, halfWidth: vestibuleHalfWidth(spec)}).panes;
+  const pane = panes.find(p => receiverX >= 11-p.hi && receiverX <= 11-p.lo);
+  return pane ? {lo: 11-pane.hi+.1, hi: 11-pane.lo-.1, receiverX} : null;
 }

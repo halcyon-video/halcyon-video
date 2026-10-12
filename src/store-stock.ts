@@ -9,7 +9,7 @@ import { updateStoreLoading } from './store-loading';
 // swap. Every function takes the StoreScene as its first parameter and
 // reads/writes scene state exactly as the original methods did.
 import * as THREE from 'three';
-import { isWhiteClamshell, WHITE_CLAMSHELL_DIMS } from './packaging-formats';
+import { isWhiteClamshell, isBluRayCase, WHITE_CLAMSHELL_DIMS, BLURAY_KEEPCASE_DIMS } from './packaging-formats';
 import { onCaseModelsChanged } from './packaging-model';
 import { onJoineryModelsChanged } from './joinery-model';
 import { rentalRestZ, shelfCasePacking } from './packaging-fit';
@@ -19,7 +19,7 @@ import { updateBackstock, forgetBackstock } from './case-backstock';
 const caseModelSubscriptions = new WeakMap<StoreScene, () => void>();
 import { isPublicDemo } from './demo-mode';
 import { Movie } from './jellyfin';
-import { posterQueue, CASE_MEDIUM, CASE_HEIGHT, CASE_DEPTH, textureArrayManager, createClonedCaseGeometry, getGlobalFrontMaterials, getGlobalBackMaterials, updateGlobalMaterialsEnvMap, leftmostColorCache, posterPixelCache, reflectionProbes, isGlobalMaterial, lowResCache, gameShapeKey, gameDimsForShape, gameCaseDims, gameRentalDims, rentalBottomLift, rentalBoxDepth, rentalBoxHeight, beginRebuildDrain, SERIES_DEPTH_MULT } from './video-case';
+import { posterQueue, CASE_MEDIUM, CASE_HEIGHT, CASE_DEPTH, textureArrayManager, createClonedCaseGeometry, getGlobalFrontMaterials, getGlobalBackMaterials, updateGlobalMaterialsEnvMap, leftmostColorCache, posterPixelCache, reflectionProbes, isGlobalMaterial, lowResCache, gameShapeKey, gameDimsForShape, BLURAY_RENTAL_DIMS, gameCaseDims, gameRentalDims, rentalBottomLift, rentalBoxDepth, rentalBoxHeight, beginRebuildDrain, SERIES_DEPTH_MULT } from './video-case';
 import { AISLE_SHELF_HEIGHTS, WALL_SHELF_HEIGHTS, NR_WALL_SLOPE, LEAN_ANGLE, STAGGER_OFFSET, UNIT_SIDE_CAPACITY, BACK_WALL_UNIT_IDX, sideEntrySlot, COPY_X_JITTER_RANGE, unitDepthAtHeight, extraCopiesCount, isUnstockedTitle, seededRandom01, MovieSlot } from './store-layout';
 import { validateCaseFit, type CaseFitPair } from './layout-validator';
 import { clearPosterPrefetch } from './poster-prefetch';
@@ -60,7 +60,8 @@ function aisleMeshKey(libIdx: number, unitIdx: number, side: 'front' | 'back', m
   return movie.game
     ? `${base}${AISLE_SHAPE_SEP}${gameShapeKey(movie.platform, movie.discCount)}`
     : movie.isSeries && !movie.streaming ? `${base}${AISLE_SHAPE_SEP}series`
-      : isWhiteClamshell(movie, CASE_MEDIUM) ? `${base}${AISLE_SHAPE_SEP}white` : base;
+      : isWhiteClamshell(movie, CASE_MEDIUM) ? `${base}${AISLE_SHAPE_SEP}white`
+        : isBluRayCase(movie, CASE_MEDIUM) ? `${base}${AISLE_SHAPE_SEP}bluray` : base;
 }
 
 /** The shape half of an aisle batch key, or null for ordinary movie stock. */
@@ -77,6 +78,7 @@ function aisleKeyShape(key: string): string | null {
  */
 function aisleCaseDims(movie: Movie): { height: number; depth: number; liftDepth: number } {
   if (isWhiteClamshell(movie, CASE_MEDIUM)) { const d = WHITE_CLAMSHELL_DIMS; return { height: d.h, depth: d.d, liftDepth: d.d }; }
+  if (isBluRayCase(movie, CASE_MEDIUM)) { const d = BLURAY_KEEPCASE_DIMS; return { height: d.h, depth: d.d, liftDepth: d.d }; }
   if (movie.game) {
     const d = gameCaseDims(movie.platform, movie.discCount);
     return { height: d.h, depth: d.d, liftDepth: d.d };
@@ -96,6 +98,7 @@ function aisleCaseDims(movie: Movie): { height: number; depth: number; liftDepth
  */
 function slotRentalLift(movie: Movie): number {
   if (isWhiteClamshell(movie, CASE_MEDIUM)) return rentalBottomLift(WHITE_CLAMSHELL_DIMS, gameRentalDims());
+  if (isBluRayCase(movie, CASE_MEDIUM)) return rentalBottomLift(BLURAY_KEEPCASE_DIMS, BLURAY_RENTAL_DIMS);
   if (!movie.game) return rentalBottomLift();
   return rentalBottomLift(gameCaseDims(movie.platform, movie.discCount), gameRentalDims(movie.platform));
 }
@@ -143,9 +146,9 @@ function validateCaseFitForStock(scene: StoreScene): void {
     // wrong shared helper. Reconstructing the placement here instead — the
     // first cut did — makes the check vacuous: it stayed silent with both
     // shipped bugs reintroduced.
-    const retail = movie.game ? gameCaseDims(movie.platform, movie.discCount) : isWhiteClamshell(movie, CASE_MEDIUM) ? WHITE_CLAMSHELL_DIMS : { w: 0, h: CASE_HEIGHT, d: CASE_DEPTH };
-    const rental = movie.game ? gameRentalDims(movie.platform) : isWhiteClamshell(movie, CASE_MEDIUM) ? gameRentalDims() : undefined;
-    const retailArg = movie.game || isWhiteClamshell(movie, CASE_MEDIUM) ? retail : undefined;
+    const retail = movie.game ? gameCaseDims(movie.platform, movie.discCount) : isWhiteClamshell(movie, CASE_MEDIUM) ? WHITE_CLAMSHELL_DIMS : isBluRayCase(movie, CASE_MEDIUM) ? BLURAY_KEEPCASE_DIMS : { w: 0, h: CASE_HEIGHT, d: CASE_DEPTH };
+    const rental = movie.game ? gameRentalDims(movie.platform) : isWhiteClamshell(movie, CASE_MEDIUM) ? gameRentalDims() : isBluRayCase(movie, CASE_MEDIUM) ? BLURAY_RENTAL_DIMS : undefined;
+    const retailArg = movie.game || isWhiteClamshell(movie, CASE_MEDIUM) || isBluRayCase(movie, CASE_MEDIUM) ? retail : undefined;
     pairs.push({
       label,
       retailH: retail.h, retailD: retail.d,
@@ -352,7 +355,8 @@ export async function buildAllMovieBoxes(scene: StoreScene) {
     return movie.game
       ? `${base}${AISLE_SHAPE_SEP}${gameShapeKey(movie.platform, movie.discCount)}`
       : movie.isSeries && !movie.streaming ? `${base}${AISLE_SHAPE_SEP}series`
-      : isWhiteClamshell(movie, CASE_MEDIUM) ? `${base}${AISLE_SHAPE_SEP}white` : base;
+      : isWhiteClamshell(movie, CASE_MEDIUM) ? `${base}${AISLE_SHAPE_SEP}white`
+      : isBluRayCase(movie, CASE_MEDIUM) ? `${base}${AISLE_SHAPE_SEP}bluray` : base;
   };
   const backWallCounts = new Map<string, number>();
   backWallPlacements.forEach(p => {
@@ -695,7 +699,7 @@ export async function buildAllMovieBoxes(scene: StoreScene) {
   // 4. Populate all Aisle Slots (category-sorted layout order; nulls are
   // section padding — they hold their shelf position but get no case)
   for (let libIdx = 0; libIdx < scene.libraries.length; libIdx++) {
-    const libUnits = scene.shelvingUnits.filter(u => u.libraryIdx === libIdx);
+    const libUnits = scene.plan.unitsForLibrary(libIdx);
     const layoutEntries = scene.layoutFor(libIdx).entries;
     const blockOrder = scene.plan.entryBlockOrder(libIdx);
 
@@ -1070,7 +1074,7 @@ export function rebuildMovieBoxes(scene: StoreScene) {
   // re-bake the shadow map over the next few frames as the layout settles.
   scene.queueStructuralShadowRefresh();
   for (let libIdx = 0; libIdx < scene.libraries.length; libIdx++) {
-    const libUnits = scene.shelvingUnits.filter(u => u.libraryIdx === libIdx);
+    const libUnits = scene.plan.unitsForLibrary(libIdx);
 
     // 1. Collect and remove all aisle slots for this library from the map
     const libSlots: MovieSlot[] = [];
@@ -1275,7 +1279,7 @@ export function restockSlottedFixtures(scene: StoreScene): void {
     fixture.refreshStock();
     if (fixture.getSlots().some(slot => {
       const old = scene.slotsByPosition.get(slot.key)?.movie;
-      return old && isWhiteClamshell(old, CASE_MEDIUM) !== isWhiteClamshell(slot.movie, CASE_MEDIUM);
+      return old && (isWhiteClamshell(old, CASE_MEDIUM) !== isWhiteClamshell(slot.movie, CASE_MEDIUM) || isBluRayCase(old, CASE_MEDIUM) !== isBluRayCase(slot.movie, CASE_MEDIUM));
     })) { scene.buildAllMovieBoxes(); return; }
   }
   let touched = false;

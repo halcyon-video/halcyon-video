@@ -2,7 +2,7 @@
 // remains the existing undecorated desk; this adds no interaction target.
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { assetUrl } from '../asset-url';
+import { assetUrl, dropInCandidates } from '../asset-url';
 import { counterMount, placeOnCounterMount } from '../entrance/counter-mounts';
 import { brandPackDir } from '../brand-pack';
 import { extractHousingContact, refreshEquipmentContact } from './counter-equipment-contact';
@@ -16,7 +16,7 @@ export function installCounterCashHousing(scene: StoreScene, parent: THREE.Group
   if (!anchor) return;
   const rel = 'fixtures/late-era-fixtures-2012/checkout-hardware/model.glb';
   const pack = brandPackDir();
-  const candidates = [...(pack ? [`user-assets/${pack}/${rel}`] : []), `user-assets/${rel}`];
+  const candidates = dropInCandidates([...(pack ? [`user-assets/${pack}/${rel}`] : []), `user-assets/${rel}`]);
   const attached = () => {
     let root: THREE.Object3D = parent;
     while (root.parent) root = root.parent;

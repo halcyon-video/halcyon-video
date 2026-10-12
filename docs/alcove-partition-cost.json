@@ -1,0 +1,97 @@
+{
+  "parts": [
+    {
+      "part": "AlcoveDoorSurround",
+      "triangles": 1484,
+      "vertices": 758,
+      "uv": true,
+      "manifold": true,
+      "dimensions": [
+        0.46,
+        3.58,
+        7.12
+      ],
+      "material": "AlcoveTrimTimber"
+    },
+    {
+      "part": "AlcoveHeaderCap",
+      "triangles": 164,
+      "vertices": 84,
+      "uv": true,
+      "manifold": true,
+      "dimensions": [
+        0.1042,
+        3.6,
+        0.135
+      ],
+      "material": "AlcoveTrimTimber"
+    },
+    {
+      "part": "AlcoveJambLining",
+      "triangles": 56,
+      "vertices": 32,
+      "uv": true,
+      "manifold": true,
+      "dimensions": [
+        0.34,
+        3.0,
+        6.8
+      ],
+      "material": "AlcoveTrimTimber"
+    },
+    {
+      "part": "AlcoveRailBracket",
+      "triangles": 256,
+      "vertices": 128,
+      "uv": true,
+      "manifold": true,
+      "dimensions": [
+        0.23,
+        2.97,
+        0.24
+      ],
+      "material": "AlcoveBracketBrass"
+    },
+    {
+      "part": "AlcoveBracketScrew",
+      "triangles": 224,
+      "vertices": 128,
+      "uv": true,
+      "manifold": true,
+      "dimensions": [
+        0.144,
+        2.946,
+        0.204
+      ],
+      "material": "AlcoveBracketBrass"
+    },
+    {
+      "part": "AlcoveSkirting",
+      "triangles": 148,
+      "vertices": 76,
+      "uv": true,
+      "manifold": true,
+      "dimensions": [
+        0.028,
+        1.0,
+        0.47
+      ],
+      "material": "AlcoveTrimTimber"
+    },
+    {
+      "part": "AlcoveCrown",
+      "triangles": 144,
+      "vertices": 74,
+      "uv": true,
+      "manifold": true,
+      "dimensions": [
+        0.0649,
+        1.0,
+        0.3
+      ],
+      "material": "AlcoveTrimTimber"
+    }
+  ],
+  "glbBytes": 174920,
+  "textures": 0
+}

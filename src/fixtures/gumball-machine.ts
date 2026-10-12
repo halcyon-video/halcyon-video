@@ -4,13 +4,15 @@ import type { FixtureContext, StoreFixture } from '../fixtures';
 import type { Footprint } from '../layout-validator';
 import { installDisplayModel } from './display-model';
 import { prepareRetailModel } from './retail-model';
+import { gumballDispenser } from './gumball-dispense';
 import { gumballLogo } from './gumball-logo';
 import { onBrandChange } from '../brand-live';
 import { getActiveTheme } from '../themes';
 import { GUMBALL_RADIUS, GUMBALL_HEIGHT, GUMBALL_SCALE } from './gumball-layout';
 
-/** Static set dressing. Detail uses the existing deferred, cancellable model loader. */
+/** Interactive spiral dispenser. Detail uses the existing deferred, cancellable model loader. */
 export class GumballMachine implements StoreFixture {
+  private dispenser: ReturnType<typeof gumballDispenser> | null = null;
   private group: THREE.Group | null = null;
   private removeModel: (() => void) | null = null;
   private logo: ReturnType<typeof gumballLogo> | null = null;
@@ -46,6 +48,7 @@ export class GumballMachine implements StoreFixture {
     const logo = this.logo = gumballLogo(clear, () => this.ctx.requestRender());
     logo.attach(fallback);
     this.ctx.scene.add(root);
+    const dispenser = this.dispenser = gumballDispenser(root, () => this.ctx.requestRender());
     // One stable collision proxy covers both public and installed models.
     const proxyGeo = new THREE.CylinderGeometry(GUMBALL_RADIUS,GUMBALL_RADIUS,GUMBALL_HEIGHT,24);
     const proxyMat = new THREE.MeshBasicMaterial({ visible:false }); this.owned.push(proxyGeo,proxyMat);
@@ -55,6 +58,7 @@ export class GumballMachine implements StoreFixture {
       ? ['models/gumball-machine.glb']
       : ['user-assets/fixtures/gumball-machine/machine.glb','models/gumball-machine.glb'];
     this.removeModel=installDisplayModel(this.ctx,root,fallback,sources,{ Enamel:enamel, ClearPlastic:clear },new THREE.Vector3().setScalar(GUMBALL_SCALE), model => {
+      dispenser.attach(model);
       prepareRetailModel(model);
       logo.attach(model);
     });
@@ -68,6 +72,7 @@ export class GumballMachine implements StoreFixture {
   }
   update(): void {}
   dispose(): void {
+    this.dispenser?.dispose(); this.dispenser = null;
     this.unsubscribeBrand?.(); this.unsubscribeBrand=null;
     this.logo?.dispose(); this.logo=null;
     this.removeModel?.(); this.removeModel=null;

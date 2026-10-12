@@ -37,7 +37,7 @@
 // watchdog race, asset-viewer.ts's).
 import type { LogoSpec } from './logo-spec';
 import type { StoreTheme } from './themes';
-import { assetUrl } from './asset-url';
+import { assetUrl, HOSTED_BUILD } from './asset-url';
 import { registerRuntimeFace } from './bundled-fonts';
 import { BRAND_DROP_DIR, detectBrandDrop } from './brand-drop';
 import { setBrandStringResolver } from './counter-terminal';
@@ -368,6 +368,9 @@ function adopt(manifest: BrandPackManifest, dir: string, from: BrandPackSource):
  * is set. Never rejects — a store with no drop folder pays one 404.
  */
 function loadBrandDrop(): Promise<BrandPackManifest | null> {
+  // The hosted build ships no user-assets tree; probing it cost ~85 serial and
+  // parallel 404s (about 2.8 s) on a throttled phone's critical path.
+  if (HOSTED_BUILD) { status = 'none'; return Promise.resolve(null); }
   status = 'loading';
   return detectBrandDrop((p) => assetUrl(`user-assets/${p}`))
     .then((found) => {

@@ -21,7 +21,7 @@ import { BROWSE_WINDOW_SIZE, AISLE_SHELF_HEIGHTS, SECTION_COLS, UNIT_SIDE_CAPACI
 import { OVERVIEW_POS } from './scene-shared';
 import { openSubNav, closeSubNav, forgetSubNav, subNavSelect } from './store-subnav';
 import { aimOverviewAt } from './store-camera';
-import { isEndcapKind } from './fixtures/genre-endcap';
+import { isEndcapKind } from './fixtures/endcap-shelf';
 import { slottedFixtureLabel, qualifyDuplicateLabels } from './fixture-labels';
 import type { StoreScene } from './three-scene';
 import { counterFrame } from './counter-anchors';
@@ -31,7 +31,7 @@ export function buildOverviewCursorTargets(scene: StoreScene): OverviewCursorTar
   const targets: OverviewCursorTarget[] = [];
   const CURSOR_Y = 6.9; // just above the end caps / section signboards
   for (let libIdx = 0; libIdx < scene.libraries.length; libIdx++) {
-    const units = scene.shelvingUnits.filter(u => u.libraryIdx === libIdx);
+    const units = scene.plan.unitsForLibrary(libIdx);
     if (units.length === 0) continue;
     const layout = scene.plan.layoutFor(libIdx);
     const genreTargets = layout.categorized ? scene.genreCursorTargets(libIdx, units, CURSOR_Y) : [];

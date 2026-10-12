@@ -5,6 +5,45 @@ artifact and local rollback rehearsal, not a deployed Cloudflare site. The
 existing 3D GitHub Pages workflow and links are unchanged. No domain, hosting
 project, credential, paid plan, scheduled refresh or master release was created.
 
+## Cloud preview: straight to the 3D store (activated 2026-10-11)
+
+The owner chose a free Cloudflare Pages preview address before any domain
+decision (2026-10-11), created the Cloudflare account and added
+`CLOUDFLARE_API_TOKEN` (Pages Edit) and `CLOUDFLARE_ACCOUNT_ID` as secrets of
+the `showcase-production` GitHub environment. `policy.json` records
+`cloudPreviewEnabled: true`, the `halcyon-showcase` Pages project, and
+`previewProtection: public-noindex`. The account ID itself stays in the
+environment (`environment-secret`).
+
+The same day, after seeing the flat catalog live, the owner ruled that nobody
+should ever see it: visitors go directly to the 3D store. So the preview
+address publishes no catalog at all. `deployment:cloud-preview-gate` refuses
+unless the policy allows `cloud-preview` for the exact commit, then writes the
+store entry from `src/deployment/store-entry.ts` into an empty directory:
+
+- `_redirects`: `/*` to `HOSTED_STORE_URL` (from `src/catalog-handoff.ts`)
+  with a temporary 302, so every path lands in the hosted 3D store;
+- `_headers`: `X-Robots-Tag: noindex, nofollow` on every response;
+- `index.html`: a noindex refresh and link to the same store, used only if
+  the edge ever serves a file instead of the redirect.
+
+`.github/workflows/showcase-preview.yml` runs only for devbjackson's pushes to
+`dev` in this repository. It checks that the gate wrote exactly those three
+files, then the pinned Wrangler from `deployment/wrangler/package-lock.json`
+uploads that directory with `--branch dev`, which Cloudflare treats as a
+preview deployment. The same step then deletes every other preview deployment
+in the project through the Pages API, so no earlier upload (including the
+first flat-catalog upload) stays reachable on its per-deployment address. The
+project's production branch is `master`, and no step deploys to it. Secrets
+appear only in the upload step. The job summary records the deployment ID, the
+preview address and how many superseded uploads were deleted.
+
+The flat catalog code, its fixture bundle and `showcase-artifacts.yml` are
+unchanged and still verified in CI; they are simply not published.
+
+Still closed: production, the canonical host, real catalog data (#354) and the
+daily refresh. `networkPublishingEnabled` stays false.
+
 ## Current decisions and boundaries
 
 `deployment/policy.json` records the unresolved canonical host, Cloudflare

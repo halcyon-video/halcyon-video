@@ -1,0 +1,26 @@
+{
+  "packaging-bluray-keepcase-stock": {
+    "bytes": 33160,
+    "triangles": 342,
+    "parts": 13,
+    "closedSolids": 10,
+    "dimensionsFeet": [
+      0.445,
+      0.6227,
+      0.036
+    ],
+    "textures": 0
+  },
+  "packaging-bluray-keepcase-hero": {
+    "bytes": 107624,
+    "triangles": 1430,
+    "parts": 29,
+    "closedSolids": 26,
+    "dimensionsFeet": [
+      0.445,
+      0.6227,
+      0.036
+    ],
+    "textures": 0
+  }
+}

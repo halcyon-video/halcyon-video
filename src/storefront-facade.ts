@@ -1,7 +1,9 @@
 import { copingGeometry } from './joinery-model';
 import { buildWallCourtesyTelephone } from './fixtures/wall-courtesy-telephone';
+import { buildStaffLadder, STAFF_LADDER } from './fixtures/staff-ladder';
 import { installDisplayModel } from './fixtures/display-model';
 import { buildRooftopHVAC } from './rooftop-hvac';
+import { buildGutterDownspout } from './gutter-downspout';
 import { selfLit } from './material-lighting';
 import { BB_ARCHIVO_BLACK } from './bundled-fonts';
 // Exterior envelope shared by the architectural styles. Window openings,
@@ -409,6 +411,10 @@ export function buildStorefrontFacade(params: FacadeBuildParams): StorefrontFaca
     // Independent static wall prop; door/frame and exit/navigation stay unchanged.
     buildWallCourtesyTelephone(params.context, group, rightEdgeX, rightSideDoorZone(sideRibbon)!.z0);
 
+    // Staff ladder leaning on the brick beside the stoop, behind the door
+    // exclusion zone (stoop spans doorZ +/- 2.2; ladder is 1.44 wide).
+    buildStaffLadder(params.context, group, rightEdgeX + .63, doorZ - 2.2 - .5 - STAFF_LADDER.width / 2);
+
     // EXIT sign above the door, built to real US exit-sign proportions: a
     // 15.5in x 8.75in face (aspect ~1.78) carrying RED "EXIT" at the NFPA 101 /
     // IBC minimum 6in cap height — i.e. letters filling ~69% of the face height
@@ -477,6 +483,16 @@ export function buildStorefrontFacade(params: FacadeBuildParams): StorefrontFaca
   const rooftop = buildRooftopHVAC(params.context, storeWidth, backWallZ, ceilingY);
   group.add(rooftop);
   group.addEventListener('removed', () => rooftop.userData.dispose?.());
+
+  // Proposed roof drainage on the plain rear wall, near its left corner (no
+  // glazing, door or tile band there): veneer face 0.625 ft and fascia face
+  // 0.75 ft outside the back wall plane.
+  const downspout = buildGutterDownspout(params.context, {
+    x: leftEdgeX + 2, z: backWallZ - .625, yaw: Math.PI / 2, step: .125,
+    roofY: ceilingY + .85, stepY: fasciaBot,
+  });
+  group.add(downspout);
+  group.addEventListener('removed', () => downspout.userData.dispose?.());
 
   // The brand cabinet sits over the entry, below the peak. Separate gable
   // and fascia bounds also keep optional freestanding letters inside the wall.

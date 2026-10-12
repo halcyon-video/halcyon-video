@@ -4,6 +4,7 @@ import { join, resolve } from 'node:path';
 import { buildCatalogArtifacts } from '../artifacts.ts';
 import { validatePromotion } from '../promotion.ts';
 import { snapshotSchema, type Snapshot } from '../schema.ts';
+import { requireLiveApproval } from './decision.ts';
 
 const hash = (bytes: string) => createHash('sha256').update(bytes).digest('hex');
 const encode = (value: unknown) => `${JSON.stringify(value)}\n`;
@@ -58,12 +59,14 @@ async function switchPointer(directory: string, pointer: Pointer) {
  * rename is the sole publication point. Existing immutable paths are verified,
  * never overwritten. A failed attempt cannot edit the previous pointer/data.
  */
-export async function publishSnapshot(directory: string, candidate: unknown, options: { now?: number; beforePromotion?: () => Promise<void> } = {}) {
+export async function publishSnapshot(directory: string, candidate: unknown, options: { now?: number; decision?: unknown; beforePromotion?: () => Promise<void> } = {}) {
   directory = resolve(directory);
   return exclusive(directory, async () => {
     const previous = await readCurrent(directory);
-    const snapshot = validatePromotion(candidate, previous?.snapshot, options.now ?? Date.now());
-    if (snapshot.source !== 'fixture') throw new Error('Live source publication requires project-specific permission');
+    const now = options.now ?? Date.now();
+    const snapshot = validatePromotion(candidate, previous?.snapshot, now);
+    // Only a committed owner approval (decision.ts) admits live data.
+    if (snapshot.source !== 'fixture') requireLiveApproval(options.decision, now);
     // No provider-host evidence registry is approved yet. Only the supplied
     // source watch page can leave this publisher, even if an input claims proof.
     if (snapshot.titles.some(title => title.offers.some(offer => offer.link.kind !== 'tmdb-watch-page'))) throw new Error('Provider deep-link authorization is not configured');

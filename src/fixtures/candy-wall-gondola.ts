@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { installCandyGondolaPouches } from './candy-pouch';
+import { installCandyGondolaPouches, installCandyGondolaSlatwallWing, SLATWALL_WING, slatwallWingFootprint } from './candy-pouch';
 import { retailPackaging } from './retail-packaging';
 import type { FixtureContext, StoreFixture } from '../fixtures';
 import type { FixturePlacement } from '../store-layout';
@@ -17,7 +17,8 @@ export class CandyWallGondola implements StoreFixture {
   private owned: Array<{ dispose(): void }> = [];
   private removeModel: (() => void) | null = null;
   private removePouches: (() => void) | null = null;
-  private collider: THREE.Mesh | null = null;
+  private removeWing: (() => void) | null = null;
+  private colliders: THREE.Mesh[] = [];
 
   constructor(public placement: FixturePlacement, private ctx: FixtureContext) {}
 
@@ -32,6 +33,7 @@ export class CandyWallGondola implements StoreFixture {
     const uprightMat = own(new THREE.MeshStandardMaterial({ color: '#dfdedb', roughness: 0.4 }));
     const shelfMat = own(new THREE.MeshStandardMaterial({ color: '#edece8', roughness: 0.3 }));
     const plinthMat = own(new THREE.MeshStandardMaterial({ color: '#1a1a1c', roughness: 0.7 }));
+    const wingBoard = own(new THREE.MeshStandardMaterial({ color: '#d8c7a2', roughness: 0.62 }));
 
     const fallback = new THREE.Group();
     group.add(fallback);
@@ -59,16 +61,27 @@ export class CandyWallGondola implements StoreFixture {
 
     const envelope = RETAIL_FIXTURE_SPECS['candy-wall-gondola'];
     // Collision proxy box (4.0 x 5.0 x 1.6 ft)
-    const proxy = this.collider = new THREE.Mesh(
+    const proxy = new THREE.Mesh(
       own(new THREE.BoxGeometry(envelope.w, envelope.h, envelope.d)),
       own(new THREE.MeshBasicMaterial({ visible: false })),
     );
     proxy.name = `${this.placement.id}-collision`;
     proxy.position.y = envelope.h / 2;
     group.add(proxy);
+    this.colliders.push(proxy);
+    const wing = this.hasSlatwallWing();
+    if (wing) {
+      // The hooks and bags reach past the shelving envelope into the aisle end.
+      const reach = SLATWALL_WING.board + SLATWALL_WING.reach;
+      const wingProxy = new THREE.Mesh(own(new THREE.BoxGeometry(reach, envelope.h, 2 * SLATWALL_WING.halfDepth)), proxy.material);
+      wingProxy.name = `${this.placement.id}-slatwall-collision`;
+      wingProxy.position.set(SLATWALL_WING.endX + reach / 2, envelope.h / 2, 0);
+      group.add(wingProxy);
+      this.colliders.push(wingProxy);
+    }
 
     this.ctx.scene.add(group);
-    this.ctx.addCollider(proxy);
+    this.colliders.forEach(c => this.ctx.addCollider(c));
     const finishes = retailPackaging(own, () => { if (this.group === group) this.ctx.requestRender(); });
     let prepared: THREE.Group | null = null;
     let pouchFallback: THREE.Group | null = null;
@@ -78,6 +91,9 @@ export class CandyWallGondola implements StoreFixture {
       const host = prepared;
       this.removePouches = installCandyGondolaPouches(this.ctx, group, pouchFallback,
         finishes, pouchSteel, () => host.parent === group && host.visible && this.group === group);
+      if (wing) this.removeWing = installCandyGondolaSlatwallWing(this.ctx, group, finishes, pouchSteel,
+        { SlatwallBoard: wingBoard, SlatwallKickBase: plinthMat },
+        () => host.parent === group && host.visible && this.group === group);
     };
     const prepare = (model: THREE.Group) => {
       prepared = model;
@@ -121,7 +137,12 @@ export class CandyWallGondola implements StoreFixture {
 
   getFootprint(): Footprint | null {
     if (!this.group) return null;
-    return retailFixtureFootprint('candy-wall-gondola', this.placement);
+    const footprint = retailFixtureFootprint('candy-wall-gondola', this.placement);
+    return this.hasSlatwallWing() ? slatwallWingFootprint(footprint) : footprint;
+  }
+
+  private hasSlatwallWing(): boolean {
+    return this.placement.options?.slatwallWing === true;
   }
 
   update(): void {}
@@ -129,10 +150,12 @@ export class CandyWallGondola implements StoreFixture {
   dispose(): void {
     this.removePouches?.();
     this.removePouches = null;
+    this.removeWing?.();
+    this.removeWing = null;
     this.removeModel?.();
     this.removeModel = null;
-    if (this.collider) this.collider.raycast = () => {};
-    this.collider = null;
+    this.colliders.forEach(c => { c.raycast = () => {}; });
+    this.colliders = [];
     this.group?.removeFromParent();
     this.group = null;
     this.owned.forEach((o) => o.dispose());

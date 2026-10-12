@@ -235,6 +235,18 @@ class RetailAudio {
     source.stop(start + duration);
   }
 
+  public gumballDispense(): void {
+    const ctx = this.start('gumball', 6.6);
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    // Coin detent, gear teeth, then diminishing contacts in the spiral trough.
+    this.contact(ctx, now, .06, 2300, .18, 1.5);
+    for (let i = 0; i < 7; i++) this.contact(ctx, now + .10 + i * .075, .035, 1400, .055, 1.3);
+    for (let i = 0; i < 24; i++) this.contact(ctx, now + .7 + i * .208, .09, 700 + i * 21, .045, .8, Math.sin(i) * .25);
+    this.contact(ctx, now + 5.7, .12, 1800, .14, 1.1);
+    this.contact(ctx, now + 6.25, .07, 900, .08, .9);
+  }
+
   // A register's piezo confirmation: fixed pitch and short, softened edges.
   // The second harmonic gives it a small speaker's edge without a full square
   // wave's harsh upper harmonics. No success melody or game-style pitch bend.

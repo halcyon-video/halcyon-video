@@ -30,7 +30,7 @@ export function gumballLogo(clear: THREE.Material, render: () => void) {
     // Reset the backing store too: a previously tainted image must not poison
     // a later local brand. This runs only on brand/font events.
     source.width = 768;
-    const src = source.getContext('2d')!;
+    const src = source.getContext('2d', { willReadFrequently: true })!;
     drawLogo(src, getActiveLogoSpec(getActiveTheme()), { x: 0, y: 0, w: source.width, h: source.height });
     // Canonical marks have different silhouettes, tilts, taglines and padding.
     // Contain their complete ink bounds without stretching or changing the spec.

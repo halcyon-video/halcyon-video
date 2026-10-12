@@ -13,7 +13,7 @@ import { Movie, Episode } from './jellyfin';
 import { requestHeroFrontDetail } from './hero-front-detail';
 import { createInspectionMesh, setInspectionGeometry } from './inspection-mesh';
 import { posterQueue, CASE_MEDIUM, CASE_WIDTH, CASE_HEIGHT, leftmostColorCache, posterPixelCache, getCaseGeometry, getRentalCaseGeometry, createHeroJellyfinMaterials, createHeroRentalMaterials, applyGameCaseArt, backCoverRegions, getSeriesBoxsetGeometry, createHeroSeriesBoxsetMaterials, drawSeriesBrandPanel, drawSeriesEpisodeBackCover, drawSeriesSeasonPanel, gameCaseDims, gameRentalDims } from './video-case';
-import { isWhiteClamshell } from './packaging-formats';
+import { isWhiteClamshell, isBluRayCase, BLURAY_KEEPCASE_DIMS } from './packaging-formats';
 import { detailedCaseGeometry } from './packaging-model';
 import { syncJewelDressing } from './jewel-case';
 import { AISLE_SHELF_HEIGHTS, WALL_SHELF_HEIGHTS, BACK_WALL_UNIT_IDX, MovieSlot } from './store-layout';
@@ -618,7 +618,8 @@ export function ensureHeroCases(scene: StoreScene, movie: Movie, nrCase = false)
   // real carton, the shell behind it is the media-class rental case. Using
   // one set of dims for both is what squashed the clamshell to each game's
   // aspect, so the rental copy appeared to change size per title.
-  const gameDims = movie.game ? gameCaseDims(movie.platform, movie.discCount) : undefined;
+  const gameDims = movie.game ? gameCaseDims(movie.platform, movie.discCount)
+    : isBluRayCase(movie, CASE_MEDIUM) ? BLURAY_KEEPCASE_DIMS : undefined;
   const shellDims = movie.game ? gameRentalDims(movie.platform) : undefined;
   // Same probe the shelf path resolves off the browsed library (store-stock's
   // updateLOD) — the hero/inspect case sits closer to the camera than any

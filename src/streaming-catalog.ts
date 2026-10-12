@@ -227,6 +227,19 @@ export function buildStreamingUrl(def: StreamingServiceDef, title: string, tmdbI
   return def.urlTemplate ? def.urlTemplate(title, tmdbId) : tmdbWatchFallbackUrl(tmdbId);
 }
 
+/** What a checkout link actually opens, so the handoff never over-promises:
+ *  an exact title page, the service's own search, or TMDB's watch options. */
+export type StreamingDestinationKind = 'title' | 'search' | 'watch-options';
+
+export function streamingDestinationKind(url: string): StreamingDestinationKind {
+  try {
+    const u = new URL(url);
+    if (/(^|\.)themoviedb\.org$/.test(u.hostname)) return 'watch-options';
+    if (/\/search\/?$/.test(u.pathname) || u.searchParams.has('q')) return 'search';
+  } catch { return 'watch-options'; }
+  return 'title';
+}
+
 /** Repair legacy search links from persisted catalogs at checkout.
  * Verified Moana entity: https://www.disneyplus.com/browse/entity-e8896bfa-1052-41f7-ae2e-00255d77cf05
  * Other Disney titles use watch availability until a real provider deep link is supplied.

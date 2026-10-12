@@ -58,3 +58,16 @@ Logo verification additionally covers frontal and oblique views of both model
 paths, the built-in fallback, live text/color/emblem changes, installed image
 artwork, and teardown during asynchronous detail/font preparation. Public
 photographs must still be captured with user assets absent.
+
+The dispenser is interactive in walk mode. Mouse, touch, the keyboard reticle and
+VR share the fixture hit resolver. A click turns the named handle, rolls one ball
+down the spiral, opens the delivery flap and leaves the ball at the outlet, with
+coin, gear, rolling and landing contacts on the shared effects bus. Repeated
+clicks during dispensing do not add another ball or restart the cycle. The bounded
+animation releases its frame callback and GPU objects when the fixture is disposed.
+
+The public export retains separate `Turn handle` and `Delivery flap` parts.
+`Clear chute sleeve` carries its low/high/radius/turn-count metadata so installed
+models follow their own raceway. Static material batches leave animated parts
+independent. Both the five-turn public asset and seven-turn installed asset were
+exercised through a real click, with live audio, delivery and teardown evidence.

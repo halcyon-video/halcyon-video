@@ -1,7 +1,7 @@
 import { vestibuleLayout } from '../src/vestibule-layout.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { exitReturnLayout, exitReturnSegments } from '../src/exit-return-layout.ts';
+import { exitReturnLayout, exitReturnSegments, RETURN_WINDOW_CLEARANCE } from '../src/exit-return-layout.ts';
 import { validateLayout } from '../src/layout-validator.ts';
 
 test('exit counter fits small and large chain rooms, preserving side-wall clearance',()=>{
@@ -97,13 +97,13 @@ test('returned tape stacks sit cleanly on worktops and clear counter walls', () 
   }
 });
 
-test('white window worktop reaches the glass at every supported room width',()=>{
+test('white window worktop clears the glass at every supported room width',()=>{
   for(const width of [40,48,64,80]) {
     const f=exitReturnLayout(width,{xL:3.3,frontZ:15,sideDoorZ:10,doorW:3.2,hasChamber:true})!;
     const parts=exitReturnSegments(f);
     assert.ok(!parts.some(p=>p.label.endsWith('back')||p.label.endsWith('vestibule-stub')));
     const worktop=parts.find(p=>p.label.endsWith('window-worktop'))!;
     const rear=worktop.cz+Math.abs(Math.cos(worktop.yaw))*worktop.d/2+Math.abs(Math.sin(worktop.yaw))*worktop.w/2;
-    assert.ok(Math.abs(rear-15)<1e-9,'scaled counter must butt against fixed glazing');
+    assert.ok(Math.abs(rear-(15-RETURN_WINDOW_CLEARANCE))<1e-9,'scaled counter must preserve its window clearance');
   }
 });

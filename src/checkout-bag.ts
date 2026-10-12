@@ -1058,6 +1058,11 @@ export class CheckoutBag {
         const k = cm[ci];
         const a3 = conA[k] * 3;
         const b3 = conB[k] * 3;
+        // A standing weld cannot share an edge translation with a free node:
+        // midpoint contacts otherwise fight its counter pin on every step.
+        // Keep the original contact coverage while lifting or repinning.
+        if (!this.lifting && !this.repinning &&
+            (this.rest[a3 + 1] < 0.03 || this.rest[b3 + 1] < 0.03)) continue;
         const wx = (pos[a3] + pos[b3]) * 0.5 - px;
         const wy = (pos[a3 + 1] + pos[b3 + 1]) * 0.5 - py;
         const wz = (pos[a3 + 2] + pos[b3 + 2]) * 0.5 - pz;

@@ -1,7 +1,9 @@
 # Customer visits and parking
 
 Regulars choose actual stocked shelf sections, reserve their destination and keep
-2.6 feet between floor positions. Temporary occupied cells use the shared clerk
+2.6 feet between bodies on the floor. Reserved browsing positions sit at least
+four feet apart, so neighbouring sections never hold a shoulder-to-shoulder
+pair; the counter and door keep their own turn-taking. Temporary occupied cells use the shared clerk
 A* grid; segment checks visit every crossed grid cell, including corner crossings.
 A remaining route reserves its corridor until it is traversed, so crossing or
 opposing paths wait their turn. Counter turns and the entrance have explicit
@@ -12,18 +14,22 @@ not browsing destinations; displayed streaming titles remain available.
 
 Preferences are explicit identity data in `customer-preferences.ts`. Customer 08
 (windbreaker) favors games, customer 07 (rose cardigan) favors suspense/thrillers,
-and customer 04 (plaid shirt) favors action. The other seven have neutral authored
-profiles. Every regular's choice is configurable in Store Look. Favored sections
-have weight six, secondary choices weight three, and other available departments
-weight one. Department weights are divided across their available positions so
+and customer 04 (plaid shirt) favors action. The other seven have individually
+authored primary and secondary tastes, covering comedy, drama, romance, horror,
+science fiction, documentary and animation. Favored sections
+have weight twelve, secondary choices weight four, and other available departments
+weight one. An unlabeled all-genre section earns only the matching share of its
+departments, so a mixed shelf holding one comedy is not every comedy fan's
+favorite. Department weights are divided across their available positions so
 a longer aisle does not overwhelm a smaller department. Missing, unreachable or
 occupied choices leave alternatives available. Nothing derives preferences from
 age or gender.
 
-An optional `bb_customer_preferences` JSON record supports multiple favored and
-secondary departments per identity; e.g. `{"customer-08":{"favored":["games"],
-"secondary":["action"]}}`. The per-regular Store Look selector overrides that
-record; Regular's Choice uses it. Malformed records retain the authored defaults.
+Profiles are maintained in the identity data rather than visitor settings.
+Legacy customer preference and population settings are ignored. Population
+targets follow the store's time of day: morning two, afternoon four, sunset
+eight and night five. All ten identities rotate through the roster. Missing
+artwork, stock, reachable stops or parking can reduce actual admission.
 
 Admission requires both a reachable browsing position and an eligible parking
 space. The same visit owns the position and car throughout browsing and checkout.
@@ -32,7 +38,7 @@ after a staggered absence, with a fresh capacity check. The clerk grid excludes
 the vestibule: the approach is the visit boundary; exterior driving or walking
 animation is not implemented. The opening population is already browsing.
 Inactivity/back-room sleep pauses visits and keeps their parked cars. Switching
-customer settings or rebuilding the scene releases the old ownership/resources.
+time of day or rebuilding the scene releases the old ownership/resources.
 
 The only admitted asset in this inventory is the existing original generic
 1987-era hatchback documented in [its model notes](car-hatchback-model.md).
@@ -52,13 +58,15 @@ remain unresolved. No additional unclear preference category is encoded.
 ## Verification
 
 `npm run check` builds production and runs the complete test suite. Focused
-`tests/customer-lifecycle.test.ts` covers preferences/overrides, department size
+`tests/customer-lifecycle.test.ts` covers authored preferences, department size
 bias, unavailable/crowded destinations, admission/capacity, reserved/access bays,
 model-year/dimension rejection, separation, repeated checkout/departure/arrival,
 ownership cleanup, exact corner traversal and six admission orders on a captured
 public production floor. Browser verification runs the
 actual production scene with ten regulars, plus low/medium/high quality, the
-small-store format, a missing vehicle asset, empty stock and Customers Off.
+small-store format, a missing vehicle asset, empty stock and the former Customers
+Off setting. Those captures predate automatic time-of-day populations; they are
+historical lifecycle evidence rather than proof that an Off control still exists.
 
 Findable photographs and a short deterministic movement capture are linked below.
 The video advances the real simulation by 0.1 seconds per captured frame; its

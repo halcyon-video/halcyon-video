@@ -29,6 +29,7 @@ import { FixtureContext, StoreFixture } from '../fixtures';
 import { FixturePlacement, FLOOR_FIXTURE_MAX_Z, mapWallSegmentUV } from '../store-layout';
 import { Footprint, FLOOR_DISPLAY_CLEARANCE } from '../layout-validator';
 import { themeTrimDarkHex, scaleHex } from '../themes';
+import { installDisplayModel } from './display-model';
 
 /** Clad width/depth of the column, feet. */
 const SIDE = 2.0;
@@ -37,6 +38,8 @@ const PLINTH_H = 0.55;
 const CAP_H = 0.45;
 /** How far the plinth and cap stand proud of the mirror face, feet. */
 const REVEAL = 0.06;
+/** Panel height the GLB (tools/models/mirror-column.py) is authored at: 13.5 ft ceiling. */
+const MODEL_PANEL_H = 12.5;
 /** Gap left at each end of a mirror panel so the panel edge is not pinched. */
 const PANEL_INSET = 0.02;
 
@@ -45,6 +48,7 @@ export class MirrorColumn implements StoreFixture {
 
   private ctx: FixtureContext;
   private group: THREE.Group | null = null;
+  private releaseModel: (() => void) | null = null;
   private disposables: Array<{ dispose(): void }> = [];
 
   constructor(placement: FixturePlacement, ctx: FixtureContext) {
@@ -90,6 +94,10 @@ export class MirrorColumn implements StoreFixture {
     });
     this.disposables.push(trimMat, coreMat);
 
+    // Primitive stack: the loading fallback and the registered collision shape.
+    // Hidden once the modelled frame (base, posts, rails, cap) arrives.
+    const fallback = new THREE.Group();
+    group.add(fallback);
     const box = (w: number, h: number, d: number, y: number, mat: THREE.Material) => {
       const geo = mat === trimMat ? finishedPanelGeometry(w, h, d) : new THREE.BoxGeometry(w, h, d);
       this.disposables.push(geo);
@@ -97,7 +105,7 @@ export class MirrorColumn implements StoreFixture {
       mesh.position.set(0, y + h / 2, 0);
       mesh.castShadow = true;
       mesh.receiveShadow = true;
-      group.add(mesh);
+      fallback.add(mesh);
       return mesh;
     };
 
@@ -147,6 +155,18 @@ export class MirrorColumn implements StoreFixture {
     this.ctx.scene.add(group);
     this.ctx.addCollider(group);
     this.group = group;
+
+    // The GLB parts are authored for a 13.5 ft ceiling with their origins at their own
+    // bottoms: the cap rides up to this store's ceiling and the posts and core stretch
+    // between plinth and cap (straight prisms, so the stretch is lossless).
+    this.releaseModel = installDisplayModel(this.ctx, group, fallback, 'models/mirror-column.glb', {
+      ColumnTrim: trimMat, ColumnCore: coreMat, ColumnCorner: coreMat,
+    }, undefined, (model) => {
+      model.traverse((o) => {
+        if (o.name === 'Column cap') o.position.y = ceilingY - CAP_H;
+        else if (o.name === 'Column core' || o.name === 'Column corner posts') o.scale.y = panelH / MODEL_PANEL_H;
+      });
+    });
   }
 
   getFootprint(): Footprint | null {
@@ -171,6 +191,8 @@ export class MirrorColumn implements StoreFixture {
   }
 
   dispose(): void {
+    this.releaseModel?.();
+    this.releaseModel = null;
     if (this.group) {
       this.ctx.scene.remove(this.group);
       this.group = null;

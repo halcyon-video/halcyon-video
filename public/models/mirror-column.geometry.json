@@ -1,0 +1,23 @@
+{
+  "bytes": 36200,
+  "triangles": 468,
+  "drawCalls": 6,
+  "nodes": [
+    "Column base",
+    "Column cap",
+    "Column core",
+    "Column corner posts"
+  ],
+  "materials": [
+    "ColumnTrim",
+    "ColumnCorner",
+    "ColumnCore"
+  ],
+  "images": 0,
+  "sideFeet": 2.0,
+  "baseHeightFeet": 0.55,
+  "capHeightFeet": 0.45,
+  "nominalPanelHeightFeet": 12.5,
+  "maxOuterWidthFeet": 2.12,
+  "allPrimitivesHaveUV": true
+}

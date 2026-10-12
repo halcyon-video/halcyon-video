@@ -108,7 +108,7 @@ def endcap(taper=True):
         # Triangular stamped bracket seats underneath each deck and into panel.
         for x in [-w*.32,w*.32]:
             extrude(f'Shelf {row+1} bracket {x:+.2f}',[(underside(y,.32,-.2,.055),.055),(y-.30,.055),(underside(y,.32,-.2,.50),.50)],.038,'DisplayHardware',.006,x)
-    export('genre-endcap-'+('tapered' if taper else 'straight'))
+    export('endcap-shelf-'+('tapered' if taper else 'straight'))
 
 def tub():
     reset()

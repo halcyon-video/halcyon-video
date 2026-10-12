@@ -1,5 +1,5 @@
 {
-  "genre-endcap-tapered": {
+  "endcap-shelf-tapered": {
     "triangles": 4344,
     "vertices": 2196,
     "material_roles": [
@@ -24,7 +24,7 @@
       ]
     ]
   },
-  "genre-endcap-straight": {
+  "endcap-shelf-straight": {
     "triangles": 4344,
     "vertices": 2196,
     "material_roles": [

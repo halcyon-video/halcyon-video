@@ -2,7 +2,7 @@
 // available during loading and on failure. Optional local equipment wins.
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { assetUrl } from '../asset-url';
+import { assetUrl, dropInCandidates } from '../asset-url';
 import { counterMount, placeOnCounterMount } from '../entrance/counter-mounts';
 import { brandPackDir } from '../brand-pack';
 import { finishTelephone, refreshTelephoneContact } from './telephone-surfaces';
@@ -14,10 +14,10 @@ export function installCounterTelephone(
 ): void {
   const rel = 'fixtures/late-era-fixtures-2012/telephone/model.glb';
   const pack = brandPackDir();
-  const candidates = [
+  const candidates = dropInCandidates([
     ...(pack ? [`user-assets/${pack}/${rel}`] : []),
     `user-assets/${rel}`, 'models/counter-telephone.glb',
-  ];
+  ]);
   const attached = () => {
     let root: THREE.Object3D = parent;
     while (root.parent) root = root.parent;

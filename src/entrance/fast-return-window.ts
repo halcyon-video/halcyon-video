@@ -1,3 +1,5 @@
+import { FRAME_REVEAL_CENTER } from '../frame-reveal';
+import { RETURN_WINDOW_CLEARANCE } from '../exit-return-layout';
 import quickDrop from '../exit-return-spec.json' with { type: 'json' };
 import { markSignMesh } from '../sign-builders';
 import * as THREE from 'three';
@@ -6,11 +8,11 @@ import { BB_ARCHIVO_BLACK, ensureBundledFont } from '../bundled-fonts';
 import { onBrandChange } from '../brand-live';
 import { getActiveTheme } from '../themes';
 
-/** Window vinyl over the receiving well; the glazing stays uninterrupted. */
+/** Window vinyl above the pane insert and its open receiving throat. */
 export function addFastReturnWindow(ctx: FixtureContext, root: THREE.Group, scale: number) {
   const group = new THREE.Group(); group.name = 'fast-return-window';
   // Keep the outward vinyl just clear of the glazing to avoid z-fighting.
-  group.position.set(quickDrop.receiverX*scale,0,quickDrop.glassOffset + quickDrop.faceClearance - .025); root.add(group);
+  group.position.set(quickDrop.receiverX*scale,0,quickDrop.glassOffset + RETURN_WINDOW_CLEARANCE + FRAME_REVEAL_CENTER + quickDrop.faceClearance - .025); root.add(group);
   const geometries: THREE.BufferGeometry[]=[];
   const canvas=document.createElement('canvas');canvas.width=1024;canvas.height=200;
   const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;

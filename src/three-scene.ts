@@ -2,7 +2,7 @@ import { setChangedShelfMatrix } from './shelf-instance-matrix';
 import { releaseUploadRenderer } from './poster-textures';
 import { reelModeEnabled, reelSetting } from './reel-profile';
 import { updateReelFlight, reelFlightKey, reelFlightMouse } from './store-reel-flight';
-import { loadMobileRoomLighting, updateMobileRoomLighting } from './mobile-room-lighting';
+import { BAKED_ROOM_CUBE_SIZE, loadMobileRoomLighting, mobileRoomLightingExpected, updateMobileRoomLighting } from './mobile-room-lighting';
 import { refreshStockedReflections, reflectionRefreshRunning } from './stocked-reflection-refresh';
 import { streamingInspectPose } from './streaming-case-pose';
 import { isExternalGameActive } from './external-game-state.ts';
@@ -18,7 +18,7 @@ import { planNrRuns, nrSlotTransform, type NrRun } from './nr-run-layout';
 import { disposeSceneMeshes } from './scene-mesh-disposal';
 import { installStoreSurfaceFinishes } from './store-surface-finish';
 import { fitSteppedCornerDepth } from './stepped-corner-clearance';
-import { placementBudget } from './progressive-placement';
+import { placementBudget, prioritizeInitialPlacements } from './progressive-placement';
 import { tickShelfVisibility, disposeShelfVisibility } from './shelf-visibility';
 import { mobileWalkInput } from './mobile-walk';
 import { mobileStoreActive, mobileStoreTap } from './mobile-store';
@@ -62,6 +62,7 @@ import { MirrorCubemapLifecycle, stockPlacementSettled } from './mirror-cubemap-
 import { BeautyPass, PartialComposite } from './partial-composite';
 import { FixtureContext, SlottedFixture, StoreFixture } from './fixtures';
 import { disposeRooftopHVAC } from './rooftop-hvac';
+import { disposeGutterDownspout } from './gutter-downspout';
 import { setWindowAwningLighting, disposeWindowAwnings } from './storefront-awning';
 import { setFacadeEntryLighting, disposeFacadeEntry } from './storefront-entry-model';
 import { OverviewCursors, OverviewCursorTarget } from './overview-cursors';
@@ -87,7 +88,7 @@ import {
   StoreShellSpec,
   getStoreShellSpec,
   StorefrontSpec,
-  FixturePlacement, newReleasesWallSpan, wallAllowsFeatureSections,
+  newReleasesWallSpan, wallAllowsFeatureSections,
 } from './store-layout';
 import { activeMediaCutoff } from './media-release-date';
 import { titleMatchKeys } from './staff-picks';
@@ -491,6 +492,7 @@ export class StoreScene {
     getCeilingY: () => this.ceilingY,
     getHeadlight: () => this.headlight ?? null,
     getBakeHidden: () => (this.selectionArrow ? [this.selectionArrow] : []),
+    isInteractionActive: () => this.reflectionInteractionActive || !!this.launchAnim,
     onEnvironmentRebaked: (captureProbes = true) => {
       mirrors.updateMirrorThrottle(this, true);
       this.requestRender();
@@ -676,10 +678,8 @@ export class StoreScene {
   // T18: Romm video-game stock for the VIDEO GAMES section (see romm.ts and the
   // game-section fixture). Empty when Romm isn't configured/reachable.
   public gameMovies: Movie[] = [];
-  // Watch-history staff picks (see staff-picks.ts): owned titles wearing the
-  // sticker (ranked), and not-in-library order candidates for the genre
-  // endcaps. Both empty when there's no watch history / no Jellyseerr.
-  // Public: read by store-clerk-flow's staffPickEndcapPlacements().
+  // Ranked watch-history candidates for deliberate recommendations and
+  // inline request suggestions. Empty without watch history or an integration.
   public staffPickOwned: Movie[] = [];
   public staffPickMovies: Movie[] = [];
   // New Releases wall composition: `recentlyAddedMovies` fills the "row per
@@ -1728,15 +1728,12 @@ export class StoreScene {
     };
   }
 
-  /** Staff-picks genre endcap placements — see store-clerk-flow.ts. */
-  public staffPickEndcapPlacements(excludeLineIds?: Set<number>): FixturePlacement[] { return clerkFlow.staffPickEndcapPlacements(this, excludeLineIds); }
-
   /**
    * Late-arriving staff picks (the loader lost boot's race against a slow
    * Jellyseerr): just record the ranked owned pool. Owned winners are
    * deliberately unmarked — no sticker restamp (user direction after pin
-   * 012). Endcaps are build-time fixtures — they appear next boot,
-   * instantly, off the loader's cache.
+   * 012). The ranked pool is available
+   * to deliberate recommendations and inline catalog suggestions.
    */
   public applyStaffPicks(picks: { ownedPicks: Movie[] }): void {
     if (picks.ownedPicks.length === 0) return;
@@ -2054,7 +2051,11 @@ export class StoreScene {
     const pmremGenerator = new THREE.PMREMGenerator(this.renderer);
     pmremGenerator.compileEquirectangularShader();
     const roomEnv = new RoomEnvironment();
-    const bootstrapRT = pmremGenerator.fromScene(roomEnv, 0.04);
+    // Phones swap in the shipped baked map once it downloads, often while the
+    // opening view's programs are preparing. Match its CubeUV size so that swap
+    // keeps the same lit-material variants instead of recompiling the room.
+    const bootstrapRT = pmremGenerator.fromScene(roomEnv, 0.04, 0.1, 100,
+      mobileRoomLightingExpected() ? { size: BAKED_ROOM_CUBE_SIZE } : {});
     this.scene.environment = bootstrapRT.texture;
     // Held only until the constructor's first outdoor.bakeEnvironment() call
     // installs the real baked environment, then disposed (issue #121).
@@ -5167,7 +5168,7 @@ export class StoreScene {
     let movingSlots = 0;
     const admitPlacement = placementBudget();
     let hasDeferredPlacement = false;
-    for (const slot of this.dirtySlots) {
+    for (const slot of prioritizeInitialPlacements(this.dirtySlots,this.camera)) {
       if (slot.needsInitialMatrixUpdate && slot.key !== activeKey) {
         if (!admitPlacement()) {
           hasDeferredPlacement = true;
@@ -6052,6 +6053,7 @@ export class StoreScene {
     disposeWindowAwnings(this.scene);
     disposeFacadeEntry(this.scene);
     disposeRooftopHVAC(this.scene);
+    disposeGutterDownspout(this.scene);
     this.scene.getObjectByName('serviceDoor')?.userData.dispose?.();
     mirrors.disposeMirrorTargets(this);
     disposeSceneMeshes(this.scene);

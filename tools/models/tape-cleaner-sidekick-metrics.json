@@ -1,0 +1,73 @@
+{
+  "parts": 28,
+  "triangles": 2016,
+  "vertices": 1064,
+  "material_roles": [
+    "SidekickAcrylic",
+    "SidekickBase",
+    "SidekickHeader",
+    "SidekickPost",
+    "SidekickSlat"
+  ],
+  "glbBytes": 139456,
+  "bounds_blender_xyz": [
+    [
+      -1.03,
+      1.03
+    ],
+    [
+      -0.5,
+      0.5
+    ],
+    [
+      -0.0,
+      5.2
+    ]
+  ],
+  "tiers": [
+    {
+      "trayTopY": 0.9,
+      "cartonCenterY": 1.2335,
+      "cartonZ": -0.27,
+      "cartonX": [
+        -0.63,
+        -0.21,
+        0.21,
+        0.63
+      ]
+    },
+    {
+      "trayTopY": 1.8,
+      "cartonCenterY": 2.1335,
+      "cartonZ": -0.27,
+      "cartonX": [
+        -0.63,
+        -0.21,
+        0.21,
+        0.63
+      ]
+    },
+    {
+      "trayTopY": 2.7,
+      "cartonCenterY": 3.0335,
+      "cartonZ": -0.27,
+      "cartonX": [
+        -0.63,
+        -0.21,
+        0.21,
+        0.63
+      ]
+    },
+    {
+      "trayTopY": 3.6,
+      "cartonCenterY": 3.9335,
+      "cartonZ": -0.27,
+      "cartonX": [
+        -0.63,
+        -0.21,
+        0.21,
+        0.63
+      ]
+    }
+  ]
+}

@@ -15,9 +15,12 @@ import { finishedPanelGeometry, copingGeometry } from './joinery-model';
 import * as THREE from 'three';
 import { STORE_CENTER_X, FRONT_GLASS_Z } from './store-layout';
 import { createStuccoTexture } from './canvas-textures';
+import type { FixtureContext } from './fixtures';
+import { buildGutterDownspout } from './gutter-downspout';
 import { WINDOW_HEAD_Y, type FacadeLogoAnchor, type StorefrontFacade } from './storefront-facade';
 
 export interface ShopFacadeBuildParams {
+  context: FixtureContext;
   storeWidth: number;
   backWallZ: number;
   ceilingY: number;
@@ -138,6 +141,15 @@ export function buildShopfrontFacade(params: ShopFacadeBuildParams): StorefrontF
     stuccoBox(rearW + 0.1, fasciaH, 0.6, CX, fasciaCY, backWallZ - 0.35);
     addBox(rearW + 0.1, 0.12, 0.65, CX, parapetTop + 0.06, backWallZ - 0.35, coping);
   }
+
+  // Proposed roof drainage on the plain rear wall, near its left corner:
+  // stucco veneer face 0.55 ft and fascia face 0.65 ft outside the back wall.
+  const downspout = buildGutterDownspout(params.context, {
+    x: leftEdgeX + 2, z: backWallZ - .55, yaw: Math.PI / 2, step: .1,
+    roofY: ceilingY + .85, stepY: fasciaBot,
+  });
+  group.add(downspout);
+  group.addEventListener('removed', () => downspout.userData.dispose?.());
 
   // ── Logo anchor: centred on the fascia band. gable is a degenerate flat
   // shape sized to the fascia itself (never a real triangular gable on this

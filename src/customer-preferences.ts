@@ -25,8 +25,16 @@ export function customerDepartment(label: string): string {
 export function customerPreference(id: string): CustomerPreference {
   return CUSTOMER_PREFERENCES[id] ?? { favored: [], secondary: [] };
 }
+export const FAVORED_WEIGHT = 12, SECONDARY_WEIGHT = 4;
+/** A mixed shelf only earns the share of its departments that match, so an
+ * unlabeled all-genre section cannot count as everyone's favorite. */
 export function customerPreferenceWeight(profile: CustomerPreference, departments: readonly string[]): number {
-  if (departments.some(d => profile.favored.includes(customerDepartment(d)))) return 6;
-  if (departments.some(d => profile.secondary.includes(customerDepartment(d)))) return 3;
-  return 1;
+  if (!departments.length) return 1;
+  let favored = 0, secondary = 0;
+  for (const d of departments) {
+    const department = customerDepartment(d);
+    if (profile.favored.includes(department)) favored++;
+    else if (profile.secondary.includes(department)) secondary++;
+  }
+  return 1 + ((FAVORED_WEIGHT - 1) * favored + (SECONDARY_WEIGHT - 1) * secondary) / departments.length;
 }

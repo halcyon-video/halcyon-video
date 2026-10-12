@@ -1,0 +1,86 @@
+name: Publish showcase catalog
+
+# Daily and manual live catalog refresh (GH #354). Dormant by construction:
+# the gate job reads showcase/deployment/source-decision.json and the publish
+# job runs only when that committed record says "approved" — an owner edit
+# that lands on master through a normal release. Until then each run is a
+# few seconds of jq and a "blocked" summary, never a credential read.
+#
+# The last good artifact persists in the Actions cache. A failed run never
+# saves, so the next run restores the previous good publication and its
+# 30%-drop gates compare against it. GitHub emails the maintainer when a
+# scheduled run fails; that failure is the alert.
+
+on:
+  schedule:
+    - cron: '23 10 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+concurrency:
+  group: catalog-publish
+  cancel-in-progress: false
+
+jobs:
+  gate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      approved: ${{ steps.decision.outputs.approved }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+          sparse-checkout: showcase/deployment
+      - id: decision
+        name: Read the committed source decision
+        run: |
+          status="$(jq -r .status showcase/deployment/source-decision.json)"
+          if [ "$status" = approved ]; then
+            echo approved=true >> "$GITHUB_OUTPUT"
+          else
+            echo approved=false >> "$GITHUB_OUTPUT"
+            echo "Live catalog publication blocked: source decision is '$status'. No credential was read." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  publish:
+    needs: gate
+    if: needs.gate.outputs.approved == 'true' && github.repository == 'halcyon-video/halcyon-video' && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: showcase
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22.19.0'
+          cache: npm
+          cache-dependency-path: showcase/package-lock.json
+      - run: npm ci --no-fund
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+      - name: Restore the last good publication
+        uses: actions/cache/restore@0400d5f644dc74513175e3cd8d07132dd4860809
+        with:
+          path: showcase/input/published-live
+          key: catalog-live-${{ github.run_id }}
+          restore-keys: catalog-live-
+      - name: Collect, validate and promote
+        shell: bash
+        run: node --experimental-strip-types tools/publish-live.ts input/published-live | tee -a "$GITHUB_STEP_SUMMARY"
+        env:
+          TMDB_READ_ACCESS_TOKEN: ${{ secrets.TMDB_READ_ACCESS_TOKEN }}
+      - name: Retain the new last good publication
+        if: success()
+        uses: actions/cache/save@0400d5f644dc74513175e3cd8d07132dd4860809
+        with:
+          path: showcase/input/published-live
+          key: catalog-live-${{ github.run_id }}-${{ github.run_attempt }}
+      - name: Record the retained artifact on failure
+        if: failure()
+        run: echo "Catalog refresh failed; the previously cached publication was not replaced." >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,26 @@
+{
+  "bytes": 157376,
+  "triangles": 3640,
+  "meshes": 9,
+  "units": "feet",
+  "materials": [
+    "BoxCoverIvory",
+    "BrassContact",
+    "ConduitGalvanized",
+    "CordJacket",
+    "PlugBody"
+  ],
+  "plateEdgeAnchor": [
+    0,
+    -0.045,
+    -0.29
+  ],
+  "serviceBoxAnchor": [
+    0,
+    0,
+    -0.8
+  ],
+  "conduitBendRadiusFeet": 0.3,
+  "conduitOuterRadiusFeet": 0.0294,
+  "cordRadiusFeet": 0.012
+}

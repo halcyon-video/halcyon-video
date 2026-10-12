@@ -4,6 +4,7 @@ import { assetUrl } from './asset-url';
 import { disposeSceneMeshes } from './scene-mesh-disposal';
 import { exposedCeilingEnabled } from './ceiling-luminaire';
 import { activeStoreFormat } from './store-format';
+import { installTvFeed } from './ambient-tv-feed';
 import type { FixtureContext } from './fixtures';
 
 /** Model coordinates match the existing CRT; only the drop tube changes length. */
@@ -31,7 +32,16 @@ export async function installTvMount(ctx: FixtureContext, ceiling: THREE.Group, 
     stem.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), top.clone().sub(end).normalize());
     joint.position.copy(pivot); joint.quaternion.copy(television.quaternion);
     television.add(cradle); ceiling.add(plate, stem, joint);
-    if (exposedCeilingEnabled(activeStoreFormat().id, ctx.ceilingY, localStorage.getItem('bb_ceiling_structure'))) {
+    const enclosure = cradle.getObjectByName('TripleHousing');
+    if (enclosure) {
+      television.updateWorldMatrix(true, true);
+      const bounds = new THREE.Box3().setFromObject(enclosure, true);
+      // Low rooms retain the established open cradle and unchanged CRTs.
+      // Only the optional outer skins are omitted when their clearance fails.
+      enclosure.visible = bounds.min.y >= 7 && bounds.max.y <= ctx.ceilingY - .1;
+    }
+    const exposedRoof = exposedCeilingEnabled(activeStoreFormat().id, ctx.ceilingY, localStorage.getItem('bb_ceiling_structure'));
+    if (exposedRoof) {
       // The opaque roof underside is .35 ft above the tile datum. Reuse the
       // authored drop tube to bridge that now-visible gap without moving TVs.
       const upperDrop = stem.clone(true); upperDrop.name = 'Exposed roof contact';
@@ -47,9 +57,10 @@ export async function installTvMount(ctx: FixtureContext, ceiling: THREE.Group, 
       if (mesh.isMesh) { mesh.castShadow = true; mesh.receiveShadow = true; }
     });
     for (const part of fallback) part.visible = false;
-    ceiling.userData.tvMount = {variant: triple ? 'triple' : 'single', dropFeet: length,
+    ceiling.userData.tvMount = {variant: triple ? 'triple' : 'single', enclosure: enclosure?.visible ?? false, dropFeet: length,
       ceilingAttachment: top.toArray(), cabinetAttachment: pivot.toArray()};
     ctx.requestShadowRefresh(); ctx.requestRender();
+    void installTvFeed(ctx, ceiling, new THREE.Vector3(end.x, 0, end.z), exposedRoof, alive);
   } catch (error) {
     if (source) disposeSceneMeshes(source);
     if (alive()) console.warn('[ambient-tvs] suspension fallback retained', error);

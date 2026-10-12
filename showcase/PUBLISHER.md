@@ -102,21 +102,59 @@ The fixture preview does not display a misleading live-source badge or fetch
 third-party logos/posters. Approved image/logo presentation and final attribution
 review remain prerequisites, not completed visual work.
 
+## Live gate and scheduled job (2026-10-10 increment)
+
+Live publication now has exactly one key: the committed, owner-authored record
+`deployment/source-decision.json`. It ships as `"status": "unresolved"`, so
+every live path stays closed. `src/catalog/publisher/decision.ts` validates it;
+an approval must carry all of:
+
+- `decidedBy: "devbjackson"`, `decidedAt`, and a `reviewBy` date. After the
+  review date the gate closes again until the record is renewed.
+- `reference` (HTTPS link to the agreement or terms page relied on), `agreement`,
+  `permittedPurpose`, `imagePresentation`, `cacheRetentionDays` (1 to 30) and
+  `monthlyCostUsd`.
+- `publicRedistribution: true` and an `attribution` block that has the exact TMDB
+  notice above, `tmdbLogo: true` and `justWatch: true`.
+
+An unknown field, another approver, an altered notice or an expired review keeps
+the gate closed. No environment variable, CLI flag or snapshot field can stand in
+for the record. `publishSnapshot()` accepts a `tmdb` snapshot only when it is
+given a valid approval, including for a first publication.
+
+`tools/publish-live.ts [outDir] [decisionPath]` checks the record before it reads
+`TMDB_READ_ACCESS_TOKEN`. While the record is unresolved it exits 75 (blocked)
+and writes nothing. When approved, it runs the bounded collector through the
+pinned TMDB client and promotes the result through the same validation and
+atomic pointer. It prints the pointer, movie and series counts, request count and
+coverage limitations. Error output is truncated and the credential is scrubbed
+from it.
+
+`.github/workflows/catalog-publish.yml` runs daily at 10:23 UTC and can also be
+started manually. Its gate job uses only `jq` on the record and never sees a
+secret. The publish job runs only when the record is approved, on `master` in the
+upstream repository. It restores the last good publication from the Actions
+cache, runs the live CLI with the `TMDB_READ_ACCESS_TOKEN` repository secret, and
+saves the cache only on success. A failed run therefore leaves the previous
+publication in place for the next run's drop gates. GitHub's failed-run email for
+scheduled workflows is the maintainer alert. The workflow has read-only
+permissions, no artifact upload, and no deployment step. Hosting the promoted
+artifact belongs to #356.
+
 ## Remaining work before #354 can close
 
-1. Obtain the owner's project-specific source decision and any required agreement;
-   no cost or account action is authorized by this implementation.
-2. Supply a CI-only TMDB read-access token using documented
-   [application authentication](https://developer.themoviedb.org/docs/authentication-application),
-   never a VITE-prefixed/browser variable. No live CLI or environment-variable
-  bypass is provided while permission is unresolved. The storage API itself also
-  refuses live-source publication, including a first snapshot in an empty output.
-3. Add daily/manual trusted-source CI, failure notifications to the maintainer,
-   approved persisted cache/artifact retention, and approved immutable source-SHA
-   selection. This increment does not activate a scheduled workflow.
-4. Measure real coverage, sampled movie/TV offers, API usage and artifact sizes
-   under approved source terms. Preserve the last good artifact across an actual
-   failed job. Fixture evidence cannot prove upstream coverage or deployed rollback.
-5. Connect approved data to finished consumer attribution/freshness behavior and
-   the separately authorized deployment flow. Production still requires explicit
-   owner release approval; unreleased dev is not a production source.
+1. Owner: decide on project-specific TMDB use, sign any required agreement, then
+   fill in and commit the approval record. Nothing in this repository can make
+   that decision, and no cost or account action has been taken.
+2. Owner: add the `TMDB_READ_ACCESS_TOKEN` repository secret (an application
+   read-access token, never a `VITE_` variable).
+3. After the first approved run on `master`: record the measured coverage, the
+   sampled movie and TV offers for every provider (or the stated limitation), API
+   usage and artifact size. Then force one failure, for example by revoking the
+   secret for one manual run, and confirm that the cached last good publication
+   survives. Fixture tests cannot stand in for this evidence.
+4. Automatic pruning of retained versions according to `cacheRetentionDays` is
+   not implemented. While the record is unresolved no live data exists to prune.
+5. Connect approved data to finished consumer attribution and freshness behavior
+   (#355) and the separately authorized deployment flow (#356). Production still
+   requires the owner's explicit release approval.

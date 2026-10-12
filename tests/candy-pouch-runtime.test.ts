@@ -43,3 +43,33 @@ test('gondola full pouch mounts reach the long peg and remain in original envelo
     assert.ok(new THREE.Vector3(0,0,1).transformDirection(matrix).z>.99);
   }
 });
+
+test('slatwall wing bags ride their hook wire, face the aisle and stay inside the wing footprint', async () => {
+  const { slatwallHookMatrix, slatwallPouchMatrix, SLATWALL_WING } = await import('../src/fixtures/candy-pouch.ts');
+  const outer = SLATWALL_WING.endX + SLATWALL_WING.board + SLATWALL_WING.reach;
+  for (let tier = 0; tier < 4; tier++) for (let column = 0; column < 2; column++) {
+    const hook = slatwallHookMatrix(tier, column);
+    // Wire root is .06 ft below a .25-ft slot pitch starting at .5 ft.
+    const slot = new THREE.Vector3(0, .06, 0).applyMatrix4(hook).y;
+    assert.ok(Math.abs((slot - .5) / .25 - Math.round((slot - .5) / .25)) < 1e-9);
+    const boxes: THREE.Box3[] = [];
+    for (const [slotIndex, load] of [.40, .62].entries()) {
+      const bag = slatwallPouchMatrix(tier, column, slotIndex);
+      const rest = new THREE.Vector3(0, .72 - .0285, 0).applyMatrix4(bag);
+      assert.ok(rest.distanceTo(new THREE.Vector3(0, 0, load).applyMatrix4(hook)) < 1e-9);
+      assert.ok(new THREE.Vector3(0, 0, 1).transformDirection(bag).x > .99);
+      const box = new THREE.Box3(new THREE.Vector3(-.25, 0, -.1), new THREE.Vector3(.25, .72, .1)).applyMatrix4(bag);
+      assert.ok(box.min.x > SLATWALL_WING.endX + SLATWALL_WING.board && box.max.x < outer);
+      assert.ok(Math.abs(box.min.z) <= SLATWALL_WING.halfDepth && Math.abs(box.max.z) <= SLATWALL_WING.halfDepth);
+      assert.ok(box.min.y > .4 && box.max.y < 5);
+      for (const other of boxes) assert.ok(!box.clone().expandByScalar(-1e-6).intersectsBox(other));
+      boxes.push(box);
+    }
+  }
+  // Tiers clear each other vertically and columns horizontally.
+  const top = (t: number) => new THREE.Vector3(0, .72, 0).applyMatrix4(slatwallPouchMatrix(t, 0, 1)).y;
+  const bottom = (t: number) => new THREE.Vector3().applyMatrix4(slatwallPouchMatrix(t, 0, 1)).y;
+  for (let t = 0; t < 3; t++) assert.ok(bottom(t + 1) - top(t) > .2);
+  const gap = new THREE.Vector3(.25, 0, 0).applyMatrix4(slatwallPouchMatrix(0, 0, 0)).z;
+  assert.ok(gap < new THREE.Vector3(-.25, 0, 0).applyMatrix4(slatwallPouchMatrix(0, 1, 0)).z);
+});
