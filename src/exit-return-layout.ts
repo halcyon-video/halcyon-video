@@ -1,5 +1,5 @@
-import { vestibuleHalfWidth, type StorefrontSpec } from './store-layout';
-import { windowBayLayout } from './storefront-window-layout';
+import { vestibuleHalfWidth, type StorefrontSpec } from './store-layout.ts';
+import { windowBayLayout } from './storefront-window-layout.ts';
 import quickDrop from './exit-return-spec.json' with { type: 'json' };
 import type { Footprint } from './layout-validator.ts';
 export interface ExitGeometry { xL: number; frontZ: number; sideDoorZ: number; doorW: number; hasChamber: boolean }

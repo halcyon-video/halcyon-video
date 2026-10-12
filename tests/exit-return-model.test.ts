@@ -39,6 +39,11 @@ test('angled returns export preserves its floor origin, worktop height and bound
     o.geometry.dispose();
   });
   assert.equal(triangles,metrics.triangles);
-  assert.ok(meshes<=6 && triangles<8000 && bytes.length<400000);
+  // The through-window insert uses its own metal material, in addition to
+  // the six existing millwork materials. Keep one draw per material role.
+  assert.deepEqual([...materials].map(m=>m.name).sort(),
+    ['CounterBody','CounterTop','CounterInlay','CounterWorktop','CounterPlinth','CounterReveal','CounterReturnMetal'].sort());
+  assert.equal(meshes,materials.size);
+  assert.ok(triangles<8000 && bytes.length<400000);
   for(const m of materials)m.dispose();
 });
