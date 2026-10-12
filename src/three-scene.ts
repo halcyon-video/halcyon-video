@@ -14,6 +14,7 @@ import { ABOVE_R_LIBRARY_ID, partitionAboveRRoom } from './above-r-room';
 import { createNrBayWash } from './nr-bay-wash';
 import { STORE_CENTER_X, FRONT_GLASS_Z } from './store-layout';
 import { activeStoreFormat } from './store-format';
+import { wallBankShelfPlan, wallBankShelfSlot } from './wall-bank-profile';
 import { planNrRuns, nrSlotTransform, type NrRun } from './nr-run-layout';
 import { disposeSceneMeshes } from './scene-mesh-disposal';
 import { installStoreSurfaceFinishes } from './store-surface-finish';
@@ -1814,7 +1815,12 @@ export class StoreScene {
   public nrLeftWallUnitCenterZ(): number { return this.nrRuns[0]?.z ?? this.nrLeftWallUnitBackZ(); }
   private nrLeftWallUnitBackZ(): number { return this.backWallZ + (this.plan.clubhouse ? 18 : NR_RUN_DEPTH); }
   public getNewReleasesSlotTransform(col: number, _movie?: Movie, shelfY = WALL_SHELF_HEIGHTS[0]): { x: number, z: number, rotationY: number } {
-    return nrSlotTransform(this.nrRuns, col, nrWallStockOffset(shelfY));
+    return wallBankShelfSlot(wallBankShelfPlan(this.nrRuns, getActiveTheme().id), col, WALL_SHELF_HEIGHTS.indexOf(shelfY))
+      ?? nrSlotTransform(this.nrRuns, col, nrWallStockOffset(shelfY));
+  }
+
+  public getNewReleasesShelfHeight(col: number, row: number): number {
+    return wallBankShelfSlot(wallBankShelfPlan(this.nrRuns, getActiveTheme().id), col, row)?.y ?? WALL_SHELF_HEIGHTS[row];
   }
 
   private initThree() {

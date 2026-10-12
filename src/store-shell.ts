@@ -56,6 +56,7 @@ import { facadeDimensions, facadeStyle } from './storefront-architecture';
 import { addGlassReflectionPane } from './glass-reflection';
 import { buildExteriorEnvironment } from './exterior-environment';
 import { buildExteriorPanorama } from './exterior-panorama';
+import { wallBankShelfPlan } from './wall-bank-profile';
 import { NR_WALL_SLOPE, nrWallDepthAtHeight, NR_WALL_SHELF_DEPTH, NR_WALL_CLEARANCE, NR_LEFT_UNIT_STANDOFF, WALL_SHELF_HEIGHTS, NR_SECTION_COLS, UNIT_SECTIONS, seededRandom01, getStorefrontSpec, vestibuleHalfWidth, posterBayIndices, entranceOpeningHalfWidth, mapWallSegmentUV, CENTER_WALKWAY, STORE_CENTER_X, FRONT_GLASS_Z } from './store-layout';
 import { buildFrontSoffit, frontSoffitLidPolygon, frontSoffitPolygon, frontSoffitY, pointInSoffit, soffitConnectHalf, soffitKeyCenters, soffitTrofferCenters, tileOverlapsSoffit } from './ceiling-soffit';
 import { createFixture } from './fixture-registry';
@@ -2193,11 +2194,40 @@ export function buildStore(scene: StoreScene) {
     });
   };
 
+  const bankPlan = wallBankShelfPlan(scene.nrRuns, theme.id);
+  scene.scene.userData.wallBankShelfPlan = bankPlan;
   const midStepZ = (backWallZ + stepWallZ) / 2;
   const leftWallXCenter = STORE_CENTER_X - storeWidth / 2 + NR_LEFT_UNIT_STANDOFF;
   const leftWallZCenter = scene.nrLeftWallUnitCenterZ();
   for (const run of scene.nrRuns) if (run.cols > 0) {
-    buildShelfRun(run.length, new THREE.Vector3(run.x, 0, run.z), run.yaw, run.startCol, run.wallInset);
+    if (!bankPlan || bankPlan.run !== run) {
+      buildShelfRun(run.length, new THREE.Vector3(run.x, 0, run.z), run.yaw, run.startCol, run.wallInset);
+      continue;
+    }
+    const leftWidth = bankPlan.firstBay * NR_BAY_WIDTH;
+    const rightWidth = run.length - leftWidth - bankPlan.width;
+    if (leftWidth > 0) buildShelfRun(leftWidth, new THREE.Vector3(run.x - run.length / 2 + leftWidth / 2, 0, run.z), 0, run.startCol, run.wallInset);
+    if (rightWidth > 0) buildShelfRun(rightWidth, new THREE.Vector3(run.x + run.length / 2 - rightWidth / 2, 0, run.z), 0, bankPlan.startCol + bankPlan.cols, run.wallInset);
+    // A complete, usable fallback owns its own group so the local furniture can
+    // replace it after GPU preparation without hiding neighbouring wall shelves.
+    const center = new THREE.Group(); center.name = 'wall-bank-shelf-fallback';
+    center.position.set(bankPlan.x, 0, run.z); scene.scene.add(center);
+    const bayWidth = bankPlan.width / bankPlan.bays;
+    for (let bay = 0; bay < bankPlan.bays; bay++) {
+      const x = -bankPlan.width / 2 + (bay + .5) * bayWidth;
+      const backing = new THREE.Mesh(new THREE.BoxGeometry(bayWidth - .03, 8.69, .05), sharedShelfMat);
+      backing.position.set(x, 8.69 / 2, .48); center.add(backing); scene.shelves.push(backing);
+      for (const y of bankPlan.heights) {
+        const depth = bankPlan.depth - .5;
+        const geometry = new THREE.BoxGeometry(bayWidth - .035, .0625, depth);
+        const positions = geometry.getAttribute('position');
+        for (let i = 0; i < positions.count; i++) positions.setY(i, positions.getY(i) - .01125 + NR_WALL_SLOPE * (positions.getZ(i) - depth / 2));
+        geometry.computeVertexNormals();
+        const shelf = new THREE.Mesh(geometry, sharedShelfMat);
+        shelf.position.set(x, y, .5 + depth / 2); shelf.castShadow = shelf.receiveShadow = true;
+        center.add(shelf); scene.shelves.push(shelf);
+      }
+    }
   }
 
   buildNrBayLighting(scene);

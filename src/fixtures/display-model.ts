@@ -14,6 +14,7 @@ export function installDisplayModel(
   finishes: Record<string, THREE.Material>,
   scale = new THREE.Vector3(1, 1, 1),
   prepare?: (model: THREE.Group) => void,
+  onInstalled?: (model: THREE.Group) => void,
 ): () => void {
   fallback.name = 'display-fallback';
   let cancelled = false;
@@ -91,6 +92,7 @@ export function installDisplayModel(
     }
     model.visible = true;
     fallback.visible = false; // Registered collision meshes keep their established shape.
+    onInstalled?.(model);
     ctx.requestShadowRefresh();
     ctx.requestRender();
   };

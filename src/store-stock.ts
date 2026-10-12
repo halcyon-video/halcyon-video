@@ -819,7 +819,7 @@ export async function buildAllMovieBoxes(scene: StoreScene) {
     const col = slotPos.col;
     const shelfIdx = slotPos.shelfIdx;
 
-    const shelfY = WALL_SHELF_HEIGHTS[shelfIdx];
+    const shelfY = scene.getNewReleasesShelfHeight(col, shelfIdx);
     const transform = scene.getNewReleasesSlotTransform(col, movie, shelfY);
     const lean = movie.isSeries ? 0 : shelfLeanAngle(shelfIdx);
     const hinge = scene.leanHingeOffset(lean, transform.rotationY, boxHeight);

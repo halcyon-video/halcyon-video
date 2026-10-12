@@ -112,6 +112,7 @@ import { refreshStoreDateStamp, destroyStoreDateStamp } from './media-date-badge
 import { retailAudio } from './audio';
 import { BB_ARCHIVO_BLACK, bundledFontsReady } from './bundled-fonts';
 import { brandString, loadBrandPack } from './brand-pack';
+import { loadWallBankProfile } from './wall-bank-profile';
 import { loadFloorDisplayProfiles } from './fixtures/load-floor-display-profiles';
 import type { StoreScene } from './three-scene';
 import { waitForStartupModel } from './startup-reveal';
@@ -2938,7 +2939,7 @@ async function waitForFontsAndInit() {
   // bundledFontsReady()'s wait rather than a repaint that never comes. Never
   // rejects — no pack installed is the normal case (src/brand-pack.ts).
   await paintStoreLoading(22, 'Loading the store identity');
-  await Promise.all([loadBrandPack(), loadFloorDisplayProfiles()]);
+  await Promise.all([loadBrandPack(), loadFloorDisplayProfiles(), loadWallBankProfile()]);
   // Same reason, for the bundled display faces (Anton / Archivo Black / Outfit /
   // Orbitron / Yellowtail): most of the canvases that set them are painted once
   // into a texture cache and never repainted, so a face landing after the store
