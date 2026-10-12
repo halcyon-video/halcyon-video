@@ -61,7 +61,9 @@ def build(config=None,output=None,source=None):
     lathe('Foot plinth',base,enamel)
     lo,hi=config.get('tube_height',(.57,2.5))
     r=config.get('tube_radius',.43)
-    lathe('Clear chute sleeve',[(r,lo),(r,hi),(r-.016,hi),(r-.016,lo)],clear)
+    sleeve=lathe('Clear chute sleeve',[(r,lo),(r,hi),(r-.016,hi),(r-.016,lo)],clear)
+    sleeve['gumballChuteLow']=lo;sleeve['gumballChuteHigh']=hi;sleeve['gumballChuteRadius']=r
+    sleeve['gumballChuteTurns']=config.get('turns',5)
     for h in [lo,hi-.06]:lathe('Sleeve retaining collar',[(0,h),(.52,h),(.52,h+.055),(0,h+.055)],chrome)
     lathe('Chute floor',[(0,lo+.055),(.46,lo+.055),(.46,lo+.085),(0,lo+.085)],enamel)
     # A closed helical trough with raised outer lip, not a wire coil.
@@ -131,12 +133,12 @@ def build(config=None,output=None,source=None):
     # Export one mesh per finish, keeping transparent hopper and raceway separate.
     for mat in list(bpy.data.materials):
         if mat==clear:continue
-        objects=[o for o in scene.objects if o.type=='MESH' and o.data.materials and o.data.materials[0]==mat]
+        objects=[o for o in scene.objects if o.type=='MESH' and o.data.materials and o.data.materials[0]==mat and o.name not in {'Turn handle','Delivery flap'}]
         if len(objects)<2:continue
         bpy.ops.object.select_all(action='DESELECT')
         for o in objects:o.select_set(True)
         bpy.context.view_layer.objects.active=objects[0];bpy.ops.object.join();bpy.context.object.name=mat.name+' parts'
-    bpy.ops.export_scene.gltf(filepath=output,export_format='GLB',export_yup=True,export_texcoords=True)
+    bpy.ops.export_scene.gltf(filepath=output,export_format='GLB',export_yup=True,export_texcoords=True,export_extras=True)
     triangles=sum(sum(len(p.vertices)-2 for p in o.data.polygons) for o in scene.objects if o.type=='MESH')
     print(json.dumps({'file':output,'bytes':os.path.getsize(output),'triangles':triangles,'meshes':sum(o.type=='MESH' for o in scene.objects)}))
 

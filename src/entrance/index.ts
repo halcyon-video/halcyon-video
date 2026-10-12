@@ -352,9 +352,10 @@ export class EntranceCheckout implements StoreFixture {
       const along = (center: number, lenAlong: number, y: number, h: number, thick: number, mat: THREE.Material) => {
         // The exterior front frame must cover the interior liner and brick
         // reveal together. Chamber glazing retains its slim frame depth.
-        const exteriorFrame = orient === 'X' && Math.abs(fixed - frontZ) < .01 && mat === frameMat;
+        const exteriorFront = orient === 'X' && Math.abs(fixed - frontZ) < .01;
+        const exteriorFrame = exteriorFront && mat === frameMat;
         if (orient === 'X') {
-          const mesh = box(lenAlong, h, exteriorFrame ? FRAME_REVEAL_DEPTH : thick, mat, center, y, fixed + (exteriorFrame ? FRAME_REVEAL_CENTER : 0));
+          const mesh = box(lenAlong, h, exteriorFrame ? FRAME_REVEAL_DEPTH : thick, mat, center, y, fixed + (exteriorFront ? FRAME_REVEAL_CENTER : 0));
           if (exteriorFrame) mesh.name = 'entrance-exterior-reveal-frame';
         }
         else box(thick, h, lenAlong, mat, fixed, y, center);
@@ -437,7 +438,7 @@ export class EntranceCheckout implements StoreFixture {
     };
 
     const sideDoorZ = hasChamber ? vestibuleSide(spec,-1,cx).doorZ : chamber.sideDoorZ;
-    this.vestibuleInfo = { cx, xL, xR, frontZ, backZ, doorW, sideDoorZ, hasChamber };
+    this.vestibuleInfo = { cx, xL, xR, frontZ: frontZ + (hasChamber ? FRAME_REVEAL_CENTER : 0), backZ, doorW, sideDoorZ, hasChamber };
     const doorMats = { frameMat, glassMat, chrome };
     if (hasChamber && this.ctx.wallSurface) {
       const surface = this.ctx.wallSurface;
@@ -493,8 +494,8 @@ export class EntranceCheckout implements StoreFixture {
       // Viewed from outside, the entrance hinges left and opens inward.
       // The exit swings outward into the vestibule.
       const noFrame = { header: false, jambLeft: false, jambRight: false };
-      this.doors.push(buildVestibuleDoor(this.ctx, group, doorMats, spec, exitX, frontZ, doorH, true, true, -1.4, noFrame));
-      this.doors.push(buildVestibuleDoor(this.ctx, group, doorMats, spec, entrX, frontZ, doorH, true, true, 1.4, noFrame));
+      this.doors.push(buildVestibuleDoor(this.ctx, group, doorMats, spec, exitX, frontZ + FRAME_REVEAL_CENTER, doorH, true, true, -1.4, noFrame));
+      this.doors.push(buildVestibuleDoor(this.ctx, group, doorMats, spec, entrX, frontZ + FRAME_REVEAL_CENTER, doorH, true, true, 1.4, noFrame));
 
       // ----- Back wall (Z = backZ): glass too, so the whole chamber is glazed -----
       const backHalf = vestibuleBackHalf(spec);
@@ -505,7 +506,7 @@ export class EntranceCheckout implements StoreFixture {
       for (const side of [-1, 1] as const) {
         const wall = vestibuleSide(spec, side, cx);
         const straight = vestibuleStraightSide(spec,side,cx);
-        buildGlazedWall('Z', straight.x, straight.z, frontZ - .15, [], {singlePanels:true});
+        buildGlazedWall('Z', straight.x, straight.z, frontZ + FRAME_REVEAL_CENTER - .15, [], {singlePanels:true});
         const assembly = new THREE.Group(); assembly.name = `vestibule-side-${side}`;
         const first = group.children.length;
         buildGlazedWall('Z', 0, 0, wall.length, [wall.doorAlong], {singlePanels:true,doorWidth:wall.doorWidth});
@@ -523,7 +524,7 @@ export class EntranceCheckout implements StoreFixture {
       }
 
       // ----- Central glass divider splitting entrance (+X) from exit (-X) -----
-      buildGlazedWall('Z', cx, backZ, frontZ, []);
+      buildGlazedWall('Z', cx, backZ, frontZ + FRAME_REVEAL_CENTER, []);
 
       // ----- Solid soffit cap (opens up only when soffitCapY > wallH, i.e. the
       // 'high' ceiling preset) -----
@@ -733,7 +734,7 @@ export class EntranceCheckout implements StoreFixture {
         : [standingAt(spec.counterShape === 'usquare' ? -3.5 : -4), standingAt(spec.counterShape === 'usquare' ? 3.5 : 4)],
     };
 
-    this.clerkNavInfo.footprints.push(...buildExitReturnCounter(this.ctx, group, this.vestibuleInfo));
+    this.clerkNavInfo.footprints.push(...buildExitReturnCounter(this.ctx, group, { ...this.vestibuleInfo, frontZ }));
 
     // Anchor offsets ALONG the inner island, in feet from its centre. The
     // usquare counter's island is shorter (±5.0 vs the shield's ±6.0 — see

@@ -15,7 +15,7 @@
 // place: entering writes a record and arms the lockout timer, leaving clears
 // the ledger and runs the return-chute ritual. A screensaver must not touch
 // any of that, so the tour's finale is a raised look back over the whole
-// floor from the front corner instead.
+// floor from the front corner, then leaves through the customer exit.
 //
 // Break: InputManager stamps the shared input clock on every REAL control
 // input (user-activity.ts). The tour subscribes to that clock and restores
@@ -31,7 +31,8 @@ import { getLastUserActivity, onUserActivity } from './user-activity';
 import { counterFrame } from './counter-anchors';
 import { activeStoreFormat } from './store-format';
 import { STORE_CENTER_X, FRONT_GLASS_Z, FLOOR_FIXTURE_MAX_Z } from './store-layout';
-import { fadeToBlack, fadeFromBlack } from './back-room';
+import { vestibuleSide } from './vestibule-layout';
+import { facadeEntryGlazing, facadeStyle } from './storefront-architecture';
 import { isWelcomeActive, dismissWelcome } from './store-welcome';
 import { hasReachableFocusedControl } from './text-entry-focus';
 
@@ -66,7 +67,6 @@ let legs: Leg[] = [];
 let totalMs = 0;
 let active = false;
 let pinned = false;
-let fading = false;
 let raf = 0;
 let poll = 0;
 let startedAt = 0;
@@ -101,17 +101,19 @@ function ease(u: number, kind: Ease): number {
  *   2. vestibule → side door → shop floor (or straight in without a chamber)
  *   3. down the central walkway, gaze drifting shelf to shelf, to the back wall
  *   4. turn and come back to the customer side of the counter
- *   5. rise into a front-corner overview of the whole floor, fade, loop
+ *   5. rise into an overview, leave through the exit, return to the first pose
  */
 function buildTour(s: StoreScene): Leg[] {
   const v = s.entrance?.getVestibuleInfo() ?? null;
   const chamber = !!v?.hasChamber;
   const frontZ = v?.frontZ ?? FRONT_GLASS_Z;
   const backZ = v?.backZ ?? 8.6;
-  const sideZ = v?.sideDoorZ ?? (frontZ + backZ) / 2;
-  const xR = v?.xR ?? 18.7;
+  const entrySide = vestibuleSide(s.storefrontSpec, 1, v?.cx);
+  const exitSide = vestibuleSide(s.storefrontSpec, -1, v?.cx);
   // Entrance leaf: the +X half of a chambered door pair, the middle of a single leaf.
-  const xE = v ? (chamber ? v.cx + v.doorW / 2 : v.cx) : 13.0;
+  const entryOffset = facadeEntryGlazing(v?.doorW ?? s.storefrontSpec.doorWidth, facadeStyle()).doorCenterOffset;
+  const xE = v ? (chamber ? v.cx + entryOffset : v.cx) : 13.0;
+  const xExit = v ? (chamber ? v.cx - entryOffset : v.cx) : xE;
   const cx = STORE_CENTER_X;
   const fmt = activeStoreFormat();
   // Formats without a central walkway land a shelving run ON the centreline
@@ -141,19 +143,25 @@ function buildTour(s: StoreScene): Leg[] {
   let floorEntry: THREE.Vector3;
   let floorGaze: THREE.Vector3;
   if (chamber) {
-    floorEntry = P(xR + 6.5, EYE_Y, sideZ - 7);
+    // Keep each crossing straight along the opening's normal. A spline that
+    // bends through an angled doorway cuts its jamb or the adjoining pane.
+    const inside = P(entrySide.doorX - entrySide.cos * 2.4, EYE_Y, entrySide.doorZ + entrySide.sin * 2.4);
+    const outside = P(entrySide.doorX + entrySide.cos * 2.4, EYE_Y, entrySide.doorZ - entrySide.sin * 2.4);
+    floorEntry = P(outside.x + 2.5, EYE_Y, outside.z - 5);
     floorGaze = P(lane + 4, 4.6, zField - 10);
-    out.push(leg('vestibule',
-      [doorstep, P(xE, EYE_Y, sideZ + 0.6), P(xR + 2.5, EYE_Y, sideZ), floorEntry],
-      [P(xE, 5.2, backZ - 8), P(xR + 6, 5.2, sideZ - 1), P(xR + 8, 5.0, -8), floorGaze],
-      11_000, 'none'));
+    const portalGaze = P(outside.x + entrySide.cos * 5, 5.2, outside.z - entrySide.sin * 5);
+    const throughFront = P(xE, EYE_Y, frontZ - 2.4);
+    out.push(leg('front-entry', [doorstep, throughFront],
+      [P(xE, 5.2, backZ - 8)], 3_500, 'none'));
+    out.push(leg('vestibule', [throughFront, inside],
+      [P(xE, 5.2, backZ - 8), portalGaze], 3_500, 'inout'));
+    out.push(leg('entry-door', [inside, outside], [portalGaze], 4_000, 'none'));
+    out.push(leg('floor-entry', [outside, floorEntry], [portalGaze, floorGaze], 3_000, 'inout'));
   } else {
-    floorEntry = P(lane, EYE_Y, -3);
+    floorEntry = P(xE, EYE_Y, frontZ - 3);
     floorGaze = P(lane, 4.8, zMid);
-    out.push(leg('vestibule',
-      [doorstep, P(xE, EYE_Y, 4), floorEntry],
-      [P(xE, 5.2, -12), floorGaze],
-      8_000, 'none'));
+    out.push(leg('vestibule', [doorstep, floorEntry],
+      [P(xE, 5.2, -12), floorGaze], 5_000, 'none'));
   }
 
   const backWallGaze = P(lane, 5.0, zb - 3);
@@ -171,6 +179,30 @@ function buildTour(s: StoreScene): Leg[] {
     [atCounter, P(f.fx + 4, 6.8, -2), P(xOverview, yOverview, zOverview)],
     [counterLook, P(cx, 4.5, zMid), P(cx - 2, 3.5, zMid - 4)],
     14_000, 'inout', 3_000));
+  const overview = P(xOverview, yOverview, zOverview);
+  const exitInside = chamber
+    ? P(exitSide.doorX - exitSide.cos * 2.4, EYE_Y, exitSide.doorZ + exitSide.sin * 2.4)
+    : P(xExit, EYE_Y, frontZ - 2.4);
+  const exitOutside = chamber
+    ? P(exitSide.doorX + exitSide.cos * 2.4, EYE_Y, exitSide.doorZ - exitSide.sin * 2.4)
+    : exitInside;
+  const exitGaze = P(exitOutside.x + (chamber ? exitSide.cos * 5 : 0), 5.2, exitOutside.z - (chamber ? exitSide.sin * 5 : -10));
+  // Return by the customer walkway before crossing the left, exit-only door.
+  // Stay on the sales-floor side of the shield; never fly across its counter.
+  const floorExit = P(exitInside.x - (chamber ? 3 : 0), EYE_Y, backZ - 8);
+  out.push(leg('exit-approach', [overview, P(lane, EYE_Y, -8), floorExit, exitInside],
+    [P(cx - 2, 3.5, zMid - 4), P(cx - 6, 5.2, -8), exitGaze], 16_000, 'inout'));
+  if (chamber) out.push(leg('exit-door', [exitInside, exitOutside],
+    [exitGaze], 4_000, 'none'));
+  const beforeFrontExit = P(xExit, EYE_Y, frontZ - 2.4);
+  if (chamber) out.push(leg('exit-vestibule', [exitOutside, beforeFrontExit],
+    [exitGaze, P(xExit, 5.2, frontZ + 16)], 4_000, 'inout'));
+  const afterFrontExit = P(xExit, EYE_Y, frontZ + 3);
+  out.push(leg('front-exit', [beforeFrontExit, afterFrontExit],
+    [P(xExit, 5.2, frontZ + 16)], 4_000, 'none'));
+  out.push(leg('return-to-start',
+    [afterFrontExit, P(xExit, 5.7, frontZ + 20), out[0].pos.points[0].clone()],
+    [P(xExit, 5.2, frontZ + 16), P(cx, 8.5, frontZ - 1)], 12_000, 'inout'));
   return out;
 }
 
@@ -201,15 +233,11 @@ function apply(s: StoreScene, pose: Pose): void {
   s.requestRender();
 }
 
-async function loopSeam(s: StoreScene): Promise<void> {
-  fading = true;
-  await fadeToBlack();
-  if (!active || !fading) return;
+function loopSeam(s: StoreScene): void {
+  // The last pose is the first pose: looping needs neither a cut nor a fade.
   startedAt = performance.now();
   const first = poseAt(0);
   if (first) apply(s, first);
-  fadeFromBlack();
-  fading = false;
 }
 
 function tick(now: number): void {
@@ -223,10 +251,9 @@ function tick(now: number): void {
     stopAttractTour();
     return;
   }
-  if (fading) return;
   const pose = poseAt(now - startedAt);
   if (!pose) {
-    void loopSeam(s);
+    loopSeam(s);
     return;
   }
   apply(s, pose);
@@ -281,10 +308,6 @@ export function stopAttractTour(): void {
   cancelAnimationFrame(raf);
   unsubscribe?.();
   unsubscribe = null;
-  if (fading) {
-    fading = false;
-    fadeFromBlack();
-  }
   s.attractTour = false;
   if (s.isWalkAroundMode && s.mode === 'walk-around') {
     if (saved?.walk) {

@@ -18,7 +18,7 @@ import { planNrRuns, nrSlotTransform, type NrRun } from './nr-run-layout';
 import { disposeSceneMeshes } from './scene-mesh-disposal';
 import { installStoreSurfaceFinishes } from './store-surface-finish';
 import { fitSteppedCornerDepth } from './stepped-corner-clearance';
-import { placementBudget } from './progressive-placement';
+import { placementBudget, prioritizeInitialPlacements } from './progressive-placement';
 import { tickShelfVisibility, disposeShelfVisibility } from './shelf-visibility';
 import { mobileWalkInput } from './mobile-walk';
 import { mobileStoreActive, mobileStoreTap } from './mobile-store';
@@ -5173,7 +5173,7 @@ export class StoreScene {
     let movingSlots = 0;
     const admitPlacement = placementBudget();
     let hasDeferredPlacement = false;
-    for (const slot of this.dirtySlots) {
+    for (const slot of prioritizeInitialPlacements(this.dirtySlots,this.camera)) {
       if (slot.needsInitialMatrixUpdate && slot.key !== activeKey) {
         if (!admitPlacement()) {
           hasDeferredPlacement = true;

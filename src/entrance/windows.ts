@@ -86,7 +86,6 @@ export function buildWindowBays(
     metalness: 0.8,
   });
   const frameThickness = 0.2;
-  const frameDepth = 0.3;
 
   // Solid knee wall + trim, finished in the store's amber-gold with a navy cap
   // and base to match the interior trim. One segment per wing (the vestibule
@@ -128,8 +127,8 @@ export function buildWindowBays(
     // (three-scene.ts) so the two read as one continuous baseboard height
     // instead of stepping up/down at every corner where a window wall meets
     // a solid one.
-    const kick = new THREE.Mesh(baseboardGeometry(segW, 0.3, 0.34), kneeTrimMat);
-    kick.position.set(cxSeg, 0.15, -.15);
+    const kick = new THREE.Mesh(baseboardGeometry(segW, 0.3, 0.04), kneeTrimMat);
+    kick.position.set(cxSeg, 0.15, .02);
     kick.castShadow = true;
     kick.receiveShadow = true;
     group.add(kick);
@@ -143,13 +142,14 @@ export function buildWindowBays(
     divider.position.set((lo+hi)/2, height/2, -.15);
     divider.castShadow = divider.receiveShadow = true;
     group.add(divider);
-    const kick = new THREE.Mesh(baseboardGeometry(hi-lo, .3, .34), kneeTrimMat);
-    kick.position.set((lo+hi)/2, .15, -.15);
+    const kick = new THREE.Mesh(baseboardGeometry(hi-lo, .3, .04), kneeTrimMat);
+    kick.position.set((lo+hi)/2, .15, .02);
+    kick.castShadow = kick.receiveShadow = true;
     group.add(kick);
   }
 
   // Per-wing glass + frames + dividers.
-  const mullionGeo = windowFrameGeometry(frameThickness * 0.7, height - KNEE_H, frameDepth * 0.7);
+  const mullionGeo = windowFrameGeometry(frameThickness * 0.7, height - KNEE_H, FRAME_REVEAL_DEPTH);
   wings.forEach((wing) => {
     const wingW = wing.hi - wing.lo;
     const wingC = (wing.lo + wing.hi) / 2;
@@ -157,6 +157,7 @@ export function buildWindowBays(
     // Glass — one sheet per wing, knee wall to head.
     const glass = new THREE.Mesh(windowGlassGeometry(wing.lo,wing.hi,KNEE_H,height,aperture), glassMat);
     glass.name = 'front-window-glass';
+    glass.position.z = -FRAME_REVEAL_CENTER;
     glass.receiveShadow = true;
     group.add(glass);
     // ...and the reflection the pane above cannot show. Its 0.06 opacity is
@@ -200,10 +201,10 @@ export function buildWindowBays(
 
     // Grid vertical dividers between panes — only through the glazed span
     // above the knee wall.
-    const dividerGeo = windowFrameGeometry(frameThickness, height - KNEE_H, frameDepth);
+    const dividerGeo = windowFrameGeometry(frameThickness, height - KNEE_H, FRAME_REVEAL_DEPTH);
     for (let i = 1; i < edges.length - 1; i++) {
       const divider = new THREE.Mesh(dividerGeo, frameMat);
-      divider.position.set(edges[i], KNEE_H + (height - KNEE_H) / 2, 0);
+      divider.position.set(edges[i], KNEE_H + (height - KNEE_H) / 2, -FRAME_REVEAL_CENTER);
       divider.castShadow = true;
       divider.receiveShadow = true;
       group.add(divider);
@@ -216,7 +217,7 @@ export function buildWindowBays(
     if (!b.hasCenterMullion || !panes[i]) return;
     const centerX = (panes[i].lo + panes[i].hi) / 2;
     const mullion = new THREE.Mesh(mullionGeo, frameMat);
-    mullion.position.set(centerX, KNEE_H + (height - KNEE_H) / 2, 0);
+    mullion.position.set(centerX, KNEE_H + (height - KNEE_H) / 2, -FRAME_REVEAL_CENTER);
     mullion.castShadow = true;
     mullion.receiveShadow = true;
     group.add(mullion);

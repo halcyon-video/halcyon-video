@@ -243,7 +243,7 @@ function buildLibraryRow(scene: StoreScene): SubNavItem[] {
     });
   }
   for (let libIdx = 0; libIdx < scene.libraries.length; libIdx++) {
-    const units = scene.shelvingUnits.filter((u) => u.libraryIdx === libIdx);
+    const units = scene.plan.unitsForLibrary(libIdx);
     if (units.length === 0) continue;
     // The library ticket floats over the run's averaged centre (the overview's
     // uncategorized-library placement) whether or not genre tickets join it.
@@ -342,7 +342,7 @@ function faceFixture(scene: StoreScene, item: SubNavItem, dist: number, eyeY: nu
  */
 function aisleVantage(scene: StoreScene, item: SubNavItem): { x: number; z: number } | null {
   if (item.kind !== 'library' && item.kind !== 'genre') return null;
-  const units = scene.shelvingUnits.filter((u) => u.libraryIdx === item.libraryIdx);
+  const units = scene.plan.unitsForLibrary(item.libraryIdx);
   const unit = units[item.unitIdxInLibrary];
   if (!unit) return null;
   // A physical row can be poured as several units (and several lineId chunks);
@@ -587,7 +587,7 @@ export function subNavSelect(scene: StoreScene): boolean {
     const libIdx = typeof opts.libraryIdx === 'number' ? opts.libraryIdx : -1;
     const lineId = typeof opts.lineId === 'number' ? opts.lineId : -1;
     const host = libIdx >= 0
-      ? scene.shelvingUnits.filter((u) => u.libraryIdx === libIdx).find((u) => u.lineId === lineId)
+      ? scene.plan.unitsForLibrary(libIdx).find((u) => u.lineId === lineId)
       : undefined;
     if (fixture && host) {
       // Stand at the hosting run's entrance column first, then step onto the

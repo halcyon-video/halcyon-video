@@ -257,12 +257,12 @@ export function beginMobileDrag(scene: StoreScene, x: number, y: number) {
   const isAisleShelving = !isFixture
     && scene.selectedUnitIdx !== BACK_WALL_UNIT_IDX && scene.selectedUnitIdx >= 0;
   const activeUnit = isAisleShelving
-    ? scene.shelvingUnits.find(u => u.libraryIdx === scene.selectedLibraryIdx && u.unitIdxInLibrary === scene.selectedUnitIdx)
+    ? scene.plan.unitsForLibrary(scene.selectedLibraryIdx)[scene.selectedUnitIdx]
     : null;
   const runUnitIndices = activeUnit && activeUnit.rowGroupId !== undefined
     ? new Set(
-        scene.shelvingUnits
-          .filter(u => u.libraryIdx === scene.selectedLibraryIdx && u.rowGroupId === activeUnit.rowGroupId)
+        scene.plan.unitsForLibrary(scene.selectedLibraryIdx)
+          .filter(u => u.rowGroupId === activeUnit.rowGroupId)
           .map(u => u.unitIdxInLibrary)
       )
     : null;

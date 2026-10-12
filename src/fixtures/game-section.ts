@@ -57,11 +57,19 @@ const PLATFORM_BRAND: Record<string, { color: string; name?: string }> = {
 // platform name reading top→bottom. The corners are cut by ALPHA — the card
 // mesh is a plain plane pair with alphaTest, so the silhouette comes entirely
 // from this texture (no rectangular edge geometry to betray the curve).
-function createPlatformCardTexture(platform: string): THREE.CanvasTexture {
+function createPlatformCardTexture(platform: string): { texture: THREE.CanvasTexture; width: number; height: number } {
   const brand = PLATFORM_BRAND[platform] || { color: '#f2a900' };
   const label = brand.name || platform;
-  const W = 128, H = 448;
   const canvas = document.createElement('canvas');
+  const measure = canvas.getContext('2d')!;
+  let size = 40;
+  measure.font = `bold ${size}px Arial, sans-serif`;
+  while (size > 15 && measure.measureText(label).width > 448 - 150) {
+    size -= 2; measure.font = `bold ${size}px Arial, sans-serif`;
+  }
+  // Preserve the previous world-space lettering. Remove only unused field:
+  // 80 instead of 128px wide, and length fitted to the same word plus end caps.
+  const W = 80, H = Math.ceil((measure.measureText(label).width + 100) / 2) * 2;
   canvas.width = W;
   canvas.height = H;
   const ctx = canvas.getContext('2d')!;
@@ -87,12 +95,7 @@ function createPlatformCardTexture(platform: string): THREE.CanvasTexture {
   ctx.fillStyle = '#ffffff';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  let size = 40;
   ctx.font = `bold ${size}px Arial, sans-serif`;
-  while (size > 15 && ctx.measureText(label).width > H - 150) {
-    size -= 2;
-    ctx.font = `bold ${size}px Arial, sans-serif`;
-  }
   ctx.save();
   ctx.translate(W / 2, H / 2);
   ctx.rotate(Math.PI / 2);
@@ -101,7 +104,7 @@ function createPlatformCardTexture(platform: string): THREE.CanvasTexture {
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.anisotropy = 4;
-  return tex;
+  return { texture: tex, width: W * .6 / 128, height: H * .6 / 128 };
 }
 
 function leanHingeOffset(pitch: number, yaw: number, boxHeight: number): { x: number, y: number, z: number } {
@@ -519,20 +522,7 @@ export class GameSection implements SlottedFixture {
     // which reads top→bottom — legible walking the aisle. The department's
     // platform wayfinding.
     {
-      const CARD_W = 0.6, CARD_H = 2.1;
-      // Top edge lands on the top shelf board's top surface (SHELF_HEIGHTS top
-      // 4.3 + half the 0.04 board thickness), not the gap below it.
       const TOP_SHELF_TIP = SHELF_HEIGHTS[SHELF_HEIGHTS.length - 1] + 0.02;
-      const CARD_Y = TOP_SHELF_TIP - CARD_H / 2;
-      const cardGeo = new THREE.PlaneGeometry(CARD_W, CARD_H);
-      // Follow the divider's tapered outer edge over the card's whole height.
-      // This gives the marker a continuous mounting edge without burying any
-      // part of its face through the shelf decks below.
-      const cardBottom = TOP_SHELF_TIP - CARD_H;
-      const edgeHalfTop = unitDepthAtHeight(TOP_SHELF_TIP) / 2;
-      const edgeHalfBottom = unitDepthAtHeight(cardBottom) / 2;
-      const edgeHalfMid = (edgeHalfTop + edgeHalfBottom) / 2;
-      const edgeAngle = Math.atan((edgeHalfBottom - edgeHalfTop) / CARD_H);
       const cardSides: ('front' | 'back')[] = this.faces === 'front' ? ['front'] : ['front', 'back'];
       for (const side of cardSides) {
         const platforms = side === 'front' ? this.frontPlatforms : this.backPlatforms;
@@ -548,7 +538,15 @@ export class GameSection implements SlottedFixture {
             : shelfLength / 2 - 0.5 - (s * GAME_SECTION_COLS - 0.5) * BOX_SPACING;
           const zCard = side === 'front' ? -boundary : boundary;
 
-          const tex = createPlatformCardTexture(platform);
+          const card = createPlatformCardTexture(platform);
+          const tex = card.texture, CARD_W = card.width, CARD_H = card.height;
+          const CARD_Y = TOP_SHELF_TIP - CARD_H / 2;
+          const cardGeo = new THREE.PlaneGeometry(CARD_W, CARD_H);
+          const cardBottom = TOP_SHELF_TIP - CARD_H;
+          const edgeHalfTop = unitDepthAtHeight(TOP_SHELF_TIP) / 2;
+          const edgeHalfBottom = unitDepthAtHeight(cardBottom) / 2;
+          const edgeHalfMid = (edgeHalfTop + edgeHalfBottom) / 2;
+          const edgeAngle = Math.atan((edgeHalfBottom - edgeHalfTop) / CARD_H);
           this.textures.push(tex);
           const faceMat = new THREE.MeshStandardMaterial({
             map: tex, roughness: 0.45, metalness: 0.05, alphaTest: 0.5

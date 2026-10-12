@@ -67,7 +67,26 @@ cheek=[(Y,FRONT),(H_BACK,FRONT),(H_FRONT,Z_FRONT),(Y,Z_FRONT)]
 channel('Quick return receiver left cheek',RECEIVER_X-HALF,RECEIVER_X-OPEN_HALF,cheek)
 channel('Quick return receiver right cheek',RECEIVER_X+OPEN_HALF,RECEIVER_X+HALF,cheek)
 channel('Quick return receiver hood',RECEIVER_X-HALF,RECEIVER_X+HALF,
- [(H_BACK-.08,-.10),(H_BACK,-.10),(H_FRONT,Z_FRONT),(H_FRONT-.08,Z_FRONT)])
+ [(H_BACK-.08,BACK),(H_BACK,BACK),(H_FRONT,Z_FRONT),(H_FRONT-.08,Z_FRONT)])
+# One closed sheet-metal insert fills the clear pane width, with a real
+# rectangular tape throat. Runtime fits only its outer sides to that pane.
+metal=bpy.data.materials.new('CounterReturnMetal');metal.diffuse_color=(.62,.65,.67,1);metal.use_nodes=True
+metal.node_tree.nodes['Principled BSDF'].inputs['Base Color'].default_value=(.62,.65,.67,1)
+metal.node_tree.nodes['Principled BSDF'].inputs['Metallic'].default_value=.85
+metal.node_tree.nodes['Principled BSDF'].inputs['Roughness'].default_value=.36
+outer=[(RECEIVER_X-2,2.1),(RECEIVER_X+2,2.1),(RECEIVER_X+2,H_BACK),(RECEIVER_X-2,H_BACK)]
+inner=[(RECEIVER_X-OPEN_HALF,3.22),(RECEIVER_X+OPEN_HALF,3.22),(RECEIVER_X+OPEN_HALF,H_BACK-.08),(RECEIVER_X-OPEN_HALF,H_BACK-.08)]
+vertices=[(x,-z,y) for z in (BACK,FRONT) for x,y in outer+inner]
+faces=[]
+for i in range(4):
+ j=(i+1)%4
+ faces.extend([(i,j,j+4,i+4),(i+8,i+12,j+12,j+8),(i,i+8,j+8,j),(i+4,j+4,j+12,i+12)])
+me=bpy.data.meshes.new('Full pane metal return insert');me.from_pydata(vertices,[],faces);me.materials.append(metal);me.update()
+ob=bpy.data.objects.new('Full pane metal return insert',me);bpy.context.collection.objects.link(ob)
+bm=bmesh.new();bm.from_mesh(me);bmesh.ops.recalc_face_normals(bm,faces=list(bm.faces));assert all(e.is_manifold for e in bm.edges);bm.to_mesh(me);bm.free()
+bpy.context.view_layer.objects.active=ob;ob.select_set(True)
+bpy.ops.object.mode_set(mode='EDIT');bpy.ops.mesh.select_all(action='SELECT');bpy.ops.uv.smart_project(island_margin=.01);bpy.ops.object.mode_set(mode='OBJECT');ob.select_set(False)
+parts.append(ob)
 # Finished front panel and white worktop bridge conceal the under-counter well.
 slope=(H_BACK-H_FRONT)/(-.10-Z_FRONT)
 channel('Quick return receiver front panel',RECEIVER_X-OPEN_HALF,RECEIVER_X+OPEN_HALF,

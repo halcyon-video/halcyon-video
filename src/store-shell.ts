@@ -8,7 +8,7 @@ import { installTrofferModels, trofferCeilingGeometry } from './troffer-model.ts
 import { reelSetting } from './reel-profile';
 import { mobileStoreActive } from './mobile-store';
 import { vestibuleSide, vestibuleLayout, counterDatumShift } from './vestibule-layout.ts';
-import { exitReturnLayout } from './exit-return-layout';
+import { exitReturnLayout, returnWindowPane } from './exit-return-layout';
 import { RETAIL_FIXTURE_SPECS } from './retail-fixture-specs';
 import { floorPromotionPlacements, frontRefreshmentPlacements, placeFloorSaleTable } from './floor-merchandising';
 import { placeStockCart } from './fixtures/stock-cart-layout';
@@ -165,7 +165,7 @@ scene: StoreScene,
   // display gains (1.2 x the day gain 1.3) — see applyExteriorEnvClamp.
   glassMat.userData.envGainTarget = 1.56;
   const glass = new THREE.Mesh(glassGeo, glassMat);
-  glass.position.set(0, KNEE_H + (height - KNEE_H) / 2, 0);
+  glass.position.set(0, KNEE_H + (height - KNEE_H) / 2, -FRAME_REVEAL_CENTER);
   glass.receiveShadow = true;
   group.add(glass);
   // The fresnel mirror this pane's own comment above promises ("at grazing
@@ -230,8 +230,8 @@ scene: StoreScene,
     // Navy base kick — #134: matches baseboardMat's 0.3ft height exactly
     // (below, in the room-shell baseboards) so this window wall's trim
     // lines up with the solid walls' at every corner instead of stepping.
-    const kick = new THREE.Mesh(baseboardGeometry(segW, 0.3, 0.34), kneeTrimMat);
-    kick.position.set(cxSeg, 0.15, -.15);
+    const kick = new THREE.Mesh(baseboardGeometry(segW, 0.3, 0.04), kneeTrimMat);
+    kick.position.set(cxSeg, 0.15, .02);
     kick.receiveShadow = true;
     group.add(kick);
   });
@@ -270,11 +270,11 @@ scene: StoreScene,
   group.add(rightFrame);
 
   // Grid vertical dividers — only through the glazed span above the knee wall
-  const dividerGeo = windowFrameGeometry(frameThickness, height - KNEE_H, frameDepth);
+  const dividerGeo = windowFrameGeometry(frameThickness, height - KNEE_H, FRAME_REVEAL_DEPTH);
   for (let c = 1; c < numCols; c++) {
     const dividerX = -width / 2 + (width / numCols) * c;
     const divider = new THREE.Mesh(dividerGeo, frameMat);
-    divider.position.set(dividerX, KNEE_H + (height - KNEE_H) / 2, 0);
+    divider.position.set(dividerX, KNEE_H + (height - KNEE_H) / 2, -FRAME_REVEAL_CENTER);
     divider.castShadow = true;
     divider.receiveShadow = true;
     group.add(divider);
@@ -287,7 +287,7 @@ scene: StoreScene,
     const waistThickness = frameThickness * 1.6; // chunkier waist rail
     const horizDividerGeo = new THREE.BoxGeometry(width, waistThickness, frameDepth + 0.05);
     const waistDivider = new THREE.Mesh(horizDividerGeo, frameMat);
-    waistDivider.position.set(0, waistY, 0);
+    waistDivider.position.set(0, waistY, -FRAME_REVEAL_CENTER);
     waistDivider.castShadow = true;
     waistDivider.receiveShadow = true;
     group.add(waistDivider);
@@ -1538,9 +1538,11 @@ export function buildStore(scene: StoreScene) {
     hasChamber:scene.storefrontSpec.entryStyle==='vestibule',
   });
   const returnWindowX = returnWindowCounter ? returnWindowCounter.cx + quickDrop.receiverX*returnWindowCounter.w/15.5 : Infinity;
+  const returnPane = returnWindowCounter ? returnWindowPane(scene.storefrontSpec, returnWindowCounter) : null;
   const { group: frontWindow, panes: frontPanes, width: frontGlazedWidth } = buildWindowBays(
     scene.storefrontSpec, WINDOW_HEAD_Y, { center: 0, halfWidth: frontVestibuleHalfWidth },
     scene.wallSurface ?? undefined,
+    returnPane ? {x: STORE_CENTER_X-(returnPane.lo+returnPane.hi)/2, width: returnPane.hi-returnPane.lo, bottom: 2.1, top: quickDrop.hoodBackHeight} : undefined,
   );
   frontWindow.position.set(STORE_CENTER_X, floorY, FRONT_GLASS_Z);
   frontWindow.rotation.y = Math.PI; // Facing inwards
@@ -1580,8 +1582,8 @@ export function buildStore(scene: StoreScene) {
     scene.scene.add(seg);
     // Navy base kick matching the knee wall's (#134) so the baseboard line
     // runs unbroken from the knee wall across the margin into the side wall.
-    const kick = new THREE.Mesh(new THREE.BoxGeometry(b - a, 0.3, 0.34), marginKickMat);
-    kick.position.set(STORE_CENTER_X + (a + b) / 2, floorY + 0.15, FRONT_GLASS_Z + .15);
+    const kick = new THREE.Mesh(baseboardGeometry(b - a, 0.3, 0.04), marginKickMat);
+    kick.position.set(STORE_CENTER_X + (a + b) / 2, floorY + 0.15, FRONT_GLASS_Z - .02);
     kick.receiveShadow = true;
     scene.scene.add(kick);
   });
@@ -1803,6 +1805,7 @@ export function buildStore(scene: StoreScene) {
   const bbBackGeo = baseboardGeometry(storeWidth, 0.3, 0.04);
   const bbBack = new THREE.Mesh(bbBackGeo, baseboardMat);
   bbBack.position.set(STORE_CENTER_X, floorY + 0.15, backWallZ + 0.02);
+  bbBack.castShadow = bbBack.receiveShadow = true;
   scene.scene.add(bbBack);
 
   // Baseboards for the stepped right section. bbStepFront's left edge (at
@@ -1815,6 +1818,7 @@ export function buildStore(scene: StoreScene) {
     const bbStepFrontRight = rightEdgeX - 2 * BB_HALF; // clears the right run's near edge (rightEdgeX-0.04)
     const bbStepFront = new THREE.Mesh(baseboardGeometry(bbStepFrontRight - scene.stepX, 0.3, 0.04), baseboardMat);
     bbStepFront.position.set((scene.stepX + bbStepFrontRight) / 2, floorY + 0.15, stepWallZ + 0.03);
+    bbStepFront.castShadow = bbStepFront.receiveShadow = true;
     scene.scene.add(bbStepFront);
 
     const bbStepSideNear = backWallZ + 0.04; // clears bbBack's far edge (backWallZ+0.04)
@@ -1822,22 +1826,21 @@ export function buildStore(scene: StoreScene) {
     const bbStepSide = new THREE.Mesh(baseboardGeometry(bbStepSideFar - bbStepSideNear, 0.3, 0.04), baseboardMat);
     bbStepSide.position.set(scene.stepX - 0.03, floorY + 0.15, (bbStepSideNear + bbStepSideFar) / 2);
     bbStepSide.rotation.y = Math.PI / 2;
+    bbStepSide.castShadow = bbStepSide.receiveShadow = true;
     scene.scene.add(bbStepSide);
   }
 
   // Side-wall baseboards, BOTH walls, on the SOLID spans only: the window
-  // ribbon's own base kick (createWindowSection, 0.34 ft deep) covers the
+  // ribbon's own base kick (createWindowSection, 0.04 ft deep) covers the
   // glazed span — running a baseboard behind it too made the two coplanar
   // base trims z-fight along the whole ribbon. Ends are trimmed so every
   // floor corner is a clean butt-join:
   //  - back end starts 0.04 off the back wall (clear of bbBack; on the
   //    stepped right wall, 0.05 off the step's front face, clear of
   //    bbStepFront's 0.01..0.05 z-span),
-  //  - front end stops at the front corner-margin kick's inner face
-  //    (z = 15 - 0.02; that kick is 0.34 ft deep, centered 0.15 ft
-  //    outside the glass line) instead of running under it — the deeper kick reads as the
-  //    corner return and this run butts into its side.
-  const FRONT_KICK_INNER_Z = FRONT_GLASS_Z - 0.02;
+  //  - front end butts into the front corner-margin cove base, whose
+  //    inner face is 0.04 ft inside the wall.
+  const FRONT_KICK_INNER_Z = FRONT_GLASS_Z - 0.04;
   const buildSideBaseboards = (side: 'left' | 'right') => {
     const wallX = side === 'left' ? STORE_CENTER_X - storeWidth / 2 : STORE_CENTER_X + storeWidth / 2;
     const inward = side === 'left' ? 1 : -1;
@@ -1850,6 +1853,7 @@ export function buildStore(scene: StoreScene) {
       const seg = new THREE.Mesh(baseboardGeometry(z1 - z0, 0.3, 0.04), baseboardMat);
       seg.position.set(wallX + inward * BB_HALF, floorY + 0.15, (z0 + z1) / 2);
       seg.rotation.y = inward * Math.PI / 2;
+      seg.castShadow = seg.receiveShadow = true;
       scene.scene.add(seg);
     });
   };
@@ -2695,9 +2699,10 @@ export function buildStore(scene: StoreScene) {
     const lineUnits = scene.plan.shelvingUnits.filter(u => u.lineId === lineId);
     if (lineUnits.length === 0) return 'MOVIES';
     const firstUnit = lineUnits[0];
-    const lib = scene.libraries[firstUnit.libraryIdx];
+    const firstOwner = scene.plan.faceOwner(firstUnit,'front');
+    const lib = scene.libraries[firstOwner.libraryIdx];
     if (!lib) return 'MOVIES';
-    const layout = scene.plan.layoutFor(firstUnit.libraryIdx);
+    const layout = scene.plan.layoutFor(firstOwner.libraryIdx);
     if (!layout.categorized) {
       return lib.name;
     }
@@ -2706,9 +2711,11 @@ export function buildStore(scene: StoreScene) {
       (['front', 'back'] as const).forEach(side => {
         // Labels are keyed by GLOBAL section index; each unit face holds one
         // entry block = UNIT_SECTIONS sections (see StorePlan.blockIndexOf).
-        const block = scene.plan.blockIndexOf(u.libraryIdx, u.unitIdxInLibrary, side);
+        const owner = scene.plan.faceOwner(u,side);
+        const block = owner.block;
+        const faceLayout = scene.plan.layoutFor(owner.libraryIdx);
         for (let s = 0; s < UNIT_SECTIONS; s++) {
-          const label = layout.sectionLabels.get(String(block * UNIT_SECTIONS + s));
+          const label = faceLayout.sectionLabels.get(String(block * UNIT_SECTIONS + s));
           if (label) labels.push(label);
         }
       });

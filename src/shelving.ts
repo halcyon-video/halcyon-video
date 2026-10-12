@@ -557,12 +557,13 @@ export function buildAisleShelving(deps: AisleShelvingDeps): void {
     // category of the stock actually shelved there — per FACE, since the two
     // sides of a unit can hold different categories.
 
-    const layout = plan.layoutFor(unit.libraryIdx);
+    const ownerFor = (side: 'front' | 'back') => plan.faceOwner(unit,side);
+    const layoutFor = (side: 'front' | 'back') => plan.layoutFor(ownerFor(side).libraryIdx);
     // Entry blocks flow in customer walk order (see StorePlan.entryBlockOrder);
     // blockIndexOf says which block each of this unit's faces holds.
     const sideEntryCount = (side: 'front' | 'back') => {
-      const startIdx = plan.blockIndexOf(unit.libraryIdx, unit.unitIdxInLibrary, side) * UNIT_SIDE_CAPACITY;
-      return Math.max(0, Math.min(UNIT_SIDE_CAPACITY, layout.entries.length - startIdx));
+      const startIdx = ownerFor(side).block * UNIT_SIDE_CAPACITY;
+      return Math.max(0, Math.min(UNIT_SIDE_CAPACITY, layoutFor(side).entries.length - startIdx));
     };
     // `p` is the PHYSICAL section index from the unit's front end. Faces whose
     // column order is mirrored (see aisleColZ: -X-browsed fronts, and the
@@ -572,12 +573,13 @@ export function buildAisleShelving(deps: AisleShelvingDeps): void {
     // box, one on a format whose units are a single signboard bay wide).
     const sectionLabelFor = (side: 'front' | 'back', p: number): string => {
       const cnt = sideEntryCount(side);
-      if (cnt <= 0) return lib.name;
+      const faceLib = libraries[ownerFor(side).libraryIdx];
+      if (cnt <= 0) return faceLib.name;
       const totalSecs = Math.ceil(cols / SECTION_COLS);
       const mirrored = (unit.browseSign < 0) !== (side === 'back');
       const s = mirrored ? (totalSecs - 1 - p) : p;
-      const block = plan.blockIndexOf(unit.libraryIdx, unit.unitIdxInLibrary, side);
-      return layout.sectionLabels.get(String(block * UNIT_SECTIONS + s)) ?? lib.name;
+      const block = ownerFor(side).block;
+      return layoutFor(side).sectionLabels.get(String(block * UNIT_SECTIONS + s)) ?? faceLib.name;
     };
 
     // Create signboards running long ways above each shelf section at the top
@@ -613,6 +615,8 @@ export function buildAisleShelving(deps: AisleShelvingDeps): void {
         const claspShelfDepth = unitDepthAtHeight(CLASP_SHELF_Y);
         const claspY = CLASP_SHELF_Y;
         const place = (label: string, sign: 1 | -1) => {
+          const side = (sign > 0) === (unit.browseSign > 0) ? 'front' : 'back';
+          const owner = ownerFor(side);
           deps.registerClasp!({
             x: xCenter + sign * (claspShelfDepth / 2 + 0.012),
             y: claspY,
@@ -621,8 +625,8 @@ export function buildAisleShelving(deps: AisleShelvingDeps): void {
             parent: aisleParent,
             // An uncategorized library labels every section with its own name,
             // which is exactly the "one clasp for the library" case.
-            category: label === lib.name ? null : label,
-            libraryIdx: unit.libraryIdx,
+            category: label === libraries[owner.libraryIdx].name ? null : label,
+            libraryIdx: owner.libraryIdx,
           });
         };
         place(plusXLabel, 1);
@@ -844,7 +848,7 @@ export function buildAisleShelving(deps: AisleShelvingDeps): void {
       leftCap.castShadow = true;
       leftCap.receiveShadow = true;
       leftCap.userData = {
-        libraryIdx: unit.libraryIdx,
+        libraryIdx: ownerFor('front').libraryIdx,
         restingZ: FIELD_Z_FRONT + unit.zPos + 0.05,
         lineId: unit.lineId,
         isFront: isBlue
@@ -866,7 +870,7 @@ export function buildAisleShelving(deps: AisleShelvingDeps): void {
       rightCap.castShadow = true;
       rightCap.receiveShadow = true;
       rightCap.userData = {
-        libraryIdx: unit.libraryIdx,
+        libraryIdx: ownerFor('back').libraryIdx,
         restingZ: FIELD_Z_FRONT + unit.zPos - shelfLength - 0.05,
         lineId: unit.lineId,
         isFront: isBlue

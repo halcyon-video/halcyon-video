@@ -699,7 +699,7 @@ export async function buildAllMovieBoxes(scene: StoreScene) {
   // 4. Populate all Aisle Slots (category-sorted layout order; nulls are
   // section padding — they hold their shelf position but get no case)
   for (let libIdx = 0; libIdx < scene.libraries.length; libIdx++) {
-    const libUnits = scene.shelvingUnits.filter(u => u.libraryIdx === libIdx);
+    const libUnits = scene.plan.unitsForLibrary(libIdx);
     const layoutEntries = scene.layoutFor(libIdx).entries;
     const blockOrder = scene.plan.entryBlockOrder(libIdx);
 
@@ -1074,7 +1074,7 @@ export function rebuildMovieBoxes(scene: StoreScene) {
   // re-bake the shadow map over the next few frames as the layout settles.
   scene.queueStructuralShadowRefresh();
   for (let libIdx = 0; libIdx < scene.libraries.length; libIdx++) {
-    const libUnits = scene.shelvingUnits.filter(u => u.libraryIdx === libIdx);
+    const libUnits = scene.plan.unitsForLibrary(libIdx);
 
     // 1. Collect and remove all aisle slots for this library from the map
     const libSlots: MovieSlot[] = [];

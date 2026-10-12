@@ -1,3 +1,4 @@
+import { ShelfFaceAllocation } from './shelf-face-allocation.ts';
 import { ABOVE_R_LIBRARY_ID, ABOVE_R_ROOM_WIDTH } from './above-r-room.ts';
 // The store's floor-plan brain: decides what goes where. Sorts each library
 // into the store wall categories (padded to whole signboard sections), hatches
@@ -113,6 +114,7 @@ export class StorePlan {
   plan(theme = '', ceiling = 13.5) {
     this.buildLibraryLayouts();
     this.blockOrderCache.clear();
+    this.faceAllocation = null;
     const roomLibrary = this.libraries.findIndex(lib => lib.id === ABOVE_R_LIBRARY_ID);
     const roomUnits = roomLibrary >= 0 ? Math.ceil(this.layoutFor(roomLibrary).entries.length / UNIT_SIDE_CAPACITY) : 0;
     this.aboveRRoom = FORMAT.singleField && roomUnits ? { libraryIdx: roomLibrary,
@@ -171,6 +173,8 @@ export class StorePlan {
     // Pivot the diagonal aisle rotation about the centre of the aisle cluster so the
     // angled islands stay inside the room rather than swinging into the walls.
     this.aislePivotZ = (this.scaleZ(FIELD_Z_FRONT) + this.backWallZ) / 2;
+    const original = new Map(this.libraries.map((_,lib) => [lib,this.entryBlockOrder(lib)]));
+    this.faceAllocation = new ShelfFaceAllocation(this.shelvingUnits,original);
   }
 
   // Nominal X centre of a library column before run planning (fallback only).
@@ -187,9 +191,7 @@ export class StorePlan {
   // planner places it (libraries are contiguous segments of the shared runs, so they
   // no longer line up with a fixed column). Falls back to the nominal column.
   getLibraryXCenter(libraryIdx: number): number {
-    const first = this.shelvingUnits.find(
-      (u) => u.libraryIdx === libraryIdx && u.unitIdxInLibrary === 0
-    );
+    const first = this.unitsForLibrary(libraryIdx)[0];
     if (first) return first.xCenter;
     return this.columnXCenter(libraryIdx, this.libraries.length);
   }
@@ -1006,6 +1008,7 @@ export class StorePlan {
   // section's stock flow across the small RUN_BREAK_GAP instead of jumping to
   // whatever line the reorder happened to place next.
   entryBlockOrder(libIdx: number): { unit: number; side: 'front' | 'back' }[] {
+    if (this.faceAllocation) return this.faceAllocation.orders.get(libIdx) ?? [];
     let order = this.blockOrderCache.get(libIdx);
     if (order) return order;
     order = [];
@@ -1027,12 +1030,28 @@ export class StorePlan {
   // holds. Falls back to the unit index for synthetic units (back wall etc.)
   // that aren't part of the plan.
   blockIndexOf(libIdx: number, unitIdx: number, side: 'front' | 'back'): number {
-    if (side === 'back' && this.shelvingUnits.find(u => u.libraryIdx === libIdx && u.unitIdxInLibrary === unitIdx)?.singleSided) return Number.MAX_SAFE_INTEGER;
+    if (side === 'back' && this.unitsForLibrary(libIdx)[unitIdx]?.singleSided) return Number.MAX_SAFE_INTEGER;
     const order = this.entryBlockOrder(libIdx);
     for (let b = 0; b < order.length; b++) {
       if (order[b].unit === unitIdx && order[b].side === side) return b;
     }
     return unitIdx;
+  }
+
+  private faceAllocation: ShelfFaceAllocation | null = null;
+  unitsForLibrary(libIdx: number): ShelvingUnit[] {
+    return this.faceAllocation?.units.get(libIdx) ?? this.shelvingUnits.filter(u=>u.libraryIdx===libIdx);
+  }
+  oppositeFace(libIdx: number, unitIdx: number, side: 'front' | 'back') {
+    const units = this.unitsForLibrary(libIdx), unit = units[unitIdx];
+    if (!unit) return null;
+    if (unit.rowGroupId >= 0) return {unit:unitIdx,side:side==='front'?'back' as const:'front' as const};
+    const index = units.findIndex(other=>other.xCenter===unit.xCenter && other.zPos===unit.zPos && other.browseSign===-unit.browseSign);
+    return index < 0 ? null : {unit:index,side:'front' as const};
+  }
+  faceOwner(unit: ShelvingUnit, side: 'front' | 'back') {
+    return this.faceAllocation?.owner(unit,side) ?? {libraryIdx:unit.libraryIdx,unitIdx:unit.unitIdxInLibrary,side,
+      block:this.blockIndexOf(unit.libraryIdx,unit.unitIdxInLibrary,side)};
   }
 
   scaleZ(z: number): number {
@@ -1112,10 +1131,11 @@ export class StorePlan {
       // The genre at THIS end of the run: front face's entry block holds
       // sections 2b and 2b+1; which one sits at the entrance end follows the
       // same mirroring rule as the column order (see aisleColZ).
-      const layout = this.layoutFor(u.libraryIdx);
+      const owner = this.faceOwner(u,'front');
+      const layout = this.layoutFor(owner.libraryIdx);
       let genreLabel: string | null = null;
       if (layout.categorized) {
-        const b = this.blockIndexOf(u.libraryIdx, u.unitIdxInLibrary, 'front');
+        const b = owner.block;
         const mirrored = u.browseSign < 0;
         genreLabel =
           // One entry block = UNIT_SECTIONS signboard sections. On a mirrored
@@ -1127,7 +1147,7 @@ export class StorePlan {
       }
 
       ends.push({
-        unit: u,
+        unit: { ...u, libraryIdx:owner.libraryIdx, unitIdxInLibrary:owner.unitIdx },
         frontLocalZ,
         genreLabel,
         worldX: this.unitToWorld(u, u.xCenter, frontLocalZ).x,

@@ -469,9 +469,9 @@ export function showPersonEndcap(scene: StoreScene, person: string, kind: 'actor
   };
 
   // Locate the initiating shelving unit run.
-  let activeUnit = scene.shelvingUnits.find(u => u.libraryIdx === scene.selectedLibraryIdx && u.unitIdxInLibrary === scene.selectedUnitIdx);
+  let activeUnit: ShelvingUnit | undefined = scene.plan.unitsForLibrary(scene.selectedLibraryIdx)[scene.selectedUnitIdx];
   if (!activeUnit || scene.selectedUnitIdx === BACK_WALL_UNIT_IDX) {
-    activeUnit = scene.shelvingUnits.find(u => u.libraryIdx === scene.selectedLibraryIdx && u.isLineFront);
+    activeUnit = scene.plan.unitsForLibrary(scene.selectedLibraryIdx).find(u => u.isLineFront);
   }
   if (!activeUnit) {
     activeUnit = scene.shelvingUnits.find(u => u.isLineFront);
@@ -485,7 +485,7 @@ export function showPersonEndcap(scene: StoreScene, person: string, kind: 'actor
   // Find the front endcap mesh of this run.
   let leftCap: THREE.Mesh | undefined;
   if (activeUnit) {
-    const frontUnit = scene.shelvingUnits.find(u => u.libraryIdx === activeUnit.libraryIdx && u.lineId === activeUnit.lineId && u.isLineFront);
+    const frontUnit = scene.plan.unitsForLibrary(activeUnit.libraryIdx).find(u => u.lineId === activeUnit.lineId && u.isLineFront);
     if (frontUnit) {
       leftCap = scene.libraryEndCaps.find(cap => cap.userData.lineId === frontUnit.lineId && canHostActor(cap));
     }

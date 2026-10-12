@@ -1,3 +1,5 @@
+import { vestibuleHalfWidth, type StorefrontSpec } from './store-layout';
+import { windowBayLayout } from './storefront-window-layout';
 import quickDrop from './exit-return-spec.json' with { type: 'json' };
 import type { Footprint } from './layout-validator.ts';
 export interface ExitGeometry { xL: number; frontZ: number; sideDoorZ: number; doorW: number; hasChamber: boolean }
@@ -30,4 +32,12 @@ export function exitReturnSegments(f: Footprint): Footprint[] {
     segment([7.75,quickDrop.glassOffset/sx],[-7.75,quickDrop.glassOffset/sx],-quickDrop.worktopFront+quickDrop.glassOffset/sx,'window-worktop'),
     segment([-6.95,-5.35],[-2,-10.3],1.3,'inner-worktop-left'),
     segment([-2,-10.3],[2.4,-5.9],1.3,'inner-worktop-right')];
+}
+
+/** The receiver's metal insert replaces the lower part of its actual pane. */
+export function returnWindowPane(spec: StorefrontSpec, counter: Footprint) {
+  const receiverX = counter.cx + quickDrop.receiverX * counter.w / 15.5;
+  const panes = windowBayLayout(spec.windowBays, {center: 0, halfWidth: vestibuleHalfWidth(spec)}).panes;
+  const pane = panes.find(p => receiverX >= 11-p.hi && receiverX <= 11-p.lo);
+  return pane ? {lo: 11-pane.hi+.1, hi: 11-pane.lo-.1, receiverX} : null;
 }

@@ -129,7 +129,7 @@ function exitGenreEndcapToShelf(scene: StoreScene, fixture: SceneFixture, exitTo
   const libraryIdx = typeof opts.libraryIdx === 'number' ? opts.libraryIdx : -1;
   const lineId = typeof opts.lineId === 'number' ? opts.lineId : -1;
   if (libraryIdx < 0 || lineId < 0) return false;
-  const libUnits = scene.shelvingUnits.filter((u) => u.libraryIdx === libraryIdx);
+  const libUnits = scene.plan.unitsForLibrary(libraryIdx);
   const lineFirst = lineStartUnit(scene, libUnits, lineId);
   if (!lineFirst) return false;
 
@@ -174,7 +174,7 @@ export function getSelectableWorldPos(scene: StoreScene, idx: number): { x: numb
   const N = scene.libraries.length;
   if (idx < 0) return null;
   if (idx < N) {
-    const u = scene.shelvingUnits.find(su => su.libraryIdx === idx && su.unitIdxInLibrary === 0);
+    const u = scene.plan.unitsForLibrary(idx)[0];
     if (!u) return null;
     return { x: scene.getLibraryXCenter(idx), z: scene.aisleZCenter(u) };
   }
@@ -346,7 +346,7 @@ export function moveLeftInternal(scene: StoreScene) {
         scene.selectedCol--;
         scene.updateCameraTarget();
       } else {
-        const libUnits = scene.shelvingUnits.filter(u => u.libraryIdx === scene.selectedLibraryIdx);
+        const libUnits = scene.plan.unitsForLibrary(scene.selectedLibraryIdx);
         const currentUnit = libUnits[scene.selectedUnitIdx];
         // Screen-left neighbor: units are numbered in screen order, so it's
         // always the previous unit.
@@ -406,7 +406,7 @@ export function moveLeftInternal(scene: StoreScene) {
         scene.updateCameraTarget();
       } else {
         // We are at col 0 of the current unit (its screen-left edge)
-        const libUnits = scene.shelvingUnits.filter(u => u.libraryIdx === scene.selectedLibraryIdx);
+        const libUnits = scene.plan.unitsForLibrary(scene.selectedLibraryIdx);
         const currentUnit = libUnits[scene.selectedUnitIdx];
         // On the back face DEEPER units are screen-left, so the screen-left
         // neighbor is the NEXT unit (entered at its screen-right end).
@@ -514,7 +514,7 @@ export function moveRightInternal(scene: StoreScene) {
         scene.selectedCol++;
         scene.updateCameraTarget();
       } else {
-        const libUnits = scene.shelvingUnits.filter(u => u.libraryIdx === scene.selectedLibraryIdx);
+        const libUnits = scene.plan.unitsForLibrary(scene.selectedLibraryIdx);
         const currentUnit = libUnits[scene.selectedUnitIdx];
         // Screen-right neighbor: units are numbered in screen order, so it's
         // always the next unit.
@@ -584,7 +584,7 @@ export function moveRightInternal(scene: StoreScene) {
         scene.updateCameraTarget();
       } else {
         // We are at the unit's last col (its screen-right edge)
-        const libUnits = scene.shelvingUnits.filter(u => u.libraryIdx === scene.selectedLibraryIdx);
+        const libUnits = scene.plan.unitsForLibrary(scene.selectedLibraryIdx);
         const currentUnit = libUnits[scene.selectedUnitIdx];
         // On the back face SHALLOWER units are screen-right, so the
         // screen-right neighbor is the PREVIOUS unit (entered at col 0).
@@ -739,18 +739,21 @@ export function wrapOverShelfTop(scene: StoreScene) {
     scene.updateCameraTarget();
     return;
   }
-  const unit = scene.shelvingUnits.filter(u => u.libraryIdx === scene.selectedLibraryIdx)[scene.selectedUnitIdx];
+  const unit = scene.plan.unitsForLibrary(scene.selectedLibraryIdx)[scene.selectedUnitIdx];
   if (!unit) return;
-  const toSide = scene.selectedSide === 'back' ? 'front' : 'back';
+  const destination = scene.plan.oppositeFace(scene.selectedLibraryIdx,scene.selectedUnitIdx,scene.selectedSide==='back'?'back':'front');
+  if (!destination) return;
+  const toSide = destination.side;
   // Occupancy test copied from the end-of-run wrap: no movies on the far
   // face (wall-lined runs, layout tails) means no wrap.
-  const block = scene.plan.blockIndexOf(scene.selectedLibraryIdx, scene.selectedUnitIdx, toSide);
+  const block = scene.plan.blockIndexOf(scene.selectedLibraryIdx, destination.unit, toSide);
   const sideEntries = scene.getLayoutEntries().slice(block * UNIT_SIDE_CAPACITY, (block + 1) * UNIT_SIDE_CAPACITY);
   if (!sideEntries.some(Boolean)) return;
   // aisleColZ mirrors the two faces across the unit's geometric span (effCol
   // = unit.cols-1-col on exactly one side), so the slot physically behind
   // col c is unit.cols-1-c; clamp when the far face holds fewer columns.
   const mirrored = unit.cols - 1 - scene.selectedCol;
+  scene.selectedUnitIdx = destination.unit;
   scene.selectedSide = toSide;
   scene.updateColsCount();
   scene.selectedCol = Math.max(0, Math.min(scene.colsCount - 1, mirrored));
