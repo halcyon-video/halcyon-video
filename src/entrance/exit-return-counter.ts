@@ -23,8 +23,9 @@ export function buildExitReturnCounter(ctx: FixtureContext, parent: THREE.Group,
   const segments=exitReturnSegments(footprint);
   const root=new THREE.Group();root.name='exit-return-counter';
   root.position.set(footprint.cx,0,footprint.cz+footprint.d/2-quickDrop.glassOffset);root.rotation.y=footprint.yaw;parent.add(root);
-  const body = new THREE.MeshStandardMaterial({ color: ctx.activeTheme.palette.counterBody, roughness: .58 });
-  const top = new THREE.MeshStandardMaterial({ color: ctx.activeTheme.palette.counterTop, roughness: .38 });
+  const early = ctx.activeTheme.id === 'bb-1990';
+  const body = new THREE.MeshStandardMaterial({ color: early ? ctx.activeTheme.palette.primary : ctx.activeTheme.palette.counterBody, roughness: .58 });
+  const top = new THREE.MeshStandardMaterial({ color: early ? ctx.activeTheme.palette.primary : ctx.activeTheme.palette.counterTop, roughness: .38 });
   const plinth = new THREE.MeshStandardMaterial({ color: 0x191919, roughness: .7 });
   const fallback = new THREE.Group(); root.add(fallback);
   const worktop = new THREE.MeshStandardMaterial({color:0xf4f4f0,roughness:.5});
@@ -33,7 +34,7 @@ export function buildExitReturnCounter(ctx: FixtureContext, parent: THREE.Group,
     const lower=f.label.includes('worktop');
     const piece=new THREE.Group();piece.position.set(f.cx-footprint.cx,0,f.cz-root.position.z);piece.rotation.y=f.yaw;
     for(const [height,y,material] of (lower ? [[2.7,1.35,body],[.12,2.76,worktop]] :
-      [[2.28,1.14,body],[1.26,2.91,top],[.13,3.29,stripe]]) as [number,number,THREE.Material][]) {
+      (early ? [[2.74,1.37,body],[.8,3.14,top]] : [[2.28,1.14,body],[1.26,2.91,top],[.13,3.29,stripe]])) as [number,number,THREE.Material][]) {
       const mesh=new THREE.Mesh(new THREE.BoxGeometry(f.w,height,f.d),material);
       mesh.position.y=y;mesh.castShadow=mesh.receiveShadow=true;piece.add(mesh);
     }
@@ -55,14 +56,14 @@ export function buildExitReturnCounter(ctx: FixtureContext, parent: THREE.Group,
     insert.name='Full pane metal return insert fallback';insert.position.z=quickDrop.glassOffset+RETURN_WINDOW_CLEARANCE+FRAME_REVEAL_CENTER;
     insert.castShadow=insert.receiveShadow=true;fallback.add(insert);
   }
-  const unsubscribe=onBrandChange(()=>{const t=getActiveTheme();body.color.set(t.palette.counterBody);
-    worktop.color.set(0xf4f4f0);top.color.set(t.palette.counterTop);stripe.color.set(t.palette.secondary);});
+  const unsubscribe=onBrandChange(()=>{const t=getActiveTheme();body.color.set(early ? t.palette.primary : t.palette.counterBody);
+    worktop.color.set(0xf4f4f0);top.color.set(early ? t.palette.primary : t.palette.counterTop);stripe.color.set(t.palette.secondary);});
   ctx.addCollider(fallback);
-  const rel = 'fixtures/exit-return-counter/counter.glb';
+  const rel = `fixtures/exit-return-counter/counter${early ? '-1990' : ''}.glb`;
   const pack = brandPackDir();
   const hosted = import.meta.env.VITE_DEMO === '1';
   const paths = [...(!hosted && pack ? [`user-assets/${pack}/${rel}`] : []),
-    ...(!hosted ? [`user-assets/${rel}`] : []), 'models/exit-return-counter.glb'];
+    ...(!hosted ? [`user-assets/${rel}`] : []), `models/exit-return-counter${early ? '-1990' : ''}.glb`];
   const releaseWindow = addFastReturnWindow(ctx,root,length/15.5);
   const release = installDisplayModel(ctx,root,fallback,paths,
     {CounterBody:body,CounterTop:top,CounterWorktop:worktop,CounterInlay:stripe,CounterPlinth:plinth,CounterReturnMetal:metal},new THREE.Vector3(length/15.5,1,length/15.5),model=>{

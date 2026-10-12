@@ -1,6 +1,7 @@
 import { FRAME_REVEAL_DEPTH, FRAME_REVEAL_CENTER } from '../frame-reveal';
 import { vestibuleLayout, vestibuleSide, vestibuleStraightSide, vestibuleBackHalf } from '../vestibule-layout.ts';
 import { buildExitReturnCounter } from './exit-return-counter';
+import { addInformationSign1990 } from './information-sign-1990';
 import { buildWalkOffMats } from './walk-off-mats';
 import { installCounterOfficeKit } from '../fixtures/counter-office-kit';
 import { installPriceLabelGun } from '../fixtures/price-label-gun';
@@ -690,6 +691,7 @@ export class EntranceCheckout implements StoreFixture {
     // the counterStyle/counterTop variants — the footprint below is identical
     // across styles so every anchor below is unaffected by which style is active.
     const counterResult = buildCheckoutCounter(this.ctx, group, cx, backZ, spec, this.ctx.storeWidth);
+    if (activeStoreFormat().counterDressing) addInformationSign1990(this.ctx, group, counterResult);
     this.counterModelReady = counterResult.modelReady;
     const officeAnchor = counterOfficeKitAnchor(spec.counterShape, cx, backZ);
     if (officeAnchor && this.ctx.activeTheme.id !== 'bb-2010' && activeStoreFormat().counterDressing) {

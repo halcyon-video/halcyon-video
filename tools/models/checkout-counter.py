@@ -6,6 +6,8 @@ that surface. Dimensions are feet, matching entrance/counter.ts. Blender's Z
 is up; (x, -store_z, height) exports directly to Three's Y-up coordinates.
 """
 import math
+import sys
+EARLY_EXPORT = "--era-1990" in sys.argv
 from pathlib import Path
 import bpy
 import bmesh
@@ -36,23 +38,23 @@ for name, color, roughness in [
     MATERIALS.append(mat)
 
 
-def section(depth, island=False, rounded=False, drawers=False):
+def section(depth, island=False, rounded=False, drawers=False, early=False):
     """(inset, height, material on the following strip). Closed joinery profile."""
     h = 2.82 if island else 3.54
     top = 3 if island else 1
     # Recessed kick, eased panel foot, cabinet face, under-top shadow reveal.
-    face_top = 2.55 if island else 2.23
+    face_top = 2.55 if island else (2.74 if early else 2.23)
     p = [(.20, 0, 4), (.20, .28, 4), (.18, .32, 4),
          (.055, .32, 0), (.035, .35, 0), (.035, face_top, 0),
          (.045, face_top + .018, 5), (.07, face_top + .018, 5),
          (.07, face_top + .05, top), (.025, face_top + .05, top)]
-    if not island:
+    if not island and not early:
         # Recessed contrasting inlay, with an actual return at both lips.
         p += [(.015, 3.195, 1), (.032, 3.215, 1),
               (.055, 3.225, 2), (.055, 3.355, 1),
               (.032, 3.365, 1), (.015, 3.385, 1)]
     # A rolled front and rear edge, confined to the existing top footprint.
-    r = (.085 if rounded else .035) if not island else (.065 if rounded else .025)
+    r = (.055 if early else .085 if rounded else .035) if not island else (.065 if rounded else .025)
     p.append((0, h-r, top))
     for k in range(1, 7):
         a = math.pi - k * math.pi/12
@@ -78,9 +80,19 @@ def section(depth, island=False, rounded=False, drawers=False):
     return p
 
 
-def sweep(name, path, depth, island=False, rounded=False, drawers=False):
+def sweep(name, path, depth, island=False, rounded=False, drawers=False, early=False):
     """Welded quad rings, including mitres, routed seams and closed cut ends."""
     pts = [Vector(p) for p in path]
+    if early and not island:
+        # Small eased plan corners, within the established collision envelope.
+        eased = [pts[0]]
+        for a, b, c in zip(pts, pts[1:], pts[2:]):
+            start = b + (a-b).normalized()*.10
+            end = b + (c-b).normalized()*.10
+            for k in range(7):
+                t = k/6
+                eased.append(start*(1-t)**2 + b*2*t*(1-t) + end*t*t)
+        pts = eased + [pts[-1]]
     tangents = [(b-a).normalized() for a, b in zip(pts, pts[1:])]
     normals = [Vector((-t.y, t.x)) for t in tangents]
     offsets = [normals[0]]
@@ -106,7 +118,7 @@ def sweep(name, path, depth, island=False, rounded=False, drawers=False):
             t = s/length
             rings.append((a.lerp(b, t), offsets[i].lerp(offsets[i+1], t), distance+s, seam))
         distance += length
-    profile = section(depth, island, rounded, drawers)
+    profile = section(depth, island, rounded, drawers, early)
     verts, faces, materials, uv = [], [], [], []
     perimeter = [0]
     for a, b in zip(profile, profile[1:]):
@@ -216,7 +228,7 @@ def cut_return_receiver(objects, shape):
 
 
 variants = []
-for variant in ['shield', 'usquare', 'desk', 'shield-2010', 'usquare-2010']:
+for variant in (['shield', 'usquare'] if EARLY_EXPORT else ['shield', 'usquare', 'desk', 'shield-2010', 'usquare-2010']):
     modern = variant.endswith('-2010')
     shape = variant.removesuffix('-2010')
     if shape == 'shield':
@@ -232,7 +244,7 @@ for variant in ['shield', 'usquare', 'desk', 'shield-2010', 'usquare-2010']:
         bpy.context.scene.collection.children.link(collection)
         objects = []
         for i, path in enumerate(paths):
-            objects.append(sweep(f'{shape}-surround-{i}', path, 1.5, rounded=style == 'rounded'))
+            objects.append(sweep(f'{shape}-surround-{i}', path, 1.5, rounded=style == 'rounded', early=EARLY_EXPORT))
         objects.append(sweep(f'{shape}-work-cabinet', island, 1.6, island=True, rounded=style == 'rounded', drawers=modern))
         if shape != 'desk' and not modern:
             cut_return_receiver(objects[:-1], shape)
@@ -244,7 +256,7 @@ for variant in ['shield', 'usquare', 'desk', 'shield-2010', 'usquare-2010']:
         for obj in objects:
             obj.select_set(True)
         bpy.context.view_layer.objects.active = objects[0]
-        bpy.ops.export_scene.gltf(filepath=str(OUT / f'checkout-counter-{shape}-{style}{"-2010" if modern else ""}.glb'),
+        bpy.ops.export_scene.gltf(filepath=str(OUT / f'checkout-counter-{shape}-{style}{"-1990" if EARLY_EXPORT else "-2010" if modern else ""}.glb'),
                                   export_format='GLB', use_selection=True,
                                   export_extras=True, export_yup=True)
         tris = sum(sum(len(p.vertices)-2 for p in o.data.polygons) for o in objects)
@@ -270,4 +282,4 @@ for screen in bpy.data.screens:
 bpy.context.scene.unit_settings.system = 'IMPERIAL'
 bpy.context.scene.unit_settings.scale_length = .3048
 bpy.context.preferences.filepaths.save_version = 0
-bpy.ops.wm.save_as_mainfile(filepath=str(ROOT / 'tools/models/checkout-counter.blend'), compress=True)
+bpy.ops.wm.save_as_mainfile(filepath=str(ROOT / f'tools/models/checkout-counter{"-1990" if EARLY_EXPORT else ""}.blend'), compress=True)

@@ -1,3 +1,4 @@
+import { buildPaintedColumn1990 } from './painted-column-1990';
 import { finishedPanelGeometry } from '../joinery-model';
 // Four-sided mirrored column — a clad structural pillar standing in the open
 // sales floor, every face a mirror.
@@ -73,6 +74,12 @@ export class MirrorColumn implements StoreFixture {
 
   build(): void {
     const side = this.side();
+    if (this.ctx.activeTheme.id === 'bb-1990') {
+      const result = buildPaintedColumn1990(this.ctx, this.placement, side);
+      this.group = result.group;
+      this.releaseModel = result.dispose;
+      return;
+    }
     const { x, z } = this.placement.position;
     const ceilingY = this.ctx.ceilingY;
     const panelH = ceilingY - PLINTH_H - CAP_H;

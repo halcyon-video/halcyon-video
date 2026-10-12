@@ -181,6 +181,7 @@ export function buildCheckoutCounter(
     : null;
 
   const theme = getActiveTheme();
+  const early = theme.id === 'bb-1990' && !desk;
   // Laminate mottle/scuff albedo + micro-stipple normal (shared generator with
   // the shelving): the counter is the single biggest uniform-color slab in the
   // store, and bare material colors on it read as untextured CG.
@@ -189,19 +190,21 @@ export function buildCheckoutCounter(
   counterLamNorm.repeat.set(4, 4);
   counterLamRough.repeat.set(4, 4);
   const counterWhite = new THREE.MeshStandardMaterial({
-    color: new THREE.Color(theme.palette.counterBody), map: counterLamTex,
+    color: new THREE.Color(early ? theme.palette.primary : theme.palette.counterBody), map: counterLamTex,
     normalMap: counterLamNorm, normalScale: new THREE.Vector2(0.4, 0.4),
     // The map averages 0.65: 0.62 gives a satin finish near 0.40 while
     // allowing subtle wipe/grain variation in reflected highlights.
     roughnessMap: counterLamRough, roughness: 0.62, metalness: 0,
   });
   const counterTopBlue = new THREE.MeshStandardMaterial({
-    color: new THREE.Color(theme.palette.counterTop), map: counterLamTex,
+    color: new THREE.Color(early ? theme.palette.primary : theme.palette.counterTop), map: counterLamTex,
     normalMap: counterLamNorm, normalScale: new THREE.Vector2(0.4, 0.4),
     roughnessMap: counterLamRough, roughness: 0.55, metalness: 0,
   });
   const counterStripe = new THREE.MeshStandardMaterial({ color: new THREE.Color(theme.palette.secondary), map: counterLamTex, normalMap: counterLamNorm, normalScale: new THREE.Vector2(0.2, 0.2), roughnessMap: counterLamRough, roughness: 0.6, metalness: 0 });
-  const innerTopMat = counterTopMaterial(spec.counterTop, counterWhite);
+  const workWhite = early ? counterWhite.clone() : counterWhite;
+  if (early) workWhite.color.set(theme.palette.counterBody);
+  const innerTopMat = counterTopMaterial(spec.counterTop, workWhite);
 
   const bandH = 3.4;
   const bandD = 1.5;
@@ -334,7 +337,7 @@ export function buildCheckoutCounter(
 
     // 'rounded-2000s' softens every extruded edge with a bevel; 'laminate-90s'
     // keeps the original sharp-edged 90s laminate look.
-    const geom = new THREE.ExtrudeGeometry(shape, rounded && !opts?.noBevel
+    const geom = new THREE.ExtrudeGeometry(shape, (rounded || early) && !opts?.noBevel
       ? { depth: h, bevelEnabled: true, bevelThickness: Math.min(0.06, h / 3), bevelSize: 0.05, bevelSegments: 3 }
       : { depth: h, bevelEnabled: false });
     const mesh = new THREE.Mesh(geom, mat);
@@ -403,6 +406,10 @@ export function buildCheckoutCounter(
     // between the two blue pieces is the safety-stripe inlay groove. (The old
     // single-piece approach with a proud stripe box read as a bolted-on strip
     // and could z-fight; a real recessed channel can't.)
+    if (early) {
+      extrudeSegment(A_out, B_out, B_in, A_in, bandH + .14, 0, counterTopBlue);
+      return;
+    }
     const whiteH = bandH * (2 / 3);
     extrudeSegment(A_out, B_out, B_in, A_in, whiteH, 0, counterWhite);
     extrudeSegment(A_out, B_out, B_in, A_in, (STRIPE_Y - GROOVE_HALF) - whiteH, whiteH, counterTopBlue);
@@ -479,7 +486,7 @@ export function buildCheckoutCounter(
   const dFace = STRIPE_RECESS;            // stripe's visible face, just behind the band face
   const dBack = STRIPE_RECESS + STRIPE_T; // stripe slab's hidden back face
   const slabH = STRIPE_H + 0.02 + (rounded ? 0.12 : 0); // over-tall: tucks into the blue (and their bevels)
-  bandSegs.forEach(({ edge, trimA, trimB, e }) => {
+  if (!early) bandSegs.forEach(({ edge, trimA, trimB, e }) => {
     const N = normals[edge];
     const T = tangents[edge];
     const A = P_out[edge];
