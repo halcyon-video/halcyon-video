@@ -112,7 +112,7 @@ export function isEndcapKind(kind: string | undefined): boolean {
 // the fixture it sits under. Era-neutral furniture: the box itself carries no
 // print — a seasonal kit dresses its FRONT face (see collection-endcap.ts).
 export const ENDCAP_FOOTER_H = 1.30;
-const FOOTER_LIP = 0.06;
+export const FOOTER_LIP = 0.06;
 
 // How far the plinth reaches into the walkway, measured from the run's end
 // face (the plane the carcass mounts on, local z = -ENDCAP_CORE_DEPTH/2).
@@ -199,13 +199,14 @@ export function buildEndcapFooter(
   group: THREE.Group,
   coreWidth: number,
   coreDepth: number,
-  opts: { color?: string; dressFront?: (c: CanvasRenderingContext2D, W: number, H: number) => void } = {},
+  opts: { color?: string; dressFront?: (c: CanvasRenderingContext2D, W: number, H: number) => void;
+    context?: FixtureContext; ownModel?: (dispose: () => void) => void } = {},
 ): THREE.CanvasTexture | null {
   const w = coreWidth + FOOTER_LIP;
-  // Back edge stays a lip's-worth behind the carcass; the box then runs
-  // FORWARD to ENDCAP_FOOTER_DEPTH off the run's end face (see that constant),
+  // Back edge meets the host run; the deck projects only into open floor.
+  // It runs FORWARD to ENDCAP_FOOTER_DEPTH off the run's end face (see that constant),
   // so the panel and its shelves stand ON the plinth rather than over its edge.
-  const zBack = -(coreDepth / 2 + FOOTER_LIP / 2);
+  const zBack = -coreDepth / 2;
   const d = footerFrontZ() - zBack;
   const body = new THREE.MeshStandardMaterial({
     color: new THREE.Color((opts.color ?? getActiveTheme().palette.primary) as any),
@@ -240,7 +241,21 @@ export function buildEndcapFooter(
   plinth.position.set(0, ENDCAP_FOOTER_H / 2, zBack + d / 2);
   plinth.castShadow = true;
   plinth.receiveShadow = true;
-  group.add(plinth);
+  const fallback = new THREE.Group();
+  fallback.add(plinth);
+  group.add(fallback);
+  if (opts.context && opts.ownModel) {
+    const band = new THREE.MeshStandardMaterial({
+      color: opts.dressFront ? '#A8181F' : body.color, roughness: .8,
+    });
+    // The optional local millwork uses the same dimensions and material roles.
+    // Its fallback remains both visible and collidable until detail is ready.
+    const release = installDisplayModel(opts.context, group, fallback,
+      'user-assets/fixtures/endcap-plinth/model.glb',
+      { FooterBody: body, FooterTop: topLip, FooterFront: mats[4], FooterBand: band },
+      new THREE.Vector3(w / 2.22, 1, d / 1.50));
+    opts.ownModel(() => { release(); band.dispose(); });
+  }
   return tex;
 }
 
@@ -256,6 +271,7 @@ export abstract class EndcapShelf implements SlottedFixture {
   protected footerTex: THREE.Texture | null = null;
   private movies: Movie[] = [];
   private disposeModel: (() => void) | null = null;
+  protected disposeFooterModel: (() => void) | null = null;
   private dismissedIds = new Set<string>();
   private requestedTagMeshes = new Map<string, THREE.Mesh>();
 
@@ -314,6 +330,7 @@ export abstract class EndcapShelf implements SlottedFixture {
     if (footerOpt) {
       this.footerTex = buildEndcapFooter(this.group, coreWidth, coreDepth, {
         color: typeof footerOpt === 'string' ? footerOpt : undefined,
+        context: this.ctx, ownModel: dispose => { this.disposeFooterModel = dispose; },
       });
     }
 
@@ -405,6 +422,8 @@ export abstract class EndcapShelf implements SlottedFixture {
 
   /** Release whatever buildHeader() allocated (paired override point). */
   protected disposeHeader(): void {
+    this.disposeFooterModel?.();
+    this.disposeFooterModel = null;
     this.footerTex?.dispose();
     this.footerTex = null;
   }
@@ -436,7 +455,7 @@ export abstract class EndcapShelf implements SlottedFixture {
       kind: 'fixture',
       cx: this.placement.position.x + centerLocalZ * Math.sin(yaw),
       cz: this.placement.position.z + centerLocalZ * Math.cos(yaw),
-      w: ENDCAP_WIDTH,
+      w: ENDCAP_WIDTH + (this.hasFooter() ? FOOTER_LIP : 0),
       d: frontExtent + backExtent,
       yaw,
     };

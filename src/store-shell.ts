@@ -76,6 +76,7 @@ import { buildStorefrontCampaignPoster, campaignBannerSpan } from './fixtures/st
 import { buildSecurityCamera93 } from './fixtures/security-camera-93';
 import { isEndcapKind } from './fixtures/endcap-shelf';
 import { collectionEndcapPlacements } from './fixtures/collection-endcap';
+import { aisleEndBasePlacements } from './fixtures/aisle-end-base';
 import { buildMembershipOvalHanger } from './fixtures/membership-oval-hanger';
 import { buildRentingBetterHangers } from './fixtures/renting-better-hanger';
 import { buildJoinTodayRewardsRisers } from './fixtures/join-today-rewards-riser';
@@ -2321,6 +2322,7 @@ export function buildStore(scene: StoreScene) {
     ...(scene.gameMovies.length > 0 ? gameSectionPlacements(scene.getStoreWidth()) : []),
     // Franchise collection displays at their reserved run ends.
     ...collectionEndcaps,
+    ...aisleEndBasePlacements(scene, endcapHostLineIds),
     // The back room, on the formats that have one (GH #33).
     ...(scene.plan.aboveRRoom ? curtainedAlcovePlacements(scene.plan.aboveRRoom.depth) : []),
     // Potted plants in mom-and-pop mode
@@ -2400,7 +2402,7 @@ export function buildStore(scene: StoreScene) {
     }
     const fixture = createFixture(placement, scene.fixtureContext());
     fixture.build();
-    if (placement.kind in RETAIL_FIXTURE_SPECS || placement.kind === 'gumball-machine') scene.retailFixtures.push(fixture);
+    if (placement.kind in RETAIL_FIXTURE_SPECS || placement.kind === 'gumball-machine' || placement.kind === 'aisle-end-base') scene.retailFixtures.push(fixture);
     const footprint = fixture.getFootprint?.();
     if (footprint) fixtureFootprints.push(footprint);
     fixtureFootprints.push(...(fixture.getFootprints?.() ?? []));

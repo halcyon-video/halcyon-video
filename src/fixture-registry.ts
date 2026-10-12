@@ -21,6 +21,7 @@ import {
 import { GameSection } from './fixtures/game-section';
 import { BargainBin } from './fixtures/bargain-bin';
 import { CollectionEndcap } from './fixtures/collection-endcap';
+import { AisleEndBase } from './fixtures/aisle-end-base';
 import { GoldClamshellDisplay } from './fixtures/gold-clamshell';
 import { PvDrapeTable } from './fixtures/pv-drape-table';
 import { ComingSoonLetterboard } from './fixtures/coming-soon-letterboard';
@@ -104,3 +105,5 @@ registerFixtureKind('now-showing-lightbox', (placement, ctx) => new NowShowingLi
 registerFixtureKind('gumball-machine', (placement, ctx) => new GumballMachine(placement, ctx));
 
 registerFixtureKind('twin-crt-tower', (placement, ctx) => new TwinCrtTower(placement, ctx));
+
+registerFixtureKind('aisle-end-base', (placement, ctx) => new AisleEndBase(placement, ctx));
