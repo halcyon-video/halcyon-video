@@ -5,7 +5,13 @@ import { CASE_DEPTH } from '../video-case';
 /** Closed square millwork shell following a locally installed shelf contract. */
 export function terracedDisplayGeometry(profile: FloorDisplayProfile): THREE.BufferGeometry {
   const { shelfHeights: heights, shelfCenters: centers, lean, coreHeight } = profile;
-  const rings: [number, number][] = [[0, centers[0] + .12]];
+  const outer = centers[0] + .12;
+  const support = profile.pedestalWidth == null ? outer : profile.pedestalWidth / 2;
+  const rings: [number, number][] = [[0, support]];
+  if (profile.pedestalWidth != null) {
+    const underside = heights[0] - .07;
+    rings.push([underside, support], [underside, outer]);
+  }
   heights.forEach((height, row) => {
     const radius = centers[row] + .12;
     rings.push([height - .035, radius], [height, radius]);

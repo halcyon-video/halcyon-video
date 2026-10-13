@@ -28,3 +28,20 @@ test('installed era profiles apply only to their era and allow individual overri
   installFloorDisplayProfiles({early:{'*':{...profile,model:'../bad.glb'}}});
   assert.equal(localFloorDisplayProfile('stand', 'early'), null);
 });
+
+test('a raised terrace keeps an inset support and rejects incoherent widths', () => {
+  const raised = {...profile, terraced: true, pedestalWidth: 1.4};
+  assert.equal(parseFloorDisplayProfile(raised)?.pedestalWidth, 1.4);
+  for (const width of [0, NaN, Infinity, 3, '1.4']) {
+    assert.equal(parseFloorDisplayProfile({...raised, pedestalWidth: width}), null);
+  }
+  assert.equal(parseFloorDisplayProfile({...raised, terraced: false}), null);
+});
+
+test('one installed feature stand leaves other displays and eras untouched', () => {
+  installFloorDisplayProfiles({early:{feature:{...profile,terraced:true,pedestalWidth:1.4}}});
+  assert.equal(localFloorDisplayProfile('feature','early')?.pedestalWidth,1.4);
+  assert.equal(localFloorDisplayProfile('other','early'),null);
+  assert.equal(localFloorDisplayProfile('feature','later'),null);
+  installFloorDisplayProfiles({});
+});

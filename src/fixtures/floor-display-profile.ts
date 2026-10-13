@@ -8,6 +8,8 @@ export interface FloorDisplayProfile {
   dark: boolean;
   topper: boolean;
   terraced?: boolean;
+  /** Optional inset support below the lowest terrace, in feet. */
+  pedestalWidth?: number;
   light?: boolean;
   shelfColumns?: number[];
 }
@@ -23,11 +25,13 @@ export function parseFloorDisplayProfile(value: unknown): FloorDisplayProfile | 
   if (centers.some(n => typeof n !== 'number' || !Number.isFinite(n) || n < .5 || n > (p.terraced === true ? 1.38 : 1.25))) return null;
   if (typeof p.coreHeight !== 'number' || !Number.isFinite(p.coreHeight) || p.coreHeight < heights[heights.length - 1] + .5 || p.coreHeight > 6) return null;
   if (typeof p.lean !== 'number' || !Number.isFinite(p.lean) || p.lean < -.65 || p.lean > 0) return null;
+  const pedestalWidth = p.pedestalWidth;
+  if (pedestalWidth !== undefined && (p.terraced !== true || typeof pedestalWidth !== 'number' || !Number.isFinite(pedestalWidth) || pedestalWidth < .5 || pedestalWidth >= 2 * (centers[0] + .12))) return null;
   const columns = p.shelfColumns;
   if (columns !== undefined && (!Array.isArray(columns) || columns.length !== heights.length || columns.some(n => !Number.isInteger(n) || n < 1 || n > 5))) return null;
   if (p.terraced === true && centers.some((n, i) => i > 0 && n >= centers[i - 1])) return null;
   if (p.terraced === true && centers.some((n, i) => n - .15 + ((heights[i + 1] ?? p.coreHeight as number) - heights[i]) * Math.tan(p.lean as number) <= .1)) return null;
-  return { terraced: p.terraced === true, light: p.light === true, shelfColumns: Array.isArray(columns) ? columns.slice() : undefined, model: p.model, coreHeight: p.coreHeight, shelfHeights: heights.slice(), shelfCenters: centers.slice(), lean: p.lean, dark: p.dark === true, topper: p.topper !== false };
+  return { pedestalWidth: typeof pedestalWidth === 'number' ? pedestalWidth : undefined, terraced: p.terraced === true, light: p.light === true, shelfColumns: Array.isArray(columns) ? columns.slice() : undefined, model: p.model, coreHeight: p.coreHeight, shelfHeights: heights.slice(), shelfCenters: centers.slice(), lean: p.lean, dark: p.dark === true, topper: p.topper !== false };
 }
 
 const installed: Record<string, Record<string, FloorDisplayProfile>> = Object.create(null);
