@@ -114,19 +114,15 @@ export function isEndcapKind(kind: string | undefined): boolean {
 export const ENDCAP_FOOTER_H = 1.30;
 export const FOOTER_LIP = 0.06;
 
-// How far the plinth reaches into the walkway, measured from the run's end
-// face (the plane the carcass mounts on, local z = -ENDCAP_CORE_DEPTH/2).
-//
-// Owner ruling 2026-08-01, F8 pin 021: "the green plinth needs to extend out
-// about a foot and a half at the base of this endcap". It used to be
-// ENDCAP_CORE_DEPTH + FOOTER_LIP = 0.20 ft — a card standing behind the
-// display shelves, which overhang 0.57 ft, so the fixture read as shelves
-// floating over nothing and the "plinth" showed only as a green stripe on the
-// carcass. The reference agrees with the owner: in photo 2580265323 the green
-// base of both holiday units is a deep box the panel stands ON, its front and
-// side faces well proud of the panel and its white deck carrying stock (the
-// Bond instance shows tapes standing on that deck).
-export const ENDCAP_FOOTER_DEPTH = 1.50;
+// Reach from the run's end face. Keep a usable deck beyond the display
+// shelves without the oversized projection of the earlier 1.50 ft base.
+export const ENDCAP_FOOTER_DEPTH = 1.10;
+
+// Fit the deck to the tapered panel at deck height, with a small total lip.
+// The floor-width panel would leave a conspicuous ledge on both sides here.
+function endcapFooterWidth(coreWidth: number): number {
+  return Math.min(coreWidth, unitDepthAtHeight(ENDCAP_FOOTER_H)) + FOOTER_LIP;
+}
 
 // The plinth's LIVERY, measured off IMG-A (1988 "NOW OPEN" commercial frame,
 // /uploads/…064e0392-6484.png): the floor plinths standing under the white
@@ -202,7 +198,7 @@ export function buildEndcapFooter(
   opts: { color?: string; dressFront?: (c: CanvasRenderingContext2D, W: number, H: number) => void;
     context?: FixtureContext; ownModel?: (dispose: () => void) => void } = {},
 ): THREE.CanvasTexture | null {
-  const w = coreWidth + FOOTER_LIP;
+  const w = endcapFooterWidth(coreWidth);
   // Back edge meets the host run; the deck projects only into open floor.
   // It runs FORWARD to ENDCAP_FOOTER_DEPTH off the run's end face (see that constant),
   // so the panel and its shelves stand ON the plinth rather than over its edge.
@@ -253,7 +249,10 @@ export function buildEndcapFooter(
     const release = installDisplayModel(opts.context, group, fallback,
       'user-assets/fixtures/endcap-plinth/model.glb',
       { FooterBody: body, FooterTop: topLip, FooterFront: mats[4], FooterBand: band },
-      new THREE.Vector3(w / 2.22, 1, d / 1.50));
+      new THREE.Vector3(w / 2.22, 1, d / 1.50), undefined, model => {
+        // Scaling the authored -0.07 ft back edge must not open a gap at the run.
+        model.position.z = zBack + 0.07 * d / 1.50;
+      });
     opts.ownModel(() => { release(); band.dispose(); });
   }
   return tex;
@@ -455,7 +454,8 @@ export abstract class EndcapShelf implements SlottedFixture {
       kind: 'fixture',
       cx: this.placement.position.x + centerLocalZ * Math.sin(yaw),
       cz: this.placement.position.z + centerLocalZ * Math.cos(yaw),
-      w: ENDCAP_WIDTH + (this.hasFooter() ? FOOTER_LIP : 0),
+      w: this.placement.options?.dressingOnly === true ? endcapFooterWidth(ENDCAP_WIDTH)
+        : ENDCAP_WIDTH + (this.hasFooter() ? FOOTER_LIP : 0),
       d: frontExtent + backExtent,
       yaw,
     };
