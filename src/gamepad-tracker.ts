@@ -38,3 +38,9 @@ if (typeof window !== 'undefined') {
     }
   });
 }
+
+/** False while the page is hidden or unfocused (e.g. a game is in front): local pad input must be ignored then. */
+export function padInputAllowed(): boolean {
+  if (typeof document === 'undefined') return true;
+  return !document.hidden && document.hasFocus();
+}

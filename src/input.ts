@@ -1,6 +1,6 @@
 import { isExternalGameActive, onExternalGameChange } from './external-game-state.ts';
 // HTPC Input Management System for Project Blue Ticket
-import { gamepadEverConnected } from './gamepad-tracker';
+import { gamepadEverConnected, padInputAllowed } from './gamepad-tracker';
 import { notifyUserActivity } from './video-case';
 import { markUserActivity } from './user-activity';
 import { keyboardOwnedByControl } from './text-entry-focus';
@@ -418,6 +418,11 @@ export class InputManager {
   // Poll controller axis and button states
   private pollGamepad() {
     if (!gamepadEverConnected || !navigator.getGamepads) return;
+    if (!padInputAllowed()) {
+      // Backgrounded: drop edge state so regaining focus re-baselines instead of firing a burst.
+      this.lastButtonsState = []; this.lastAxesState = [];
+      return;
+    }
     const gamepads = navigator.getGamepads();
     if (!gamepads) return;
     let gp: Gamepad | null = null;
