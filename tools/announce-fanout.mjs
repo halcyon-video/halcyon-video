@@ -212,7 +212,12 @@ function fitSentences(text, maxLen) {
   return out || truncate(text, maxLen);
 }
 
-/** { title, blurb, url } — the raw material every channel formats to its own limit. */
+/**
+ * { title, blurb, url, notesUrl } — the raw material every channel formats to
+ * its own limit. `url` is the browser demo; `notesUrl` is this tag's GitHub
+ * Release page, i.e. the changelog announce.yml publishes just before the
+ * fan-out runs.
+ */
 function buildAnnouncement(opts) {
   const [org, name] = opts.repo.split('/');
   const title = `Halcyon Video ${opts.tag}`;
@@ -226,7 +231,8 @@ function buildAnnouncement(opts) {
       + ' git tag -a <tag> -m "<what this adds>"');
   }
   const url = `https://${org}.github.io/${name}/`;
-  return { title, blurb, url };
+  const notesUrl = `https://github.com/${org}/${name}/releases/tag/${encodeURIComponent(opts.tag)}`;
+  return { title, blurb, url, notesUrl };
 }
 
 function composeText(maxLen, { title, blurb, url }, identity = null) {
@@ -285,11 +291,18 @@ function readScreenshot(opts) {
 // just sized for an embed instead of a status.
 const DISCORD_BLURB_MAX = 350;
 
+// The Discord community is mostly people who already have the app, so the
+// post sends them to what changed rather than back to the demo (owner ask,
+// 2026-10-13). The other channels keep the demo link: that audience is new.
+function discordDescription(ann) {
+  return `${fitSentences(ann.blurb, DISCORD_BLURB_MAX)}\n\nFull changelog: ${ann.notesUrl}`;
+}
+
 async function channelDiscord(opts, ann) {
   const creds = requireEnv('DISCORD_WEBHOOK_URL');
   if (!creds) return;
   const shot = readScreenshot(opts);
-  const embed = { title: ann.title, description: `${fitSentences(ann.blurb, DISCORD_BLURB_MAX)}\n\n${ann.url}`, color: 0x2b6cb0 };
+  const embed = { title: ann.title, url: ann.notesUrl, description: discordDescription(ann), color: 0x2b6cb0 };
   const form = new FormData();
   if (shot) {
     embed.image = { url: `attachment://${shot.name}` };
@@ -486,6 +499,7 @@ function channelPreview(opts, ann) {
   console.log(`source: ${src}`);
   console.log(`title:  ${ann.title}`);
   console.log(`url:    ${ann.url}`);
+  console.log(`notes:  ${ann.notesUrl}`);
   console.log(`image:  ${opts.screenshot || '(none)'}`);
   console.log(`\nblurb:\n${ann.blurb}\n`);
   for (const [name, limit] of [['discord', 4096], ['mastodon', 500], ['bluesky', 300], ['x', 280]]) {
@@ -493,7 +507,7 @@ function channelPreview(opts, ann) {
     // hide a wall-of-text post that only shows up once it's already live —
     // which is what happened to v0.9.1's Discord embed.
     const text = name === 'discord'
-      ? `${ann.title}\n\n${fitSentences(ann.blurb, DISCORD_BLURB_MAX)}\n\n${ann.url}`
+      ? `${ann.title}\n\n${discordDescription(ann)}`
       : composeText(limit, ann, IDENTITY);
     console.log(`--- ${name} (${text.length}/${limit}) ---\n${text}\n`);
   }
