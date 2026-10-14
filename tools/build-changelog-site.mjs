@@ -131,39 +131,52 @@ function renderMarkdown(md, rewrite = (u) => u) {
 
 // ---- pages -------------------------------------------------------------------
 
+// Styled after a mid-90s video-store home page (owner reference, 2026-10-13):
+// black page, Times, a banner shot with the store's badge, orange underlined
+// links behind blue squares, thumbnail rows, a red rule over the footer.
 const CSS = `
-:root { color-scheme: dark; --ink: #f2efe6; --dim: #b9c3d6; --blue: #2b6cb0; --gold: #f2c14e; --bg: #0d1626; --card: #15223a; }
 * { box-sizing: border-box; }
-body { margin: 0; background: var(--bg); color: var(--ink); font: 17px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-a { color: var(--gold); }
-header.site { background: var(--blue); border-bottom: 4px solid var(--gold); }
-header.site .wrap { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 14px; padding-bottom: 14px; }
-header.site a.brand { color: #fff; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; text-decoration: none; font-size: 18px; }
-.wrap { max-width: 820px; margin: 0 auto; padding: 0 18px; }
-.cta { display: inline-block; background: var(--gold); color: #10213b; font-weight: 700; text-decoration: none; padding: 10px 16px; border-radius: 6px; font-size: 16px; }
-h1 { font-size: 32px; line-height: 1.2; margin: 28px 0 4px; }
-h2 { font-size: 23px; margin: 30px 0 8px; }
-h3 { font-size: 19px; margin: 22px 0 6px; color: var(--dim); }
-.date { color: var(--dim); margin: 0 0 18px; font-size: 16px; }
-img { max-width: 100%; height: auto; display: block; border-radius: 6px; }
-figure { margin: 18px 0; }
-figcaption { color: var(--dim); font-size: 15px; margin-top: 6px; }
-ul { padding-left: 22px; }
+html, body { background: #000; }
+body { margin: 0; color: #fff; font: 18px/1.45 "Times New Roman", Times, serif; }
+.page { max-width: 560px; margin: 0 auto; padding-bottom: 24px; }
+a { color: #ff9933; }
+a:hover { color: #ffcc66; }
+.banner { position: relative; display: block; }
+.banner .shot { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; }
+.banner .badge { position: absolute; left: 3%; top: 5%; width: 36%; transform: rotate(-5deg); filter: drop-shadow(3px 4px 0 rgba(0, 0, 0, .65)); }
+.inner { padding: 0 14px; }
+h1 { font-weight: normal; font-size: 26px; line-height: 1.2; text-transform: uppercase; text-align: center; margin: 22px 0 12px; }
+nav { text-align: center; line-height: 1.6; margin: 0 0 18px; }
+nav a { white-space: nowrap; margin: 0 3px; }
+nav a::before, summary::before { content: ""; display: inline-block; width: .55em; height: .55em; background: #3333ff; margin-right: 2px; }
+hr { border: 0; border-top: 1px solid #6b6b6b; margin: 18px 0; }
+.dateline { font-size: 16px; margin: 0 0 14px; }
+.intro { text-align: center; }
+h2, h3 { font-weight: normal; text-transform: uppercase; letter-spacing: .04em; font-size: 20px; margin: 26px 0 8px; }
+ul { padding-left: 22px; list-style: square; }
 li { margin: 6px 0; }
-code { background: #22324f; padding: 1px 5px; border-radius: 4px; font-size: 15px; }
-.gallery { display: grid; gap: 16px; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
-.gallery figure { margin: 0; }
-details { background: var(--card); border-radius: 8px; padding: 12px 16px; margin: 26px 0; }
-summary { cursor: pointer; font-weight: 700; font-size: 18px; }
-.release { display: block; background: var(--card); border-radius: 10px; overflow: hidden; margin: 22px 0; color: inherit; text-decoration: none; }
-.release img { border-radius: 0; aspect-ratio: 16 / 9; object-fit: cover; width: 100%; }
-.release .body { padding: 14px 18px 18px; }
-.release h2 { margin: 0 0 2px; }
-.release p { margin: 8px 0 0; }
-footer { color: var(--dim); font-size: 15px; padding: 30px 0 40px; }
+li::marker { color: #3333ff; }
+code { font-family: "Courier New", Courier, monospace; font-size: 16px; }
+img { max-width: 100%; height: auto; }
+figure { margin: 16px 0; }
+figure img, .rel img { display: block; border: 1px solid #9a9a9a; }
+figcaption { font-size: 15px; margin-top: 4px; }
+.shots { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 14px; }
+.shots figure { margin: 0; }
+details { margin: 22px 0; }
+summary { cursor: pointer; color: #ff9933; text-decoration: underline; list-style: none; }
+summary::-webkit-details-marker { display: none; }
+.rel { display: flex; gap: 14px; align-items: flex-start; margin: 0 0 22px; }
+.rel > a:first-child { flex: none; width: 132px; }
+.rel img { width: 100%; }
+.rel p { margin: 4px 0 0; }
+.ver { text-transform: uppercase; }
+.new { color: #ffff00; font-weight: bold; font-size: 16px; }
+.date { font-size: 16px; }
+footer { border-top: 1px solid #cc0000; margin: 26px 14px 0; padding-top: 8px; font-size: 15px; line-height: 1.35; text-align: center; }
 `;
 
-function page({ title, description, image, url, body, links }) {
+function page({ title, heading, description, image, url, banner, body, links }) {
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -179,11 +192,16 @@ ${image ? `<meta property="og:image" content="${escapeHtml(image)}">\n<meta name
 <style>${CSS}</style>
 </head>
 <body>
-<header class="site"><div class="wrap"><a class="brand" href="${links.index}">Halcyon Video</a><a class="cta" href="${links.demo}">Try the store</a></div></header>
-<main class="wrap">
+<div class="page">
+<a class="banner" href="${links.index}"><img class="shot" src="${escapeHtml(banner.src)}" alt="${escapeHtml(banner.alt)}"><img class="badge" src="${links.badge}" alt="Halcyon Video"></a>
+<div class="inner">
+<h1>${escapeHtml(heading)}</h1>
+<nav><a href="${links.index}">All Releases</a> <a href="${links.demo}">Try the Store</a> <a href="${links.repo}/releases/latest">Downloads</a></nav>
+<hr>
 ${body}
-</main>
-<footer class="wrap">Halcyon Video is free and open source. <a href="${links.repo}">Source and downloads</a>.</footer>
+</div>
+<footer>Halcyon Video is free and open source software.<br><a href="${links.repo}">Source code and downloads</a> are on GitHub.</footer>
+</div>
 </body>
 </html>
 `;
@@ -213,8 +231,17 @@ function main() {
   fs.rmSync(opts.out, { recursive: true, force: true });
   fs.mkdirSync(opts.out, { recursive: true });
 
+  // Site art: the store's badge (the app icon's sign, without its tile) and
+  // the aisle shot for pages whose release has no headline picture.
+  const icon = fs.readFileSync(path.join(root, 'src-tauri', 'icons', 'app-icon.svg'), 'utf8');
+  const badge = icon.replace(/<rect\b[^>]*id="rect1"[^>]*\/>/, '')
+    .replace(/width="1024"\s+height="1024"\s+viewBox="0 0 1024 1024"/, 'width="944" height="536" viewBox="40 244 944 536"');
+  if (badge === icon) console.log('::warning::build-changelog-site: app-icon.svg changed shape; the banner badge keeps its tile');
+  fs.writeFileSync(path.join(opts.out, 'halcyon-badge.svg'), badge);
+  fs.copyFileSync(path.join(root, 'public', 'social-preview.jpg'), path.join(opts.out, 'banner.jpg'));
+
   const cards = [];
-  for (const tag of tags) {
+  for (const [i, tag] of tags.entries()) {
     const dir = path.join(opts.out, tag);
     fs.mkdirSync(dir, { recursive: true });
     const notesFile = path.join(releasesDir, `${tag}.md`);
@@ -250,43 +277,49 @@ function main() {
     const version = tag.slice(1);
     const summary = (notes && summaryOf(notes)) || `Everything that changed in Halcyon Video ${version}.`;
 
+    const older = tags[i + 1];
+    const newer = tags[i - 1];
     const body = [
-      `<p><a href="../">All releases</a></p>`,
-      `<h1>Halcyon Video ${escapeHtml(version)}</h1>`,
-      entry?.date ? `<p class="date">Released ${formatDate(entry.date)}</p>` : '',
-      hero ? `<figure><img src="${hero.name}" alt="${escapeHtml(hero.caption || `Halcyon Video ${version}`)}">${hero.caption ? `<figcaption>${escapeHtml(hero.caption)}</figcaption>` : ''}</figure>` : '',
+      `<p class="dateline">${entry?.date ? `Released ${formatDate(entry.date)}` : `Version ${escapeHtml(version)}`}${hero?.caption ? `<br>Pictured above: ${escapeHtml(hero.caption)}` : ''}</p>`,
       notesHtml,
       gallery.length
-        ? `<h2>Screenshots</h2><div class="gallery">${gallery.map((p) =>
+        ? `<h2>See it in action!</h2><div class="shots">${gallery.map((p) =>
           `<figure><a href="${p.name}"><img src="${p.name}" alt="${escapeHtml(p.caption || '')}" loading="lazy"></a>${p.caption ? `<figcaption>${escapeHtml(p.caption)}</figcaption>` : ''}</figure>`).join('')}</div>`
         : '',
       entry?.body
         ? (notes
-          ? `<details><summary>Every change in ${escapeHtml(version)}</summary>${renderMarkdown(entry.body)}</details>`
+          ? `<details><summary>Click here for every change in ${escapeHtml(version)}!</summary>${renderMarkdown(entry.body)}</details>`
           : `<h2>What changed</h2>${renderMarkdown(entry.body)}`)
+        : '',
+      older || newer
+        ? `<hr><nav>${newer ? `<a href="../${newer}/">Newer: ${escapeHtml(newer.slice(1))}</a> ` : ''}${older ? `<a href="../${older}/">Older: ${escapeHtml(older.slice(1))}</a>` : ''}</nav>`
         : '',
     ].filter(Boolean).join('\n');
 
     const html = page({
       title: `Halcyon Video ${version}: what's new`,
+      heading: `New in Halcyon Video ${version}!`,
       description: summary,
       image: hero ? `${site}/changelog/${tag}/${hero.name}` : `${site}/social-preview.jpg`,
       url: `${site}/changelog/${tag}/`,
+      banner: hero ? { src: hero.name, alt: hero.caption || `Halcyon Video ${version}` } : { src: '../banner.jpg', alt: 'The Halcyon Video store' },
       body,
-      links: { index: '../', demo: '../../', repo },
+      links: { index: '../', demo: '../../', repo, badge: '../halcyon-badge.svg' },
     });
     fs.writeFileSync(path.join(dir, 'index.html'), html);
 
-    cards.push(`<a class="release" href="${tag}/">${hero ? `<img src="${tag}/${hero.name}" alt="" loading="lazy">` : ''}<div class="body"><h2>${escapeHtml(version)}</h2>${entry?.date ? `<div class="date">${formatDate(entry.date)}</div>` : ''}<p>${escapeHtml(summary)}</p></div></a>`);
+    cards.push(`<div class="rel">${hero ? `<a href="${tag}/"><img src="${tag}/${hero.name}" alt="" loading="lazy"></a>` : ''}<div><a class="ver" href="${tag}/">Version ${escapeHtml(version)}</a>${i === 0 ? ' <span class="new">NEW!</span>' : ''}${entry?.date ? `<br><span class="date">${formatDate(entry.date)}</span>` : ''}<p>${escapeHtml(summary)}</p></div></div>`);
   }
 
   const index = page({
     title: "Halcyon Video: what's new",
+    heading: "What's New at Halcyon Video!",
     description: 'Every Halcyon Video release, with what changed and pictures of it.',
     image: `${site}/social-preview.jpg`,
     url: `${site}/changelog/`,
-    body: `<h1>What's new</h1>\n<p class="date">Every release of Halcyon Video, newest first.</p>\n${cards.join('\n')}`,
-    links: { index: './', demo: '../', repo },
+    banner: { src: 'banner.jpg', alt: 'The Halcyon Video store' },
+    body: `<p class="intro">Bookmark this page and check back for every new release! Each one has its own page with pictures and every change.</p>\n<hr>\n${cards.join('\n')}`,
+    links: { index: './', demo: '../', repo, badge: 'halcyon-badge.svg' },
   });
   fs.writeFileSync(path.join(opts.out, 'index.html'), index);
   console.log(`build-changelog-site: ${tags.length} release pages in ${opts.out}`);
