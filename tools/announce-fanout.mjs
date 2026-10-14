@@ -213,10 +213,11 @@ function fitSentences(text, maxLen) {
 }
 
 /**
- * { title, blurb, url, notesUrl } — the raw material every channel formats to
- * its own limit. `url` is the browser demo; `notesUrl` is this tag's GitHub
- * Release page, i.e. the changelog announce.yml publishes just before the
- * fan-out runs.
+ * { title, blurb, url, changelogUrl, releaseUrl } — the raw material every
+ * channel formats to its own limit. `url` is the browser demo; `changelogUrl`
+ * is this release's page on the hosted changelog beside it (built by
+ * tools/build-changelog-site.mjs in deploy-demo.yml); `releaseUrl` is the
+ * GitHub Release announce.yml creates, the fallback while that page deploys.
  */
 function buildAnnouncement(opts) {
   const [org, name] = opts.repo.split('/');
@@ -231,8 +232,9 @@ function buildAnnouncement(opts) {
       + ' git tag -a <tag> -m "<what this adds>"');
   }
   const url = `https://${org}.github.io/${name}/`;
-  const notesUrl = `https://github.com/${org}/${name}/releases/tag/${encodeURIComponent(opts.tag)}`;
-  return { title, blurb, url, notesUrl };
+  const changelogUrl = `${url}changelog/${encodeURIComponent(opts.tag)}/`;
+  const releaseUrl = `https://github.com/${org}/${name}/releases/tag/${encodeURIComponent(opts.tag)}`;
+  return { title, blurb, url, changelogUrl, releaseUrl };
 }
 
 function composeText(maxLen, { title, blurb, url }, identity = null) {
@@ -294,15 +296,34 @@ const DISCORD_BLURB_MAX = 350;
 // The Discord community is mostly people who already have the app, so the
 // post sends them to what changed rather than back to the demo (owner ask,
 // 2026-10-13). The other channels keep the demo link: that audience is new.
-function discordDescription(ann) {
-  return `${fitSentences(ann.blurb, DISCORD_BLURB_MAX)}\n\nFull changelog: ${ann.notesUrl}`;
+function discordDescription(ann, link) {
+  return `${fitSentences(ann.blurb, DISCORD_BLURB_MAX)}\n\nWhat's new, with pictures: ${link}`;
+}
+
+// The tag push starts this workflow and the master push starts the Pages
+// deploy at the same moment, and the deploy takes a few minutes longer, so
+// the release's changelog page usually isn't up yet when Discord's turn comes.
+// Wait for it; if it never appears, link the GitHub Release instead of a 404.
+const CHANGELOG_WAIT_MS = 15 * 60 * 1000;
+
+async function liveChangelogLink(ann) {
+  const deadline = Date.now() + CHANGELOG_WAIT_MS;
+  for (;;) {
+    const res = await fetch(ann.changelogUrl, { method: 'HEAD', redirect: 'follow' }).catch(() => null);
+    if (res?.ok) return ann.changelogUrl;
+    if (Date.now() >= deadline) break;
+    await new Promise((r) => setTimeout(r, 20_000));
+  }
+  console.log(`::warning::announce-fanout: ${ann.changelogUrl} did not come up within 15 minutes — Discord links the GitHub Release instead`);
+  return ann.releaseUrl;
 }
 
 async function channelDiscord(opts, ann) {
   const creds = requireEnv('DISCORD_WEBHOOK_URL');
   if (!creds) return;
   const shot = readScreenshot(opts);
-  const embed = { title: ann.title, url: ann.notesUrl, description: discordDescription(ann), color: 0x2b6cb0 };
+  const link = await liveChangelogLink(ann);
+  const embed = { title: ann.title, url: link, description: discordDescription(ann, link), color: 0x2b6cb0 };
   const form = new FormData();
   if (shot) {
     embed.image = { url: `attachment://${shot.name}` };
@@ -499,7 +520,7 @@ function channelPreview(opts, ann) {
   console.log(`source: ${src}`);
   console.log(`title:  ${ann.title}`);
   console.log(`url:    ${ann.url}`);
-  console.log(`notes:  ${ann.notesUrl}`);
+  console.log(`notes:  ${ann.changelogUrl}`);
   console.log(`image:  ${opts.screenshot || '(none)'}`);
   console.log(`\nblurb:\n${ann.blurb}\n`);
   for (const [name, limit] of [['discord', 4096], ['mastodon', 500], ['bluesky', 300], ['x', 280]]) {
@@ -507,7 +528,7 @@ function channelPreview(opts, ann) {
     // hide a wall-of-text post that only shows up once it's already live —
     // which is what happened to v0.9.1's Discord embed.
     const text = name === 'discord'
-      ? `${ann.title}\n\n${discordDescription(ann)}`
+      ? `${ann.title}\n\n${discordDescription(ann, ann.changelogUrl)}`
       : composeText(limit, ann, IDENTITY);
     console.log(`--- ${name} (${text.length}/${limit}) ---\n${text}\n`);
   }
