@@ -235,7 +235,7 @@ function main() {
   // the aisle shot for pages whose release has no headline picture.
   const icon = fs.readFileSync(path.join(root, 'src-tauri', 'icons', 'app-icon.svg'), 'utf8');
   const badge = icon.replace(/<rect\b[^>]*id="rect1"[^>]*\/>/, '')
-    .replace(/width="1024"\s+height="1024"\s+viewBox="0 0 1024 1024"/, 'width="944" height="536" viewBox="40 244 944 536"');
+    .replace(/width="1024"\s+height="1024"\s+viewBox="0 0 1024 1024"/, 'width="920" height="480" viewBox="52 272 920 480"');
   if (badge === icon) console.log('::warning::build-changelog-site: app-icon.svg changed shape; the banner badge keeps its tile');
   fs.writeFileSync(path.join(opts.out, 'halcyon-badge.svg'), badge);
   fs.copyFileSync(path.join(root, 'public', 'social-preview.jpg'), path.join(opts.out, 'banner.jpg'));
