@@ -28,6 +28,7 @@ for name, color, roughness in [
     ('CounterWorktop', (.82, .81, .75, 1), .40),
     ('CounterPlinth', (.022, .028, .035, 1), .70),
     ('CounterReveal', (.09, .105, .12, 1), .65),
+    ('CounterInterior', (.91, .91, .89, 1), .45),
 ]:
     mat = bpy.data.materials.new(name)
     mat.diffuse_color = color
@@ -44,10 +45,13 @@ def section(depth, island=False, rounded=False, drawers=False, early=False):
     top = 3 if island else 1
     # Recessed kick, eased panel foot, cabinet face, under-top shadow reveal.
     face_top = 2.55 if island else (2.74 if early else 2.23)
-    p = [(.20, 0, 4), (.20, .28, 4), (.18, .32, 4),
-         (.055, .32, 0), (.035, .35, 0), (.035, face_top, 0),
-         (.045, face_top + .018, 5), (.07, face_top + .018, 5),
-         (.07, face_top + .05, top), (.025, face_top + .05, top)]
+    # Recess the cabinet beneath the upper fascia, keeping the established
+    # outer top/collision envelope. The 3.6-inch projection is an estimate.
+    recess = .265 if early and not island else 0
+    p = [(.20+recess, 0, 4), (.20+recess, .28, 4), (.18+recess, .32, 4),
+         (.055+recess, .32, 0), (.035+recess, .35, 0), (.035+recess, face_top, 0),
+         (.045+recess, face_top + .018, 5), (.07+recess, face_top + .018, 5),
+         (.07+recess, face_top + .05, top), (.025, face_top + .05, top)]
     if not island and not early:
         # Recessed contrasting inlay, with an actual return at both lips.
         p += [(.015, 3.195, 1), (.032, 3.215, 1),
@@ -59,14 +63,15 @@ def section(depth, island=False, rounded=False, drawers=False, early=False):
     for k in range(1, 7):
         a = math.pi - k * math.pi/12
         p.append((r + r*math.cos(a), h-r + r*math.sin(a), top))
-    p.append((depth-r, h, top))
+    interior = 6 if EARLY_EXPORT else 0
+    p.append((depth-r, h, interior if early else top))
     for k in range(1, 7):
         a = math.pi/2 - k * math.pi/12
-        p.append((depth-r + r*math.cos(a), h-r + r*math.sin(a), top))
+        p.append((depth-r + r*math.cos(a), h-r + r*math.sin(a), interior if early else top))
     # Clerk-side finger rail and inset door faces are part of the same skin.
-    p += [(depth, h-.13, top), (depth-.04, h-.16, 5),
-          (depth-.11, h-.16, 5), (depth-.11, h-.23, 5),
-          (depth-.035, h-.25, 0), (depth-.035, .35, 0),
+    p += [(depth, h-.13, interior if early else top), (depth-.04, h-.16, interior if early else 5),
+          (depth-.11, h-.16, interior if early else 5), (depth-.11, h-.23, interior if early else 5),
+          (depth-.035, h-.25, interior), (depth-.035, .35, interior),
           (depth-.055, .32, 4), (depth-.20, .32, 4),
           (depth-.20, 0, 4)]
     if drawers and island:
@@ -77,22 +82,12 @@ def section(depth, island=False, rounded=False, drawers=False, early=False):
             seams += [(depth-.035,y+.015,0),(depth-.06,y+.008,5),
                       (depth-.06,y-.008,5),(depth-.035,y-.015,0)]
         p[start:start] = seams
-    return p
+    return [(d,y,6 if EARLY_EXPORT and island and mat == 0 else mat) for d,y,mat in p]
 
 
 def sweep(name, path, depth, island=False, rounded=False, drawers=False, early=False):
     """Welded quad rings, including mitres, routed seams and closed cut ends."""
     pts = [Vector(p) for p in path]
-    if early and not island:
-        # Small eased plan corners, within the established collision envelope.
-        eased = [pts[0]]
-        for a, b, c in zip(pts, pts[1:], pts[2:]):
-            start = b + (a-b).normalized()*.10
-            end = b + (c-b).normalized()*.10
-            for k in range(7):
-                t = k/6
-                eased.append(start*(1-t)**2 + b*2*t*(1-t) + end*t*t)
-        pts = eased + [pts[-1]]
     tangents = [(b-a).normalized() for a, b in zip(pts, pts[1:])]
     normals = [Vector((-t.y, t.x)) for t in tangents]
     offsets = [normals[0]]
@@ -149,7 +144,7 @@ def sweep(name, path, depth, island=False, rounded=False, drawers=False, early=F
         if reverse:
             indices.reverse()
         faces.append(indices)
-        materials.append(0)
+        materials.append(6 if EARLY_EXPORT and island else 0)
         uv.append([(profile[j % count][0]/4, profile[j % count][1]/4) for j in indices])
     mesh = bpy.data.meshes.new(name)
     mesh.from_pydata(verts, [], faces)
@@ -176,7 +171,7 @@ def sweep(name, path, depth, island=False, rounded=False, drawers=False, early=F
     for face in bm.faces:
         if face[cap_layer]:
             y = face.calc_center_median().z
-            face.material_index = 4 if y < .32 else (3 if island else 1) if y > (2.60 if island else 2.28) else 0
+            face.material_index = 4 if y < .32 else (3 if island else 1) if y > (2.60 if island else 2.28) else (6 if EARLY_EXPORT and island else 0)
     bmesh.ops.recalc_face_normals(bm, faces=list(bm.faces))
     # Every authored part must be closed and manifold BEFORE export.
     assert all(e.is_manifold for e in bm.edges), name + ': open/nonmanifold edge'
@@ -187,6 +182,20 @@ def sweep(name, path, depth, island=False, rounded=False, drawers=False, early=F
         face.smooth = len(face.verts) == 4
     bm.to_mesh(mesh)
     bm.free()
+    if early:
+        # Bevel the joined solid, not the sweep path: offsetting a tiny rounded
+        # path by the full cabinet depth folds the inner panels through its face.
+        bpy.context.view_layer.objects.active = obj
+        bevel = obj.modifiers.new('Eased millwork corners', 'BEVEL')
+        bevel.width = .045
+        bevel.segments = 2
+        bevel.limit_method = 'ANGLE'
+        bevel.angle_limit = math.radians(35)
+        bevel.use_clamp_overlap = True
+        bpy.ops.object.modifier_apply(modifier=bevel.name)
+        bm = bmesh.new(); bm.from_mesh(obj.data)
+        assert all(e.is_manifold for e in bm.edges), name + ': bevel opened solid'
+        bm.free()
     obj['construction'] = 'Welded millwork surface with routed panel joints; original Halcyon model'
     return obj
 

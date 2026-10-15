@@ -33,7 +33,7 @@ export function buildExitReturnCounter(ctx: FixtureContext, parent: THREE.Group,
   for(const f of segments) {
     const lower=f.label.includes('worktop');
     const piece=new THREE.Group();piece.position.set(f.cx-footprint.cx,0,f.cz-root.position.z);piece.rotation.y=f.yaw;
-    for(const [height,y,material] of (lower ? [[2.7,1.35,body],[.12,2.76,worktop]] :
+    for(const [height,y,material] of (lower ? [[2.7,1.35,early ? worktop : body],[.12,2.76,worktop]] :
       (early ? [[2.74,1.37,body],[.8,3.14,top]] : [[2.28,1.14,body],[1.26,2.91,top],[.13,3.29,stripe]])) as [number,number,THREE.Material][]) {
       const mesh=new THREE.Mesh(new THREE.BoxGeometry(f.w,height,f.d),material);
       mesh.position.y=y;mesh.castShadow=mesh.receiveShadow=true;piece.add(mesh);
@@ -66,7 +66,7 @@ export function buildExitReturnCounter(ctx: FixtureContext, parent: THREE.Group,
     ...(!hosted ? [`user-assets/${rel}`] : []), `models/exit-return-counter${early ? '-1990' : ''}.glb`];
   const releaseWindow = addFastReturnWindow(ctx,root,length/15.5);
   const release = installDisplayModel(ctx,root,fallback,paths,
-    {CounterBody:body,CounterTop:top,CounterWorktop:worktop,CounterInlay:stripe,CounterPlinth:plinth,CounterReturnMetal:metal},new THREE.Vector3(length/15.5,1,length/15.5),model=>{
+    {CounterBody:body,CounterTop:top,CounterWorktop:worktop,CounterInterior:worktop,CounterInlay:stripe,CounterPlinth:plinth,CounterReturnMetal:metal},new THREE.Vector3(length/15.5,1,length/15.5),model=>{
       // The plan scales with the store; the receiver must still pass through the moved glazing.
       model.traverse(o=>{
         if (!(o instanceof THREE.Mesh)) return;

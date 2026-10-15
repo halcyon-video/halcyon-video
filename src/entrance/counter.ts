@@ -203,7 +203,7 @@ export function buildCheckoutCounter(
   });
   const counterStripe = new THREE.MeshStandardMaterial({ color: new THREE.Color(theme.palette.secondary), map: counterLamTex, normalMap: counterLamNorm, normalScale: new THREE.Vector2(0.2, 0.2), roughnessMap: counterLamRough, roughness: 0.6, metalness: 0 });
   const workWhite = early ? counterWhite.clone() : counterWhite;
-  if (early) workWhite.color.set(theme.palette.counterBody);
+  if (early) workWhite.color.set(0xf4f4f0);
   const innerTopMat = counterTopMaterial(spec.counterTop, workWhite);
 
   const bandH = 3.4;
@@ -407,7 +407,9 @@ export function buildCheckoutCounter(
     // single-piece approach with a proud stripe box read as a bolted-on strip
     // and could z-fight; a real recessed channel can't.)
     if (early) {
-      extrudeSegment(A_out, B_out, B_in, A_in, bandH + .14, 0, counterTopBlue);
+      extrudeSegment(A_out.clone().lerp(A_in,.2), B_out.clone().lerp(B_in,.2), B_in, A_in, 2.74, 0, counterWhite);
+      extrudeSegment(A_out, B_out, B_in, A_in, .8, 2.74, counterTopBlue);
+      extrudeSegment(A_in.clone().lerp(A_out,.025), B_in.clone().lerp(B_out,.025), B_in, A_in, 3.49, 0, workWhite, { noBevel:true, noCollide:true });
       return;
     }
     const whiteH = bandH * (2 / 3);
@@ -578,9 +580,9 @@ export function buildCheckoutCounter(
   const pBack1 = pFront1.clone().addScaledVector(bisector, miterLen);
   const pBack2 = pFront2.clone().addScaledVector(nRight, innerD);
 
-  extrudeSegment(pFront0, pFront1, pBack1, pBack0, innerH, 0, counterWhite);
+  extrudeSegment(pFront0, pFront1, pBack1, pBack0, innerH, 0, workWhite);
   extrudeSegment(pFront0, pFront1, pBack1, pBack0, 0.12, innerH, innerTopMat);
-  extrudeSegment(pFront1, pFront2, pBack2, pBack1, innerH, 0, counterWhite);
+  extrudeSegment(pFront1, pFront2, pBack2, pBack1, innerH, 0, workWhite);
   extrudeSegment(pFront1, pFront2, pBack2, pBack1, 0.12, innerH, innerTopMat);
 
   const getInnerCounterSpine = (x: number): { z: number; rotY: number } => {

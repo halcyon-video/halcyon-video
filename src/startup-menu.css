@@ -6,13 +6,14 @@
   --startup-accent: var(--bb-yellow);
 }
 #mobile-era-choice {
+  --startup-accent: #fff;
   box-sizing: border-box; width: min(94vw, 660px); max-height: 92dvh;
   margin: auto; padding: 0; overflow: auto; border: 0; border-radius: 0;
   color: #fff; background: var(--startup-blue); font-family: var(--startup-body);
 }
 #mobile-era-choice::backdrop { background: #030b16e8; }
 .mobile-era-heading {
-  padding: 34px 3% 20px; color: var(--startup-blue); background: var(--startup-accent);
+  padding: 34px 3% 20px; color: #fff; background: var(--startup-blue);
 }
 #mobile-era-title, .mobile-era-intro { margin: 0; text-align: center; line-height: 1; font-family: var(--startup-display); font-weight: 400; }
 .mobile-era-fit { display: inline-block; white-space: nowrap; font-size: 64px; line-height: 1.05; letter-spacing: -.025em; }
@@ -31,13 +32,13 @@
 }
 .mobile-era-chevron { color: var(--startup-accent); font: 400 46px/1 Arial, sans-serif; }
 .mobile-era-step:hover .mobile-era-chevron { color: #fff; }
-.mobile-era-neighbor { font: 700 12px var(--startup-body); font-variant-numeric: tabular-nums; }
+.mobile-era-neighbor { font: 700 15px var(--startup-body); font-variant-numeric: tabular-nums; }
 .mobile-era-step:disabled { visibility: hidden; }
-.mobile-era-hint { margin: 8px 0 18px; color: #fff; font: 400 13px/1.35 var(--startup-body); }
+.mobile-era-hint { margin: 8px 0 18px; color: #fff; font: 400 15px/1.35 var(--startup-body); }
 .mobile-era-enter {
   display: block; width: 100%; min-height: 54px; margin: 0;
   padding: 14px 3%; border: 0; border-radius: 0;
-  background: var(--startup-accent); color: var(--startup-blue);
+  background: var(--startup-blue); color: #fff; border-top: 1px solid #ffffff80;
   cursor: pointer; font: 400 21px/1.2 var(--startup-display); text-transform: uppercase;
 }
 .mobile-era-step, .mobile-era-enter { touch-action: manipulation; }
@@ -51,6 +52,6 @@
   .mobile-era-fit { max-height: 50px; font-size: 48px; }
   #mobile-era-year { font-size: 76px; }
   .mobile-era-step { min-height: 64px; gap: 0; }
-  .mobile-era-hint { margin-bottom: 10px; font-size: 12px; }
+  .mobile-era-hint { margin-bottom: 10px; font-size: 15px; }
   .mobile-era-enter { min-height: 46px; padding-block: 10px; font-size: 19px; }
 }

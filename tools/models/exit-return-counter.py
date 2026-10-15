@@ -97,8 +97,8 @@ channel('Sloping quick-return ramp',RECEIVER_X-1.06,RECEIVER_X+1.06,
  [(3.30,FRONT),(3.22,FRONT),(2.12,-1.88),(2.20,-1.88)])
 # Keep the receiving cabinet beneath the opening. Only the worktop is open;
 # removing an entire sweep must not leave a floor-to-counter void in the run.
-solid('Receiver cabinet front',[(-1.18,-2.2),(1.18,-2.2),(1.18,-2.12),(-1.18,-2.12)],.32,2.70,0)
-solid('Receiver cabinet back',[(-1.18,BACK-.08),(1.18,BACK-.08),(1.18,BACK),(-1.18,BACK)],.32,2.70,0)
+solid('Receiver cabinet front',[(-1.18,-2.2),(1.18,-2.2),(1.18,-2.12),(-1.18,-2.12)],.32,2.70,6 if EARLY_EXPORT else 0)
+solid('Receiver cabinet back',[(-1.18,BACK-.08),(1.18,BACK-.08),(1.18,BACK),(-1.18,BACK)],.32,2.70,6 if EARLY_EXPORT else 0)
 solid('Receiver cabinet plinth',[(-1.12,-2.12),(1.12,-2.12),(1.12,BACK-.08),(-1.12,BACK-.08)],0,.32,4)
 
 scene=bpy.context.scene;scene.unit_settings.system='IMPERIAL';scene.unit_settings.scale_length=.3048

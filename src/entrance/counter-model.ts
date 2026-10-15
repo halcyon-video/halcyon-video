@@ -21,6 +21,7 @@ export function installCounterModel(
   const materials: Record<string, THREE.Material> = {
     CounterBody: finishes.body, CounterTop: finishes.top,
     CounterInlay: finishes.inlay, CounterWorktop: finishes.worktop,
+    CounterInterior: finishes.worktop,
   };
   const themeId = getActiveTheme().id;
   const edition = shape === 'desk' ? '' : themeId === 'bb-1990' ? '-1990' : themeId === 'bb-2010' ? '-2010' : '';
