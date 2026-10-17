@@ -84,6 +84,8 @@ export interface CounterBuildResult {
   // mitred corners to satisfy the validator's SAT-overlap check, which reads
   // as fake gaps to a pathfinder; these trace the real geometry instead.
   navFootprints: Footprint[];
+  // The band again with that gap shut: shoppers' paths never enter the well.
+  gateFootprints: Footprint[];
   // Where the clerk stands while working the register (inside the band,
   // behind the inner counter's apex, facing the customer side).
   registerStanding: ClerkStanding;
@@ -465,6 +467,9 @@ export function buildCheckoutCounter(
   bandSegs.forEach((s) => buildMiteredSegment(s.e));
   const navFootprints: Footprint[] = bandSegs.map((s, i) =>
     segFootprint(`structure:counter-band-nav-${i}`, s.e, bandD));
+  // Pin 265: every band edge the walk-through gap is carved from, untrimmed.
+  const gateFootprints: Footprint[] = [...new Set(bandSegs.filter(s => Math.max(s.trimA, s.trimB) > .05).map(s => s.edge))]
+    .map(edge => segFootprint(`structure:counter-gate-${edge}`, segEnds(edge, 0, 0), bandD));
 
   // Theme-gold safety stripe wrapping the customer-facing front of the shield
   // band as a RECESSED INLAY, ~3 in below the band top: one slab per band
@@ -704,6 +709,6 @@ export function buildCheckoutCounter(
     })),
     bandTopY: bandH + 0.14,
     frame, spineAt, standingAt,
-    navFootprints, registerStanding, getTerminalStanding,
+    navFootprints, gateFootprints, registerStanding, getTerminalStanding,
   };
 }

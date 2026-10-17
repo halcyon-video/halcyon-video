@@ -164,11 +164,12 @@ export class EntranceCheckout implements StoreFixture {
   // build(); null until then.
   private clerkNavInfo: {
     footprints: Footprint[];
+    gate: Footprint[];
     register: ClerkStanding;
     terminals: ClerkStanding[];
   } | null = null;
 
-  getClerkNav(): { footprints: Footprint[]; register: ClerkStanding; terminals: ClerkStanding[] } | null {
+  getClerkNav(): { footprints: Footprint[]; gate: Footprint[]; register: ClerkStanding; terminals: ClerkStanding[] } | null {
     return this.clerkNavInfo;
   }
 
@@ -737,6 +738,8 @@ export class EntranceCheckout implements StoreFixture {
           cx, cz: (frontZ + backZ) / 2, w: boxW + 0.24, d: boxDepth + 0.24, yaw: 0,
         },
       ],
+      // Shoppers' extra keep-out: the band with the staff gap shut (pin 265).
+      gate: counterResult.gateFootprints,
       register: counterResult.registerStanding,
       // Same anchors the terminal props are built at, below.
       terminals: spec.counterShape === 'desk'
