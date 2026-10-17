@@ -299,17 +299,28 @@ let riserRepaint: (() => void) | null = null;
  * to clip a riser to", which read as "no cap at all in some arrangements" and
  * sent an agent hunting a build bug that does not exist. Verified 2026-08-02:
  * risers build in all three arrangements — see scratch/wiring3.)
+ *
+ * Only MAX_RISERS of those caps carry one (owner pin 278: "just two per store
+ * is fine") — picked evenly across the room left to right, so the pair reads
+ * as two placements rather than a card on every run end.
  */
+const MAX_RISERS = 2;
+
 export function buildJoinTodayRewardsRisers(
   scene: StoreScene,
   endcapHostLineIds?: Set<number>,
 ): void {
   if (!popKitVisible(2004, 2008)) return;
 
-  const hosts = scene.plan.shelvingUnits.filter(
+  const caps = scene.plan.shelvingUnits.filter(
     (u) => u.isLineFront && u.libraryIdx >= 0 && !endcapHostLineIds?.has(u.lineId),
-  );
-  if (hosts.length === 0) return;
+  ).map((u) => {
+    const localZ = FIELD_Z_FRONT + u.zPos + CAP_FACE_LOCAL_Z + CARD_STANDOFF;
+    return { u, p: scene.plan.unitToWorld(u, u.xCenter, localZ) };
+  }).sort((a, b) => a.p.x - b.p.x || a.p.z - b.p.z);
+  if (caps.length === 0) return;
+  const hosts = caps.length <= MAX_RISERS ? caps
+    : Array.from({ length: MAX_RISERS }, (_, k) => caps[Math.floor((k + 0.5) * caps.length / MAX_RISERS)]);
 
   const group = new THREE.Group();
   group.name = 'join-today-rewards-risers';
@@ -331,9 +342,7 @@ export function buildJoinTodayRewardsRisers(
   // One geometry, one material, one mesh per run end: the kit's own
   // "clipped to successive shelf ends" pattern at two triangles a copy.
   const geo = new THREE.PlaneGeometry(RISER_W_FT, RISER_H_FT);
-  for (const u of hosts) {
-    const localZ = FIELD_Z_FRONT + u.zPos + CAP_FACE_LOCAL_Z + CARD_STANDOFF;
-    const p = scene.plan.unitToWorld(u, u.xCenter, localZ);
+  for (const { u, p } of hosts) {
     const card = new THREE.Mesh(geo, mat);
     card.position.set(p.x, RISER_CENTER_Y, p.z);
     card.rotation.y = u.yaw; // same convention unitToWorld uses — local +Z out
