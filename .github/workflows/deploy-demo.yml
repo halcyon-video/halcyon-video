@@ -53,6 +53,11 @@ jobs:
         env:
           VITE_DEMO: "1"
 
+      # The hosted changelog: a page per release (notes + screenshots from
+      # docs/releases/, every change from CHANGELOG.md) at <site>/changelog/.
+      # The Discord release post links the new release's page.
+      - run: node tools/build-changelog-site.mjs --out dist/changelog --repo "${{ github.repository }}"
+
       - uses: actions/configure-pages@v5
         with:
           enablement: true

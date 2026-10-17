@@ -302,6 +302,22 @@ test('the family stand carries NO adult or teen ratings', () => {
   });
 });
 
+test('Christmas pictures stay off the Halloween stands, ghosts or not (pin 266)', () => {
+  withMonth('2026-10-20', () => {
+    const libs = halloweenLibs();
+    libs[0].movies.push(
+      mk('The Muppet Christmas Carol', { rating: 'G', overview: 'Scrooge is visited by three ghosts on Christmas Eve.' }),
+      mk('The Nightmare Before Christmas', { rating: 'PG', overview: 'The pumpkin king of Halloween Town discovers Christmas Town.' }),
+      mk('Krampus', { rating: 'PG-13', genres: ['Horror'], overview: 'A demon punishes a family at Christmas.' }),
+    );
+    for (const band of ['family', 'adult'] as const) {
+      const c = buildPromoCampaign([`seasonal:${band}`], libs, ROWS, COLS)!;
+      const titles = c.faces.flatMap((f) => f.movies.map((m) => m.title));
+      assert.ok(!titles.some((t) => /christmas|krampus/i.test(t)), titles.join(', '));
+    }
+  });
+});
+
 test('the horror stand carries no family ratings, and does take teen', () => {
   withMonth('2026-10-15', () => {
     const c = buildPromoCampaign(['seasonal:adult'], halloweenLibs(), ROWS, COLS)!;

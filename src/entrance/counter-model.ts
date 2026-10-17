@@ -21,10 +21,12 @@ export function installCounterModel(
   const materials: Record<string, THREE.Material> = {
     CounterBody: finishes.body, CounterTop: finishes.top,
     CounterInlay: finishes.inlay, CounterWorktop: finishes.worktop,
+    CounterInterior: finishes.worktop,
   };
-  const edition = getActiveTheme().id === 'bb-2010' && shape !== 'desk' ? '-2010' : '';
+  const themeId = getActiveTheme().id;
+  const edition = shape === 'desk' ? '' : themeId === 'bb-1990' ? '-1990' : themeId === 'bb-2010' ? '-2010' : '';
   const filename = `checkout-counter-${shape}-${rounded ? 'rounded' : 'laminate'}${edition}.glb`;
-  const rel = `fixtures/checkout-counter/${getActiveTheme().id}-${shape}-${rounded ? 'rounded' : 'laminate'}.glb`;
+  const rel = `fixtures/checkout-counter/${getActiveTheme().id}-${shape}-${rounded ? 'rounded' : 'laminate'}${edition === '-1990' ? '-solid' : ''}.glb`;
   const pack = brandPackDir();
   const paths = dropInCandidates([...(pack ? [`user-assets/${pack}/${rel}`] : []), `user-assets/${rel}`, `models/${filename}`]);
   // Request every candidate together: on a slow first visit, a missing drop-in's

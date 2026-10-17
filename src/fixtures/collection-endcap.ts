@@ -996,6 +996,7 @@ export class CollectionEndcap extends EndcapShelf {
     this.footerTex = buildEndcapFooter(this.group, coreWidth, coreDepth, {
       color: FOOTER_GREEN,
       dressFront: drawFooterRibbon,
+      context: this.ctx, ownModel: dispose => { this.disposeFooterModel = dispose; },
     });
 
     // ── The tree, FLUSH on the carcass ──────────────────────────────────────
@@ -1113,6 +1114,7 @@ export class CollectionEndcap extends EndcapShelf {
       tagGroup.add(face);
     }
     kit.add(tagGroup);
+    if (this.placement.options?.dressingOnly === true) return;
 
     // ── The card, mounted on the OUTER (kraft) face ─────────────────────────
     // Owner ruling 2026-07-30: the white sign reads to the outer walkway,

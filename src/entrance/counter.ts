@@ -39,8 +39,16 @@ export interface CounterFrame {
   facingYaw: number;
 }
 
+/** One built outer-band run: its customer-facing top edge A→B on the floor
+ *  plan (world x/z) and the unit normal pointing INTO the band. */
+export interface CounterBandEdge { ax: number; az: number; bx: number; bz: number; nx: number; nz: number }
+
 export interface CounterBuildResult {
   modelReady: Promise<THREE.Group | null>;
+  // Customer-facing faces of the walk-in band (empty on the standalone desk)
+  // and the band's top height — seasonal dressing hangs off these edges.
+  bandEdges: CounterBandEdge[];
+  bandTopY: number;
   // The counter's store-facing point Z (frames the checkout camera move).
   // Kept for the front-facing shapes, whose "apex" really is a Z; a side-wall
   // desk faces across the room, so anything positional should read `frame`
@@ -76,6 +84,8 @@ export interface CounterBuildResult {
   // mitred corners to satisfy the validator's SAT-overlap check, which reads
   // as fake gaps to a pathfinder; these trace the real geometry instead.
   navFootprints: Footprint[];
+  // The band again with that gap shut: shoppers' paths never enter the well.
+  gateFootprints: Footprint[];
   // Where the clerk stands while working the register (inside the band,
   // behind the inner counter's apex, facing the customer side).
   registerStanding: ClerkStanding;
@@ -181,6 +191,7 @@ export function buildCheckoutCounter(
     : null;
 
   const theme = getActiveTheme();
+  const early = theme.id === 'bb-1990' && !desk;
   // Laminate mottle/scuff albedo + micro-stipple normal (shared generator with
   // the shelving): the counter is the single biggest uniform-color slab in the
   // store, and bare material colors on it read as untextured CG.
@@ -189,19 +200,21 @@ export function buildCheckoutCounter(
   counterLamNorm.repeat.set(4, 4);
   counterLamRough.repeat.set(4, 4);
   const counterWhite = new THREE.MeshStandardMaterial({
-    color: new THREE.Color(theme.palette.counterBody), map: counterLamTex,
+    color: new THREE.Color(early ? theme.palette.primary : theme.palette.counterBody), map: counterLamTex,
     normalMap: counterLamNorm, normalScale: new THREE.Vector2(0.4, 0.4),
     // The map averages 0.65: 0.62 gives a satin finish near 0.40 while
     // allowing subtle wipe/grain variation in reflected highlights.
     roughnessMap: counterLamRough, roughness: 0.62, metalness: 0,
   });
   const counterTopBlue = new THREE.MeshStandardMaterial({
-    color: new THREE.Color(theme.palette.counterTop), map: counterLamTex,
+    color: new THREE.Color(early ? theme.palette.primary : theme.palette.counterTop), map: counterLamTex,
     normalMap: counterLamNorm, normalScale: new THREE.Vector2(0.4, 0.4),
     roughnessMap: counterLamRough, roughness: 0.55, metalness: 0,
   });
   const counterStripe = new THREE.MeshStandardMaterial({ color: new THREE.Color(theme.palette.secondary), map: counterLamTex, normalMap: counterLamNorm, normalScale: new THREE.Vector2(0.2, 0.2), roughnessMap: counterLamRough, roughness: 0.6, metalness: 0 });
-  const innerTopMat = counterTopMaterial(spec.counterTop, counterWhite);
+  const workWhite = early ? counterWhite.clone() : counterWhite;
+  if (early) workWhite.color.set(0xf4f4f0);
+  const innerTopMat = counterTopMaterial(spec.counterTop, workWhite);
 
   const bandH = 3.4;
   const bandD = 1.5;
@@ -334,7 +347,7 @@ export function buildCheckoutCounter(
 
     // 'rounded-2000s' softens every extruded edge with a bevel; 'laminate-90s'
     // keeps the original sharp-edged 90s laminate look.
-    const geom = new THREE.ExtrudeGeometry(shape, rounded && !opts?.noBevel
+    const geom = new THREE.ExtrudeGeometry(shape, (rounded || early) && !opts?.noBevel
       ? { depth: h, bevelEnabled: true, bevelThickness: Math.min(0.06, h / 3), bevelSize: 0.05, bevelSegments: 3 }
       : { depth: h, bevelEnabled: false });
     const mesh = new THREE.Mesh(geom, mat);
@@ -403,6 +416,12 @@ export function buildCheckoutCounter(
     // between the two blue pieces is the safety-stripe inlay groove. (The old
     // single-piece approach with a proud stripe box read as a bolted-on strip
     // and could z-fight; a real recessed channel can't.)
+    if (early) {
+      extrudeSegment(A_out.clone().lerp(A_in,.2), B_out.clone().lerp(B_in,.2), B_in, A_in, 2.74, 0, counterWhite);
+      extrudeSegment(A_out, B_out, B_in, A_in, .8, 2.74, counterTopBlue);
+      extrudeSegment(A_in.clone().lerp(A_out,.025), B_in.clone().lerp(B_out,.025), B_in, A_in, 3.49, 0, workWhite, { noBevel:true, noCollide:true });
+      return;
+    }
     const whiteH = bandH * (2 / 3);
     extrudeSegment(A_out, B_out, B_in, A_in, whiteH, 0, counterWhite);
     extrudeSegment(A_out, B_out, B_in, A_in, (STRIPE_Y - GROOVE_HALF) - whiteH, whiteH, counterTopBlue);
@@ -448,6 +467,9 @@ export function buildCheckoutCounter(
   bandSegs.forEach((s) => buildMiteredSegment(s.e));
   const navFootprints: Footprint[] = bandSegs.map((s, i) =>
     segFootprint(`structure:counter-band-nav-${i}`, s.e, bandD));
+  // Pin 265: every band edge the walk-through gap is carved from, untrimmed.
+  const gateFootprints: Footprint[] = [...new Set(bandSegs.filter(s => Math.max(s.trimA, s.trimB) > .05).map(s => s.edge))]
+    .map(edge => segFootprint(`structure:counter-gate-${edge}`, segEnds(edge, 0, 0), bandD));
 
   // Theme-gold safety stripe wrapping the customer-facing front of the shield
   // band as a RECESSED INLAY, ~3 in below the band top: one slab per band
@@ -479,7 +501,7 @@ export function buildCheckoutCounter(
   const dFace = STRIPE_RECESS;            // stripe's visible face, just behind the band face
   const dBack = STRIPE_RECESS + STRIPE_T; // stripe slab's hidden back face
   const slabH = STRIPE_H + 0.02 + (rounded ? 0.12 : 0); // over-tall: tucks into the blue (and their bevels)
-  bandSegs.forEach(({ edge, trimA, trimB, e }) => {
+  if (!early) bandSegs.forEach(({ edge, trimA, trimB, e }) => {
     const N = normals[edge];
     const T = tangents[edge];
     const A = P_out[edge];
@@ -571,9 +593,9 @@ export function buildCheckoutCounter(
   const pBack1 = pFront1.clone().addScaledVector(bisector, miterLen);
   const pBack2 = pFront2.clone().addScaledVector(nRight, innerD);
 
-  extrudeSegment(pFront0, pFront1, pBack1, pBack0, innerH, 0, counterWhite);
+  extrudeSegment(pFront0, pFront1, pBack1, pBack0, innerH, 0, workWhite);
   extrudeSegment(pFront0, pFront1, pBack1, pBack0, 0.12, innerH, innerTopMat);
-  extrudeSegment(pFront1, pFront2, pBack2, pBack1, innerH, 0, counterWhite);
+  extrudeSegment(pFront1, pFront2, pBack2, pBack1, innerH, 0, workWhite);
   extrudeSegment(pFront1, pFront2, pBack2, pBack1, 0.12, innerH, innerTopMat);
 
   const getInnerCounterSpine = (x: number): { z: number; rotY: number } => {
@@ -682,7 +704,11 @@ export function buildCheckoutCounter(
 
   return {
     modelReady, deskApexZ, cx, innerH, innerDepth: innerD, getInnerCounterSpine,
+    bandEdges: bandSegs.map(({ edge, e }) => ({
+      ax: e.A_out.x, az: e.A_out.y, bx: e.B_out.x, bz: e.B_out.y, nx: normals[edge].x, nz: normals[edge].y,
+    })),
+    bandTopY: bandH + 0.14,
     frame, spineAt, standingAt,
-    navFootprints, registerStanding, getTerminalStanding,
+    navFootprints, gateFootprints, registerStanding, getTerminalStanding,
   };
 }

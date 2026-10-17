@@ -10,7 +10,7 @@ import { RopeStanchions } from './fixtures/rope-stanchions';
 import { ReleaseCart } from './fixtures/release-cart';
 import { CustomerInformationTerminal } from './fixtures/customer-information-terminal';
 import { FixturePlacement } from './store-layout';
-import { FixtureContext, StoreFixture } from './fixtures';
+import { FixtureContext } from './fixtures';
 import { FourSidedDisplay } from './fixtures/four-sided-display';
 import {
   CandyDisplay,
@@ -21,6 +21,7 @@ import {
 import { GameSection } from './fixtures/game-section';
 import { BargainBin } from './fixtures/bargain-bin';
 import { CollectionEndcap } from './fixtures/collection-endcap';
+import { AisleEndBase } from './fixtures/aisle-end-base';
 import { GoldClamshellDisplay } from './fixtures/gold-clamshell';
 import { PvDrapeTable } from './fixtures/pv-drape-table';
 import { ComingSoonLetterboard } from './fixtures/coming-soon-letterboard';
@@ -37,25 +38,11 @@ import { CandyWallGondola } from './fixtures/candy-wall-gondola';
 import { NowShowingLightbox } from './fixtures/now-showing-lightbox';
 import { SecondaryServiceCounter } from './fixtures/secondary-service-counter';
 
-export interface PlacedFixture extends StoreFixture {
-  placement: FixturePlacement;
-}
-
-export type FixtureFactory = (placement: FixturePlacement, ctx: FixtureContext) => PlacedFixture;
-
-const registry = new Map<string, FixtureFactory>();
-
-export function registerFixtureKind(kind: string, factory: FixtureFactory) {
-  registry.set(kind, factory);
-}
-
-// Every registered fixture kind, for tooling/enumeration (tools/list-slots.mjs).
-export function listFixtureKinds(): string[] {
-  return [...registry.keys()].sort();
-}
+import { fixtureFactory, registerFixtureKind, type PlacedFixture } from './fixture-kinds';
+export { registerFixtureKind, listFixtureKinds, type PlacedFixture, type FixtureFactory } from './fixture-kinds';
 
 export function createFixture(placement: FixturePlacement, ctx: FixtureContext): PlacedFixture {
-  const factory = registry.get(placement.kind);
+  const factory = fixtureFactory(placement.kind);
   if (!factory) {
     throw new Error(`Unknown fixture kind: ${placement.kind}`);
   }
@@ -118,3 +105,5 @@ registerFixtureKind('now-showing-lightbox', (placement, ctx) => new NowShowingLi
 registerFixtureKind('gumball-machine', (placement, ctx) => new GumballMachine(placement, ctx));
 
 registerFixtureKind('twin-crt-tower', (placement, ctx) => new TwinCrtTower(placement, ctx));
+
+registerFixtureKind('aisle-end-base', (placement, ctx) => new AisleEndBase(placement, ctx));

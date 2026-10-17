@@ -9,7 +9,7 @@ import { selfLit } from './material-lighting';
 // reads/writes scene state exactly as the original methods did.
 import * as THREE from 'three';
 import { CASE_WIDTH, CASE_HEIGHT } from './video-case';
-import { FIELD_Z_FRONT, BROWSE_WINDOW_SIZE, AISLE_SHELF_HEIGHTS, WALL_SHELF_HEIGHTS, BOX_SPACING, UNIT_FRAME_HEIGHT, unitDepthAtHeight, BACK_WALL_UNIT_IDX, extraCopiesCount, MovieSlot, STORE_CENTER_X } from './store-layout';
+import { FIELD_Z_FRONT, BROWSE_WINDOW_SIZE, AISLE_SHELF_HEIGHTS, BOX_SPACING, UNIT_FRAME_HEIGHT, unitDepthAtHeight, BACK_WALL_UNIT_IDX, extraCopiesCount, MovieSlot, STORE_CENTER_X } from './store-layout';
 import { getActiveTheme } from './themes';
 import { activeStoreFormat } from './store-format';
 import { OVERVIEW_POS, OVERVIEW_PITCH_MIN, OVERVIEW_PITCH_MAX, INSPECT_FAN_X, INSPECT_CASE_Z, INSPECT_FIT_MARGIN } from './scene-shared';
@@ -71,6 +71,7 @@ export function updateLookDownPresent(scene: StoreScene) {
 }
 
 export function updateCameraTarget(scene: StoreScene) {
+  if (scene.selectedUnitSource === 'fixture') scene.updateColsCount();
   scene.updateLOD();
   // Any retargeting (user navigation, mode change) cuts the return-drop
   // watch short — the player's intent wins over the diegetic beat. The
@@ -302,7 +303,7 @@ export function updateCameraTarget(scene: StoreScene) {
       const transform = scene.getNewReleasesSlotTransform(centerCol);
 
       // Dynamic Y height centered on selected back wall shelf
-      const shelfY = WALL_SHELF_HEIGHTS[scene.selectedShelf] || 3.5;
+      const shelfY = scene.getNewReleasesShelfHeight(scene.selectedCol, scene.selectedShelf) || 3.5;
       const cameraY = steady ? shelfY + 0.4 : Math.max(6.3, shelfY + 0.8);
       const lookAtY = shelfY + 0.4;
 
@@ -423,7 +424,7 @@ export function updateCameraTarget(scene: StoreScene) {
     const isBackWall = (scene.selectedUnitIdx === BACK_WALL_UNIT_IDX);
     
     const fixture = isDisplay ? scene.slottedFixtures.find(f => f.placement.id === scene.selectedFixtureId) : null;
-    const shelfY = fixture ? (fixture.shelfHeights[scene.selectedShelf] || 2.4) : (isBackWall ? WALL_SHELF_HEIGHTS[scene.selectedShelf] : AISLE_SHELF_HEIGHTS[scene.selectedShelf]);
+    const shelfY = fixture ? (fixture.shelfHeights[scene.selectedShelf] || 2.4) : (isBackWall ? scene.getNewReleasesShelfHeight(scene.selectedCol, scene.selectedShelf) : AISLE_SHELF_HEIGHTS[scene.selectedShelf]);
     const actualBoxHeight = CASE_HEIGHT;
     const actualBoxWidth = CASE_WIDTH;
     // +0.3 matches the inspect mode animation Y offset. A dump tub is the

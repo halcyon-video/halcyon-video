@@ -13,6 +13,25 @@ shipped.** If a release adds VR walk mode, the announcement has to show VR walk
 mode, or the post is doing no work: people scroll past a wall of text, and they
 scroll past a picture they have already seen.
 
+## The hosted changelog
+
+Everything in this directory is also published as the project's changelog
+website, beside the browser demo at `<site>/changelog/`, with one page per
+release (`<site>/changelog/<tag>/`). The Discord release post links that page.
+`.github/workflows/deploy-demo.yml` builds it with
+`tools/build-changelog-site.mjs` from:
+
+- `<tag>.md`: the written notes, shown in full;
+- `<tag>.jpg`: the headline shot, at the top of the page;
+- `<tag>/*.jpg`: every further shot, in a gallery in file-name order, with an
+  optional `<tag>/<name>.txt` beside a shot as its caption;
+- the release's `CHANGELOG.md` entry, under "Every change".
+
+So a release page shows the right pictures only if they are committed here
+before the tag is pushed. One shot per headline change is the target.
+
+Preview locally: `node tools/build-changelog-site.mjs --out scratch/changelog`.
+
 ## Cutting one
 
 Take the shot in a clone that has the screenshot harness, framed on the single

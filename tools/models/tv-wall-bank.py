@@ -31,13 +31,15 @@ def sheet(name,vertices,faces,role,thickness=.035):
  return finish(o,role)
 
 def p(x,y,z):return (x,-z,y)
-BL=(-5.2865,-1.88475);BR=(5.2865,-1.53025);TR=(5.6135,1.66025);TL=(-5.6135,2.01475)
+PITCH=3.0 # live-screen pitch (ft); must match AmbientTvs.buildWallBank (outerW + .5)
+BASE=(PITCH+1.25+.7) # half-width of the housing surround at its middle
+BL=(-BASE*.97,-1.88475);BR=(BASE*.97,-1.53025);TR=(BASE*1.03,1.66025);TL=(-BASE*1.03,2.01475)
 left=lambda y:BL[0]+(TL[0]-BL[0])*(y-BL[1])/(TL[1]-BL[1])
 right=lambda y:BR[0]+(TR[0]-BR[0])*(y-BR[1])/(TR[1]-BR[1])
 top=lambda x:TL[1]+(TR[1]-TL[1])*(x-TL[0])/(TR[0]-TL[0])
 bottom=lambda x:BL[1]+(BR[1]-BL[1])*(x-BL[0])/(BR[0]-BL[0])
 # Continuous developed front pressing: no triangles bridge any live picture.
-cuts=[-4.57,-2.43,-1.07,1.07,2.43,4.57]
+cuts=[-(PITCH+1.07),-(PITCH-1.07),-1.07,1.07,PITCH-1.07,PITCH+1.07]
 rows=[[(x,bottom(x)) for x in [BL[0],*cuts,BR[0]]],[(x,-.8075) for x in [left(-.8075),*cuts,right(-.8075)]],[(x,.8075) for x in [left(.8075),*cuts,right(.8075)]],[(x,top(x)) for x in [TL[0],*cuts,TR[0]]]]
 vertices=[p(x,y,.5) for row in rows for x,y in row];faces=[]
 for j in range(3):
@@ -62,14 +64,14 @@ outer=[BL,BR,TR,TL];inner=[(x*.97,y*.93) for x,y in outer];vertices=[p(x,y,0) fo
 faces=[(i+4,(i+1)%4+4,(i+1)%4,i) for i in range(4)]
 sheet('Open wall attachment flange',vertices,faces,'HousingAmber',.025)
 # Three matching open cassette supports fit behind the existing pierced bezels.
-for centre in [-3.5,0,3.5]:
+for centre in [-PITCH,0,PITCH]:
  outer=[(centre-1.15,-.8875),(centre+1.15,-.8875),(centre+1.15,.8875),(centre-1.15,.8875)]
  inner=[(centre-1.07,-.8075),(centre+1.07,-.8075),(centre+1.07,.8075),(centre-1.07,.8075)]
  v=[p(x,y,z) for z in [.20,.46] for x,y in outer+inner];f=[]
  for i in range(4):
   j=(i+1)%4;f += [(i,j,j+8,i+8),(i+4,i+12,j+12,j+4),(i,i+4,j+4,j),(i+8,j+8,j+12,i+12)]
  finish(mesh('Open inset cassette support '+str(centre),v,f),'RecessHardware')
-for x in [-5.03,5.03]:
+for x in [-(BASE*.97-.2565),BASE*.97-.2565]:
  for y in [-1.27,1.27]:
   bpy.ops.mesh.primitive_cylinder_add(vertices=8,radius=.025,depth=.020,location=p(x,y,.486));o=bpy.context.object;o.rotation_euler.x=math.pi/2
   bpy.ops.object.transform_apply(location=False,rotation=True,scale=True);o.name='Visible casework fastener';finish(o,'WallFasteners',.002)

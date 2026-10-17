@@ -1474,7 +1474,7 @@ export class AmbientTvs implements StoreFixture {
     this.screenAspect = screenW / screenH; // what the video crop is solved against
     const bezelPad = 0.2;
     const outerW = screenW + bezelPad * 2, outerH = screenH + bezelPad * 2;
-    const pitch = outerW + 1.0; // + a stretch of periwinkle wall between sets
+    const pitch = outerW + 0.5; // + a narrow stretch of housing between the sets
     const bezelDepth = 0.16;
     const outset = 0.5; // the housing cabinet juts this far off the wall (user)
     const bankZ = this.ctx.backWallZ + outset; // bezels sit on the housing front
@@ -1488,7 +1488,7 @@ export class AmbientTvs implements StoreFixture {
       this.ctx.ceilingY - halfH - 1.1, // leave room for the taller housing surround
       Math.max(CASE_TOP + halfH + 0.9, CASE_TOP + (this.ctx.ceilingY - CASE_TOP) * 0.38),
     );
-    const centerX = 11.0;
+    const centerX = this.ctx.scene.userData.wallBankShelfPlan?.x ?? 11.0;
 
     // ── Grey housing cabinet that holds all three sets ───────────────────────
     // One box outset `outset` off the wall (user), with a slightly keystoned
@@ -1521,7 +1521,7 @@ export class AmbientTvs implements StoreFixture {
       housing.castShadow = true;
       housing.receiveShadow = true;
       this.removeWallBankModel?.();
-      this.removeWallBankModel = installWallBankHousing(this.ctx, housing, bankY);
+      this.removeWallBankModel = installWallBankHousing(this.ctx, housing, bankY, { pitch, outset });
       this.ctx.addCollider(housing);
     }
 

@@ -37,6 +37,14 @@ the millwork section. Neutral plinth/reveal finishes stay with the model. The
 loader refreshes shadows after installation and releases model resources if
 the entrance is removed, including requests finishing after a rebuild.
 
+The 1990 exports use a recessed cabinet face beneath the upper fascia. The
+upper footprint, worktop heights, staff openings and navigation envelope stay
+fixed; the approximately 3.6-inch projection is an estimated construction
+dimension. `CounterInterior` marks white staff-facing panels and lower cabinet
+faces independently of the blue exterior. The returns enclosure shares this
+profile and finish role. Regenerate these variants with `-- --era-1990` after
+the Blender script argument, using both counter authoring scripts.
+
 Optional local installations use
 `public/user-assets/fixtures/checkout-counter/<theme>-<shape>-<profile>.glb`
 (`laminate` or `rounded`). An active brand pack has precedence over the flat

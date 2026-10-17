@@ -63,6 +63,11 @@ const YELLOW_FRAC = 1 / 3;      // trim stripe, centered — the other 2/3 split
 // from THERE, not from the true ceiling plane.
 const CEILING_GAP_FT = 0.2;     // band TOP sits this far below the VISIBLE ceiling line
 
+export function wallStripe1990Top(ceilingY: number): number {
+  return ceilingY - CORNICE_DROP - CEILING_GAP_FT;
+}
+export const WALL_STRIPE_1990_HEIGHT = BAND_H_FT;
+
 const WALL_STANDOFF = 0.04;     // ft off the wall plane — behind every wall fixture
 
 // One texture tile = this many feet of wall, so a future user asset with real
@@ -162,8 +167,7 @@ function perimeterRuns(scene: StoreScene, bandBottomY: number): StripeRun[] {
 export function buildWallStripe1990(scene: StoreScene): void {
   if (!wallStripe1990Active()) return;
 
-  const visibleCeilingY = scene.ceilingY - CORNICE_DROP;
-  const bandTopY = visibleCeilingY - CEILING_GAP_FT;
+  const bandTopY = wallStripe1990Top(scene.ceilingY);
   const centerY = bandTopY - BAND_H_FT / 2;
 
   const runs = perimeterRuns(scene, bandTopY - BAND_H_FT);
@@ -270,7 +274,7 @@ function liftHex(hex: string, f: number): string {
 // livery in every brand rather than one chain's colors painted on the wall:
 // primary lifted slightly (a painted band reads a touch brighter than the
 // emblem's ink under room light), and the trim band straight off secondary.
-function createWallStripeTexture(): THREE.CanvasTexture {
+export function createWallStripeTexture(): THREE.CanvasTexture {
   const { primary, secondary } = getActiveTheme().palette;
   const bandBody = liftHex(primary, 1.12);
   const canvas = document.createElement('canvas');

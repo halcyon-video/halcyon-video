@@ -6,6 +6,8 @@ that surface. Dimensions are feet, matching entrance/counter.ts. Blender's Z
 is up; (x, -store_z, height) exports directly to Three's Y-up coordinates.
 """
 import math
+import sys
+EARLY_EXPORT = "--era-1990" in sys.argv
 from pathlib import Path
 import bpy
 import bmesh
@@ -26,6 +28,7 @@ for name, color, roughness in [
     ('CounterWorktop', (.82, .81, .75, 1), .40),
     ('CounterPlinth', (.022, .028, .035, 1), .70),
     ('CounterReveal', (.09, .105, .12, 1), .65),
+    ('CounterInterior', (.91, .91, .89, 1), .45),
 ]:
     mat = bpy.data.materials.new(name)
     mat.diffuse_color = color
@@ -36,35 +39,39 @@ for name, color, roughness in [
     MATERIALS.append(mat)
 
 
-def section(depth, island=False, rounded=False, drawers=False):
+def section(depth, island=False, rounded=False, drawers=False, early=False):
     """(inset, height, material on the following strip). Closed joinery profile."""
     h = 2.82 if island else 3.54
     top = 3 if island else 1
     # Recessed kick, eased panel foot, cabinet face, under-top shadow reveal.
-    face_top = 2.55 if island else 2.23
-    p = [(.20, 0, 4), (.20, .28, 4), (.18, .32, 4),
-         (.055, .32, 0), (.035, .35, 0), (.035, face_top, 0),
-         (.045, face_top + .018, 5), (.07, face_top + .018, 5),
-         (.07, face_top + .05, top), (.025, face_top + .05, top)]
-    if not island:
+    face_top = 2.55 if island else (2.74 if early else 2.23)
+    # Recess the cabinet beneath the upper fascia, keeping the established
+    # outer top/collision envelope. The 3.6-inch projection is an estimate.
+    recess = .265 if early and not island else 0
+    p = [(.20+recess, 0, 4), (.20+recess, .28, 4), (.18+recess, .32, 4),
+         (.055+recess, .32, 0), (.035+recess, .35, 0), (.035+recess, face_top, 0),
+         (.045+recess, face_top + .018, 5), (.07+recess, face_top + .018, 5),
+         (.07+recess, face_top + .05, top), (.025, face_top + .05, top)]
+    if not island and not early:
         # Recessed contrasting inlay, with an actual return at both lips.
         p += [(.015, 3.195, 1), (.032, 3.215, 1),
               (.055, 3.225, 2), (.055, 3.355, 1),
               (.032, 3.365, 1), (.015, 3.385, 1)]
     # A rolled front and rear edge, confined to the existing top footprint.
-    r = (.085 if rounded else .035) if not island else (.065 if rounded else .025)
+    r = (.055 if early else .085 if rounded else .035) if not island else (.065 if rounded else .025)
     p.append((0, h-r, top))
     for k in range(1, 7):
         a = math.pi - k * math.pi/12
         p.append((r + r*math.cos(a), h-r + r*math.sin(a), top))
-    p.append((depth-r, h, top))
+    interior = 6 if EARLY_EXPORT else 0
+    p.append((depth-r, h, interior if early else top))
     for k in range(1, 7):
         a = math.pi/2 - k * math.pi/12
-        p.append((depth-r + r*math.cos(a), h-r + r*math.sin(a), top))
+        p.append((depth-r + r*math.cos(a), h-r + r*math.sin(a), interior if early else top))
     # Clerk-side finger rail and inset door faces are part of the same skin.
-    p += [(depth, h-.13, top), (depth-.04, h-.16, 5),
-          (depth-.11, h-.16, 5), (depth-.11, h-.23, 5),
-          (depth-.035, h-.25, 0), (depth-.035, .35, 0),
+    p += [(depth, h-.13, interior if early else top), (depth-.04, h-.16, interior if early else 5),
+          (depth-.11, h-.16, interior if early else 5), (depth-.11, h-.23, interior if early else 5),
+          (depth-.035, h-.25, interior), (depth-.035, .35, interior),
           (depth-.055, .32, 4), (depth-.20, .32, 4),
           (depth-.20, 0, 4)]
     if drawers and island:
@@ -75,10 +82,10 @@ def section(depth, island=False, rounded=False, drawers=False):
             seams += [(depth-.035,y+.015,0),(depth-.06,y+.008,5),
                       (depth-.06,y-.008,5),(depth-.035,y-.015,0)]
         p[start:start] = seams
-    return p
+    return [(d,y,6 if EARLY_EXPORT and island and mat == 0 else mat) for d,y,mat in p]
 
 
-def sweep(name, path, depth, island=False, rounded=False, drawers=False):
+def sweep(name, path, depth, island=False, rounded=False, drawers=False, early=False):
     """Welded quad rings, including mitres, routed seams and closed cut ends."""
     pts = [Vector(p) for p in path]
     tangents = [(b-a).normalized() for a, b in zip(pts, pts[1:])]
@@ -106,7 +113,7 @@ def sweep(name, path, depth, island=False, rounded=False, drawers=False):
             t = s/length
             rings.append((a.lerp(b, t), offsets[i].lerp(offsets[i+1], t), distance+s, seam))
         distance += length
-    profile = section(depth, island, rounded, drawers)
+    profile = section(depth, island, rounded, drawers, early)
     verts, faces, materials, uv = [], [], [], []
     perimeter = [0]
     for a, b in zip(profile, profile[1:]):
@@ -137,7 +144,7 @@ def sweep(name, path, depth, island=False, rounded=False, drawers=False):
         if reverse:
             indices.reverse()
         faces.append(indices)
-        materials.append(0)
+        materials.append(6 if EARLY_EXPORT and island else 0)
         uv.append([(profile[j % count][0]/4, profile[j % count][1]/4) for j in indices])
     mesh = bpy.data.meshes.new(name)
     mesh.from_pydata(verts, [], faces)
@@ -164,7 +171,7 @@ def sweep(name, path, depth, island=False, rounded=False, drawers=False):
     for face in bm.faces:
         if face[cap_layer]:
             y = face.calc_center_median().z
-            face.material_index = 4 if y < .32 else (3 if island else 1) if y > (2.60 if island else 2.28) else 0
+            face.material_index = 4 if y < .32 else (3 if island else 1) if y > (2.60 if island else 2.28) else (6 if EARLY_EXPORT and island else 0)
     bmesh.ops.recalc_face_normals(bm, faces=list(bm.faces))
     # Every authored part must be closed and manifold BEFORE export.
     assert all(e.is_manifold for e in bm.edges), name + ': open/nonmanifold edge'
@@ -175,6 +182,20 @@ def sweep(name, path, depth, island=False, rounded=False, drawers=False):
         face.smooth = len(face.verts) == 4
     bm.to_mesh(mesh)
     bm.free()
+    if early:
+        # Bevel the joined solid, not the sweep path: offsetting a tiny rounded
+        # path by the full cabinet depth folds the inner panels through its face.
+        bpy.context.view_layer.objects.active = obj
+        bevel = obj.modifiers.new('Eased millwork corners', 'BEVEL')
+        bevel.width = .045
+        bevel.segments = 2
+        bevel.limit_method = 'ANGLE'
+        bevel.angle_limit = math.radians(35)
+        bevel.use_clamp_overlap = True
+        bpy.ops.object.modifier_apply(modifier=bevel.name)
+        bm = bmesh.new(); bm.from_mesh(obj.data)
+        assert all(e.is_manifold for e in bm.edges), name + ': bevel opened solid'
+        bm.free()
     obj['construction'] = 'Welded millwork surface with routed panel joints; original Halcyon model'
     return obj
 
@@ -216,7 +237,7 @@ def cut_return_receiver(objects, shape):
 
 
 variants = []
-for variant in ['shield', 'usquare', 'desk', 'shield-2010', 'usquare-2010']:
+for variant in (['shield', 'usquare'] if EARLY_EXPORT else ['shield', 'usquare', 'desk', 'shield-2010', 'usquare-2010']):
     modern = variant.endswith('-2010')
     shape = variant.removesuffix('-2010')
     if shape == 'shield':
@@ -232,7 +253,7 @@ for variant in ['shield', 'usquare', 'desk', 'shield-2010', 'usquare-2010']:
         bpy.context.scene.collection.children.link(collection)
         objects = []
         for i, path in enumerate(paths):
-            objects.append(sweep(f'{shape}-surround-{i}', path, 1.5, rounded=style == 'rounded'))
+            objects.append(sweep(f'{shape}-surround-{i}', path, 1.5, rounded=style == 'rounded', early=EARLY_EXPORT))
         objects.append(sweep(f'{shape}-work-cabinet', island, 1.6, island=True, rounded=style == 'rounded', drawers=modern))
         if shape != 'desk' and not modern:
             cut_return_receiver(objects[:-1], shape)
@@ -244,7 +265,7 @@ for variant in ['shield', 'usquare', 'desk', 'shield-2010', 'usquare-2010']:
         for obj in objects:
             obj.select_set(True)
         bpy.context.view_layer.objects.active = objects[0]
-        bpy.ops.export_scene.gltf(filepath=str(OUT / f'checkout-counter-{shape}-{style}{"-2010" if modern else ""}.glb'),
+        bpy.ops.export_scene.gltf(filepath=str(OUT / f'checkout-counter-{shape}-{style}{"-1990" if EARLY_EXPORT else "-2010" if modern else ""}.glb'),
                                   export_format='GLB', use_selection=True,
                                   export_extras=True, export_yup=True)
         tris = sum(sum(len(p.vertices)-2 for p in o.data.polygons) for o in objects)
@@ -270,4 +291,4 @@ for screen in bpy.data.screens:
 bpy.context.scene.unit_settings.system = 'IMPERIAL'
 bpy.context.scene.unit_settings.scale_length = .3048
 bpy.context.preferences.filepaths.save_version = 0
-bpy.ops.wm.save_as_mainfile(filepath=str(ROOT / 'tools/models/checkout-counter.blend'), compress=True)
+bpy.ops.wm.save_as_mainfile(filepath=str(ROOT / f'tools/models/checkout-counter{"-1990" if EARLY_EXPORT else ""}.blend'), compress=True)

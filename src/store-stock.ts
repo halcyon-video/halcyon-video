@@ -206,7 +206,10 @@ export function updateColsCount(scene: StoreScene) {
     // every non-game-section fixture, capping the drape table's browse
     // cursor at 3 of its actual 11 columns per face).
     const fixture = scene.slottedFixtures.find(f => f.placement.id === scene.selectedFixtureId);
-    scene.colsCount = fixture && 'cols' in fixture ? (fixture as any).cols : 3;
+    if (fixture && 'columnsForShelf' in fixture) {
+      scene.colsCount = (fixture as { columnsForShelf(row: number): number }).columnsForShelf(scene.selectedShelf);
+      scene.selectedCol = Math.min(scene.selectedCol, scene.colsCount - 1);
+    } else scene.colsCount = fixture && 'cols' in fixture ? (fixture as any).cols : 3;
   } else if (scene.selectedUnitIdx === BACK_WALL_UNIT_IDX) {
     scene.colsCount = scene.nrTotalCols; // left wall unit + continuous back wall
   } else {
@@ -816,7 +819,7 @@ export async function buildAllMovieBoxes(scene: StoreScene) {
     const col = slotPos.col;
     const shelfIdx = slotPos.shelfIdx;
 
-    const shelfY = WALL_SHELF_HEIGHTS[shelfIdx];
+    const shelfY = scene.getNewReleasesShelfHeight(col, shelfIdx);
     const transform = scene.getNewReleasesSlotTransform(col, movie, shelfY);
     const lean = movie.isSeries ? 0 : shelfLeanAngle(shelfIdx);
     const hinge = scene.leanHingeOffset(lean, transform.rotationY, boxHeight);

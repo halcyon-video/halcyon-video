@@ -1,6 +1,7 @@
 import { FRAME_REVEAL_DEPTH, FRAME_REVEAL_CENTER } from '../frame-reveal';
 import { vestibuleLayout, vestibuleSide, vestibuleStraightSide, vestibuleBackHalf } from '../vestibule-layout.ts';
 import { buildExitReturnCounter } from './exit-return-counter';
+import { addInformationSign1990 } from './information-sign-1990';
 import { buildWalkOffMats } from './walk-off-mats';
 import { installCounterOfficeKit } from '../fixtures/counter-office-kit';
 import { installPriceLabelGun } from '../fixtures/price-label-gun';
@@ -61,7 +62,7 @@ import { vestibuleCeilingY } from '../ceiling-soffit';
 import { WINDOW_HEAD_Y } from '../storefront-facade';
 import { buildVestibuleDoor, updateVestibuleDoors, VestibuleDoor } from './doors';
 import { counterMount, placeOnCounterMount } from './counter-mounts';
-import { buildCheckoutCounter, ClerkStanding, CounterFrame } from './counter';
+import { buildCheckoutCounter, ClerkStanding, CounterBandEdge, CounterFrame } from './counter';
 import { buildCounterTv } from './counter-tv';
 import { Footprint } from '../layout-validator';
 import { CheckoutBag } from '../checkout-bag';
@@ -149,6 +150,13 @@ export class EntranceCheckout implements StoreFixture {
     return this.counterTopInfo?.frame ?? null;
   }
 
+  // The walk-in band's customer-facing faces (none on a standalone desk).
+  // Null until build().
+  private counterBand: { edges: CounterBandEdge[]; topY: number } | null = null;
+  getCounterBand(): { edges: CounterBandEdge[]; topY: number } | null {
+    return this.counterBand;
+  }
+
   // Everything the clerk's navigation needs from the entrance architecture:
   // exact counter footprints (band + inner island, real walk-through gap kept
   // open), the whole vestibule chamber as one keep-out rect, and her work
@@ -156,11 +164,12 @@ export class EntranceCheckout implements StoreFixture {
   // build(); null until then.
   private clerkNavInfo: {
     footprints: Footprint[];
+    gate: Footprint[];
     register: ClerkStanding;
     terminals: ClerkStanding[];
   } | null = null;
 
-  getClerkNav(): { footprints: Footprint[]; register: ClerkStanding; terminals: ClerkStanding[] } | null {
+  getClerkNav(): { footprints: Footprint[]; gate: Footprint[]; register: ClerkStanding; terminals: ClerkStanding[] } | null {
     return this.clerkNavInfo;
   }
 
@@ -690,6 +699,7 @@ export class EntranceCheckout implements StoreFixture {
     // the counterStyle/counterTop variants — the footprint below is identical
     // across styles so every anchor below is unaffected by which style is active.
     const counterResult = buildCheckoutCounter(this.ctx, group, cx, backZ, spec, this.ctx.storeWidth);
+    if (activeStoreFormat().counterDressing) addInformationSign1990(this.ctx, group, counterResult);
     this.counterModelReady = counterResult.modelReady;
     const officeAnchor = counterOfficeKitAnchor(spec.counterShape, cx, backZ);
     if (officeAnchor && this.ctx.activeTheme.id !== 'bb-2010' && activeStoreFormat().counterDressing) {
@@ -715,6 +725,7 @@ export class EntranceCheckout implements StoreFixture {
       cx, topY: innerH + 0.12, depth: innerDepth,
       frame: counterResult.frame, spineAt,
     };
+    this.counterBand = { edges: counterResult.bandEdges, topY: counterResult.bandTopY };
 
     // Clerk nav data: counter rects + the vestibule chamber (glass box, never
     // walkable for her) + work spots at the register and the two terminals
@@ -727,6 +738,8 @@ export class EntranceCheckout implements StoreFixture {
           cx, cz: (frontZ + backZ) / 2, w: boxW + 0.24, d: boxDepth + 0.24, yaw: 0,
         },
       ],
+      // Shoppers' extra keep-out: the band with the staff gap shut (pin 265).
+      gate: counterResult.gateFootprints,
       register: counterResult.registerStanding,
       // Same anchors the terminal props are built at, below.
       terminals: spec.counterShape === 'desk'

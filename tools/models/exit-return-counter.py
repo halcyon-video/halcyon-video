@@ -16,7 +16,7 @@ HALF=SPEC['receiverWidth']/2
 OPEN_HALF=HALF-.09
 # The rear is a white worktop with a low white backsplash against the glazing.
 # Retain the customer-side enclosure; its finished end meets the white bench.
-parts.append(sweep('Blue customer-side enclosure',[(-7.75,-2.2),(-7.75,-5.75),(-2,-11.5),(3.25,-6.25)],.8))
+parts.append(sweep('Blue customer-side enclosure',[(-7.75,-2.2),(-7.75,-5.75),(-2,-11.5),(3.25,-6.25)],.8,early=EARLY_EXPORT))
 BACK=SPEC['glassOffset'];BENCH_D=BACK-SPEC['worktopFront']
 parts.append(sweep('White window worktop right',[(7.75,BACK),(RECEIVER_X+OPEN_HALF,BACK)],BENCH_D,island=True))
 parts.append(sweep('White window worktop left',[(RECEIVER_X-OPEN_HALF,BACK),(-7.75,BACK)],BENCH_D,island=True))
@@ -97,8 +97,8 @@ channel('Sloping quick-return ramp',RECEIVER_X-1.06,RECEIVER_X+1.06,
  [(3.30,FRONT),(3.22,FRONT),(2.12,-1.88),(2.20,-1.88)])
 # Keep the receiving cabinet beneath the opening. Only the worktop is open;
 # removing an entire sweep must not leave a floor-to-counter void in the run.
-solid('Receiver cabinet front',[(-1.18,-2.2),(1.18,-2.2),(1.18,-2.12),(-1.18,-2.12)],.32,2.70,0)
-solid('Receiver cabinet back',[(-1.18,BACK-.08),(1.18,BACK-.08),(1.18,BACK),(-1.18,BACK)],.32,2.70,0)
+solid('Receiver cabinet front',[(-1.18,-2.2),(1.18,-2.2),(1.18,-2.12),(-1.18,-2.12)],.32,2.70,6 if EARLY_EXPORT else 0)
+solid('Receiver cabinet back',[(-1.18,BACK-.08),(1.18,BACK-.08),(1.18,BACK),(-1.18,BACK)],.32,2.70,6 if EARLY_EXPORT else 0)
 solid('Receiver cabinet plinth',[(-1.12,-2.12),(1.12,-2.12),(1.12,BACK-.08),(-1.12,BACK-.08)],0,.32,4)
 
 scene=bpy.context.scene;scene.unit_settings.system='IMPERIAL';scene.unit_settings.scale_length=.3048
@@ -111,8 +111,8 @@ for screen in bpy.data.screens:
  for area in screen.areas:
   if area.type=='VIEW_3D':area.spaces.active.region_3d.view_distance=22;area.spaces.active.region_3d.view_location=(0,3.5,1.6)
 metrics={'boundsFeet':[15.5,11.5+FRONT,H_BACK],'parts':len(parts),'triangles':sum(len(p.vertices)-2 for ob in parts for p in ob.data.polygons),'allSolidPartsManifold':True,'worktopHeightFeet':2.82,'staffOpeningFeet':round(math.hypot(7.75-3.25,6.25-2.2),2),'staffOpeningSide':'vestibule (+X)','vestibuleStubDepthFeet':0,'receiverCenterXFeet':RECEIVER_X,'receiverFrontBeyondGlassFeet':.00328084,'worktopOpeningFeet':[2*OPEN_HALF,BENCH_D],'hasSlopingRamp':True,'rampOutletHeightFeet':2.20,'rearBlueRim':False,'whiteWorktopMeetsGlass':True,'whiteBacksplashHeightFeet':BH,'receiverHeightAboveWorktopFeet':H_BACK-Y}
-(ROOT/'tools/models/exit-return-counter-metrics.json').write_text(json.dumps(metrics,indent=2)+'\n')
-bpy.ops.wm.save_as_mainfile(filepath=str(ROOT/'tools/models/exit-return-counter.blend'),compress=True)
+(ROOT/f'tools/models/exit-return-counter{"-1990" if EARLY_EXPORT else ""}-metrics.json').write_text(json.dumps(metrics,indent=2)+'\n')
+bpy.ops.wm.save_as_mainfile(filepath=str(ROOT/f'tools/models/exit-return-counter{"-1990" if EARLY_EXPORT else ""}.blend'),compress=True)
 bpy.ops.object.join();bpy.context.object.name='ExitReturnCounter'
-bpy.ops.export_scene.gltf(filepath=str(ROOT/'public/models/exit-return-counter.glb'),export_format='GLB',use_selection=True,export_yup=True)
+bpy.ops.export_scene.gltf(filepath=str(ROOT/f'public/models/exit-return-counter{"-1990" if EARLY_EXPORT else ""}.glb'),export_format='GLB',use_selection=True,export_yup=True)
 print(json.dumps(metrics))

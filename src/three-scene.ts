@@ -14,6 +14,7 @@ import { ABOVE_R_LIBRARY_ID, partitionAboveRRoom } from './above-r-room';
 import { createNrBayWash } from './nr-bay-wash';
 import { STORE_CENTER_X, FRONT_GLASS_Z } from './store-layout';
 import { activeStoreFormat } from './store-format';
+import { wallBankShelfPlan, wallBankShelfSlot } from './wall-bank-profile';
 import { planNrRuns, nrSlotTransform, type NrRun } from './nr-run-layout';
 import { disposeSceneMeshes } from './scene-mesh-disposal';
 import { installStoreSurfaceFinishes } from './store-surface-finish';
@@ -23,6 +24,7 @@ import { tickShelfVisibility, disposeShelfVisibility } from './shelf-visibility'
 import { mobileWalkInput } from './mobile-walk';
 import { mobileStoreActive, mobileStoreTap } from './mobile-store';
 import * as THREE from 'three';
+import { notifyWalkBlocked } from './walk-bump';
 import { paintStoreLoading } from './store-loading';
 import { installDirectLightVisibility } from './direct-light-visibility';
 installDirectLightVisibility();
@@ -96,7 +98,7 @@ import { OutdoorLightingRig, type OutsideMode } from './outdoor-lighting';
 import { CandyDisplay, CandyRow } from './fixtures/period-fixtures';
 import { TipJar } from './fixtures/tip-jar';
 import { openTipOverlay } from './tip-jar';
-import { gamepadEverConnected } from './gamepad-tracker';
+import { gamepadEverConnected, padInputAllowed } from './gamepad-tracker';
 import { StoreTheme, getActiveTheme } from './themes';
 import {
   CASE_EULER_ORDER,
@@ -1814,7 +1816,12 @@ export class StoreScene {
   public nrLeftWallUnitCenterZ(): number { return this.nrRuns[0]?.z ?? this.nrLeftWallUnitBackZ(); }
   private nrLeftWallUnitBackZ(): number { return this.backWallZ + (this.plan.clubhouse ? 18 : NR_RUN_DEPTH); }
   public getNewReleasesSlotTransform(col: number, _movie?: Movie, shelfY = WALL_SHELF_HEIGHTS[0]): { x: number, z: number, rotationY: number } {
-    return nrSlotTransform(this.nrRuns, col, nrWallStockOffset(shelfY));
+    return wallBankShelfSlot(wallBankShelfPlan(this.nrRuns, getActiveTheme().id), col, WALL_SHELF_HEIGHTS.indexOf(shelfY))
+      ?? nrSlotTransform(this.nrRuns, col, nrWallStockOffset(shelfY));
+  }
+
+  public getNewReleasesShelfHeight(col: number, row: number): number {
+    return wallBankShelfSlot(wallBankShelfPlan(this.nrRuns, getActiveTheme().id), col, row)?.y ?? WALL_SHELF_HEIGHTS[row];
   }
 
   private initThree() {
@@ -4435,7 +4442,7 @@ export class StoreScene {
 
     // Query active gamepad once per frame using a plain indexed loop to avoid allocations/GC pressure
     let firstActiveGamepad: Gamepad | null = null;
-    if (gamepadEverConnected && navigator.getGamepads) {
+    if (gamepadEverConnected && navigator.getGamepads && padInputAllowed()) {
       const gps = navigator.getGamepads();
       if (gps) {
         for (let i = 0; i < gps.length; i++) {
@@ -4553,8 +4560,10 @@ export class StoreScene {
           storeWidth,
           this.backWallZ + 1.5
         );
+        const blocked = constrained.x !== this.camera.position.x || constrained.z !== this.camera.position.z;
         this.camera.position.x = constrained.x;
         this.camera.position.z = constrained.z;
+        if (blocked) notifyWalkBlocked(constrained.x, constrained.z); // pin 272: bumpable props
         // Head-bob: a footstep-phased vertical bounce on top of the 5.5ft eye
         // height. Only y is touched, so x/z (and thus collision) are never
         // perturbed; when bobAmount eases to 0 this is exactly 5.5 again.

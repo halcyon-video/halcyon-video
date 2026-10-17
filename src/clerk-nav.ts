@@ -55,7 +55,12 @@ export class ClerkNavGrid {
   private readonly visitStamp: Int32Array;
   private stamp = 0;
 
+  private readonly bounds: NavBounds;
+  private readonly rects: NavRect[];
+  private readonly opts: NavGridOptions;
+
   constructor(bounds: NavBounds, rects: NavRect[], opts: NavGridOptions = {}) {
+    this.bounds = bounds; this.rects = rects; this.opts = opts;
     this.cell = opts.cellSize ?? 0.5;
     this.clearance = opts.clearance ?? 0.8;
     this.wallMargin = opts.wallMargin ?? this.clearance;
@@ -104,6 +109,11 @@ export class ClerkNavGrid {
         }
       }
     }
+  }
+
+  /** The same plan with extra keep-outs (built once, never per frame). */
+  extended(rects: readonly NavRect[]): ClerkNavGrid {
+    return new ClerkNavGrid(this.bounds, [...this.rects, ...rects], this.opts);
   }
 
   private cellOf(x: number, z: number): number {

@@ -1,8 +1,10 @@
 # Cuts a GitHub Release — grouped notes plus, where possible, a store
 # screenshot — and lands a matching CHANGELOG.md entry on master, with no
 # human action, every time a version tag is pushed. Once the Release exists,
-# fans the same artifact (a short blurb + the screenshot + the demo link) out
-# to Discord, Mastodon, Bluesky and X (issue #105).
+# fans the same artifact (a short blurb + the screenshot + a link) out to
+# Discord, Mastodon, Bluesky and X (issue #105). Discord links the release's
+# page on the hosted changelog (deploy-demo.yml builds it); the other channels
+# link the browser demo.
 #
 # Why this exists (issue #104): tags ran to v0.8.1 while the newest Release
 # page still said v0.6.2 — Releases is the only subscribe button this project

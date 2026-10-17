@@ -49,6 +49,7 @@ import { SlottedFixture } from './fixtures';
 import { AmbientTvs } from './ambient-tvs';
 import { EntranceCheckout } from './entrance';
 import { installHalloween } from './entrance/halloween';
+import { installHalloweenEndcapCutouts } from './halloween-endcap-cutouts';
 import { HALLOWEEN_PUMPKIN_COUNTER_U, HALLOWEEN_PUMPKIN_DESK_U, halloweenPumpkinCounterPosition } from './entrance/halloween-layout';
 import { buildWindowBays } from './entrance/windows';
 import { windowBayLayout } from './storefront-window-layout';
@@ -56,6 +57,7 @@ import { facadeDimensions, facadeStyle } from './storefront-architecture';
 import { addGlassReflectionPane } from './glass-reflection';
 import { buildExteriorEnvironment } from './exterior-environment';
 import { buildExteriorPanorama } from './exterior-panorama';
+import { wallBankShelfPlan } from './wall-bank-profile';
 import { NR_WALL_SLOPE, nrWallDepthAtHeight, NR_WALL_SHELF_DEPTH, NR_WALL_CLEARANCE, NR_LEFT_UNIT_STANDOFF, WALL_SHELF_HEIGHTS, NR_SECTION_COLS, UNIT_SECTIONS, seededRandom01, getStorefrontSpec, vestibuleHalfWidth, posterBayIndices, entranceOpeningHalfWidth, mapWallSegmentUV, CENTER_WALKWAY, STORE_CENTER_X, FRONT_GLASS_Z } from './store-layout';
 import { buildFrontSoffit, frontSoffitLidPolygon, frontSoffitPolygon, frontSoffitY, pointInSoffit, soffitConnectHalf, soffitKeyCenters, soffitTrofferCenters, tileOverlapsSoffit } from './ceiling-soffit';
 import { createFixture } from './fixture-registry';
@@ -75,6 +77,7 @@ import { buildStorefrontCampaignPoster, campaignBannerSpan } from './fixtures/st
 import { buildSecurityCamera93 } from './fixtures/security-camera-93';
 import { isEndcapKind } from './fixtures/endcap-shelf';
 import { collectionEndcapPlacements } from './fixtures/collection-endcap';
+import { aisleEndBasePlacements } from './fixtures/aisle-end-base';
 import { buildMembershipOvalHanger } from './fixtures/membership-oval-hanger';
 import { buildRentingBetterHangers } from './fixtures/renting-better-hanger';
 import { buildJoinTodayRewardsRisers } from './fixtures/join-today-rewards-riser';
@@ -669,18 +672,26 @@ export function buildStore(scene: StoreScene) {
 
   // Ceiling, trim and diffusers receive the room's diffuse bounce light.
   // Their albedo/normal/roughness maps remain ordinary PBR surface inputs.
-  const ceilTex = createCeilingTileTexture();
-  ceilTex.repeat.set(storeWidth / TILE_X, floorCeilLen / TILE_Z);
-
-  const ceilGeo = new THREE.PlaneGeometry(storeWidth, floorCeilLen);
-  const ceilMat = new THREE.MeshStandardMaterial({
-    color: 0xf4f4f0,
-    map: ceilTex,
-    roughness: 0.92,
-    metalness: 0.0,
-    bumpMap: ceilTex,
-    bumpScale: 0.01,
+  // Plain (unlit) acoustic panel — same recessed T-bar module as a troffer,
+  // but a flat matte tile instead of an emissive diffuser. Shares the
+  // troffer's frame material/geometry (same metal trim), just a different
+  // face. Instanced: the panel count scales with the whole ceiling area
+  // (hundreds at full store scale), so unlike the sparse troffers these
+  // must not be individual THREE.Mesh objects.
+  const acousticPanelTex = createAcousticPanelTexture();
+  const panelMat = new THREE.MeshStandardMaterial({
+    // Fissured mineral-fibre texture — flat color here was a loud CG tell
+    // on the second-largest surface in view.
+    map: acousticPanelTex,
+    color: 0xfdfdfb, roughness: 0.92, metalness: 0.0
   });
+
+  // Pin 277: the plane is what shows as the cut tiles between the last full
+  // module and the walls, so it wears the panels' own fibre with UVs in feet
+  // (the grid model's TileRim grain density) instead of a printed-rail tile.
+  const ceilGeo = new THREE.PlaneGeometry(storeWidth, floorCeilLen);
+  const ceilUv = ceilGeo.getAttribute('uv') as THREE.BufferAttribute;
+  for (let i = 0; i < ceilUv.count; i++) ceilUv.setXY(i, ceilUv.getX(i) * storeWidth, ceilUv.getY(i) * floorCeilLen);
   // Mostly hidden BEHIND the instanced panels; what shows is the grid line
   // between them, so it has to sit at the panels' level. History: 0.22 flat
   // read uniform, 0.12 flat went dead — the fix for THAT was routing the glow
@@ -692,7 +703,7 @@ export function buildStore(scene: StoreScene) {
   // troffer lens panels (HDR 1.55) are unambiguously the fixtures. The map is
   // what keeps this dim value from flattening.
 
-  const ceiling: THREE.Mesh<THREE.BufferGeometry> = new THREE.Mesh(ceilGeo, ceilMat);
+  const ceiling: THREE.Mesh<THREE.BufferGeometry> = new THREE.Mesh(ceilGeo, panelMat);
   ceiling.position.set(STORE_CENTER_X, ceilingY, sideWallZ);
   ceiling.rotation.x = Math.PI / 2; // Facing down
   ceiling.receiveShadow = true;
@@ -764,19 +775,7 @@ export function buildStore(scene: StoreScene) {
   // rebalance (was 0.42) — kept just below the plane's 0.24 so the lattice
   // still reads without the whole grid glowing.
 
-  // Plain (unlit) acoustic panel — same recessed T-bar module as a troffer,
-  // but a flat matte tile instead of an emissive diffuser. Shares the
-  // troffer's frame material/geometry (same metal trim), just a different
-  // face. Instanced: the panel count scales with the whole ceiling area
-  // (hundreds at full store scale), so unlike the sparse troffers these
-  // must not be individual THREE.Mesh objects.
-  const acousticPanelTex = createAcousticPanelTexture();
-  const panelMat = new THREE.MeshStandardMaterial({
-    // Fissured mineral-fibre texture — flat color here was a loud CG tell
-    // on the second-largest surface in view.
-    map: acousticPanelTex,
-    color: 0xfdfdfb, roughness: 0.92, metalness: 0.0
-  });
+  // Plain panels use panelMat (declared with the ceiling plane above).
   // Eyeballed against reference drop ceilings: the point where tile reads as
   // lit mineral fibre rather than storm-grey or lightbox. 0.5 tipped into
   // lightbox (out-glowed the merchandise); 0.24 sits on the lit-fibre side and
@@ -2193,11 +2192,40 @@ export function buildStore(scene: StoreScene) {
     });
   };
 
+  const bankPlan = wallBankShelfPlan(scene.nrRuns, theme.id);
+  scene.scene.userData.wallBankShelfPlan = bankPlan;
   const midStepZ = (backWallZ + stepWallZ) / 2;
   const leftWallXCenter = STORE_CENTER_X - storeWidth / 2 + NR_LEFT_UNIT_STANDOFF;
   const leftWallZCenter = scene.nrLeftWallUnitCenterZ();
   for (const run of scene.nrRuns) if (run.cols > 0) {
-    buildShelfRun(run.length, new THREE.Vector3(run.x, 0, run.z), run.yaw, run.startCol, run.wallInset);
+    if (!bankPlan || bankPlan.run !== run) {
+      buildShelfRun(run.length, new THREE.Vector3(run.x, 0, run.z), run.yaw, run.startCol, run.wallInset);
+      continue;
+    }
+    const leftWidth = bankPlan.firstBay * NR_BAY_WIDTH;
+    const rightWidth = run.length - leftWidth - bankPlan.width;
+    if (leftWidth > 0) buildShelfRun(leftWidth, new THREE.Vector3(run.x - run.length / 2 + leftWidth / 2, 0, run.z), 0, run.startCol, run.wallInset);
+    if (rightWidth > 0) buildShelfRun(rightWidth, new THREE.Vector3(run.x + run.length / 2 - rightWidth / 2, 0, run.z), 0, bankPlan.startCol + bankPlan.cols, run.wallInset);
+    // A complete, usable fallback owns its own group so the local furniture can
+    // replace it after GPU preparation without hiding neighbouring wall shelves.
+    const center = new THREE.Group(); center.name = 'wall-bank-shelf-fallback';
+    center.position.set(bankPlan.x, 0, run.z); scene.scene.add(center);
+    const bayWidth = bankPlan.width / bankPlan.bays;
+    for (let bay = 0; bay < bankPlan.bays; bay++) {
+      const x = -bankPlan.width / 2 + (bay + .5) * bayWidth;
+      const backing = new THREE.Mesh(new THREE.BoxGeometry(bayWidth - .03, 8.69, .05), sharedShelfMat);
+      backing.position.set(x, 8.69 / 2, .48); center.add(backing); scene.shelves.push(backing);
+      for (const y of bankPlan.heights) {
+        const depth = bankPlan.depth - .5;
+        const geometry = new THREE.BoxGeometry(bayWidth - .035, .0625, depth);
+        const positions = geometry.getAttribute('position');
+        for (let i = 0; i < positions.count; i++) positions.setY(i, positions.getY(i) - .01125 + NR_WALL_SLOPE * (positions.getZ(i) - depth / 2));
+        geometry.computeVertexNormals();
+        const shelf = new THREE.Mesh(geometry, sharedShelfMat);
+        shelf.position.set(x, y, .5 + depth / 2); shelf.castShadow = shelf.receiveShadow = true;
+        center.add(shelf); scene.shelves.push(shelf);
+      }
+    }
   }
 
   buildNrBayLighting(scene);
@@ -2248,6 +2276,8 @@ export function buildStore(scene: StoreScene) {
       : undefined,
     suppressFrontCapLineIds: endcapHostLineIds,
   });
+  // October paper cutouts standing off the top of every end cap (pin 274).
+  installHalloweenEndcapCutouts(scene.scene, scene.libraryEndCaps);
   nrWallModels.finish(() => {
     scene.renderer.shadowMap.needsUpdate = true;
     scene.requestRender();
@@ -2291,6 +2321,7 @@ export function buildStore(scene: StoreScene) {
     ...(scene.gameMovies.length > 0 ? gameSectionPlacements(scene.getStoreWidth()) : []),
     // Franchise collection displays at their reserved run ends.
     ...collectionEndcaps,
+    ...aisleEndBasePlacements(scene, endcapHostLineIds),
     // The back room, on the formats that have one (GH #33).
     ...(scene.plan.aboveRRoom ? curtainedAlcovePlacements(scene.plan.aboveRRoom.depth) : []),
     // Potted plants in mom-and-pop mode
@@ -2370,7 +2401,7 @@ export function buildStore(scene: StoreScene) {
     }
     const fixture = createFixture(placement, scene.fixtureContext());
     fixture.build();
-    if (placement.kind in RETAIL_FIXTURE_SPECS || placement.kind === 'gumball-machine') scene.retailFixtures.push(fixture);
+    if (placement.kind in RETAIL_FIXTURE_SPECS || placement.kind === 'gumball-machine' || placement.kind === 'aisle-end-base') scene.retailFixtures.push(fixture);
     const footprint = fixture.getFootprint?.();
     if (footprint) fixtureFootprints.push(footprint);
     fixtureFootprints.push(...(fixture.getFootprints?.() ?? []));
@@ -2493,15 +2524,25 @@ export function buildStore(scene: StoreScene) {
     );
     if (pumpkinAnchor) {
       const pumpkinPosition = halloweenPumpkinCounterPosition(pumpkinAnchor, pumpkinUsesOuterBand);
-      installHalloween(
-        frontWindow,
-        frontPanes,
-        scene.scene,
-        { position: new THREE.Vector3(pumpkinPosition.x, pumpkinPosition.y, pumpkinPosition.z), yaw: pumpkinAnchor.rotY },
-        () => { scene.renderer.shadowMap.needsUpdate = true; scene.queueStructuralShadowRefresh(); scene.requestRender(); },
-        [...frontPanelsWithPosters, ...frontPanes.flatMap((p,i) =>
-          returnWindowX >= STORE_CENTER_X-p.hi && returnWindowX <= STORE_CENTER_X-p.lo ? [i] : [])],
-      );
+      // Side ribbons wear clings too (pin 276), clear of the posters that
+      // hang on every second pane (see the ribbon poster loop above).
+      const sideRuns = [leftRibbon, rightRibbon].flatMap(r => r ? [{
+        parent: r.win,
+        panes: Array.from({ length: r.cols }, (_, i) => ({ lo: -r.len / 2 + i * r.len / r.cols, hi: -r.len / 2 + (i + 1) * r.len / r.cols })),
+        occupied: activeStoreFormat().id === 'mom-and-pop' ? [] : Array.from({ length: r.cols }, (_, i) => i).filter(i => i % 2 === 1),
+      }] : []);
+      installHalloween({
+        windows: [{ parent: frontWindow, panes: frontPanes, occupied: [...frontPanelsWithPosters, ...frontPanes.flatMap((p,i) =>
+          returnWindowX >= STORE_CENTER_X-p.hi && returnWindowX <= STORE_CENTER_X-p.lo ? [i] : [])] }, ...sideRuns],
+        counterParent: scene.scene,
+        pumpkinPose: {
+          position: new THREE.Vector3(pumpkinPosition.x, pumpkinPosition.y, pumpkinPosition.z),
+          yaw: pumpkinAnchor.rotY, faceYaw: Math.atan2(-nx, -nz),
+        },
+        band: scene.entrance?.getCounterBand() ?? null,
+        refresh: () => { scene.renderer.shadowMap.needsUpdate = true; scene.queueStructuralShadowRefresh(); scene.requestRender(); },
+        requestRender: () => scene.requestRender(),
+      });
     }
   }
 

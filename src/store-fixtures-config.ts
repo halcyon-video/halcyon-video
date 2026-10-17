@@ -5,7 +5,7 @@ import { fitDepartmentArch, type DepartmentArchHost } from './fixtures/departmen
 export { WALL_COURTESY_PHONE } from './fixtures/wall-courtesy-telephone';
 import { FixturePlacement, BOX_SPACING, STORE_CENTER_X } from './store-layout';
 import { type CounterShape } from './store-format';
-import { registerFixtureKind } from './fixture-registry';
+import { registerFixtureKind } from './fixture-kinds';
 import { StructureFootprint } from './fixtures/period-fixtures';
 import { PV_DRAPE_TABLE_POP_KIT } from './fixtures/pv-drape-table';
 import { COMING_SOON_LETTERBOARD_THEMES } from './fixtures/coming-soon-letterboard';
