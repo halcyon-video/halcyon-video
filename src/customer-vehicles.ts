@@ -4,23 +4,26 @@ import { assetUrl } from './asset-url';
 import { type CustomerVehicle, type CustomerParking } from './customer-parking';
 
 type Resource = { dispose(): void };
-/** Shared per-asset sources with customer-owned paint and explicit load silhouettes. */
+/** Shared per-asset sources and per-paint materials, with explicit load silhouettes. */
 export class CustomerVehicles {
   readonly group = new THREE.Group();
   private readonly cars = new Map<string, THREE.Group>();
   private readonly owned = new Set<Resource>();
   private readonly sources = new Map<string, THREE.Group>();
   private readonly fallbacks = new Map<string, THREE.Group>();
+  /** One BodyPaint clone per source material and colour, shared by every car wearing it. */
+  private readonly paints = new Map<THREE.Material, Map<number, THREE.MeshStandardMaterial>>();
   private disposed = false;
   private version = -1;
-  constructor(readonly parking: CustomerParking, private readonly wake: () => void) {
+  constructor(readonly parking: CustomerParking, private readonly wake: () => void, private readonly lite = false) {
     this.group.name = 'customer-vehicles';
     // Only admitted period assets need loading. One source per distinct asset,
     // independent of occupancy, with no loader or resource per parked customer.
     for (const vehicle of parking.vehicles) {
       if (!parking.eligible(vehicle) || this.fallbacks.has(vehicle.asset)) continue;
       this.fallbacks.set(vehicle.asset, this.makeFallback(vehicle));
-      new GLTFLoader().load(assetUrl('models/' + vehicle.asset), gltf => {
+      // Low and medium quality load the lighter level of detail at the same size.
+      new GLTFLoader().load(assetUrl('models/' + (this.lite ? vehicle.liteAsset : vehicle.asset)), gltf => {
         const resources = new Set<Resource>();
         gltf.scene.traverse(object => {
           if (!(object instanceof THREE.Mesh)) return;
@@ -65,11 +68,15 @@ export class CustomerVehicles {
       add(wheels, tire, x * (vehicle.width / 2 - .4), radius, z * vehicle.length * .29);
     return group;
   }
-  private removeCar(car: THREE.Group): void {
-    car.traverse(o => {
-      if (o instanceof THREE.Mesh && o.userData.customerPaint) (o.material as THREE.Material).dispose();
-    });
-    car.removeFromParent();
+  private paint(source: THREE.MeshStandardMaterial, color: number): THREE.MeshStandardMaterial {
+    let byColor = this.paints.get(source);
+    if (!byColor) { byColor = new Map(); this.paints.set(source, byColor); }
+    let mat = byColor.get(color);
+    if (!mat) {
+      mat = source.clone(); mat.color.setHex(color); mat.envMapIntensity = .25;
+      byColor.set(color, mat); this.owned.add(mat);
+    }
+    return mat;
   }
   sync(): void {
     if (this.disposed || this.version === this.parking.version) return;
@@ -78,7 +85,7 @@ export class CustomerVehicles {
       const assignment = this.parking.assignments.get(id);
       if (assignment && car.userData.asset === assignment.vehicle.asset &&
           car.userData.original === this.sources.has(assignment.vehicle.asset)) continue;
-      this.removeCar(car); this.cars.delete(id);
+      car.removeFromParent(); this.cars.delete(id);
     }
     for (const [id, a] of this.parking.assignments) {
       if (this.cars.has(id)) continue;
@@ -92,8 +99,7 @@ export class CustomerVehicles {
       car.position.set(a.space.x, -.09, a.space.z); car.rotation.y = a.space.yaw;
       car.traverse(o => {
         if (!(o instanceof THREE.Mesh) || Array.isArray(o.material) || o.material.name !== 'BodyPaint') return;
-        const mat = (o.material as THREE.MeshStandardMaterial).clone();
-        mat.color.setHex(a.color); mat.envMapIntensity = .25; o.material = mat; o.userData.customerPaint = true;
+        o.material = this.paint(o.material as THREE.MeshStandardMaterial, a.color);
       });
       this.cars.set(id, car); this.group.add(car);
     }
@@ -102,8 +108,8 @@ export class CustomerVehicles {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
-    this.cars.forEach(car => this.removeCar(car)); this.cars.clear();
+    this.cars.forEach(car => car.removeFromParent()); this.cars.clear();
     this.group.removeFromParent(); this.group.clear();
-    this.owned.forEach(r => r.dispose()); this.owned.clear(); this.sources.clear(); this.fallbacks.clear();
+    this.owned.forEach(r => r.dispose()); this.owned.clear(); this.sources.clear(); this.fallbacks.clear(); this.paints.clear();
   }
 }

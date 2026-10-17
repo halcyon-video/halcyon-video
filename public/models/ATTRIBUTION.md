@@ -13,10 +13,9 @@ used for the store's prop dressing.
 | File | Model | Author | License |
 |---|---|---|---|
 | `retro_tv.glb` | [Retro TV](https://poly.pizza/m/2tfjTOK1Lh4) | Alex Safayan | [CC-BY 3.0](https://creativecommons.org/licenses/by/3.0/) |
-| `car_sedan.glb` | Original unbadged compact period sedan (#266) | Halcyon contributors | Repository license; [source and contract](../../docs/car-sedan-model.md) |
+| `customer-car-{sedan,hatchback,wagon,minivan}[-lite].glb` | Original unbadged period customer cars (#392) | Halcyon contributors | Repository license; [source and contract](../../docs/customer-cars-model.md) |
 | `car_sports.glb` | [Sports Car](https://poly.pizza/m/1mkmFkAz5v) | Quaternius | CC0 |
 
-| `car_hatchback.glb` | [Car Hatchback](https://poly.pizza/m/BG0KAhmGDt) | Kay Lousberg | CC0 |
 
 | `coffee_table.glb` | Original Halcyon oak/glass coffee table (#215) | Halcyon contributors | Repository license; embedded ambientCG WoodFloor043 maps CC0 |
 | `tv_ceiling.glb` / `tv_hero.glb` | [CRT-TV](https://sketchfab.com/3d-models/crt-tv-bc61b13e2ac2472dbfcdd1dd2fa8c584) | pawelk1568890 | [CC-BY 4.0](https://creativecommons.org/licenses/by/4.0/) |
@@ -96,14 +95,13 @@ or branded print. Editable source, generator, uncertainty and attachment contrac
 privately; no faithful skin is distributed. The runtime display is an explicitly
 generic envelope pending device and placement references.
 
-`car_hatchback.glb` is original generic Halcyon scripted Blender construction,
-covered by this repository's license. Editable parts and authoring script:
-`tools/models/car-hatchback.blend` and `tools/models/car-hatchback.py`.
-It replaces Kay Lousberg's CC0 [Car Hatchback](https://poly.pizza/m/BG0KAhmGDt).
-No downloaded geometry, textures or badges are carried over. An original 1987
-Volkswagen brochure photograph was inspected for period construction only;
-this is not a branded replica. See `docs/car-hatchback-model.md` for reference
-links, dimensions, material roles, placement and full-lot resource costs.
+The `customer-car-*.glb` sedan, hatchback, station wagon and minivan, each with a
+lighter `-lite` level of detail, are original generic Halcyon scripted Blender
+construction, covered by this repository's license. Editable parts and the
+authoring script: `tools/models/customer-cars.blend` and
+`tools/models/customer-cars.py`. They replace the earlier scripted hatchback and
+sedan; no downloaded geometry, textures, badges or lettering are used, and no
+real make or model is replicated. See `docs/customer-cars-model.md`.
 
 ### Concrete sidewalk, curb and gutter kit (#265)
 

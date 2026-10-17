@@ -4,7 +4,7 @@ import { CustomerParking, customerStoreYear } from './customer-parking';
 import { CustomerSimulation, type CustomerStop } from './customer-simulation';
 import { customerStops } from './customer-stops';
 import { CustomerVehicles } from './customer-vehicles';
-import { customerCount } from './cast-catalog';
+import { CUSTOMER_IDS, customerCount } from './cast-catalog';
 
 export function installStoreCustomers(scene: StoreScene): void {
   // Pin 265: shoppers path on the clerk's plan with her counter gap shut.
@@ -25,9 +25,9 @@ export function installStoreCustomers(scene: StoreScene): void {
   const exit:CustomerStop={...exitPoint,id:'exit',yaw:0,departments:[]};
   const stops=customerStops(scene.plan,scene.libraries,scene.slottedFixtures,nav,exit,checkout);
   if(!stops.length)return;
-  const parking=new CustomerParking(exterior.parking.spaces,customerStoreYear(scene.activeTheme.id),exterior.parking.stallWidth,exterior.parking.stallDepth);
+  const parking=new CustomerParking(exterior.parking.spaces,customerStoreYear(scene.activeTheme.id),exterior.parking.stallWidth,exterior.parking.stallDepth,undefined,CUSTOMER_IDS);
   const simulation=new CustomerSimulation(nav,stops,parking,checkout,exit);
-  const vehicles=new CustomerVehicles(parking,()=>{scene.queueStructuralShadowRefresh();scene.requestRender();});
+  const vehicles=new CustomerVehicles(parking,()=>{scene.queueStructuralShadowRefresh();scene.requestRender();},scene.effectiveQuality!=='high');
   exterior.group.add(vehicles.group);
   scene.customers=new StoreCustomers(simulation,vehicles,()=>scene.requestRender(),scene.getOutsideMode());
   scene.scene.add(scene.customers.group);
