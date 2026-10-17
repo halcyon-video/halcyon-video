@@ -5,6 +5,20 @@ All notable changes to Halcyon Video, generated from commit history by
 it on every version tag push. Deterministic and offline: no entry here was
 written by a model.
 
+## [v0.28.0] — 2026-10-17
+
+### CHANGELOG
+- V0.27.0
+
+### General
+- Prepare 0.28.0 release
+- Park four original period body styles, one persistent car per regular (Closes [#392](https://github.com/halcyon-video/halcyon-video/issues/392))
+- Show RomM platform logos over the game bays
+- Hang JOIN TODAY membership cards on two run ends per store
+- Draw the VIDEO GAMES banner lettering at the banner's own proportions
+- Letter the film title on feature headers that have no title art
+- Rotate the actor and studio spotlight stands weekly
+
 ## [v0.27.0] — 2026-10-16
 
 ### CHANGELOG
