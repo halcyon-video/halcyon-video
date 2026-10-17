@@ -5,6 +5,36 @@ All notable changes to Halcyon Video, generated from commit history by
 it on every version tag push. Deterministic and offline: no entry here was
 written by a model.
 
+## [v0.27.0] — 2026-10-16
+
+### CHANGELOG
+- V0.26.0
+
+### General
+- Prepare 0.27.0 Halloween release
+- Match the wall-bank test to the three-foot live-screen pitch
+- Keep shoppers out of the counter well
+- Dress the October store: cat clings, side windows, carved pumpkin, garland, endcap cutouts
+- Keep Christmas pictures off the Halloween promo stands
+- Move the games-bay "what's NEW" card off the games onto an end-cap blade
+- Stop the facade brick band showing through the top of the storefront glass
+- Give the perimeter ceiling strip the same acoustic tile as the inner modules
+- Keep the exit counter's window backsplash a uniform thickness
+- Restore 1990 counter ledges and white mobile era controls
+- Ignore local gamepad input while the store is not the focused window
+- Replace the old green Halcyon sign with the current blue emblem
+- Restyle the hosted changelog as a mid-90s video-store home page
+- Publish a hosted changelog page per release and link it from Discord
+- Link Discord release posts to the changelog
+- Support raised tier displays on inset pedestals
+- Refine aisle-end base proportions
+- Keep 1990 aisle-end bases present through seasonal changes (Closes [#389](https://github.com/halcyon-video/halcyon-video/issues/389))
+- Initialise the fixture registry before anything registers into it
+- Support integrated wall display shelving and local casework
+- Support era-scoped tiered floor displays
+- Refine the 1990 store column, counters and information sign
+- Document entrance and returns check verification (Closes [#387](https://github.com/halcyon-video/halcyon-video/issues/387))
+
 ## [v0.26.0] — 2026-10-11
 
 ### CHANGELOG
