@@ -624,10 +624,12 @@ export function createLibraryLabelTexture(categoryName: string, theme = getActiv
 // elongated banner in the theme's sign color with white display-face
 // lettering. The rounded top corners are geometry-level (see the flush-topper
 // builder in shelving.ts), so the canvas is a plain filled rect.
-export function createFlushTopperLabelTexture(label: string, theme = getActiveTheme()): THREE.Texture {
+export function createFlushTopperLabelTexture(label: string, theme = getActiveTheme(), aspect = 512 / 192): THREE.Texture {
   const canvas = document.createElement('canvas');
-  canvas.width = 512; // matches the half-section plaque's ~2.8:1 face aspect
+  // Canvas aspect = face aspect, or the lettering stretches with the banner.
+  // The default matches the half-section plaque's ~2.8:1 face.
   canvas.height = 192;
+  canvas.width = Math.min(2048, Math.round(192 * aspect));
   paintFlushTopperLabel(canvas, label, theme);
   return toSignTexture(canvas);
 }
@@ -640,7 +642,8 @@ export function paintFlushTopperLabel(canvas: HTMLCanvasElement, label: string, 
   ctx.shadowOffsetY = 0;
 
   ctx.fillStyle = theme.palette.primary; // theme's existing sign background color
-  ctx.fillRect(0, 0, 512, 192);
+  const W = canvas.width, H = canvas.height;
+  ctx.fillRect(0, 0, W, H);
 
   ctx.fillStyle = '#ffffff';
   ctx.textAlign = 'center';
@@ -651,14 +654,14 @@ export function paintFlushTopperLabel(canvas: HTMLCanvasElement, label: string, 
   const fontFor = (px: number) => getLogoFontString(spec, px);
   let fontSize = 110;
   ctx.font = fontFor(fontSize);
-  while (ctx.measureText(text).width > 512 - 50 && fontSize > 34) {
+  while (ctx.measureText(text).width > W - 50 && fontSize > 34) {
     fontSize -= 6;
     ctx.font = fontFor(fontSize);
   }
   ctx.shadowColor = 'rgba(0,0,0,0.45)';
   ctx.shadowBlur = 6;
   ctx.shadowOffsetY = 3;
-  ctx.fillText(text, 256, 96 + 8); // slight down-shift optically centers the display face
+  ctx.fillText(text, W / 2, H / 2 + 8); // slight down-shift optically centers the display face
 }
 
 // ── 2000-era "ACTION"-style arched genre plaque (bb-2000 theme) ─────────────

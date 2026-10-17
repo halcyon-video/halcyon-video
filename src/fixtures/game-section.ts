@@ -449,15 +449,17 @@ export class GameSection implements SlottedFixture {
       // cards below, so the topper reads the same at any platform count.
       const w = Math.min(4.2, Math.max(1.2, shelfLength * 0.55));
       const geo = getFlushTopperGeo(w);
+      // Lettering cut to this banner's own w:h — a fixed plaque-shaped canvas
+      // stretched the type ~2.8x across the wide games banner (owner pin 270).
+      // Both faces read the same, so they share one texture and material.
+      const labelTex = createFlushTopperLabelTexture('VIDEO GAMES', theme, w / FLUSH_TOPPER_H);
+      this.textures.push(labelTex);
+      const labelMat = new THREE.MeshStandardMaterial({
+        map: labelTex,
+        roughness: 0.4,
+        metalness: 0.05
+      });
       ([1, -1] as const).forEach(dir => {
-        const labelTex = createFlushTopperLabelTexture('VIDEO GAMES', theme);
-        this.textures.push(labelTex);
-        const labelMat = new THREE.MeshStandardMaterial({
-          map: labelTex,
-          roughness: 0.4,
-          metalness: 0.05
-        });
-
         const mesh = new THREE.Mesh(geo, [labelMat, flushSideMat]);
         mesh.rotation.y = dir * Math.PI / 2;
         mesh.position.set(0, UNIT_FRAME_HEIGHT, 0);
