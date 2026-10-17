@@ -671,18 +671,26 @@ export function buildStore(scene: StoreScene) {
 
   // Ceiling, trim and diffusers receive the room's diffuse bounce light.
   // Their albedo/normal/roughness maps remain ordinary PBR surface inputs.
-  const ceilTex = createCeilingTileTexture();
-  ceilTex.repeat.set(storeWidth / TILE_X, floorCeilLen / TILE_Z);
-
-  const ceilGeo = new THREE.PlaneGeometry(storeWidth, floorCeilLen);
-  const ceilMat = new THREE.MeshStandardMaterial({
-    color: 0xf4f4f0,
-    map: ceilTex,
-    roughness: 0.92,
-    metalness: 0.0,
-    bumpMap: ceilTex,
-    bumpScale: 0.01,
+  // Plain (unlit) acoustic panel — same recessed T-bar module as a troffer,
+  // but a flat matte tile instead of an emissive diffuser. Shares the
+  // troffer's frame material/geometry (same metal trim), just a different
+  // face. Instanced: the panel count scales with the whole ceiling area
+  // (hundreds at full store scale), so unlike the sparse troffers these
+  // must not be individual THREE.Mesh objects.
+  const acousticPanelTex = createAcousticPanelTexture();
+  const panelMat = new THREE.MeshStandardMaterial({
+    // Fissured mineral-fibre texture — flat color here was a loud CG tell
+    // on the second-largest surface in view.
+    map: acousticPanelTex,
+    color: 0xfdfdfb, roughness: 0.92, metalness: 0.0
   });
+
+  // Pin 277: the plane is what shows as the cut tiles between the last full
+  // module and the walls, so it wears the panels' own fibre with UVs in feet
+  // (the grid model's TileRim grain density) instead of a printed-rail tile.
+  const ceilGeo = new THREE.PlaneGeometry(storeWidth, floorCeilLen);
+  const ceilUv = ceilGeo.getAttribute('uv') as THREE.BufferAttribute;
+  for (let i = 0; i < ceilUv.count; i++) ceilUv.setXY(i, ceilUv.getX(i) * storeWidth, ceilUv.getY(i) * floorCeilLen);
   // Mostly hidden BEHIND the instanced panels; what shows is the grid line
   // between them, so it has to sit at the panels' level. History: 0.22 flat
   // read uniform, 0.12 flat went dead — the fix for THAT was routing the glow
@@ -694,7 +702,7 @@ export function buildStore(scene: StoreScene) {
   // troffer lens panels (HDR 1.55) are unambiguously the fixtures. The map is
   // what keeps this dim value from flattening.
 
-  const ceiling: THREE.Mesh<THREE.BufferGeometry> = new THREE.Mesh(ceilGeo, ceilMat);
+  const ceiling: THREE.Mesh<THREE.BufferGeometry> = new THREE.Mesh(ceilGeo, panelMat);
   ceiling.position.set(STORE_CENTER_X, ceilingY, sideWallZ);
   ceiling.rotation.x = Math.PI / 2; // Facing down
   ceiling.receiveShadow = true;
@@ -766,19 +774,7 @@ export function buildStore(scene: StoreScene) {
   // rebalance (was 0.42) — kept just below the plane's 0.24 so the lattice
   // still reads without the whole grid glowing.
 
-  // Plain (unlit) acoustic panel — same recessed T-bar module as a troffer,
-  // but a flat matte tile instead of an emissive diffuser. Shares the
-  // troffer's frame material/geometry (same metal trim), just a different
-  // face. Instanced: the panel count scales with the whole ceiling area
-  // (hundreds at full store scale), so unlike the sparse troffers these
-  // must not be individual THREE.Mesh objects.
-  const acousticPanelTex = createAcousticPanelTexture();
-  const panelMat = new THREE.MeshStandardMaterial({
-    // Fissured mineral-fibre texture — flat color here was a loud CG tell
-    // on the second-largest surface in view.
-    map: acousticPanelTex,
-    color: 0xfdfdfb, roughness: 0.92, metalness: 0.0
-  });
+  // Plain panels use panelMat (declared with the ceiling plane above).
   // Eyeballed against reference drop ceilings: the point where tile reads as
   // lit mineral fibre rather than storm-grey or lightbox. 0.5 tipped into
   // lightbox (out-glowed the merchandise); 0.24 sits on the lit-fibre side and
