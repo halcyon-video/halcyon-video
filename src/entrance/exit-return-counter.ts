@@ -89,7 +89,11 @@ export function buildExitReturnCounter(ctx: FixtureContext, parent: THREE.Group,
             if(x<quickDrop.receiverX-1.99) p.setX(i,(pane.lo-footprint.cx)/scale);
             if(x>quickDrop.receiverX+1.99) p.setX(i,(pane.hi-footprint.cx)/scale);
           }
-          if(z>=quickDrop.glassOffset-.001 && (isMetal || Math.abs(x-quickDrop.receiverX)<quickDrop.receiverWidth/2+.001))
+          // Pin 280: the backsplash boards end on the cheeks' outer planes. Their
+          // end vertices stay put, or the long board tapers out to the glazing.
+          const boardEnd=Math.abs(x-quickDrop.receiverX)>quickDrop.receiverWidth/2-.001 && z<=quickDrop.glassOffset+.0005
+            && p.getY(i)<=quickDrop.worktopHeight+quickDrop.backsplashHeight+.001;
+          if(z>=quickDrop.glassOffset-.001 && (isMetal || (!boardEnd && Math.abs(x-quickDrop.receiverX)<quickDrop.receiverWidth/2+.001)))
             p.setZ(i,(isMetal?z-quickDrop.glassOffset:0)+(receiverFront-quickDrop.faceClearance)/scale);
         }
         p.needsUpdate=true;o.geometry.computeVertexNormals();o.geometry.computeBoundingBox();o.geometry.computeBoundingSphere();
