@@ -323,7 +323,7 @@ export function buildGameRentals2For10Signs(scene: StoreScene): void {
   // same transform game-section.ts's own group applies (rotation.y = yaw).
   const place = (
     u: GameSection, geo: THREE.BufferGeometry, mat: THREE.Material,
-    lx: number, y: number, lz: number,
+    lx: number, y: number, lz: number, turn = Math.PI / 2,
   ): void => {
     const yaw = u.placement.yaw as number;
     const c = Math.cos(yaw), s = Math.sin(yaw);
@@ -333,7 +333,7 @@ export function buildGameRentals2For10Signs(scene: StoreScene): void {
       y,
       u.placement.position.z - lx * s + lz * c,
     );
-    mesh.rotation.y = yaw + Math.PI / 2; // plane normal along local +X
+    mesh.rotation.y = yaw + turn; // default: plane normal along local +X
     markSignMesh(mesh); // flush on the fixture: nothing to cast onto
     group.add(mesh);
   };
@@ -363,12 +363,18 @@ export function buildGameRentals2For10Signs(scene: StoreScene): void {
     const s = Math.sin(yaw);
     const endSign = Math.abs(s) < 1e-6 ? 1 : -Math.sign(s);
     const shelfLength = (host.cols - 1) * BOX_SPACING + 1.0;
-    // Outer edge flush with the run's end-cap plane (shelfLength/2 + 0.05).
-    const lz = endSign * (shelfLength / 2 + 0.05 - PYLON_W_FT / 2);
-    // Stand proud of the WIDEST shelf edge the card spans (its own bottom) so
-    // an upright plane on a tapered gondola never cuts into a lower shelf.
-    const lx = frontHalfDepth(pylonBottom) + FACE_STANDOFF;
-    place(host, pylonGeo, pylonMat, lx, PYLON_TOP_Y - PYLON_H_FT / 2, lz);
+    // Pin 271: laid on the stocked face, the card hid the first bay's games.
+    // It now projects from the end cap's aisle-side edge as a two-sided blade
+    // in the end-cap plane (shelfLength/2 + 0.05): face-on to shoppers coming
+    // from the mouth, edge-on to the games. Its inner edge clears the WIDEST
+    // shelf edge it spans (its own bottom) on the tapered gondola.
+    const lz = endSign * (shelfLength / 2 + 0.05);
+    const lx = frontHalfDepth(pylonBottom) + FACE_STANDOFF + PYLON_W_FT / 2;
+    for (const face of [0, Math.PI]) {
+      // Back-to-back prints a hair apart, each facing out of its own side.
+      const out = (face === 0 ? 1 : -1) * endSign;
+      place(host, pylonGeo, pylonMat, lx, PYLON_TOP_Y - PYLON_H_FT / 2, lz + out * 0.004, face + (endSign > 0 ? 0 : Math.PI));
+    }
   }
 
   if ((!pylonTex || !stripTex) && !userTexMissing) {
