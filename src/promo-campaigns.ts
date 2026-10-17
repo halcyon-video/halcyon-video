@@ -132,6 +132,10 @@ interface Season {
   /** Matched against title + overview — a season is rarely a genre. Hocus
    *  Pocus is Comedy/Fantasy; only the word "witch" finds it. */
   keywords: RegExp;
+  /** Titles that belong to ANOTHER season even though they match this one.
+   *  A Christmas Carol is full of ghosts, but it is a December picture — the
+   *  October stand never stocks it (feedback pin 266). */
+  excludes?: RegExp;
 }
 
 const SEASONS: Season[] = [
@@ -142,6 +146,7 @@ const SEASONS: Season[] = [
     labels: { family: 'FAMILY FRIGHTS', adult: 'HALLOWEEN HORROR' },
     genres: ['horror'],
     keywords: /\b(halloween|witch|witches|ghost|ghosts|ghoul|haunt|haunted|haunting|monster|monsters|vampire|werewolf|zombie|spooky|pumpkin|graveyard|cemetery|coffin|frankenstein|dracula|mummy|goblin|skeleton|demon|possessed|possession|occult|séance|seance)/i,
+    excludes: /\b(christmas|xmas|santa claus|santa's|yuletide|scrooge|nutcracker|reindeer|north pole|mistletoe|sleigh)\b/i,
   },
   {
     id: 'holiday',
@@ -186,6 +191,7 @@ export function inSeason(id: string): boolean {
 }
 
 function matchesSeason(m: Movie, s: Season): boolean {
+  if (s.excludes?.test(`${m.title} ${m.overview || ''}`)) return false;
   const genres = (m.genres || []).map((g) => g.toLowerCase());
   if (s.genres.some((g) => genres.includes(g))) return true;
   return s.keywords.test(`${m.title} ${m.overview || ''}`);
