@@ -203,7 +203,9 @@ export function buildStorefrontFacade(params: FacadeBuildParams): StorefrontFaca
   // into the side elevations' outer faces — the corner is a plain 90° brick
   // arris now (the old proud corner piers are gone, per user direction:
   // nothing may protrude at the corner).
-  const frontBandBot = WINDOW_HEAD_Y - 0.1;
+  // Pin 269: the band starts AT the window head. Dropped 0.1 below it, its
+  // brick showed through the top of every pane from inside the store.
+  const frontBandBot = WINDOW_HEAD_Y;
   for (const { lo, hi } of params.windowMasonryGaps) {
     // The interior window builder owns a 0.3-ft solid wall from z=15.0 to
     // 15.3.  The old full-depth exterior box ran from 15.05 to 15.75, so the
