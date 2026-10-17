@@ -535,6 +535,15 @@ function seasonal(libs: JellyfinLibrary[], rows: number, cols: number, band: 'fa
   return faces ? { id: `seasonal:${season.id}:${band}`, topper: season.labels[band], faces } : null;
 }
 
+/** Stands per actor/studio spotlight kind in floor-merchandising's programme. */
+const SPOTLIGHT_STANDS = 2;
+
+/** Whole weeks since the epoch on the promo calendar (`bb_promo_date` forces it). */
+function spotlightWeek(): number {
+  const d = promoToday();
+  return Math.floor(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / (7 * 86400000));
+}
+
 /** Floor promotions use existing catalog metadata and cover art. A featured
  * film deliberately repeats on every facing; it is not a claim about stock
  * quantity, sale price, or a home-video release date the catalog does not have. */
@@ -558,9 +567,13 @@ function floorFeature(libs: JellyfinLibrary[], rows: number, cols: number,
         group.movies.push(film); groups.set(name, group);
       }
     }
-    const group = [...groups.values()].filter(g => g.movies.length >= rows * cols)
-      .sort((a, b) => b.movies.length - a.movies.length || a.label.localeCompare(b.label))[pick];
-    if (!group) return null;
+    const eligible = [...groups.values()].filter(g => g.movies.length >= rows * cols)
+      .sort((a, b) => b.movies.length - a.movies.length || a.label.localeCompare(b.label));
+    if (pick >= eligible.length) return null;
+    // The subject rotates weekly on the promo calendar (owner pin 268: it was
+    // always the same actor). Each week advances by SPOTLIGHT_STANDS so both
+    // stands of a kind change together and never show the same subject.
+    const group = eligible[(pick + spotlightWeek() * SPOTLIGHT_STANDS) % eligible.length];
     label = group.label;
     stock = group.movies.slice(0, rows * cols);
   }
