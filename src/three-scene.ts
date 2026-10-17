@@ -24,6 +24,7 @@ import { tickShelfVisibility, disposeShelfVisibility } from './shelf-visibility'
 import { mobileWalkInput } from './mobile-walk';
 import { mobileStoreActive, mobileStoreTap } from './mobile-store';
 import * as THREE from 'three';
+import { notifyWalkBlocked } from './walk-bump';
 import { paintStoreLoading } from './store-loading';
 import { installDirectLightVisibility } from './direct-light-visibility';
 installDirectLightVisibility();
@@ -4559,8 +4560,10 @@ export class StoreScene {
           storeWidth,
           this.backWallZ + 1.5
         );
+        const blocked = constrained.x !== this.camera.position.x || constrained.z !== this.camera.position.z;
         this.camera.position.x = constrained.x;
         this.camera.position.z = constrained.z;
+        if (blocked) notifyWalkBlocked(constrained.x, constrained.z); // pin 272: bumpable props
         // Head-bob: a footstep-phased vertical bounce on top of the 5.5ft eye
         // height. Only y is touched, so x/z (and thus collision) are never
         // perturbed; when bobAmount eases to 0 this is exactly 5.5 again.

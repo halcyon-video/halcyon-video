@@ -49,6 +49,7 @@ import { SlottedFixture } from './fixtures';
 import { AmbientTvs } from './ambient-tvs';
 import { EntranceCheckout } from './entrance';
 import { installHalloween } from './entrance/halloween';
+import { installHalloweenEndcapCutouts } from './halloween-endcap-cutouts';
 import { HALLOWEEN_PUMPKIN_COUNTER_U, HALLOWEEN_PUMPKIN_DESK_U, halloweenPumpkinCounterPosition } from './entrance/halloween-layout';
 import { buildWindowBays } from './entrance/windows';
 import { windowBayLayout } from './storefront-window-layout';
@@ -2275,6 +2276,8 @@ export function buildStore(scene: StoreScene) {
       : undefined,
     suppressFrontCapLineIds: endcapHostLineIds,
   });
+  // October paper cutouts standing off the top of every end cap (pin 274).
+  installHalloweenEndcapCutouts(scene.scene, scene.libraryEndCaps);
   nrWallModels.finish(() => {
     scene.renderer.shadowMap.needsUpdate = true;
     scene.requestRender();
@@ -2521,15 +2524,25 @@ export function buildStore(scene: StoreScene) {
     );
     if (pumpkinAnchor) {
       const pumpkinPosition = halloweenPumpkinCounterPosition(pumpkinAnchor, pumpkinUsesOuterBand);
-      installHalloween(
-        frontWindow,
-        frontPanes,
-        scene.scene,
-        { position: new THREE.Vector3(pumpkinPosition.x, pumpkinPosition.y, pumpkinPosition.z), yaw: pumpkinAnchor.rotY },
-        () => { scene.renderer.shadowMap.needsUpdate = true; scene.queueStructuralShadowRefresh(); scene.requestRender(); },
-        [...frontPanelsWithPosters, ...frontPanes.flatMap((p,i) =>
-          returnWindowX >= STORE_CENTER_X-p.hi && returnWindowX <= STORE_CENTER_X-p.lo ? [i] : [])],
-      );
+      // Side ribbons wear clings too (pin 276), clear of the posters that
+      // hang on every second pane (see the ribbon poster loop above).
+      const sideRuns = [leftRibbon, rightRibbon].flatMap(r => r ? [{
+        parent: r.win,
+        panes: Array.from({ length: r.cols }, (_, i) => ({ lo: -r.len / 2 + i * r.len / r.cols, hi: -r.len / 2 + (i + 1) * r.len / r.cols })),
+        occupied: activeStoreFormat().id === 'mom-and-pop' ? [] : Array.from({ length: r.cols }, (_, i) => i).filter(i => i % 2 === 1),
+      }] : []);
+      installHalloween({
+        windows: [{ parent: frontWindow, panes: frontPanes, occupied: [...frontPanelsWithPosters, ...frontPanes.flatMap((p,i) =>
+          returnWindowX >= STORE_CENTER_X-p.hi && returnWindowX <= STORE_CENTER_X-p.lo ? [i] : [])] }, ...sideRuns],
+        counterParent: scene.scene,
+        pumpkinPose: {
+          position: new THREE.Vector3(pumpkinPosition.x, pumpkinPosition.y, pumpkinPosition.z),
+          yaw: pumpkinAnchor.rotY, faceYaw: Math.atan2(-nx, -nz),
+        },
+        band: scene.entrance?.getCounterBand() ?? null,
+        refresh: () => { scene.renderer.shadowMap.needsUpdate = true; scene.queueStructuralShadowRefresh(); scene.requestRender(); },
+        requestRender: () => scene.requestRender(),
+      });
     }
   }
 

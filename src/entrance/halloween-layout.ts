@@ -39,7 +39,8 @@ const CLUSTERS = [
   { u: 0.73, v: 0.57, width: 1.08, tilt: 0.13 },
   { u: 0.46, v: 0.79, width: 0.96, tilt: -0.07 },
 ] as const;
-const DESIGN_ASPECTS = [0.59, 0.92, 1.79] as const;
+// Bat, pumpkin, ghost and arched cat, in SVG path order.
+const DESIGN_ASPECTS = [0.59, 0.92, 1.79, 0.81] as const;
 
 function jitter(paneIndex: number, clusterIndex: number, salt: number): number {
   const n = Math.sin((paneIndex + 1) * 91.17 + (clusterIndex + 1) * 37.41 + salt * 13.7) * 43758.5453;

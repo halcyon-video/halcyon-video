@@ -39,8 +39,16 @@ export interface CounterFrame {
   facingYaw: number;
 }
 
+/** One built outer-band run: its customer-facing top edge A→B on the floor
+ *  plan (world x/z) and the unit normal pointing INTO the band. */
+export interface CounterBandEdge { ax: number; az: number; bx: number; bz: number; nx: number; nz: number }
+
 export interface CounterBuildResult {
   modelReady: Promise<THREE.Group | null>;
+  // Customer-facing faces of the walk-in band (empty on the standalone desk)
+  // and the band's top height — seasonal dressing hangs off these edges.
+  bandEdges: CounterBandEdge[];
+  bandTopY: number;
   // The counter's store-facing point Z (frames the checkout camera move).
   // Kept for the front-facing shapes, whose "apex" really is a Z; a side-wall
   // desk faces across the room, so anything positional should read `frame`
@@ -691,6 +699,10 @@ export function buildCheckoutCounter(
 
   return {
     modelReady, deskApexZ, cx, innerH, innerDepth: innerD, getInnerCounterSpine,
+    bandEdges: bandSegs.map(({ edge, e }) => ({
+      ax: e.A_out.x, az: e.A_out.y, bx: e.B_out.x, bz: e.B_out.y, nx: normals[edge].x, nz: normals[edge].y,
+    })),
+    bandTopY: bandH + 0.14,
     frame, spineAt, standingAt,
     navFootprints, registerStanding, getTerminalStanding,
   };

@@ -62,7 +62,7 @@ import { vestibuleCeilingY } from '../ceiling-soffit';
 import { WINDOW_HEAD_Y } from '../storefront-facade';
 import { buildVestibuleDoor, updateVestibuleDoors, VestibuleDoor } from './doors';
 import { counterMount, placeOnCounterMount } from './counter-mounts';
-import { buildCheckoutCounter, ClerkStanding, CounterFrame } from './counter';
+import { buildCheckoutCounter, ClerkStanding, CounterBandEdge, CounterFrame } from './counter';
 import { buildCounterTv } from './counter-tv';
 import { Footprint } from '../layout-validator';
 import { CheckoutBag } from '../checkout-bag';
@@ -148,6 +148,13 @@ export class EntranceCheckout implements StoreFixture {
   // which is what let the desk turn onto a side wall. Null until build().
   getCounterFrame(): CounterFrame | null {
     return this.counterTopInfo?.frame ?? null;
+  }
+
+  // The walk-in band's customer-facing faces (none on a standalone desk).
+  // Null until build().
+  private counterBand: { edges: CounterBandEdge[]; topY: number } | null = null;
+  getCounterBand(): { edges: CounterBandEdge[]; topY: number } | null {
+    return this.counterBand;
   }
 
   // Everything the clerk's navigation needs from the entrance architecture:
@@ -717,6 +724,7 @@ export class EntranceCheckout implements StoreFixture {
       cx, topY: innerH + 0.12, depth: innerDepth,
       frame: counterResult.frame, spineAt,
     };
+    this.counterBand = { edges: counterResult.bandEdges, topY: counterResult.bandTopY };
 
     // Clerk nav data: counter rects + the vestibule chamber (glass box, never
     // walkable for her) + work spots at the register and the two terminals
