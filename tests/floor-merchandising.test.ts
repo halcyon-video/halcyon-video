@@ -48,6 +48,27 @@ test('spotlights have one subject on all sides and nine distinct, matching films
   }
 });
 
+test('spotlight subjects rotate weekly and the two stands of a kind never share one', () => {
+  const g = globalThis as { localStorage?: unknown };
+  const had = 'localStorage' in g, prev = g.localStorage;
+  const labelsOn = (iso: string, kind: string) => {
+    g.localStorage = { getItem: (k: string) => (k === 'bb_promo_date' ? iso : null) };
+    return [0, 1].map((pick) => buildPromoCampaign([`${kind}:${pick}`], libraries, 3, 3)!.faces[0].label);
+  };
+  try {
+    for (const kind of ['actor-spotlight', 'studio-feature']) {
+      const thisWeek = labelsOn('2026-10-14', kind), nextWeek = labelsOn('2026-10-21', kind);
+      assert.notEqual(thisWeek[0], thisWeek[1]);
+      assert.notEqual(nextWeek[0], nextWeek[1]);
+      // Three actors qualify, so a new week brings a new pairing; the two
+      // studios that qualify are both always on the floor.
+      if (kind === 'actor-spotlight') assert.notDeepEqual(thisWeek, nextWeek);
+    }
+  } finally {
+    if (had) g.localStorage = prev; else delete g.localStorage;
+  }
+});
+
 test('unavailable titles and duplicated service listings cannot manufacture a spotlight', () => {
   const sparse: Library[] = [
     {

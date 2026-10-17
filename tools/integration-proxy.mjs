@@ -6,7 +6,7 @@ import { SeerrIdentityError, seerrUserHeaders } from './seerr-user-auth.mjs';
 
 const MAX_BODY = 64 * 1024;
 const MAX_RESPONSE = 8 * 1024 * 1024;
-const CATALOG_KEYS = new Set(('id title name originalTitle overview posterPath backdropPath releaseDate firstAirDate runtime voteAverage voteCount genreIds genres mediaType mediaInfo status status4k tmdbId credits cast crew job character productionCompanies collection parts results page totalPages totalResults pageInfo pages pageSize media total items limit offset slug romCount rom_count platform platform_id platforms summary rating fs_name fs_name_no_ext file_name first_release_date release_date metadatum igdb_metadata ss_metadata sibling_roms path_cover_l path_cover_large path_cover_s url_cover box2d_side_path box2d_side_url box2d_back_path box2d_back_url physical_path physical_url').split(' '));
+const CATALOG_KEYS = new Set(('id title name originalTitle overview posterPath backdropPath releaseDate firstAirDate runtime voteAverage voteCount genreIds genres mediaType mediaInfo status status4k tmdbId credits cast crew job character productionCompanies collection parts results page totalPages totalResults pageInfo pages pageSize media total items limit offset slug romCount rom_count platform platform_id platforms summary rating fs_name fs_name_no_ext file_name first_release_date release_date metadatum igdb_metadata ss_metadata sibling_roms path_cover_l path_cover_large path_cover_s url_cover box2d_side_path box2d_side_url box2d_back_path box2d_back_url physical_path physical_url url_logo').split(' '));
 
 // Explicit public catalog fields, recursively: new upstream account/settings
 // fields never become public by default. Request actors and internal URLs vanish.
