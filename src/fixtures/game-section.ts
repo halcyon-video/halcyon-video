@@ -12,6 +12,7 @@ import { FixturePlacement, shelfTitleCompare, BOX_SPACING, UNIT_DEPTH, AISLE_SHE
 import { FixtureContext, SlottedFixture, FixtureSlot } from '../fixtures';
 import { Footprint, localZOffset } from '../layout-validator';
 import { createCategorySignTexture, createFlushTopperLabelTexture } from '../canvas-textures';
+import { platformLogoRuns, createPlatformLogoTexture } from './platform-logo-plaques';
 import { gameCaseDims } from '../video-case';
 import { createTrapezoidGeometry, splitTrapezoidGroups, createLibraryEndCapMaterial, markSignMesh } from '../sign-builders';
 
@@ -460,14 +461,31 @@ export class GameSection implements SlottedFixture {
         metalness: 0.05
       });
       ([1, -1] as const).forEach(dir => {
-        const mesh = new THREE.Mesh(geo, [labelMat, flushSideMat]);
-        mesh.rotation.y = dir * Math.PI / 2;
-        mesh.position.set(0, UNIT_FRAME_HEIGHT, 0);
-        mesh.castShadow = true;
-        mesh.receiveShadow = true;
-        mesh.layers.set(1);
-        this.group!.add(mesh);
-        this.ctx.addCollider(mesh);
+        // A face whose every stocked bay has a RomM platform logo wears those
+        // logos over their bays instead (owner pin 281); else the banner.
+        const side = dir > 0 ? 'front' : 'back';
+        const runs = side === 'back' && this.faces === 'front' ? null
+          : platformLogoRuns(side === 'front' ? this.frontPlatforms : this.backPlatforms, numSections);
+        const bay = GAME_SECTION_COLS * BOX_SPACING;
+        const plaques = runs ? runs.map(run => {
+          const pw = Math.min(4.2, (run.last - run.first + 1) * bay * 0.9);
+          const tex = createPlatformLogoTexture(run, pw / FLUSH_TOPPER_H,
+            () => this.group !== null, () => this.ctx.requestRender());
+          this.textures.push(tex);
+          const center = shelfLength / 2 - 0.5 - ((run.last + run.first + 1) / 2 * GAME_SECTION_COLS - 0.5) * BOX_SPACING;
+          return { geo: getFlushTopperGeo(pw), z: side === 'front' ? -center : center,
+            mat: new THREE.MeshStandardMaterial({ map: tex, roughness: 0.4, metalness: 0.05 }) };
+        }) : [{ geo, mat: labelMat, z: 0 }];
+        for (const plaque of plaques) {
+          const mesh = new THREE.Mesh(plaque.geo, [plaque.mat, flushSideMat]);
+          mesh.rotation.y = dir * Math.PI / 2;
+          mesh.position.set(0, UNIT_FRAME_HEIGHT, plaque.z);
+          mesh.castShadow = true;
+          mesh.receiveShadow = true;
+          mesh.layers.set(1);
+          this.group!.add(mesh);
+          this.ctx.addCollider(mesh);
+        }
       });
     } else {
       // NO FEET — owner ruling 2026-07-30 off the 1990 ticket-sign reference

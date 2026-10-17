@@ -163,6 +163,17 @@ interface RommPlatform {
   name: string;
   slug: string;
   romCount: number;
+  logoUrl?: string;
+}
+
+// Platform logos as the RomM server reports them (`url_logo`, usually an IGDB
+// image), keyed by shelf label. Read at runtime only — no platform logo is
+// ever stored or shipped with the app.
+const platformLogos = new Map<string, string>();
+
+/** The RomM-provided logo URL for a games-department platform label, if any. */
+export function rommPlatformLogoUrl(label: string): string | undefined {
+  return platformLogos.get(label);
 }
 
 // Friendly, era-appropriate section label for a Romm platform (matches the
@@ -478,6 +489,7 @@ export async function fetchGames(): Promise<Movie[]> {
         name: p.name || p.slug || 'Games',
         slug: p.slug || '',
         romCount: p.rom_count ?? p.roms_count ?? 0,
+        logoUrl: typeof p.url_logo === 'string' && /^https?:\/\//.test(p.url_logo) ? p.url_logo : undefined,
       }))
       .filter((p: RommPlatform) => typeof p.id === 'number' && p.romCount !== 0)
       .filter((p: RommPlatform) => wholeLibrary || isPlatformEnabled(platformLabel(p.name, p.slug)))
@@ -512,6 +524,8 @@ export async function fetchGames(): Promise<Movie[]> {
       if (games.length >= sectionCap) break; // safety net only — the even split stays under the cap
       const platform = platforms[i];
       const label = platformLabel(platform.name, platform.slug);
+      if (platform.logoUrl) platformLogos.set(label, platform.logoUrl);
+      else platformLogos.delete(label);
       const result = results[i];
       if (result.status === 'rejected') {
         // A dropped platform is invisible from inside the store — its aisles
