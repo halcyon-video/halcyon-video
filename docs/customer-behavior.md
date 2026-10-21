@@ -9,7 +9,13 @@ A remaining route reserves its corridor until it is traversed, so crossing or
 opposing paths wait their turn. Counter turns and the entrance have explicit
 ownership; new browsing routes wait while the next counter customer approaches.
 A blocked shopper waits before replanning. An occupied position sends the next
-shopper to another reachable section. Empty fixtures and request-only cases are
+shopper to another reachable section, preferably a nearby one: a taken, crowded
+or reserved position the shopper would have liked hands its extra pull to open
+positions within twelve feet, falling off with distance
+(`customer-destinations.ts`), so a games fan whose section is busy browses the
+next section over instead of crossing the store. The last two positions a
+shopper browsed are damped to about a third of their weight, so two favored
+positions do not turn into an identical back-and-forth loop. Empty fixtures and request-only cases are
 not browsing destinations; displayed streaming titles remain available.
 
 Preferences are explicit identity data in `customer-preferences.ts`. Customer 08
@@ -58,7 +64,9 @@ remain unresolved. No additional unclear preference category is encoded.
 ## Verification
 
 `npm run check` builds production and runs the complete test suite. Focused
-`tests/customer-lifecycle.test.ts` covers authored preferences, department size
+`tests/customer-destinations.test.ts` covers seeded nearby fallback choice,
+department division, recent-stop damping, reservation spacing and reproducible
+visit sequences. `tests/customer-lifecycle.test.ts` covers authored preferences, department size
 bias, unavailable/crowded destinations, admission/capacity, reserved/access bays,
 model-year/dimension rejection, separation, repeated checkout/departure/arrival,
 ownership cleanup, exact corner traversal and six admission orders on a captured
