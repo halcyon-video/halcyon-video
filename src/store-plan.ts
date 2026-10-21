@@ -174,8 +174,12 @@ export class StorePlan {
     // angled islands stay inside the room rather than swinging into the walls.
     this.aislePivotZ = (this.scaleZ(FIELD_Z_FRONT) + this.backWallZ) / 2;
     const original = new Map(this.libraries.map((_,lib) => [lib,this.entryBlockOrder(lib)]));
-    this.faceAllocation = new ShelfFaceAllocation(this.shelvingUnits,original);
+    // Stock fills whole bays: each library's trailing slack is handed to the
+    // next library instead of sitting empty mid-floor (#395).
+    const stocked = new Map(this.libraries.map((_,lib) => [lib, Math.ceil(this.layoutFor(lib).entries.length / UNIT_SIDE_CAPACITY)]));
+    this.faceAllocation = new ShelfFaceAllocation(this.shelvingUnits,original,stocked,this.floorOrder);
   }
+  private floorOrder: number[] = [];
 
   // Nominal X centre of a library column before run planning (fallback only).
   columnXCenter(col: number, N: number): number {
@@ -558,6 +562,7 @@ export class StorePlan {
       floorOrder.splice(floorOrder.indexOf(wallLibrary), 1);
       floorOrder.unshift(wallLibrary);
     }
+    this.floorOrder = floorOrder;
     for (const i of floorOrder) {
       if (i === this.aboveRRoom?.libraryIdx) continue;
       // Padded layout length (not raw movie count): category padding claims
