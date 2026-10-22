@@ -14,6 +14,7 @@
 // riding that group's existing exterior env-map dimming pass for free.
 import * as THREE from 'three';
 import { createMatchedPavement } from './matched-pavement';
+import { roadSpan, STREET_CURB_DEPTH as CURB_DEPTH, STREET_GUTTER_DEPTH as GUTTER_DEPTH, STREET_ROAD_DEPTH as ROAD_DEPTH } from './parking-layout';
 
 export interface ExteriorRoad {
   group: THREE.Group;
@@ -29,19 +30,14 @@ export interface ExteriorRoadOptions {
   frontZ: number; // lot's near edge (against the building — not curbed, never seen)
   farZ: number; // lot's far/street-facing edge (world z) — the road starts here
   initialGroundColor: THREE.Color;
-  customEdges?: boolean; // caller supplies shaped concrete and an open driveway
+  customEdges?: boolean; // caller supplies shaped concrete, an open driveway and the road surface
 }
 
 const CURB_COLOR = '#6d6a60'; // matches the entrance curb in exterior-environment.ts
 const GUTTER_COLOR = '#5c584e'; // poured concrete gutter pan, a shade darker than the curb
 const CENTERLINE_COLOR = '#d9bd49'; // worn traffic-paint yellow
 
-const CURB_DEPTH = 0.4; // z-thickness of the raised curb, ft — matches the entrance curb
 const CURB_HEIGHT = 0.14;
-const GUTTER_DEPTH = 1.6; // flat drainage pan between the curb and the road surface, ft
-const ROAD_DEPTH = 26; // two-lane road, ft (24-30 requested)
-const ROAD_OVERHANG = 70; // road runs this far past the lot's side edges, ft — wide
-// enough that its ends leave frame rather than terminating in the photo
 
 const DASH_LENGTH = 6;
 const DASH_GAP = 10;
@@ -53,7 +49,6 @@ export function buildExteriorRoad(parent: THREE.Object3D, opts: ExteriorRoadOpti
   const lotDepth = farZ - frontZ;
   const group = new THREE.Group();
   group.name = 'exteriorRoad';
-  group.userData.photographicGroundSurface = true;
   parent.add(group);
 
   const disposables: Array<{ dispose(): void }> = [];
@@ -62,8 +57,9 @@ export function buildExteriorRoad(parent: THREE.Object3D, opts: ExteriorRoadOpti
   const edgeFallback = new THREE.Group(); edgeFallback.name = 'Road edge fallback';
   group.add(edgeFallback);
 
-  const roadMinX = minX - ROAD_OVERHANG;
-  const roadMaxX = maxX + ROAD_OVERHANG;
+  const span = roadSpan(minX, maxX, farZ);
+  const roadMinX = span.minX;
+  const roadMaxX = span.maxX;
   const roadWidth = roadMaxX - roadMinX;
 
   // ─── Curbs on all three exposed lot edges (issue #145 rule: "a curb is
@@ -96,17 +92,20 @@ export function buildExteriorRoad(parent: THREE.Object3D, opts: ExteriorRoadOpti
 
   }
 
-  // The through street has no parking-stall markings.
-  const roadStartZ = farZ + CURB_DEPTH + GUTTER_DEPTH;
-  const pavement = track(createMatchedPavement());
-  pavement.setColor(opts.initialGroundColor);
-  const roadMat = pavement.material;
-  pavement.setRepeat(roadWidth/8,ROAD_DEPTH/8);
-  const road = new THREE.Mesh(track(new THREE.PlaneGeometry(roadWidth, ROAD_DEPTH)), roadMat);
-  road.rotation.x = -Math.PI / 2;
-  road.position.set(centerX, opts.customEdges ? -.09 : -.03, roadStartZ + ROAD_DEPTH / 2);
-  road.receiveShadow = true;
-  group.add(road);
+  // The through street has no parking-stall markings. With custom edges the
+  // lot's asphalt batch already paves it (parking-lot.ts, GH #398).
+  const roadStartZ = span.nearZ;
+  let pavement: ReturnType<typeof createMatchedPavement> | null = null;
+  if (!opts.customEdges) {
+    pavement = track(createMatchedPavement());
+    pavement.setColor(opts.initialGroundColor);
+    pavement.setRepeat(roadWidth/8,ROAD_DEPTH/8);
+    const road = new THREE.Mesh(track(new THREE.PlaneGeometry(roadWidth, ROAD_DEPTH)), pavement.material);
+    road.rotation.x = -Math.PI / 2;
+    road.position.set(centerX, -.03, roadStartZ + ROAD_DEPTH / 2);
+    road.receiveShadow = true;
+    group.add(road);
+  }
 
   // ─── Dashed centerline, one instanced box per dash spanning the road's
   // full width so it runs off both sides rather than stopping mid-frame.
@@ -126,7 +125,7 @@ export function buildExteriorRoad(parent: THREE.Object3D, opts: ExteriorRoadOpti
   dashMesh.instanceMatrix.needsUpdate = true;
   group.add(dashMesh);
 
-  function setGroundColor(color: THREE.Color) { pavement.setColor(color); }
+  function setGroundColor(color: THREE.Color) { pavement?.setColor(color); }
 
   function dispose() { disposables.forEach(item => item.dispose()); group.removeFromParent(); }
   return { group, edgeFallback, setGroundColor, dispose };

@@ -1,8 +1,8 @@
 import { buildEntranceBollards } from './entrance-bollards';
 import { selfLit } from './material-lighting';
-import { setPhotographicGround } from './photographic-ground';
-// Nearby physical walks, parking markings, bollards and light spill.
-// The shared photographic panorama supplies pavement and distant scenery.
+// Nearby physical walks, parking markings, bollards and light spill. The
+// modeled lot, street and ground surround cover the level ground in every
+// view; the shared photographic panorama supplies only the distant scenery.
 import * as THREE from 'three';
 import { createLightPoolTexture, createConcreteSidewalkTexture } from './canvas-textures';
 import { activeStoreFormat } from './store-format';
@@ -10,6 +10,9 @@ import { installExteriorReturnKiosk } from './exterior-return-kiosk';
 import { parkingLayout } from './parking-layout';
 import { buildParkingLot } from './parking-lot';
 import { buildExteriorRoad } from './exterior-road';
+import { buildGroundSurround, SURROUND_OPAQUE_RADIUS, SURROUND_FADE_RADIUS } from './exterior-ground-surround';
+import { PANORAMA_EYE_HEIGHT, PANORAMA_ROTATION_Y } from './exterior-panorama-profile';
+import { createMatchedPavement } from './matched-pavement';
 import { tryLoadUserAssetTexture } from './user-assets';
 import type { OutsideMode } from './outdoor-lighting';
 import { STORE_CENTER_X, FRONT_GLASS_Z } from './store-layout';
@@ -19,8 +22,8 @@ export interface ExteriorEnvironment {
   walkFarZ: number;
   parking: ReturnType<typeof parkingLayout>;
   setOutsideMode(mode: OutsideMode): void;
-  setGroundColor(color: THREE.Color): void;
-  setPhotographicGround(enabled: boolean): void;
+  /** `panorama`: the complete photograph whose floor the ground surround replaces, if any. */
+  setGroundColor(color: THREE.Color, panorama?: HTMLImageElement | null): void;
   dispose(): void;
 }
 
@@ -117,7 +120,13 @@ export function buildExteriorEnvironment(scene: THREE.Scene, storeWidth: number,
 
   const road = track(buildExteriorRoad(group, {centerX,minX:plan.minX,maxX:plan.maxX,
     frontZ:plan.rearZ,farZ:plan.streetZ,customEdges:true,initialGroundColor:new THREE.Color('#80766b')}));
-  function setGroundColor(color: THREE.Color) { parking.setGroundColor(color); road.setGroundColor(color); }
+  const surround = track(buildGroundSurround(group, {centerX, centerZ: FRONT_GLASS_Z + 1,
+    opaqueRadius: SURROUND_OPAQUE_RADIUS, fadeRadius: SURROUND_FADE_RADIUS,
+    y: -.12, tileSize: 8, initialGroundColor: new THREE.Color('#80766b'),
+    panoramaRotationY: PANORAMA_ROTATION_Y, eyeHeight: PANORAMA_EYE_HEIGHT}, createMatchedPavement()));
+  function setGroundColor(color: THREE.Color, panorama?: HTMLImageElement | null) {
+    parking.setGroundColor(color); road.setGroundColor(color); surround.setGroundColor(color, panorama);
+  }
 
   // ─── Mode reactions (no per-frame work; called on day/night flips) ─────
   function setOutsideMode(mode: OutsideMode) {
@@ -137,5 +146,5 @@ export function buildExteriorEnvironment(scene: THREE.Scene, storeWidth: number,
     scene.remove(group);
   }
 
-  return { group, parking: plan, walkFarZ: plan.farZ - 1.5, setOutsideMode, setGroundColor, setPhotographicGround: enabled => setPhotographicGround(group, enabled), dispose };
+  return { group, parking: plan, walkFarZ: plan.farZ - 1.5, setOutsideMode, setGroundColor, dispose };
 }

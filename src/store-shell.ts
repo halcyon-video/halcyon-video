@@ -498,9 +498,9 @@ export function buildStore(scene: StoreScene) {
   // ─── T15: exterior environment dressing (sidewalk, lamps, cars, strip-mall
   // backdrop) — everything beyond the glass that only needs to exist for the
   // view outward. Synced to the current day/night mode immediately.
-  // Also builds the GH #144 ground-blend ring (see exterior-environment.ts)
-  // that fades the lot's exposed edges into whatever ground the current sky
-  // pano shows there — recolored live via the listener below as panos load.
+  // Also builds the GH #398 ground surround (exterior-ground-surround.ts) that
+  // carries the lot's matched pavement out toward the horizon — recolored live
+  // via the listener below as panos load.
   scene.exterior = buildExteriorEnvironment(scene.scene, storeWidth, sidewalkDepth, scene.effectiveQuality === 'high', () => {
     // Async exterior meshes must enter the next on-demand shadow bake too.
     scene.renderer.shadowMap.needsUpdate = true;
@@ -509,8 +509,7 @@ export function buildStore(scene: StoreScene) {
   }, scene.backWallZ);
   scene.exterior.setOutsideMode(scene.outdoor.outsideMode);
   scene.exterior.setGroundColor(scene.outdoor.getGroundColor());
-  scene.outdoor.setGroundColorListener(color => scene.exterior?.setGroundColor(color));
-  scene.outdoor.setGroundModeListener(enabled => scene.exterior?.setPhotographicGround(enabled));
+  scene.outdoor.setGroundColorListener((color, panorama) => scene.exterior?.setGroundColor(color, panorama));
   dimEnvOutside(scene.exterior.group);
 
   // Initialize 3D wall signage textures and materials
