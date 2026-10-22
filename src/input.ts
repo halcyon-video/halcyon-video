@@ -1,6 +1,6 @@
 import { isExternalGameActive, onExternalGameChange } from './external-game-state.ts';
 // HTPC Input Management System for Project Blue Ticket
-import { gamepadEverConnected, padInputAllowed } from './gamepad-tracker';
+import { gamepadEverConnected, padInputAllowed, pickActiveGamepad } from './gamepad-tracker';
 import { notifyUserActivity } from './video-case';
 import { markUserActivity } from './user-activity';
 import { keyboardOwnedByControl } from './text-entry-focus';
@@ -425,14 +425,7 @@ export class InputManager {
     }
     const gamepads = navigator.getGamepads();
     if (!gamepads) return;
-    let gp: Gamepad | null = null;
-    for (let i = 0; i < gamepads.length; i++) {
-      const g = gamepads[i];
-      if (g !== null) {
-        gp = g;
-        break;
-      }
-    }
+    const gp = pickActiveGamepad(gamepads);
     if (!gp) return;
 
     // Handle Buttons (Standard Mapping)

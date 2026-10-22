@@ -98,7 +98,7 @@ import { OutdoorLightingRig, type OutsideMode } from './outdoor-lighting';
 import { CandyDisplay, CandyRow } from './fixtures/period-fixtures';
 import { TipJar } from './fixtures/tip-jar';
 import { openTipOverlay } from './tip-jar';
-import { gamepadEverConnected, padInputAllowed } from './gamepad-tracker';
+import { gamepadEverConnected, padInputAllowed, pickActiveGamepad } from './gamepad-tracker';
 import { StoreTheme, getActiveTheme } from './themes';
 import {
   CASE_EULER_ORDER,
@@ -4444,15 +4444,7 @@ export class StoreScene {
     let firstActiveGamepad: Gamepad | null = null;
     if (gamepadEverConnected && navigator.getGamepads && padInputAllowed()) {
       const gps = navigator.getGamepads();
-      if (gps) {
-        for (let i = 0; i < gps.length; i++) {
-          const g = gps[i];
-          if (g !== null) {
-            firstActiveGamepad = g;
-            break;
-          }
-        }
-      }
+      if (gps) firstActiveGamepad = pickActiveGamepad(gps);
     }
 
     if (this.reelFlightActive && !this.isWalkAroundMode) this.reelFlightActive = false;
