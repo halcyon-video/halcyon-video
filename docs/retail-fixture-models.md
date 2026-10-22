@@ -67,6 +67,30 @@ the aprons and clear the tray above.
 
 Film displays keep the three-foot approach on every side. Viability is now
 checked against each fixture's own 4 × 3 grid. A store with three base towers
-places one film display. Studio and actor subjects stay on four-sided towers
-until their own families arrive. Independent-store formats still exclude the
-kind. This is an original generic design, not an authenticated period replica.
+places one film display. Actor subjects now use the marquee column described
+below. Independent-store formats still exclude both kinds. This is an original generic design, not an authenticated period replica.
+
+## October 21 actor spotlight column
+
+Actor spotlights (`actor-spotlight:0` and `:1`) now use an original marquee
+column. The plinth and drum are one turned body. Three chrome ledge rings rake
+up 0.20 radians toward their rims, and copies lean back against the drum, twelve
+per ring: three columns on each of four quarter faces. A four-sided marquee box
+sits on a chrome seat collar. Its bevelled edges are the chrome trim, and seven
+lamps run above and below the subject's name on each face. The house fascia
+blades letter the name, so the label follows live brand edits. The lamps glow in
+the room but opt out of the environment cube bake.
+
+| Fixture | Exported width × depth × height, ft | Reserved width × depth, ft | Triangles | Runtime mesh draws |
+|---|---:|---:|---:|---:|
+| Actor spotlight column | 2.58 × 2.58 × 5.25 | 2.60 × 2.60 | 8,780 | 3, plus 4 name blades |
+
+The 328 KB export is untextured, with satin black, chrome and lamp finishes.
+`tools/models/spotlight-column.py` reproduces the editable
+`spotlight-column.blend` and the runtime GLB. The script shares its measurements
+with `src/fixtures/spotlight-column-geometry.ts`.
+`tests/spotlight-column.test.ts` checks them against the export. It also checks
+that DVD and VHS copies rest on their rings, stay off the drum and inside the
+rims, clear the ring or marquee above, and stay inside their own wedge. Browsing
+uses the four-sided stand's face-to-face stepping, and the camera squares up to
+each quarter face's centre column. Studio subjects remain on four-sided towers.

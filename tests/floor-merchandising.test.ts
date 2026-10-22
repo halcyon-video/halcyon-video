@@ -98,12 +98,14 @@ test('ten varied promotions fit without colliding with diagonal shelves or check
   const films = plan.filter((p) => p.kind === 'film-floor-display');
   assert.deepEqual(films.map((p) => (p.options!.campaigns as string[])[0]).sort(), ['feature-title:0', 'feature-title:1']);
   assert.ok(films.every((p) => buildPromoCampaign(p.options!.campaigns as string[], libraries, 4, 3)));
-  // 4 four-sided displays remain: 2 studio features, 2 actor spotlights
+  // 2 marquee columns for the actor spotlights
+  const columns = plan.filter((p) => p.kind === 'spotlight-column');
+  assert.deepEqual(columns.map((p) => (p.options!.campaigns as string[])[0]).sort(), ['actor-spotlight:0', 'actor-spotlight:1']);
+  // 2 four-sided displays remain, for the studio features
   const towers = plan.filter((p) => p.kind === 'four-sided-display');
-  assert.equal(towers.length, 4);
-  assert.ok(towers.every((p) => buildPromoCampaign(p.options!.campaigns as string[], libraries, 3, 3)));
+  assert.equal(towers.length, 2);
+  assert.ok([...columns, ...towers].every((p) => buildPromoCampaign(p.options!.campaigns as string[], libraries, 3, 3)));
   assert.equal(towers.filter((p) => (p.options!.campaigns as string[])[0].startsWith('studio-feature:')).length, 2);
-  assert.equal(towers.filter((p) => (p.options!.campaigns as string[])[0].startsWith('actor-spotlight:')).length, 2);
 
   // 2 sale fixtures: bargain bin + pv drape table
   assert.equal(plan.filter((p) => p.kind === 'bargain-bin').length, 1);
@@ -120,8 +122,8 @@ test('ten varied promotions fit without colliding with diagonal shelves or check
     kind: 'fixture',
     cx: p.position.x,
     cz: p.position.z,
-    w: p.kind === 'pv-drape-table' ? 6.2 : p.kind === 'acrylic-popcorn-bin' || p.kind === 'rotating-merchandiser' || p.kind === 'film-floor-display' ? 2.2 : 3,
-    d: p.kind === 'pv-drape-table' ? 2.7 : p.kind === 'acrylic-popcorn-bin' || p.kind === 'rotating-merchandiser' ? 2.2 : p.kind === 'film-floor-display' ? 1.1 : 3,
+    w: p.kind === 'pv-drape-table' ? 6.2 : p.kind === 'acrylic-popcorn-bin' || p.kind === 'rotating-merchandiser' || p.kind === 'film-floor-display' ? 2.2 : p.kind === 'spotlight-column' ? 2.6 : 3,
+    d: p.kind === 'pv-drape-table' ? 2.7 : p.kind === 'acrylic-popcorn-bin' || p.kind === 'rotating-merchandiser' ? 2.2 : p.kind === 'film-floor-display' ? 1.1 : p.kind === 'spotlight-column' ? 2.6 : 3,
     yaw: p.yaw,
     clearance: 3,
   }));
@@ -149,9 +151,10 @@ test('three existing towers leave room for actual fixture variety within ten', (
   assert.equal(plan.length, 6);
   for (const kind of ['bargain-bin', 'pv-drape-table', 'rotating-merchandiser'])
     assert.ok(plan.some(p => p.kind === kind), kind);
-  // The first film, studio and actor subjects: one new film display, two towers.
+  // The first film, studio and actor subjects: a film display, a tower and a column.
   assert.equal(plan.filter(p => p.kind === 'film-floor-display').length, 1);
-  assert.equal(plan.filter(p => p.kind === 'four-sided-display').length, 2);
+  assert.equal(plan.filter(p => p.kind === 'four-sided-display').length, 1);
+  assert.equal(plan.filter(p => p.kind === 'spotlight-column').length, 1);
 });
 
 

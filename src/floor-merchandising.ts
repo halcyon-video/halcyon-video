@@ -1,5 +1,6 @@
 import { RETAIL_FIXTURE_SPECS, type RetailFixtureKind } from './retail-fixture-specs.ts';
 import { FILM_DISPLAY } from './fixtures/film-floor-display-geometry.ts';
+import { SPOTLIGHT_COLUMN } from './fixtures/spotlight-column-geometry.ts';
 import { buildPromoCampaign } from './promo-campaigns.ts';
 import { validateLayout, type Footprint } from './layout-validator.ts';
 import type { FixturePlacement } from './store-layout.ts';
@@ -22,6 +23,7 @@ interface PromotionBlueprint {
 }
 
 const FILM_DISPLAY_SPEC = RETAIL_FIXTURE_SPECS['film-floor-display'];
+const COLUMN_SPEC = RETAIL_FIXTURE_SPECS['spotlight-column'];
 
 const FLOOR_PROMOTION_BLUEPRINTS: PromotionBlueprint[] = [
   {
@@ -52,15 +54,17 @@ const FLOOR_PROMOTION_BLUEPRINTS: PromotionBlueprint[] = [
   },
   {
     id: 'floor-promotion-actor-spotlight-0',
-    kind: 'four-sided-display',
+    kind: 'spotlight-column',
     campaign: ['actor-spotlight:0'],
-    w: 3, d: 3, clearance: 3,
+    w: COLUMN_SPEC.w, d: COLUMN_SPEC.d, clearance: COLUMN_SPEC.clearance,
+    rows: SPOTLIGHT_COLUMN.ledgeY.length, cols: SPOTLIGHT_COLUMN.columns,
   },
   {
     id: 'floor-promotion-actor-spotlight-1',
-    kind: 'four-sided-display',
+    kind: 'spotlight-column',
     campaign: ['actor-spotlight:1'],
-    w: 3, d: 3, clearance: 3,
+    w: COLUMN_SPEC.w, d: COLUMN_SPEC.d, clearance: COLUMN_SPEC.clearance,
+    rows: SPOTLIGHT_COLUMN.ledgeY.length, cols: SPOTLIGHT_COLUMN.columns,
   },
   {
     id: 'floor-promotion-bargain-bin',
@@ -91,7 +95,7 @@ const FLOOR_PROMOTION_BLUEPRINTS: PromotionBlueprint[] = [
  * - 2 single-film corrugated floor displays (feature-title:0, 1)
  * - 2 studio subjects (studio-feature:0, 1) on four-sided towers until a
  *   dedicated family arrives
- * - 2 actor subjects (actor-spotlight:0, 1), likewise on towers
+ * - 2 actor subjects (actor-spotlight:0, 1) on lamp-lit marquee columns
  * - 2 sale fixtures (bargain-bin, pv-drape-table)
  * - 1 rotating impulse rack (rotating-merchandiser / #275)
  */
