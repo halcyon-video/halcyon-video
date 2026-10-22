@@ -114,14 +114,29 @@ export function installCounterModel(
         model.removeFromParent();
       };
       parent.addEventListener('removed', disposeModel);
-      // Keep the established collision meshes registered: their exact footprints
-      // also drive clerk navigation. Raycasting does not depend on visibility.
-      // The fallback remains owned by the entrance's normal disposal traversal.
-      fallback.visible = false;
-      fallback.name = 'checkout-counter-collision';
-      ctx.requestShadowRefresh();
-      ctx.requestRender();
-      resolve(model);
+      const reveal = () => {
+        parent.removeEventListener('removed', abandon);
+        // The entrance can be disposed while the model's programs prepare.
+        if (!model.parent) { resolve(null); return; }
+        model.visible = true;
+        // Keep the established collision meshes registered: their exact footprints
+        // also drive clerk navigation. Raycasting does not depend on visibility.
+        // The fallback remains owned by the entrance's normal disposal traversal.
+        fallback.visible = false;
+        fallback.name = 'checkout-counter-collision';
+        ctx.requestShadowRefresh();
+        ctx.requestRender();
+        resolve(model);
+      };
+      const lifetime = new AbortController();
+      const abandon = () => lifetime.abort();
+      parent.addEventListener('removed', abandon);
+      // Hosted and phone stores link the model's own programs while it is still
+      // hidden, not inside the next frame; the startup reveal waits for this.
+      if (ctx.prepareDetailModel) {
+        model.visible = false;
+        ctx.prepareDetailModel(model, lifetime.signal).then(reveal, reveal);
+      } else reveal();
     }, failed)).catch(failed); // parse throws synchronously on a non-glTF fallback page
     function failed(error: unknown) {
       let root: THREE.Object3D = parent;

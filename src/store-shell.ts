@@ -979,6 +979,7 @@ export function buildStore(scene: StoreScene) {
     paint: trofferFrameMat, fiber: panelMat, tiles: panelSpots,
     fallback: gridFallback, colors: gridColors,
     refresh: () => { scene.queueStructuralShadowRefresh(); scene.requestRender(); },
+    prepare: scene.fixtureContext().prepareDetailModel,
   });
 
   // Sprinkler heads: a short chrome drop with a brass deflector disc,
