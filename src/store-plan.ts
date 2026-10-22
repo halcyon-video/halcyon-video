@@ -52,6 +52,13 @@ export interface OpenRunEnd {
   worldX: number;
 }
 
+/** One line-back run end that opens onto walkway. See StorePlan.openLineBackEnds(). */
+export interface OpenRunBackEnd {
+  unit: ShelvingUnit;
+  /** Local Z of the unit's back end face (the white cap's abutment plane). */
+  backLocalZ: number;
+}
+
 export class StorePlan {
   // Active floor arrangement. Decides each unit's yaw/browseSign (see runFields).
   // FORMAT wins over the user's pick when it declares one: a cramped store is
@@ -1111,17 +1118,7 @@ export class StorePlan {
    * first one had already rejected.
    */
   openLineFrontEnds(): OpenRunEnd[] {
-    const unitFootprints = this.getUnitFootprints();
-    const insideAnyUnit = (px: number, pz: number, margin: number): boolean => {
-      for (const fp of unitFootprints) {
-        const dx = px - fp.cx, dz = pz - fp.cz;
-        const c = Math.cos(fp.yaw), s = Math.sin(fp.yaw);
-        const lx = dx * c - dz * s;
-        const lz = dx * s + dz * c;
-        if (Math.abs(lx) < fp.w / 2 + margin && Math.abs(lz) < fp.d / 2 + margin) return true;
-      }
-      return false;
-    };
+    const insideAnyUnit = this.unitOccupancyTest();
 
     const ends: OpenRunEnd[] = [];
     for (const u of this.shelvingUnits) {
@@ -1159,6 +1156,41 @@ export class StorePlan {
       });
     }
     return ends;
+  }
+
+  /**
+   * The other end of the same runs: every line-back end (the white cap, facing
+   * into the store) whose face opens onto real walkway. Same open-floor probe
+   * as openLineFrontEnds, so a back end facing the next chunk across a
+   * RUN_BREAK_GAP cross-aisle stays a closed join, exactly like the front end
+   * across that gap.
+   */
+  openLineBackEnds(): OpenRunBackEnd[] {
+    const insideAnyUnit = this.unitOccupancyTest();
+    const ends: OpenRunBackEnd[] = [];
+    for (const u of this.shelvingUnits) {
+      if (!u.isLineBack || u.libraryIdx < 0 || u.singleSided) continue;
+      const backLocalZ = FIELD_Z_FRONT + u.zPos - ((u.cols - 1) * BOX_SPACING + 1.0);
+      const probe = this.unitToWorld(u, u.xCenter, backLocalZ - 4.0);
+      if (insideAnyUnit(probe.x, probe.z, 0.4)) continue;
+      ends.push({ unit: u, backLocalZ });
+    }
+    return ends;
+  }
+
+  /** Point-in-unit test against every unit footprint, grown by `margin` ft. */
+  private unitOccupancyTest(): (px: number, pz: number, margin: number) => boolean {
+    const unitFootprints = this.getUnitFootprints();
+    return (px, pz, margin) => {
+      for (const fp of unitFootprints) {
+        const dx = px - fp.cx, dz = pz - fp.cz;
+        const c = Math.cos(fp.yaw), s = Math.sin(fp.yaw);
+        const lx = dx * c - dz * s;
+        const lz = dx * s + dz * c;
+        if (Math.abs(lx) < fp.w / 2 + margin && Math.abs(lz) < fp.d / 2 + margin) return true;
+      }
+      return false;
+    };
   }
 
   // Rotate a Vector3's X/Z about a unit's own centre in place (Y untouched). Used for
