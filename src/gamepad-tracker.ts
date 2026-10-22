@@ -39,8 +39,13 @@ if (typeof window !== 'undefined') {
   });
 }
 
-/** False while the page is hidden or unfocused (e.g. a game is in front): local pad input must be ignored then. */
+/**
+ * False while the page is hidden: local pad input must be ignored then. Focus is deliberately
+ * not consulted: kiosk, Tauri/WebKitGTK and Steam-launched windows can report themselves
+ * unfocused while they are the only thing on screen, which left the store deaf to the pad.
+ * Games launched from the store are covered separately by external-game-state.
+ */
 export function padInputAllowed(): boolean {
   if (typeof document === 'undefined') return true;
-  return !document.hidden && document.hasFocus();
+  return !document.hidden;
 }
