@@ -9,6 +9,36 @@ import { assetUrl, dropInCandidates } from '../asset-url';
 import type { FixtureContext } from '../fixtures';
 import type { StorefrontSpec } from '../store-layout';
 
+// Candidate model paths, highest priority first (drop-ins lead the bundled file).
+function counterModelPaths(shape: StorefrontSpec['counterShape'], rounded: boolean): string[] {
+  const themeId = getActiveTheme().id;
+  const edition = shape === 'desk' ? '' : themeId === 'bb-1990' ? '-1990' : themeId === 'bb-2010' ? '-2010' : '';
+  const filename = `checkout-counter-${shape}-${rounded ? 'rounded' : 'laminate'}${edition}.glb`;
+  const rel = `fixtures/checkout-counter/${themeId}-${shape}-${rounded ? 'rounded' : 'laminate'}${edition === '-1990' ? '-solid' : ''}.glb`;
+  const pack = brandPackDir();
+  return dropInCandidates([...(pack ? [`user-assets/${pack}/${rel}`] : []), `user-assets/${rel}`, `models/${filename}`]);
+}
+
+function requestCounterModel(path: string): Promise<ArrayBuffer> {
+  const request = fetch(assetUrl(path)).then(response => {
+    if (!response.ok) throw new Error(`${response.status} ${response.statusText} for ${path}`);
+    return response.arrayBuffer();
+  });
+  request.catch(() => {});
+  return request;
+}
+
+const prefetched = new Map<string, Promise<ArrayBuffer>>();
+
+/** The startup splash waits for this model, but the entrance is built after
+ * the room's decorative fixtures, so its request used to queue behind every
+ * one of their downloads. Start it as soon as the storefront is known. */
+export function prefetchCounterModel(spec: StorefrontSpec): void {
+  const paths = counterModelPaths(spec.counterShape, spec.counterStyle === 'rounded-2000s');
+  for (const path of prefetched.keys()) if (!paths.includes(path)) prefetched.delete(path);
+  for (const path of paths) if (!prefetched.has(path)) prefetched.set(path, requestCounterModel(path));
+}
+
 export function installCounterModel(
   ctx: FixtureContext,
   parent: THREE.Group,
@@ -23,20 +53,15 @@ export function installCounterModel(
     CounterInlay: finishes.inlay, CounterWorktop: finishes.worktop,
     CounterInterior: finishes.worktop,
   };
-  const themeId = getActiveTheme().id;
-  const edition = shape === 'desk' ? '' : themeId === 'bb-1990' ? '-1990' : themeId === 'bb-2010' ? '-2010' : '';
-  const filename = `checkout-counter-${shape}-${rounded ? 'rounded' : 'laminate'}${edition}.glb`;
-  const rel = `fixtures/checkout-counter/${getActiveTheme().id}-${shape}-${rounded ? 'rounded' : 'laminate'}${edition === '-1990' ? '-solid' : ''}.glb`;
-  const pack = brandPackDir();
-  const paths = dropInCandidates([...(pack ? [`user-assets/${pack}/${rel}`] : []), `user-assets/${rel}`, `models/${filename}`]);
+  const paths = counterModelPaths(shape, rounded);
   // Request every candidate together: on a slow first visit, a missing drop-in's
   // 404 queues behind optional model downloads and holds the startup splash.
   // Drop-ins keep their priority; the bundled bytes are merely already arriving.
-  const requests = paths.map(path => fetch(assetUrl(path)).then(response => {
-    if (!response.ok) throw new Error(`${response.status} ${response.statusText} for ${path}`);
-    return response.arrayBuffer();
-  }));
-  requests.forEach(request => request.catch(() => {}));
+  const requests = paths.map(path => {
+    const early = prefetched.get(path);
+    prefetched.delete(path);
+    return early ?? requestCounterModel(path);
+  });
   const loader = new GLTFLoader();
   return new Promise(resolve => {
     const load = (index: number): void => { requests[index].then(buffer => loader.parse(buffer,

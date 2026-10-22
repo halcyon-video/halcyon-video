@@ -49,6 +49,7 @@ import { SlottedFixture } from './fixtures';
 import { AmbientTvs } from './ambient-tvs';
 import { EntranceCheckout } from './entrance';
 import { installHalloween } from './entrance/halloween';
+import { prefetchCounterModel } from './entrance/counter-model';
 import { installHalloweenEndcapCutouts } from './halloween-endcap-cutouts';
 import { HALLOWEEN_PUMPKIN_COUNTER_U, HALLOWEEN_PUMPKIN_DESK_U, halloweenPumpkinCounterPosition } from './entrance/halloween-layout';
 import { buildWindowBays } from './entrance/windows';
@@ -310,6 +311,9 @@ export function buildStore(scene: StoreScene) {
   // storefront window build below and the EntranceCheckout fixture (via
   // fixtureContext()).
   scene.storefrontSpec = getStorefrontSpec(storeWidth);
+  // The entrance below holds the startup splash for its counter model; start
+  // that download ahead of the decorative fixtures built in between.
+  prefetchCounterModel(scene.storefrontSpec);
   const panoramaWalkDepth = activeStoreFormat().facadeStyle === 'storefront' ? 4.7
     : facadeDimensions(scene.ceilingY, vestibuleHalfWidth(scene.storefrontSpec), facadeStyle()).sidewalkDepth;
   const sky = buildExteriorPanorama(storeWidth, scene.backWallZ, scene.ceilingY, panoramaWalkDepth, scene.effectiveQuality === 'high');
