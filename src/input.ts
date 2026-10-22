@@ -377,7 +377,9 @@ export class InputManager {
 
     window.addEventListener('gamepaddisconnected', () => {
       console.log('[Input] Gamepad disconnected.');
-      this.stopGamepadPolling();
+      // With two pads paired, one sleeping must not stop polling for the one still in hand;
+      // the tracker's own listener has already recounted the remaining pads.
+      if (!gamepadEverConnected) this.stopGamepadPolling();
     });
 
     // Check if any gamepad is already connected at start
