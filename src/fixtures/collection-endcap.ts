@@ -77,7 +77,7 @@ import { Movie } from '../jellyfin';
 import { FixturePlacement, shelfTitleCompare } from '../store-layout';
 import { FixtureContext } from '../fixtures';
 import { markSignMesh } from '../sign-builders';
-import { EndcapShelf, ENDCAP_CORE_DEPTH, ENDCAP_CORE_HEIGHT, ENDCAP_WIDTH, buildEndcapFooter } from './endcap-shelf';
+import { EndcapShelf, ENDCAP_CORE_DEPTH, ENDCAP_CORE_HEIGHT, buildEndcapFooter } from './endcap-shelf';
 import { getActiveTheme, themeTrimDarkHex, type StoreTheme } from '../themes';
 import { tryLoadUserAssetTexture, tryLoadUserSignArtTexture } from '../user-assets';
 import type { StoreScene } from '../three-scene';
@@ -517,12 +517,15 @@ function getSlatTexture(): THREE.Texture {
 //                  top width. Measured on the same object at the same depth,
 //                  so this ratio survives the absolute-scale uncertainty.
 //
-// LOW CONFIDENCE, and deliberately not used: absolute inches. The only
-// same-depth anchors are the Scotch head-cleaner box (~4.4 x 7.75 in => the
-// tree is ~11 x 22 in) and the tower's own height (=> ~20 x 42 in); they
-// disagree by 2x and the photo gives no third anchor, so the build scales off
-// the carcass instead, which is what the fixture-fit ratio is for.
-const TREE_W_FRAC = 0.88;     // tree base width / carcass width (measured)
+// ABSOLUTE SIZE — owner correction 2026-10-13 ("those Christmas trees are too
+// big"). The fixture-fit ratio above was taken on a ~14-20 in wedge tower, so
+// scaling it to a 26 in endcap made a ~23 x 47 in tree, twice the real one.
+// The owner's 1990 endcap photograph supplies the missing third anchor: the
+// collection price card hangs ON the tree, at the tree's own depth, and the
+// tree's base is 114 px against that 8 in card's 80 px => ~11.4 in. That
+// agrees with the Scotch-box anchor (~11 x 22 in) here, so the tree is a fixed
+// die-cut size, not a share of whatever carcass it stands on.
+const TREE_W = 11.5 / 12;     // tree base width, feet
 // tree width / tree height. Its half, 0.245, IS the fitted flank slope 0.2445
 // — the two measurements are the same measurement and agree to within a pixel.
 const TREE_ASPECT = 0.49;
@@ -568,13 +571,9 @@ const CARD_T = 0.03;
 // ~2 deg clockwise on both (card edges vs the frame verticals), which is what
 // "looks near-vertical" measures to.
 //
-// NOTE on the "straddles the serrated edge" read: it does in the photo, and it
-// does NOT here, on purpose. In the photo the card is HALF the tree's width,
-// because that tree stands on a ~14-20 in wedge tower; scaled to a 26 in
-// endcap the same tree makes the true-size 8 in card only 0.31 of its width,
-// so the card sits inside the foliage instead of hanging off it. Keeping the
-// card honest (8 x 13 in) and the tree honest (bottom tier ~ carcass width)
-// costs the overhang; faking either to buy it back would be the stick again.
+// With the tree at its true ~11.5 in base (see TREE_W), the true-size 8 in
+// card is ~0.70 of the tree's width, as in the owner's 1990 endcap photograph,
+// so it reads as a card hung across the tree rather than lost in the foliage.
 const CARD_ON_TREE_H = 0.30;
 // Centred on the tree axis — owner ruling 2026-07-30. The HITS instance
 // measures +0.02 W (≈ centred); the +0.09 W BOND read that pulled the split
@@ -1002,7 +1001,7 @@ export class CollectionEndcap extends EndcapShelf {
     // ── The tree, FLUSH on the carcass ──────────────────────────────────────
     // Bottom edge at y = coreHeight exactly: no riser, no foot, nothing planted
     // on the deck. That flush join is the whole correction.
-    const treeW = coreWidth * TREE_W_FRAC;
+    const treeW = TREE_W;
     const treeH = treeW / TREE_ASPECT;
     // BACK edge of the deck — owner correction 2026-07-30, and what all three
     // photo instances show: the tree rises from the far edge with the stock in
@@ -1038,9 +1037,14 @@ export class CollectionEndcap extends EndcapShelf {
     // is where the white collection card mounts (centred, below). The kit
     // pieces really were independent staples on cardboard, so splitting card
     // from art across the two faces is deployment, not invention.
+    // An aisle-end base (dressingOnly) carries no collection card, and the
+    // people browsing it stand at its end face, so there the kit turns back
+    // about the core's centre: green face and tag out to the walkway, as in
+    // the owner's 1990 endcap photograph, with the rear construction behind.
+    const faceOut = this.placement.options?.dressingOnly === true;
     const kit = new THREE.Group();
-    kit.position.set(0, 0, treeZ);
-    kit.rotation.y = Math.PI;
+    kit.position.set(0, 0, faceOut ? -treeZ : treeZ);
+    kit.rotation.y = faceOut ? 0 : Math.PI;
     this.group.add(kit);
     for (const dz of [0.006, -0.006]) {
       const face = markSignMesh(new THREE.Mesh(treeGeo, dz > 0 ? treeMat : treeBackMat));
@@ -1396,4 +1400,4 @@ export function collectionEndcapPlacements(scene: StoreScene): FixturePlacement[
  * deg reaches 0.86 H at its highest corner. So the tip wins by a clear foot.
  */
 export const COLLECTION_HEADER_TOP_Y =
-  ENDCAP_CORE_HEIGHT + (ENDCAP_WIDTH * TREE_W_FRAC) / TREE_ASPECT;
+  ENDCAP_CORE_HEIGHT + TREE_W / TREE_ASPECT;

@@ -46,3 +46,31 @@ test('alias numbering remains continuous when an ordinary row follows shared fac
  assert.deepEqual(a.orders.get(0),[{unit:0,side:'front'},{unit:1,side:'front'},{unit:2,side:'front'},{unit:2,side:'back'}]);
  assert.equal(next.unitIdxInLibrary,1);
 });
+// #395: a library's unstocked trailing faces must not sit between it and the
+// next library's first block.
+test('next library starts on the bay after the last stocked block; slack pools at the end',()=>{
+ const physical=[0,1,2].map(i=>({...unit(i<2?0:1,i),rowGroupId:i,lineId:i,zPos:-i*8,isLineFront:true,isLineBack:true}));
+ const snake=[{unit:0,side:'front' as const},{unit:1,side:'front' as const},{unit:1,side:'back' as const},{unit:0,side:'back' as const}];
+ const a=new ShelfFaceAllocation(physical,new Map([[0,snake],[1,[{unit:0,side:'front'},{unit:0,side:'back'}]]]),new Map([[0,3],[1,2]]),[0,1]);
+ // library 0 has three stocked blocks of four, library 1 two of two
+ assert.equal(a.owner(physical[0],'front')!.libraryIdx,0);
+ assert.equal(a.owner(physical[1],'front')!.libraryIdx,0);
+ assert.equal(a.owner(physical[1],'back')!.libraryIdx,0);
+ assert.equal(a.owner(physical[1],'back')!.block,2);
+ assert.equal(a.owner(physical[0],'back')!.libraryIdx,1,'library 1 takes the slack face');
+ assert.equal(a.owner(physical[0],'back')!.block,0);
+ assert.equal(a.owner(physical[2],'front')!.libraryIdx,1);
+ assert.equal(a.owner(physical[2],'front')!.block,1);
+ const slack=a.owner(physical[2],'back')!;
+ assert.equal(slack.libraryIdx,1,'slack pools on the last library');
+ assert.ok(slack.block>=2,'slack blocks sit beyond the last library stock');
+ assert.equal(a.orders.get(0)!.length,3,'library 0 keeps only stocked blocks');
+});
+test('singleSided faces and libraries without stock are not repacked',()=>{
+ const wall={...unit(0,0),rowGroupId:5,lineId:5,singleSided:true};
+ const floor={...unit(1,0),rowGroupId:6,lineId:6};
+ const a=new ShelfFaceAllocation([wall,floor],new Map([[0,[{unit:0,side:'front'}]],[1,[{unit:0,side:'front'},{unit:0,side:'back'}]]]),new Map([[0,0],[1,1]]),[0,1]);
+ assert.equal(a.owner(wall,'front')!.libraryIdx,0);
+ assert.equal(a.owner(floor,'front')!.libraryIdx,1);
+ assert.equal(a.owner(floor,'back')!.libraryIdx,1);
+});

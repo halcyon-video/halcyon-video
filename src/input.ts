@@ -1,6 +1,6 @@
 import { isExternalGameActive, onExternalGameChange } from './external-game-state.ts';
 // HTPC Input Management System for Project Blue Ticket
-import { gamepadEverConnected, padInputAllowed } from './gamepad-tracker';
+import { gamepadEverConnected, padInputAllowed, pickActiveGamepad } from './gamepad-tracker';
 import { notifyUserActivity } from './video-case';
 import { markUserActivity } from './user-activity';
 import { keyboardOwnedByControl } from './text-entry-focus';
@@ -377,7 +377,9 @@ export class InputManager {
 
     window.addEventListener('gamepaddisconnected', () => {
       console.log('[Input] Gamepad disconnected.');
-      this.stopGamepadPolling();
+      // With two pads paired, one sleeping must not stop polling for the one still in hand;
+      // the tracker's own listener has already recounted the remaining pads.
+      if (!gamepadEverConnected) this.stopGamepadPolling();
     });
 
     // Check if any gamepad is already connected at start
@@ -425,14 +427,7 @@ export class InputManager {
     }
     const gamepads = navigator.getGamepads();
     if (!gamepads) return;
-    let gp: Gamepad | null = null;
-    for (let i = 0; i < gamepads.length; i++) {
-      const g = gamepads[i];
-      if (g !== null) {
-        gp = g;
-        break;
-      }
-    }
+    const gp = pickActiveGamepad(gamepads);
     if (!gp) return;
 
     // Handle Buttons (Standard Mapping)

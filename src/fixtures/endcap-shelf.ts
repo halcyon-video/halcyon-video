@@ -1,4 +1,4 @@
-import { finishedPanelGeometry } from '../joinery-model';
+import { endcapFooterGeometry } from './endcap-footer-profile';
 // Shared aisle-end shelving construction for collection displays. Header
 // identity belongs to the concrete collection fixture, not this furniture.
 import * as THREE from 'three';
@@ -233,7 +233,7 @@ export function buildEndcapFooter(
     // Print on +Z only; the white lip on +Y survives the dressing.
     mats = [body, body, topLip, body, front, body];
   }
-  const plinth = new THREE.Mesh(finishedPanelGeometry(w, ENDCAP_FOOTER_H, d), mats);
+  const plinth = new THREE.Mesh(endcapFooterGeometry(w, ENDCAP_FOOTER_H, d), mats);
   plinth.position.set(0, ENDCAP_FOOTER_H / 2, zBack + d / 2);
   plinth.castShadow = true;
   plinth.receiveShadow = true;

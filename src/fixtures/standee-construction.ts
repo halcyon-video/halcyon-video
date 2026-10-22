@@ -5,6 +5,11 @@ import { canvasAlphaField, traceAlphaContours, simplifyLoop } from '../alpha-tra
 import type { FixtureContext } from '../fixtures';
 import { installDisplayModel } from './display-model';
 
+// The header support was authored behind a 1.9 ft wide cutout (easel webs at
+// +-0.43 ft, 1.2 ft tall). It keeps those proportions behind any other width;
+// depth stays as authored so its glue flanges remain behind the back face.
+const SUPPORT_AUTHORED_WIDTH = 1.9;
+
 export function installStandeeConstruction(
   ctx: FixtureContext, kit: THREE.Group, width: number, height: number, base: number,
   image: CanvasImageSource,
@@ -15,8 +20,9 @@ export function installStandeeConstruction(
   kit.add(root);
   const fallback = new THREE.Group();
   root.add(fallback); // The existing two printed planes remain the load-error fallback.
+  const fit = width / SUPPORT_AUTHORED_WIDTH;
   const disposeModel = installDisplayModel(ctx, root, fallback,
-    'models/standee-support-header.glb', {});
+    'models/standee-support-header.glb', {}, new THREE.Vector3(fit, fit, 1));
   const edgeMaterial = new THREE.MeshStandardMaterial({
     color: 0xffffff, vertexColors: true, roughness: .96,
   });

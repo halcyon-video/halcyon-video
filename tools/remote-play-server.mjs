@@ -186,7 +186,12 @@ export function remotePlayPlugin() {
       "log-file=stdout",
       "",
     ].join("\n"), { mode: 0o600 });
+    // A server that died without its exit hook (SIGTERM, SIGKILL, crash) leaves its relay
+    // orphaned; reap the one recorded for this port before starting another.
+    const childPidPath = path.join(os.tmpdir(), `halcyon-turn-${port()}.child`);
+    reapStaleTurn(childPidPath, confPath);
     const proc = spawn(bin, ["-c", confPath], { stdio: ["ignore", "ignore", "pipe"] });
+    try { fs.writeFileSync(childPidPath, String(proc.pid ?? ""), { mode: 0o600 }); } catch { /* best effort */ }
     proc.on("error", () => { turn = null; });
     proc.on("exit", (code) => {
       if (turn?.proc !== proc) return;
@@ -219,6 +224,22 @@ export function remotePlayPlugin() {
       });
     }
     return list;
+  }
+
+  /** SIGTERM a recorded relay only if that pid is still a turnserver running our config. */
+  function reapStaleTurn(childPidPath, confPath) {
+    let pid = 0;
+    try { pid = Number(fs.readFileSync(childPidPath, "utf8").trim()); } catch { return; }
+    if (!Number.isInteger(pid) || pid <= 1) return;
+    let cmdline = "";
+    try { cmdline = fs.readFileSync(`/proc/${pid}/cmdline`, "utf8"); } catch { return; }
+    const argv = cmdline.split("\0");
+    if (!path.basename(argv[0] ?? "").startsWith("turnserver") || !argv.includes(confPath)) return;
+    try { process.kill(pid, "SIGTERM"); } catch { return; }
+    // Give it up to a second to free the relay port before the replacement binds.
+    const tick = new Int32Array(new SharedArrayBuffer(4));
+    for (let i = 0; i < 20 && fs.existsSync(`/proc/${pid}`); i++) Atomics.wait(tick, 0, 0, 50);
+    console.log(`[remote-play] reaped orphaned turnserver ${pid}`);
   }
 
   function stopTurn() {
