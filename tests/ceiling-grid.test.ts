@@ -90,3 +90,39 @@ test('installer retains fallback on failure; batches, refreshes and discards lat
     sentinel.geometry.dispose();success(await loadKit());assert.equal(teardown.children.length,1);assert.equal(refreshes,expectedRefreshes);
   }finally{GLTFLoader.prototype.load=original;THREE.TextureLoader.prototype.load=originalTexture;if(descriptor)Object.defineProperty(globalThis,'window',descriptor);else Reflect.deleteProperty(globalThis,'window');}
 });
+
+test('prepared ceiling grain stays off the live tiles and is released on cancellation',async()=>{
+  const original=GLTFLoader.prototype.load,originalTexture=THREE.TextureLoader.prototype.load;
+  const descriptor=Object.getOwnPropertyDescriptor(globalThis,'window');
+  Object.defineProperty(globalThis,'window',{value:{},configurable:true});
+  let modelReady:Parameters<GLTFLoader['load']>[1]=()=>{};
+  let textureReady:(texture:THREE.Texture)=>void=()=>{};
+  GLTFLoader.prototype.load=function(_url,onLoad){modelReady=onLoad;};
+  THREE.TextureLoader.prototype.load=function(_url,onLoad){textureReady=onLoad!;return new THREE.Texture();};
+  try{
+    for(const cancel of [false,true]){
+      const parent=new THREE.Scene(),paint=new THREE.MeshStandardMaterial(),fiber=new THREE.MeshStandardMaterial();
+      let settle!:()=>void,signal:AbortSignal|undefined,probe:THREE.Group|undefined,refreshes=0;
+      const root=installCeilingGrid({parent,paint,fiber,y:13.5,tiles:[{x:2.5,z:1.25}],
+        plan:moduleGridPlan([{x:2.5,z:1.25}],5,2.5),refresh:()=>refreshes++,
+        prepare:(model,lifetime)=>{probe=model;signal=lifetime;return new Promise<void>(resolve=>{settle=resolve;});}});
+      modelReady(await loadKit());
+      const material=(root.getObjectByName('TileRim') as THREE.InstancedMesh).material as THREE.MeshStandardMaterial;
+      const grain=new THREE.Texture();let disposed=0;grain.addEventListener('dispose',()=>disposed++);
+      textureReady(grain);
+      assert.equal(material.map,null,'the live tile must keep its prepared finish until grain is ready');
+      assert.equal(((probe!.children[0] as THREE.Mesh).material as THREE.MeshStandardMaterial).map,grain);
+      const before=refreshes;
+      if(cancel){root.removeFromParent();assert.equal(signal!.aborted,true);assert.equal(disposed,1);}
+      settle();await Promise.resolve();
+      assert.equal(refreshes,before+(cancel?0:1));
+      assert.equal(material.map,cancel?null:grain);
+      if(!cancel)root.removeFromParent();
+      assert.equal(disposed,1,'the grain belongs to exactly one cleanup path');
+      paint.dispose();fiber.dispose();
+    }
+  }finally{
+    GLTFLoader.prototype.load=original;THREE.TextureLoader.prototype.load=originalTexture;
+    if(descriptor)Object.defineProperty(globalThis,'window',descriptor);else Reflect.deleteProperty(globalThis,'window');
+  }
+});
