@@ -38,3 +38,35 @@ have sealed ends and bulged profiles rather than solid cartons. Runtime original
 product wraps distinguish soda, candy and popcorn; clear acrylic/glass keeps
 stock visible. Existing object scale, origin and collision envelopes are retained.
 The authoring scripts and editable Blender sources reproduce the public exports.
+
+## October 21 single-film floor display
+
+The two single-film promotions (`feature-title:0` and `:1`) no longer borrow
+the four-sided tower. They use an original printed corrugated floor display.
+One scored blank forms the back and both side panels: it is rounded at the
+rear folds and cut back along a taper from 0.50 feet deep at the kick to 0.04
+feet at the top. Each of the four trays folds a back flange into its 0.20-radian
+raked deck and butts against a separate printed apron. The kick base folds its
+top and front from one strip. The header card stands in the back panel's plane
+on two rear lock tabs. It carries the featured film's landscape backdrop and
+title through the existing feature-film header art. As on the towers, a film
+with only portrait art leaves the card bare. The stock is twelve face-out
+copies of the film, three per tray, filled from the top tray down.
+
+| Fixture | Exported width × depth × height, ft | Reserved width × depth, ft | Triangles | Runtime mesh draws |
+|---|---:|---:|---:|---:|
+| Single-film floor display | 2.10 × 1.02 × 5.28 | 2.20 × 1.10 | 388 | 3, plus 2 for header art |
+
+The 45.6 KB export is untextured, using satin black print, kraft and darker cut
+flute, with planar UVs. `tools/models/film-floor-display.py` reproduces the
+editable `film-floor-display.blend` and the runtime GLB. The script shares its
+measurements with `src/fixtures/film-floor-display-geometry.ts`.
+`tests/film-floor-display.test.ts` checks the runtime trays against the exported
+metrics. It also checks that DVD and VHS copies rest on their decks, stay behind
+the aprons and clear the tray above.
+
+Film displays keep the three-foot approach on every side. Viability is now
+checked against each fixture's own 4 × 3 grid. A store with three base towers
+places one film display. Studio and actor subjects stay on four-sided towers
+until their own families arrive. Independent-store formats still exclude the
+kind. This is an original generic design, not an authenticated period replica.
