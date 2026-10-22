@@ -1,5 +1,7 @@
 import { addTrofferApertures, installTrofferModels, type TrofferModelContext } from './troffer-model.ts';
-import { counterDatumShift } from './vestibule-layout.ts';
+import { counterDatumShift, vestibuleLayout } from './vestibule-layout.ts';
+import { angularSoffitPolygon } from './front-of-store-plan.ts';
+import { buildBulkheadFascia } from './bulkhead-fascia.ts';
 import { installCeilingGrid } from './ceiling-grid.ts';
 import { polygonGridPlan } from './ceiling-grid-plan.ts';
 import { selfLit } from './material-lighting.ts';
@@ -135,6 +137,14 @@ export function frontSoffitPolygon(
       { x: CX + 7.0, z: -5.5 + counterDatumShift(spec) },
       { x: CX + armHalf, z: backZ },
     ];
+  }
+
+  // 2000 and 2010 (GH #388): the angular bulkhead from the owner's wide
+  // interior reference — straight sides, 45-degree chamfers and a straight
+  // front edge clearing the counter's apex (counter.ts: back corners 0.1 ft
+  // inside the chamber's back wall, 4.3 ft to the shoulders, 10.5 to the point).
+  if (spec.frontPlan === 'angular') {
+    return angularSoffitPolygon(CX, armHalf, backZ, vestibuleLayout(spec).backZ - 14.9);
   }
 
   // Shield counter: a true point, aimed down the centreline past the counter's
@@ -352,6 +362,11 @@ export function buildFrontSoffit(params: FrontSoffitParams): FrontSoffitResult {
     tileMaterial, trofferPanelMaterial, trofferFrameMaterial, tileX, tileZ,
     plainWhite,
   } = params;
+  // 2000/2010's angular bulkhead (#388) keeps the plain soffit's paint but
+  // recesses a gridded, troffer-lit ceiling inside a deep fascia; only the
+  // other plain soffits keep the flat lid with cans.
+  const bulkhead = !!plainWhite && storefrontSpec.frontPlan === 'angular';
+  const cans = !!plainWhite && !bulkhead;
 
   // Painted drywall receives interior bounce and retains its surface texture.
   const whiteBodyMat = plainWhite
@@ -392,7 +407,7 @@ export function buildFrontSoffit(params: FrontSoffitParams): FrontSoffitResult {
   const edges = soffitMirroredEdges(poly);
   const fasciaCount = edges.length;
 
-  const troffers = soffitLampCenters(poly,corniceBand,!!plainWhite);
+  const troffers = soffitLampCenters(poly,corniceBand,cans);
 
   // ── The lid ──────────────────────────────────────────────────────────────
   // On the LID outline, not the band's — it runs on past the fascia, over the
@@ -406,20 +421,20 @@ export function buildFrontSoffit(params: FrontSoffitParams): FrontSoffitResult {
   const shape = new THREE.Shape();
   lidPoly.forEach((p, i) => (i === 0 ? shape.moveTo(p.x, p.z) : shape.lineTo(p.x, p.z)));
   shape.closePath();
-  if (plainWhite) {
+  if (cans) {
     for (const t of troffers) {
       const hole = new THREE.Path();
       hole.absarc(t.x, t.z, DOWNLIGHT_APERTURE_RADIUS, 0, Math.PI * 2, true);
       shape.holes.push(hole);
     }
   }
-  if (!plainWhite) addTrofferApertures(shape, troffers, tileX, tileZ);
-  const slab = new THREE.Mesh(new THREE.ShapeGeometry(shape), whiteBodyMat ?? tileMaterial);
+  if (!cans) addTrofferApertures(shape, troffers, tileX, tileZ);
+  const slab = new THREE.Mesh(new THREE.ShapeGeometry(shape), (cans && whiteBodyMat) || tileMaterial);
   slab.position.y = soffitY;
   slab.rotation.x = Math.PI / 2;
   slab.receiveShadow = true;
   group.add(slab);
-  if (!plainWhite) {
+  if (!cans) {
     const phase = soffitTrofferCenters()[0];
     installCeilingGrid({
       parent: group, y: soffitY,
@@ -435,7 +450,8 @@ export function buildFrontSoffit(params: FrontSoffitParams): FrontSoffitResult {
   // plenum and the back of the storefront wall. Plain painted drywall, from
   // the lid up to the deck — the same board the lid's own cut used to be
   // closed with, moved to where the opening actually is.
-  {
+  // The bulkhead's own fascia runs on to the glass and closes these instead.
+  if (!bulkhead) {
     const armHalf = soffitConnectHalf(storefrontSpec, storeWidth, corniceWallGap);
     const backZ = FRONT_Z - corniceWallGap - corniceBand;
     const runH = ceilingY - soffitY;
@@ -461,7 +477,9 @@ export function buildFrontSoffit(params: FrontSoffitParams): FrontSoffitResult {
   // chain back along the same edges offset inward by `band`, with each inner
   // joint placed where the two offset lines actually intersect — extruded down
   // through the drop. Same trick counter.ts uses for the counter's own band.
-  if (plainWhite) {
+  if (bulkhead) {
+    group.add(buildBulkheadFascia(poly, FRONT_Z, ceilingY, soffitY, corniceBand));
+  } else if (plainWhite) {
     // Plain painted fascia closes at its actual endpoints.
     const first = edges[0], last = edges[fasciaCount - 1];
     const startOuter = first.a;
@@ -521,7 +539,7 @@ export function buildFrontSoffit(params: FrontSoffitParams): FrontSoffitResult {
   // Mirrored formats get one continuous Blender cornice from buildCeilingFrame,
   // including the counter V. The lid and light anchors remain owned here.
 
-  if (plainWhite) {
+  if (cans) {
     // ── bb-2000: a grid of INSET CIRCULAR (recessed can) lights ─────────────
     // Small round downlights spaced along the white soffit body instead of the
     // two rectangular troffers. Procedural fallback ring/disc + 3D model loader.

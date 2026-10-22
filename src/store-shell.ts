@@ -42,6 +42,8 @@ import { Movie } from './jellyfin';
 import { assetUrl } from './asset-url';
 import { posterQueue, loadDecorPosterTexture } from './video-case';
 import { bakeFloorAO, makeWallContactAO } from './lightmap-bake';
+import { buildFrontTileFloor, applyFrontTileAO } from './front-tile-floor';
+import { angularFrontEra } from './front-of-store-plan';
 import { buildCornice } from './ceiling-cornice';
 import { corniceOffset } from './cornice-plan';
 import { liveMirrorsAllowed, reflectorTargetSize } from './store-mirrors';
@@ -310,7 +312,7 @@ export function buildStore(scene: StoreScene) {
   // is known (window bay widths are sized in feet) and read by both the
   // storefront window build below and the EntranceCheckout fixture (via
   // fixtureContext()).
-  scene.storefrontSpec = getStorefrontSpec(storeWidth);
+  scene.storefrontSpec = { ...getStorefrontSpec(storeWidth), ...(angularFrontEra(getActiveTheme().id) ? { frontPlan: 'angular' as const } : {}) };
   // The entrance below holds the startup splash for its counter model; start
   // that download ahead of the decorative fixtures built in between.
   prefetchCounterModel(scene.storefrontSpec);
@@ -1090,7 +1092,7 @@ export function buildStore(scene: StoreScene) {
     // walk naturally staggers the rows it takes from each column) — an even
     // scatter keeps the store's grounding uniform instead of leaving one
     // half of the floor shadowless.
-    const counterLights = soffitKeyCenters(frontSoffitPolygon(scene.storefrontSpec,storeWidth,CORNICE_WALL_GAP,CORNICE_BAND),CORNICE_BAND,!wantsCeilingCornice);
+    const counterLights = soffitKeyCenters(frontSoffitPolygon(scene.storefrontSpec,storeWidth,CORNICE_WALL_GAP,CORNICE_BAND),CORNICE_BAND,!wantsCeilingCornice && scene.storefrontSpec.frontPlan !== 'angular');
     const shadowPicks = new Set<number>();
     if (trofferShadows) {
       // The counter always receives its two real fittings first. Spend only
@@ -1253,6 +1255,10 @@ export function buildStore(scene: StoreScene) {
     // but it is the store's inventory of ceiling lights, and a future reader
     // wanting "every troffer" would silently miss the checkout zone entirely.
     scene.troffers.push(...soffit.troffers);
+    // 2000/2010 (#388): the bounded tile zone follows the bulkhead overhead.
+    const frontTiles = scene.storefrontSpec.frontPlan === 'angular' ? buildFrontTileFloor(soffit.polygon, FRONT_GLASS_Z,
+      { minX: leftEdge, maxX: leftEdge + storeWidth, minZ: backWallZ, maxZ: FRONT_GLASS_Z }, scene.effectiveQuality === 'low') : null;
+    if (frontTiles) scene.scene.add(frontTiles);
   }
 
   if (scene.plan.clubhouse) {
@@ -2654,6 +2660,7 @@ export function buildStore(scene: StoreScene) {
     scene.floorMat.aoMap = scene.floorAOTex;
     scene.floorMat.aoMapIntensity = 0.85;
     scene.floorMat.needsUpdate = true;
+    applyFrontTileAO(scene.scene, scene.floorAOTex, 0.85);
   }
   // Wall-shelf stocking spots (back + right new-release walls) so her
   // destinations aren't limited to freestanding fixtures (#50) — placed
