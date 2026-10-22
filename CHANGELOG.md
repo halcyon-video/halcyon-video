@@ -5,6 +5,20 @@ All notable changes to Halcyon Video, generated from commit history by
 it on every version tag push. Deterministic and offline: no entry here was
 written by a model.
 
+## [v0.28.1] — 2026-10-21
+
+### CHANGELOG
+- V0.28.0
+
+### General
+- Prepare 0.28.1 release
+- Keep polling the controller when a second paired pad disconnects
+- Follow the controller the player is holding when two are paired
+- Take controller input whenever the store is visible, and reap orphaned TURN relays
+- Pack libraries at bay granularity so the next library follows the last stocked bay (Closes [#395](https://github.com/halcyon-video/halcyon-video/issues/395))
+- Round the built-in aisle-end plinth fronts
+- Size 1990 endcap trees to the reference
+
 ## [v0.28.0] — 2026-10-17
 
 ### CHANGELOG
