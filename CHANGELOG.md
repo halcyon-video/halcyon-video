@@ -5,6 +5,23 @@ All notable changes to Halcyon Video, generated from commit history by
 it on every version tag push. Deterministic and offline: no entry here was
 written by a model.
 
+## [v0.29.0] — 2026-10-22
+
+### CHANGELOG
+- V0.28.1
+
+### General
+- Prepare 0.29.0 release
+- Model the whole parking lot instead of the photograph's smeared floor (Closes [#398](https://github.com/halcyon-video/halcyon-video/issues/398))
+- Rebuild the 2000 and 2010 front of store as an angular bulkhead over a tiled zone
+- Release ceiling grain cancelled during program preparation (issue #289)
+- Prepare the counter model and ceiling grain before they appear (issue #289)
+- Give phones a compact copy of the 1990 clerk uniform (issue #289)
+- Prepare fixture cover shaders and fetch the counter first on phone entry (issue #289)
+- Give actor spotlights a lamp-lit marquee column
+- Put the projecting plinths on the inner 1990 endcaps (Closes [#397](https://github.com/halcyon-video/halcyon-video/issues/397))
+- Give single-film promotions a corrugated floor display
+
 ## [v0.28.1] — 2026-10-21
 
 ### CHANGELOG
