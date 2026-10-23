@@ -135,6 +135,10 @@ export interface StorefrontSpec {
   // FOOTPRINT, so counterStructureFootprints() in store-fixtures-config.ts
   // must stay in sync with counter.ts for both shapes.
   counterShape: CounterShape;
+  // Era-specific front of store (GH #388): 'angular' builds the 2000/2010
+  // bulkhead over the cash wrap and the tiled zone beneath it. Set from the
+  // active theme by store-shell; absent means the classic front.
+  frontPlan?: 'angular';
 }
 
 // Width of one entrance door leaf (ft). FORMAT-DRIVEN — a mom-and-pop hangs a

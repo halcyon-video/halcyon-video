@@ -964,6 +964,21 @@ export class CollectionEndcap extends EndcapShelf {
   }
 
   /**
+   * The footer plinth, ribbon-dressed: the kit's green base with the
+   * GIVE-THE-GIFT ribbon — the same plinth EndcapShelf arms via
+   * `options.footer` for its plain 80s form, dressed here because a collection
+   * end IS the kit (photo 2580265323, both bases).
+   */
+  protected buildKitFooter(coreWidth: number, coreDepth: number): void {
+    if (!this.group) return;
+    this.footerTex = buildEndcapFooter(this.group, coreWidth, coreDepth, {
+      color: FOOTER_GREEN,
+      dressFront: drawFooterRibbon,
+      context: this.ctx, ownModel: dispose => { this.disposeFooterModel = dispose; },
+    });
+  }
+
+  /**
    * The attested 1990 composition: die-cut Christmas tree flush on the carcass,
    * the white franchise card mounted on it, the red gift tag cocked near the
    * tip. Two drop-in art hooks, both silent-404:
@@ -988,15 +1003,7 @@ export class CollectionEndcap extends EndcapShelf {
     const named = styleId ? COLLECTION_HEADER_STYLES[styleId] : undefined;
     const style = named ? houseHeaderStyle(named) : collectionHeaderStyleFor(getActiveTheme().id);
 
-    // ── The footer plinth, ribbon-dressed ───────────────────────────────────
-    // The kit's green base with the GIVE-THE-GIFT ribbon — the same plinth
-    // EndcapShelf arms via `options.footer` for its plain 80s form, dressed
-    // here because a collection end IS the kit (photo 2580265323, both bases).
-    this.footerTex = buildEndcapFooter(this.group, coreWidth, coreDepth, {
-      color: FOOTER_GREEN,
-      dressFront: drawFooterRibbon,
-      context: this.ctx, ownModel: dispose => { this.disposeFooterModel = dispose; },
-    });
+    this.buildKitFooter(coreWidth, coreDepth);
 
     // ── The tree, FLUSH on the carcass ──────────────────────────────────────
     // Bottom edge at y = coreHeight exactly: no riser, no foot, nothing planted

@@ -10,6 +10,8 @@ interface GridInstall {
   paint: THREE.Material; fiber?: THREE.MeshStandardMaterial;
   tiles?: GridPoint[]; fallback?: THREE.Object3D[];
   colors?: THREE.InstancedBufferAttribute | null; refresh: () => void;
+  /** Draw-free program/texture preparation (hosted and phone stores). */
+  prepare?: (model: THREE.Group, signal: AbortSignal) => Promise<void>;
 }
 /** Geometry and finishes are shared by part, never allocated per tile. */
 export function installCeilingGrid(options: GridInstall): THREE.Group {
@@ -18,9 +20,11 @@ export function installCeilingGrid(options: GridInstall): THREE.Group {
   // Empty owned sentinel participates in the existing scene geometry teardown.
   const sentinel=new THREE.Mesh(new THREE.BufferGeometry(),new THREE.MeshBasicMaterial());
   sentinel.visible=false;sentinel.name='Grid lifetime';root.add(sentinel);
-  let stopped=false;
+  let pendingGrain:THREE.Texture|undefined;
+  let stopped=false;const lifetime=new AbortController();const owned:THREE.Material[]=[];
   const stop=()=>{
     if(stopped)return;stopped=true;parent.removeEventListener('removed',stop);
+    lifetime.abort();pendingGrain?.dispose();pendingGrain=undefined;owned.forEach(m=>m.dispose());
     root.traverse(o=>{if(o instanceof THREE.InstancedMesh)o.dispose();});
     disposeDetachedModel(root);
   };
@@ -93,7 +97,17 @@ export function installCeilingGrid(options: GridInstall): THREE.Group {
     if(fiber)new THREE.TextureLoader().load(assetUrl('models/ceiling-tile-grain.png'),texture=>{
       if(stopped){texture.dispose();return;}
       texture.colorSpace=THREE.SRGBColorSpace;texture.wrapS=texture.wrapT=THREE.RepeatWrapping;
-      fiber.map=texture;fiber.bumpMap=texture;fiber.bumpScale=.008;fiber.needsUpdate=true;refresh();
+      const grain=(m:THREE.MeshStandardMaterial)=>{m.map=texture;m.bumpMap=texture;m.bumpScale=.008;m.needsUpdate=true;};
+      const apply=()=>{if(!stopped){grain(fiber);pendingGrain=undefined;refresh();}};
+      // Grain adds map and bump programs to the visible tiles. Prepare them on a
+      // draw-free view first; the copy stays referenced so its program survives.
+      const rims=root.getObjectByName('TileRim');
+      if(!options.prepare||!(rims instanceof THREE.InstancedMesh)){apply();return;}
+      const copy=fiber.clone();copy.onBeforeCompile=fiber.onBeforeCompile;copy.customProgramCacheKey=fiber.customProgramCacheKey;
+      grain(copy);pendingGrain=texture;owned.push(copy);
+      const view=Object.create(rims) as THREE.InstancedMesh;view.material=copy;view.children=[];
+      const probe=new THREE.Group();probe.children=[view];
+      options.prepare(probe,lifetime.signal).then(apply,apply);
     },undefined,()=>{ /* Neutral fibre remains usable if grain is unavailable. */ });
   },undefined,()=>{ /* Keep the established procedural ceiling on missing/offline GLB. */ });
   return root;

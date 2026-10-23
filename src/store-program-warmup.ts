@@ -5,7 +5,7 @@ import { createInspectionProgramProbe } from './inspection-mesh';
 import * as THREE from 'three';
 import type { StoreScene } from './three-scene';
 import type { Movie } from './providers/media-source-provider';
-import { CASE_MEDIUM, posterPixelCache, createProgramWarmupMaterials } from './video-case';
+import { CASE_MEDIUM, posterPixelCache, createProgramWarmupMaterials, cropFrontTextureForMedium, makePlasticMaterial } from './video-case';
 import { isWhiteClamshell } from './packaging-formats';
 import { retailAudio } from './audio';
 import { isPublicDemo } from './demo-mode';
@@ -38,19 +38,44 @@ export async function prepareInitialViewPrograms(scene: StoreScene): Promise<voi
   stagedInitialRooms.add(scene);
   if (!scene.isWalkAroundMode) scene.snapCamera();
   const roots = new THREE.Group();
-  roots.children = [...initialProgramObjects(scene.scene, scene.camera), ...shadows];
+  roots.children = [...initialProgramObjects(scene.scene, scene.camera), ...shadows,
+    stockArtProbe(scene.programWarmupController.signal)];
   try {
     await compileProgramsInStages(scene.renderer, scene.scene, scene.camera,
       scene.composer?.readBuffer ?? null, scene.programWarmupController.signal, roots,
       (fraction, detail) => updateStoreLoading(70 + 14 * fraction, detail));
     // Models that finished downloading during that pass joined the view after
-    // its snapshot. Prepare them too instead of linking inside the first frame;
-    // everything already prepared is a program-cache hit.
-    roots.children = initialProgramObjects(scene.scene, scene.camera);
+    // its snapshot, and they cast shadows too. Prepare them instead of linking
+    // inside the first frame; everything already prepared is a cache hit.
+    roots.children = [...initialProgramObjects(scene.scene, scene.camera),
+      ...(scene.renderer.shadowMap.enabled ? shadowDepthProgramViews(scene.scene,
+        scene.renderer.shadowMap.type, scene.programWarmupController.signal).children : [])];
     await compileProgramsInStages(scene.renderer, scene.scene, scene.camera,
       scene.composer?.readBuffer ?? null, scene.programWarmupController.signal, roots,
       (_fraction, detail) => updateStoreLoading(84, detail));
   } finally { roots.children = []; }
+}
+
+/** Fixture stock such as bargain-bin filler swaps in per-title cover and spine
+ * materials as artwork arrives, which can be mid-preparation or after the last
+ * snapshot. They are newer than the room's surface finishes, so they need
+ * program variants of their own: prepare those with the opening view. The
+ * probe draws nothing and keeps its programs referenced until teardown. */
+function stockArtProbe(lifetime: AbortSignal): THREE.InstancedMesh {
+  const geometry = new THREE.BoxGeometry(0.01, 0.01, 0.01);
+  const pixels = new THREE.DataTexture(new Uint8Array([128, 128, 128, 255]), 1, 1);
+  pixels.colorSpace = THREE.SRGBColorSpace;
+  const cover = cropFrontTextureForMedium(pixels);
+  const materials = [makePlasticMaterial({ map: cover }), makePlasticMaterial({ color: 0x0f172a })];
+  const probe = new THREE.InstancedMesh(geometry, materials, 1);
+  probe.visible = false;
+  lifetime.addEventListener('abort', () => {
+    probe.dispose(); geometry.dispose();
+    materials.forEach(material => material.dispose());
+    if (cover !== pixels) cover.dispose();
+    pixels.dispose();
+  }, { once: true });
+  return probe;
 }
 
 export async function warmupRuntimePrograms(scene: StoreScene) {

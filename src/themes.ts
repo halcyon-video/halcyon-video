@@ -155,6 +155,9 @@ export const THEMES: Record<string, StoreTheme> = {
     defaultMedium: 'vhs',
     shelving: { frame: 'laminate-white' },
     signageSet: 'halcyon-2000-signs',
+    // Clear-anodized storefront and vestibule framing, per the wide front-of-
+    // store reference (GH #388).
+    frameColorOverride: '#a9adb2',
   },
   // ── 2010: late-era DVD store — flush banner toppers, black wire shelving ────
   'bb-2010': {
@@ -162,6 +165,8 @@ export const THEMES: Record<string, StoreTheme> = {
     name: 'Halcyon 2010',
     shelfStyleId: 'classic-trapezoid-4',
     topperStyle: 'flush',
+    // Clear-anodized framing, as for 2000 (GH #388).
+    frameColorOverride: '#a9adb2',
     palette: { primary: HALCYON_BLUE, ...HALCYON_ROOM_PALETTE },
     brand: {
       name: 'Halcyon Video',

@@ -2,5 +2,9 @@
   "public/textures/clerk/color.png": "50a6460e05c8da551d607e7011b939ab453665920589ad2db46e27f6a106ee3d",
   "public/textures/clerk/livery.png": "335c2293353a7b67839c6abbd196bb8d938cc7bdceb5210069bbd173d8081848",
   "public/mobile/textures/clerk/rendered-color.webp": "a57eef6e05466289277d64fb38f5247a23b687bbfb7710ce4642f567e8aaa3c4",
-  "public/mobile/textures/clerk/rendered-livery.webp": "1cea1366fa54d2c09ba86c8abdd787617dcd2423d4494f3ba25dc420a8f0a83e"
+  "public/mobile/textures/clerk/rendered-livery.webp": "1cea1366fa54d2c09ba86c8abdd787617dcd2423d4494f3ba25dc420a8f0a83e",
+  "public/textures/clerk/oxford/color.png": "9153563dd308068c121e17f59bc71d63b707970ad91badfefeaa677f80225522",
+  "public/textures/clerk/oxford/livery.png": "80c57c91db809a1d33288ef99822ed75f7a3769d31a3c361031cd7b621ca3502",
+  "public/mobile/textures/clerk/oxford/rendered-color.webp": "aebbaedbe06b2ea4b11f377e3e2af4c745a2f266f02c3065a6dbe6a2d8613db2",
+  "public/mobile/textures/clerk/oxford/rendered-livery.webp": "21674db27f574e85e18207dab2151de9e2a33b49c5d63640c006803dd3750b1a"
 }

@@ -552,8 +552,12 @@ export class EntranceCheckout implements StoreFixture {
       // kneeMat fallback) rather than a hardcoded hex.
       const capH = soffitCapY - wallH;
       if (capH > 0.05) {
-        const wallSurf = this.ctx.wallSurface;
-        const capMat = wallSurf?.material
+        // 2000/2010 (#388): the wide reference shows the glazing running up to
+        // the pale bulkhead, so the head takes the bulkhead's paint there.
+        const wallSurf = spec.frontPlan === 'angular' ? undefined : this.ctx.wallSurface;
+        const capMat = spec.frontPlan === 'angular'
+          ? new THREE.MeshStandardMaterial({ name: 'VestibuleHeadPaint', color: 0xe6e3da, roughness: 0.95, metalness: 0 })
+          : wallSurf?.material
           ?? new THREE.MeshStandardMaterial({ color: new THREE.Color(themeKneeGoldHex()), roughness: 0.92, metalness: 0.0 });
         const corner = vestibuleStraightSide(spec,1,cx);
         const outline = new THREE.Shape();

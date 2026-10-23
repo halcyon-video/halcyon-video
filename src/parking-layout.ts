@@ -29,3 +29,16 @@ export function parkingLayout(storeWidth: number, sidewalkDepth: number, backWal
     drivewayMinX, streetZ, stallWidth, stallDepth, laneDepth, sidewalkDepth, spaces};
 }
 export type ParkingLayout = ReturnType<typeof parkingLayout>;
+
+// The through street beyond the lot's street walk (feet). GH #398: it runs far
+// past the lot's sides so its ends sit out on the opaque ground surround
+// (exterior-ground-surround.ts) rather than terminating against the photograph.
+export const STREET_CURB_DEPTH = 0.4;
+export const STREET_GUTTER_DEPTH = 1.6;
+export const STREET_ROAD_DEPTH = 26;
+export const STREET_OVERHANG = 150;
+/** World extent of the through street for a lot whose street edge is at curbZ. */
+export function roadSpan(minX: number, maxX: number, curbZ: number) {
+  const nearZ = curbZ + STREET_CURB_DEPTH + STREET_GUTTER_DEPTH;
+  return { minX: minX - STREET_OVERHANG, maxX: maxX + STREET_OVERHANG, nearZ, farZ: nearZ + STREET_ROAD_DEPTH };
+}

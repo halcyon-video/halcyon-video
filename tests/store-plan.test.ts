@@ -167,3 +167,33 @@ test('2400 titles fill existing wings before adding a seventh side pane', () => 
   assert.ok(15 - plan.backWallZ < 56.5, 'retain six whole panes at this stock level');
   assert.ok(plan.shelvingUnits.length >= 20, 'do not discard stock to avoid growth');
 });
+
+// Issue #397: the inner (line-back) run ends host the same plinth as the
+// outer ends, but a back end that faces the next chunk of a split row across
+// the RUN_BREAK_GAP cross-aisle is a closed join, never a display site.
+for (const arrangement of ['straight', 'herringbone'] as ArrangementId[]) {
+  test(`inner run ends open onto walkway, not onto a split row's next chunk (${arrangement})`, () => {
+    const format = activeStoreFormat(), savedCap = format.maxRunUnitsCap;
+    let plan: StorePlan;
+    try {
+      format.maxRunUnitsCap = 3;
+      plan = new StorePlan([buildBigLibrary(9000)]);
+      plan.arrangement = arrangement;
+      plan.plan();
+    } finally { format.maxRunUnitsCap = savedCap; }
+    const backs = plan.openLineBackEnds();
+    const backLines = new Set(backs.map((e) => e.unit.lineId));
+    assert.equal(backLines.size, backs.length, 'one inner end per line');
+    const pairs = findSameRowContinuations(plan, 0);
+    assert.ok(pairs.length > 0, 'expected a split row to exercise the closed join');
+    for (const { a } of pairs) assert.ok(!backLines.has(a.lineId), `line ${a.lineId} faces the next chunk`);
+    const rows = new Set(plan.shelvingUnits.filter((u) => u.libraryIdx >= 0 && !u.singleSided).map((u) => u.rowGroupId));
+    const openRows = new Set(backs.map((e) => e.unit.rowGroupId));
+    assert.equal(openRows.size, rows.size, 'every physical row keeps an open inner end');
+    for (const { unit, backLocalZ } of backs) {
+      assert.ok(unit.isLineBack, 'inner ends sit on the line-back unit');
+      const L = (unit.cols - 1) * BOX_SPACING + 1.0;
+      assert.ok(Math.abs(plan.aisleZCenter(unit) - L / 2 - backLocalZ) < 1e-9, 'abutment plane is the run end face');
+    }
+  });
+}

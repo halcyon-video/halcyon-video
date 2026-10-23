@@ -15,9 +15,9 @@ test('private drop-ins, provider URLs, and unknown assets never get rewritten', 
 });
 
 test('phones use the current rendered clerk sheets instead of the retired mobile art', () => {
- for (const pass of ['color', 'livery']) {
-  const source = `textures/clerk/${pass}.png`;
-  assert.equal(mobileAssetPath(source, true), `mobile/textures/clerk/rendered-${pass}.webp`);
+ for (const base of ['textures/clerk', 'textures/clerk/oxford']) for (const pass of ['color', 'livery']) {
+  const source = `${base}/${pass}.png`;
+  assert.equal(mobileAssetPath(source, true), `mobile/${base}/rendered-${pass}.webp`);
   assert.equal(mobileAssetPath(source, false), source);
  }
 });

@@ -92,23 +92,28 @@ export class OutdoorLightingRig {
   private skyTex = new Map<string, THREE.Texture>();
 
   private groundColor = new THREE.Color('#80766b');
-  private groundColorListener: ((color: THREE.Color) => void) | null = null;
+  private groundColorListener: ((color: THREE.Color, panorama: HTMLImageElement | null) => void) | null = null;
   private photographicGround = false;
-  private groundModeListener: ((enabled: boolean) => void) | null = null;
-  setGroundModeListener(fn: (enabled: boolean) => void) { this.groundModeListener = fn; fn(this.photographicGround); }
   getGroundColor() { return this.groundColor; }
-  setGroundColorListener(fn: (color: THREE.Color) => void) { this.groundColorListener = fn; }
+  setGroundColorListener(fn: (color: THREE.Color, panorama: HTMLImageElement | null) => void) { this.groundColorListener = fn; }
   private sampleGround(tex: THREE.Texture) {
     const canvas = document.createElement('canvas'); canvas.width = 16; canvas.height = 8;
     const ctx = canvas.getContext('2d');
     const image = tex.image as HTMLImageElement;
     if (!ctx || !image?.width) return;
-    ctx.drawImage(image, image.width*.25, image.height*.82, image.width*.5, image.height*.12, 0,0,16,8);
+    // A complete panorama is sampled where visitors actually look across the
+    // lot, 12-30 degrees below the horizon (about 10-25 ft out); its nadir
+    // renders darker than any ground in view (GH #398). Partial strips keep
+    // their lower band.
+    const [top, band] = this.photographicGround ? [.5 + 12 / 180, 18 / 180] : [.82, .12];
+    ctx.drawImage(image, image.width*.25, image.height*top, image.width*.5, image.height*band, 0,0,16,8);
     const data = ctx.getImageData(0,0,16,8).data; let r=0,g=0,b=0;
     for (let i=0;i<data.length;i+=4) {r+=data[i];g+=data[i+1];b+=data[i+2];}
     const n=data.length/4;
     this.groundColor.setRGB(r/n/255,g/n/255,b/n/255,THREE.SRGBColorSpace);
-    this.groundColorListener?.(this.groundColor);
+    // A complete panorama also hands over its image so the ground surround can
+    // match the photograph's own tone near the horizon (GH #398).
+    this.groundColorListener?.(this.groundColor, this.photographicGround ? image : null);
   }
 
   // Baked-environment state (see bakeEnvironment): the PMREM currently installed
@@ -331,7 +336,6 @@ export class OutdoorLightingRig {
     const applyTexture = (tex: THREE.Texture | null) => {
       const image = tex?.image as HTMLImageElement | undefined;
       this.photographicGround = Boolean(image && image.width / image.height <= 2.5);
-      this.groundModeListener?.(this.photographicGround);
       if (this.skyMesh) setPanoramaProjection(this.skyMesh, this.photographicGround);
       if (tex && image && image.width / image.height > 2.5 && this.skyMesh) {
         if (!this.partialSky) {
