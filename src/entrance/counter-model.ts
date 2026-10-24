@@ -32,11 +32,16 @@ const prefetched = new Map<string, Promise<ArrayBuffer>>();
 
 /** The startup splash waits for this model, but the entrance is built after
  * the room's decorative fixtures, so its request used to queue behind every
- * one of their downloads. Start it as soon as the storefront is known. */
-export function prefetchCounterModel(spec: StorefrontSpec): void {
+ * one of their downloads. Start it as soon as the storefront is known. The
+ * result settles once some candidate's bytes arrive, or every candidate fails. */
+export function prefetchCounterModel(spec: StorefrontSpec): Promise<void> {
   const paths = counterModelPaths(spec.counterShape, spec.counterStyle === 'rounded-2000s');
   for (const path of prefetched.keys()) if (!paths.includes(path)) prefetched.delete(path);
   for (const path of paths) if (!prefetched.has(path)) prefetched.set(path, requestCounterModel(path));
+  return new Promise(resolve => {
+    let failed = 0;
+    for (const path of paths) prefetched.get(path)!.then(() => resolve(), () => { if (++failed === paths.length) resolve(); });
+  });
 }
 
 export function installCounterModel(

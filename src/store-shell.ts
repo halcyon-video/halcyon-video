@@ -7,6 +7,8 @@ import quickDrop from './exit-return-spec.json' with { type: 'json' };
 import { installTrofferModels, trofferCeilingGeometry } from './troffer-model.ts';
 import { reelSetting } from './reel-profile';
 import { mobileStoreActive } from './mobile-store';
+import { isPublicDemo } from './demo-mode';
+import { holdModelDownloads } from './model-download-gate';
 import { vestibuleSide, vestibuleLayout, counterDatumShift } from './vestibule-layout.ts';
 import { exitReturnLayout, returnWindowPane } from './exit-return-layout';
 import { RETAIL_FIXTURE_SPECS } from './retail-fixture-specs';
@@ -314,8 +316,11 @@ export function buildStore(scene: StoreScene) {
   // fixtureContext()).
   scene.storefrontSpec = { ...getStorefrontSpec(storeWidth), ...(angularFrontEra(getActiveTheme().id) ? { frontPlan: 'angular' as const } : {}) };
   // The entrance below holds the startup splash for its counter model; start
-  // that download ahead of the decorative fixtures built in between.
-  prefetchCounterModel(scene.storefrontSpec);
+  // that download ahead of the decorative fixtures built in between. On phone
+  // and hosted entry their model downloads wait for its bytes, rather than
+  // splitting a slow connection two dozen ways (src/model-download-gate.ts).
+  const counterBytes = prefetchCounterModel(scene.storefrontSpec);
+  if (isPublicDemo || mobileStoreActive()) holdModelDownloads(counterBytes);
   const panoramaWalkDepth = activeStoreFormat().facadeStyle === 'storefront' ? 4.7
     : facadeDimensions(scene.ceilingY, vestibuleHalfWidth(scene.storefrontSpec), facadeStyle()).sidewalkDepth;
   const sky = buildExteriorPanorama(storeWidth, scene.backWallZ, scene.ceilingY, panoramaWalkDepth, scene.effectiveQuality === 'high');
