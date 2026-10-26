@@ -418,9 +418,6 @@ const FLOOR_DISPLAY_KINDS = new Set([
   'candy-wall-gondola',
   'tape-cleaner-sidekick',
   'secondary-service-counter',
-  'film-floor-display',
-  'spotlight-column',
-  'studio-island',
 ]);
 
 // Fixture kinds that mount ON the checkout counter's walk-in BAND — its blue

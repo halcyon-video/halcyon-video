@@ -1,7 +1,4 @@
 import { RETAIL_FIXTURE_SPECS, type RetailFixtureKind } from './retail-fixture-specs.ts';
-import { FILM_DISPLAY } from './fixtures/film-floor-display-geometry.ts';
-import { SPOTLIGHT_COLUMN } from './fixtures/spotlight-column-geometry.ts';
-import { STUDIO_ISLAND } from './fixtures/studio-island-geometry.ts';
 import { buildPromoCampaign } from './promo-campaigns.ts';
 import { validateLayout, type Footprint } from './layout-validator.ts';
 import type { FixturePlacement } from './store-layout.ts';
@@ -18,57 +15,44 @@ interface PromotionBlueprint {
   w: number;
   d: number;
   clearance: number;
-  // Campaign grid the fixture stocks; viability is checked against it.
-  rows?: number;
-  cols?: number;
 }
-
-const FILM_DISPLAY_SPEC = RETAIL_FIXTURE_SPECS['film-floor-display'];
-const COLUMN_SPEC = RETAIL_FIXTURE_SPECS['spotlight-column'];
-const ISLAND_SPEC = RETAIL_FIXTURE_SPECS['studio-island'];
 
 const FLOOR_PROMOTION_BLUEPRINTS: PromotionBlueprint[] = [
   {
     id: 'floor-promotion-feature-title-0',
-    kind: 'film-floor-display',
+    kind: 'four-sided-display',
     campaign: ['feature-title:0'],
-    w: FILM_DISPLAY_SPEC.w, d: FILM_DISPLAY_SPEC.d, clearance: FILM_DISPLAY_SPEC.clearance,
-    rows: FILM_DISPLAY.rows, cols: FILM_DISPLAY.columns,
+    w: 3, d: 3, clearance: 3,
   },
   {
     id: 'floor-promotion-feature-title-1',
-    kind: 'film-floor-display',
+    kind: 'four-sided-display',
     campaign: ['feature-title:1'],
-    w: FILM_DISPLAY_SPEC.w, d: FILM_DISPLAY_SPEC.d, clearance: FILM_DISPLAY_SPEC.clearance,
-    rows: FILM_DISPLAY.rows, cols: FILM_DISPLAY.columns,
+    w: 3, d: 3, clearance: 3,
   },
   {
     id: 'floor-promotion-studio-feature-0',
-    kind: 'studio-island',
+    kind: 'four-sided-display',
     campaign: ['studio-feature:0'],
-    w: ISLAND_SPEC.w, d: ISLAND_SPEC.d, clearance: ISLAND_SPEC.clearance,
-    rows: STUDIO_ISLAND.deckY.length, cols: STUDIO_ISLAND.columns,
+    w: 3, d: 3, clearance: 3,
   },
   {
     id: 'floor-promotion-studio-feature-1',
-    kind: 'studio-island',
+    kind: 'four-sided-display',
     campaign: ['studio-feature:1'],
-    w: ISLAND_SPEC.w, d: ISLAND_SPEC.d, clearance: ISLAND_SPEC.clearance,
-    rows: STUDIO_ISLAND.deckY.length, cols: STUDIO_ISLAND.columns,
+    w: 3, d: 3, clearance: 3,
   },
   {
     id: 'floor-promotion-actor-spotlight-0',
-    kind: 'spotlight-column',
+    kind: 'four-sided-display',
     campaign: ['actor-spotlight:0'],
-    w: COLUMN_SPEC.w, d: COLUMN_SPEC.d, clearance: COLUMN_SPEC.clearance,
-    rows: SPOTLIGHT_COLUMN.ledgeY.length, cols: SPOTLIGHT_COLUMN.columns,
+    w: 3, d: 3, clearance: 3,
   },
   {
     id: 'floor-promotion-actor-spotlight-1',
-    kind: 'spotlight-column',
+    kind: 'four-sided-display',
     campaign: ['actor-spotlight:1'],
-    w: COLUMN_SPEC.w, d: COLUMN_SPEC.d, clearance: COLUMN_SPEC.clearance,
-    rows: SPOTLIGHT_COLUMN.ledgeY.length, cols: SPOTLIGHT_COLUMN.columns,
+    w: 3, d: 3, clearance: 3,
   },
   {
     id: 'floor-promotion-bargain-bin',
@@ -96,9 +80,9 @@ const FLOOR_PROMOTION_BLUEPRINTS: PromotionBlueprint[] = [
 
 /** Populate available floor pockets with a varied retail promotion programme.
  * Nine movie-floor displays; popcorn belongs to the checkout queue:
- * - 2 single-film corrugated floor displays (feature-title:0, 1)
- * - 2 studio subjects (studio-feature:0, 1) on two-sided island merchandisers
- * - 2 actor subjects (actor-spotlight:0, 1) on lamp-lit marquee columns
+ * - 2 single-film displays (feature-title:0, 1)
+ * - 2 studio subjects (studio-feature:0, 1)
+ * - 2 actor subjects (actor-spotlight:0, 1)
  * - 2 sale fixtures (bargain-bin, pv-drape-table)
  * - 1 rotating impulse rack (rotating-merchandiser / #275)
  */
@@ -113,7 +97,7 @@ export function floorPromotionPlacements(
 
   const viable = FLOOR_PROMOTION_BLUEPRINTS.filter(bp => {
     if (bp.kind === 'acrylic-popcorn-bin') return false; // Checkout concessions, never the movie/game floor.
-    if (bp.campaign) return Boolean(buildPromoCampaign(bp.campaign, libraries, bp.rows ?? 3, bp.cols ?? 3));
+    if (bp.campaign) return Boolean(buildPromoCampaign(bp.campaign, libraries, 3, 3));
     // Match the reused sale fixtures' stock contracts rather than reserving
     // floor space for an empty movie table in a series-only library.
     if (bp.kind === 'bargain-bin' && obstacles.some(o => o.label === `fixture:${bp.id}`)) return false;

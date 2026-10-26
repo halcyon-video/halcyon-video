@@ -115,12 +115,6 @@ function endcapForLine(scene: StoreScene, lineId: number): SceneFixture | null {
  * sub-nav jump index, which enters an endcap by this exact route.
  */
 const enterEndcapFromShelf = enterEndcapCursor;
-// Fixtures stocked on ONE face: stepping past an edge column wraps along
-// that face instead of rotating the camera to a bare side or back panel.
-const SINGLE_FACE_WRAP_KINDS = new Set(['release-cart', 'twin-crt-tower', 'film-floor-display']);
-// Fixtures stocked front and back: stepping past an edge column crosses to
-// the other face rather than onto a bare end.
-const TWO_FACE_KINDS = new Set(['pv-drape-table', 'studio-island']);
 
 /**
  * Step off a collection endcap's edge column back onto the browse snake, in
@@ -275,7 +269,7 @@ export function moveLeftInternal(scene: StoreScene) {
     scene.moveEndcapSelection(-1, 0);
   } else if (scene.mode === 'browse') {
     if (scene.selectedUnitSource === 'fixture') {
-      if (SINGLE_FACE_WRAP_KINDS.has(scene.slottedFixtures.find(f => f.placement.id === scene.selectedFixtureId)?.placement.kind ?? '')) {
+      if (['release-cart','twin-crt-tower'].includes(scene.slottedFixtures.find(f => f.placement.id === scene.selectedFixtureId)?.placement.kind ?? '')) {
         scene.selectedCol = (scene.selectedCol - 1 + scene.colsCount) % scene.colsCount;
         scene.updateCameraTarget();
         return;
@@ -318,7 +312,7 @@ export function moveLeftInternal(scene: StoreScene) {
             exitEndcapToShelf(scene, fixture!, 'prevBack');
             return;
           }
-          if (fixture && TWO_FACE_KINDS.has(fixture.placement.kind)) {
+          if (fixture?.placement.kind === 'pv-drape-table') {
             const toSide = scene.selectedSide === 'front' ? 'back' : 'front';
             if (fixture.getSlots().some(slot => slot.side === toSide)) {
               scene.selectedSide = toSide; scene.selectedCol = scene.colsCount - 1;
@@ -453,7 +447,7 @@ export function moveRightInternal(scene: StoreScene) {
     scene.moveEndcapSelection(1, 0);
   } else if (scene.mode === 'browse') {
     if (scene.selectedUnitSource === 'fixture') {
-      if (SINGLE_FACE_WRAP_KINDS.has(scene.slottedFixtures.find(f => f.placement.id === scene.selectedFixtureId)?.placement.kind ?? '')) {
+      if (['release-cart','twin-crt-tower'].includes(scene.slottedFixtures.find(f => f.placement.id === scene.selectedFixtureId)?.placement.kind ?? '')) {
         scene.selectedCol = (scene.selectedCol + 1 + scene.colsCount) % scene.colsCount;
         scene.updateCameraTarget();
         return;
@@ -489,7 +483,7 @@ export function moveRightInternal(scene: StoreScene) {
             exitEndcapToShelf(scene, fixture!, 'lineFront');
             return;
           }
-          if (fixture && TWO_FACE_KINDS.has(fixture.placement.kind)) {
+          if (fixture?.placement.kind === 'pv-drape-table') {
             const toSide = scene.selectedSide === 'front' ? 'back' : 'front';
             if (fixture.getSlots().some(slot => slot.side === toSide)) {
               scene.selectedSide = toSide; scene.selectedCol = 0;
