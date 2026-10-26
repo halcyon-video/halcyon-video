@@ -1,6 +1,7 @@
 import { RETAIL_FIXTURE_SPECS, type RetailFixtureKind } from './retail-fixture-specs.ts';
 import { FILM_DISPLAY } from './fixtures/film-floor-display-geometry.ts';
 import { SPOTLIGHT_COLUMN } from './fixtures/spotlight-column-geometry.ts';
+import { STUDIO_ISLAND } from './fixtures/studio-island-geometry.ts';
 import { buildPromoCampaign } from './promo-campaigns.ts';
 import { validateLayout, type Footprint } from './layout-validator.ts';
 import type { FixturePlacement } from './store-layout.ts';
@@ -24,6 +25,7 @@ interface PromotionBlueprint {
 
 const FILM_DISPLAY_SPEC = RETAIL_FIXTURE_SPECS['film-floor-display'];
 const COLUMN_SPEC = RETAIL_FIXTURE_SPECS['spotlight-column'];
+const ISLAND_SPEC = RETAIL_FIXTURE_SPECS['studio-island'];
 
 const FLOOR_PROMOTION_BLUEPRINTS: PromotionBlueprint[] = [
   {
@@ -42,15 +44,17 @@ const FLOOR_PROMOTION_BLUEPRINTS: PromotionBlueprint[] = [
   },
   {
     id: 'floor-promotion-studio-feature-0',
-    kind: 'four-sided-display',
+    kind: 'studio-island',
     campaign: ['studio-feature:0'],
-    w: 3, d: 3, clearance: 3,
+    w: ISLAND_SPEC.w, d: ISLAND_SPEC.d, clearance: ISLAND_SPEC.clearance,
+    rows: STUDIO_ISLAND.deckY.length, cols: STUDIO_ISLAND.columns,
   },
   {
     id: 'floor-promotion-studio-feature-1',
-    kind: 'four-sided-display',
+    kind: 'studio-island',
     campaign: ['studio-feature:1'],
-    w: 3, d: 3, clearance: 3,
+    w: ISLAND_SPEC.w, d: ISLAND_SPEC.d, clearance: ISLAND_SPEC.clearance,
+    rows: STUDIO_ISLAND.deckY.length, cols: STUDIO_ISLAND.columns,
   },
   {
     id: 'floor-promotion-actor-spotlight-0',
@@ -93,8 +97,7 @@ const FLOOR_PROMOTION_BLUEPRINTS: PromotionBlueprint[] = [
 /** Populate available floor pockets with a varied retail promotion programme.
  * Nine movie-floor displays; popcorn belongs to the checkout queue:
  * - 2 single-film corrugated floor displays (feature-title:0, 1)
- * - 2 studio subjects (studio-feature:0, 1) on four-sided towers until a
- *   dedicated family arrives
+ * - 2 studio subjects (studio-feature:0, 1) on two-sided island merchandisers
  * - 2 actor subjects (actor-spotlight:0, 1) on lamp-lit marquee columns
  * - 2 sale fixtures (bargain-bin, pv-drape-table)
  * - 1 rotating impulse rack (rotating-merchandiser / #275)

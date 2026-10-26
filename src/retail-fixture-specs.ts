@@ -15,6 +15,8 @@ export const RETAIL_FIXTURE_SPECS = {
   'film-floor-display': { w: 2.2, h: 5.3, d: 1.1, clearance: 3 },
   // Round marquee column browsed from every side.
   'spotlight-column': { w: 2.6, h: 5.3, d: 2.6, clearance: 3 },
+  // Two-sided island; both stocked faces and both gable ends need an approach.
+  'studio-island': { w: 3.2, h: 5.2, d: 2.0, clearance: 3 },
 } as const;
 export type RetailFixtureKind = keyof typeof RETAIL_FIXTURE_SPECS;
 export function retailFixtureFootprint(kind: RetailFixtureKind, placement: FixturePlacement): Footprint {

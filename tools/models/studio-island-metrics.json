@@ -1,0 +1,51 @@
+{
+  "triangles": 316,
+  "glbBytes": 39228,
+  "parts": 17,
+  "materials": [
+    "IslandLaminate",
+    "IslandEdgeBand",
+    "IslandBase",
+    "IslandChrome"
+  ],
+  "textures": 0,
+  "boundsFeet": {
+    "min": [
+      -1.600000023841858,
+      0.0,
+      -1.0
+    ],
+    "max": [
+      1.600000023841858,
+      5.150000095367432,
+      1.0
+    ]
+  },
+  "lean": 0.2,
+  "laminate": 0.0625,
+  "spineHalf": 0.06,
+  "innerHalfWidth": 1.5375,
+  "rows": [
+    {
+      "deckFrontY": 0.75,
+      "deckBackY": 0.5802,
+      "railFrontZ": 0.9177
+    },
+    {
+      "deckFrontY": 1.85,
+      "deckBackY": 1.7177,
+      "railFrontZ": 0.7324
+    },
+    {
+      "deckFrontY": 2.95,
+      "deckBackY": 2.8553,
+      "railFrontZ": 0.5472
+    }
+  ],
+  "header": {
+    "bottomY": 4.3,
+    "height": 0.85,
+    "halfDepth": 0.1
+  },
+  "stock": "Three raked shelves of four face-out copies on each face; the header carries the studio name."
+}

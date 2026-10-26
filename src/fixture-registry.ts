@@ -39,6 +39,7 @@ import { NowShowingLightbox } from './fixtures/now-showing-lightbox';
 import { SecondaryServiceCounter } from './fixtures/secondary-service-counter';
 import { FilmFloorDisplay } from './fixtures/film-floor-display';
 import { SpotlightColumn } from './fixtures/spotlight-column';
+import { StudioIsland } from './fixtures/studio-island';
 
 import { fixtureFactory, registerFixtureKind, type PlacedFixture } from './fixture-kinds';
 export { registerFixtureKind, listFixtureKinds, type PlacedFixture, type FixtureFactory } from './fixture-kinds';
@@ -103,6 +104,7 @@ registerFixtureKind('candy-wall-gondola', (placement, ctx) => new CandyWallGondo
 registerFixtureKind('secondary-service-counter', (placement, ctx) => new SecondaryServiceCounter(placement, ctx));
 registerFixtureKind('film-floor-display', (placement, ctx) => new FilmFloorDisplay(placement, ctx));
 registerFixtureKind('spotlight-column', (placement, ctx) => new SpotlightColumn(placement, ctx));
+registerFixtureKind('studio-island', (placement, ctx) => new StudioIsland(placement, ctx));
 
 registerFixtureKind('now-showing-lightbox', (placement, ctx) => new NowShowingLightbox(placement, ctx));
 

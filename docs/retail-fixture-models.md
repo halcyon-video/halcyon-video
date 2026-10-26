@@ -93,4 +93,38 @@ with `src/fixtures/spotlight-column-geometry.ts`.
 that DVD and VHS copies rest on their rings, stay off the drum and inside the
 rims, clear the ring or marquee above, and stay inside their own wedge. Browsing
 uses the four-sided stand's face-to-face stepping, and the camera squares up to
-each quarter face's centre column. Studio subjects remain on four-sided towers.
+each quarter face's centre column. Studio subjects now use the island described
+below.
+
+## October 26 studio island
+
+Studio features (`studio-feature:0` and `:1`) no longer borrow the four-sided
+tower. They use an original two-sided island merchandiser. Two 0.0625-foot
+laminate gables with banded edges stand 2.00 feet deep from the floor to a
+0.50-foot shoulder, then taper to 0.72 feet at the 4.30-foot top. A spine runs
+between them on a black plinth 0.32 feet tall. Each face carries three
+shelves raked 0.20 radians, with deck fronts at 0.75, 1.85 and 2.95 feet. A
+chrome rail stands 0.12 feet proud of each deck nose. Because the gables taper,
+the decks shorten going up, at 0.84, 0.65 and 0.47 feet from the spine to the
+rail. A header bar 0.85 feet tall and 0.20 feet deep spans the top. Its
+bevelled edges are the chrome trim. The house fascia blades letter the studio
+on both faces, so the label follows live brand edits. The stock is four
+face-out copies per shelf on each face, twenty-four in all, filled from the top
+shelf down.
+
+| Fixture | Exported width × depth × height, ft | Reserved width × depth, ft | Triangles | Runtime mesh draws |
+|---|---:|---:|---:|---:|
+| Studio island | 3.20 × 2.00 × 5.15 | 3.20 × 2.00 | 316 | 4, plus 2 name blades |
+
+The 39.2 KB export is untextured, with maple laminate, darker edge band, black
+plinth and chrome finishes. `tools/models/studio-island.py` reproduces the
+editable `studio-island.blend` and the runtime GLB. The script shares its
+measurements with `src/fixtures/studio-island-geometry.ts`.
+`tests/studio-island.test.ts` checks the runtime shelves and header against the
+export, and the export against the reserved footprint within float32 rounding.
+It also checks that DVD and VHS copies rest on their decks, stay between the
+rail and the spine and clear the shelf above. Both faces and both gable ends
+keep the three-foot approach. Browsing steps along one face and crosses to the
+other past an edge column, as on the previously-viewed drape table. A store
+with three base towers places one island. Independent-store formats still
+exclude all three families.
