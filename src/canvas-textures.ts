@@ -12,7 +12,7 @@ import {
   drawLogo, getLogoFontString, logoFontFamily, buildLogoShapePath, logoShapeInnerBox,
   logoShapeFitRect,
 } from './logo-renderer';
-import agencyFontUrl from './assets/sairasemicondensed-medium.ttf';
+import agencyFontUrl from './assets/sairasemicondensed-medium.woff2';
 import { BB_ARCHIVO_BLACK, bundledFontsReady } from './bundled-fonts';
 import { createCategoryPlate1993Texture } from './fixtures/category-plate-1993';
 import { activeStoreFormat, isMomAndPop } from './store-format';

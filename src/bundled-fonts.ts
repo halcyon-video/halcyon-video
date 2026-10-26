@@ -25,15 +25,17 @@
 // ensureVarsityFont (fixtures/genre-fascia.ts) already use: register the
 // bundled file as a FontFace under a BB-prefixed family name, so nothing can
 // collide with a same-named system family or with the stylesheet's webfont
-// copy, and repaint in place when it lands. No network fetch: Vite inlines
-// these as bundle assets.
-import antonUrl from './assets/anton.ttf';
-import archivoBlackUrl from './assets/archivo-black.ttf';
-import bebasNeueUrl from './assets/bebas-neue.ttf';
-import outfitUrl from './assets/outfit.ttf';
-import orbitronUrl from './assets/orbitron.ttf';
-import yellowtailUrl from './assets/yellowtail.ttf';
-import shareTechMonoUrl from './assets/share-tech-mono.ttf';
+// copy, and repaint in place when it lands. The files ship with the bundle
+// (no third-party URL), but on the hosted site they are still fetched, and
+// the boot waits on all of them, so they ship as WOFF2: the same outlines
+// and metrics as the upstream TTFs at about a third of the bytes.
+import antonUrl from './assets/anton.woff2';
+import archivoBlackUrl from './assets/archivo-black.woff2';
+import bebasNeueUrl from './assets/bebas-neue.woff2';
+import outfitUrl from './assets/outfit.woff2';
+import orbitronUrl from './assets/orbitron.woff2';
+import yellowtailUrl from './assets/yellowtail.woff2';
+import shareTechMonoUrl from './assets/share-tech-mono.woff2';
 
 /** Anton — the Impact-class ultra-condensed black. Also the varsity/fascia face. */
 export const BB_ANTON = 'BBAnton';

@@ -2943,8 +2943,8 @@ async function waitForFontsAndInit() {
   // Same reason, for the bundled display faces (Anton / Archivo Black / Outfit /
   // Orbitron / Yellowtail): most of the canvases that set them are painted once
   // into a texture cache and never repainted, so a face landing after the store
-  // build bakes a fallback in permanently. These are local bundle assets, so
-  // the wait is a decode, not a fetch.
+  // build bakes a fallback in permanently. On the hosted site this wait is a
+  // download on the phone connection, which is why the faces ship as WOFF2.
   await paintStoreLoading(23, 'Preparing the lettering');
   await bundledFontsReady();
   await paintStoreLoading(24, 'Preparing the catalog');
