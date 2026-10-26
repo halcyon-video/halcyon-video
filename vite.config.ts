@@ -1,6 +1,7 @@
 import { defineConfig, loadEnv } from "vite";
 // @ts-expect-error plain JavaScript build helper, not browser code
 import { buildSourcePlugin } from "./tools/build-source.mjs";
+import { compressedModelsPlugin } from "./tools/compressed-models.mjs";
 // @ts-expect-error node:fs/node:path have no type declarations without @types/node
 // (not installed; vite.config.ts is outside tsconfig's "include" so this never
 // hits the `npm run build` gate, only editor intellisense).
@@ -573,6 +574,7 @@ export default defineConfig(async () => ({
     integrationProxyPlugin(operatorEnv),
     operatorConfigPlugin(),
     remotePlayPlugin(),
+    compressedModelsPlugin(),
   ],
 
   // Two entries: index.html (the real Tauri/Jellyfin app) and harness.html

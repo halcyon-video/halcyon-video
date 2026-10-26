@@ -1,4 +1,5 @@
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { installCompressedModelLoads } from './compressed-models.ts';
 
 /** Phone and hosted entry hold the reveal for the checkout counter model
  * (startup-reveal.ts), but every decorative fixture starts its own model
@@ -16,6 +17,7 @@ let installed = false;
 function install(): void {
   if (installed) return;
   installed = true;
+  installCompressedModelLoads();
   const load = GLTFLoader.prototype.load;
   GLTFLoader.prototype.load = function (this: GLTFLoader, ...args: Parameters<GLTFLoader['load']>) {
     const pending = hold;

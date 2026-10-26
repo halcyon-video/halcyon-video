@@ -6,6 +6,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { getActiveTheme } from '../themes';
 import { brandPackDir } from '../brand-pack';
 import { assetUrl, dropInCandidates } from '../asset-url';
+import { fetchModelBytes } from '../compressed-models';
 import type { FixtureContext } from '../fixtures';
 import type { StorefrontSpec } from '../store-layout';
 
@@ -20,10 +21,7 @@ function counterModelPaths(shape: StorefrontSpec['counterShape'], rounded: boole
 }
 
 function requestCounterModel(path: string): Promise<ArrayBuffer> {
-  const request = fetch(assetUrl(path)).then(response => {
-    if (!response.ok) throw new Error(`${response.status} ${response.statusText} for ${path}`);
-    return response.arrayBuffer();
-  });
+  const request = fetchModelBytes(assetUrl(path));
   request.catch(() => {});
   return request;
 }
