@@ -2651,6 +2651,30 @@
       "uv": true
     },
     {
+      "name": "LeftDoorGasketH_5.49",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "LeftDoorGasketH_1.03",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "LeftDoorGasketV_-0.84",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "LeftDoorGasketV_0.84",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
       "name": "LeftDoorHandle",
       "triangles": 108,
       "nonmanifoldEdges": 0,
@@ -2699,6 +2723,30 @@
       "uv": true
     },
     {
+      "name": "RightDoorGasketH_5.49",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "RightDoorGasketH_1.03",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "RightDoorGasketV_-0.84",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
+      "name": "RightDoorGasketV_0.84",
+      "triangles": 44,
+      "nonmanifoldEdges": 0,
+      "uv": true
+    },
+    {
       "name": "RightDoorHandle",
       "triangles": 108,
       "nonmanifoldEdges": 0,
@@ -2729,6 +2777,6 @@
       6.5
     ]
   },
-  "triangles": 17572,
-  "glbBytes": 428884
+  "triangles": 17924,
+  "glbBytes": 459900
 }

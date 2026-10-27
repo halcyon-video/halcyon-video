@@ -38,6 +38,7 @@ m_cabinet = make_mat('CoolerCabinet', (0.65, 0.025, 0.035), 0.27, metal=0.15)
 m_interior = make_mat('CoolerInteriorWhite', (0.48, 0.51, 0.52), 0.60)
 m_grille = make_mat('CoolerGrilleDark', (0.05, 0.05, 0.06), 0.70, metal=0.50)
 m_frame = make_mat('CoolerDoorFrame', (0.018, 0.020, 0.023), 0.36, metal=0.25)
+m_gasket = make_mat('CoolerDoorGasket', (0.012, 0.012, 0.014), 0.85)
 m_handle = make_mat('CoolerHandleMetal', (0.022, 0.024, 0.026), 0.39, metal=0.20)
 m_glass = make_mat('CoolerGlass', (0.85, 0.93, 0.95), 0.05, alpha=0.15)
 m_wire = make_mat('CoolerWireShelf', (0.88, 0.90, 0.92), 0.25, metal=0.40)
@@ -209,6 +210,12 @@ for d_side, cx in [('Left', -0.95), ('Right', 0.95)]:
     box(f'{d_side}DoorFrameRight', (cx + 0.91, -1.13, 3.26), (0.11, 0.085, 4.52), m_frame, bevel=0.002)
     # Double-pane glass panel
     box(f'{d_side}DoorGlass', (cx, -1.13, 3.26), (1.76, 0.02, 4.52), m_glass, bevel=0.001)
+
+    # Magnetic gasket: dark rubber strips seated in the recess just inside the frame opening
+    for gz, gl in [(5.49, 1.70), (1.03, 1.70)]:
+        box(f'{d_side}DoorGasketH_{gz}', (cx, -1.105, gz), (gl, 0.035, 0.05), m_gasket, bevel=0.001)
+    for gx in (-0.84, 0.84):
+        box(f'{d_side}DoorGasketV_{gx}', (cx + gx, -1.105, 3.26), (0.05, 0.035, 4.42), m_gasket, bevel=0.001)
 
     # Vertical full-length metal handle
     hx = cx + (0.75 if d_side == 'Left' else -0.75)
