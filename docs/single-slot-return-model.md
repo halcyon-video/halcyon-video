@@ -5,21 +5,20 @@ A hollow blue laminate saddle caps the return counter: a lettered front panel
 hanging almost to the floor, a quarter-round crown over the counter top, side
 cheeks the full depth of the band, and a short clip over the staff-side band
 top. One opening a little bigger than a VHS case sits below the lettering, with
-a tapered pale-metal throat behind it that ends on a dark baffle, and a pale
-label plate beneath. There is no flap; the drop ritual slides each case through
+a tapered pale-metal throat behind it that ends on a dark baffle. Nothing pale sits
+below it (the reference's lower label plate is omitted on the owner's ruling, GH #405). There is no flap; the drop ritual slides each case through
 the open throat and it vanishes behind the baffle.
 
 ## Contract and provenance
 
 Feet, ground origin, width along X, front toward local +Z, counter band face at
 Z 0. Blender coordinates are `(x, -store_z, height)` and export directly to
-Three.js Y-up. Bounds: X ±1.35, Y 0.35–3.90, Z −1.49–0.345333. The face stands
+Three.js Y-up. Bounds: X ±1.35, Y 0.35–3.90, Z −1.49–0.337333. The face stands
 at Z 1/3 like the chute, so both styles share the entrance anchors in
 `src/entrance/index.ts` and the clerk nav footprint formula. The opening is
 1.0 × 0.62 ft centred at (0, 2.41, 1/3); the throat narrows to 0.78 × 0.42 ft
 at Z 0.06; the baffle sits at Z 0.03–0.05. The crown roll is 0.33 ft; the skin
-is 0.14 ft; the rear clip runs Y 2.55–3.47 at Z −1.49. The lower plate is
-1.12 × 0.73 ft at Y 1.22–1.95.
+is 0.14 ft; the rear clip runs Y 2.55–3.47 at Z −1.49.
 
 Proportions were read as fractions of the housing face off the owner-held
 close-up (reference record `lenneth-tape-return-20261012`, circa 2000 by the
@@ -44,7 +43,7 @@ measured 0.28 ft rather than squeezing the letters).
 
 Run Blender with an absolute script path and `-b -t 2 -P`. Material roles are
 the chute's: `ChuteLaminate` (recoloured to the theme's counter blue at
-runtime), `ChuteSteel` (throat, plate), `ChuteReveal` (baffle), with the same
+runtime), `ChuteSteel` (throat), `ChuteReveal` (baffle), with the same
 packed fine-grain normal and roughness images.
 
 ## Integration

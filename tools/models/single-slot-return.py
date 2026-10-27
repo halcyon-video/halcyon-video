@@ -1,9 +1,9 @@
 """Single-slot tape-return housing (issue #403): a hollow blue saddle that caps the
-return counter, with one recessed opening and a lower label plate. Same runtime
+return counter, with one recessed opening. Same runtime
 envelope conventions as interior-return-chute.py: feet, ground origin, width
 along X, customer face toward local +Z, counter band face at Z 0.
 Run: blender -b -t 2 -P /absolute/path/to/tools/models/single-slot-return.py
-No reference artwork included; the runtime paints both labels in a bundled face.
+No reference artwork included; the runtime paints the lettering in a bundled face.
 """
 import bpy, bmesh, json, math
 import numpy as np
@@ -92,11 +92,9 @@ slab('Right throat wall',[(MOUTH_W/2,MOUTH_Y0,F),(MOUTH_W/2,MOUTH_Y1,F),(IX,IY1,
 # Dark baffle masks the counter band behind the throat; the dropped case
 # vanishes behind it.
 box('Rear light baffle',-IX-.03,IX+.03,IY0-.03,IY1+.03,.03,.05,dark,.002)
-# Lower label plate: a pale metal plate below the opening; the runtime letters it.
-box('Lower label plate',-.56,.56,1.22,1.95,FACE,FACE+.012,metal,.003)
 scene=bpy.context.scene; scene.unit_settings.system='IMPERIAL'; scene.unit_settings.scale_length=.3048
 scene['provenance']='Original scripted construction proportioned off the owner-held tape-return close-up (reference record lenneth-tape-return-20261012); no photo pixels or chain marks embedded. Runtime paints the lettering.'
-scene['dimensions_ft']='2.7 W x 3.9 H x 1.835 D; rear -1.49, face .333; single mouth (0,2.41,.333) 1.0 x .62'
+scene['dimensions_ft']='2.7 W x 3.9 H x 1.827 D; rear -1.49, face .333; single mouth (0,2.41,.333) 1.0 x .62'
 scene['moving_parts']='none; the drop ritual slides the case through the open throat'
 for o in parts:
  bm=bmesh.new(); bm.from_mesh(o.data); assert all(e.is_manifold for e in bm.edges),o.name; bm.free()

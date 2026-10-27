@@ -4,19 +4,20 @@
 // almost to the floor, a rolled crown over the counter top, side cheeks and
 // a short clip over the staff-side band top. One opening a little bigger
 // than a VHS case sits below the "TAPE RETURN" lettering, with a tapered
-// pale-metal throat behind it and a smaller lettered plate beneath. The
+// pale-metal throat behind it and nothing pale beneath (the close-up's lower
+// label plate is left off on the owner's ruling, GH #405: one slot only). The
 // proportions are read off the owner's close-up (reference record
 // lenneth-tape-return-20261012, circa 2000 by the owner's estimate): the
 // face is ~0.78 as wide as it is tall, the opening sits a third of the way
-// down and spans ~0.4 of the width, the lower label sits 0.55–0.76 down.
+// down and spans ~0.4 of the width.
 // The photo's decal on the crown carries a chain mark, so it stays off.
 //
 // Same local frame as return-slot.ts: housing centred on x=0, customer face
 // toward +Z, the counter band's outer face at z=0 and its inner face at
 // z=-1.5. ReturnSlot owns the group, materials, drop ritual and disposal;
-// this module only grows the fallback geometry and paints the two labels.
+// this module only grows the fallback geometry and paints the lettering.
 // The fitted GLB (tools/models/single-slot-return.py) replaces the boxes
-// when it arrives; the painted labels stay on top of either.
+// when it arrives; the painted lettering stays on top of either.
 import * as THREE from 'three';
 import { BB_ARCHIVO_BLACK, ensureBundledFont } from '../bundled-fonts';
 import type { ReturnSlotModelSpec } from './return-slot-model';
@@ -30,7 +31,6 @@ const ROLL = 0.33;               // quarter-round crown along the top-front edge
 const REAR = -1.49;              // tucks to the band's inner face, as the chute
 const CLIP_Y = 2.55;             // the staff-side leg stops here
 export const MOUTH_W = 1.0, MOUTH_H = 0.62, MOUTH_Y = 2.41;
-const LABEL_Y0 = 1.22, LABEL_Y1 = 1.95, LABEL_HALF_W = 0.56;
 const LETTER_Y = 3.08;           // main lettering centre line
 const LETTER_INK_W = 2.08;       // "TAPE RETURN" ink run across the face
 
@@ -90,15 +90,11 @@ export function buildSingleSlotHousing(kit: HousingKit, goldHex: string): THREE.
   box(MOUTH_W, LINER, throatD, 0, mouthBot + LINER / 2, zFace - throatD / 2, metalMat, false);
   for (const sx of [-1, 1]) box(LINER, MOUTH_H, throatD, sx * (MOUTH_W - LINER) / 2, MOUTH_Y, zFace - throatD / 2, metalMat, false);
   box(MOUTH_W, MOUTH_H, 0.02, 0, MOUTH_Y, 0.04, darkMat, false);
-  // Lower label plate.
-  box(LABEL_HALF_W * 2, LABEL_Y1 - LABEL_Y0, 0.012, 0, (LABEL_Y0 + LABEL_Y1) / 2, zFace + 0.006, metalMat, false);
   const fallback = [...kit.group.children];
 
-  // "TAPE RETURN" across the face, theme gold on body blue; a smaller repeat
-  // on the pale plate below the opening. Both in the bundled black grotesque,
-  // sized by the measured ink run — never squeezed to fit.
+  // "TAPE RETURN" across the face, theme gold on body blue, in the bundled
+  // black grotesque sized by the measured ink run — never squeezed to fit.
   paintLabel(kit, goldHex, 'Single slot lettering', 2.4, 0.6, LETTER_INK_W, 0, LETTER_Y, zFace + 0.004);
-  paintLabel(kit, goldHex, 'Single slot plate lettering', LABEL_HALF_W * 2, LABEL_Y1 - LABEL_Y0, 0.82, 0, (LABEL_Y0 + LABEL_Y1) / 2, zFace + 0.016);
   return fallback;
 }
 

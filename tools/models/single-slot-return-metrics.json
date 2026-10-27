@@ -1,5 +1,5 @@
 {
-  "triangles": 1268,
+  "triangles": 1160,
   "draws": 3,
   "materials": 3,
   "images": 2,
@@ -7,6 +7,6 @@
     256,
     256
   ],
-  "glb_bytes": 258740,
-  "source_parts": 7
+  "glb_bytes": 251176,
+  "source_parts": 6
 }

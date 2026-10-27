@@ -95,7 +95,7 @@ test('outside return ramp descends through the countertop into an enclosed cabin
   assert.ok(front.intersectObject(scene,true).length,'cabinet below the opening remains enclosed');
 });
 
-test('single-slot housing: fitted saddle, one open throat, baffle depth and label plate', async () => {
+test('single-slot housing: fitted saddle, one open throat, baffle depth and no lower plate', async () => {
   const bytes = readFileSync(new URL('../public/models/single-slot-return.glb', import.meta.url));
   const jsonLength = bytes.readUInt32LE(12);
   const gltf = JSON.parse(bytes.subarray(20, 20 + jsonLength).toString());
@@ -105,7 +105,7 @@ test('single-slot housing: fitted saddle, one open throat, baffle depth and labe
     assert.ok(m.pbrMetallicRoughness.metallicRoughnessTexture);
     const [red, green, blue] = m.pbrMetallicRoughness.baseColorFactor;
     if (m.name === 'ChuteLaminate') assert.ok(blue > red * 3 && blue > green * 3, 'housing retains blue laminate');
-    if (m.name === 'ChuteSteel') assert.ok(Math.min(red, green, blue) > .8, 'throat and plate are pale metal');
+    if (m.name === 'ChuteSteel') assert.ok(Math.min(red, green, blue) > .8, 'throat is pale metal');
     delete m.normalTexture;
     delete m.pbrMetallicRoughness.metallicRoughnessTexture;
   }
@@ -120,7 +120,7 @@ test('single-slot housing: fitted saddle, one open throat, baffle depth and labe
   scene.updateMatrixWorld(true);
   const b = new THREE.Box3().setFromObject(scene);
   assert.ok(b.min.distanceTo(new THREE.Vector3(-1.35, .35, -1.49)) < .001);
-  assert.ok(b.max.distanceTo(new THREE.Vector3(1.35, 3.9, .345333)) < .001);
+  assert.ok(b.max.distanceTo(new THREE.Vector3(1.35, 3.9, .337333)) < .001);
   let triangles = 0; const roles = new Set<string>();
   scene.traverse(o => {
     if (!(o instanceof THREE.Mesh)) return;
@@ -141,8 +141,8 @@ test('single-slot housing: fitted saddle, one open throat, baffle depth and labe
   }
   const throat = new THREE.Raycaster(new THREE.Vector3(0, 2.41, .2), new THREE.Vector3(0, -1, 0)).intersectObject(scene, true);
   assert.ok(throat.length && throat[0].object.name === 'ChuteSteel' && throat[0].point.y > 2.10, 'tapered steel floor rises into the recess');
-  const plate = new THREE.Raycaster(new THREE.Vector3(0, 1.58, 1), new THREE.Vector3(0, 0, -1)).intersectObject(scene, true);
-  assert.ok(plate.length && plate[0].object.name === 'ChuteSteel' && plate[0].point.z > 1 / 3, 'lower label plate stands proud of the face');
+  const below = new THREE.Raycaster(new THREE.Vector3(0, 1.58, 1), new THREE.Vector3(0, 0, -1)).intersectObject(scene, true);
+  assert.ok(below.length && below[0].object.name === 'ChuteLaminate' && Math.abs(below[0].point.z - 1 / 3) < .001, 'nothing pale stands proud of the face below the opening');
   const roof = new THREE.Raycaster(new THREE.Vector3(0, 4.3, -.8), new THREE.Vector3(0, -1, 0), 0, 1).intersectObject(scene, true);
   assert.ok(roof.length && Math.abs(roof[0].point.y - 3.9) < .01, 'crown covers the counter top');
   const roll = .33, diagonal = roll / Math.sqrt(2);
