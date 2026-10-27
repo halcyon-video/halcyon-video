@@ -11,7 +11,7 @@ import type { Movie } from './jellyfin';
 // module evaluation, from localStorage — which is why every constant below can
 // derive from it and still be a plain `const`. See that module's header for
 // why switching format is a reload rather than a scene rebuild.
-import { activeStoreFormat, type CounterShape } from './store-format.ts';
+import { activeStoreFormat, type CounterShape, type ReturnStationStyle } from './store-format.ts';
 import { facadeEntryGlazing, facadeStyle } from './storefront-architecture.ts';
 import type { WindowBay } from './storefront-window-layout.ts';
 
@@ -135,6 +135,11 @@ export interface StorefrontSpec {
   // FOOTPRINT, so counterStructureFootprints() in store-fixtures-config.ts
   // must stay in sync with counter.ts for both shapes.
   counterShape: CounterShape;
+  // Tape-return station on the counter (GH #403): the two-mouth "RETURN TAPES
+  // HERE" chute, or the single-opening "TAPE RETURN" saddle housing. Chosen
+  // beside the counter shape — the Storefront presets below — never on its
+  // own settings row. Tape eras only; the DVD-era store builds neither.
+  returnStation: ReturnStationStyle;
   // Era-specific front of store (GH #388): 'angular' builds the 2000/2010
   // bulkhead over the cash wrap and the tiled zone beneath it. Set from the
   // active theme by store-shell; absent means the classic front.
@@ -250,6 +255,7 @@ export function getStorefrontSpec(storeWidth: number): StorefrontSpec {
       counterStyle: 'rounded-2000s',
       counterTop: 'speckled',
       counterShape: 'shield',
+      returnStation: 'return-tapes-here',
       entryStyle: 'vestibule',
     };
   }
@@ -262,7 +268,23 @@ export function getStorefrontSpec(storeWidth: number): StorefrontSpec {
       counterStyle: 'laminate-90s',
       counterTop: 'white',
       counterShape: 'usquare',
+      returnStation: 'return-tapes-here',
       entryStyle: 'vestibule',
+    };
+  }
+  // The standard storefront with the single-slot return housing (GH #403) on
+  // its counter instead of the two-mouth chute.
+  if (preset === 'single-slot-return') {
+    return {
+      doorStyle: FORMAT.doorStyle,
+      doorWidth: DEFAULT_DOOR_WIDTH,
+      windowBays: defaultWindowBays(storeWidth, DEFAULT_DOOR_WIDTH),
+      frameColor: '#111111',
+      counterStyle: 'laminate-90s',
+      counterTop: FORMAT.counterShape === 'desk' ? 'woodgrain' : 'white',
+      counterShape: FORMAT.counterShape,
+      returnStation: 'single-slot',
+      entryStyle: FORMAT.entryStyle,
     };
   }
   // The unnamed 'standard' storefront IS the active format's own storefront:
@@ -278,6 +300,7 @@ export function getStorefrontSpec(storeWidth: number): StorefrontSpec {
     counterStyle: 'laminate-90s',
     counterTop: FORMAT.counterShape === 'desk' ? 'woodgrain' : 'white',
     counterShape: FORMAT.counterShape,
+    returnStation: FORMAT.returnStation,
     entryStyle: FORMAT.entryStyle,
   };
 }

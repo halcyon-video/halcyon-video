@@ -822,7 +822,9 @@ export class EntranceCheckout implements StoreFixture {
     // of it was wider than the desk was deep (GH #112). Every consumer of the
     // return ritual already guards on hasReturnSlot(), because the 2010 store
     // has had none since the theme shipped; tapes still come back, they just
-    // come back without the drop animation.
+    // come back without the drop animation. Which STATION stands there —
+    // the two-mouth chute or the single-slot housing (GH #403) — is the
+    // storefront's returnStation; both take the same anchor and face.
     const chuteTheme = getActiveTheme();
     if (chuteTheme.defaultMedium === 'vhs' && activeStoreFormat().counterDressing) {
       const zBackC = backZ - 0.1; // counter.ts's band outline datum
@@ -862,7 +864,7 @@ export class EntranceCheckout implements StoreFixture {
         const tl = Math.hypot(bx - ax, bz - az);
         faceYaw = Math.atan2((bz - az) / tl, -(bx - ax) / tl);
       }
-      this.returnSlot = new ReturnSlot(this.ctx, group, anchor, faceYaw);
+      this.returnSlot = new ReturnSlot(this.ctx, group, anchor, faceYaw, spec.returnStation);
       this.clerkNavInfo.footprints.push(this.returnSlot.getFootprint());
     }
 

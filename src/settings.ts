@@ -720,10 +720,13 @@ export function registerCoreSettings(): void {
       { id: 'standard', label: 'Standard' },
       { id: 'rounded-counter', label: 'Rounded Counter' },
       { id: 'usquare-counter', label: 'Half-Square Counter' },
+      // The tape-return station rides with the counter (GH #403): the first
+      // three carry the "Return tapes here" chute, this one the single slot.
+      { id: 'single-slot-return', label: 'Single Slot Return' },
     ],
     default: 'standard',
     applyMode: 'rebuild-scene',
-    hint: 'Doors, storefront window framing, and counter style.',
+    hint: 'Doors, storefront window framing, counter style and its tape return: Return tapes here, or Single slot.',
     subpage: 'Building & Storefront',
   });
 
