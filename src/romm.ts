@@ -23,6 +23,7 @@ import { operatorDefault } from './operator-defaults';
 import { isGamesOnly } from './games-only';
 import { isPlatformEnabled } from './game-platforms';
 import { fetchGamesFromSnapshot } from './games-snapshot';
+import { pickShelfStock, stockVisitSeed } from './romm-stock';
 
 /** True inside the Tauri desktop shell (no vite dev middleware there). */
 function inTauriShell(): boolean {
@@ -54,12 +55,14 @@ const GAME_SECTION_CAP = 384;
 // (96 = one full unit). The actual per-platform request size is an even split
 // of the section cap across enabled platforms, computed in fetchGames().
 const PER_PLATFORM_CAP = 96;
-// How many roms to REQUEST per platform (name order — the only order_by every
-// Romm version supports). Larger than the shelf budget on purpose: the shelf
-// keeps the top-RATED slice, and rating can't be ordered server-side, so an
-// alphabetical fetch capped at the shelf size would shelve "the first N by
-// name" instead of the platform's most popular games.
-const PER_PLATFORM_FETCH = 500;
+// The budgeted department fetches each platform WHOLE (paged, name order — the
+// only order_by every Romm version supports): the shelf keeps the top-RATED
+// slice, and rating can't be ordered server-side, so any fetch cut short by
+// name would shelve "the best of A–C" instead of the platform's best games
+// (GH #406). Page ceiling = 20k roms per platform; later pages get a longer
+// timeout since they only gate the platform's tail, never its first page.
+const STOCK_MAX_PAGES = 10;
+const STOCK_PAGE_TIMEOUT_MS = 60_000;
 // GAMES ONLY (games-only.ts): the games have the whole floor plan, so there is
 // no budget to split — every rom of every platform gets a shelf. The request
 // limit is a sanity ceiling on a single response, not a shelf budget; a
@@ -433,8 +436,7 @@ function generateMockGames(wholeLibrary = false): Movie[] {
 /**
  * Every rom of one platform, in fs_name order, paged so a platform bigger than
  * a single response still comes back whole. Only games-only mode asks for this
- * — the department's budgeted mode takes one PER_PLATFORM_FETCH page and ranks
- * it. Stops on the first short page, which is also what a `total` we can't
+ * — the department's budgeted mode uses fetchPlatformStock and ranks it. Stops on the first short page, which is also what a `total` we can't
  * trust (see the order_by=name note below) degrades to safely.
  */
 async function fetchAllPlatformRoms(config: RommConfig, platformId: number): Promise<any[]> {
@@ -452,6 +454,38 @@ async function fetchAllPlatformRoms(config: RommConfig, platformId: number): Pro
   }
 }
 
+/**
+ * The budgeted department's per-platform list (GH #406): the whole platform,
+ * so ranking and the unrated spread see every title rather than the first
+ * alphabetical slice. A platform that fits one page costs exactly one request,
+ * as before. A larger one pages on in sequence; if a later page fails or the
+ * ceiling is hit, the roms gathered so far are used rather than losing the
+ * platform — the boot-critical path keeps its normal request timeout.
+ */
+async function fetchPlatformStock(config: RommConfig, platformId: number): Promise<any[]> {
+  const items: any[] = [];
+  for (let page = 0; page < STOCK_MAX_PAGES; page++) {
+    const offset = page * FULL_LIBRARY_PAGE;
+    let batch: any[];
+    try {
+      const data = await rommRequest(
+        config,
+        `/api/roms?platform_ids=${platformId}&limit=${FULL_LIBRARY_PAGE}&offset=${offset}` +
+          '&order_by=fs_name&order_dir=asc',
+        page === 0 ? REQUEST_TIMEOUT_MS : STOCK_PAGE_TIMEOUT_MS
+      );
+      batch = Array.isArray(data?.items) ? data.items : Array.isArray(data) ? data : [];
+    } catch (e) {
+      if (page === 0) throw e;
+      console.warn(`[Romm] Platform ${platformId}: page ${page + 1} failed, ranking the ${items.length} roms fetched so far`, e);
+      return items;
+    }
+    items.push(...batch);
+    if (batch.length < FULL_LIBRARY_PAGE) break;
+  }
+  return items;
+}
+
 export async function fetchGames(): Promise<Movie[]> {
   // GAMES ONLY: the games own the floor plan, so the shelf budget and the
   // per-platform toggles both step aside — "every one in the Romm library"
@@ -466,6 +500,7 @@ export async function fetchGames(): Promise<Movie[]> {
   const games: Movie[] = [];
   const seenRomIds = new Set<number | string>();
   const sectionCap = wholeLibrary ? Infinity : GAME_SECTION_CAP;
+  const visitSeed = stockVisitSeed();
   const failed: string[] = [];
 
   try {
@@ -513,10 +548,7 @@ export async function fetchGames(): Promise<Movie[]> {
       platforms.map((platform) =>
         wholeLibrary
           ? fetchAllPlatformRoms(config, platform.id)
-          : rommRequest(
-              config,
-              `/api/roms?platform_ids=${platform.id}&limit=${PER_PLATFORM_FETCH}&order_by=fs_name&order_dir=asc`
-            )
+          : fetchPlatformStock(config, platform.id)
       )
     );
 
@@ -534,15 +566,12 @@ export async function fetchGames(): Promise<Movie[]> {
         console.warn(`[Romm] Failed to fetch games for platform ${platform.name}:`, result.reason);
         continue;
       }
-      const data = result.value;
-      const items: any[] = Array.isArray(data?.items)
-        ? data.items
-        : Array.isArray(data)
-        ? data
-        : [];
-      // Keep this platform's TOP-RATED slice of the (alphabetical, oversized)
-      // fetch — the shelf should carry each platform's most popular games,
-      // and Romm can't order by rating server-side.
+      const items: any[] = result.value;
+      // Keep this platform's TOP-RATED slice of its WHOLE list (fetched in
+      // pages — see fetchPlatformStock) — the shelf should carry each
+      // platform's most popular games, and Romm can't order by rating
+      // server-side. Unrated roms fill the rest as a seeded spread across the
+      // alphabet (romm-stock.ts, GH #406).
       const valid = items.filter((rom) => {
         const id = rom.id;
         const title = rom.name || rom.fs_name_no_ext || rom.fs_name;
@@ -561,8 +590,8 @@ export async function fetchGames(): Promise<Movie[]> {
         seenRomIds.add(id);
         return true;
       });
-      valid.sort((a, b) => (b.rating || 0) - (a.rating || 0));
-      for (const rom of valid.slice(0, perPlatform)) {
+      const stock = wholeLibrary ? valid.sort((a, b) => (b.rating || 0) - (a.rating || 0)) : pickShelfStock(valid, perPlatform, visitSeed);
+      for (const rom of stock) {
         if (games.length >= sectionCap) break;
         const id = rom.id;
         const title: string = rom.name || rom.fs_name_no_ext || rom.fs_name;
