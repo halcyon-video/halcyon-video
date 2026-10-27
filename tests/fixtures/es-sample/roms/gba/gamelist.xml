@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<gameList>
+  <game>
+    <path>./Metroid_Fusion.gba</path>
+    <name>Metroid Fusion</name>
+    <releasedate>20020917T000000</releasedate>
+    <rating>0.9</rating>
+  </game>
+  <game>
+    <path>./Advance_Wars.gba</path>
+    <name>Advance Wars</name>
+    <releasedate>20010910T000000</releasedate>
+    <rating>0.85</rating>
+  </game>
+  <game>
+    <path>./Pokemon_Emerald.gba</path>
+    <name>Pokemon Emerald</name>
+    <releasedate>20041001T000000</releasedate>
+  </game>
+</gameList>

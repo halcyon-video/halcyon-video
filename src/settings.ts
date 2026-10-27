@@ -1286,7 +1286,7 @@ export function registerCoreSettings(): void {
     group: 'Video Games',
     default: false,
     applyMode: 'reload',
-    hint: 'Adds a Video Games shelf stocked from Romm (or demo).',
+    hint: 'Adds a Video Games shelf stocked from Romm, Steam, an EmulationStation folder (or demo).',
   });
 
   registerSetting({ key: 'bb_steam_review_tier', label: 'Steam review tier', kind: 'cycle', group: 'Video Games', default: 'all',
@@ -1328,7 +1328,7 @@ export function registerCoreSettings(): void {
     group: 'Video Games',
     default: false,
     applyMode: 'rebuild-scene',
-    hint: 'The whole store becomes the game store — every game in your Romm library, no movies.',
+    hint: 'The whole store becomes the game store — every game in your connected library, no movies.',
     visibleWhen: gamesOn,
   });
 

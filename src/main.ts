@@ -5,6 +5,8 @@ import { mobileStoreActive } from './mobile-store';
 import { beginMobileEraChoice, finishMobileEraChoice } from './mobile-era-choice';
 import { isRequestTitle } from './request-title';
 import { buildSteamControls } from './steam-settings';
+import { buildEsControls } from './es-settings';
+import { esConfigured, loadEsGames } from './es-library';
 import { loadSteamGames } from './providers/steam-provider';
 import { isExternalGameActive, onExternalGameChange } from './external-game-state.ts';
 import { playSteamGame } from './steam-playback';
@@ -621,11 +623,14 @@ async function loadGameMovies(): Promise<void> {
   const steamEnabled = localStorage.getItem('steam_enabled') === '1';
   // Both optional sources own their timeouts. Steam review scanning can take
   // longer than the small Romm department and reports its progress in settings.
-  const [romm, steam] = await Promise.allSettled([
-    !getRommConfig() && (steamEnabled || localStorage.getItem('steam_configured') === '1') ? Promise.resolve([] as Movie[]) : fetchGames(),
+  // A chosen EmulationStation folder is a real library too, so it displaces the
+  // bundled demo titles exactly as a connected Steam account does.
+  const [romm, steam, es] = await Promise.allSettled([
+    !getRommConfig() && (steamEnabled || esConfigured() || localStorage.getItem('steam_configured') === '1') ? Promise.resolve([] as Movie[]) : fetchGames(),
     loadSteamGames(),
+    loadEsGames(),
   ]);
-  gameMovies = [...(romm.status === 'fulfilled' ? romm.value : []), ...(steam.status === 'fulfilled' ? steam.value : [])];
+  gameMovies = [...(romm.status === 'fulfilled' ? romm.value : []), ...(steam.status === 'fulfilled' ? steam.value : []), ...(es.status === 'fulfilled' ? es.value : [])];
   if (romm.status === 'rejected') logToConsole('[System] Romm could not refresh its games.', 'system');
   if (steam.status === 'rejected') logToConsole('[System] Steam needs attention in Video Games settings.', 'system');
   logToConsole(`[System] Video games: ${gameMovies.length} titles loaded.`, 'system');
@@ -1289,6 +1294,11 @@ function generateSettingsDrawer() {
       }
     };
     if (settingsPage === 'Video Games' && settingsSubpage === null) buildSteamControls(groupEl, {
+      registerRow: (key) => { settingsRowKeys.push(key); return settingsRowKeys.length - 1; },
+      selectRow: setSettingsSelection,
+      dirty: () => { settingsPendingGameRefetch = true; settingsPendingRebuild = true; refreshSettingsValues(); updateSettingsStatus(); },
+    });
+    if (settingsPage === 'Video Games' && settingsSubpage === null) buildEsControls(groupEl, {
       registerRow: (key) => { settingsRowKeys.push(key); return settingsRowKeys.length - 1; },
       selectRow: setSettingsSelection,
       dirty: () => { settingsPendingGameRefetch = true; settingsPendingRebuild = true; refreshSettingsValues(); updateSettingsStatus(); },

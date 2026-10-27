@@ -1,0 +1,60 @@
+<?xml version="1.0"?>
+<gameList>
+  <game>
+    <path>./Final_Fantasy_VII.cue</path>
+    <name>Final Fantasy VII</name>
+    <image>./media/images/Final_Fantasy_VII-mix.png</image>
+    <thumbnail>./media/images/Final_Fantasy_VII-box.png</thumbnail>
+    <releasedate>19970131T000000</releasedate>
+    <developer>Square</developer>
+    <genre>RPG</genre>
+    <players>1</players>
+    <rating>0.98</rating>
+    <playcount>30</playcount>
+  </game>
+  <game>
+    <path>./Metal_Gear_Solid.cue</path>
+    <name>Metal Gear Solid</name>
+    <image>./media/images/Metal_Gear_Solid-mix.png</image>
+    <thumbnail>./media/images/Metal_Gear_Solid-box.png</thumbnail>
+    <releasedate>19981021T000000</releasedate>
+    <developer>Konami</developer>
+    <genre>Stealth</genre>
+    <players>1</players>
+    <rating>0.96</rating>
+    <playcount>18</playcount>
+  </game>
+  <game>
+    <path>./Crash_Bandicoot.cue</path>
+    <name>Crash Bandicoot</name>
+    <image>./media/images/Crash_Bandicoot-mix.png</image>
+    <thumbnail>./media/images/Crash_Bandicoot-box.png</thumbnail>
+    <releasedate>19960831T000000</releasedate>
+    <developer>Naughty Dog</developer>
+    <genre>Platformer</genre>
+    <players>1</players>
+    <rating>0.8</rating>
+  </game>
+  <game>
+    <path>./Gran_Turismo.cue</path>
+    <name>Gran Turismo</name>
+    <image>./media/images/Gran_Turismo-mix.png</image>
+    <thumbnail>./media/images/Gran_Turismo-box.png</thumbnail>
+    <releasedate>19971223T000000</releasedate>
+    <developer>Polyphony</developer>
+    <genre>Racing</genre>
+    <players>1-2</players>
+  </game>
+  <game>
+    <path>./Resident_Evil_2.cue</path>
+    <name>Resident Evil 2</name>
+    <image>./media/images/Resident_Evil_2-mix.png</image>
+    <thumbnail>./media/images/Resident_Evil_2-box.png</thumbnail>
+    <releasedate>19980121T000000</releasedate>
+    <developer>Capcom</developer>
+    <genre>Survival Horror</genre>
+    <players>1</players>
+    <rating>0.9</rating>
+    <playcount>7</playcount>
+  </game>
+</gameList>
