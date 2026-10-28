@@ -25,8 +25,16 @@
 // diegetic beat, fully non-blocking, with a plastic clatter-thunk as each
 // case is swallowed. Event-time work allocates freely; update() is
 // allocation-free (scratch objects only).
+//
+// A second STYLE (GH #403, 'single-slot') swaps the two-mouth chute for the
+// saddle housing in return-housing.ts: same anchor, same group, same drop
+// ritual — only the geometry, the labels and the mouth the ritual aims at
+// change. StorefrontSpec.returnStation picks the style; the chute stays the
+// default everywhere.
 import * as THREE from 'three';
-import { installReturnSlotModel } from './return-slot-model';
+import { INTERIOR_CHUTE_MODEL, installReturnSlotModel } from './return-slot-model';
+import { buildSingleSlotHousing, HOUSING_FACE, HOUSING_W, MOUTH_Y, SINGLE_SLOT_MODEL } from './return-housing';
+import type { ReturnStationStyle } from '../store-format';
 import type { Movie } from '../jellyfin';
 import { FixtureContext } from '../fixtures';
 import { getActiveTheme } from '../themes';
@@ -132,14 +140,22 @@ export class ReturnSlot {
   private ownedTex: THREE.Texture[] = [];
   private letterTex: THREE.CanvasTexture | null = null;
 
-  // Local mouth position — the drop choreography anchors off this.
-  private readonly mouthLocal = new THREE.Vector3(SLOT_X, SLOT_Y, CHUTE_D);
+  // Local mouth position — the drop choreography anchors off this. The chute
+  // aims at its left mouth; the single slot at its one centred opening.
+  private readonly mouthLocal: THREE.Vector3;
+  private readonly bodyW: number;
 
   // Scratch — update() allocates nothing.
   private readonly _p = new THREE.Vector3();
 
-  constructor(private ctx: FixtureContext, parent: THREE.Group, anchor: { x: number; z: number }, faceYaw: number) {
-    this.group.name = 'interior-return-chute';
+  constructor(
+    private ctx: FixtureContext, parent: THREE.Group, anchor: { x: number; z: number }, faceYaw: number,
+    style: ReturnStationStyle = 'return-tapes-here',
+  ) {
+    const single = style === 'single-slot';
+    this.mouthLocal = single ? new THREE.Vector3(0, MOUTH_Y, HOUSING_FACE) : new THREE.Vector3(SLOT_X, SLOT_Y, CHUTE_D);
+    this.bodyW = single ? HOUSING_W : CHUTE_W;
+    this.group.name = single ? 'single-slot-return' : 'interior-return-chute';
     parent.add(this.group);
     this.group.position.set(anchor.x, 0, anchor.z);
     this.group.rotation.y = faceYaw;
@@ -169,7 +185,10 @@ export class ReturnSlot {
     });
     const whiteMat = new THREE.MeshStandardMaterial({ color: 0xf4f4f0, roughness: 0.45, metalness: 0.0 });
     const darkMat = new THREE.MeshStandardMaterial({ color: 0x05070c, roughness: 0.95, metalness: 0.0 });
-    this.ownedMats.push(blueMat, whiteMat, darkMat);
+    // Brushed-metal slot frame (the footage flap unit reads stainless, not
+    // white trim); the single slot's throat liner and label plate share it.
+    const metalMat = new THREE.MeshStandardMaterial({ color: 0xf4f4f0, roughness: 0.45, metalness: 0 });
+    this.ownedMats.push(blueMat, whiteMat, darkMat, metalMat);
 
     // Rear a hair in FRONT of the band's inner face: flush to the eye, but
     // never coplanar with the band mesh (which would z-fight over the strip of
@@ -189,6 +208,18 @@ export class ReturnSlot {
       return m;
     };
 
+    if (single) {
+      const fallback = buildSingleSlotHousing({
+        group: this.group, box, blueMat, metalMat, darkMat,
+        ownGeometry: (g) => { this.ownedGeoms.push(g); },
+        ownMaterial: (m) => { this.ownedMats.push(m); },
+        ownTexture: (t) => { this.ownedTex.push(t); },
+        requestRender: () => ctx.requestRender(),
+      }, goldHex);
+      this.model = installReturnSlotModel(ctx, this.group, fallback, blueHex, SINGLE_SLOT_MODEL);
+      return;
+    }
+
     const slotBot = SLOT_Y - SLOT_H / 2;
     const slotTop = SLOT_Y + SLOT_H / 2;
     const faceZ = zFace - FRONT_T / 2;
@@ -205,10 +236,7 @@ export class ReturnSlot {
       [SLOT_X+SLOT_W/2,-SLOT_X-SLOT_W/2],[-SLOT_X+SLOT_W/2,CHUTE_W/2]]) {
       box(hi-lo,SLOT_H,FRONT_T,(lo+hi)/2,SLOT_Y,faceZ,blueMat);
     }
-    // Brushed-metal slot frame (the footage flap unit reads stainless, not
-    // white trim) + the flap plate itself resting tilted into the throat.
-    const metalMat = new THREE.MeshStandardMaterial({ color: 0xf4f4f0, roughness: 0.45, metalness: 0 });
-    this.ownedMats.push(metalMat);
+    // Slot frames + the flap plates resting tilted into the throats.
     const LINER = 0.03;
     for (const sx of [SLOT_X,-SLOT_X]) {
     box(SLOT_W, LINER, FRONT_T, sx, slotTop - LINER / 2, faceZ, metalMat, false);
@@ -239,7 +267,7 @@ export class ReturnSlot {
     // "▼ RETURN TAPES HERE ▼" across the top panel, theme gold on body blue.
     const fallback = [...this.group.children];
     this.buildLettering(zFace, slotTop, theme.palette.counterTop, goldHex);
-    this.model = installReturnSlotModel(ctx, this.group, fallback, blueHex);
+    this.model = installReturnSlotModel(ctx, this.group, fallback, blueHex, INTERIOR_CHUTE_MODEL);
     const titles = ctx.libraries.flatMap(l => l.movies).filter(m => !m.discovery && !m.collectionGap && !m.comingSoon).slice(0, 4);
     titles.forEach((movie, index) => {
       const materials = createHeroRentalMaterials(movie).map(m => m.clone()); this.ownedMats.push(...materials);
@@ -260,12 +288,13 @@ export class ReturnSlot {
    * exactly the group's own yaw here.
    */
   getFootprint(): Footprint {
-    const cd = CHUTE_D / 2;
+    const proud = this.mouthLocal.z; // both styles stand their face this far off the band
+    const cd = proud / 2;
     return {
       label: 'structure:return-slot', kind: 'structure',
       cx: this.group.position.x + Math.sin(this.faceYaw) * cd,
       cz: this.group.position.z + Math.cos(this.faceYaw) * cd,
-      w: CHUTE_W, d: CHUTE_D + 0.1,
+      w: this.bodyW, d: proud + 0.1,
       yaw: this.faceYaw,
     };
   }

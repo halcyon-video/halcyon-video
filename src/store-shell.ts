@@ -7,6 +7,8 @@ import quickDrop from './exit-return-spec.json' with { type: 'json' };
 import { installTrofferModels, trofferCeilingGeometry } from './troffer-model.ts';
 import { reelSetting } from './reel-profile';
 import { mobileStoreActive } from './mobile-store';
+import { isPublicDemo } from './demo-mode';
+import { holdModelDownloads } from './model-download-gate';
 import { vestibuleSide, vestibuleLayout, counterDatumShift } from './vestibule-layout.ts';
 import { exitReturnLayout, returnWindowPane } from './exit-return-layout';
 import { RETAIL_FIXTURE_SPECS } from './retail-fixture-specs';
@@ -71,7 +73,9 @@ import { activeStoreFormat } from './store-format';
 import { resolveOverviewVantage } from './scene-shared';
 import { formatCarpetTextures, formatCarpetHex, formatWallTextures, formatWallIsPrefinished, formatShelfWood } from './format-surfaces';
 import { onBrandChange } from './brand-live';
-import { validateLayout, Footprint } from './layout-validator';
+import { validateLayout, Footprint, FLOOR_DISPLAY_CLEARANCE } from './layout-validator';
+import { clearPromoStandsOfShelving } from './promo-stand-clearance';
+import { FLOOR_FIXTURE_MAX_Z as PROMO_FLOOR_FIXTURE_MAX_Z } from './store-layout';
 import { buildAisleShelving } from './shelving';
 import { ShelfModelBatch } from './shelf-model';
 import { buildCounterProps93 } from './fixtures/counter-props-93';
@@ -314,8 +318,11 @@ export function buildStore(scene: StoreScene) {
   // fixtureContext()).
   scene.storefrontSpec = { ...getStorefrontSpec(storeWidth), ...(angularFrontEra(getActiveTheme().id) ? { frontPlan: 'angular' as const } : {}) };
   // The entrance below holds the startup splash for its counter model; start
-  // that download ahead of the decorative fixtures built in between.
-  prefetchCounterModel(scene.storefrontSpec);
+  // that download ahead of the decorative fixtures built in between. On phone
+  // and hosted entry their model downloads wait for its bytes, rather than
+  // splitting a slow connection two dozen ways (src/model-download-gate.ts).
+  const counterBytes = prefetchCounterModel(scene.storefrontSpec);
+  if (isPublicDemo || mobileStoreActive()) holdModelDownloads(counterBytes);
   const panoramaWalkDepth = activeStoreFormat().facadeStyle === 'storefront' ? 4.7
     : facadeDimensions(scene.ceilingY, vestibuleHalfWidth(scene.storefrontSpec), facadeStyle()).sidewalkDepth;
   const sky = buildExteriorPanorama(storeWidth, scene.backWallZ, scene.ceilingY, panoramaWalkDepth, scene.effectiveQuality === 'high');
@@ -2323,7 +2330,17 @@ export function buildStore(scene: StoreScene) {
     // Promo floor stands: the third one exists only in a store deep enough for
     // it (see promoStandPlacements), and any stand whose campaign chain comes
     // up empty builds nothing.
-    ...promoStandPlacements(scene.backWallZ),
+    // Slid sideways in the corridor when the shelf field (herringbone tips,
+    // odd library sizes) would leave them under their 3 ft clearance.
+    ...clearPromoStandsOfShelving(promoStandPlacements(scene.backWallZ), [
+      ...scene.plan.getUnitFootprints(),
+      ...DEFAULT_FIXTURE_PLACEMENTS.filter(p => p.kind === 'bargain-bin' && p.options?.relativeToBackWall).map(p => ({
+        label: `fixture:${p.id}`, kind: 'fixture' as const,
+        cx: p.position.x, cz: Math.min(scene.backWallZ + Number(p.options?.zOffset ?? p.position.z), PROMO_FLOOR_FIXTURE_MAX_Z),
+        // A 3 ft tub at any yaw fits inside this axis-aligned square.
+        w: 4.25, d: 4.25, yaw: 0, clearance: FLOOR_DISPLAY_CLEARANCE,
+      })),
+    ], scene.backWallZ, storeWidth),
     // Counter validator rects + counter-anchored props follow the active
     // counter SHAPE — and, for the standalone desk, the ENTRY STYLE that
     // decides where the desk stands (see counterAnchoredPlacements).

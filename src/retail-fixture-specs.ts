@@ -11,10 +11,6 @@ export const RETAIL_FIXTURE_SPECS = {
   'candy-wall-gondola': { w: 4, h: 5, d: 1.6, clearance: 1.5 },
   'tape-cleaner-sidekick': { w: 2.1, h: 5.2, d: 1.0, clearance: 1.5 },
   'secondary-service-counter': { w: 5.4, h: 3.8, d: 2.9, clearance: 1.5 },
-  // One-sided single-film floor display; customers approach it like any floor stand.
-  'film-floor-display': { w: 2.2, h: 5.3, d: 1.1, clearance: 3 },
-  // Round marquee column browsed from every side.
-  'spotlight-column': { w: 2.6, h: 5.3, d: 2.6, clearance: 3 },
 } as const;
 export type RetailFixtureKind = keyof typeof RETAIL_FIXTURE_SPECS;
 export function retailFixtureFootprint(kind: RetailFixtureKind, placement: FixturePlacement): Footprint {

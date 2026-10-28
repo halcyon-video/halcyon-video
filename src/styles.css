@@ -22,28 +22,28 @@
  * It must never mean adding a URL. */
 @font-face {
   font-family: 'Bebas Neue';
-  src: url('./assets/bebas-neue.ttf') format('truetype');
+  src: url('./assets/bebas-neue.woff2') format('woff2');
   font-weight: 400;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
   font-family: 'Archivo Black';
-  src: url('./assets/archivo-black.ttf') format('truetype');
+  src: url('./assets/archivo-black.woff2') format('woff2');
   font-weight: 400;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
   font-family: 'Outfit';
-  src: url('./assets/outfit.ttf') format('truetype-variations');
+  src: url('./assets/outfit.woff2') format('woff2-variations');
   font-weight: 100 900;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
   font-family: 'Share Tech Mono';
-  src: url('./assets/share-tech-mono.ttf') format('truetype');
+  src: url('./assets/share-tech-mono.woff2') format('woff2');
   font-weight: 400;
   font-style: normal;
   font-display: swap;

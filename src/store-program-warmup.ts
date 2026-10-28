@@ -38,21 +38,29 @@ export async function prepareInitialViewPrograms(scene: StoreScene): Promise<voi
   stagedInitialRooms.add(scene);
   if (!scene.isWalkAroundMode) scene.snapCamera();
   const roots = new THREE.Group();
-  roots.children = [...initialProgramObjects(scene.scene, scene.camera), ...shadows,
-    stockArtProbe(scene.programWarmupController.signal)];
+  let view = initialProgramObjects(scene.scene, scene.camera);
+  const prepared = new Set(view);
+  roots.children = [...view, ...shadows, stockArtProbe(scene.programWarmupController.signal)];
   try {
     await compileProgramsInStages(scene.renderer, scene.scene, scene.camera,
       scene.composer?.readBuffer ?? null, scene.programWarmupController.signal, roots,
       (fraction, detail) => updateStoreLoading(70 + 14 * fraction, detail));
     // Models that finished downloading during that pass joined the view after
     // its snapshot, and they cast shadows too. Prepare them instead of linking
-    // inside the first frame; everything already prepared is a cache hit.
-    roots.children = [...initialProgramObjects(scene.scene, scene.camera),
-      ...(scene.renderer.shadowMap.enabled ? shadowDepthProgramViews(scene.scene,
-        scene.renderer.shadowMap.type, scene.programWarmupController.signal).children : [])];
-    await compileProgramsInStages(scene.renderer, scene.scene, scene.camera,
-      scene.composer?.readBuffer ?? null, scene.programWarmupController.signal, roots,
-      (_fraction, detail) => updateStoreLoading(84, detail));
+    // inside the first frame; everything already prepared is a cache hit. On
+    // a phone connection the decorative models land while these passes run,
+    // so repeat (bounded) until a pass finds no newcomers.
+    for (let pass = 0; pass < 4; pass++) {
+      view = initialProgramObjects(scene.scene, scene.camera);
+      if (pass > 0 && view.every(object => prepared.has(object))) break;
+      view.forEach(object => prepared.add(object));
+      roots.children = [...view,
+        ...(scene.renderer.shadowMap.enabled ? shadowDepthProgramViews(scene.scene,
+          scene.renderer.shadowMap.type, scene.programWarmupController.signal).children : [])];
+      await compileProgramsInStages(scene.renderer, scene.scene, scene.camera,
+        scene.composer?.readBuffer ?? null, scene.programWarmupController.signal, roots,
+        (_fraction, detail) => updateStoreLoading(84, detail));
+    }
   } finally { roots.children = []; }
 }
 

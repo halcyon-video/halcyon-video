@@ -51,6 +51,15 @@ export type StoreFormatId = 'corporate' | 'mom-and-pop';
 /** Ground-plan of the checkout counter this format builds (see entrance/counter.ts). */
 export type CounterShape = 'shield' | 'usquare' | 'desk';
 
+/**
+ * Which tape-return station the tape-era counters carry (src/entrance/
+ * return-slot.ts): the two-mouth "RETURN TAPES HERE" chute of GH #219, or the
+ * single-opening "TAPE RETURN" saddle housing of GH #403. Labelled by its own
+ * lettering wherever the choice is shown. The chute is the default for every
+ * era and every existing store.
+ */
+export type ReturnStationStyle = 'return-tapes-here' | 'single-slot';
+
 export interface StoreFormatSpec {
   id: StoreFormatId;
   /** Shown in the settings drawer. */
@@ -134,6 +143,8 @@ export interface StoreFormatSpec {
   doorWidth: number;
   /** Ground-plan of the checkout counter (see entrance/counter.ts). */
   counterShape: CounterShape;
+  /** Tape-return station on that counter (tape eras only; see ReturnStationStyle). */
+  returnStation: ReturnStationStyle;
   /**
    * How the entrance leaves are BUILT (StorefrontSpec.doorStyle): 'single' is
    * the lighter, thinner-framed single-glazed door a small shop hangs, against
@@ -428,6 +439,7 @@ const CORPORATE: StoreFormatSpec = {
   vestibuleInnerWidth: 9.0,
   doorWidth: 3.2,
   counterShape: 'shield',
+  returnStation: 'return-tapes-here',
   doorStyle: 'double-swing',
   entryStyle: 'vestibule',
   frontCornerMargin: 2.25,
@@ -512,6 +524,7 @@ const MOM_AND_POP: StoreFormatSpec = {
   vestibuleInnerWidth: 4.6,
   doorWidth: 3.0,
   counterShape: 'desk',
+  returnStation: 'return-tapes-here',
   doorStyle: 'single',
   // GH #110: no chamber at all — one door leaf in the front wall, the way a
   // real small shop is built. This is what actually shrinks the format's

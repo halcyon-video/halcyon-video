@@ -320,7 +320,10 @@ self.onmessage = async (e) => {
   // costs no network fetch.
   const usePixelStore = scale === 1;
   try {
-    const db = url ? await getDB() : null;
+    // blob:/data: art (an EmulationStation folder's files) names bytes that live
+    // only for this session: a new URL every boot, so a persisted copy could never
+    // be hit again and would just fill IndexedDB with one orphan per cover.
+    const db = url && !/^(?:blob|data):/.test(url) ? await getDB() : null;
 
     // Fast path: pre-decoded pixel data already in IndexedDB — skip all image
     // decoding. This is the common case after the first session has warmed up.

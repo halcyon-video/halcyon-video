@@ -1,0 +1,77 @@
+<?xml version="1.0"?>
+<gameList>
+  <game>
+    <path>./Super_Mario_World.sfc</path>
+    <name>Super Mario World</name>
+    <desc>Super Mario World — sample entry for the EmulationStation library source.</desc>
+    <rating>0.95</rating>
+    <playcount>41</playcount>
+    <releasedate>19900821T000000</releasedate>
+    <developer>Nintendo</developer>
+    <genre>Platformer</genre>
+    <players>2</players>
+  </game>
+  <game>
+    <path>./The_Legend_of_Zelda_A_Link_to_the_Past.sfc</path>
+    <name>The Legend of Zelda: A Link to the Past</name>
+    <desc>The Legend of Zelda: A Link to the Past — sample entry for the EmulationStation library source.</desc>
+    <rating>0.97</rating>
+    <playcount>60</playcount>
+    <releasedate>19911121T000000</releasedate>
+    <developer>Nintendo</developer>
+    <genre>Action-Adventure</genre>
+    <players>1</players>
+  </game>
+  <game>
+    <path>./Chrono_Trigger.sfc</path>
+    <name>Chrono Trigger</name>
+    <desc>Chrono Trigger — sample entry for the EmulationStation library source.</desc>
+    <rating>0.96</rating>
+    <playcount>25</playcount>
+    <releasedate>19950311T000000</releasedate>
+    <developer>Square</developer>
+    <genre>RPG</genre>
+    <players>1</players>
+  </game>
+  <game>
+    <path>./Super_Metroid.sfc</path>
+    <name>Super Metroid</name>
+    <desc>Super Metroid — sample entry for the EmulationStation library source.</desc>
+    <rating>0.94</rating>
+    <playcount>12</playcount>
+    <releasedate>19940319T000000</releasedate>
+    <developer>Nintendo</developer>
+    <genre>Action-Adventure</genre>
+    <players>1</players>
+  </game>
+  <game>
+    <path>./F-Zero.sfc</path>
+    <name>F-Zero</name>
+    <desc>F-Zero — sample entry for the EmulationStation library source.</desc>
+    <rating>0.82</rating>
+    <playcount>3</playcount>
+    <releasedate>19901121T000000</releasedate>
+    <developer>Nintendo</developer>
+    <genre>Racing</genre>
+    <players>1</players>
+  </game>
+  <game>
+    <path>./Donkey_Kong_Country.sfc</path>
+    <name>Donkey Kong Country</name>
+    <desc>Donkey Kong Country — sample entry for the EmulationStation library source.</desc>
+    <rating>0.88</rating>
+    <releasedate>19941121T000000</releasedate>
+    <developer>Rare</developer>
+    <genre>Platformer</genre>
+    <players>1-2</players>
+  </game>
+  <game>
+    <path>./Street_Fighter_II_&_Turbo.sfc</path>
+    <name>Street Fighter II &amp; Turbo</name>
+    <desc>Street Fighter II &amp; Turbo — sample entry for the EmulationStation library source.</desc>
+    <releasedate>19920610T000000</releasedate>
+    <developer>Capcom</developer>
+    <genre>Fighting</genre>
+    <players>1-2</players>
+  </game>
+</gameList>

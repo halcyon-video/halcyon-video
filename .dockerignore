@@ -14,6 +14,7 @@
 !public
 !tools/check-file-budget.mjs
 !tools/build-source.mjs
+!tools/compressed-models.mjs
 !tools/check-provider-boundary.mjs
 !tools/list-slots.mjs
 !tools/remote-play-server.mjs
