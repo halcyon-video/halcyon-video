@@ -5,6 +5,26 @@ All notable changes to Halcyon Video, generated from commit history by
 it on every version tag push. Deterministic and offline: no entry here was
 written by a model.
 
+## [v0.30.0] — 2026-10-27
+
+### CHANGELOG
+- V0.29.0
+
+### General
+- Prepare 0.30.0 release
+- Keep session-only cover art (blob:, data:) out of the poster IndexedDB caches (Closes [#409](https://github.com/halcyon-video/halcyon-video/issues/409))
+- Rent an EmulationStation game: play the picked ROM in the browser, or say plainly why not (Closes [#408](https://github.com/halcyon-video/halcyon-video/issues/408))
+- Stock the games department from an EmulationStation folder (Fixes #407) (Closes [#407](https://github.com/halcyon-video/halcyon-video/issues/407))
+- Rank each Romm platform's whole list so shelves span the alphabet (Closes [#406](https://github.com/halcyon-video/halcyon-video/issues/406))
+- Show one opening on the Single slot tape return (issue #405)
+- Add the Single slot tape-return style (Closes [#388](https://github.com/halcyon-video/halcyon-video/issues/388), [#403](https://github.com/halcyon-video/halcyon-video/issues/403))
+- Remove floor displays that had no reference basis
+- Give studio features a two-sided island merchandiser
+- Fetch hosted models through gzip twins (issue #401) (Closes [#401](https://github.com/halcyon-video/halcyon-video/issues/401))
+- Ship the bundled display faces as WOFF2 (issue #401)
+- Slide the front promo stands clear of the shelf field
+- Let the counter model download first on phone entry (issue #399) (Closes [#399](https://github.com/halcyon-video/halcyon-video/issues/399))
+
 ## [v0.29.0] — 2026-10-22
 
 ### CHANGELOG
