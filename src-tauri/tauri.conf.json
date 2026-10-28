@@ -24,7 +24,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval' https://cdn.emulatorjs.org; worker-src 'self' blob:; img-src 'self' data: blob: http: https:; media-src 'self' blob: http: https:; connect-src 'self' blob: data: http: https: ws:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com"
+      "csp": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval' 'unsafe-eval' blob: https://cdn.emulatorjs.org; worker-src 'self' blob:; img-src 'self' data: blob: http: https:; media-src 'self' blob: http: https:; connect-src 'self' blob: data: http: https: ws:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.emulatorjs.org; font-src 'self' data: https://fonts.gstatic.com"
     }
   },
   "bundle": {
