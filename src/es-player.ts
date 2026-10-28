@@ -7,22 +7,16 @@ import { esRomFile } from './es-library';
 import { esCoreFor } from './es-gamelist';
 import { openDemoPlaybackOverlay, type OverlayContent } from './demo-playback';
 
-const EJS_DATA = 'https://cdn.emulatorjs.org/stable/data/';
-
 const note = (heading: string, subtitle: string, body: string): OverlayContent => ({ heading, subtitle, body });
 
-/** The page the card shows: the emulator in its own frame, fed the ROM File. */
+/** The page the card shows: the emulator in its own same-origin frame, fed the ROM File. */
 function playerHtml(core: string): string {
-  // The iframe shares this page's origin, so the picked File is handed over as
-  // a global rather than a URL (EmulatorJS takes a File and keeps its name,
-  // which is how it knows the ROM's type). A failed script load (offline, or a
-  // strict CSP) tells the parent so the card can explain itself.
-  const doc = `<!doctype html><meta charset="utf-8"><body style="margin:0;background:#000;overflow:hidden">`
-    + `<div id="game" style="width:100%;height:100vh"></div><script>`
-    + `var f=parent.__halcyonEsRom;EJS_player='#game';EJS_core='${core}';EJS_pathtodata='${EJS_DATA}';`
-    + `EJS_gameUrl=new File([f],f.name);EJS_startOnLoaded=true;EJS_color='#ffa903';<\/script>`
-    + `<script src="${EJS_DATA}loader.js" onerror="parent.postMessage('es-player-failed','*')"><\/script>`;
-  return `<iframe id="es-player-frame" title="Game" allow="autoplay; gamepad; fullscreen" style="width:100%;height:100%;border:0;background:#000" srcdoc="${doc.replace(/&/g, '&amp;').replace(/"/g, '&quot;')}"></iframe>`;
+  // public/es-player.html is a bundled file (no inline script, so the Tauri CSP
+  // allows it). Same origin means the picked File is handed over as a global
+  // rather than a URL. A failed script load (offline) tells the parent so the
+  // card can explain itself.
+  const src = `${import.meta.env.BASE_URL}es-player.html?core=${encodeURIComponent(core)}`;
+  return `<iframe id="es-player-frame" title="Game" allow="autoplay; gamepad; fullscreen" style="width:100%;height:100%;border:0;background:#000" src="${src}"></iframe>`;
 }
 
 /**
