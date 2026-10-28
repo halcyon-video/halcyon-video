@@ -49,13 +49,33 @@ export function initDemoPlayback(d: DemoPlaybackDeps) { deps = d; }
 
 export type DemoOverlayKind = 'video' | 'game';
 
-export function renderDemoOverlayHtml(kind: DemoOverlayKind = 'video', returnToCouch = false): string {
+/**
+ * Own content for the same full-screen card (EmulationStation rentals, #408):
+ * either a note (heading/subtitle/body) or a ready-made `html` page such as the
+ * browser emulator. `onClose` releases whatever the card holds.
+ */
+export interface OverlayContent {
+  heading?: string;
+  subtitle?: string;
+  body?: string;
+  html?: string;
+  onClose?(): void;
+}
+
+let custom: OverlayContent | null = null;
+let customSeq = 0;
+
+export function renderDemoOverlayHtml(kind: DemoOverlayKind = 'video', returnToCouch = false, note?: OverlayContent): string {
   const isGame = kind === 'game';
-  const heading = isGame ? 'GAME PLAY DISABLED' : 'PLAYBACK DISABLED';
-  const subtitle = isGame ? 'THIS PUBLIC DEMO HAS NO GAME SERVER' : 'THIS PUBLIC DEMO HAS NO MEDIA SERVER';
-  const body = isGame
+  if (note?.html) {
+    return `<div style="position:relative;width:100%;height:100%;">${note.html}
+      <button id="demo-playback-back" style="position:absolute;top:10px;right:10px;min-height:44px;padding:10px 20px;border:0;border-radius:10px;cursor:pointer;font-family:${BB_ARCHIVO_BLACK},sans-serif;font-size:15px;letter-spacing:0.06em;background:#ffa903;color:#10214a;">${returnToCouch ? 'BACK TO THE COUCH' : 'BACK TO THE STORE'}</button></div>`;
+  }
+  const heading = note?.heading ?? (isGame ? 'GAME PLAY DISABLED' : 'PLAYBACK DISABLED');
+  const subtitle = note?.subtitle ?? (isGame ? 'THIS PUBLIC DEMO HAS NO GAME SERVER' : 'THIS PUBLIC DEMO HAS NO MEDIA SERVER');
+  const body = note?.body ?? (isGame
     ? 'Point Halcyon at your Romm server to play your retro game collection.'
-    : 'Point Halcyon at your Jellyfin or Plex server to stream your own collection.';
+    : 'Point Halcyon at your Jellyfin or Plex server to stream your own collection.');
   const linkText = PROJECT_PAGE_URL.replace(/^https?:\/\//, '');
 
   return `
@@ -63,7 +83,7 @@ export function renderDemoOverlayHtml(kind: DemoOverlayKind = 'video', returnToC
         <h1 style="font-family:${BB_ARCHIVO_BLACK},sans-serif;color:#ffa903;font-size:clamp(32px,5.5vw,76px);letter-spacing:0.06em;margin:0;line-height:1.1;">${heading}</h1>
         <p style="color:#8fa3c8;font-family:'Courier New',monospace;font-size:clamp(12px,1.4vw,17px);letter-spacing:0.22em;margin:18px 0 0;">${subtitle}</p>
         <p style="color:#c5d2e8;font-family:'Courier New',monospace;font-size:clamp(13px,1.3vw,16px);letter-spacing:0.04em;line-height:1.6;margin:28px auto 0;">${body}</p>
-        <a id="demo-playback-project-link" href="${PROJECT_PAGE_URL}" target="_blank" rel="noopener noreferrer" style="display:inline-block;color:#ffa903;font-family:'Courier New',monospace;font-size:clamp(13px,1.3vw,16px);font-weight:bold;letter-spacing:0.06em;margin:12px auto 0;text-decoration:underline;text-underline-offset:4px;word-break:break-all;">${linkText}</a>
+        ${note ? '' : `<a id="demo-playback-project-link" href="${PROJECT_PAGE_URL}" target="_blank" rel="noopener noreferrer" style="display:inline-block;color:#ffa903;font-family:'Courier New',monospace;font-size:clamp(13px,1.3vw,16px);font-weight:bold;letter-spacing:0.06em;margin:12px auto 0;text-decoration:underline;text-underline-offset:4px;word-break:break-all;">${linkText}</a>`}
         <button id="demo-playback-back" style="margin:34px auto 0;display:block;min-height:52px;padding:15px 30px;border:0;border-radius:10px;cursor:pointer;font-family:${BB_ARCHIVO_BLACK},sans-serif;font-size:17px;letter-spacing:0.06em;background:#ffa903;color:#10214a;-webkit-tap-highlight-color:transparent;">${returnToCouch ? 'BACK TO THE COUCH' : 'BACK TO THE STORE'}</button>
         <p style="color:#55607a;font-family:'Courier New',monospace;font-size:12px;letter-spacing:0.25em;margin:20px 0 0;">OR PRESS ESC</p>
       </div>`;
@@ -103,16 +123,18 @@ function ensureOverlay(): HTMLElement {
     });
     document.body.appendChild(el);
   }
-  const variant = `${activeKind}:${fromCouch}`;
+  const variant = custom ? `custom:${customSeq}` : `${activeKind}:${fromCouch}`;
   if (el && (el.dataset.variant !== variant || !el.innerHTML.trim())) {
     el.dataset.variant = variant;
-    el.innerHTML = renderDemoOverlayHtml(activeKind, fromCouch);
+    el.innerHTML = renderDemoOverlayHtml(activeKind, fromCouch, custom ?? undefined);
   }
   return el!;
 }
 
-export function openDemoPlaybackOverlay(title: string, startHidden = false, kind: DemoOverlayKind = 'video', returnToCouch = false) {
+export function openDemoPlaybackOverlay(title: string, startHidden = false, kind: DemoOverlayKind = 'video', returnToCouch = false, content?: OverlayContent) {
   if (!deps) return;
+  custom = content ?? null;
+  customSeq++;
   activeKind = kind;
   fromCouch = returnToCouch;
   launchScene = deps.scene();
@@ -122,7 +144,9 @@ export function openDemoPlaybackOverlay(title: string, startHidden = false, kind
   if (typeof window !== 'undefined') {
     window.addEventListener('keydown', onOverlayKeydown);
   }
-  if (kind === 'game') {
+  if (content) {
+    deps.log(`[System] Rental screen for "${title}".`, 'system');
+  } else if (kind === 'game') {
     deps.log(`[System] Demo mode: game emulation for "${title}" is disabled (no game server).`, 'system');
   } else {
     deps.log(`[Video] Demo mode: playback of "${title}" is disabled (no media server).`, 'video');
@@ -151,6 +175,14 @@ export function closeDemoPlaybackOverlay() {
   }
   const overlay = typeof document !== 'undefined' ? document.getElementById('demo-playback-overlay') : null;
   if (overlay) overlay.style.display = 'none';
+  if (custom) {
+    // Tear down the card's own content (an emulator keeps running and playing
+    // audio unless its iframe is removed).
+    if (overlay) overlay.innerHTML = '';
+    custom.onClose?.();
+  }
+  const hadCustom = !!custom;
+  custom = null;
   // Preserve the rental lockout and the scene that owns this launch. A
   // session teardown may already have replaced the scene beneath the card.
   const scene = deps?.scene();
@@ -165,7 +197,9 @@ export function closeDemoPlaybackOverlay() {
   }
   launchScene = null;
   deps?.onClosed();
-  if (activeKind === 'game') {
+  if (hadCustom) {
+    deps?.log(`[System] Rental screen dismissed. ${fromCouch ? 'Back on the couch.' : 'Returned through the entrance.'}`, 'system');
+  } else if (activeKind === 'game') {
     deps?.log(`[System] Demo game rental screen dismissed. ${fromCouch ? 'Back on the couch.' : 'Returned through the entrance.'}`, 'system');
   } else {
     deps?.log(`[Video] Demo playback screen dismissed. ${fromCouch ? 'Back on the couch.' : 'Returned through the entrance.'}`, 'video');

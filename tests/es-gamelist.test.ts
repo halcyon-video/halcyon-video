@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { esPopularity, esReleaseYear, esSpreadKey, parseGamelist } from '../src/es-gamelist.ts';
+import { esCoreFor, esPopularity, esReleaseYear, esSpreadKey, parseGamelist } from '../src/es-gamelist.ts';
 import { platformLabel } from '../src/game-platform-label.ts';
 
 const read = (p: string) => readFileSync(new URL(`./fixtures/es-sample/${p}`, import.meta.url), 'utf8');
@@ -61,4 +61,11 @@ test('ES system folders land on store signboards', () => {
   assert.equal(l('gba'), 'GAME BOY ADVANCE');
   assert.equal(l('tg16'), 'TURBOGRAFX-16');
   assert.equal(l('fbneo'), 'ARCADE');
+});
+
+test('browser player cores follow the ES system folder name', () => {
+  assert.equal(esCoreFor('snes'), 'snes');
+  assert.equal(esCoreFor('MegaDrive'), 'segaMD');
+  assert.equal(esCoreFor('gbc'), 'gb');
+  assert.equal(esCoreFor('dreamcast'), undefined);
 });

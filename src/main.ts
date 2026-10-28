@@ -6,7 +6,7 @@ import { beginMobileEraChoice, finishMobileEraChoice } from './mobile-era-choice
 import { isRequestTitle } from './request-title';
 import { buildSteamControls } from './steam-settings';
 import { buildEsControls } from './es-settings';
-import { esConfigured, loadEsGames } from './es-library';
+import { esConfigured, isEsGame, loadEsGames } from './es-library';
 import { loadSteamGames } from './providers/steam-provider';
 import { isExternalGameActive, onExternalGameChange } from './external-game-state.ts';
 import { playSteamGame } from './steam-playback';
@@ -74,6 +74,7 @@ import {
 import { reportError } from './error-telemetry';
 import { verifySeerrCredentialsLive } from './seerr-service-status';
 import { fetchGames, launchGame, getRommConfig } from './romm';
+import { rentEsGame } from './es-player';
 import { storeCatalog } from './games-only';
 import { buildStreamingLibraries, resolveEnabledServices, resolveStreamingCheckoutUrl } from './streaming-catalog';
 import { showStreamingHandoff } from './streaming-handoff';
@@ -3108,6 +3109,8 @@ function handleGapDismiss() {
 async function handleGameLaunch(movie: Movie, startHidden = false, fromCouch = false) {
   if (storeScene && !fromCouch) rememberPlaybackPosition(storeScene);
   if (movie.steamAppId) { await playSteamGame(movie, (message) => logToConsole(`[Steam] ${message}`, 'system')); return; }
+  // The visitor's own EmulationStation folder plays in the browser, hosted demo included.
+  if (isEsGame(movie)) { if (await rentEsGame(movie, startHidden, fromCouch) === 'playing') retailAudio.playCheckoutChime(); return; }
   if (isDemoMode) {
     openDemoPlaybackOverlay(movie.title, startHidden, 'game', fromCouch);
     return;

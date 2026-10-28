@@ -116,3 +116,15 @@ export const ES_MEDIA_KINDS = {
   back: ['backcovers'],
   label: ['physicalmedia'],
 } as const;
+
+/** ES system folder name -> EmulatorJS core. */
+const CORES: Record<string, string> = {
+  nes: 'nes', famicom: 'nes', fds: 'nes',
+  snes: 'snes', sfc: 'snes', snesna: 'snes', superfamicom: 'snes',
+  genesis: 'segaMD', megadrive: 'segaMD', md: 'segaMD', megadrivejp: 'segaMD',
+  mastersystem: 'segaMS', sms: 'segaMS', gamegear: 'segaGG', gg: 'segaGG',
+  gb: 'gb', gbc: 'gb', gba: 'gba', n64: 'n64', nds: 'nds',
+  psx: 'psx', ps1: 'psx', pcengine: 'pce', tg16: 'pce', atari2600: 'atari2600', atari7800: 'atari7800', lynx: 'lynx',
+};
+
+export const esCoreFor = (system: string): string | undefined => CORES[system.toLowerCase()];

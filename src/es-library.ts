@@ -27,6 +27,7 @@ const WALK_ENTRY_CAP = 400_000;
 
 let index: FileIndex | null = null;
 let current: Movie[] = [];
+const roms = new Map<string, { system: string; file: FileGetter }>();
 let blobUrls: string[] = [];
 let status = 'No EmulationStation library chosen.';
 const listeners = new Set<() => void>();
@@ -42,7 +43,11 @@ const changed = () => window.dispatchEvent(new Event('es-library-changed'));
 // ---- folder access -------------------------------------------------------------
 
 const extOf = (name: string) => (name.split('.').pop() || '').toLowerCase();
-const wanted = (name: string) => name.toLowerCase() === 'gamelist.xml' || IMAGE_EXT.includes(extOf(name));
+// ROM files are indexed by name only (a handle each, nothing is read) so a rented
+// game can find its file; the browser player reads it on demand.
+const ROM_EXT = new Set(['nes', 'fds', 'sfc', 'smc', 'gb', 'gbc', 'gba', 'md', 'gen', 'smd', 'sms', 'gg', 'n64', 'z64', 'v64', 'nds',
+  'pce', 'a26', 'a78', 'lnx', 'ws', 'wsc', 'ngp', 'ngc', 'bin', 'cue', 'iso', 'chd', 'pbp', 'zip', '7z']);
+const wanted = (name: string) => name.toLowerCase() === 'gamelist.xml' || IMAGE_EXT.includes(extOf(name)) || ROM_EXT.has(extOf(name));
 
 function indexFileList(list: FileList): FileIndex {
   const out: FileIndex = new Map();
@@ -153,6 +158,14 @@ function findFile(idx: FileIndex, gamelistKey: string, written: string): FileGet
   return tails(idx, 2).get(norm.split('/').slice(-2).join('/').toLowerCase());
 }
 
+/** A game's ROM: beside the gamelist (Batocera, RetroPie) or in <ROMs>/<system>/ (ES-DE, where gamelists live apart from the ROMs). */
+function findRom(idx: FileIndex, gamelistKey: string, system: string, written: string): FileGetter | undefined {
+  const direct = findFile(idx, gamelistKey, written);
+  if (direct) return direct;
+  const rel = written.replace(/\\/g, '/').replace(/^\.\//, '');
+  return tails(idx, rel.split('/').length + 1).get(`${system}/${rel}`.toLowerCase());
+}
+
 /** ES-DE keeps scrapes in downloaded_media/<system>/<kind>/<rom stem>.<ext>. */
 function findMedia(idx: FileIndex, system: string, kinds: readonly string[], romPath: string): FileGetter | undefined {
   const stem = romPath.replace(/^.*[\\/]/, '').replace(/\.[^.]+$/, '').toLowerCase();
@@ -199,6 +212,7 @@ async function buildGames(idx: FileIndex): Promise<Movie[]> {
     : Math.min(PER_PLATFORM_CAP, Math.floor(SECTION_CAP / Math.max(1, platforms.length)));
 
   const out: Movie[] = [];
+  roms.clear();
   for (const p of platforms) {
     // Rated or played games first (the frontend's own popularity), the rest in
     // a stable pseudo-random spread so an unscraped library isn't just A-to-Z.
@@ -214,8 +228,11 @@ async function buildGames(idx: FileIndex): Promise<Movie[]> {
       const popularity = esPopularity(g);
       const facts = [g.genre, g.players ? `${g.players} player(s)` : '', g.developer || g.publisher]
         .filter(Boolean).join(' · ');
+      const id = `game_es_${p.system}_${esSpreadKey(g.path).toString(36)}`;
+      const romFile = findRom(idx, p.key, p.system, g.path);
+      if (romFile) roms.set(id, { system: p.system, file: romFile });
       out.push({
-        id: `game_es_${p.system}_${esSpreadKey(g.path).toString(36)}`,
+        id,
         title: g.name,
         year: g.releaseYear ?? 0,
         duration: 'N/A',
@@ -229,8 +246,7 @@ async function buildGames(idx: FileIndex): Promise<Movie[]> {
         gameArt: back || label ? { back, label } : undefined,
         game: true,
         platform: p.label,
-        // A browser cannot see the absolute path the ROM lives at, so renting
-        // an EmulationStation title is shelf-only for now (see issue #407).
+        // No server path: renting resolves the ROM through esRomFile() instead.
         launchPath: '',
         communityRating: popularity,
         criticRating: popularity ? popularity * 10 : 0,
@@ -241,6 +257,10 @@ async function buildGames(idx: FileIndex): Promise<Movie[]> {
 }
 
 // ---- public surface ---------------------------------------------------------------
+
+export const isEsGame = (movie: Movie): boolean => movie.id.startsWith('game_es_');
+/** The rented game's ROM in the chosen folder (undefined when the folder holds no such file). */
+export const esRomFile = (movie: Movie) => roms.get(movie.id);
 
 async function adopt(next: FileIndex, name: string): Promise<void> {
   index = next;
