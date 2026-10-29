@@ -71,3 +71,37 @@ The public export retains separate `Turn handle` and `Delivery flap` parts.
 models follow their own raceway. Static material batches leave animated parts
 independent. Both the five-turn public asset and seven-turn installed asset were
 exercised through a real click, with live audio, delivery and teardown evidence.
+
+### Instanced candy and entrance clearance (#198)
+
+The editable `Candy fill` assembly contains linked 80-triangle candy meshes,
+with one shared mesh for each of seven finishes. Blender exports the assembly
+using `EXT_mesh_gpu_instancing`; the runtime draws seven candy batches. The
+fixed seed, positions, sizes and colors retain the existing filled hopper.
+The display loader releases each instance buffer as well as its shared geometry
+and materials, including cancellation during asynchronous model preparation.
+
+The public export is 541,920 bytes (previously 3,191,572), contains 12,386 stored
+triangles and submits 89,586 triangles across 15 mesh primitives. It has 972
+candy instances, 11 material roles and no image textures. These costs exclude
+the separately owned configured-logo decal and animated dispensed ball. Source
+parts remain individually editable; the runtime export batches static finishes
+while keeping the handle and flap independent. The hopper and chute are closed,
+double-wall shells, with 0.016-foot authored thickness (about 0.14 inches after
+the existing runtime scale).
+
+The existing registry entry and conditional placement remain the integration
+point: the games shelf receives the machine when present; otherwise its anchor
+is on the customer side of the entrance counter. The entrance placement tests
+reserve a complete door-width circle around either possible side-door hinge,
+plus a three-foot approach gap, for both shield and U counters with 3.2- and
+4.2-foot doors. This is a conservative geometric clearance check, not a claim
+of building-code certification. Runtime inspection additionally checks a
+30-by-48-inch customer space against actual navigation footprints.
+
+`tests/gumball-model.test.ts` checks exported instancing, UVs, separate operable
+hardware and resource limits. The authoring source uses feet, ground-centered
+origin and the existing Blender-to-store axes documented above. Blender source
+inspection verifies closed manifold parts; browser verification exercises
+rendered instances, the original collision envelope, dispensing, cancellation
+and one-time cleanup.

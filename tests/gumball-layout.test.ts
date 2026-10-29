@@ -68,3 +68,23 @@ test('counter fronts face the customer floor rather than the work surface',()=>{
   const desk=gumballPlacement([],28,{...spec,counterShape:'desk'});
   assert.ok(Math.sin(desk.yaw)>0);
 });
+
+// A complete circle around either possible hinge is more conservative than
+// the real leaf sweep. Reserve another three feet beyond it for the approach.
+test('entrance counter machine stays beyond door swings and a three-foot approach', async () => {
+  const { vestibuleSide } = await import('../src/vestibule-layout.ts');
+  for (const counterShape of ['shield', 'usquare'] as const) for (const doorWidth of [3.2, 4.2]) {
+    const config = { ...spec, counterShape, doorWidth };
+    const p = gumballPlacement([], 64, config).position;
+    for (const side of [-1, 1] as const) {
+      const wall = vestibuleSide(config, side);
+      for (const end of [-1, 1]) {
+        const hinge = { x: wall.doorX + end * wall.sin * doorWidth / 2,
+          z: wall.doorZ + end * wall.cos * doorWidth / 2 };
+        const clear = Math.hypot(p.x - hinge.x, p.z - hinge.z) - GUMBALL_RADIUS - doorWidth;
+        assert.ok(clear >= 3, `${counterShape}, ${doorWidth}-ft leaf: ${clear.toFixed(3)} ft free`);
+      }
+    }
+    assert.ok(15 - p.z - GUMBALL_RADIUS - doorWidth >= 3, 'front door approach remains clear');
+  }
+});
