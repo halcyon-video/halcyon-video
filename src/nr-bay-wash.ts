@@ -25,10 +25,13 @@ export function createNrBayWash(scene: StoreScene) {
       originals.set(material, { compile, key, release });
       material.addEventListener('dispose', release);
       const priorKey = key.call(material);
-      material.customProgramCacheKey = () => priorKey + ':nr-bay-wash-v4:' + layout.length;
+      material.customProgramCacheKey = () => priorKey + ':nr-bay-wash-v5:' + layout.length;
       material.onBeforeCompile = function(shader, renderer) {
         compile.call(this, shader, renderer);
         shader.uniforms.nrWashRuns = { value: layout };
+        // A uniform loop bound keeps drivers from expanding the whole perimeter
+        // into every material variant during opening-view compilation.
+        shader.uniforms.nrWashRunCount = { value: layout.length };
         shader.uniforms.nrWashHeight = { value: scene.ceilingY - 2.78 };
         shader.vertexShader = 'varying vec3 vNrWashWorld;\n' + shader.vertexShader;
         shader.vertexShader = shader.vertexShader.replace('#include <worldpos_vertex>', `
@@ -43,9 +46,10 @@ export function createNrBayWash(scene: StoreScene) {
           varying vec3 vNrWashWorld;
           uniform vec4 nrWashRuns[${layout.length}];
           uniform float nrWashHeight;
+          uniform int nrWashRunCount;
           vec3 nrBayIrradiance(vec3 worldNormal) {
             float energy = 0.0;
-            for (int i = 0; i < ${layout.length}; i++) {
+            for (int i = 0; i < nrWashRunCount; i++) {
               vec4 run = nrWashRuns[i];
               vec2 tangent = vec2(cos(run.z), -sin(run.z));
               vec2 facing = vec2(-tangent.y, tangent.x);
