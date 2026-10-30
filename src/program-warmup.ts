@@ -23,7 +23,7 @@ export async function compileProgramsInStages(
   target: THREE.WebGLRenderTarget | null, signal: AbortSignal,
   roots: THREE.Object3D = scene,
   progress?: (fraction: number, detail: string) => void,
-  options: { batchSize?: number; beforeWork?: () => Promise<void> } = {},
+  options: { batchSize?: number; beforeWork?: () => Promise<void>; flatRoots?: boolean } = {},
 ): Promise<void> {
   signal.throwIfAborted();
   const maxBatchSize = options.batchSize ?? 32;
@@ -32,7 +32,7 @@ export async function compileProgramsInStages(
   const extension = gl.getExtension('KHR_parallel_shader_compile');
   const objects: THREE.Object3D[] = [];
   const signatures = new Set<string>();
-  roots.traverse(object => {
+  const collect = (object: THREE.Object3D) => {
     // Some surfaces mirror another material's maps in onBeforeRender. Give
     // those surfaces their explicit, draw-free preparation hook before compile.
     object.userData.prepareProgram?.();
@@ -48,7 +48,11 @@ export async function compileProgramsInStages(
       signatures.add(key);
     }
     objects.push(object);
-  });
+  };
+  // An opening-view snapshot is already selected. Traversing its descendants
+  // would pull hidden and off-camera fixture programs back onto the entry path.
+  if (options.flatRoots) roots.children.forEach(collect);
+  else roots.traverse(collect);
   const batch = new THREE.Group();
   const empty = new THREE.Scene();
   const batchSize = extension ? Math.max(1, Math.floor(maxBatchSize)) : 1;
