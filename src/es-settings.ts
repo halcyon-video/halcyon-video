@@ -2,6 +2,21 @@ import { setSetting } from './settings';
 import { SettingsRowKit, type RowKitHooks } from './settings-rows';
 import { chooseEsFolder, esConfigured, esStatus, forgetEsFolder } from './es-library';
 
+/** The power-menu / terminal row that starts the one-step hookup. */
+export const ES_GAMES_BUTTON_ID = 'btn-es-games';
+
+/**
+ * Choose the folder, then switch on the games section and every system found in
+ * it, so the aisles fill from one pick. Must run straight from a click. The caller
+ * rebuilds the store in place (no reload) when this resolves true.
+ */
+export async function hookUpEsGames(): Promise<boolean> {
+  await chooseEsFolder((keys) => { for (const key of keys) setSetting(key, true); });
+  if (!esConfigured()) return false;
+  setSetting('bb_games_enabled', true);
+  return true;
+}
+
 // Video Games page controls for the EmulationStation library source (#407).
 // Sits beside the Steam controls: both are optional extra shelves, neither is
 // required, and Romm stays the server-based option above them.
@@ -29,6 +44,6 @@ export function buildEsControls(container: HTMLElement, hooks: RowKitHooks & { d
     display(esStatus());
   };
   kit.confirmAction('choose', 'Choose EmulationStation folder', 'Pick the folder holding your gamelist.xml files (ES-DE, Batocera, RetroPie). It is read in your browser and never uploaded.',
-    () => void perform(async () => { await chooseEsFolder(); if (esConfigured()) setSetting('bb_games_enabled', true); }));
+    () => void perform(async () => { await hookUpEsGames(); }));
   kit.confirmAction('forget', 'Forget game folder', 'Stop using this folder and take its games off the shelves.', () => void perform(forgetEsFolder));
 }

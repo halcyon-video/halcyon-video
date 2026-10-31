@@ -27,6 +27,8 @@ export const PROJECT_PAGE_URL = 'https://github.com/halcyon-video/halcyon-video'
 // every label here must stay within 38.
 export const COUNTER_TERMINAL_LABELS: Record<string, string> = {
   'btn-settings': 'STORE SETTINGS',
+  // One pick of the visitor's game folder stocks every system in it (#415); 33 columns.
+  'btn-es-games': 'BRING YOUR EMULATIONSTATION GAMES',
   'btn-flat-mode': 'SWITCH TO 2D MODE',
   'btn-suspend': 'SUSPEND SYSTEM (SLEEP)',
   'btn-cec-toggle': 'DISPLAY ON/OFF (CEC)',
