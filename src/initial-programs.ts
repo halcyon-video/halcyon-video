@@ -1,11 +1,14 @@
 import * as THREE from 'three';
 
 /** First-draw colour materials only. Shadow/depth rendering still owns all casters.
- * Include every stock instance conservatively: its matrices/count can be updated
+ * Include the supplied dynamic shelf stock conservatively: its matrices/count can be updated
  * by the first animation tick, so a cached sphere need not describe that draw.
+ * Static instanced fixtures use the same visibility rules as ordinary meshes.
  * References are returned without reparenting anything in the live scene.
  */
-export function initialProgramObjects(scene: THREE.Scene, camera: THREE.Camera): THREE.Object3D[] {
+export function initialProgramObjects(
+  scene: THREE.Scene, camera: THREE.Camera, dynamicStock: ReadonlySet<THREE.Object3D> = new Set(),
+): THREE.Object3D[] {
   scene.updateMatrixWorld(true);
   camera.updateMatrixWorld(true);
   const frustum = new THREE.Frustum().setFromProjectionMatrix(
@@ -14,7 +17,7 @@ export function initialProgramObjects(scene: THREE.Scene, camera: THREE.Camera):
   scene.traverse(object => {
     const mesh = object as THREE.Mesh;
     if (!mesh.material) return;
-    if ((mesh as THREE.InstancedMesh).isInstancedMesh) { objects.push(object); return; }
+    if (dynamicStock.has(object)) { objects.push(object); return; }
     if (!object.layers.test(camera.layers)) return;
     for (let parent: THREE.Object3D | null = object; parent; parent = parent.parent) {
       if (!parent.visible) return;

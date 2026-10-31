@@ -38,20 +38,21 @@ export async function prepareInitialViewPrograms(scene: StoreScene): Promise<voi
   stagedInitialRooms.add(scene);
   if (!scene.isWalkAroundMode) scene.snapCamera();
   const roots = new THREE.Group();
-  let view = initialProgramObjects(scene.scene, scene.camera);
+  const dynamicStock = new Set<THREE.Object3D>(scene.meshes);
+  let view = initialProgramObjects(scene.scene, scene.camera, dynamicStock);
   const prepared = new Set(view);
   roots.children = [...view, ...shadows, stockArtProbe(scene.programWarmupController.signal)];
   try {
     await compileProgramsInStages(scene.renderer, scene.scene, scene.camera,
       scene.composer?.readBuffer ?? null, scene.programWarmupController.signal, roots,
-      (fraction, detail) => updateStoreLoading(70 + 14 * fraction, detail));
+      (fraction, detail) => updateStoreLoading(70 + 14 * fraction, detail), { flatRoots: true });
     // Models that finished downloading during that pass joined the view after
     // its snapshot, and they cast shadows too. Prepare them instead of linking
     // inside the first frame; everything already prepared is a cache hit. On
     // a phone connection the decorative models land while these passes run,
     // so repeat (bounded) until a pass finds no newcomers.
     for (let pass = 0; pass < 4; pass++) {
-      view = initialProgramObjects(scene.scene, scene.camera);
+      view = initialProgramObjects(scene.scene, scene.camera, dynamicStock);
       if (pass > 0 && view.every(object => prepared.has(object))) break;
       view.forEach(object => prepared.add(object));
       roots.children = [...view,
@@ -59,7 +60,7 @@ export async function prepareInitialViewPrograms(scene: StoreScene): Promise<voi
           scene.renderer.shadowMap.type, scene.programWarmupController.signal).children : [])];
       await compileProgramsInStages(scene.renderer, scene.scene, scene.camera,
         scene.composer?.readBuffer ?? null, scene.programWarmupController.signal, roots,
-        (_fraction, detail) => updateStoreLoading(84, detail));
+        (_fraction, detail) => updateStoreLoading(84, detail), { flatRoots: true });
     }
   } finally { roots.children = []; }
 }

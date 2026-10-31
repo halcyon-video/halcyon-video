@@ -1,6 +1,6 @@
 """Original, unbranded spiral dispenser. Blender mesh authoring; units are feet.
 Run: blender --background --python tools/models/gumball-machine.py
-The public design uses a barrel hopper and squat plinth, not a measured replica.
+The public design uses a spherical glass globe and squat plinth, not a measured replica.
 """
 import bpy, bmesh, math, os, random, json
 ROOT=os.path.abspath(os.path.join(os.path.dirname(__file__),'../..'))
@@ -82,9 +82,18 @@ def build(config=None,output=None,source=None):
     if config.get('body_profile'):lathe('Coin housing',config['body_profile'],enamel)
     else:box('Rounded coin cabinet',(0,0,(bodylo+bodyhi)/2),(1.12,1.12,bodyhi-bodylo),enamel,.10)
     lathe('Hopper seating ring',[(0,bodyhi-.02),(.68,bodyhi-.02),(.7,bodyhi+.045),(0,bodyhi+.045)],dark)
-    outer=config.get('hopper',[(.66,3.28),(.83,3.4),(.90,3.58),(.90,4.87),(.83,5.05),(.66,5.18)])
-    shell=outer+[(r-.016,z) for r,z in reversed(outer)]
-    lathe('Clear hopper shell',shell,clear)
+    # The public globe is a true sphere: one circular arc swept from the seating
+    # ring opening up to the lid opening, so its silhouette is round from every
+    # side. It is 2.04 ft across, the same globe width as the installable private model.
+    gR,gz,glo,ghi=config.get('globe',(1.02,4.23,3.28,5.18))
+    a0,a1=math.asin((glo-gz)/gR),math.asin((ghi-gz)/gR)
+    arc=[a0+(a1-a0)*i/48 for i in range(49)]
+    if 'hopper' in config:
+        outer=config['hopper'];inner=[(r-.016,z) for r,z in reversed(outer)]
+    else:
+        outer=[(gR*math.cos(a),gz+gR*math.sin(a)) for a in arc]
+        inner=[((gR-.016)*math.cos(a),gz+(gR-.016)*math.sin(a)) for a in reversed(arc)]
+    lathe('Clear hopper shell',outer+inner,clear)
     # Fit the rolled seam to the actual hopper opening, with a thin overlap.
     opening,seat=outer[-1]
     rim=config.get('lid_rim',[(opening-.012,seat-.008),(opening+.012,seat-.008),
@@ -111,18 +120,37 @@ def build(config=None,output=None,source=None):
     box('Delivery flap',(0,-.628,.45),(.19,.035,.19),chrome,.015)
     colors=[(.85,.045,.045),(1,.59,.035),(.95,.86,.035),(.13,.60,.08),(.02,.60,.83),(.96,.32,.56),(.94,.91,.80)]
     gums=[material('Gum'+str(i),c,0,.24) for i,c in enumerate(colors)]
+    # Linked editable objects become EXT_mesh_gpu_instancing batches, one per
+    # candy finish. UVs/topology are authored once, not copied for every ball.
+    bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=2,radius=1)
+    template=bpy.context.object;template.name='Candy topology'
+    for f in template.data.polygons:f.use_smooth=True
+    bpy.ops.object.mode_set(mode='EDIT');bpy.ops.mesh.select_all(action='SELECT');bpy.ops.uv.smart_project(island_margin=.02);bpy.ops.object.mode_set(mode='OBJECT')
+    candy_meshes=[]
+    for mat in gums:
+        me=template.data.copy();me.name=mat.name+' shared candy';me.materials.append(mat);candy_meshes.append(me)
+    bpy.data.objects.remove(template,do_unlink=True)
+    # Blender's GPU-instancing exporter groups siblings beneath an object,
+    # not separate roots in the scene. Keep the fill under its own assembly.
+    candy_root=bpy.data.objects.new('Candy fill',None);bpy.context.collection.objects.link(candy_root)
     rng=random.Random(729)
     for layer in range(6):
         z=3.4+layer*.115
-        radius=config.get('fill_radii',[.77]*6)[layer]
+        # In the globe each layer fills out to the glass, less a ball radius and
+        # its jitter, so the pile settles into the sphere's curve.
+        inside=math.sqrt(max((gR-.016-.071)**2-(gz-z+.012)**2,0))
+        radius=config.get('fill_radii',[.77]*6 if 'hopper' in config else [inside]*6)[layer]
         for iy in range(-10,11):
             for ix in range(-10,11):
                 x=(ix+.5*(iy%2))*.112;y=iy*.097
                 if x*x+y*y>radius*radius or x*x+y*y<.035**2:continue
-                bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=2,radius=rng.uniform(.047,.051),location=(x+rng.uniform(-.006,.006),y+rng.uniform(-.006,.006),z+rng.uniform(-.012,.012)))
-                o=bpy.context.object;o.name='Gumball';o.rotation_euler=(rng.random()*math.tau,rng.random()*math.tau,rng.random()*math.tau);o.data.materials.append(rng.choice(gums))
-                for f in o.data.polygons:f.use_smooth=True
-                bpy.ops.object.mode_set(mode='EDIT');bpy.ops.mesh.select_all(action='SELECT');bpy.ops.uv.smart_project(island_margin=.02);bpy.ops.object.mode_set(mode='OBJECT')
+                ball_radius=rng.uniform(.047,.051)
+                loc=(x+rng.uniform(-.006,.006),y+rng.uniform(-.006,.006),z+rng.uniform(-.012,.012))
+                rotation=(rng.random()*math.tau,rng.random()*math.tau,rng.random()*math.tau)
+                me=rng.choice(candy_meshes)
+                o=bpy.data.objects.new('Gumball',me);bpy.context.collection.objects.link(o)
+                o.parent=candy_root
+                o.location=loc;o.scale=(ball_radius,)*3;o.rotation_euler=rotation
     scene=bpy.context.scene;scene.unit_settings.system='IMPERIAL';scene.unit_settings.scale_length=.3048
     bpy.context.preferences.filepaths.save_version=0
     for a in bpy.data.screens:
@@ -132,13 +160,13 @@ def build(config=None,output=None,source=None):
     bpy.ops.wm.save_as_mainfile(filepath=source)
     # Export one mesh per finish, keeping transparent hopper and raceway separate.
     for mat in list(bpy.data.materials):
-        if mat==clear:continue
+        if mat==clear or mat in gums:continue
         objects=[o for o in scene.objects if o.type=='MESH' and o.data.materials and o.data.materials[0]==mat and o.name not in {'Turn handle','Delivery flap'}]
         if len(objects)<2:continue
         bpy.ops.object.select_all(action='DESELECT')
         for o in objects:o.select_set(True)
         bpy.context.view_layer.objects.active=objects[0];bpy.ops.object.join();bpy.context.object.name=mat.name+' parts'
-    bpy.ops.export_scene.gltf(filepath=output,export_format='GLB',export_yup=True,export_texcoords=True,export_extras=True)
+    bpy.ops.export_scene.gltf(filepath=output,export_format='GLB',export_yup=True,export_texcoords=True,export_extras=True,export_gpu_instances=True)
     triangles=sum(sum(len(p.vertices)-2 for p in o.data.polygons) for o in scene.objects if o.type=='MESH')
     print(json.dumps({'file':output,'bytes':os.path.getsize(output),'triangles':triangles,'meshes':sum(o.type=='MESH' for o in scene.objects)}))
 

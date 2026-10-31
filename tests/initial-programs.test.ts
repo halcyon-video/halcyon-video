@@ -17,5 +17,16 @@ test('hidden ancestors and camera layers are respected; uncullable drawables rem
 test('off-camera and hidden stock instances remain conservative first-tick candidates',()=>{
  const {scene,camera}=setup(),stock=new THREE.InstancedMesh(new THREE.BoxGeometry(1,1,1),new THREE.MeshStandardMaterial(),1);
  stock.position.set(100,100,100);stock.visible=false;scene.add(stock);
- assert.deepEqual(initialProgramObjects(scene,camera),[stock]);
+ assert.deepEqual(initialProgramObjects(scene,camera,new Set([stock])),[stock]);
+});
+
+test('static instanced fixtures outside the opening view are deferred, including hidden descendants',()=>{
+ const {scene,camera}=setup();
+ const fixture=new THREE.InstancedMesh(new THREE.BoxGeometry(),new THREE.MeshStandardMaterial(),1);
+ fixture.position.set(40,2,0);scene.add(fixture);
+ assert.deepEqual(initialProgramObjects(scene,camera),[]);
+ fixture.position.set(4,2,0);
+ assert.deepEqual(initialProgramObjects(scene,camera),[fixture]);
+ const hidden=new THREE.Group();hidden.visible=false;scene.add(hidden);hidden.add(fixture);
+ assert.deepEqual(initialProgramObjects(scene,camera),[]);
 });
