@@ -5419,9 +5419,13 @@ export class StoreScene {
         // only reads as "sleeve still out" when there IS a clamshell to read
         // instead. With bScale 0 (a series boxset, bargain-bin stock) it hid
         // the selection entirely.
-        hf.visible = posterPixelCache.has(slot.movie.id)
-          || textureArrayManager.hasArt(slot.movie.id)
-          || bScale <= 0.0001;
+        //
+        // Once its art has shown, the box keeps it: the hero material owns that
+        // texture, so a later LRU eviction of the CPU pixels (shelves keep
+        // decoding behind an open inspect) must not hide the box as it turns.
+        const artReady = posterPixelCache.has(slot.movie.id) || textureArrayManager.hasArt(slot.movie.id);
+        if (artReady) hf.userData.heroArtFor = slot.movie.id;
+        hf.visible = artReady || hf.userData.heroArtFor === slot.movie.id || bScale <= 0.0001;
         hb.visible = bScale > 0.0001;
         hf.position.set(fWorldX, fWorldY, fWorldZ);
         hf.rotation.set(slot.currentRotX, slot.frontRotY + theta, 0, CASE_EULER_ORDER);
