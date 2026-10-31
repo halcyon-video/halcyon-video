@@ -3,7 +3,9 @@
 An original, unbranded spiral dispenser ships as `public/models/gumball-machine.glb`.
 Its editable source and reproducible Blender mesh authoring script live in
 `tools/models/gumball-machine.blend` and `tools/models/gumball-machine.py`.
-The public design has a barrel hopper, rounded coin cabinet and a squat plinth.
+The public design has a spherical clear globe, rounded coin cabinet and a squat plinth.
+The globe is a true sphere 2.04 ft across in authoring units (1.48 ft at runtime), with
+its openings at the seating ring and the lid; the gumball fill stays inside it.
 Installed private models can replace it through
 `public/user-assets/fixtures/gumball-machine/machine.glb`; private references and
 reconstructions remain outside Git.

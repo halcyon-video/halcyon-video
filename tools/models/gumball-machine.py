@@ -1,6 +1,6 @@
 """Original, unbranded spiral dispenser. Blender mesh authoring; units are feet.
 Run: blender --background --python tools/models/gumball-machine.py
-The public design uses a barrel hopper and squat plinth, not a measured replica.
+The public design uses a spherical glass globe and squat plinth, not a measured replica.
 """
 import bpy, bmesh, math, os, random, json
 ROOT=os.path.abspath(os.path.join(os.path.dirname(__file__),'../..'))
@@ -82,9 +82,18 @@ def build(config=None,output=None,source=None):
     if config.get('body_profile'):lathe('Coin housing',config['body_profile'],enamel)
     else:box('Rounded coin cabinet',(0,0,(bodylo+bodyhi)/2),(1.12,1.12,bodyhi-bodylo),enamel,.10)
     lathe('Hopper seating ring',[(0,bodyhi-.02),(.68,bodyhi-.02),(.7,bodyhi+.045),(0,bodyhi+.045)],dark)
-    outer=config.get('hopper',[(.66,3.28),(.83,3.4),(.90,3.58),(.90,4.87),(.83,5.05),(.66,5.18)])
-    shell=outer+[(r-.016,z) for r,z in reversed(outer)]
-    lathe('Clear hopper shell',shell,clear)
+    # The public globe is a true sphere: one circular arc swept from the seating
+    # ring opening up to the lid opening, so its silhouette is round from every
+    # side. It is 2.04 ft across, the same globe width as the installable private model.
+    gR,gz,glo,ghi=config.get('globe',(1.02,4.23,3.28,5.18))
+    a0,a1=math.asin((glo-gz)/gR),math.asin((ghi-gz)/gR)
+    arc=[a0+(a1-a0)*i/48 for i in range(49)]
+    if 'hopper' in config:
+        outer=config['hopper'];inner=[(r-.016,z) for r,z in reversed(outer)]
+    else:
+        outer=[(gR*math.cos(a),gz+gR*math.sin(a)) for a in arc]
+        inner=[((gR-.016)*math.cos(a),gz+(gR-.016)*math.sin(a)) for a in reversed(arc)]
+    lathe('Clear hopper shell',outer+inner,clear)
     # Fit the rolled seam to the actual hopper opening, with a thin overlap.
     opening,seat=outer[-1]
     rim=config.get('lid_rim',[(opening-.012,seat-.008),(opening+.012,seat-.008),
@@ -127,7 +136,10 @@ def build(config=None,output=None,source=None):
     rng=random.Random(729)
     for layer in range(6):
         z=3.4+layer*.115
-        radius=config.get('fill_radii',[.77]*6)[layer]
+        # In the globe each layer fills out to the glass, less a ball radius and
+        # its jitter, so the pile settles into the sphere's curve.
+        inside=math.sqrt(max((gR-.016-.071)**2-(gz-z+.012)**2,0))
+        radius=config.get('fill_radii',[.77]*6 if 'hopper' in config else [inside]*6)[layer]
         for iy in range(-10,11):
             for ix in range(-10,11):
                 x=(ix+.5*(iy%2))*.112;y=iy*.097
