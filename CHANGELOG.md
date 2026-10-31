@@ -5,6 +5,21 @@ All notable changes to Halcyon Video, generated from commit history by
 it on every version tag push. Deterministic and offline: no entry here was
 written by a model.
 
+## [v0.30.1] — 2026-10-31
+
+### CHANGELOG
+- V0.30.0
+
+### General
+- Prepare 0.30.1 release
+- Give the public gumball machine a spherical globe
+- Keep an inspected cover box visible while it turns
+- Keep shelf-light shader loops compact during compilation (Closes [#413](https://github.com/halcyon-video/halcyon-video/issues/413))
+- Limit opening preparation to selected fixture programs (issue #413)
+- Instance gumball candy and verify entrance clearance (Closes [#198](https://github.com/halcyon-video/halcyon-video/issues/198))
+- Let the EmulationStation player actually start under the Tauri CSP
+- Run the EmulationStation game player from a bundled page so the Tauri CSP allows it (Closes [#410](https://github.com/halcyon-video/halcyon-video/issues/410))
+
 ## [v0.30.0] — 2026-10-27
 
 ### CHANGELOG
