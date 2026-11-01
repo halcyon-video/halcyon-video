@@ -37,9 +37,9 @@ test('idle screen keeps the default pitch', () => {
 
 test('the full manager ring seats without clipping (#77)', () => {
   const ids = Object.keys(COUNTER_TERMINAL_LABELS).filter((id) => id !== 'btn-project');
-  assert.equal(ids.length, 10); // distinct actions plus streaming and date
+  assert.equal(ids.length, 11); // distinct actions plus streaming, date and the EmulationStation folder
   const { lines, cursorLine } = counterTerminalLines(ids, ids.length - 1);
-  assert.equal(lines.length, 3); // 2 header rows + 9 buttons
+  assert.equal(lines.length, 4); // 2 header rows + the last 2 buttons (page 2 of 2)
   assert.equal(lines[lines.length - 1], '> RETURN TO STORE');
   assert.equal(cursorLine, lines.length - 1);
   const { lineH, maxLines } = fitTerminalPitch(lines.length, LINE_H, FONT_PX, BODY_SPAN);
@@ -51,9 +51,9 @@ test('the full manager ring seats without clipping (#77)', () => {
 
 test('the demo manager ring seats without clipping (#133)', () => {
   const ids = Object.keys(COUNTER_TERMINAL_LABELS).filter((id) => id !== 'btn-logout' && id !== 'btn-exit');
-  assert.equal(ids.length, 9); // demo: logout/exit replaced by project link
+  assert.equal(ids.length, 10); // demo: logout/exit replaced by project link
   const { lines, cursorLine } = counterTerminalLines(ids, ids.length - 1);
-  assert.equal(lines.length, 11); // 2 header rows + 8 buttons
+  assert.equal(lines.length, 3); // 2 header rows + the last button (page 2 of 2)
   assert.equal(lines[lines.length - 1], '> RETURN TO STORE');
   assert.equal(cursorLine, lines.length - 1);
   const { lineH, maxLines } = fitTerminalPitch(lines.length, LINE_H, FONT_PX, BODY_SPAN);
