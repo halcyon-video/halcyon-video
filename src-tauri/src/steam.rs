@@ -2,11 +2,12 @@
 //! access tokens never cross IPC into the store or appear in diagnostics.
 use serde::{Deserialize, Serialize};
 use std::{collections::{HashMap, HashSet}, sync::{atomic::{AtomicBool, Ordering}, Mutex}, time::{Duration, Instant}};
-use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
+use tauri::{webview::Cookie, AppHandle, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 use reqwest::blocking::Client;
 
 const AUTH_WINDOW: &str = "steam-sign-in";
 const STORE: &str = "https://store.steampowered.com";
+const SIGN_IN_AGAIN: &str = "Steam sign-in expired. Choose Connect Steam to sign in again.";
 #[derive(Default)]
 pub struct SteamState {
     owned: Mutex<HashSet<u32>>,
@@ -94,9 +95,13 @@ fn attribute_json(html: &str, name: &str) -> Result<serde_json::Value, String> {
     let decoded = encoded.replace("&quot;", "\"").replace("&#34;", "\"").replace("&#39;", "'").replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&");
     serde_json::from_str(&decoded).map_err(|_| "Steam returned an unfamiliar sign-in response.".into())
 }
-fn read_library(cookie: String) -> Result<Library, String> {
+/// `None` when Steam redirects the store page instead of serving it, as it does
+/// once a sign-in's short-lived token is due for Steam's own refresh.
+fn read_library(cookie: &str) -> Result<Option<Library>, String> {
     let client = client()?;
-    let html = response_text(client.get(format!("{STORE}/explore/")).header(reqwest::header::COOKIE, cookie).send())?;
+    let page = client.get(format!("{STORE}/explore/")).header(reqwest::header::COOKIE, cookie).send();
+    if page.as_ref().is_ok_and(|response| response.status().is_redirection()) { return Ok(None); }
+    let html = response_text(page)?;
     let user = attribute_json(&html, "data-userinfo")?;
     let config = attribute_json(&html, "data-store_user_config")?;
     if user["logged_in"].as_bool() != Some(true) { return Err("Sign in to Steam, then choose Refresh library.".into()); }
@@ -113,7 +118,26 @@ fn read_library(cookie: String) -> Result<Library, String> {
         _ => return Err("Steam returned an incomplete library. Please retry.".into()),
     };
     if games.len() as u64 != count { return Err("Steam returned an incomplete library. Please retry.".into()); }
-    Ok(Library { steam_id, games })
+    Ok(Some(Library { steam_id, games }))
+}
+fn steam_cookies(auth: &WebviewWindow) -> Result<Vec<Cookie<'static>>, String> {
+    auth.cookies_for_url(STORE.parse().unwrap()).map_err(|_| "Cannot read Steam sign-in. Please sign in again.".into())
+}
+fn cookie_header(cookies: &[Cookie]) -> String { cookies.iter().map(|c| format!("{}={}", c.name(), c.value())).collect::<Vec<_>>().join("; ") }
+fn refreshed(cookies: &[Cookie], stale: &str) -> bool { cookies.iter().any(|c| c.name() == "steamLoginSecure" && c.value() != stale) }
+/// Steam's refresh needs the long-lived refresh cookie that only the sign-in
+/// webview holds, so load the store page there and let Steam's own redirects
+/// replace the sign-in token.
+fn refresh_sign_in(auth: &WebviewWindow, stale: &str) -> Result<Vec<Cookie<'static>>, String> {
+    auth.navigate(format!("{STORE}/explore/").parse().unwrap()).map_err(|_| SIGN_IN_AGAIN)?;
+    let start = Instant::now();
+    while start.elapsed() < Duration::from_secs(20) {
+        std::thread::sleep(Duration::from_millis(250));
+        let cookies = steam_cookies(auth)?;
+        if refreshed(&cookies, stale) { println!("[Steam] Sign-in refreshed by Steam."); return Ok(cookies); }
+    }
+    println!("[Steam] Steam did not refresh the sign-in; it needs a new sign-in.");
+    Err(SIGN_IN_AGAIN.into())
 }
 #[tauri::command]
 pub async fn steam_library(app: AppHandle, window: WebviewWindow) -> Result<Library, String> {
@@ -123,10 +147,13 @@ pub async fn steam_library(app: AppHandle, window: WebviewWindow) -> Result<Libr
 pub(crate) fn companion_library(app: &AppHandle) -> Result<Library, String> {
     let auth = auth_window(&app, false)?;
     let generation = *app.state::<SteamState>().generation.lock().unwrap();
-    let cookies = auth.cookies_for_url(STORE.parse().unwrap()).map_err(|_| "Cannot read Steam sign-in. Please sign in again.")?;
-    if !cookies.iter().any(|c| c.name() == "steamLoginSecure") { return Err("Sign in to Steam, then choose Refresh library.".into()); }
-    let cookie = cookies.iter().map(|c| format!("{}={}", c.name(), c.value())).collect::<Vec<_>>().join("; ");
-    let library = read_library(cookie)?;
+    let cookies = steam_cookies(&auth)?;
+    let token = cookies.iter().find(|c| c.name() == "steamLoginSecure").map(|c| c.value()).ok_or("Sign in to Steam, then choose Refresh library.")?;
+    let library = match read_library(&cookie_header(&cookies))? {
+        Some(library) => library,
+        // Retry once: a second redirect means Steam wants a full sign-in.
+        None => read_library(&cookie_header(&refresh_sign_in(&auth, token)?))?.ok_or(SIGN_IN_AGAIN)?,
+    };
     let state = app.state::<SteamState>();
     let current = state.generation.lock().unwrap();
     if generation != *current { return Err("Steam account changed. Refresh the library again.".into()); }
@@ -235,6 +262,14 @@ mod tests {
         let html = r#"<div data-userinfo="{&quot;logged_in&quot;:true,&quot;steamid&quot;:&quot;123&quot;}"></div>"#;
         assert_eq!(attribute_json(html, "data-userinfo").unwrap()["steamid"], "123");
         assert!(attribute_json("login page", "data-userinfo").is_err());
+    }
+    #[test] fn refresh_waits_for_a_new_sign_in_token_not_other_cookie_churn() {
+        let jar = |token: &'static str, country: &'static str| vec![Cookie::new("steamCountry", country), Cookie::new("steamLoginSecure", token)];
+        assert!(!refreshed(&jar("aged", "US"), "aged"));
+        assert!(!refreshed(&jar("aged", "CA"), "aged"));
+        assert!(!refreshed(&[Cookie::new("steamCountry", "US")], "aged"));
+        assert!(refreshed(&jar("fresh", "US"), "aged"));
+        assert_eq!(cookie_header(&jar("fresh", "US")), "steamCountry=US; steamLoginSecure=fresh");
     }
     #[test] fn track_exact_game_environment_not_client_or_prefix() {
         assert!(environment_matches(b"PATH=/bin\0SteamAppId=42\0", 42));
