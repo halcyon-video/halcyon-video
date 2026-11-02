@@ -563,6 +563,11 @@ function clientErrorRelayPlugin() {
 
 // https://vite.dev/config/
 export default defineConfig(async () => ({
+  // The release version, shown in the rental terminal's title bar and the
+  // setup failure report (src/app-version.ts).
+  define: {
+    __HALCYON_APP_VERSION__: JSON.stringify(JSON.parse(fs.readFileSync(path.join(import.meta.dirname, "package.json"), "utf8")).version),
+  },
   plugins: [
     buildSourcePlugin(import.meta.dirname),
     // First: everything below it answers only to an allowed Host header.

@@ -4,6 +4,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { APP_VERSION } from '../src/app-version.ts';
 import {
   initSetupReport,
   recordSetupServer,
@@ -80,7 +81,7 @@ test('report builder: formats app version, server info, library list, failing st
 
   const report = getLastSetupReport();
   assert.match(report, /=== Halcyon Setup Failure Report ===/);
-  assert.match(report, /App: Halcyon 0\.11\.1/);
+  assert.ok(report.includes(`App: Halcyon ${APP_VERSION}\n`), 'report names the app version');
   assert.match(report, /Server: Plex Media Server \(v1\.40\.2, relay: false\)/);
   assert.match(report, /Libraries \(3 found, 2 carried\):/);
   assert.match(report, /  - Movies, movie, carried/);

@@ -7,7 +7,7 @@
 // Non-goals: NO telemetry, NO network upload, NO dependencies.
 // All tokens (Plex/Jellyfin/Bearer), IP addresses, URLs, and account/user names are scrubbed.
 
-export const APP_VERSION = '0.11.1';
+import { APP_VERSION } from './app-version.ts';
 
 export interface SetupStageRecord {
   name: string;

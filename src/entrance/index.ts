@@ -71,8 +71,12 @@ import { activeStoreFormat } from '../store-format';
 import type { Movie } from '../jellyfin';
 import { counterCrtPalette } from '../crt-theme';
 import { brandString } from '../brand-pack';
+import { APP_VERSION } from '../app-version';
 import { textureArrayManager } from '../poster-textures';
 import { counterMonitorAsset, counterMonitorUsesTubeEffects, terminalPictureDistance, fitTerminalPitch, posterShortfallLines } from '../counter-terminal';
+
+// The title bar's right-hand version tag, built once.
+const TERMINAL_VERSION = `v${APP_VERSION}`;
 
 export class EntranceCheckout implements StoreFixture {
   // The counter's store-facing point Z (used by StoreScene to frame the checkout camera move).
@@ -1438,7 +1442,16 @@ export class EntranceCheckout implements StoreFixture {
     ctx.fillRect(PAD_X - CH * 0.5, PAD_Y, SAFE_W + CH, BAR_H);
     ctx.font = `bold ${FONT_PX}px "Courier New", monospace`;
     ctx.fillStyle = palette.ink;
-    ctx.fillText(brandString('pos-system-title', 'HALCYON RENTAL SYSTEM'), PAD_X, PAD_Y + (BAR_H - FONT_PX) / 2);
+    const title = brandString('pos-system-title', 'HALCYON RENTAL SYSTEM');
+    const titleY = PAD_Y + (BAR_H - FONT_PX) / 2;
+    ctx.fillText(title, PAD_X, titleY);
+    // The release version at the bar's right end, so a self-hoster can tell
+    // which build their server pulled. A long custom brand title keeps its
+    // room: the version gives way, never the name.
+    const versionW = ctx.measureText(TERMINAL_VERSION).width;
+    if (ctx.measureText(title).width + CH * 2 + versionW <= SAFE_W) {
+      ctx.fillText(TERMINAL_VERSION, PAD_X + SAFE_W - versionW, titleY);
+    }
 
     // The idle screen is also the manager terminal's only in-world signpost
     // (UX pass 2026-08): the Left press at the counter was taught nowhere,
