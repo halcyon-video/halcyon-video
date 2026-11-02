@@ -1005,6 +1005,17 @@ export async function buildAllMovieBoxes(scene: StoreScene) {
     gatedSlots.sort((a, b) => distance(a) - distance(b));
   }
   const total = gatedSlots.length;
+  // A picked EmulationStation folder's art is local bytes (blob:/data:): no network to wait
+  // on, so its nearest cases are requested now, ahead of the entrance posters, instead of
+  // after the reveal gate and a camera pass (issue #417). Kept out of the gate so a movie
+  // boot is not held for them.
+  allSlots
+    .filter(slot => slot.movie.game && !slot.hidden && /^(?:blob|data):/.test(slot.movie.posterUrl ?? ''))
+    .map(slot => ({ slot, d: (slot.restingX - OVERVIEW_POS.x) ** 2 + (slot.restingY - OVERVIEW_POS.y) ** 2
+      + (slot.restingZ - OVERVIEW_POS.z) ** 2 }))
+    .sort((a, b) => a.d - b.d)
+    .slice(0, LOCAL_GAME_PRELOAD)
+    .forEach(({ slot }) => { requestedPriority.set(slot, 1); slot.loadShelfDetails(1); });
   let loaded = 0;
   // Nothing is interactive while this preload runs (the boot overlay is up), so
   // the queue should drain at burst rate rather than the polite 4-per-frame
@@ -1346,6 +1357,8 @@ export function restockSlottedFixtures(scene: StoreScene): void {
 
 const priorityPoint = new THREE.Vector3();
 const requestedPriority = new WeakMap<MovieSlot, number>();
+/** Nearest folder-art game cases requested at stock time (see the local-art preload in the stock build). */
+const LOCAL_GAME_PRELOAD = 24;
 export function updateLOD(scene: StoreScene): boolean {
   const activeEnvMap = reflectionProbes[Math.min(scene.selectedLibraryIdx, 4)] || null;
   updateGlobalMaterialsEnvMap(activeEnvMap);

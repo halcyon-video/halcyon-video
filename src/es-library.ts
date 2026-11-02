@@ -7,7 +7,7 @@
 // is inert.
 import type { Movie } from './jellyfin';
 import { platformLabel } from './game-platform-label';
-import { isPlatformEnabled } from './game-platforms';
+import { isPlatformEnabled, platformSettingKey } from './game-platforms';
 import { isGamesOnly } from './games-only';
 import {
   ES_MEDIA_KINDS, esPopularity, esSpreadKey, parseGamelist, type EsGame,
@@ -268,8 +268,23 @@ async function adopt(next: FileIndex, name: string): Promise<void> {
   await loadEsGames(true);
 }
 
-/** Choose the library folder. Must run from a click (browsers require it). */
-export async function chooseEsFolder(): Promise<void> {
+/** Setting keys (bb_platform_*) of every system whose gamelist.xml sits in the folder. */
+function systemSettingKeys(idx: FileIndex): string[] {
+  const keys = new Set<string>();
+  for (const key of idx.keys()) {
+    if (!key.endsWith('gamelist.xml')) continue;
+    const system = systemOf(key);
+    if (system) keys.add(platformSettingKey(platformLabel(system, system)));
+  }
+  return [...keys];
+}
+
+/**
+ * Choose the library folder. Must run from a click (browsers require it).
+ * `onSystems` hears the platform settings of every system found in the folder
+ * before the shelves are built, so the caller can switch them all on at once.
+ */
+export async function chooseEsFolder(onSystems?: (settingKeys: string[]) => void): Promise<void> {
   const picker = (window as any).showDirectoryPicker as undefined | ((o: object) => Promise<any>);
   publish('Reading your EmulationStation folder…');
   if (picker) {
@@ -278,12 +293,15 @@ export async function chooseEsFolder(): Promise<void> {
     catch { publish(esConfigured() ? status : 'No folder chosen.'); return; }
     const idx = await indexDirectory(handle);
     await dbPut(handle).catch(() => {});
+    onSystems?.(systemSettingKeys(idx));
     await adopt(idx, handle.name);
   } else {
     const files = await pickWithInput();
     if (!files || !files.length) { publish('No folder chosen.'); return; }
     const name = (files[0].webkitRelativePath || '').split('/')[0] || 'EmulationStation';
-    await adopt(indexFileList(files), name);
+    const idx = indexFileList(files);
+    onSystems?.(systemSettingKeys(idx));
+    await adopt(idx, name);
   }
 }
 

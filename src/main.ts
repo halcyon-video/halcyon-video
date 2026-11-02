@@ -5,7 +5,7 @@ import { mobileStoreActive } from './mobile-store';
 import { beginMobileEraChoice, finishMobileEraChoice } from './mobile-era-choice';
 import { isRequestTitle } from './request-title';
 import { buildSteamControls } from './steam-settings';
-import { buildEsControls } from './es-settings';
+import { buildEsControls, ES_GAMES_BUTTON_ID, hookUpEsGames } from './es-settings';
 import { esConfigured, isEsGame, loadEsGames } from './es-library';
 import { loadSteamGames } from './providers/steam-provider';
 import { isExternalGameActive, onExternalGameChange } from './external-game-state.ts';
@@ -683,8 +683,8 @@ const ui = {
 let powerMenuIndex = 0;
 // Demo mode replaces the unusable logout/exit rows with the standing project route (#133).
 const powerButtons = isDemoMode
-  ? ['btn-settings', 'btn-suspend', 'btn-cec-toggle', PROJECT_PAGE_BUTTON_ID, 'btn-cancel']
-  : ['btn-settings', 'btn-suspend', 'btn-cec-toggle', 'btn-logout', 'btn-exit', 'btn-cancel'];
+  ? ['btn-settings', ES_GAMES_BUTTON_ID, 'btn-suspend', 'btn-cec-toggle', PROJECT_PAGE_BUTTON_ID, 'btn-cancel']
+  : ['btn-settings', ES_GAMES_BUTTON_ID, 'btn-suspend', 'btn-cec-toggle', 'btn-logout', 'btn-exit', 'btn-cancel'];
 
 // The single CEC row toggles the display: we track the last state WE commanded
 // (there's no CEC status read-back) and alternate standby/wake. If reality
@@ -1549,7 +1549,7 @@ function activateSetting(key: string, dir: number) {
     // a fresh Romm fetch; every other rebuild-scene setting can reuse gameMovies.
     // GAMES ONLY changes it the most of all — it swaps a 192-case budgeted
     // slice for the entire Romm library (and back) — so it refetches too.
-    if (key.startsWith('bb_platform_') || key === 'bb_games_only' || key === 'bb_steam_review_tier') settingsPendingGameRefetch = true;
+    if (key.startsWith('bb_platform_') || key === 'bb_games_only' || key === 'bb_games_enabled' || key === 'bb_steam_review_tier') settingsPendingGameRefetch = true;
   } else if (def.applyMode === 'reload') {
     settingsPendingReload = true;
   }
@@ -2973,6 +2973,17 @@ async function executePowerMenuAction(btnId: string) {
   switch (btnId) {
     case 'btn-settings':
       openSettingsDrawer();
+      return;
+
+    case ES_GAMES_BUTTON_ID:
+      // One pick turns the games section and every system in the folder on; the store restocks in
+      // place (no reload). Called straight from the click/Enter so the folder dialog may open.
+      closePowerMenu();
+      try {
+        if (!(await hookUpEsGames())) return;
+        settingsPendingGameRefetch = true;
+        await rebuildStoreScene();
+      } catch (error) { logToConsole(`[System] That folder could not be read: ${error}`, 'system'); }
       return;
 
     case 'btn-controls':

@@ -1,0 +1,1 @@
+A homebrew NES game picked from an EmulationStation folder, held up in the games aisle with its own cover art.

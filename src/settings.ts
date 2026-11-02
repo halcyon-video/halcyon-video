@@ -1285,7 +1285,7 @@ export function registerCoreSettings(): void {
     kind: 'toggle',
     group: 'Video Games',
     default: false,
-    applyMode: 'reload',
+    applyMode: 'rebuild-scene',
     hint: 'Adds a Video Games shelf stocked from Romm, Steam, an EmulationStation folder (or demo).',
   });
 
