@@ -5,6 +5,19 @@ All notable changes to Halcyon Video, generated from commit history by
 it on every version tag push. Deterministic and offline: no entry here was
 written by a model.
 
+## [v0.30.2] — 2026-11-02
+
+### CHANGELOG
+- V0.30.1
+
+### General
+- Prepare 0.30.2 release
+- Feather the morning sky's panorama seam so the sky reads as one piece (Closes [#419](https://github.com/halcyon-video/halcyon-video/issues/419))
+- Let Steam refresh an aged companion sign-in before calling it expired (issue #418)
+- Update the manager ring tests for the EmulationStation button and the paged terminal (#415)
+- Request folder-picked game covers at stock time, nearest first (Fixes #417) (Closes [#417](https://github.com/halcyon-video/halcyon-video/issues/417))
+- One-step EmulationStation hookup from the store power menu (issue #415)
+
 ## [v0.30.1] — 2026-10-31
 
 ### CHANGELOG
