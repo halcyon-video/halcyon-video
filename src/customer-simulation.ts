@@ -1,5 +1,6 @@
 import type { NavPoint } from './clerk-nav.ts';
-import { customerPreferenceWeight, type CustomerPreference } from './customer-preferences.ts';
+import type { CustomerPreference } from './customer-preferences.ts';
+import { customerDestinationWeights, RECENT_STOP_MEMORY } from './customer-destinations.ts';
 import type { CustomerParking } from './customer-parking.ts';
 import { customerRouteObstacles, customerRoutesSeparated } from './customer-route.ts';
 
@@ -18,13 +19,15 @@ export interface CustomerState extends NavPoint {
   id: string; profile: CustomerPreference; heading: number; phase: CustomerPhase;
   stop: CustomerStop | null; path: NavPoint[]; waypoint: number; wait: number;
   visits: number; trips: number; blocked: number; moving: boolean; active: boolean;
+  /** Last few browsing positions, newest last; damps identical loops. */
+  recent: string[];
 }
 const distance = (a: NavPoint, b: NavPoint) => Math.hypot(a.x - b.x, a.z - b.z);
 /** Floor and parking ownership share one lifetime. Art adapters only mirror this state. */
 export class CustomerSimulation {
   readonly people: CustomerState[] = [];
   readonly reservations = new Map<string, string>();
-  private seed = 377;
+  private seed: number;
   private doorOwner: string | null = null;
   private readonly checkoutQueue: string[] = [];
   private checkoutYield=false;
@@ -35,8 +38,8 @@ export class CustomerSimulation {
   readonly checkout: CustomerStop;
   readonly exit: CustomerStop;
   constructor(nav: CustomerNavigation, stops: readonly CustomerStop[],
-    parking: CustomerParking, checkout: CustomerStop, exit: CustomerStop) {
-    this.nav=nav;this.stops=stops;this.parking=parking;this.checkout=checkout;this.exit=exit;
+    parking: CustomerParking, checkout: CustomerStop, exit: CustomerStop, seed = 377) {
+    this.seed=seed>>>0;this.nav=nav;this.stops=stops;this.parking=parking;this.checkout=checkout;this.exit=exit;
   }
   private random(): number {
     this.seed = (Math.imul(this.seed, 1664525) + 1013904223) >>> 0;
@@ -67,20 +70,18 @@ export class CustomerSimulation {
     return this.people.every(p => p === person || !p.active || !p.stop || distance(stop, p.stop) >= spacing);
   }
   private select(person: CustomerState, from: NavPoint): {stop: CustomerStop; path: NavPoint[]} | null {
-    const candidates: { stop: CustomerStop; weight: number }[] = [];
+    const open: CustomerStop[] = [], taken: CustomerStop[] = [];
     for (const stop of this.stops) {
-      if (stop.id === person.stop?.id || !this.available(stop, person)) continue;
-      // Weight departments once, then divide across their positions. A long action
-      // aisle must not erase a short games section merely by having more stops.
-      const weight = customerPreferenceWeight(person.profile, stop.departments);
-      candidates.push({ stop, weight });
+      if (stop.id === person.stop?.id) continue;
+      (this.available(stop, person) ? open : taken).push(stop);
     }
-    if (!candidates.length) return null;
-    const counts = new Map<string, number>();
-    const key = (s: CustomerStop) => [...s.departments].sort().join('|');
-    for (const c of candidates) counts.set(key(c.stop), (counts.get(key(c.stop)) ?? 0) + 1);
+    if (!open.length) return null;
+    // Department weights divide across their open positions; a taken favorite
+    // pulls the choice toward open positions beside it (customer-destinations.ts).
+    const weights = customerDestinationWeights(person.profile, open, taken, person.recent);
+    const candidates = open.map((stop, i) => ({ stop, weight: weights[i] }));
     let total = 0;
-    for (const c of candidates) total += c.weight /= counts.get(key(c.stop))!;
+    for (const c of candidates) total += c.weight;
     // Routing runs only for selected candidates, rather than every stocked
     // position. A crowded/unreachable choice is removed before the next draw.
     while(candidates.length) {
@@ -104,12 +105,12 @@ export class CustomerSimulation {
     if (this.people.some(p => p.id === id)) return null;
     const person: CustomerState = { id, profile, x: this.exit.x, z: this.exit.z, heading: 0,
       phase: 'browsing', stop: null, path: [], waypoint: 0, wait: 8 + this.people.length * 2,
-      visits: 0, trips: 0, blocked: 0, active: false, moving: false };
+      visits: 0, trips: 0, blocked: 0, active: false, moving: false, recent: [] };
     const choice = this.select(person, this.exit);
     if (!choice || !this.parking.reserve(id)) return null;
     // Opening population is already shopping; later visits arrive via the door.
     person.x = choice.stop.x; person.z = choice.stop.z; person.heading = choice.stop.yaw;
-    person.stop = choice.stop; person.active = true; this.people.push(person);
+    person.stop = choice.stop; person.active = true; person.recent.push(choice.stop.id); this.people.push(person);
     this.reservations.set(choice.stop.id, id); return person;
   }
   private releaseStop(person: CustomerState): void {
@@ -185,7 +186,8 @@ export class CustomerSimulation {
         person.path = []; person.waypoint = 0; person.heading = person.stop!.yaw;
         if (person.phase === 'leaving') { this.leave(person); continue; }
         if (person.phase === 'walking') {
-          person.phase = 'browsing'; person.visits++;if(this.doorOwner===person.id)this.doorOwner=null;
+          person.phase = 'browsing'; person.visits++;
+          person.recent.push(person.stop!.id);if(person.recent.length>RECENT_STOP_MEMORY)person.recent.shift();if(this.doorOwner===person.id)this.doorOwner=null;
           if(person.visits>=3&&!this.checkoutQueue.includes(person.id))this.checkoutQueue.push(person.id);
         }
         person.wait = person.phase === 'checkout' ? 4 : 9 + this.random() * 9;
