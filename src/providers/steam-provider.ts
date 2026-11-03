@@ -3,12 +3,13 @@ import { filterSteamTitles, steamTitle, type SteamGame, type SteamReview } from 
 import type { Title } from './media-source-provider';
 import { isExternalGameActive } from '../external-game-state.ts';
 import { clearCompanionPair, companionInvoke } from '../steam-companion-client.ts';
+import { withSteamDeadline } from '../steam-deadline.ts';
 export { companionInvoke, installSteamCompanion } from '../steam-companion-client.ts';
 const nativeSteam = (): boolean => typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__;
 export const hasSteamNative = (): boolean => typeof window !== 'undefined';
 export const needsSteamCompanion = (): boolean => !nativeSteam();
 function steamInvoke<T>(command: string, args: Record<string, unknown> = {}): Promise<T> {
-  return nativeSteam() ? invoke<T>(command, args) : companionInvoke<T>(command.replace(/^steam_/, ''), args);
+  return withSteamDeadline(nativeSteam() ? invoke<T>(command, args) : companionInvoke<T>(command.replace(/^steam_/, ''), args));
 }
 let generation = 0;
 let pending: Promise<Title[]> | null = null;
