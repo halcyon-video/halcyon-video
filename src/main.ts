@@ -9,6 +9,7 @@ import { buildEsControls, ES_GAMES_BUTTON_ID, hookUpEsGames } from './es-setting
 import { esConfigured, isEsGame, loadEsGames } from './es-library';
 import { loadSteamGames } from './providers/steam-provider';
 import { isExternalGameActive, onExternalGameChange } from './external-game-state.ts';
+import { padInputAllowed, setPadInputOccluded } from './gamepad-tracker';
 import { playSteamGame } from './steam-playback';
 import { invoke } from '@tauri-apps/api/core';
 import { getCurrentWindow } from '@tauri-apps/api/window';
@@ -4209,6 +4210,7 @@ async function main() {
     },
     onActivity: () => {
       if (isExternalGameActive()) return;
+      if (isOccluded) onReveal(); // only direct input can reach here while pads are parked
       if (isWelcomeActive()) dismissWelcome();
       if (ui.isScreensaverActive) {
         ui.isScreensaverActive = false;
@@ -4327,6 +4329,7 @@ async function main() {
   const inputManager = new InputManager(inputCallbacks);
   onExternalGameChange((active) => {
     if (active) {
+      setPadInputOccluded(true);
       isOccluded = true;
       stopScreensaverAnimation();
       retailAudio.suspendForIdle();
@@ -4363,10 +4366,13 @@ async function main() {
   // instead of waiting out the input-idle timer: fully suspend the render loop
   // (the rAF stops — verify via storeScene.getPerfInfo().frames), pause the
   // ambient-TV video textures, and suspend the AudioContext so CPU + GPU fall
-  // to near-zero while occluded. Wake is instant and silent. We deliberately
-  // leave an in-app movie playing if the window merely lost focus.
+  // to near-zero while occluded. Local controllers stay parked with audio;
+  // an in-app movie pauses until the user deliberately resumes playback.
   let isOccluded = false;
   function onOcclude() {
+    setPadInputOccluded(true);
+    inputManager.suspendLocalInput();
+    videoPlayer?.videoElement.pause();
     stopReelRecording('Saved when the store lost focus.');
     if (isOccluded) return;
     isOccluded = true;
@@ -4379,12 +4385,12 @@ async function main() {
     // while the screensaver is already up doesn't keep compositing a
     // background window indefinitely. isScreensaverActive stays true.
     if (ui.isScreensaverActive) stopScreensaverAnimation();
-    if (ui.isPlaybackActive) return; // don't park a movie the user is watching
     storeScene?.pauseAmbientTvs();
     storeScene?.pauseRendering();
   }
   function onReveal() {
-    if (isExternalGameActive()) return;
+    if (isExternalGameActive() || document.hidden) return;
+    setPadInputOccluded(false);
     if (!isOccluded) return;
     isOccluded = false;
     if (ui.isScreensaverActive) {
@@ -4406,12 +4412,13 @@ async function main() {
   // a remote viewer. Input-idle tiers and the screensaver still apply there.
   if (!isRemoteInstance()) {
     document.addEventListener('visibilitychange', () => {
-      document.visibilityState === 'hidden' ? onOcclude() : onReveal();
+      document.hidden || !document.hasFocus() ? onOcclude() : onReveal();
     });
     // window blur/focus catch the Wayland/X11 case where the compositor keeps the
     // surface "visible" but another app has the foreground — the Brave/kiosk path.
     window.addEventListener('blur', onOcclude);
     window.addEventListener('focus', onReveal);
+    if (!padInputAllowed()) onOcclude();
     if (isTauri) {
       getCurrentWindow().onFocusChanged(({ payload: focused }) => {
         focused ? onReveal() : onOcclude();

@@ -417,6 +417,14 @@ export class InputManager {
     }
   }
 
+  /** Cancel pending holds as soon as the window loses the foreground. */
+  public suspendLocalInput() {
+    this.holdSelect.destroy(); this.holdDown.destroy(); this.holdBack.destroy();
+    this.lastButtonsState = []; this.lastAxesState = [];
+    this.repeatDirection = null;
+    this.lastHadActivity = false;
+  }
+
   // Poll controller axis and button states
   private pollGamepad() {
     if (!gamepadEverConnected || !navigator.getGamepads) return;
@@ -453,11 +461,11 @@ export class InputManager {
     axesState[0] = gp.axes[0] || 0;
     axesState[1] = gp.axes[1] || 0;
 
-    // Initialize state arrays if empty (first tick's snapshot is discarded,
-    // matching the pre-scratch behavior: next tick edge-detects against false)
+    // Baseline the actual held state after focus returns: buttons pressed in
+    // another app must be released before they can become a fresh store press.
     if (this.lastButtonsState.length === 0) {
-      this.lastButtonsState = new Array(buttonStates.length).fill(false);
-      this.lastAxesState = [0, 0];
+      this.lastButtonsState = buttonStates.slice();
+      this.lastAxesState = axesState.slice();
       return;
     }
 

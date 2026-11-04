@@ -39,15 +39,18 @@ if (typeof window !== 'undefined') {
   });
 }
 
-/**
- * False while the page is hidden: local pad input must be ignored then. Focus is deliberately
- * not consulted: kiosk, Tauri/WebKitGTK and Steam-launched windows can report themselves
- * unfocused while they are the only thing on screen, which left the store deaf to the pad.
- * Games launched from the store are covered separately by external-game-state.
- */
+// Share the idle governor's actual blur/focus transitions. Polling hasFocus()
+// here broke kiosk/WebKit controllers; ignoring blur let a background pad wake
+// the governor, resume audio, and navigate the store on another desktop.
+let padInputOccluded = false;
+export function setPadInputOccluded(occluded: boolean): void {
+  padInputOccluded = occluded;
+}
+
+/** Local controllers cannot wake a window that the idle governor parked. */
 export function padInputAllowed(): boolean {
-  if (typeof document === 'undefined') return true;
-  return !document.hidden;
+  if (typeof document === 'undefined') return !padInputOccluded;
+  return !padInputOccluded && !document.hidden;
 }
 
 let activeSlot = -1;
