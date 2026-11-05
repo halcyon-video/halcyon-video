@@ -1,3 +1,5 @@
+import { localInputAllowed } from './store-foreground.ts';
+
 // Tracks whether a gamepad has ever been connected to mitigate navigator.getGamepads() allocation overhead
 export let gamepadEverConnected = false;
 
@@ -39,18 +41,9 @@ if (typeof window !== 'undefined') {
   });
 }
 
-// Share the idle governor's actual blur/focus transitions. Polling hasFocus()
-// here broke kiosk/WebKit controllers; ignoring blur let a background pad wake
-// the governor, resume audio, and navigate the store on another desktop.
-let padInputOccluded = false;
-export function setPadInputOccluded(occluded: boolean): void {
-  padInputOccluded = occluded;
-}
-
-/** Local controllers cannot wake a window that the idle governor parked. */
+/** Controllers share the foreground state captured before asynchronous boot. */
 export function padInputAllowed(): boolean {
-  if (typeof document === 'undefined') return !padInputOccluded;
-  return !padInputOccluded && !document.hidden;
+  return localInputAllowed();
 }
 
 let activeSlot = -1;

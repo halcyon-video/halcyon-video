@@ -1,5 +1,5 @@
-import { isExternalGameActive } from './external-game-state.ts';
 import { assetUrl } from './asset-url.ts';
+import { createStoreAudioContext, isStoreForeground } from './store-foreground.ts';
 
 export type CaseMedium = 'vhs' | 'dvd';
 
@@ -32,9 +32,9 @@ class RetailAudio {
   private remoteDest: MediaStreamAudioDestinationNode | null = null;
 
   private ensureCtx(): AudioContext | null {
-    if (this.idleSuspended || isExternalGameActive()) return null; // discard hidden triggers; never queue a burst for wake
+    if (this.idleSuspended || !isStoreForeground()) return null; // discard hidden triggers; never queue a burst for wake
     try {
-      if (!this.ctx) this.ctx = new AudioContext();
+      if (!this.ctx) this.ctx = createStoreAudioContext();
       if (this.ctx.state === 'suspended' && !this.idleSuspended) this.ctx.resume().catch(() => {});
       if (!this.foleyLoaded && !this.foleyLoading) this.preloadFoley(this.ctx);
       return this.ctx;
@@ -61,7 +61,7 @@ class RetailAudio {
    */
   public captureRemoteTrack(): MediaStreamTrack | null {
     try {
-      if (!this.ctx) this.ctx = new AudioContext();
+      if (!this.ctx) this.ctx = createStoreAudioContext();
       if (!this.remoteDest) {
         // Materialize the bus BEFORE registering the destination so bus()
         // doesn't also connect it — that double path would sum the mix twice.
@@ -84,19 +84,19 @@ class RetailAudio {
     if (this.ctx && this.ctx.state === 'running') this.ctx.suspend().catch(() => {});
   }
   public resumeFromIdle() {
-    if (isExternalGameActive()) return;
+    if (!isStoreForeground()) return;
     this.idleSuspended = false;
     if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume().catch(() => {});
   }
 
   // Boot-time prewarm (perf-trace: the FIRST sound trigger — i.e. the first
-  // selection move's box-slide — used to pay `new AudioContext()`'s audio
+  // selection move's box-slide — used to pay `createStoreAudioContext()`'s audio
   // device negotiation inside the keypress). Construction is allowed before a
   // user gesture (the context just sits suspended); ensureCtx() resumes it on
   // the first real trigger as before.
   public prewarm() {
     try {
-      if (!this.ctx) this.ctx = new AudioContext();
+      if (!this.ctx) this.ctx = createStoreAudioContext();
       this.noiseBuffer(this.ctx);
       this.preloadFoley(this.ctx);
     } catch { /* no audio device — ensureCtx keeps handling that case */ }
