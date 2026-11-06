@@ -11,7 +11,7 @@ use sha2::{Digest, Sha256};
 use std::{collections::HashMap, convert::Infallible, fs, io::{Read, Write}, path::PathBuf, sync::{Arc, Mutex}, thread, time::{Duration, SystemTime, UNIX_EPOCH}};
 #[cfg(unix)] use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
 use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
-use tokio::{net::TcpListener, sync::Semaphore, time::timeout};
+use tokio::{net::TcpListener, sync::Semaphore, task::JoinError, time::timeout};
 use url::Url;
 
 const ADDRESS: &str = "127.0.0.1:1421";
@@ -21,6 +21,9 @@ const GRANT_TTL_SECS: u64 = 30 * 24 * 60 * 60;
 const MAX_PENDING: usize = 1;
 const MAX_CONNECTIONS: usize = 32;
 const MAX_OPERATIONS: usize = 4;
+/// A Steam or webview call that never returns must not keep its slot forever.
+const OPERATION_DEADLINE: Duration = Duration::from_secs(30);
+const STEAM_DEADLINE: Duration = Duration::from_secs(120);
 const MAX_BODY: usize = 64 * 1024;
 const CHALLENGE_TTL_SECS: u64 = 30;
 const MAX_CHALLENGES: usize = 64;
@@ -176,6 +179,19 @@ fn route(method: Method, path: String, request_origin: Option<String>, nonce: Op
     } })();
     RouteOutput { result, authentication: Some(authentication) }
 }
+enum Bounded<T> { Busy, TimedOut, Done(Result<T, JoinError>) }
+/// Launching waits for the whole game session, so only that route is unbounded.
+fn operation_deadline(method: &Method, path: &str) -> Option<Duration> {
+    match (method, path) { (&Method::POST, "/v1/launch") => None, (&Method::POST, "/v1/library" | "/v1/reviews") => Some(STEAM_DEADLINE), _ => Some(OPERATION_DEADLINE) }
+}
+/// The slot belongs to this future, not to the blocking thread: a call that
+/// hangs inside Steam or a webview frees its slot at the deadline, and the
+/// thread is abandoned rather than counted against the companion forever.
+async fn run_bounded<T: Send + 'static>(operations: &Arc<Semaphore>, deadline: Option<Duration>, work: impl FnOnce() -> T + Send + 'static) -> Bounded<T> {
+    let Ok(_slot) = operations.clone().try_acquire_owned() else { return Bounded::Busy; };
+    let task = tokio::task::spawn_blocking(work);
+    match deadline { Some(limit) => match timeout(limit, task).await { Ok(done) => Bounded::Done(done), Err(_) => Bounded::TimedOut }, None => Bounded::Done(task.await) }
+}
 async fn handle_http(request: Request<Incoming>, app: AppHandle, operations: Arc<Semaphore>) -> Result<HttpResponse, Infallible> {
     let host_ok = request.headers().get(header::HOST).and_then(|value| value.to_str().ok()).is_some_and(|value| matches!(value, "127.0.0.1:1421" | "localhost:1421"));
     if !host_ok { return Ok(json_response(StatusCode::FORBIDDEN, error("Invalid companion host."), None)); }
@@ -191,9 +207,13 @@ async fn handle_http(request: Request<Incoming>, app: AppHandle, operations: Arc
     let method = request.method().clone(); let path = request.uri().path().to_owned(); let body = if method == Method::POST {
         match timeout(Duration::from_secs(5), Limited::new(request.into_body(), MAX_BODY).collect()).await { Ok(Ok(value)) => value.to_bytes().to_vec(), _ => return Ok(json_response(StatusCode::REQUEST_TIMEOUT, error("Request body timed out or exceeded the limit."), request_origin.as_deref())) }
     } else { Vec::new() };
-    let Ok(operation) = operations.try_acquire_owned() else { return Ok(json_response(StatusCode::SERVICE_UNAVAILABLE, error("Steam companion is busy."), request_origin.as_deref())); };
-    let cors = request_origin.clone(); let work = tokio::task::spawn_blocking(move || { let output = route(method, path, request_origin, nonce, proof, body, app); drop(operation); output }).await;
-    let output = match work { Ok(output) => output, Err(_) => RouteOutput { result: Err("Companion request stopped.".into()), authentication: None } };
+    let cors = request_origin.clone(); let deadline = operation_deadline(&method, &path);
+    let output = match run_bounded(&operations, deadline, move || route(method, path, request_origin, nonce, proof, body, app)).await {
+        Bounded::Busy => return Ok(json_response(StatusCode::SERVICE_UNAVAILABLE, error("Steam companion is busy."), cors.as_deref())),
+        Bounded::Done(Ok(output)) => output,
+        Bounded::Done(Err(_)) => RouteOutput { result: Err("Companion request stopped.".into()), authentication: None },
+        Bounded::TimedOut => RouteOutput { result: Err("Steam did not answer in time. Please try again.".into()), authentication: None },
+    };
     let (status, body) = match output.result { Ok(body) => (StatusCode::OK, body), Err(message) => (StatusCode::BAD_REQUEST, error(message)) };
     let mut response = json_response(status, body.clone(), cors.as_deref());
     if let Some((token, nonce)) = output.authentication { response.headers_mut().insert("X-Halcyon-Response-Proof", sign(&token, &response_message(&nonce, status, &body)).parse().unwrap()); }
@@ -224,6 +244,20 @@ pub fn start(app: &AppHandle) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test] fn a_hung_call_frees_its_slot_at_the_deadline() {
+        let runtime = tokio::runtime::Builder::new_multi_thread().worker_threads(1).enable_all().build().unwrap();
+        runtime.block_on(async {
+            let operations = Arc::new(Semaphore::new(1)); let (release, parked) = std::sync::mpsc::channel::<()>();
+            assert!(matches!(run_bounded(&operations, Some(Duration::from_millis(50)), move || { let _ = parked.recv(); 1 }).await, Bounded::TimedOut));
+            assert_eq!(operations.available_permits(), 1);
+            assert!(matches!(run_bounded(&operations, Some(Duration::from_secs(5)), || 2).await, Bounded::Done(Ok(2))));
+            let held = operations.clone().try_acquire_owned().unwrap(); assert!(matches!(run_bounded(&operations, None, || 3).await, Bounded::Busy)); drop(held);
+            let _ = release.send(());
+        });
+    }
+    #[test] fn only_launch_may_outlast_the_deadline() {
+        assert_eq!(operation_deadline(&Method::POST, "/v1/launch"), None); assert_eq!(operation_deadline(&Method::POST, "/v1/library"), Some(STEAM_DEADLINE)); assert_eq!(operation_deadline(&Method::POST, "/v1/connect"), Some(OPERATION_DEADLINE));
+    }
     #[test] fn pairing_accepts_only_secure_exact_web_origins() { for origin in ["http://localhost:1420", "http://127.0.0.1:1420", "https://halcyon.example"] { assert!(valid_origin(origin)); } for origin in ["http://192.168.1.5:1420", "http://halcyon.lan:1420", "file:///tmp/x", "javascript:alert(1)", "https://user@halcyon.example/", "https://halcyon.example/path"] { assert!(!valid_origin(origin)); } }
     #[test] fn approval_is_native_app_path_and_window() { assert_eq!(approval_path("abc"), "companion-approve.html?request=abc"); assert!(is_approval_window("steam-companion-approval")); for label in ["main", "steam-sign-in", ""] { assert!(!is_approval_window(label)); } }
     #[test] fn completed_pair_is_exact_origin_and_single_delivery() {
