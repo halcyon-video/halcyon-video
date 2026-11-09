@@ -1,0 +1,1 @@
+The rental terminal at the checkout counter, its title bar now naming the installed release, v0.30.3.
