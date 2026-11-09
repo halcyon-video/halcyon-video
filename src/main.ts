@@ -9,6 +9,7 @@ import { buildEsControls, ES_GAMES_BUTTON_ID, hookUpEsGames } from './es-setting
 import { esConfigured, isEsGame, loadEsGames } from './es-library';
 import { loadSteamGames } from './providers/steam-provider';
 import { isExternalGameActive, onExternalGameChange } from './external-game-state.ts';
+import { isStoreForeground, onStoreForegroundChange, setWindowForeground } from './store-foreground';
 import { playSteamGame } from './steam-playback';
 import { invoke } from '@tauri-apps/api/core';
 import { getCurrentWindow } from '@tauri-apps/api/window';
@@ -2811,6 +2812,9 @@ async function initializeStoreScene(preservePosterCache = false) {
         return;
       }
       storeScene = scene;
+      if (!isStoreForeground()) {
+        scene.pauseRendering(); scene.pauseAmbientTvs(); scene.suspendChimeForIdle();
+      }
       refreshReelControls(scene);
       // The boot/rebuild that just finished got past every texture upload
       // without a context loss (or recovered from one) — a fully separate,
@@ -4208,7 +4212,8 @@ async function main() {
       openSearch();
     },
     onActivity: () => {
-      if (isExternalGameActive()) return;
+      if (!isStoreForeground()) return;
+      if (isOccluded) onReveal();
       if (isWelcomeActive()) dismissWelcome();
       if (ui.isScreensaverActive) {
         ui.isScreensaverActive = false;
@@ -4363,10 +4368,12 @@ async function main() {
   // instead of waiting out the input-idle timer: fully suspend the render loop
   // (the rAF stops — verify via storeScene.getPerfInfo().frames), pause the
   // ambient-TV video textures, and suspend the AudioContext so CPU + GPU fall
-  // to near-zero while occluded. Wake is instant and silent. We deliberately
-  // leave an in-app movie playing if the window merely lost focus.
+  // to near-zero while occluded. Local controllers stay parked with audio;
+  // an in-app movie pauses until the user deliberately resumes playback.
   let isOccluded = false;
   function onOcclude() {
+    inputManager.suspendLocalInput();
+    videoPlayer?.videoElement.pause();
     stopReelRecording('Saved when the store lost focus.');
     if (isOccluded) return;
     isOccluded = true;
@@ -4379,12 +4386,11 @@ async function main() {
     // while the screensaver is already up doesn't keep compositing a
     // background window indefinitely. isScreensaverActive stays true.
     if (ui.isScreensaverActive) stopScreensaverAnimation();
-    if (ui.isPlaybackActive) return; // don't park a movie the user is watching
     storeScene?.pauseAmbientTvs();
     storeScene?.pauseRendering();
   }
   function onReveal() {
-    if (isExternalGameActive()) return;
+    if (!isStoreForeground()) return;
     if (!isOccluded) return;
     isOccluded = false;
     if (ui.isScreensaverActive) {
@@ -4405,16 +4411,18 @@ async function main() {
   // screen) must not deep-idle on occlusion — its whole job is rendering for
   // a remote viewer. Input-idle tiers and the screensaver still apply there.
   if (!isRemoteInstance()) {
-    document.addEventListener('visibilitychange', () => {
-      document.visibilityState === 'hidden' ? onOcclude() : onReveal();
-    });
-    // window blur/focus catch the Wayland/X11 case where the compositor keeps the
-    // surface "visible" but another app has the foreground — the Brave/kiosk path.
-    window.addEventListener('blur', onOcclude);
-    window.addEventListener('focus', onReveal);
+    onStoreForegroundChange(foreground => foreground ? onReveal() : onOcclude());
     if (isTauri) {
-      getCurrentWindow().onFocusChanged(({ payload: focused }) => {
-        focused ? onReveal() : onOcclude();
+      const nativeWindow = getCurrentWindow();
+      let focusEvents = 0;
+      nativeWindow.onFocusChanged(({ payload: focused }) => {
+        focusEvents++;
+        setWindowForeground(focused);
+      }).then(() => {
+        const observed = focusEvents;
+        void nativeWindow.isFocused().then(focused => {
+          if (observed === focusEvents) setWindowForeground(focused);
+        }).catch(() => {});
       }).catch(() => {});
     }
   }

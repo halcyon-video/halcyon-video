@@ -7,10 +7,11 @@
 import * as THREE from 'three';
 import { loadArt } from '../video-case';
 import { rommPlatformLogoUrl } from '../romm';
+import { isMisattributedPlatformLogo } from '../platform-logo-veto';
 import { BB_ANTON } from '../bundled-fonts';
 
 /** Consecutive bays on one face that share a platform. */
-export interface PlatformLogoRun { platform: string; url: string; first: number; last: number }
+export interface PlatformLogoRun { platform: string; url: string /* '' = lettered plaque only */; first: number; last: number }
 
 /** The face's logo runs, or null when any stocked bay lacks a RomM logo. */
 export function platformLogoRuns(platforms: (string | undefined)[], sections: number): PlatformLogoRun[] | null {
@@ -18,8 +19,11 @@ export function platformLogoRuns(platforms: (string | undefined)[], sections: nu
   for (let s = 0; s < sections; s++) {
     const platform = platforms[s];
     if (!platform) continue;
-    const url = rommPlatformLogoUrl(platform);
-    if (!url) return null;
+    const reported = rommPlatformLogoUrl(platform);
+    if (!reported) return null;
+    // A logo known to depict another platform counts as a failed load: this
+    // run keeps its lettered plaque, the rest of the face keeps its logos.
+    const url = isMisattributedPlatformLogo(reported) ? '' : reported;
     const prev = runs[runs.length - 1];
     if (prev && prev.platform === platform && prev.last === s - 1) prev.last = s;
     else runs.push({ platform, url, first: s, last: s });
@@ -55,6 +59,7 @@ export function createPlatformLogoTexture(
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.anisotropy = 4;
 
+  if (!run.url) return texture;
   loadArt(run.url, 512, (logo) => {
     try {
       if (!alive() || !logo?.width || !logo.height) return;

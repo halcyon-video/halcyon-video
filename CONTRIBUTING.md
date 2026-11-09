@@ -35,8 +35,9 @@ it's the actual answer, and the license exists to make it a real one.
 reason as the pull requests: the direction of this thing lives in one head, and
 a queue of good ideas is exactly what erodes that. It is not that your idea is
 bad — it's that the answer would be "no" often enough to waste your time and
-sour mine. Bring it to the Discord, where it's a conversation instead of a
-ticket, or fork and build it; the license is there for that.
+sour mine. Post it in #feature-requests on the Discord, where it's a
+conversation instead of a ticket, or fork and build it; the license is there
+for that.
 
 Related: issues opened by anyone other than the maintainer are automatically
 labelled `external-untrusted` and get a banner comment. That's not an

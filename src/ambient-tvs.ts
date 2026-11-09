@@ -3,6 +3,7 @@ import { compactAssets } from './mobile-assets';
 import { installTvMount } from './ambient-tv-mount';
 import { installWallBankHousing } from './ambient-wall-bank';
 import { isExternalGameActive } from './external-game-state.ts';
+import { createStoreAudioContext, isStoreForeground } from './store-foreground';
 import { publishAmbientPicture, ambientReceiverInFrustum } from './ambient-screen';
 import { selfLit } from './material-lighting';
 import { VideoFrameUploadGate } from './video-frame-upload';
@@ -913,6 +914,7 @@ export class AmbientTvs implements StoreFixture {
   // that a real frame size is known, and let it run.
   private startPlayback(video: HTMLVideoElement): void {
     this.refitVideoCrop?.();
+    if (!isStoreForeground()) return;
     video.play().catch(() => {});
   }
 
@@ -1413,9 +1415,9 @@ export class AmbientTvs implements StoreFixture {
     if (!video || !videoTex) return; // dead-glass TVs are silent
 
     try {
-      const audioCtx = new AudioContext();
+      const audioCtx = createStoreAudioContext();
       this.audioCtx = audioCtx;
-      if (!isExternalGameActive()) audioCtx.resume().catch(() => {});
+      if (isStoreForeground()) audioCtx.resume().catch(() => {});
 
       const source = audioCtx.createMediaElementSource(video);
       const gain   = audioCtx.createGain();
@@ -1450,10 +1452,11 @@ export class AmbientTvs implements StoreFixture {
     // suspended. Unmute + resume on the first real user gesture (same idea as
     // retailAudio's lazy, gesture-driven context init).
     const unlock = () => {
+      if (!isStoreForeground()) return;
       window.removeEventListener('pointerdown', unlock, true);
       window.removeEventListener('keydown', unlock, true);
       this.gestureUnlock = null;
-      if (!isExternalGameActive()) this.audioCtx?.resume().catch(() => {});
+      if (isStoreForeground()) this.audioCtx?.resume().catch(() => {});
       if (this.video) {
         this.video.muted = false;
         if (this.video.paused) this.video.play().catch(() => {});
@@ -1578,9 +1581,9 @@ export class AmbientTvs implements StoreFixture {
     const video = this.video, videoTex = this.videoTex;
     if (!video || !videoTex) return; // dead-glass TVs are silent
     try {
-      const audioCtx = new AudioContext();
+      const audioCtx = createStoreAudioContext();
       this.audioCtx = audioCtx;
-      if (!isExternalGameActive()) audioCtx.resume().catch(() => {});
+      if (isStoreForeground()) audioCtx.resume().catch(() => {});
       const source = audioCtx.createMediaElementSource(video);
       const gain = audioCtx.createGain();
       gain.gain.value = 0.35;
@@ -1607,10 +1610,11 @@ export class AmbientTvs implements StoreFixture {
       video.volume = 0.08;
     }
     const unlock = () => {
+      if (!isStoreForeground()) return;
       window.removeEventListener('pointerdown', unlock, true);
       window.removeEventListener('keydown', unlock, true);
       this.gestureUnlock = null;
-      if (!isExternalGameActive()) this.audioCtx?.resume().catch(() => {});
+      if (isStoreForeground()) this.audioCtx?.resume().catch(() => {});
       if (this.video) {
         this.video.muted = false;
         if (this.video.paused) this.video.play().catch(() => {});
@@ -1899,8 +1903,8 @@ export class AmbientTvs implements StoreFixture {
   }
 
   resume(): void {
+    if (!isStoreForeground()) return;
     for (const feed of this.feeds) feed.resume();
-    if (isExternalGameActive()) return;
     this.hls?.startLoad();
     this.video?.play().catch(() => {});
     if (this.audioCtx && this.audioCtx.state === 'suspended') {

@@ -3584,7 +3584,7 @@ dependencies = [
 
 [[package]]
 name = "tauri-app"
-version = "0.30.2"
+version = "0.30.3"
 dependencies = [
  "bytes",
  "hmac",

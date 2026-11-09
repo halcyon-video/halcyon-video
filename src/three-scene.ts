@@ -5,7 +5,6 @@ import { updateReelFlight, reelFlightKey, reelFlightMouse } from './store-reel-f
 import { BAKED_ROOM_CUBE_SIZE, loadMobileRoomLighting, mobileRoomLightingExpected, updateMobileRoomLighting } from './mobile-room-lighting';
 import { refreshStockedReflections, reflectionRefreshRunning } from './stocked-reflection-refresh';
 import { streamingInspectPose } from './streaming-case-pose';
-import { isExternalGameActive } from './external-game-state.ts';
 import { capturePinPng } from './feedback-image';
 import { compileProgramsInStages, yieldForPrograms } from './program-warmup';
 import * as programWarmup from './store-program-warmup';
@@ -99,6 +98,7 @@ import { CandyDisplay, CandyRow } from './fixtures/period-fixtures';
 import { TipJar } from './fixtures/tip-jar';
 import { openTipOverlay } from './tip-jar';
 import { gamepadEverConnected, padInputAllowed, pickActiveGamepad } from './gamepad-tracker';
+import { createStoreAudioContext, isStoreForeground } from './store-foreground';
 import { StoreTheme, getActiveTheme } from './themes';
 import {
   CASE_EULER_ORDER,
@@ -1556,7 +1556,7 @@ export class StoreScene {
     // Preload the recorded door-bell sample so even the first door pass plays
     // it (decode runs fine on a still-suspended AudioContext).
     try {
-      if (!this.chimeCtx) this.chimeCtx = new AudioContext();
+      if (!this.chimeCtx) this.chimeCtx = createStoreAudioContext();
       this.loadDoorBell(this.chimeCtx);
     } catch { /* no WebAudio here — playDoorChime degrades the same way */ }
 
@@ -4087,9 +4087,9 @@ export class StoreScene {
   // played whenever the entrance or exit doors are passed. No synth fallback:
   // if the sample has not loaded yet the pass retries the fetch and rings as
   // soon as it lands; if WebAudio is unavailable the doors open silently.
-  public playDoorChime() { if (isExternalGameActive()) return;
+  public playDoorChime() { if (!isStoreForeground()) return;
     try {
-      if (!this.chimeCtx) this.chimeCtx = new AudioContext();
+      if (!this.chimeCtx) this.chimeCtx = createStoreAudioContext();
       const ctx = this.chimeCtx;
       ctx.resume().catch(() => {});
       if (!this.doorBellBuffer) {
@@ -4417,7 +4417,7 @@ export class StoreScene {
 
   // Animation render loop
   private animate = () => {
-    if (isExternalGameActive()) { this.pauseRendering(); return; } if (!this.isRendering) return;
+    if (!isStoreForeground()) { this.pauseRendering(); return; } if (!this.isRendering) return;
     
     this.rafId = requestAnimationFrame(this.animate);
     this.frameCount++;
@@ -5654,7 +5654,7 @@ export class StoreScene {
     this.ambientTvs?.pause();
   }
 
-  public resumeAmbientTvs(): void { if (isExternalGameActive()) return;
+  public resumeAmbientTvs(): void { if (!isStoreForeground()) return;
     this.ambientTvs?.resume();
   }
 
@@ -5669,7 +5669,7 @@ export class StoreScene {
   }
 
   // Resume rendering loop on playback end
-  public resumeRendering() { if (isExternalGameActive()) return;
+  public resumeRendering() { if (!isStoreForeground()) return;
     if (!this.isRendering) {
       this.isRendering = true;
       this.requestRender(); // draw a real frame immediately, don't wait for the idle heartbeat

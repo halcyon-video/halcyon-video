@@ -603,7 +603,12 @@ export class StorePlan {
           }
           let bestIdx = splitIdx;
           let minDiff = Infinity;
-          if (libStart > taken) {
+          // Ending this field early at the library's start keeps the library
+          // whole, but never at the cost of starving the field: a small first
+          // library would otherwise hold the entrance-facing field alone and
+          // push a far larger one into the next field (#429). At half its share
+          // or less, keep the split; the library continues in the next field.
+          if (libStart - taken > want / 2) {
             const diff = Math.abs(libStart - splitIdx);
             if (diff < minDiff) {
               minDiff = diff;
