@@ -5,6 +5,22 @@ All notable changes to Halcyon Video, generated from commit history by
 it on every version tag push. Deterministic and offline: no entry here was
 written by a model.
 
+## [v0.30.3] — 2026-11-09
+
+### CHANGELOG
+- V0.30.2
+
+### General
+- Prepare 0.30.3 release
+- Letter the N64 plaque when RomM reports the iQue logo for it (issue #430)
+- Keep a large library on the front floor when a small one is listed first (Closes [#429](https://github.com/halcyon-video/halcyon-video/issues/429))
+- Free a companion slot when a Steam call hangs instead of holding it forever (Closes [#424](https://github.com/halcyon-video/halcyon-video/issues/424))
+- Keep inactive store windows silent from startup (Closes [#425](https://github.com/halcyon-video/halcyon-video/issues/425))
+- Keep background controller input from waking store audio
+- Give up on a silent Steam after 30 seconds so the store still opens
+- Send feature requests to the Discord's #feature-requests forum
+- Show the release version in the rental terminal's title bar
+
 ## [v0.30.2] — 2026-11-02
 
 ### CHANGELOG
