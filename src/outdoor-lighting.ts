@@ -1,4 +1,4 @@
-import { captureEnvironmentInSlices } from './cube-capture';
+import { blackEnvironment, captureEnvironmentInSlices } from './cube-capture';
 import { yieldForPrograms } from './program-warmup';
 import { getLastUserActivity } from './user-activity';
 // Outside world + interior light energy: the sky dome texture per mode
@@ -476,8 +476,10 @@ export class OutdoorLightingRig {
     // light only, each further bounce adds one order of indirect. Leaving the
     // previous environment installed would let stale light (the bootstrap
     // RoomEnvironment, or the previous outside mode) leak into the new bake and
-    // make lighting depend on mode-switch history.
-    scene.environment = null;
+    // make lighting depend on mode-switch history. Black, not null: the same
+    // darkness on the environment shader variant the later bounces use.
+    const black = blackEnvironment(renderer, this.envPmremGen, this.bakeResolution);
+    scene.environment = black.texture;
 
     // Bake at a FIXED env intensity regardless of the display gain: with gain >1
     // inside the bounce loop the iteration over-amplifies (bright albedo × gain
@@ -557,6 +559,8 @@ export class OutdoorLightingRig {
         };
       }
     } finally {
+      if (scene.environment === black.texture) scene.environment = null;
+      black.dispose();
       hidden.forEach((o) => (o.visible = true));
       suppressed.forEach((v, m) => ((m as THREE.MeshStandardMaterial).emissiveIntensity = v));
       scene.environmentIntensity = this.envDisplayIntensity;

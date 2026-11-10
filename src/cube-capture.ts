@@ -80,11 +80,31 @@ export function captureSceneState(scene: THREE.Scene, extraHidden: THREE.Object3
   };
 }
 
+/** A zero-radiance environment shaped exactly like a bake's own PMREM output.
+ * Seeding the first bounce with it instead of null adds nothing to the capture,
+ * but keeps every lit material on the shader variant later bounces and the
+ * finished room use. A null seed made each one link a second, no-environment
+ * program that only the first bounce ever drew. */
+export function blackEnvironment(renderer: THREE.WebGLRenderer, pmrem: THREE.PMREMGenerator,
+  resolution: number): THREE.WebGLRenderTarget {
+  const cube = new THREE.WebGLCubeRenderTarget(resolution, {type: THREE.HalfFloatType});
+  const colour = renderer.getClearColor(new THREE.Color()), alpha = renderer.getClearAlpha();
+  try {
+    renderer.setClearColor(0x000000, 1);
+    cube.clear(renderer, true, false, false);
+    return pmrem.fromCubemap(cube.texture);
+  } finally {
+    renderer.setClearColor(colour, alpha);
+    cube.dispose();
+  }
+}
+
 export async function captureEnvironmentInSlices(renderer: THREE.WebGLRenderer, scene: THREE.Scene,
   pmrem: THREE.PMREMGenerator, position: THREE.Vector3, resolution: number, bounces: number,
   hidden: THREE.Object3D[], wait: () => Promise<void>, signal: AbortSignal): Promise<THREE.WebGLRenderTarget> {
   let result: THREE.WebGLRenderTarget | null = null;
-  const state = captureSceneState(scene, hidden, () => result?.texture ?? null, () => .95, true);
+  const black = blackEnvironment(renderer, pmrem, resolution);
+  const state = captureSceneState(scene, hidden, () => (result ?? black).texture, () => .95, true);
   try {
     for (let bounce = 0; bounce < bounces; bounce++) {
       const cube = new THREE.WebGLCubeRenderTarget(resolution, {type: THREE.HalfFloatType});
@@ -99,4 +119,5 @@ export async function captureEnvironmentInSlices(renderer: THREE.WebGLRenderer, 
     }
     return result!;
   } catch (error) { result?.dispose(); throw error; }
+  finally { black.dispose(); }
 }
