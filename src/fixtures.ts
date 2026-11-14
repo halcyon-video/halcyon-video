@@ -46,6 +46,8 @@ export interface FixtureContext {
   scheduleDetailLoad?: (start: () => Promise<void>) => () => void;
   // Prepare a hidden, attached model before replacing its visible fallback.
   prepareDetailModel?: (model: THREE.Group, signal: AbortSignal) => Promise<void>;
+  /** Link post-pass override programs (depth of field) for a model shown on arrival. */
+  preparePassPrograms?: (model: THREE.Object3D, signal: AbortSignal) => Promise<void>;
   // Active store shelving theme.
   activeTheme: StoreTheme;
   // Gondola materials for theme-aware shelving.

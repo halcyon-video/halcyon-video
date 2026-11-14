@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { compileProgramsInStages, prepareStaticTextures, yieldForPrograms } from '../src/program-warmup.ts';
+import { compileProgramsInStages, overrideProgramViews, prepareStaticTextures, yieldForPrograms } from '../src/program-warmup.ts';
 import { createInspectionProgramProbe } from '../src/inspection-mesh.ts';
 
 function fixture(parallel = true) {
@@ -244,4 +244,24 @@ test('disposed or newly resident maps are not revived after yielding; listeners 
 test('a lost context does not upload any prepared map', async () => {
   const f = textureFixture(); await f.run(async () => { f.lose(); });
   assert.deepEqual(f.uploads, []);
+});
+
+test('override views cover each mesh kind once, keep batching distinct and leave the room untouched', () => {
+  const root = new THREE.Group();
+  const geometry = new THREE.BoxGeometry(), material = new THREE.MeshStandardMaterial();
+  const plain = new THREE.Mesh(geometry, material), twin = new THREE.Mesh(geometry.clone(), material);
+  const instanced = new THREE.InstancedMesh(geometry, material, 2);
+  const batched = new THREE.BatchedMesh(1, 24, 36, material);
+  batched.addInstance(batched.addGeometry(geometry));
+  plain.add(new THREE.Mesh(geometry, material));
+  instanced.visible = false; // hidden now, drawn later: its view must still compile
+  root.add(plain, twin, instanced, batched);
+  const depth = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking });
+  const views = overrideProgramViews(root, depth);
+  assert.equal(views.length, 3, 'plain, instanced and batched kinds, one view each');
+  assert.ok(views.every(view => (view as THREE.Mesh).material === depth && view.children.length === 0 && view.visible));
+  assert.equal(instanced.visible, false);
+  assert.equal(views.filter(view => (view as THREE.BatchedMesh).isBatchedMesh).length, 1);
+  assert.equal(batched.material, material, 'originals keep their own material');
+  assert.equal(plain.children.length, 1);
 });

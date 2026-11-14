@@ -1606,6 +1606,7 @@ export class StoreScene {
       await programWarmup.prepareInitialViewPrograms(this);
       await paintStoreLoading(80);
       this.animate();
+      programWarmup.markStoreEntered(this);
       this.onConsoleLog("[System] 3D Store rendering active in Library Select mode.", "system");
       return;
     } else if (isPublicDemo && this.effectiveQuality !== 'high') {
@@ -1615,6 +1616,7 @@ export class StoreScene {
     }
     if (this.programWarmupController.signal.aborted || this.renderer.getContext().isContextLost()) return;
     this.animate();
+    programWarmup.markStoreEntered(this);
 
     this.onConsoleLog("[System] 3D Store rendering active in Library Select mode.", "system");
   }
@@ -1718,6 +1720,7 @@ export class StoreScene {
       requestRender: () => this.requestRender(),
       scheduleDetailLoad: detailLoads ? start => detailLoads.enqueue(start) : undefined,
       prepareDetailModel: detailLoads ? (model, signal) => programWarmup.prepareDetailModel(this, model, signal) : undefined,
+      preparePassPrograms: (model, signal) => programWarmup.preparePassPrograms(this, model, signal),
       activeTheme: this.activeTheme,
       gondolaMaterials: this.gondolaMaterials,
       wallSurface: this.wallSurface,

@@ -7,7 +7,7 @@ import type { FixtureContext } from '../fixtures';
 
 /** One fixture owns this load and its geometry; supplied finishes belong to its fallback. */
 export function installDisplayModel(
-  ctx: Pick<FixtureContext, 'scene' | 'requestShadowRefresh' | 'requestRender' | 'log' | 'scheduleDetailLoad' | 'prepareDetailModel'> & Partial<Pick<FixtureContext, 'camera'>>,
+  ctx: Pick<FixtureContext, 'scene' | 'requestShadowRefresh' | 'requestRender' | 'log' | 'scheduleDetailLoad' | 'prepareDetailModel' | 'preparePassPrograms'> & Partial<Pick<FixtureContext, 'camera'>>,
   parent: THREE.Group,
   fallback: THREE.Group,
   file: string | readonly string[],
@@ -96,6 +96,9 @@ export function installDisplayModel(
     model.visible = true;
     fallback.visible = false; // Registered collision meshes keep their established shape.
     onInstalled?.(model);
+    // Detail preparation covered the depth-of-field variants; a model shown on
+    // arrival queues them for after entry instead.
+    if (!ctx.prepareDetailModel) void ctx.preparePassPrograms?.(model, lifetime.signal).catch(() => {});
     ctx.requestShadowRefresh();
     ctx.requestRender();
   };

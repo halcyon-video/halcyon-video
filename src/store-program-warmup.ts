@@ -11,7 +11,7 @@ import { retailAudio } from './audio';
 import { isPublicDemo } from './demo-mode';
 import { mobileStoreActive } from './mobile-store';
 import { mirrorCubeWarmupMaterial } from './store-mirrors';
-import { compileProgramsInStages, prepareStaticTextures, shadowDepthProgramViews, submitPostPrograms, yieldForPrograms } from './program-warmup';
+import { compileProgramsInStages, overrideProgramViews, prepareStaticTextures, shadowDepthProgramViews, submitPostPrograms, yieldForPrograms } from './program-warmup';
 
 const stagedInitialRooms = new WeakSet<StoreScene>();
 const preparing = new WeakSet<StoreScene>();
@@ -273,9 +273,61 @@ export async function warmupRuntimePrograms(scene: StoreScene) {
  */
 export async function prepareDetailModel(scene: StoreScene, model: THREE.Group, lifetime: AbortSignal): Promise<void> {
   const signal = AbortSignal.any([scene.programWarmupController.signal, lifetime]);
-  await compileProgramsInStages(scene.renderer, scene.scene, scene.camera,
-    scene.composer?.readBuffer ?? null, signal, model, undefined, backgroundOptions(scene, signal));
+  const roots = new THREE.Group();
+  roots.children = [model, ...passOverrideViews(scene, model)];
+  try {
+    await compileProgramsInStages(scene.renderer, scene.scene, scene.camera,
+      scene.composer?.readBuffer ?? null, signal, roots, undefined, backgroundOptions(scene, signal));
+  } finally { roots.children = []; }
   await prepareStaticTextures(scene.renderer, model, signal, backgroundOptions(scene, signal).beforeWork);
+}
+
+/** A model shown the moment it loads (no deferred detail preparation) can
+ * arrive after the depth-of-field warmup frame, and that pass then links its
+ * depth variant for the model's mesh kinds (a retail BatchedMesh has its own)
+ * inside the first inspection. Link them in the background once the store is
+ * interactive: never in front of entry, and long before that first use.
+ */
+export async function preparePassPrograms(scene: StoreScene, model: THREE.Object3D, lifetime: AbortSignal): Promise<void> {
+  const signal = AbortSignal.any([scene.programWarmupController.signal, lifetime]);
+  await Promise.race([entered(scene).promise,
+    new Promise<void>(resolve => signal.addEventListener('abort', () => resolve(), { once: true }))]);
+  const roots = new THREE.Group();
+  roots.children = passOverrideViews(scene, model);
+  if (signal.aborted || !roots.children.length) return;
+  await compileProgramsInStages(scene.renderer, scene.scene, scene.camera, scene.composer?.readBuffer ?? null,
+    signal, roots, undefined, { ...backgroundOptions(scene, signal), flatRoots: true });
+}
+
+/** Called once the store is drawing interactively: releases preparePassPrograms,
+ * and sweeps the whole room once for mesh kinds the warmup frame did not draw
+ * (culled, or added by fixtures with their own loaders). Cached kinds cost nothing. */
+export function markStoreEntered(scene: StoreScene): void {
+  entered(scene).resolve();
+  const signal = scene.programWarmupController.signal;
+  void preparePassPrograms(scene, scene.scene, signal).catch(error => {
+    if (!signal.aborted) console.warn('[warmup] depth-of-field program preparation failed:', error);
+  });
+}
+
+const entries = new WeakMap<StoreScene, { promise: Promise<void>; resolve: () => void }>();
+function entered(scene: StoreScene) {
+  let entry = entries.get(scene);
+  if (!entry) {
+    let resolve!: () => void;
+    const promise = new Promise<void>(done => { resolve = done; });
+    entry = { promise, resolve };
+    entries.set(scene, entry);
+  }
+  return entry;
+}
+
+/** BokehPass draws the scene under its own depth material; views wearing that
+ * same material share the pass's programs exactly. */
+function passOverrideViews(scene: StoreScene, model: THREE.Object3D): THREE.Object3D[] {
+  const pass = scene.bokehPass as unknown as { _materialDepth?: THREE.Material; materialDepth?: THREE.Material } | null;
+  const depth = pass?._materialDepth ?? pass?.materialDepth;
+  return depth ? overrideProgramViews(model, depth) : [];
 }
 
 function backgroundOptions(scene: StoreScene, signal: AbortSignal) {

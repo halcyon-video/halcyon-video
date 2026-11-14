@@ -255,6 +255,39 @@ export function shadowDepthProgramViews(
   return views;
 }
 
+/** Draw-free views of `root`'s meshes wearing a pass's scene.overrideMaterial
+ * (the depth-of-field depth render), one per mesh kind. renderer.compile only
+ * visits each mesh's own material, and a pass's warmup frame only links the
+ * kinds it saw, so a kind arriving later (a retail model's BatchedMesh) would
+ * otherwise link its override variant inside the pass's first real frame.
+ */
+export function overrideProgramViews(root: THREE.Object3D, material: THREE.Material): THREE.Object3D[] {
+  const views: THREE.Object3D[] = [];
+  const seen = new Set<string>();
+  root.traverse(object => {
+    const mesh = object as THREE.Mesh;
+    if (!mesh.isMesh || !mesh.geometry) return;
+    const { attributes, morphAttributes } = mesh.geometry;
+    const instanced = mesh as THREE.InstancedMesh;
+    const signature = [(mesh as THREE.BatchedMesh).isBatchedMesh,
+      !!(mesh as unknown as { _colorsTexture?: THREE.Texture | null })._colorsTexture,
+      !!instanced.isInstancedMesh, !!instanced.instanceColor, !!instanced.morphTexture,
+      !!(mesh as THREE.SkinnedMesh).isSkinnedMesh, Object.keys(morphAttributes).join('+'),
+      morphAttributes.position?.length ?? 0, !!attributes.normal].join('|');
+    if (seen.has(signature)) return;
+    seen.add(signature);
+    const view = Object.create(object) as THREE.Mesh;
+    view.material = material;
+    view.children = [];
+    view.userData = {};
+    // The kind's first mesh may be hidden now (a hero case before inspection);
+    // compile skips invisible objects and the visible ones were deduplicated.
+    view.visible = true;
+    views.push(view);
+  });
+  return views;
+}
+
 /** Submit the post-processing chain's programs to the driver alongside the
  * room's; the composer otherwise links each one synchronously in its first
  * frame. Each pass compiles against the target it draws to (the last enabled
