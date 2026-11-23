@@ -1,3 +1,5 @@
+import { vhsLetterboxRect } from './vhs-cover-fit.ts';
+
 // IndexedDB v2: 'posters' stores raw image bytes, 'pixels' stores pre-decoded
 // RGBA pixel data so subsequent sessions skip createImageBitmap + canvas decode.
 let dbPromise: Promise<IDBDatabase | null> | null = null;
@@ -56,15 +58,18 @@ interface PixelEntry {
 // still-cached raw bytes — no network refetch, no full-cache nuke; v7: 'cart'
 // fits onto the platform's real retail box face instead of the VHS clamshell,
 // so its bars (and often the whole drawn size) changed; v8: platforms with a
-// real carton on file switched from 'cart' to 'fill' — no bars at all.
-const PIXELS_VERSION = 8;
+// real carton on file switched from 'cart' to 'fill' — no bars at all; v9:
+// the 'vhs' letterbox fits the sleeve's visible width, so a cover narrower than
+// 2:3 no longer shrinks inside left and right bars.
+const PIXELS_VERSION = 9;
 
 // How decoded art is fitted onto the 320x480 face (GH #93):
 // - 'crop': object-fit cover, never letterboxed. DVD movie fronts — Jellyfin
 //   art is authored to fill a DVD face exactly, so bars are never correct.
-// - 'vhs': cover-crop, but contain-fit letterbox into the visible VHS band
-//   when the edges look busy (#21) or the source is landscape, so the VHS
-//   face's horizontal crop doesn't cut art or text.
+// - 'vhs': cover-crop, but letterbox into the visible VHS band when the edges
+//   look busy (#21) or the source is landscape, so the VHS face's horizontal
+//   crop doesn't cut art or text. The art always spans the band's full width:
+//   bars above and below only, never at the sides (vhs-cover-fit.ts).
 // - 'fill': stretch to fill the face, never letterboxed or cropped. DISC
 //   game covers — keep-case art is authored at (near) the DVD face aspect,
 //   so the stretch is imperceptible and the complete scan shows.
@@ -252,41 +257,39 @@ async function decodeImageBytes(bytes: ArrayBuffer, mode: DecodeMode, faceAspect
   const bandEnergy = measured.bandEnergy;
   const edgeBusy = forceLetterbox === undefined ? measured.edgeBusy : forceLetterbox;
 
-  // VHS ONLY (GH #93): contain-fit (letterbox) instead of the cover-crop
-  // above when either the edges look busy (text/art would be cut by the VHS
-  // face's horizontal crop, #21) or the source is landscape. DVD ('crop') and
-  // game ('fill') faces must never be letterboxed.
+  // VHS ONLY (GH #93): letterbox instead of the cover-crop above when either
+  // the edges look busy (text/art would be cut by the VHS face's horizontal
+  // crop, #21) or the source is landscape. DVD ('crop') and game ('fill')
+  // faces must never be letterboxed.
   if (mode === 'vhs' && (edgeBusy || imgAspect > 1.05)) {
     ctx.clearRect(0, 0, W, H);
+    // The strips either side of the visible band are cropped off by every
+    // case face; they keep the spine colour.
     ctx.fillStyle = hexColor;
     ctx.fillRect(0, 0, W, H);
 
-    // Fit the source into a 262x393 box PRESERVING ITS ASPECT (the old code
-    // stretched the full frame into the box, squashing non-2:3 art), centered
-    // on the canvas.
-    const boxW = 262 * sx;
-    const boxH = 393 * sy;
-    const fit = Math.min(boxW / imgWidth, boxH / imgHeight);
-    const dw = Math.round(imgWidth * fit);
-    const dh = Math.round(imgHeight * fit);
-    const dx = Math.round((W - dw) / 2);
-    const dy = Math.round((H - dh) / 2);
+    // Fit to the WIDTH of the band the sleeve shows, preserving the aspect: a
+    // DVD-shaped cover gets bars above and below, never at the sides. A cover
+    // taller than the sleeve overflows a few pixels top and bottom instead.
+    const { dx, dy, dw, dh } = vhsLetterboxRect(imgWidth, imgHeight, W, H);
     ctx.drawImage(processedImage, 0, 0, imgWidth, imgHeight, dx, dy, dw, dh);
 
-    // Since imageOrientation is 'flipY', the poster is drawn upside-down on
-    // the canvas: the poster's bottom edge is at y=dy, its top at y=dy+dh.
-    const midX = Math.round(W / 2);
-    const bottomColorData = ctx.getImageData(midX, Math.min(H - 1, dy + 1), 1, 1).data;
-    const topColorData = ctx.getImageData(midX, Math.max(0, dy + dh - 2), 1, 1).data;
+    if (dy > 0) {
+      // Since imageOrientation is 'flipY', the poster is drawn upside-down on
+      // the canvas: the poster's bottom edge is at y=dy, its top at y=dy+dh.
+      const midX = Math.round(W / 2);
+      const bottomColorData = ctx.getImageData(midX, Math.min(H - 1, dy + 1), 1, 1).data;
+      const topColorData = ctx.getImageData(midX, Math.max(0, dy + dh - 2), 1, 1).data;
 
-    const bottomColor = `rgb(${bottomColorData[0]}, ${bottomColorData[1]}, ${bottomColorData[2]})`;
-    const topColor = `rgb(${topColorData[0]}, ${topColorData[1]}, ${topColorData[2]})`;
+      const bottomColor = `rgb(${bottomColorData[0]}, ${bottomColorData[1]}, ${bottomColorData[2]})`;
+      const topColor = `rgb(${topColorData[0]}, ${topColorData[1]}, ${topColorData[2]})`;
 
-    // Extend the poster's own edge colors into the horizontal bars.
-    ctx.fillStyle = bottomColor;
-    ctx.fillRect(0, 0, W, dy);
-    ctx.fillStyle = topColor;
-    ctx.fillRect(0, dy + dh, W, H - dy - dh);
+      // Extend the poster's own edge colors into the horizontal bars.
+      ctx.fillStyle = bottomColor;
+      ctx.fillRect(0, 0, W, dy);
+      ctx.fillStyle = topColor;
+      ctx.fillRect(0, dy + dh, W, H - dy - dh);
+    }
 
     // Re-draw low-res canvas with the new letterboxed image
     lowResCtx.clearRect(0, 0, 64, 96);

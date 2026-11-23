@@ -38,26 +38,25 @@ import {
   COVER_WIDTH,
   COVER_HEIGHT,
   HERO_COVER_SCALE,
-  POSTER_CROP_X,
+  WHITE_CLAMSHELL_POSTER_CROP_X,
   edgeBusyCache,
   posterWorkerPool,
+  posterDecodeMode,
   reflectionProbes,
-  hasRealGameBox,
   gameFaceAspect,
   getMovieOffsets,
   stampStaffPickSticker,
   makePlasticMaterial,
   cropFrontTextureForMedium,
-  applyWhiteBorderShader,
   type CaseFinish,
 } from './video-case';
+import { applyWhiteBorderShader } from './white-border-shader';
 import { isRequestTitle } from './request-title';
 import { stampCollectionGapSticker } from './case-corner-stickers';
 import { getJellyseerrConfig, isDiscoveryRequested } from './jellyseerr';
 import { onProbesReplaced } from './case-env-probes';
 import { uploadTextureNow } from './poster-textures';
 import { BB_ARCHIVO_BLACK } from './bundled-fonts';
-import type { DecodeMode } from './poster-worker';
 
 // Material-array index of the +Z face on the case BoxGeometry, whose face order
 // is [+X, -X, +Y, -Y, +Z, -Z] (video-case.ts names the other three it addresses).
@@ -225,7 +224,7 @@ function buildMaterial(
   // UVs and therefore applies the crop itself), same probe and finish.
   const cropped = (skipCrop || isAnimated) ? null : cropFrontTextureForMedium(s.tex);
   const mat = makePlasticMaterial({ map: cropped ?? s.tex, envMap: env, finish });
-  if (isAnimated) applyWhiteBorderShader(mat, skipCrop ? 0 : POSTER_CROP_X);
+  if (isAnimated) applyWhiteBorderShader(mat, skipCrop ? 0 : WHITE_CLAMSHELL_POSTER_CROP_X);
   s.cropped = cropped;
   s.mat = mat;
   s.variantKey = variantKey(probeIdx, isAnimated, skipCrop, finish);
@@ -289,9 +288,7 @@ export async function requestHeroFrontDetail(
   // The exact mode the shelf decode used for this title (PosterLoadingQueue),
   // and the letterbox decision it already made — see the worker's
   // decodeImageBytes on why that decision is pinned rather than recomputed.
-  const mode: DecodeMode = movie.game
-    ? (hasRealGameBox(movie.platform) ? 'fill' : 'cart')
-    : POSTER_CROP_X > 0 ? 'vhs' : 'crop';
+  const mode = posterDecodeMode(movie);
   try {
     const { highResData } = await posterWorkerPool.decode(
       movie.posterUrl,

@@ -51,10 +51,10 @@ import {
   reflectionProbes,
   makePlasticMaterial,
   cropFrontTextureForMedium,
-  applyWhiteBorderShader,
-  POSTER_CROP_X,
+  WHITE_CLAMSHELL_POSTER_CROP_X,
   type CaseFinish,
 } from './video-case';
+import { applyWhiteBorderShader } from './white-border-shader';
 import { uploadTextureNow, textureArrayManager } from './poster-textures';
 import { onProbesReplaced } from './case-env-probes';
 
@@ -154,7 +154,7 @@ export function getLowResFrontMaterial(
   const env = (probeIdx !== undefined && reflectionProbes[probeIdx]) ? reflectionProbes[probeIdx] : null;
   const cropped = (skipCrop || isAnimated) ? null : cropFrontTextureForMedium(tex);
   const mat = makePlasticMaterial({ map: cropped ?? tex, envMap: env, finish });
-  if (isAnimated) applyWhiteBorderShader(mat, skipCrop ? 0 : POSTER_CROP_X);
+  if (isAnimated) applyWhiteBorderShader(mat, skipCrop ? 0 : WHITE_CLAMSHELL_POSTER_CROP_X);
 
   lowResFrontLRU.set(key, { mat, tex, cropped });
   evictOverflow();

@@ -189,6 +189,7 @@ function rewriteLocalhost(url: string): string {
 }
 
 import { BB_ARCHIVO_BLACK, BB_OUTFIT, BB_ORBITRON } from './bundled-fonts';
+import { applyWhiteBorderShader, whiteClamshellWindowAspect } from './white-border-shader';
 
 // Dimensions in Three.js units (feet)
 // Note: We use a single case geometry for all movies because all Jellyfin
@@ -733,6 +734,19 @@ export let POSTER_CROP_X = Math.max(
   0,
   (1 - (CASE_WIDTH / CASE_HEIGHT) / POSTER_ASPECT) / 2
 );
+// The white family-film clamshell is not the narrow sleeve: its art window is
+// within two percent of the poster's own 2:3, so it shows the WHOLE poster,
+// decoded without bars (posterDecodeMode) and cropped only by the sliver that
+// makes the aspects agree. The sleeve's crop there stretched the art a fifth
+// too wide, and a dropped crop showed it shrunk inside bars on every side.
+export const WHITE_CLAMSHELL_POSTER_CROP_X = Math.max(0, (1 - whiteClamshellWindowAspect() / POSTER_ASPECT) / 2);
+
+/** How a title's cover is fitted at decode (poster-worker.ts). One answer for
+ *  the shelf and the inspected case, so a pickup sharpens, never reframes. */
+export function posterDecodeMode(movie: Movie): DecodeMode {
+  if (movie.game) return hasRealGameBox(movie.platform) ? 'fill' : 'cart';
+  return POSTER_CROP_X > 0 && !isWhiteClamshell(movie, CASE_MEDIUM) ? 'vhs' : 'crop';
+}
 
 // VHS-only clamshell "rim" (GH issue #42). Each shelf slot shows TWO boxes:
 // the Jellyfin retail cover box in front and the rental clamshell
@@ -1854,16 +1868,15 @@ class PosterLoadingQueue {
     this.activeCount++;
     try {
       const url = item.movie.posterUrl!;
-      // GH #93: letterboxing is VHS-only for movies. A game whose real carton
-      // is on file gets 'fill': the case face already IS that carton's aspect,
-      // so contain-fitting could only add bars — and scan sources normalise art
-      // to their own aspect (ScreenScraper hands out square Game Boy fronts),
-      // so filling also pulls the art back to the true box proportions. Only a
-      // platform with no carton on file still contain-fits onto the generic
-      // clamshell ('cart'), where bars beat distorting art onto a wrong shape.
-      const mode: DecodeMode = item.movie.game
-        ? (hasRealGameBox(item.movie.platform) ? 'fill' : 'cart')
-        : POSTER_CROP_X > 0 ? 'vhs' : 'crop';
+      // GH #93: letterboxing is for the narrow VHS sleeve only. A game whose
+      // real carton is on file gets 'fill': the case face already IS that
+      // carton's aspect, so contain-fitting could only add bars — and scan
+      // sources normalise art to their own aspect (ScreenScraper hands out
+      // square Game Boy fronts), so filling also pulls the art back to the true
+      // box proportions. Only a platform with no carton on file still
+      // contain-fits onto the generic clamshell ('cart'), where bars beat
+      // distorting art onto a wrong shape. See posterDecodeMode.
+      const mode = posterDecodeMode(item.movie);
       // 'cart' still needs the target face aspect for its contain-fit.
       const { highResData, lowResData, leftmostColor, edgeBusy } = await posterWorkerPool.decode(
         url, mode, mode === 'cart' ? gameFaceAspect(item.movie.platform) : undefined);
@@ -2128,14 +2141,13 @@ function getPosterMaterial(movieId: string, probeIdx?: number, isAnimated: boole
       ?? (isAnimated ? getAnimatedJellyfinFrontPlaceholderMaterial() : sharedJellyfinFrontPlaceholderMaterial!);
   }
   const env = (probeIdx !== undefined && reflectionProbes[probeIdx]) ? reflectionProbes[probeIdx] : null;
-  // Animated fronts crop inside applyWhiteBorderShader (it samples raw UVs, so a
-  // cropFrontTextureForMedium offset/repeat would be ignored — that's what let
-  // the poster's baked-in left/right letterbox bars show on the hero/hover box).
-  // Pass the uncropped texture and let the border shader apply POSTER_CROP_X.
+  // White clamshell fronts crop inside applyWhiteBorderShader (it samples raw
+  // UVs, so a cropFrontTextureForMedium offset/repeat would be ignored). Pass
+  // the uncropped texture and let the border shader apply the white crop.
   const map = (skipCrop || isAnimated) ? texture : cropFrontTextureForMedium(texture);
   const mat = makePlasticMaterial({ map, envMap: env, finish });
   if (isAnimated) {
-    applyWhiteBorderShader(mat, skipCrop ? 0 : POSTER_CROP_X);
+    applyWhiteBorderShader(mat, skipCrop ? 0 : WHITE_CLAMSHELL_POSTER_CROP_X);
   }
   posterMaterialCache.set(cacheKey, mat);
   return mat;
@@ -4633,60 +4645,6 @@ export function createMovieInstancedMeshes(movie: Movie, count: number, probeIdx
   return { front, back, loadShelfDetails, loadFullDetails, movie };
 }
 
-// cropX: fraction cropped off EACH horizontal side of the sampled art, matching
-// POSTER_CROP_X. This shader samples `texture(map, scaledUv)` with a hand-built
-// UV, which bypasses three's map offset/repeat transform — so a texture cropped
-// via cropFrontTextureForMedium() would NOT be cropped here. Pass the crop in
-// explicitly (front poster only; canvas-drawn backs/spines are authored at the
-// face aspect and pass 0) so the animated hero front doesn't reveal the poster's
-// baked-in left/right letterbox bars that the shelf's instanced shader crops.
-// `borderSide` picks which vertical edge carries the white rim. The retail
-// (Jellyfin) box wants the rim on the front's RIGHT + top + bottom, but on the
-// FLIPPED back the same physical edge reads on the LEFT — pass 'left' there so
-// the border tracks the box's real trimmed edge instead of the spine/hinge.
-export function applyWhiteBorderShader(
-  mat: THREE.MeshStandardMaterial | THREE.MeshPhysicalMaterial,
-  cropX: number = 0,
-  borderSide: 'right' | 'left' = 'right',
-) {
-  const xEdgeCond = borderSide === 'left' ? 'vUv.x < border' : 'vUv.x > 1.0 - border';
-  // Content region is the non-bordered strip: [border, 1] for a left rim,
-  // [0, 1-border] for a right rim. Rescale UVs back to [0,1] before cropX.
-  const xMap = borderSide === 'left'
-    ? '(vUv.x - border) / (1.0 - border)'
-    : 'vUv.x / (1.0 - border)';
-  mat.defines = mat.defines || {};
-  mat.defines.USE_UV = '';
-  mat.onBeforeCompile = (shader) => {
-    shader.vertexShader = `
-      ${shader.vertexShader}
-    `.replace(
-      '#include <uv_vertex>',
-      `
-      vUv = uv;
-      `
-    );
-
-    shader.fragmentShader = `
-      ${shader.fragmentShader}
-    `.replace(
-      '#include <map_fragment>',
-      `
-      float border = 0.04;
-      if (${xEdgeCond} || vUv.y < border || vUv.y > 1.0 - border) {
-        diffuseColor.rgb = vec3(1.0);
-      } else {
-        float cropX = ${cropX.toFixed(6)};
-        vec2 scaledUv = vec2(${xMap}, (vUv.y - border) / (1.0 - 2.0 * border));
-        scaledUv.x = cropX + scaledUv.x * (1.0 - 2.0 * cropX);
-        vec4 mapTexel = texture(map, scaledUv);
-        diffuseColor *= mapTexel;
-      }
-      `
-    );
-  };
-}
-
 function applyWhiteBorderShaderColor(mat: THREE.MeshStandardMaterial | THREE.MeshPhysicalMaterial) {
   mat.defines = mat.defines || {};
   mat.defines.USE_UV = '';
@@ -4897,7 +4855,7 @@ export function initGlobalMaterials() {
     globalFrontMaterialAnimated!.userData.compiledUniformsList = globalFrontMaterialAnimated!.userData.compiledUniformsList || [];
 
     const arrays = posterArrayUniforms(shader);
-    const uPosterCropX = shader.uniforms.uPosterCropX = { value: POSTER_CROP_X };
+    const uPosterCropX = shader.uniforms.uPosterCropX = { value: WHITE_CLAMSHELL_POSTER_CROP_X };
 
     globalFrontMaterialAnimated!.userData.compiledUniformsList.push({
       ...arrays,
@@ -5938,7 +5896,7 @@ export function createProgramWarmupMaterials(
     // High-detail fronts use an explicit cube probe, unlike the scene's IBL.
     for (const envMap of reflectionProbes[probeIdx] ? [null, reflectionProbes[probeIdx]] : [null]) {
       const mat = makePlasticMaterial({ map, finish, envMap, isRentalCase: rental });
-      if (animatedFlavor) applyWhiteBorderShader(mat, skipCrop ? 0 : POSTER_CROP_X);
+      if (animatedFlavor) applyWhiteBorderShader(mat, skipCrop ? 0 : WHITE_CLAMSHELL_POSTER_CROP_X);
       owned.push(mat);
       unmodifiedMaterials.push(mat);
       materialSets.push([mat]);
@@ -5980,13 +5938,15 @@ export function disposeSeriesPanelResources() {
  * initCaseMedium) their uPosterCropX uniform would otherwise stay stale.
  */
 export function refreshPosterCrop() {
-  const apply = (mat: any) => {
+  const apply = (mat: any, crop: number) => {
     mat?.userData?.compiledUniformsList?.forEach((u: any) => {
-      if (u.uPosterCropX) u.uPosterCropX.value = POSTER_CROP_X;
+      if (u.uPosterCropX) u.uPosterCropX.value = crop;
     });
   };
-  apply(globalFrontMaterialRegular);
-  apply(globalFrontMaterialAnimated);
+  apply(globalFrontMaterialRegular, POSTER_CROP_X);
+  // Only white clamshells draw with the animated front, and their window does
+  // not change with the medium (see WHITE_CLAMSHELL_POSTER_CROP_X).
+  apply(globalFrontMaterialAnimated, WHITE_CLAMSHELL_POSTER_CROP_X);
 }
 
 export function updateGlobalMaterialsEnvMap(envMap: THREE.Texture | null) {
