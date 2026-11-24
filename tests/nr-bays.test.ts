@@ -142,3 +142,32 @@ test('short or empty walls repeat only eligible stock and pinned and external st
   assert.deepEqual(wall.sections[0].movies, [a, a, a, a, b, b, b, b]);
   assert.deepEqual(stockNewReleaseBays([], [a], true), { movies: [], sections: [] });
 });
+
+test('a movie owns just one physical section even when most of the wall is spare', () => {
+  for (const runs of [MEASURED_RUNS, [5, 32, 3, 16], [8, 8], [5], []]) {
+    const bays = nrBaysForRuns(runs);
+    for (const count of [1, 2, 8, 20]) {
+      const films = Array.from({ length: count }, (_, i) => film('Title ' + (count - i),
+        { criticRating: i % 3 ? 65 : 95, communityRating: i % 2 ? 7 : 9 }));
+      for (const features of [true, false]) {
+        const wall = stockNewReleaseBays(bays, films, features);
+        const seen = new Set<Movie>();
+        for (const section of wall.sections) {
+          const physical = bays.filter(b => b.startCol <= section.endCol && b.endCol >= section.startCol);
+          const titles = new Set(section.movies ?? [section.movie!]);
+          assert.equal(physical.length, section.type === 'double-feature' ? 2 : 1);
+          if (physical.length === 2) {
+            assert.ok(physical.every(b => b.full && b.runIdx === physical[0].runIdx));
+            assert.equal(physical[0].endCol + 1, physical[1].startCol);
+          }
+          for (const title of titles) {
+            assert.ok(!seen.has(title), title.title + ' already has a display');
+            seen.add(title);
+          }
+        }
+        assert.deepEqual(seen, new Set(films.slice(0, bays.length * 8)));
+        assert.deepEqual([...seen], [...seen].toSorted((a, b) => a.title.localeCompare(b.title, undefined, { numeric: true })));
+      }
+    }
+  }
+});

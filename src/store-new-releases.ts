@@ -71,9 +71,12 @@ export function stockNewReleaseBays(bays: NrBay[], ranked: Movie[], allowFeature
   const remaining = spare - doubles * (2 * tiers - 1);
   const singles = Math.min(features.length - doubles, Math.floor(remaining / (tiers - 1)));
   const plan = planNrBays(bays, doubles, singles);
-  const capacity = plan.doubleStarts.length + plan.superBays.length + plan.regularBays.length * tiers;
-  const faces = movies.length ? Array.from({ length: capacity }, (_, i) => movies[i % movies.length]) : [];
-  faces.sort((a, b) => a.title.localeCompare(b.title, undefined, { sensitivity: 'base', numeric: true }));
+  // Assign titles once, before expanding their facing copies. Sorting a
+  // wall-wide list of repeated copies can spill one title over several dividers.
+  const ordered = [...movies].sort((a, b) =>
+    a.title.localeCompare(b.title, undefined, { sensitivity: 'base', numeric: true }));
+  let regularTitlesLeft = movies.length - plan.doubleStarts.length - plan.superBays.length;
+  let regularBaysLeft = plan.regularBays.length;
 
   const sections: NewReleasesSection[] = [];
   const doubleStarts = new Set(plan.doubleStarts);
@@ -82,12 +85,19 @@ export function stockNewReleaseBays(bays: NrBay[], ranked: Movie[], allowFeature
   for (let i = 0; i < bays.length; i++) {
     const { startCol, endCol } = bays[i];
     if (doubleStarts.has(i)) {
-      sections.push({ type: 'double-feature', movie: faces[next++], startCol, endCol: bays[++i].endCol });
+      sections.push({ type: 'double-feature', movie: ordered[next++], startCol, endCol: bays[++i].endCol });
     } else if (singleBays.has(i)) {
-      sections.push({ type: 'super-feature', movie: faces[next++], startCol, endCol });
+      sections.push({ type: 'super-feature', movie: ordered[next++], startCol, endCol });
     } else {
-      sections.push({ type: 'regular', movies: faces.slice(next, next + tiers), startCol, endCol });
-      next += tiers;
+      // Share distinct titles across the remaining regular bays. Face them
+      // out on this bay's tiers only, in contiguous groups from top to bottom.
+      const count = Math.ceil(regularTitlesLeft / regularBaysLeft);
+      const titles = ordered.slice(next, next + count);
+      const rows = count ? Array.from({ length: tiers }, (_, row) => titles[Math.floor(row * count / tiers)]) : [];
+      sections.push({ type: 'regular', movies: rows, startCol, endCol });
+      next += count;
+      regularTitlesLeft -= count;
+      regularBaysLeft--;
     }
   }
   return { sections, movies };
