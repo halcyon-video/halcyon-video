@@ -1,4 +1,6 @@
 import { JellyfinLibrary, Movie } from '../jellyfin';
+import { activeMediaCutoff } from '../media-release-date';
+import { selectNewReleases } from '../store-new-releases';
 import { createCase } from './flat-case';
 
 export function buildLibraryRows(
@@ -10,13 +12,7 @@ export function buildLibraryRows(
   container.className = 'flat-rows-container';
 
   // 1. New Releases Row
-  // Filter movies that have a dateCreated, sort them desc
-  const moviesWithDate = library.movies.filter(m => m.dateCreated);
-  const sortedNew = [...moviesWithDate].sort((a, b) => {
-    return new Date(b.dateCreated!).getTime() - new Date(a.dateCreated!).getTime();
-  });
-
-  const newReleasesList = sortedNew.length > 0 ? sortedNew.slice(0, 20) : library.movies.slice(0, 20);
+  const newReleasesList = selectNewReleases(library.movies, activeMediaCutoff());
 
   if (newReleasesList.length > 0) {
     const newReleasesRow = createRowElement('New Releases', newReleasesList);

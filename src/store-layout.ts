@@ -1,3 +1,5 @@
+import { movieAddedTime } from './media-release-date.ts';
+export { movieAddedTime } from './media-release-date.ts';
 import { vestibuleFrontHalf } from './vestibule-layout.ts';
 // Store floor-plan constants, shared layout types, and the pure catalog helpers
 // that decide how a library's titles are ordered and categorized on the shelves.
@@ -525,12 +527,7 @@ export function extraCopiesCount(movie: Movie): number {
   return 0;
 }
 
-// New Releases wall sectioning: a title that's highly rated but wasn't picked
-// up by the "recently added" cut still deserves a highlight rather than
-// blending into a single generic shelf row (see buildAllMovieBoxes's
-// highRatedOrderedSlots). Threshold: communityRating >= 8.0 or criticRating >=
-// 85 -- looser than extraCopiesCount's backstock threshold above, since this
-// only decides wall placement, not how much physical stock a slot implies.
+// Rating bonus for extra facing copies on ordinary aisle shelves.
 export function isWallHighlyRated(movie: Movie): boolean {
   const highStars = typeof movie.communityRating === 'number' && movie.communityRating >= 8.0;
   const highRT    = typeof movie.criticRating === 'number'    && movie.criticRating >= 85;
@@ -568,14 +565,6 @@ export const COPY_X_JITTER_RANGE = 0.06;
 // *most deserving* titles (real stores stack multiples of a hot title together).
 // Ranking, per the ticket: new releases first, then highly rated. Fully
 // deterministic (no Math.random) so the same library always fills identically.
-
-// Epoch ms a title was added to the library (its "new release" recency). Titles
-// with no dateCreated sort as oldest (0) so ratings decide among them.
-export function movieAddedTime(movie: Movie): number {
-  if (!movie.dateCreated) return 0;
-  const t = Date.parse(movie.dateCreated);
-  return Number.isFinite(t) ? t : 0;
-}
 
 // Popularity weight for fill ordering — extends extraCopiesCount()/isWallHighlyRated()'s
 // rating idea into a continuous score so ties past recency break by how loved a title is.

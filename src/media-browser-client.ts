@@ -2,7 +2,7 @@ import { invoke } from '@tauri-apps/api/core';
 // Explicit .ts specifier: tests/version-collapse.test.ts loads this module
 // under `node --test`'s type-stripping loader, which can't resolve the bare
 // sibling specifier (same note as media-date-screen.ts).
-import { activeMediaCutoff, titleReleasedBy } from './media-release-date.ts';
+import { activeMediaCutoff, movieAddedTime, titleReleasedBy } from './media-release-date.ts';
 import { HEVC_MAIN_SUPPORTED, HEVC_MAIN10_SUPPORTED } from './playback-capability.ts';
 import type { Movie, MediaStreamInfo, MovieVersion, MediaPlaybackInfo, Episode, JellyfinLibrary, LibrarySummary } from './providers/media-source-provider.ts';
 
@@ -574,6 +574,8 @@ function collapseDuplicateVersions(movies: Movie[], context: string): Movie[] {
       out.push(m);
       continue;
     }
+    // Keep the shelf identity and poster, but count the newest actual import.
+    if (movieAddedTime(m, -Infinity) > movieAddedTime(prior, -Infinity)) prior.dateCreated = m.dateCreated;
     prior.versions = [...(prior.versions ?? []), ...(m.versions ?? [])];
     collapsed++;
   }

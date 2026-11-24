@@ -81,7 +81,6 @@ import {
   UNIT_SIDE_CAPACITY,
   BACK_WALL_UNIT_IDX,
   seededRandom01,
-  isWallHighlyRated,
   LibraryLayout,
   ArrangementId,
   ShelvingUnit,
@@ -125,7 +124,8 @@ import {
   updatedMeshes,
   CLERK_SLEEP_INPUT_MS,
 } from './scene-shared';
-import { nrBaysForRuns, planNrBays } from './store-nr-bays';
+import { nrBaysForRuns } from './store-nr-bays';
+import { selectNewReleases, stockNewReleaseBays } from './store-new-releases';
 import * as shell from './store-shell';
 import * as stock from './store-stock';
 import * as checkout from './store-checkout';
@@ -684,9 +684,7 @@ export class StoreScene {
   // inline request suggestions. Empty without watch history or an integration.
   public staffPickOwned: Movie[] = [];
   public staffPickMovies: Movie[] = [];
-  // New Releases wall composition: `recentlyAddedMovies` fills the "row per
-  // title" sections (recently-added, library-only titles -- see the
-  // constructor); `nrSections` holds the sections for the New Releases wall.
+  // Window posters reuse the actual wall selection, in recency order.
   public recentlyAddedMovies: Movie[] = [];
   public nrSections: NewReleasesSection[] = [];
   // Global ribbon boundary columns (a boundary b sits between cols b-1 and b)
@@ -1298,179 +1296,13 @@ export class StoreScene {
       this.nrTotalCols = this.nrRuns.reduce((n, r) => n + r.cols, 0);
     }
 
-    // Gather all unique movies from all libraries for the New Releases back
-    // wall. Phantom stock — request suggestions, collection gaps, pending
-    // orders — never qualifies: NEW RELEASES advertising a box with no tape
-    // in it is a lie the aisle sticker treatment doesn't excuse.
-    const allMoviesMap = new Map<string, Movie>();
-    this.libraries.forEach((lib) => {
-      if (lib.id === ABOVE_R_LIBRARY_ID) return;
-      lib.movies.forEach((m) => {
-        if (m.discovery || m.collectionGap || m.comingSoon) return;
-        allMoviesMap.set(m.id, m);
-      });
-    });
-    const allMovies = Array.from(allMoviesMap.values());
-    // Media Release Date pin (#42): under a pin, "new" means newest in the
-    // STORE'S timeline — the nearest premiere at or before the rolling cutoff
-    // (the catalog is already filtered to it) — not most recently added to
-    // the server, which would fill the wall with whatever synced last.
-    const nrCutoff = activeMediaCutoff();
-    const nrReleaseKey = (m: Movie): number => {
-      if (m.premiereDate) {
-        const t = Date.parse(m.premiereDate);
-        if (Number.isFinite(t)) return t;
-      }
-      return m.year > 0 ? new Date(m.year, 0, 1).getTime() : 0;
-    };
-    const sortedByDate = [...allMovies].sort((a, b) => {
-      const dateA = nrCutoff ? nrReleaseKey(a) : (a.dateCreated ? new Date(a.dateCreated).getTime() : 0);
-      const dateB = nrCutoff ? nrReleaseKey(b) : (b.dateCreated ? new Date(b.dateCreated).getTime() : 0);
-      if (dateA !== dateB) return dateB - dateA;
-      return b.title.localeCompare(a.title);
-    });
-
-    // Sections ARE the physical bays (store-nr-bays.ts): cut per wall run the
-    // way the divider panels are, so no title ever spans a divider or the
-    // corner. Only complete physical bays enter this ribbon.
-    const nrBays = nrBaysForRuns(this.nrRuns.map(r => r.cols));
-    const numWallSections = nrBays.length;
-    // A regular wall section faces ONE title out across its whole 8-column row,
-    // so the wall wants one candidate per ROW, not per column. Those two counts
-    // only coincided while a section happened to be as tall as it is wide
-    // (6 tiers x 6 cols); at the measured 8 tiers a column-sized slice starves
-    // the wall of genuine new releases and the tail rows fall through to the
-    // catalog backfill below.
-    const nrWallRows = numWallSections * WALL_SHELF_HEIGHTS.length;
-
-    // The New Releases wall is library-only -- Jellyseerr suggestions (and
-    // its own pending-request queue) live on the ordinary shelves as
-    // REQUEST-stickered cases, filtered out of the gather above.
-    const recentlyAddedCandidates = sortedByDate.slice(0, nrWallRows);
-    const newReleaseCandidates: Movie[] = [...recentlyAddedCandidates];
-
-    // Super-featured new releases: rating of 90 or above on Rotten Tomatoes
-    const superFeatureNewReleases = newReleaseCandidates.filter(
-      (m) => typeof m.criticRating === 'number' && m.criticRating >= 90
-    );
-    // Double-featured new releases: critics AND the audience both love it —
-    // the super-feature critic bar (>= 90 RT) plus isWallHighlyRated's
-    // audience bar (communityRating >= 8.0) earns TWO adjacent sections.
-    const doubleFeatureCandidates = superFeatureNewReleases.filter(
-      (m) => typeof m.communityRating === 'number' && m.communityRating >= 8.0
-    );
-    const superFeatureIds = new Set(superFeatureNewReleases.map(m => m.id));
-    const regularNewReleases = newReleaseCandidates.filter(m => !superFeatureIds.has(m.id));
-
-    const recentlyAddedIds = new Set(newReleaseCandidates.map((m) => m.id));
-    const highRatedCandidates = allMovies
-      .filter((m) => !recentlyAddedIds.has(m.id) && isWallHighlyRated(m))
-      .sort((a, b) => (b.communityRating ?? 0) - (a.communityRating ?? 0) || (b.criticRating ?? 0) - (a.criticRating ?? 0));
-
-    // Ensure we leave at least one regular section if there are any regular
-    // movies to show. All feature tiers draw from this shared budget: a
-    // double-feature consumes 2 of numWallSections, a super-feature 1 — so on
-    // a small wall (2-3 sections) at most one double fits and a regular
-    // section always survives.
-    const featureSectionBudget = !wallAllowsFeatureSections() ? 0
-      : (regularNewReleases.length > 0 || highRatedCandidates.length > 0) ? Math.max(0, numWallSections - 1)
-      : numWallSections;
-    // Geometry has the last word on how many doubles fit: each needs two
-    // FULL bays side by side on ONE run (never across the corner).
-    const numDoubleFeaturesToPlace = planNrBays(nrBays, Math.min(
-      doubleFeatureCandidates.length,
-      Math.floor(featureSectionBudget / 2)
-    ), 0).doubleStarts.length;
-    const placedDoubleIds = new Set(
-      doubleFeatureCandidates.slice(0, numDoubleFeaturesToPlace).map(m => m.id)
-    );
-    // Double-qualified titles that didn't fit the budget still meet the
-    // single-section bar, so they compete for the super-feature slots.
-    const singleFeatureCandidates = superFeatureNewReleases.filter(m => !placedDoubleIds.has(m.id));
-    const bayPlan = planNrBays(nrBays, numDoubleFeaturesToPlace, Math.min(
-      singleFeatureCandidates.length,
-      featureSectionBudget - numDoubleFeaturesToPlace * 2
-    ));
-    const numSuperFeaturesToPlace = bayPlan.superBays.length;
-
-    const numRegularSections = bayPlan.regularBays.length;
-    const numRegularRows = numRegularSections * WALL_SHELF_HEIGHTS.length; // one faced-out title per wall tier
-
-    const regularMoviesList = [
-      ...singleFeatureCandidates.slice(numSuperFeaturesToPlace),
-      ...regularNewReleases,
-      ...highRatedCandidates
-    ];
-    // The lists above (recent + highly-rated) can run dry before numRegularRows
-    // is reached, leaving trailing shelf rows with no movie assigned — bare
-    // wall. Backfill from the rest of the catalog (any movie not already
-    // placed) so every row gets stocked whenever the library has enough
-    // titles overall; duplicates across rows are preferred over empty shelf.
-    if (regularMoviesList.length < numRegularRows) {
-      const usedIds = new Set(regularMoviesList.map((m) => m.id));
-      const fillerCandidates = allMovies.filter((m) => !usedIds.has(m.id));
-      for (const m of fillerCandidates) {
-        if (regularMoviesList.length >= numRegularRows) break;
-        regularMoviesList.push(m);
-        usedIds.add(m.id);
-      }
-      // Still short (catalog smaller than the wall itself) — repeat titles
-      // rather than leave shelves bare.
-      let i = 0;
-      while (regularMoviesList.length < numRegularRows && allMovies.length > 0) {
-        regularMoviesList.push(allMovies[i % allMovies.length]);
-        i++;
-      }
-    }
-    const regularMoviesToPlace = regularMoviesList.slice(0, numRegularRows);
-
-    this.nrSections = [];
+    const bays = nrBaysForRuns(this.nrRuns.map(run => run.cols));
+    const wallStock = this.libraries.filter(lib => lib.id !== ABOVE_R_LIBRARY_ID).flatMap(lib => lib.movies);
+    const ranked = selectNewReleases(wallStock, activeMediaCutoff());
+    const wall = stockNewReleaseBays(bays, ranked, wallAllowsFeatureSections());
+    this.nrSections = wall.sections;
+    this.recentlyAddedMovies = wall.movies;
     this.nrSuppressedDividerCols.clear();
-    // Sections go in RIBBON order, each pinned to its bay's global column
-    // range. A double-feature spans two whole adjacent bays of one run as a
-    // single doubled-width display — F8-008: the shelf DIVIDER between its
-    // halves is KEPT (the hit spans both bays, the physical panel stays), so
-    // nrSuppressedDividerCols stays empty and its consumer guards are no-ops.
-    // A super-feature takes every tier of one full bay; a regular section
-    // faces one title per shelf tier across its bay's columns (six copies —
-    // fewer on a trailing partial bay, never spilling into the next).
-    const doubleAt = new Map(bayPlan.doubleStarts.map((b, i) => [b, i]));
-    const superAt = new Map(bayPlan.superBays.map((b, i) => [b, i]));
-    let regMovieIdx = 0;
-    for (let b = 0; b < nrBays.length; b++) {
-      const bay = nrBays[b];
-      const dbl = doubleAt.get(b);
-      const sup = superAt.get(b);
-      if (dbl !== undefined) {
-        this.nrSections.push({ type: 'double-feature', movie: doubleFeatureCandidates[dbl],
-          startCol: bay.startCol, endCol: nrBays[b + 1].endCol });
-        b++;
-      } else if (sup !== undefined) {
-        this.nrSections.push({ type: 'super-feature', movie: singleFeatureCandidates[sup],
-          startCol: bay.startCol, endCol: bay.endCol });
-      } else {
-        const moviesForSection: Movie[] = [];
-        for (let r = 0; r < WALL_SHELF_HEIGHTS.length; r++) {
-          if (regMovieIdx < regularMoviesToPlace.length) {
-            moviesForSection.push(regularMoviesToPlace[regMovieIdx++]);
-          }
-        }
-        this.nrSections.push({ type: 'regular', movies: moviesForSection,
-          startCol: bay.startCol, endCol: bay.endCol });
-      }
-    }
-
-    // Keep the selected stock and feature capacities, but face titles in A–Z ribbon order.
-    const wallTitles = this.nrSections.flatMap(section => section.type === 'regular' ? (section.movies ?? []) : (section.movie ? [section.movie] : []));
-    wallTitles.sort((a, b) => a.title.localeCompare(b.title, undefined, { sensitivity: 'base', numeric: true }));
-    let wallTitleIndex = 0;
-    for (const section of this.nrSections) {
-      if (section.type === 'regular') section.movies = (section.movies ?? []).map(() => wallTitles[wallTitleIndex++]);
-      else section.movie = wallTitles[wallTitleIndex++];
-    }
-
-    // Keep these arrays populated for storefront posters and other features
-    this.recentlyAddedMovies = newReleaseCandidates;
 
     // (Floor plan already computed above, before the NR wall derivation.)
 

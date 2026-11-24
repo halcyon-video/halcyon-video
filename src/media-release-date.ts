@@ -19,6 +19,12 @@
 // guarded localStorage) so the rules unit-test straight under `node --test`
 // (npm run test:releasedate).
 
+/** Library import timestamp shared by catalog merging and shelf ranking. */
+export function movieAddedTime(movie: { dateCreated?: string }, missing = 0): number {
+  const time = Date.parse(movie.dateCreated ?? '');
+  return Number.isFinite(time) ? time : missing;
+}
+
 export const MEDIA_RELEASE_DATE_KEY = 'bb_media_release_date';
 
 export interface MediaReleasePin {

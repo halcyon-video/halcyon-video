@@ -96,3 +96,14 @@ test('same title different year, and series/games, never collapse', () => {
   assert.equal(out.length, 4);
   assert.ok(out.every((m) => m.versions === undefined));
 });
+
+test('a merged film keeps its newest valid import date regardless of which version supplies the shelf box', () => {
+  for (const dates of [['2026-01-01', '2026-10-10'], ['2026-10-10', '2026-01-01'],
+    ['bad date', '2026-10-10'], ['2026-10-10', '']]) {
+    const first = mk('Film', { id: 'first', dateCreated: dates[0] });
+    const alternate = mk('Film (4K)', { id: 'alternate', dateCreated: dates[1] });
+    const [merged] = collapseDuplicateVersions([first, alternate], 'test');
+    assert.equal(merged.id, 'first');
+    assert.equal(merged.dateCreated, '2026-10-10');
+  }
+});

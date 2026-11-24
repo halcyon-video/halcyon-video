@@ -9,6 +9,8 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import type { Movie } from '../src/providers/media-source-provider.ts';
+import { selectNewReleases, stockNewReleaseBays } from '../src/store-new-releases.ts';
 import { nrBaysForRuns, planNrBays } from '../src/store-nr-bays.ts';
 
 // The full-scale corporate store as measured 2026-09-06: left wall 44 cols,
@@ -87,4 +89,56 @@ test('wants are upper bounds — a wall too short for them places fewer', () => 
   assert.deepEqual(plan.doubleStarts, [0]);
   assert.deepEqual(plan.superBays, []);
   assert.deepEqual(plan.regularBays, [2]);
+});
+
+function film(title: string, extra: Partial<Movie> = {}): Movie {
+  return { id: title, title, year: 1990, duration: '', rating: '', overview: '', director: '',
+    actors: [], genres: [], localPath: '', ...extra };
+}
+
+test('personal releases use valid add dates, independent of ratings, premiere or catalog order', () => {
+  const latest = film('Archive find', { tmdbId: 21, dateCreated: '2026-10-03' });
+  const previous = film('Summer premiere', { year: 2026, dateCreated: '2026-10-02', criticRating: 99 });
+  const other = { dateCreated: '2026-10-04' };
+  const items = [previous, film('Undated'), film('Malformed', { dateCreated: 'bad' }),
+    film('Show', { ...other, isSeries: true }), film('Game', { ...other, game: true }),
+    film('Online', { ...other, streaming: true }), film('Suggested', { ...other, discovery: true }),
+    film('Pending', { ...other, comingSoon: true }), film('Missing', { ...other, collectionGap: true }),
+    { ...latest, id: 'another-server', dateCreated: '2026-10-01' }, latest];
+  assert.deepEqual(selectNewReleases(items, null), [latest, previous]);
+  assert.deepEqual(selectNewReleases(items.toReversed(), null), [latest, previous]);
+  assert.deepEqual(selectNewReleases([film('Unknown')], null), []);
+});
+
+test('only the newest titles that fit reach physical bays, then they face out alphabetically', () => {
+  const movies = Array.from({ length: 32 }, (_, i) => film('Title ' + (32 - i), {
+    dateCreated: new Date(Date.UTC(2026, 8, 32 - i)).toISOString(),
+    criticRating: i === 1 || i >= 20 ? 99 : 40,
+    communityRating: i === 1 || i >= 20 ? 9 : 4,
+  }));
+  const ranked = selectNewReleases(movies.toReversed(), null);
+  const wall = stockNewReleaseBays(nrBaysForRuns([48]), ranked, true);
+  assert.equal(wall.sections.filter(s => s.type === 'double-feature').length, 1);
+  assert.deepEqual(wall.movies, movies.slice(0, 20));
+  const faces = wall.sections.flatMap(s => s.movies ?? [s.movie!]);
+  assert.deepEqual([...new Set(faces)], wall.movies.toReversed());
+  assert.deepEqual(faces, faces.toSorted((a, b) => a.title.localeCompare(b.title, undefined, { numeric: true })));
+  assert.deepEqual(stockNewReleaseBays(nrBaysForRuns([8]), ranked, false).movies, movies.slice(0, 8));
+});
+
+test('short or empty walls repeat only eligible stock and pinned and external stores remain browsable', () => {
+  const a = film('A', { dateCreated: '2026-08-01', premiereDate: '1985-01-01' });
+  const b = film('B', { dateCreated: '2026-07-01', premiereDate: '1989-01-01' });
+  const future = film('Later', { premiereDate: '1995-01-01' });
+  assert.deepEqual(selectNewReleases([a, b, future], new Date('1990-01-01')), [b, a]);
+  const online = film('Streaming', { streaming: true, premiereDate: '2026-09-01' });
+  assert.deepEqual(selectNewReleases([online], null), [online]);
+  const game = film('Game', { game: true, year: 0 });
+  assert.deepEqual(selectNewReleases([game], null), [game]);
+  const bays = nrBaysForRuns([8]);
+  assert.deepEqual(stockNewReleaseBays(bays, [], true).sections[0].movies, []);
+  const wall = stockNewReleaseBays(bays, [a, b], false);
+  assert.deepEqual(wall.movies, [a, b]);
+  assert.deepEqual(wall.sections[0].movies, [a, a, a, a, b, b, b, b]);
+  assert.deepEqual(stockNewReleaseBays([], [a], true), { movies: [], sections: [] });
 });
