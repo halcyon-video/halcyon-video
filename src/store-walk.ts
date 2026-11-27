@@ -1,7 +1,7 @@
 import { keyboardOwnedByControl } from './text-entry-focus';
 import { OVERVIEW_POS } from './scene-shared';
 import { mobileStoreActive } from './mobile-store';
-import { constrainWalkObstacles } from './walk-collision';
+import { constrainWalkObstacles, constrainWalkPeople } from './walk-collision';
 import { vestibuleSide, vestibuleStraightSide, clampVestibuleSide, vestibuleBackHalf } from './vestibule-layout';
 // First-person walk-around mode — extracted from StoreScene (three-scene.ts
 // keeps one-line delegating stubs): pointer-lock acquisition, walk clicks
@@ -280,7 +280,9 @@ function constrainWalkStructure(scene: StoreScene, oldX: number, oldZ: number, n
 const walkObstacleBounds = { minX: 0, maxX: 0, minZ: 0, maxZ: 43 };
 
 export function constrainWalkPosition(scene: StoreScene, oldX: number, oldZ: number, newX: number, newZ: number, storeWidth: number, minZ: number): { x: number; z: number } {
-  const structural = constrainWalkStructure(scene, oldX, oldZ, newX, newZ, storeWidth, minZ);
+  let structural = constrainWalkStructure(scene, oldX, oldZ, newX, newZ, storeWidth, minZ);
+  const shoppers = scene.customers?.simulation.people;
+  if (shoppers?.length) structural = constrainWalkPeople(oldX, oldZ, structural.x, structural.z, shoppers, scene._constrainedWalk);
   walkObstacleBounds.maxZ = scene.exterior?.walkFarZ ?? 43;
   walkObstacleBounds.minX = 11 - storeWidth / 2 + 1.5;
   walkObstacleBounds.maxX = 11 + storeWidth / 2 - 1.5;

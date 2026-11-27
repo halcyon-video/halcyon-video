@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { constrainWalkObstacles } from '../src/walk-collision.ts';
+import { constrainWalkObstacles, constrainWalkPeople, SHOPPER_CLEARANCE } from '../src/walk-collision.ts';
 import type { NavRect } from '../src/clerk-nav.ts';
 
 const bin: NavRect = { label: 'fixture:bargain-bin', cx: 0, cz: 0, w: 4, d: 3, yaw: 0 };
@@ -59,4 +59,24 @@ test('recovery from a joined concession cabinet exits the whole angled run', () 
     const x=(out.x-rect.cx)*c-(out.z-rect.cz)*s,z=(out.x-rect.cx)*s+(out.z-rect.cz)*c;
     assert.ok(Math.abs(x)>=rect.w/2+.449 || Math.abs(z)>=rect.d/2+.449);
   }
+});
+
+test('walking straight at a standing shopper stops at arm\'s length', () => {
+  const shopper = { x: 0, z: 0, active: true };
+  let x = -5, z = 0;
+  for (let i = 0; i < 80; i++) { constrainWalkPeople(x, z, x + .1, z, [shopper], out); x = out.x; z = out.z; }
+  assert.ok(Math.abs(Math.hypot(x, z) - SHOPPER_CLEARANCE) < 1e-6);
+});
+test('a glancing step past a shopper slides around instead of stopping', () => {
+  constrainWalkPeople(-1.8, .5, -1.2, .5, [{ x: 0, z: 0, active: true }], out);
+  assert.ok(Math.abs(Math.hypot(out.x, out.z) - SHOPPER_CLEARANCE) < 1e-6);
+  assert.ok(out.x > -1.8);
+});
+test('a shopper on top of the visitor never blocks walking away, and absent shoppers never block', () => {
+  constrainWalkPeople(.2, 0, .4, 0, [{ x: 0, z: 0, active: true }], out);
+  assert.deepEqual(out, { x: .4, z: 0 });
+  constrainWalkPeople(.4, 0, .2, 0, [{ x: 0, z: 0, active: true }], out);
+  assert.deepEqual(out, { x: .4, z: 0 });
+  constrainWalkPeople(-5, 0, 0, 0, [{ x: 0, z: 0, active: false }], out);
+  assert.deepEqual(out, { x: 0, z: 0 });
 });

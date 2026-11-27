@@ -82,3 +82,32 @@ export function constrainWalkObstacles(oldX: number, oldZ: number, newX: number,
   out.x = x; out.z = z;
   return out;
 }
+
+/** How close the walking eye may come to a shopper's centre, in feet. */
+export const SHOPPER_CLEARANCE = 1.5;
+
+// Shoppers are camera-facing sprites standing on the floor, so the rectangle
+// clamp above never sees them and the eye could walk straight into one until
+// the near plane sliced the sprite. Treat each active shopper as a disc of
+// ordinary personal space: a step that would end inside it slides onto its
+// rim. Shoppers keep 1.7 ft from the visitor while they move, so this only
+// matters for one standing still. A
+// step that starts inside (a teleport, a shopper admitted on top of the
+// visitor) may still move away. No allocations in the per-frame path.
+export function constrainWalkPeople(oldX: number, oldZ: number, newX: number, newZ: number,
+  people: readonly { x: number; z: number; active?: boolean }[], out: NavPoint,
+  radius = SHOPPER_CLEARANCE): NavPoint {
+  let x = newX, z = newZ;
+  for (const p of people) {
+    if (p.active === false) continue;
+    const dx = x - p.x, dz = z - p.z, d2 = dx * dx + dz * dz;
+    if (d2 >= radius * radius) continue;
+    const ox = oldX - p.x, oz = oldZ - p.z, od2 = ox * ox + oz * oz;
+    if (d2 >= od2) continue;
+    if (od2 < radius * radius || d2 < 1e-12) { x = oldX; z = oldZ; continue; }
+    const d = Math.sqrt(d2);
+    x = p.x + dx / d * radius; z = p.z + dz / d * radius;
+  }
+  out.x = x; out.z = z;
+  return out;
+}
